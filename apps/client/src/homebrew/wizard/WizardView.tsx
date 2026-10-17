@@ -1,7 +1,7 @@
 /**
- * One wizard, any type: the step list (a column on a laptop, "Step 2 of 7" on a phone), one step's questions, the
- * live preview beside them (one tap away on a phone), and Back / Next. The last step is the review, where the
- * editor's own publish checklist is read back step by step and Publish lives.
+ * One wizard for any type. The step list sits beside one step's questions and a live preview, which is one tap away
+ * on a phone. The last step is the review. It reads the editor's own publish checklist back step by step and holds
+ * Publish.
  *
  * It owns no record state. `RecordDetail` holds the draft, its autosave and the publish action, so the wizard and
  * the full editor are two views of one draft and switching between them loses nothing.
@@ -32,11 +32,11 @@ export type WizardViewProps = Readonly<{
   spells: readonly SpellMembership[];
   /** Everything outstanding before publish: the editor's checklist, the server's verdict behind it. */
   checklist: readonly BlockedReason[];
-  /** Never blocking: the server's "worth checking" notes. */
+  /** The server's warnings, which never block a publish. */
   warnings: readonly HomebrewValidationIssue[];
   stepId: string;
   onStep: (stepId: string) => void;
-  /** Steps the GM has been through; their outstanding answers are pointed at, untouched ones are left alone. */
+  /** Steps the GM has been through. Only these point at their missing answers. */
   visited: ReadonlySet<string>;
   onVisited: (stepId: string) => void;
   /** "Publish" or "Update", or null when there is nothing to put live. */
@@ -210,7 +210,7 @@ export function WizardView(props: WizardViewProps) {
             </span>
             Back to the questions
           </Button>
-          <h3 className="hb-wiz-preview-title">As the table sees it</h3>
+          <h3 className="hb-wiz-preview-title">Preview</h3>
         </div>
         <def.Preview draft={draft} ctx={ctx} recordId={recordId} />
       </aside>
@@ -271,7 +271,7 @@ function ReviewStep({
       {!blocked ? (
         (published ?? (
           <p className="hb-wiz-intro">
-            Everything the game needs is here. Publish it to use it at the table; players see it only once you show it
+            Everything the game needs is here. Publish it to use it at the table. Players see it only after you show it
             to them.
           </p>
         ))
@@ -323,7 +323,7 @@ function ReviewStep({
         </>
       )}
       {warnings.length > 0 && (
-        <Alert tone="info" title="Worth checking">
+        <Alert tone="info" title="Warnings">
           <ul className="hb-warnings">
             {warnings.map((warning, warningIndex) => (
               <li key={`${warning.path.join(".")}-${warningIndex}`}>{warning.message}</li>

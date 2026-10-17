@@ -1,5 +1,5 @@
-/** The monster wizard: who it is (with its challenge rating, which sets the Proficiency Bonus and XP), how it
-    defends, its ability scores, traits, actions, bonus actions, reactions and legendary actions, as a stat block. */
+/** The monster wizard. Its steps follow an SRD stat block from the top line down, and the challenge rating sets
+    the Proficiency Bonus and XP. */
 
 import { useId } from "react";
 import { CREATURE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
@@ -52,7 +52,7 @@ const title = (slug: string) =>
     .map((word, index) => (index > 0 && word === "of" ? word : word ? word[0].toUpperCase() + word.slice(1) : word))
     .join(" ");
 
-/** A key of the stat-block bag the editor doesn't ask, as a wizard question. */
+/** A wizard question for a stat-block bag key that the editor has no field for. */
 const statblockField = (key: string, words: Partial<FieldDef>): FieldDef => ({
   key,
   label: key,
@@ -82,9 +82,9 @@ function ChallengeQuestion({ draft, onDraft, idPrefix }: StepProps) {
   return (
     <div className="hb-field">
       <Field
-        label="Its challenge rating"
+        label="Challenge rating"
         htmlFor={`${idPrefix}-cr`}
-        help="How hard a fight it is for a party of four at that level. It sets the Proficiency Bonus and the XP, as every SRD stat block does."
+        help="The rating says how hard a fight it is for four characters of that level. It sets the Proficiency Bonus and the XP, as in every SRD stat block."
       >
         <Select
           id={`${idPrefix}-cr`}
@@ -122,16 +122,16 @@ function HitPointsQuestion({ draft, onDraft, idPrefix }: StepProps) {
   return (
     <div className="hb-field">
       <Field
-        label="Its Hit Point Dice"
+        label="Hit Point Dice"
         htmlFor={`${idPrefix}-hd`}
-        help={`A ${title(size)} monster rolls d${HIT_DIE_BY_SIZE[size]}s, and adds its Constitution modifier (${signed(modifierOf(con))}) once for each die.`}
+        help={`A ${title(size)} monster rolls d${HIT_DIE_BY_SIZE[size]}s and adds its Constitution modifier (${signed(modifierOf(con))}) once for each die.`}
       >
         <NumberField
           id={`${idPrefix}-hd`}
           value={dice}
           min={1}
           max={60}
-          placeholder="How many dice"
+          placeholder="Number of dice"
           onChange={(next) => {
             if (next !== null) onDraft(withHitDice(draft, next));
           }}
@@ -147,18 +147,18 @@ function HitPointsQuestion({ draft, onDraft, idPrefix }: StepProps) {
 }
 
 const SPEED_WORDS: Readonly<Record<(typeof SPEED_MODES)[number], string>> = {
-  walk: "Walking",
-  fly: "Flying",
-  swim: "Swimming",
-  climb: "Climbing",
-  burrow: "Burrowing"
+  walk: "Walk",
+  fly: "Fly",
+  swim: "Swim",
+  climb: "Climb",
+  burrow: "Burrow"
 };
 
 function SpeedsQuestion({ draft, onDraft, idPrefix }: StepProps) {
   const speeds = speedsOf(draft);
   return (
     <div className="hb-field">
-      <span className="nh-field-label">How it moves</span>
+      <span className="nh-field-label">Speed</span>
       <FieldGrid min="8rem">
         {SPEED_MODES.map((mode) => (
           <Field key={mode} label={SPEED_WORDS[mode]} htmlFor={`${idPrefix}-speed-${mode}`}>
@@ -175,15 +175,9 @@ function SpeedsQuestion({ draft, onDraft, idPrefix }: StepProps) {
         ))}
       </FieldGrid>
       {typeof speeds.fly === "number" && speeds.fly > 0 && (
-        <Switch
-          checked={speeds.hover === true}
-          onChange={(next) => onDraft(withHover(draft, next))}
-          label="It hovers"
-        />
+        <Switch checked={speeds.hover === true} onChange={(next) => onDraft(withHover(draft, next))} label="Hover" />
       )}
-      <p className="nh-field-help">
-        A swimming or climbing speed lets it move that way without spending extra movement.
-      </p>
+      <p className="nh-field-help">With a Climb or Swim Speed, climbing or swimming costs it no extra movement.</p>
     </div>
   );
 }
@@ -196,7 +190,7 @@ function SavesQuestion({ draft, onDraft }: StepProps) {
   return (
     <div className="hb-field">
       <span className="nh-field-label" id={id}>
-        The saving throws it is proficient in
+        Saving throw proficiencies
       </span>
       <div className="hb-chips" role="group" aria-labelledby={id}>
         {ABILITY_IDS.map((ability) => {
@@ -219,7 +213,7 @@ function SavesQuestion({ draft, onDraft }: StepProps) {
         })}
       </div>
       <p className="nh-field-help">
-        A proficient save adds its Proficiency Bonus ({signed(proficiency)}). Most monsters have none or two.
+        A proficient saving throw adds the Proficiency Bonus ({signed(proficiency)}). Most monsters have none or two.
       </p>
     </div>
   );
@@ -237,7 +231,7 @@ function SensesQuestion({ draft, onDraft, idPrefix }: StepProps) {
   const perception = statblockOf(draft).passivePerception;
   return (
     <div className="hb-field">
-      <span className="nh-field-label">What it senses</span>
+      <span className="nh-field-label">Senses</span>
       <FieldGrid min="8rem">
         {SENSES.map((sense) => (
           <Field key={sense} label={SENSE_WORDS[sense]} htmlFor={`${idPrefix}-sense-${sense}`}>
@@ -254,8 +248,8 @@ function SensesQuestion({ draft, onDraft, idPrefix }: StepProps) {
         ))}
       </FieldGrid>
       <p className="nh-field-help">
-        Blindsight sees without eyes, Darkvision sees in darkness as dim light, Tremorsense feels movement through the
-        ground, Truesight sees through illusions and invisibility.
+        Blindsight works without eyes. Darkvision sees darkness as dim light. Tremorsense feels vibrations through the
+        ground. Truesight sees through illusions and invisibility.
         {typeof perception === "number" ? ` Its Passive Perception is ${perception}.` : ""}
       </p>
     </div>
@@ -268,7 +262,7 @@ function AbilityScoresQuestion({ draft, onDraft, idPrefix }: StepProps) {
   const scores = scoresOf(draft);
   return (
     <div className="hb-field">
-      <span className="nh-field-label">Its ability scores</span>
+      <span className="nh-field-label">Ability scores</span>
       <div className="hb-wiz-abilities">
         {ABILITY_IDS.map((ability) => (
           <Field key={ability} label={ABILITY_NAMES[ability]} htmlFor={`${idPrefix}-${ability}`}>
@@ -286,7 +280,7 @@ function AbilityScoresQuestion({ draft, onDraft, idPrefix }: StepProps) {
         ))}
       </div>
       <p className="nh-field-help">
-        10 is a typical person&rsquo;s score. Its saves, skills, Initiative and Hit Points follow these numbers.
+        A typical person has 10 in each. Its saving throws, skills, Initiative and Hit Points follow these numbers.
       </p>
     </div>
   );
@@ -318,7 +312,7 @@ function SkillsQuestion({ draft, onDraft }: StepProps) {
   const tiers = skillTiers(draft);
   const proficiency = proficiencyOf(draft);
   const totals = (statblockOf(draft).skills as Record<string, number> | undefined) ?? {};
-  /** Each tap moves a skill along: not proficient, proficient, Expertise, and back. */
+  /** Each tap moves a skill one step along the cycle from none to proficient to Expertise and back to none. */
   const cycle = (skill: string) => {
     const next = new Map<string, Tier>(tiers);
     const held = tiers.get(skill);
@@ -330,7 +324,7 @@ function SkillsQuestion({ draft, onDraft }: StepProps) {
   return (
     <div className="hb-field">
       <span className="nh-field-label" id={id}>
-        The skills it is proficient in
+        Skill proficiencies
       </span>
       <div className="hb-chips" role="group" aria-labelledby={id}>
         {SKILLS.map((skill) => {
@@ -344,7 +338,7 @@ function SkillsQuestion({ draft, onDraft }: StepProps) {
         })}
       </div>
       <p className="nh-field-help">
-        A proficient skill adds its Proficiency Bonus ({signed(proficiency)}); tap again for Expertise, which adds it
+        A proficient skill adds the Proficiency Bonus ({signed(proficiency)}). Tap again for Expertise, which adds it
         twice, and a third time to clear it.
       </p>
     </div>
@@ -377,27 +371,27 @@ function TraitsQuestion({ draft, onDraft, idPrefix }: StepProps) {
       emptyText="No traits. A trait is always true of it, like Amphibious or Pack Tactics."
       collapsible
       max={12}
-      maxReachedReason="Twelve traits is as many as this stat block holds."
+      maxReachedReason="This stat block holds up to 12 traits."
       ariaLabel="Traits"
       rowLabel={(trait) => trait.name || "Unnamed trait"}
       renderRow={(trait, index) => (
         <FieldGrid>
-          <Field label="Its name" htmlFor={`${idPrefix}-trait-${index}-name`}>
+          <Field label="Name" htmlFor={`${idPrefix}-trait-${index}-name`}>
             <Input
               id={`${idPrefix}-trait-${index}-name`}
               value={trait.name}
-              placeholder="Pack Tactics"
+              placeholder="Amphibious"
               onChange={(event) =>
                 write(traits.map((entry, i) => (i === index ? { ...entry, name: event.target.value } : entry)))
               }
             />
           </Field>
-          <Field label="What it does" htmlFor={`${idPrefix}-trait-${index}-text`} className="nh-fieldgrid-wide">
+          <Field label="Description" htmlFor={`${idPrefix}-trait-${index}-text`} className="nh-fieldgrid-wide">
             <Textarea
               id={`${idPrefix}-trait-${index}-text`}
               rows={3}
               value={trait.description}
-              placeholder="The wolf has Advantage on an attack roll against a creature if at least one of the wolf's allies is within 5 feet of the creature."
+              placeholder="The frog can breathe air and water."
               onChange={(event) =>
                 write(traits.map((entry, i) => (i === index ? { ...entry, description: event.target.value } : entry)))
               }
@@ -413,20 +407,20 @@ function TraitsQuestion({ draft, onDraft, idPrefix }: StepProps) {
 
 const LEGENDARY_RESISTANCE = /^Legendary Resistance \(\d+\/Day/;
 
-/** Legendary Resistance is both the count the engine spends and the trait the stat block prints; they move
- *  together. */
+/** Legendary Resistance is both the count the engine spends and the trait the stat block prints, so the two
+ *  change together. */
 function withLegendaryResistance(draft: Draft, perDay: number | null): Draft {
   const legendary = { ...((draft.legendary as Record<string, unknown> | undefined) ?? {}) };
   if (perDay) legendary.resistancesPerDay = perDay;
   else delete legendary.resistancesPerDay;
-  const creature = (typeof draft.name === "string" && draft.name.trim() ? draft.name.trim() : "creature").toLowerCase();
+  const named = (typeof draft.name === "string" && draft.name.trim() ? draft.name.trim() : "monster").toLowerCase();
   const others = traitsOf(draft).filter((trait) => !LEGENDARY_RESISTANCE.test(trait.name));
   const traits = perDay
     ? [
         ...others,
         {
           name: `Legendary Resistance (${perDay}/Day)`,
-          description: `If the ${creature} fails a saving throw, it can choose to succeed instead.`
+          description: `If the ${named} fails a saving throw, it can choose to succeed instead.`
         }
       ]
     : others;
@@ -454,15 +448,15 @@ function LegendaryQuestion({ draft, onDraft, idPrefix }: StepProps) {
               };
           onDraft(Object.keys(nextLegendary).length > 0 ? { ...cleared, legendary: nextLegendary } : cleared);
         }}
-        label="It takes legendary actions"
+        label="Legendary Actions"
       />
       <p className="nh-field-help">
-        A legendary monster acts again on other creatures&rsquo; turns, spending a few uses each round that come back at
-        the start of its own turn. Turning this off removes its legendary actions.
+        A legendary monster takes extra actions between other turns. Each one costs uses from a pool that refills at the
+        start of its own turn. Switching this off removes its Legendary Actions.
       </p>
       {isLegendary && (
         <Stepper
-          label="Legendary actions each round"
+          label="Uses each round"
           value={legendary?.actionsPerRound ?? 3}
           min={1}
           max={5}
@@ -470,15 +464,14 @@ function LegendaryQuestion({ draft, onDraft, idPrefix }: StepProps) {
         />
       )}
       <Stepper
-        label="Legendary Resistance each day"
+        label="Legendary Resistance per day"
         value={legendary?.resistancesPerDay ?? 0}
         min={0}
         max={6}
         onChange={(perDay) => onDraft(withLegendaryResistance(draft, perDay > 0 ? perDay : null))}
       />
       <p className="nh-field-help">
-        When it fails a saving throw it can succeed instead, this many times between long rests. Most legendary monsters
-        have 3.
+        This many times a day, it can turn a failed saving throw into a success. Most legendary monsters have 3.
       </p>
       {isLegendary && <MonsterActions draft={draft} onDraft={onDraft} activation="legendary" idPrefix={idPrefix} />}
     </div>
@@ -492,47 +485,47 @@ export const MONSTER_WIZARD: WizardDef = {
   steps: [
     {
       id: "identity",
-      title: "Who it is",
-      intro: "Its size, its creature type and its challenge rating are the first line of any stat block.",
+      title: "Identity",
+      intro: "These answers make the first lines of its stat block.",
       owns: ["name", "size", "extensions", "proficiencyBonus", "summary", "token"],
       sections: ["identity"],
       questions: [
         ask("monster", "name", {
-          label: "Its name",
+          label: "Name",
           placeholder: "Ash Hound",
           write: (next, draft) => withName(draft, typeof next === "string" ? next : "")
         }),
         ask("monster", "size", {
-          label: "Its size",
+          label: "Size",
           chips: true,
-          help: "Tiny and Small fit a 5-foot square with others; Large takes 10 feet, Huge 15 and Gargantuan 20 or more.",
+          help: "A Medium monster takes a 5-foot square. Large takes 10 feet, Huge 15 and Gargantuan 20.",
           write: (next, draft) => withSize(draft, (next as ReturnType<typeof sizeOf>) ?? "medium")
         }),
         ask("monster", "type", {
-          label: "Its creature type",
+          label: "Type",
           kind: "select",
           chips: true,
           options: CREATURE_TYPE_IDS.map((id) => opt(id, title(id))),
-          help: "Some rules and spells name a type, like a paladin's Divine Smite against Fiends and Undead.",
+          help: "Some rules name a type, like the extra damage of Divine Smite against a Fiend or an Undead.",
           write: (next, draft) => withIdentity(draft, { type: typeof next === "string" ? next : undefined })
         }),
         statblockField("alignment", {
-          label: "Its alignment",
+          label: "Alignment",
           presets: ALIGNMENTS,
-          placeholder: "Or in your own words",
+          placeholder: "Or type your own",
           write: (next, draft) =>
             withIdentity(draft, { alignment: typeof next === "string" && next.trim() ? next : undefined })
         }),
         { key: "extensions", render: (props) => <ChallengeQuestion {...props} /> },
         ask("monster", "summary", {
-          label: "Its line in the bestiary",
-          help: "Written from your answers above until you change it."
+          label: "Bestiary line",
+          help: "It follows your answers above until you change it."
         })
       ]
     },
     {
       id: "defences",
-      title: "How it defends",
+      title: "Defences",
       owns: [
         "armorClass",
         "hitPoints",
@@ -545,70 +538,70 @@ export const MONSTER_WIZARD: WizardDef = {
       sections: ["defences"],
       questions: [
         ask("monster", "armorClass", {
-          label: "Its Armor Class",
-          help: "10 plus its Dexterity modifier with no armor."
+          label: "Armor Class",
+          help: "With no armor, it is 10 plus its Dexterity modifier."
         }),
-        statblockField("armorDetail", { label: "What gives it that AC", placeholder: "natural armor" }),
+        statblockField("armorDetail", { label: "Armor Class note", placeholder: "natural armor" }),
         {
           key: "armorClass",
           render: (props) => <MonsterBenchmarks draft={props.draft} keys={["armorClass"]} />
         },
         { key: "hitPoints", render: (props) => <HitPointsQuestion {...props} /> },
         ask("monster", "hitPoints.maximum", {
-          label: "Its Hit Points",
-          help: "Set from its Hit Point Dice; change it to set your own."
+          label: "Hit Points",
+          help: "It follows the Hit Point Dice. Type a number to set your own."
         }),
         { key: "hitPoints.formula", render: (props) => <MonsterBenchmarks draft={props.draft} keys={["hitPoints"]} /> },
         { key: "speedFeet", render: (props) => <SpeedsQuestion {...props} /> },
         { key: "savingThrows", render: (props) => <SavesQuestion {...props} /> },
         ask("monster", "damageResistances", {
-          label: "Damage it resists",
+          label: "Resistances",
           help: "It takes half damage of these types."
         }),
         ask("monster", "damageImmunities", {
-          label: "Damage it is immune to",
+          label: "Damage immunities",
           help: "It takes no damage of these types."
         }),
         ask("monster", "damageVulnerabilities", {
-          label: "Damage it is vulnerable to",
+          label: "Vulnerabilities",
           help: "It takes double damage of these types."
         }),
-        ask("monster", "conditionImmunities", { label: "Conditions it is immune to", pick: true }),
+        ask("monster", "conditionImmunities", { label: "Condition immunities", pick: true }),
         { key: "senses", render: (props) => <SensesQuestion {...props} /> },
         statblockField("languages", {
-          label: "The languages it knows",
+          label: "Languages",
           presets: [opt("Common"), opt("Common plus one other language"), opt("Understands Common but can't speak")],
-          placeholder: "Or in your own words"
+          placeholder: "Or type your own"
         })
       ]
     },
     {
       id: "abilities",
-      title: "Its abilities",
+      title: "Ability scores",
       owns: ["abilityScores", "initiativeBonus"],
       sections: ["abilities"],
       questions: [
         { key: "abilityScores", render: (props) => <AbilityScoresQuestion {...props} /> },
         { key: "skills", render: (props) => <SkillsQuestion {...props} /> },
         ask("monster", "initiativeBonus", {
-          label: "Its Initiative bonus",
-          help: "Its Dexterity modifier, which follows its score; raise it for a monster that acts quickly."
+          label: "Initiative bonus",
+          help: "It follows the Dexterity modifier. Raise it for a monster that acts quickly."
         })
       ]
     },
     {
       id: "traits",
-      title: "Its traits",
-      intro: "Traits are always true of it, or true in a situation the trait names. The sheet prints them for you.",
+      title: "Traits",
+      intro:
+        "A trait is always true of it, or true in the situation the trait names. The stat block prints them in order.",
       owns: [],
       sections: [],
       questions: [{ key: "traits", render: (props) => <TraitsQuestion {...props} /> }]
     },
     {
       id: "actions",
-      title: "Its actions",
-      intro:
-        "What it does on its turn: its attacks, a breath or a gaze that forces a saving throw, and a Multiattack that makes several attacks as one action.",
+      title: "Actions",
+      intro: "Its attacks and other actions go here. A Multiattack makes several of them as one action.",
       owns: ["actions"],
       sections: ["actions"],
       questions: [
@@ -628,8 +621,8 @@ export const MONSTER_WIZARD: WizardDef = {
     },
     {
       id: "bonus-actions",
-      title: "Bonus actions",
-      intro: "Something it does as well as its action, like a goblin's Nimble Escape. Most monsters have none.",
+      title: "Bonus Actions",
+      intro: "A Bonus Action comes on top of its action, like the goblin's Nimble Escape. Most monsters have none.",
       owns: [],
       sections: [],
       questions: [
@@ -649,7 +642,7 @@ export const MONSTER_WIZARD: WizardDef = {
     {
       id: "reactions",
       title: "Reactions",
-      intro: "Something it does in answer to a trigger, even on another creature's turn, like a knight's Parry.",
+      intro: "A Reaction answers a trigger, even on another turn, like the knight's Parry.",
       owns: [],
       sections: [],
       questions: [
@@ -668,7 +661,7 @@ export const MONSTER_WIZARD: WizardDef = {
     },
     {
       id: "legendary",
-      title: "Legendary actions",
+      title: "Legendary Actions",
       owns: ["legendary"],
       sections: ["token"],
       questions: [{ key: "legendary", render: (props) => <LegendaryQuestion {...props} /> }]

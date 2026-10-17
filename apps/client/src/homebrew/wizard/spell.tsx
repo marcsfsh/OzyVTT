@@ -1,4 +1,4 @@
-/** The spell wizard: what it is, how it's cast, what it does, how it scales, who can learn it, its text. */
+/** The spell wizard. Its steps follow the spell card from top to bottom, ending with the spell lists and the text. */
 
 import { useEffect, useState } from "react";
 import type { ContentSpellSummary } from "@vtt/domain";
@@ -42,14 +42,14 @@ const rollOf = (draft: Draft) => {
   return typeof roll === "string" ? roll.trim() : "";
 };
 
-/** How the spell reaches its target. One answer, because the engine rolls one or the other. */
+/** One answer, because the engine rolls an attack or a save for a cast and never both. */
 const LANDS: FieldDef = {
   key: "attackRoll",
-  label: "How it reaches its target",
+  label: "Attack roll or saving throw",
   kind: "select",
   chips: true,
-  options: [opt("attack", "An attack roll"), opt("save", "A saving throw"), opt("neither", "Neither, it just works")],
-  help: "An attack roll is against the target's Armor Class; a saving throw is made by the target against your spell save DC.",
+  options: [opt("attack", "An attack roll"), opt("save", "A saving throw"), opt("neither", "Neither")],
+  help: "An attack roll is made against the target's Armor Class. A saving throw is made by the target against your spell save DC. Neither means the spell takes effect with no roll.",
   read: (draft) => (draft.attackRoll === true ? "attack" : hasSave(draft) ? "save" : "neither"),
   write: (next, draft) => {
     if (next === "attack") return { ...draft, attackRoll: true, save: null };
@@ -67,7 +67,7 @@ const LANDS: FieldDef = {
   }
 };
 
-/** A save outcome the editor has no switch for, stored as `true` or left out (the schema's `literal(true)`). */
+/** The schema stores these as `true` or leaves them out, so a switch turned off removes the key. */
 const saveFlag = (key: "repeatSave" | "endsOnDamage", label: string, help: string): FieldDef => ({
   key: `save.${key}`,
   label,
@@ -88,7 +88,7 @@ function RangeQuestion({ draft, onDraft }: StepProps) {
   return (
     <div className="hb-field">
       <span className="nh-field-label" id="hb-wiz-spell-range-label">
-        How far it reaches
+        Range
       </span>
       <div className="hb-chips" role="group" aria-labelledby="hb-wiz-spell-range-label">
         {RANGE_KINDS.map((option) => (
@@ -106,7 +106,7 @@ function RangeQuestion({ draft, onDraft }: StepProps) {
         ))}
       </div>
       {(kind === "feet" || kind === "miles") && (
-        <Field label={kind === "feet" ? "How many feet" : "How many miles"}>
+        <Field label={kind === "feet" ? "Feet" : "Miles"}>
           <NumberField
             value={typeof distance === "number" ? distance : null}
             min={kind === "feet" ? 5 : 1}
@@ -117,8 +117,8 @@ function RangeQuestion({ draft, onDraft }: StepProps) {
         </Field>
       )}
       <p className="nh-field-help">
-        A distance is measured from you. Self is for a spell that comes from you, often in an area such as a cone; Touch
-        is a creature or object you touch.
+        A distance counts from you. A Self spell starts from you, often as an area such as a Cone. A Touch spell needs
+        you to touch the target.
       </p>
     </div>
   );
@@ -126,7 +126,7 @@ function RangeQuestion({ draft, onDraft }: StepProps) {
 
 const HEAL_FORMULA = /^(?:\d+d\d+(?:\s*\+\s*\d+)?|\d+)$/i;
 
-/** Healing is read from the spell's text, so this answer is the healing sentence in it. */
+/** The engine reads a spell's healing from its text, so this answer is the healing sentence in the description. */
 function HealingQuestion({ draft, onDraft }: StepProps) {
   const healing = healingOf(draft);
   const [text, setText] = useState(healing?.formula ?? "");
@@ -138,13 +138,13 @@ function HealingQuestion({ draft, onDraft }: StepProps) {
   return (
     <div className="hb-field">
       <Field
-        label="Hit points it restores"
+        label="Hit Points it restores"
         help={
           malformed
             ? undefined
-            : "Like 2d8. Leave it empty for a spell that heals nothing. The healing is a sentence in the spell's text, as the SRD writes it; this keeps it there."
+            : "Like 2d8. Leave it empty for a spell that heals nothing. The healing is written into the spell's text, where the sheet reads it."
         }
-        error={malformed ? `“${typed}” isn't a roll the sheet can read. Try 2d8, 2d8 + 4 or 10.` : undefined}
+        error={malformed ? `"${typed}" is not a roll the sheet can read. Try 2d8 or 2d8 + 4.` : undefined}
       >
         <Input
           value={text}
@@ -161,12 +161,13 @@ function HealingQuestion({ draft, onDraft }: StepProps) {
         <Switch
           checked={healing.addsModifier}
           onChange={(next) => write(healing.formula, next)}
-          label="Plus your spellcasting ability modifier"
+          label="Add the spellcasting ability modifier"
         />
       )}
       {healing && rollOf(draft) !== "" && (
         <p className="nh-field-help hb-field-error">
-          A spell that heals deals no damage at the table, so its damage roll is ignored. Clear one of them.
+          A spell that restores Hit Points deals no damage at the table, so its damage roll is ignored. Clear one of
+          them.
         </p>
       )}
     </div>
@@ -189,12 +190,12 @@ function ScalingQuestion({ draft, onDraft }: StepProps) {
           checked={scaling.cantripTiers}
           disabled={!rolls}
           onChange={(next) => onDraft(withScaling(draft, { ...scaling, cantripTiers: next }))}
-          label="Its dice grow at levels 5, 11 and 17"
+          label="Dice grow at levels 5, 11 and 17"
         />
         <p className="nh-field-help">
           {rolls
             ? "Every SRD damage cantrip rolls one more die at character levels 5, 11 and 17, like Fire Bolt's 2d10, 3d10 and 4d10."
-            : "Give it damage or healing first; a cantrip that rolls nothing has nothing to grow."}
+            : "Give it damage or healing first, so there is a roll to grow."}
         </p>
       </div>
     );
@@ -205,15 +206,15 @@ function ScalingQuestion({ draft, onDraft }: StepProps) {
   return (
     <div className="hb-field">
       <Field
-        label="Dice it gains for each slot level above its own"
+        label="Extra dice per slot level"
         help={
           malformed
             ? undefined
             : rolls
-              ? "Like Fireball's 1d6: cast with a higher slot, it rolls this many more dice for each level above. Leave it empty if it doesn't grow."
-              : "Give it damage or healing first; this adds to that roll."
+              ? "Fireball adds 1d6 for each spell slot level above 3. Leave it empty for a spell that does not grow."
+              : "Give it damage or healing first, so there is a roll to add to."
         }
-        error={malformed ? `“${typed}” isn't a number of dice. Try 1d6 or 2d8.` : undefined}
+        error={malformed ? `"${typed}" is not a number of dice. Try 1d6 or 2d8.` : undefined}
       >
         <Input
           value={perSlot}
@@ -228,7 +229,7 @@ function ScalingQuestion({ draft, onDraft }: StepProps) {
         />
       </Field>
       <Stepper
-        label="More creatures it can target for each slot level above"
+        label="Extra targets per slot level"
         value={scaling.targetsPerSlot ?? 0}
         min={0}
         max={3}
@@ -252,13 +253,13 @@ function TextHelper({ draft, onDraft }: StepProps) {
       </Button>
       <p className="nh-field-help">
         {generated === ""
-          ? "Answer what it does first, and this writes a first draft in the SRD's words."
-          : "Replaces the text above with a first draft in the SRD's words, built from your answers. Edit it after."}
+          ? "Fill in the effect step first. This then writes a first draft in the SRD's words."
+          : "This replaces the text above with a first draft in the SRD's words. Edit it after."}
       </p>
       {phrase && !textNamesArea(draft) && (
         <p className="nh-field-help hb-field-error">
-          The text doesn&rsquo;t name its area as &ldquo;{phrase}&rdquo;, so the map can&rsquo;t draw its template. Say
-          it that way, or write it from your answers.
+          The text does not name its area as "{phrase}", so the map cannot draw its template. Say it that way, or write
+          it from your answers.
         </p>
       )}
     </div>
@@ -272,34 +273,34 @@ export const SPELL_WIZARD: WizardDef = {
   steps: [
     {
       id: "identity",
-      title: "What it is",
-      intro: "Every spell has a level from 0 to 9 and belongs to one of the eight schools of magic.",
+      title: "Name and level",
+      intro: "Every spell has a level from 0 to 9 and a school of magic.",
       owns: ["name", "level", "school"],
       sections: ["basics"],
       questions: [
-        ask("spell", "name", { label: "Its name", placeholder: "Ember Coil" }),
+        ask("spell", "name", { label: "Name", placeholder: "Ember Coil" }),
         ask("spell", "level", {
-          label: "Its level",
-          help: "0 is a cantrip, cast at will. A spell of level 1 to 9 takes a spell slot of that level or higher.",
+          label: "Level",
+          help: "Level 0 is a cantrip, cast at will. A spell of level 1 or higher needs a spell slot of its level or higher.",
           write: (next, draft) => rescaled(draft, { ...draft, level: next })
         }),
         ask("spell", "school", {
-          label: "Its school of magic",
+          label: "School of magic",
           kind: "select",
           chips: true,
           options: SCHOOLS,
-          help: "Abjuration protects, Conjuration summons and transports, Divination reveals, Enchantment charms, Evocation unleashes energy, Illusion deceives, Necromancy commands life and death, Transmutation changes things."
+          help: "The school is the kind of magic, like Evocation for Fireball. A few features name a school."
         })
       ]
     },
     {
       id: "casting",
-      title: "How it's cast",
+      title: "Casting",
       owns: ["castingTime", "reactionCondition", "range", "components", "duration", "concentration", "ritual"],
       sections: ["casting"],
       questions: [
         ask("spell", "castingTime", {
-          label: "How long it takes to cast",
+          label: "Casting time",
           presets: [
             opt("Action"),
             opt("Bonus Action"),
@@ -310,20 +311,20 @@ export const SPELL_WIZARD: WizardDef = {
             opt("8 hours")
           ],
           placeholder: "Or a time of your own",
-          help: "Most spells take an Action. A spell of a minute or longer takes your action on each turn of it."
+          help: "Most spells take an Action. A spell of 1 minute or longer needs the Magic action on each turn of its casting."
         }),
         ask("spell", "reactionCondition", {
-          label: "What sets it off",
-          help: "A Reaction spell says when you can cast it, as the SRD's Shield does."
+          label: "Trigger",
+          help: "A Reaction spell says when it can be cast, as Shield does when you are hit by an attack roll."
         }),
         { key: "range", render: (props) => <RangeQuestion {...props} /> },
-        ask("spell", "components.verbal", { label: "It needs spoken words (V)" }),
-        ask("spell", "components.somatic", { label: "It needs a gesture (S)" }),
-        ask("spell", "components.material", { label: "It needs a material (M)" }),
-        ask("spell", "components.materialText", { label: "Which material", placeholder: "a pinch of sulfur" }),
-        ask("spell", "components.materialConsumed", { label: "The spell uses the material up" }),
+        ask("spell", "components.verbal", { label: "Verbal (V)", help: "The caster speaks." }),
+        ask("spell", "components.somatic", { label: "Somatic (S)", help: "The caster gestures." }),
+        ask("spell", "components.material", { label: "Material (M)", help: "The caster holds an object or a focus." }),
+        ask("spell", "components.materialText", { label: "Material", placeholder: "a pinch of sulfur" }),
+        ask("spell", "components.materialConsumed", { label: "The spell consumes it" }),
         ask("spell", "duration", {
-          label: "How long it lasts",
+          label: "Duration",
           presets: [
             opt("Instantaneous"),
             opt("1 round"),
@@ -336,34 +337,33 @@ export const SPELL_WIZARD: WizardDef = {
           placeholder: "Or a time of your own"
         }),
         ask("spell", "concentration", {
-          label: "It needs Concentration",
-          help: "You can concentrate on one spell at a time, and taking damage can end it."
+          label: "Concentration",
+          help: "A caster concentrates on one spell at a time, and taking damage can end it."
         }),
         ask("spell", "ritual", {
-          label: "It can be cast as a Ritual",
-          help: "A Ritual takes 10 minutes longer and needs no spell slot."
+          label: "Ritual",
+          help: "A Ritual takes 10 minutes longer to cast and needs no spell slot."
         })
       ]
     },
     {
       id: "effect",
-      title: "What it does",
-      intro:
-        "Answer the parts the game rolls: how it reaches its target, what it deals or restores, and what it leaves on a target that fails its save.",
+      title: "Effect",
+      intro: "These are the parts the game rolls when the spell is cast. The text step says the rest.",
       owns: ["attackRoll", "save", "damage", "target", "shape"],
       sections: ["effect"],
       questions: [
         LANDS,
-        ask("spell", "save.ability", { label: "Which saving throw", chips: true, visibleWhen: hasSave }),
+        ask("spell", "save.ability", { label: "Saving throw", chips: true, visibleWhen: hasSave }),
         ask("spell", "save.successDamage", {
-          label: "A target that succeeds takes",
+          label: "On a successful save",
           chips: true,
           options: [opt("half", "Half damage"), opt("none", "No damage")],
           visibleWhen: hasSave
         }),
         ask("spell", "save.failureConditions", {
-          label: "A target that fails also has",
-          help: "The condition lasts as long as the spell, unless you say how it ends below.",
+          label: "On a failed save, the target also has",
+          help: "The condition lasts as long as the spell, unless a switch below ends it sooner.",
           visibleWhen: hasSave
         }),
         saveFlag(
@@ -371,72 +371,73 @@ export const SPELL_WIZARD: WizardDef = {
           "It repeats the save at the end of each of its turns",
           "A success ends the condition on it, as with Hold Person."
         ),
-        saveFlag("endsOnDamage", "Taking damage ends it early", "As with Sleep's Unconscious condition."),
+        saveFlag("endsOnDamage", "Taking damage ends it early", "Sleep's Unconscious condition ends this way."),
         ask("spell", "damage.roll", {
-          label: "Damage it deals",
+          label: "Damage",
           placeholder: "8d6",
           emptyValue: "null",
-          help: "Like 8d6. Leave it empty for a spell that deals none.",
+          help: "Leave it empty for a spell with no damage.",
           write: (next, draft) => rescaled(draft, setAt(draft, "damage.roll", next))
         }),
         ask("spell", "damage.types", {
-          label: "Its damage type",
-          help: "Two types for a spell like Ice Knife; the first is the one the roll deals.",
+          label: "Damage type",
+          help: "A spell like Ice Knife deals two types. The roll deals the first one.",
           visibleWhen: (draft) => rollOf(draft) !== ""
         }),
         { key: "healing", render: (props) => <HealingQuestion {...props} /> },
         ask("spell", "target.type", {
-          label: "What it targets",
+          label: "Target",
           chips: true,
           placeholder: undefined
         }),
         ask("spell", "target.count", {
-          label: "How many",
+          label: "Number of targets",
           visibleWhen: (draft) => {
             const type = getAt(draft, "target.type");
             return type === "creature" || type === "object";
           }
         }),
-        ask("spell", "shape.type", { label: "The shape of its area", chips: true, visibleWhen: isArea }),
+        ask("spell", "shape.type", { label: "Area shape", chips: true, visibleWhen: isArea }),
         ask("spell", "shape.size", {
-          label: "Its size",
-          help: "A sphere's radius; a cone's or a line's length; a cube's side.",
+          label: "Area size",
+          help: "A Sphere's radius or a Cube's side. For a Cone or a Line, its length.",
           visibleWhen: isArea
         })
       ]
     },
     {
       id: "scaling",
-      title: "How it scales",
-      intro: "Cast with a higher spell slot, many spells do more. A cantrip grows with the caster's level instead.",
+      title: "At higher levels",
+      intro:
+        "A spell cast with a higher spell slot often does more. A cantrip grows with the caster's character level.",
       owns: ["castingOptions", "higherLevel"],
       sections: ["effect"],
       questions: [
         { key: "castingOptions", render: (props) => <ScalingQuestion {...props} /> },
         ask("spell", "higherLevel", {
-          label: "In its own words",
-          help: "Written for you from the answers above; change it if the spell does something more."
+          label: "At Higher Levels text",
+          help: "It follows your answers above. Change it if the spell does more."
         })
       ]
     },
     {
       id: "lists",
-      title: "Who can learn it",
-      intro: "A class can learn the spells on its spell list. Naming a list here puts the spell on it.",
+      title: "Spell lists",
+      intro: "A class learns the spells on its spell list. Naming a list here adds the spell to it.",
       owns: ["classes"],
       sections: ["lists"],
-      questions: [ask("spell", "classes", { label: "The spell lists it is on" })]
+      questions: [ask("spell", "classes", { label: "Spell lists" })]
     },
     {
       id: "text",
-      title: "Its text",
-      intro: "The text is what players read on the spell card. Healing and the map's template are read from it.",
+      title: "Spell text",
+      intro: "Players read this on the spell card. The sheet reads healing from it, and the map reads the area.",
       owns: ["description", "attribution"],
       sections: ["basics"],
       questions: [
-        ask("spell", "description", { label: "What the spell says", help: undefined }),
+        ask("spell", "description", { label: "Spell text", help: undefined }),
         { key: "description", render: (props) => <TextHelper {...props} /> },
-        ask("spell", "attribution", { label: "Where it came from" })
+        ask("spell", "attribution", { label: "Source" })
       ]
     }
   ],

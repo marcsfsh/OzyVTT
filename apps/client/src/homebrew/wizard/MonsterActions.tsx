@@ -1,10 +1,8 @@
 /**
- * The stat block's action composer: one list per timing (actions, bonus actions, reactions, legendary actions), each
- * action built by kind. An attack asks reach or range, its bonus, its damage and what a hit leaves on the target; a
- * saving throw asks the ability, the DC, who it reaches and what a failure does; a Multiattack names the attacks it
- * makes. Every number it suggests is the SRD's own arithmetic on this monster's scores (Proficiency Bonus plus the
- * ability; 8 plus both for a DC). The text is written from the answers, in the SRD's words, until the GM writes
- * their own.
+ * The stat block's action composer. It keeps one list per timing and builds each action by kind. An attack has
+ * reach or range, a bonus, damage and what a hit does to the target. A saving throw has an ability, a DC, a target
+ * and what a failure does. A Multiattack names the attacks it makes. Each suggested number is the SRD's arithmetic
+ * on this monster's scores, and the text follows the answers in the SRD's words until the GM edits it.
  */
 
 import { useId } from "react";
@@ -43,10 +41,10 @@ import {
 } from "./monster-actions";
 
 const KIND_WORDS: Readonly<Record<ActionKind, string>> = {
-  attack: "An attack",
-  save: "A saving throw",
+  attack: "Attack",
+  save: "Saving throw",
   multiattack: "Multiattack",
-  other: "Something else"
+  other: "Other"
 };
 
 const KINDS_FOR: Readonly<Record<Activation, readonly ActionKind[]>> = {
@@ -59,8 +57,8 @@ const KINDS_FOR: Readonly<Record<Activation, readonly ActionKind[]>> = {
 const CONDITIONS = SaveConditionSchema.options;
 const titleCase = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1);
 
-const creatureWord = (draft: Draft) =>
-  (typeof draft.name === "string" && draft.name.trim() ? draft.name.trim() : "creature").toLowerCase();
+const nameWord = (draft: Draft) =>
+  (typeof draft.name === "string" && draft.name.trim() ? draft.name.trim() : "monster").toLowerCase();
 
 /** The other lists' rows stay where they were; this list's rows take their place in its own order. */
 function mergeTiming(all: readonly MonsterAction[], activation: Activation, next: readonly MonsterAction[]) {
@@ -139,7 +137,7 @@ export function MonsterActions({
 }: Readonly<{ draft: Draft; onDraft: (next: Draft) => void; activation: Activation; idPrefix: string }>) {
   const all = actionsOf(draft);
   const rows = all.filter((action) => activationOf(action) === activation);
-  const creature = creatureWord(draft);
+  const creature = nameWord(draft);
 
   const commit = (next: readonly MonsterAction[]) => {
     const merged = mergeTiming(all, activation, next);
@@ -160,32 +158,32 @@ export function MonsterActions({
       }}
       addLabel={
         activation === "bonus-action"
-          ? "Add a bonus action"
+          ? "Add a Bonus Action"
           : activation === "reaction"
-            ? "Add a reaction"
+            ? "Add a Reaction"
             : activation === "legendary"
-              ? "Add a legendary action"
+              ? "Add a Legendary Action"
               : "Add an action"
       }
       emptyText={
         activation === "action"
           ? "No actions yet. Most monsters have at least one attack."
           : activation === "bonus-action"
-            ? "No bonus actions. Most monsters have none."
+            ? "No Bonus Actions. Most monsters have none."
             : activation === "reaction"
-              ? "No reactions. Most monsters have none."
-              : "No legendary actions yet."
+              ? "No Reactions. Most monsters have none."
+              : "No Legendary Actions yet."
       }
       collapsible
       max={activation === "action" ? 12 : 6}
-      maxReachedReason="That is as many as one list of a stat block holds here."
+      maxReachedReason={`This list holds up to ${activation === "action" ? 12 : 6} entries.`}
       ariaLabel={
         activation === "bonus-action"
-          ? "Bonus actions"
+          ? "Bonus Actions"
           : activation === "reaction"
             ? "Reactions"
             : activation === "legendary"
-              ? "Legendary actions"
+              ? "Legendary Actions"
               : "Actions"
       }
       rowLabel={(action) => (typeof action.name === "string" && action.name ? action.name : "Unnamed action")}
@@ -230,14 +228,14 @@ function ActionBuilder({
     <div className="hb-monster-action">
       {kinds.length > 1 && (
         <ChipGroup
-          label="What it is"
+          label="Kind"
           id={`${autoId}-kind`}
           options={kinds.map((value) => ({ value, label: KIND_WORDS[value] }))}
           value={kind}
           onChange={(next) => onKind(next as ActionKind)}
         />
       )}
-      <Field label="Its name" htmlFor={`${idPrefix}-name`}>
+      <Field label="Name" htmlFor={`${idPrefix}-name`}>
         <Input
           id={`${idPrefix}-name`}
           value={typeof action.name === "string" ? action.name : ""}
@@ -255,19 +253,19 @@ function ActionBuilder({
 
       {kind !== "multiattack" && activation !== "reaction" && (
         <ChipGroup
-          label="How often it can"
+          label="Uses"
           id={`${autoId}-usage`}
           options={USAGES.map((usage) => ({ value: usage.value, label: usage.label }))}
           value={usageOf(action)}
           onChange={(next) => onChange(withUsage(action, next as (typeof USAGES)[number]["value"]))}
-          help="Recharge rolls a d6 at the start of its turn; 5-6 brings it back on a 5 or 6. A day is a long rest."
+          help="At the start of its turn, it rolls a d6 for each spent Recharge action. Recharge 5-6 comes back on a 5 or 6. Uses per day come back after a Long Rest."
         />
       )}
 
       {activation === "legendary" && (
         <>
           <Stepper
-            label="Legendary actions it costs"
+            label="Cost in uses"
             value={(action.legendary as { cost?: number } | undefined)?.cost ?? 1}
             min={1}
             max={3}
@@ -279,19 +277,19 @@ function ActionBuilder({
               const { oncePerRound: _once, ...legendary } = (action.legendary as Record<string, unknown>) ?? {};
               set({ legendary: next ? { ...legendary, oncePerRound: true } : legendary });
             }}
-            label="It can't take this one again until the start of its next turn"
+            label="Once per round"
           />
         </>
       )}
 
       {activation !== "reaction" && (
         <Field
-          label="What the stat block says"
+          label="Stat block text"
           htmlFor={`${idPrefix}-text`}
           help={
             kind === "other"
-              ? "Say what it does; the GM reads it at the table."
-              : "Written from your answers, in the SRD's words, until you change it."
+              ? "Describe what it does. The GM reads it at the table."
+              : "It follows your answers in the SRD's words until you change it."
           }
         >
           <Textarea
@@ -360,12 +358,12 @@ function AttackAnswers({
   return (
     <>
       <ChipGroup
-        label="How it attacks"
+        label="Attack type"
         id={`${autoId}-way`}
         options={[
-          { value: "melee", label: "In melee" },
-          { value: "ranged", label: "At range" },
-          { value: "both", label: "Either" }
+          { value: "melee", label: "Melee" },
+          { value: "ranged", label: "Ranged" },
+          { value: "both", label: "Melee or Ranged" }
         ]}
         value={way}
         onChange={(next) =>
@@ -375,7 +373,7 @@ function AttackAnswers({
             rangeNormalFeet: next === "melee" ? undefined : (attack.rangeNormalFeet ?? (next === "both" ? 20 : 80))
           })
         }
-        help="A thrown spear is either: reach 5 feet, or range 20/60."
+        help="Melee or Ranged suits a thrown weapon, like a spear with reach 5 ft. and range 20/60 ft."
       />
       <FieldGrid min="9rem">
         {melee && (
@@ -417,9 +415,9 @@ function AttackAnswers({
       </FieldGrid>
 
       <Field
-        label="Its attack bonus"
+        label="Attack bonus"
         htmlFor={`${idPrefix}-bonus`}
-        help={`The SRD's arithmetic: Proficiency Bonus ${signed(proficiency)} plus Strength ${signed(modifierOf(scores.str))} is ${signed(attackBonusFor(proficiency, modifierOf(scores.str)))}; with Dexterity ${signed(modifierOf(scores.dex))} it is ${signed(attackBonusFor(proficiency, modifierOf(scores.dex)))}.`}
+        help={`Proficiency Bonus ${signed(proficiency)} plus Strength ${signed(modifierOf(scores.str))} is ${signed(attackBonusFor(proficiency, modifierOf(scores.str)))}. With Dexterity ${signed(modifierOf(scores.dex))}, it is ${signed(attackBonusFor(proficiency, modifierOf(scores.dex)))}.`}
       >
         <NumberField
           id={`${idPrefix}-bonus`}
@@ -434,12 +432,12 @@ function AttackAnswers({
       <DamageParts
         parts={parts}
         idPrefix={idPrefix}
-        hint={`Add the ability it attacks with: Strength ${signed(modifierOf(scores.str))}, Dexterity ${signed(modifierOf(scores.dex))}. Like 1d8 + 3.`}
+        hint={`The damage adds the modifier of the ability it attacks with, Strength ${signed(modifierOf(scores.str))} or Dexterity ${signed(modifierOf(scores.dex))}.`}
         onChange={(next) => onChange({ ...action, damage: next })}
       />
 
       <ConditionChips
-        label="A hit also gives the target"
+        label="On a hit, the target also has"
         id={`${autoId}-onhit`}
         chosen={riderConditions}
         onChange={(conditions) =>
@@ -452,7 +450,7 @@ function AttackAnswers({
             <Field
               label="Escape DC"
               htmlFor={`${idPrefix}-escape`}
-              help={`8 plus its Proficiency Bonus and Strength is ${8 + proficiency + modifierOf(scores.str)}.`}
+              help={`8 plus its Proficiency Bonus and Strength modifier is ${8 + proficiency + modifierOf(scores.str)}.`}
             >
               <NumberField
                 id={`${idPrefix}-escape`}
@@ -469,7 +467,7 @@ function AttackAnswers({
               />
             </Field>
           )}
-          <Field label="Only on a target this size or smaller" htmlFor={`${idPrefix}-size`}>
+          <Field label="Largest target size" htmlFor={`${idPrefix}-size`}>
             <Select
               id={`${idPrefix}-size`}
               value={rider?.maxTargetSize ?? ""}
@@ -498,12 +496,12 @@ function AttackAnswers({
 /* ------------------------------------------------------------ saving throws ---- */
 
 const AREA_SHAPES: ReadonlyArray<Readonly<{ value: string; label: string }>> = [
-  { value: "one", label: "One creature" },
-  { value: "cone", label: "A cone" },
-  { value: "line", label: "A line" },
-  { value: "sphere", label: "A sphere" },
-  { value: "emanation", label: "An emanation" },
-  { value: "cube", label: "A cube" }
+  { value: "one", label: "One target" },
+  { value: "cone", label: "Cone" },
+  { value: "line", label: "Line" },
+  { value: "sphere", label: "Sphere" },
+  { value: "emanation", label: "Emanation" },
+  { value: "cube", label: "Cube" }
 ];
 
 function SaveAnswers({
@@ -528,16 +526,16 @@ function SaveAnswers({
   return (
     <>
       <ChipGroup
-        label="Which saving throw"
+        label="Saving throw"
         id={`${autoId}-ability`}
         options={ABILITY_IDS.map((ability) => ({ value: ability, label: ABILITY_NAMES[ability] }))}
         value={save.ability}
         onChange={(next) => setSave({ ability: next })}
       />
       <Field
-        label="Its DC"
+        label="DC"
         htmlFor={`${idPrefix}-dc`}
-        help={`The SRD's arithmetic: 8 plus its Proficiency Bonus plus the ability it uses, like Constitution for a breath (${suggested("con")}) or Charisma for a spell (${suggested("cha")}).`}
+        help={`The DC is 8 plus its Proficiency Bonus and the modifier of the ability it uses. That is ${suggested("con")} with Constitution for a breath, or ${suggested("cha")} with Charisma for a spell.`}
       >
         <NumberField
           id={`${idPrefix}-dc`}
@@ -548,7 +546,7 @@ function SaveAnswers({
         />
       </Field>
       <ChipGroup
-        label="Who it reaches"
+        label="Target"
         id={`${autoId}-target`}
         options={AREA_SHAPES}
         value={target.kind === "one" ? "one" : target.shape}
@@ -566,19 +564,19 @@ function SaveAnswers({
             )
           )
         }
-        help="An area is drawn on the map as a template when the action is used."
+        help="When the monster uses the action, the map shows the area as a template."
       />
       <Field
         label={
           target.kind === "one"
-            ? "Within how many feet"
+            ? "Range"
             : target.shape === "sphere"
-              ? "Its radius"
+              ? "Radius"
               : target.shape === "cube"
-                ? "Its side"
+                ? "Side"
                 : target.shape === "emanation"
-                  ? "How far it reaches from the monster"
-                  : "Its length"
+                  ? "Distance from the monster"
+                  : "Length"
         }
         htmlFor={`${idPrefix}-size`}
       >
@@ -601,12 +599,12 @@ function SaveAnswers({
       <DamageParts
         parts={partsOf(action)}
         idPrefix={idPrefix}
-        hint="Like 4d10. Leave it empty for a save that deals no damage."
+        hint="Leave it empty for a saving throw with no damage."
         onChange={(next) => onChange({ ...action, damage: next })}
       />
       {partsOf(action).length > 0 && (
         <ChipGroup
-          label="A target that succeeds takes"
+          label="On a successful save"
           id={`${autoId}-success`}
           options={[
             { value: "half", label: "Half damage" },
@@ -617,7 +615,7 @@ function SaveAnswers({
         />
       )}
       <ConditionChips
-        label="A target that fails also has"
+        label="On a failed save, the target also has"
         id={`${autoId}-fail`}
         chosen={save.failureConditions ?? []}
         onChange={(failureConditions) => setSave({ failureConditions })}
@@ -645,7 +643,7 @@ function MultiattackAnswers({
   const setPlan = (next: Component[]) => onChange({ ...action, multiattack: next });
 
   if (usable.length === 0)
-    return <p className="nh-field-help">Add the attacks it makes first; a Multiattack names them.</p>;
+    return <p className="nh-field-help">A Multiattack names other actions. Add those actions first.</p>;
 
   return (
     <RowEditor
@@ -653,11 +651,11 @@ function MultiattackAnswers({
       onChange={(next) => setPlan([...next])}
       rowKey={(component) => `${component.actionId}-${plan.indexOf(component)}`}
       onAdd={(): Component => ({ actionId: String(usable[0].id), count: 1 })}
-      addLabel="Add an attack to it"
-      emptyText="It makes no attacks yet."
+      addLabel="Add an attack"
+      emptyText="No attacks yet."
       max={6}
-      maxReachedReason="Six is as many as a Multiattack names."
-      ariaLabel="What the Multiattack makes"
+      maxReachedReason="A Multiattack here names up to 6 attacks."
+      ariaLabel="Multiattack attacks"
       rowLabel={(component) => {
         const found = usable.find((candidate) => candidate.id === component.actionId);
         return `${component.count} × ${found ? nameOf(found) : "an action"}`;
@@ -669,7 +667,7 @@ function MultiattackAnswers({
         return (
           <div className="hb-monster-action">
             <FieldGrid min="10rem">
-              <Field label="It makes">
+              <Field label="Attack">
                 <Select
                   value={component.actionId}
                   onChange={(event) =>
@@ -683,18 +681,12 @@ function MultiattackAnswers({
                   ))}
                 </Select>
               </Field>
-              <Stepper
-                label="How many times"
-                value={component.count}
-                min={1}
-                max={6}
-                onChange={(count) => put({ count })}
-              />
+              <Stepper label="Times" value={component.count} min={1} max={6} onChange={(count) => put({ count })} />
             </FieldGrid>
             {alternatives.length > 0 && (
               <div className="hb-field">
-                <span className="nh-field-label">Or any of these in its place</span>
-                <div className="hb-chips" role="group" aria-label="Or any of these in its place">
+                <span className="nh-field-label">Or one of these in its place</span>
+                <div className="hb-chips" role="group" aria-label="Or one of these in its place">
                   {alternatives.map((candidate) => {
                     const on = component.or?.includes(String(candidate.id)) ?? false;
                     return (
@@ -741,11 +733,11 @@ function ReactionAnswers({
   const response = parsed?.[2] ?? (parsed ? "" : description);
   const write = (nextTrigger: string, nextResponse: string) =>
     onChange({ ...action, description: `_Trigger:_ ${nextTrigger.trim()} _Response:_ ${nextResponse.trim()}`.trim() });
-  const creature = creatureWord(draft);
+  const creature = nameWord(draft);
   const parry = /adds (\d+) to its AC against that attack/i.exec(response);
   return (
     <>
-      <Field label="What sets it off" htmlFor={`${idPrefix}-trigger`}>
+      <Field label="Trigger" htmlFor={`${idPrefix}-trigger`}>
         <Input
           id={`${idPrefix}-trigger`}
           value={trigger}
@@ -753,11 +745,11 @@ function ReactionAnswers({
           onChange={(event) => write(event.target.value, response)}
         />
       </Field>
-      <Field label="What it does" htmlFor={`${idPrefix}-response`}>
+      <Field label="Response" htmlFor={`${idPrefix}-response`}>
         <Input
           id={`${idPrefix}-response`}
           value={response}
-          placeholder={`The ${creature} adds 2 to its AC against that attack, possibly causing it to miss.`}
+          placeholder={`The ${creature} adds 2 to its AC against that attack.`}
           onChange={(event) => write(trigger, event.target.value)}
         />
       </Field>
@@ -767,15 +759,16 @@ function ReactionAnswers({
           next
             ? write(
                 trigger || `The ${creature} is hit by a melee attack roll while holding a weapon.`,
-                `The ${creature} adds 2 to its AC against that attack, possibly causing it to miss.`
+                `The ${creature} adds 2 to its AC against that attack.`
               )
             : write(trigger, "")
         }
-        label="It parries: the table offers it when the monster is hit"
+        label="Parry"
       />
+      <p className="nh-field-help">With Parry on, the table offers this Reaction when the monster is hit.</p>
       {parry && (
         <Stepper
-          label="AC it adds"
+          label="AC bonus"
           value={Number(parry[1])}
           min={1}
           max={5}
@@ -839,7 +832,7 @@ function DamageParts({
             {shown.length === 0 ? "Add damage" : "Add more damage"}
           </Chip>
         )}
-        {shown.length > 0 && <Chip onClick={() => onChange(shown.slice(0, -1))}>Take the last off</Chip>}
+        {shown.length > 0 && <Chip onClick={() => onChange(shown.slice(0, -1))}>Remove the last damage</Chip>}
       </div>
     </div>
   );

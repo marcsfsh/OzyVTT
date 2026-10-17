@@ -38,7 +38,7 @@ export type WizardStep = Readonly<{
   /** The editor sections this step stands in for: the fallback for an issue with no path, and where "Full editor"
       opens. */
   sections: readonly string[];
-  /** A step the record's answers make irrelevant is left out of the flow (an item's weapon step for armour). */
+  /** A step the record's answers make irrelevant is left out of the flow (an item's weapon step for armor). */
   visibleWhen?: (draft: Draft) => boolean;
 }>;
 

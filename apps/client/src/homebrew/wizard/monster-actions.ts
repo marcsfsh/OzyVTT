@@ -215,7 +215,7 @@ export function generatedText(
 ): string | null {
   const kind = kindOf(action);
   const legendary = action.legendary ? "Legendary Action. " : "";
-  const who = creature.trim().toLowerCase() || "creature";
+  const who = creature.trim().toLowerCase() || "monster";
   if (kind === "attack") return `${legendary}${attackText(action)}`;
   if (kind === "save") return `${legendary}${saveText(action, who)}`;
   if (kind === "multiattack") return multiattackText(action, actions, who);

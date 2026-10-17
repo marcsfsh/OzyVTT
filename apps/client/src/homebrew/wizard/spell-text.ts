@@ -1,5 +1,5 @@
 /**
- * The spell wizard's answers that live in a spell's own words or its upcast rows rather than in a plain column.
+ * The spell wizard's answers that live in a spell's own words or its upcast rows.
  *
  * - Healing is read from the text, as the SRD's is (`healingOfText`): "regains Hit Points equal to 2d8 plus your
  *   spellcasting ability modifier". So the healing answer is that sentence, written into the description.
@@ -202,8 +202,6 @@ export function scalingOf(draft: Draft): Scaling {
   };
 }
 
-const ORDINAL = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
-
 const healsOnly = (draft: Draft) =>
   healingOf(draft) !== null && !(draft.damage as { roll?: string | null } | undefined)?.roll;
 
@@ -237,7 +235,7 @@ export function scalingRows(draft: Draft, scaling: Scaling): CastingOption[] {
   return rows;
 }
 
-/** "The damage increases by 1d6 for each spell slot level above 3rd.", in the SRD's wording; null for none. */
+/** "The damage increases by 1d6 for each spell slot level above 3.", in the SRD's wording; null for none. */
 export function scalingText(draft: Draft, scaling: Scaling): string | null {
   const level = typeof draft.level === "number" ? draft.level : 1;
   const base = baseRollOf(draft);
@@ -250,7 +248,7 @@ export function scalingText(draft: Draft, scaling: Scaling): string | null {
         `The ${what} increases by ${base.split(/\s*\+\s*/)[0]} when you reach levels 5 (${rows[0].damageRoll}), 11 (${rows[1].damageRoll}), and 17 (${rows[2].damageRoll}).`
       );
   } else {
-    const above = ORDINAL[level] ?? String(level);
+    const above = String(level);
     if (scaling.perSlot && base)
       out.push(`The ${what} increases by ${scaling.perSlot} for each spell slot level above ${above}.`);
     if (scaling.targetsPerSlot)

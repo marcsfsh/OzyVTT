@@ -1,5 +1,5 @@
-/** A homebrew monster as a stat block, in the SRD 5.2.1's order and words: the lines the sheet prints for it in a
-    fight (its type line, AC, HP, speeds, abilities with saves, senses, languages, CR, traits and actions). */
+/** A homebrew monster as a stat block in SRD 5.2.1 order and words. The type line reads as the sheet prints it in
+    a fight. */
 
 import { experienceForChallenge } from "@vtt/rules-5e";
 import { RichText } from "../../encounter/RichText";
@@ -70,7 +70,7 @@ export function StatBlockPreview({ draft }: PreviewProps) {
     .map((mode) => `${mode} ${speeds[mode]} ft.${mode === "fly" && speeds.hover ? " (hover)" : ""}`);
   const traits = Array.isArray(bag.traits) ? (bag.traits as Array<{ name: string; description: string }>) : [];
   const typeLine = `${title(typeof draft.size === "string" ? draft.size : "medium")} ${
-    typeof bag.type === "string" ? bag.type : "creature"
+    typeof bag.type === "string" ? bag.type : "being"
   }${typeof bag.alignment === "string" && bag.alignment ? `, ${bag.alignment}` : ""}`;
 
   return (
@@ -145,14 +145,14 @@ export function StatBlockPreview({ draft }: PreviewProps) {
         </section>
       )}
       <Entries heading="Actions" actions={actions.filter((action) => activationOf(action) === "action")} />
-      <Entries heading="Bonus actions" actions={actions.filter((action) => activationOf(action) === "bonus-action")} />
+      <Entries heading="Bonus Actions" actions={actions.filter((action) => activationOf(action) === "bonus-action")} />
       <Entries heading="Reactions" actions={actions.filter((action) => activationOf(action) === "reaction")} />
       {legendary?.actionsPerRound !== undefined && (
         <section className="hb-sb-section">
-          <h5 className="hb-sb-heading">Legendary actions</h5>
+          <h5 className="hb-sb-heading">Legendary Actions</h5>
           <p className="hb-sb-entry">
-            Legendary Action Uses: {legendary.actionsPerRound}. Immediately after another creature&rsquo;s turn, it can
-            expend a use to take one of these actions. It regains all expended uses at the start of each of its turns.
+            Legendary Action Uses: {legendary.actionsPerRound}. Immediately after another turn, it can expend a use to
+            take one of these actions. It regains all expended uses at the start of each of its turns.
           </p>
           {actions
             .filter((action) => activationOf(action) === "legendary")

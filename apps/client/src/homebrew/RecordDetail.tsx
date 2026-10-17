@@ -627,11 +627,11 @@ const WHERE_IT_APPEARS: Readonly<Record<HomebrewType, string>> = {
   subclass: "It is offered when a character of its class reaches its level.",
   species: "It is offered in the character builder.",
   background: "It is offered in the character builder.",
-  feat: "It is offered wherever its category is.",
+  feat: "The character builder offers it where its category fits.",
   spell: "Casters whose spell lists include it can learn it.",
   "spell-list": "Classes that name it draw their spells from it.",
   equipment: "It is in the equipment picker for any character's inventory.",
-  monster: "It is in the bestiary, ready to add to the table."
+  monster: "It is in the bestiary, and you can add it to a fight from there."
 };
 
 /** "Hemomancy", "Hemomancy and Bloodline" or "Hemomancy, Bloodline and 2 more", quoted. */

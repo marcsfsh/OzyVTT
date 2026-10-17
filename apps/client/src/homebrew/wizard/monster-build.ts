@@ -178,7 +178,7 @@ function rebuiltHitPoints(before: Draft, after: Draft): Draft {
 export function summaryLineOf(draft: Draft): string {
   const bag = statblockOf(draft);
   const size = sizeOf(draft);
-  const type = typeof bag.type === "string" && bag.type ? bag.type : "creature";
+  const type = typeof bag.type === "string" && bag.type ? bag.type : "being";
   const alignment = typeof bag.alignment === "string" && bag.alignment ? `, ${bag.alignment}` : "";
   const rating = challengeOf(draft);
   const cr =

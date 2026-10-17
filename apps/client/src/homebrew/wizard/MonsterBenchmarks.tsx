@@ -1,6 +1,6 @@
-/** What the SRD's own stat blocks of the chosen challenge rating have, beside the monster's number, so the GM can
-    judge it. Only what the bundled stat blocks print: the median and the lowest and highest (`content:monster-
-    benchmarks`, worked out on the server from the bundle). No table the SRD doesn't contain. */
+/** The SRD's own stat blocks of the chosen challenge rating, set beside the monster's numbers for the GM to judge.
+    The server works out the median, lowest and highest from the bundled stat blocks (`content:monster-benchmarks`),
+    so every figure is one the SRD prints. */
 
 import { useEffect, useState } from "react";
 import type { ContentMonsterBenchmark } from "@vtt/domain";
@@ -53,25 +53,25 @@ export const monsterNumbers = (draft: Draft) =>
     actions: Array.isArray(draft.actions) ? (draft.actions as Parameters<typeof statblockNumbers>[0]["actions"]) : []
   });
 
-/** One line per number: "SRD CR 3 · median 15 · 11 to 18 · yours 12". */
+/** One line per number: "median 15 · 11 to 18 · yours 12". */
 export function MonsterBenchmarks({ draft, keys }: Readonly<{ draft: Draft; keys: readonly BenchmarkKey[] }>) {
   const benchmarks = useMonsterBenchmarks();
   const rating = challengeOf(draft);
   if (rating === null) return null;
   const label = rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : String(rating);
-  if (benchmarks === null) return <p className="nh-field-help">Reading the SRD&rsquo;s stat blocks&hellip;</p>;
-  const row = benchmarks.find((entry) => entry.challengeRating === rating);
-  if (!row)
+  if (benchmarks === null)
     return (
-      <p className="nh-field-help">
-        The SRD has no stat block of CR {label} to compare with, so there is nothing to suggest.
+      <p className="nh-field-help" role="status">
+        Loading the SRD's stat blocks…
       </p>
     );
+  const row = benchmarks.find((entry) => entry.challengeRating === rating);
+  if (!row) return <p className="nh-field-help">The SRD has no stat block of CR {label} to compare with.</p>;
   const yours = monsterNumbers(draft);
   return (
     <div className="hb-bench" role="group" aria-label={`SRD monsters of CR ${label}`}>
       <p className="hb-bench-title">
-        The SRD&rsquo;s {row.count} {row.count === 1 ? "stat block" : "stat blocks"} of CR {label}
+        The SRD's {row.count} {row.count === 1 ? "stat block" : "stat blocks"} of CR {label}
       </p>
       <dl className="hb-bench-rows">
         {keys.map((key) => {
@@ -86,7 +86,7 @@ export function MonsterBenchmarks({ draft, keys }: Readonly<{ draft: Draft; keys
                     median {signedIf(key, spread.median)} · {signedIf(key, spread.min)} to {signedIf(key, spread.max)}
                   </>
                 ) : (
-                  "none of them have one"
+                  "None of them has one"
                 )}
                 {mine !== null && (
                   <span className="hb-bench-yours">
