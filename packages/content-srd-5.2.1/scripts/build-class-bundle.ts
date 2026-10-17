@@ -516,6 +516,48 @@ function skillsOf(text: string): { choose: number; from: string[] } {
   return { choose, from };
 }
 
+/** What a class's "As a Multiclass Character" section grants: the first bullet names the Core Traits it keeps. */
+type MulticlassTraits = {
+  armor: string[];
+  weapons: string[];
+  tools: string[];
+  skills?: { choose: number; from: string[] };
+  toolChoices?: { choose: number; from: string[] };
+};
+
+/**
+ * "Gain the following traits from the Core Rogue Traits table: Hit Point Die, proficiency in one skill of your
+ * choice from the Rogue's skill list, proficiency with Thieves' Tools, and training with Light armor." The Hit
+ * Point Die is the class's own and needs no field; no class keeps its Saving Throw proficiencies.
+ */
+function multiclassTraitsOf(
+  body: string,
+  className: string,
+  classSkills: readonly string[],
+  instruments: readonly string[]
+): MulticlassTraits {
+  const section = body.split(/^#### As a Multiclass Character\s*$/m)[1]?.split(/^#{3,4} /m)[0];
+  const bullet = section
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find((line) => /^[•-]/.test(line));
+  if (!bullet) throw new Error(`${className}: no "As a Multiclass Character" traits`);
+  const text = strip(bullet.replace(/^[•-]\s*/, ""));
+  const traits: MulticlassTraits = {
+    armor: armorOf(/training with (.+?)\.?$/i.exec(text)?.[1] ?? ""),
+    weapons: weaponsOf(/proficiency with (\w+) weapons/i.exec(text)?.[1] ?? ""),
+    tools: [...text.matchAll(/proficiency with (?!one )([A-Z][\w' ]*?(?:Tools|Kit|Supplies))/g)].map((match) =>
+      slug(match[1])
+    )
+  };
+  const skill = /proficiency in one skill of your choice( from the [\w' ]+ skill list)?/i.exec(text);
+  if (skill) traits.skills = { choose: 1, from: skill[1] ? [...classSkills] : [...ALL_SKILLS] };
+  // The Bard's "one Musical Instrument of your choice": any instrument the equipment catalog prints.
+  if (/proficiency with one Musical Instrument of your choice/i.test(text))
+    traits.toolChoices = { choose: 1, from: [...instruments] };
+  return traits;
+}
+
 const ITEM_ALIASES: Record<string, string> = {
   // The class tables use the SRD's shorthand; the equipment catalog carries the specific variants.
   "holy-symbol": "holy-symbol-amulet",
@@ -592,6 +634,8 @@ function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unres
 // ---- Build --------------------------------------------------------------------------------------
 
 const catalog = catalogIndex();
+/** Every Musical Instrument the equipment catalog prints, by id (its name slugs start "musical-instrument-"). */
+const INSTRUMENTS = [...catalog.keys()].filter((id) => id.startsWith("instrument-")).sort();
 const unresolvedItems: string[] = [];
 const parsed = new Map<string, ReturnType<typeof parseClass>>();
 
@@ -754,6 +798,7 @@ for (const [id, entry] of parsed) {
     weaponProficiencies: weaponsOf(traits["Weapon Proficiencies"] ?? ""),
     toolProficiencies: /choose/i.test(toolText) ? [] : toolText ? [slug(toolText)] : [],
     startingEquipment: equipment,
+    multiclassProficiencies: multiclassTraitsOf(entry.body, entry.name, skills.from, INSTRUMENTS),
     multiclassPrerequisites: {
       mode: anyOf ? "any" : "all",
       minimums: primary.map((ability) => ({ ability, minimum: 13 }))
@@ -904,6 +949,11 @@ for (const record of authoredClasses) {
     }
   }
   const skills = skillsOf(traits["Skill Proficiencies"] ?? "");
+  // The multiclass traits are compared whole: a weapon group too many is a proficiency the SRD withholds.
+  const multiclass = JSON.stringify(multiclassTraitsOf(entry.body, entry.name, skills.from, INSTRUMENTS));
+  const authoredMulticlass = JSON.stringify(record.multiclassProficiencies ?? null);
+  if (multiclass !== authoredMulticlass)
+    disagreements.push(`${record.id}.multiclassProficiencies: source ${multiclass} vs authored ${authoredMulticlass}`);
   if (skills.choose !== record.skillChoices.choose)
     disagreements.push(
       `${record.id}.skillChoices.choose: source ${skills.choose} vs authored ${record.skillChoices.choose}`

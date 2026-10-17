@@ -210,7 +210,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
     // Pact Magic tops out at level 5, so the class budget refuses a level-6 spell; as a feature pick it
     // lands on a sheet whose highest slot is level 5.
     const built = level11();
-    expect(built.spellcasting!.slots.map((slot) => slot.level)).toEqual([5]);
+    expect(built.spellcasting!.pact?.level).toBe(5);
     expect(spellOf(built, "true-seeing")).toMatchObject({ id: "true-seeing", level: 6, prepared: true });
   });
 
@@ -746,7 +746,7 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
 
   it("leaves a swing that is not that spell alone", () => {
     // `spell-id-is` filters: the Warlock's starting sickle is not Eldritch Blast and gains nothing.
-    const built = table(withInvocation("agonizing-blast"));
+    const built = table(withInvocation("agonizing-blast", [...KNOWS_ELDRITCH_BLAST, ...pointedAtTheBlast]));
     const swung = resolveDefinitionAction(
       built.state,
       actionOf(built, "item-sickle"),

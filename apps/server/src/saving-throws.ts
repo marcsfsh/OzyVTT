@@ -4,6 +4,8 @@ import {
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
+  diceRiders,
+  diceRiderTerms,
   halveDamageParts,
   parseDiceFormula,
   rescaleDamageParts,
@@ -107,6 +109,13 @@ export function saveRiderBonus(derivation: EquipmentDerivation, ability: Ability
   return derivation.saveBonus + sumRiders(momentary, "save-bonus");
 }
 
+/** The dice riders add to one saving throw (Bless +1d4, Bane -1d4), standing or at the save, as formula terms. */
+export function saveRiderDiceTerms(derivation: EquipmentDerivation, ability: AbilityId): string {
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  const atSave = collectRiders(derivation.carriers, { ...derivation.context, ability, moment: "on-saving-throw" });
+  return diceRiderTerms(diceRiders([...standing, ...atSave], "save-bonus"));
+}
+
 /** The flat rider bonus to a saving throw that names no ability, such as a death save: riders that apply to
  *  every save (Ring of Protection, Aura of Protection) and none tied to one ability. */
 export function saveRiderBonusForAnySave(derivation: EquipmentDerivation): number {
@@ -204,7 +213,8 @@ export function createPendingSaves(
     halfOnSuccess: boolean;
     conditionIds: readonly string[];
     saveBonus?: number;
-    onFailEffect?: PendingSave["onFailEffect"];
+    onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "modifiers"> &
+      Partial<Pick<NonNullable<PendingSave["onFailEffect"]>, "modifiers">>;
     /** A save repeated at the end of the bearer's turn: a success ends this effect. */
     repeatOf?: PendingSave["repeatOf"];
     /** Replace an older prompt with the same (target, actionName, source) key. Default true; per-hit riders
@@ -229,7 +239,9 @@ export function createPendingSaves(
     halfOnSuccess: input.halfOnSuccess,
     conditionIds: [...input.conditionIds],
     saveBonus: input.saveBonus ?? 0,
-    ...(input.onFailEffect ? { onFailEffect: input.onFailEffect } : {}),
+    ...(input.onFailEffect
+      ? { onFailEffect: { ...input.onFailEffect, modifiers: [...(input.onFailEffect.modifiers ?? [])] } }
+      : {}),
     ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
     createdAt: input.createdAt
   }));
@@ -303,7 +315,9 @@ export function applyFailureEffect(
       ...(onFail.speedZero ? { speedZero: true } : {}),
       ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
       ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
-      ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {})
+      ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
+      // What it does while it lasts (Bane's -1d4).
+      modifiers: [...onFail.modifiers]
     }),
     events,
     immunities
@@ -398,7 +412,9 @@ export function answerSave(
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // An explicit choice (the answerer's button, or a forced "normal") wins over detected sources.
     const mode = explicitRollMode ?? aggregated.mode;
-    const resolution = resolveDice(parseDiceFormula(d20TestFormula(mode, modifier)), deps.random);
+    // Bless's d4 rolls into the save itself, so a preview's total is the one Confirm sends.
+    const formula = d20TestFormula(mode, modifier) + saveRiderDiceTerms(derivation, pending.ability);
+    const resolution = resolveDice(parseDiceFormula(formula), deps.random);
     if (mode !== "normal")
       rollMode = {
         mode,

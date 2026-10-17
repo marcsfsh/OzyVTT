@@ -4,6 +4,7 @@ import {
   ABILITIES,
   abilityModifier,
   armorClassFromEquipment,
+  casterProgressionFor,
   hitDicePool,
   multiclassCasterLevel,
   multiclassPactSlots,
@@ -15,6 +16,7 @@ import {
   type UnarmoredDefense
 } from "@vtt/rules-5e";
 import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
+import { storedClassSequence } from "./character-offers.js";
 import { endEffectsSustainedBy } from "./effects.js";
 import { actionPools, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -85,8 +87,15 @@ export function spellSlotMaxima(
 function baseSpellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyArray<{ level: number; max: number }> {
   const spellcasting = definition?.spellcasting;
   if (!spellcasting) return [];
-  if (spellcasting.slots.length > 0) return spellcasting.slots;
   const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  // A Warlock built before Pact Magic had a pool of its own carried the pact row as its `slots`; those are its pact
+  // slots, which `pactSlotMaximum` derives, so counting them here would seed them twice.
+  const pactOnly =
+    !spellcasting.pact &&
+    casterIds.size > 0 &&
+    [...casterIds].every((classId) => casterProgressionFor(classId) === "pact");
+  if (pactOnly) return [];
+  if (spellcasting.slots.length > 0) return spellcasting.slots;
   if (casterIds.size === 0) return [];
   const casterLevels = classLevelsOf(definition!).filter((entry) => casterIds.has(entry.classId));
   return multiclassSpellSlots(multiclassCasterLevel(casterLevels))
@@ -177,29 +186,28 @@ export function armorClassRiderOf(definition: ActorDefinition): number {
   return 0;
 }
 
-/** This sheet's Unarmored Defense for the AC math, or null. Resolved from the authored rider via the
- *  catalog, else the builder's `open5e.srd-2024` bag (ability validated against `ABILITIES` so a bad
+/** This sheet's Unarmored Defenses for the AC math (a Monk/Barbarian has two). Resolved from the authored riders
+ *  via the catalog, else the builder's `open5e.srd-2024` bag (ability validated against `ABILITIES` so a bad
  *  string can't make AC NaN). Never inferred from a class name. */
-export function unarmoredDefenseOf(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense | null {
+export function unarmoredDefensesOf(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense[] {
   // Live content wins over the bag, which is a build-time snapshot and goes stale when content is
   // corrected (e.g. `allowShield`). The bag is the fallback when the feature can't be resolved (no
   // catalog, deleted homebrew class).
-  const fromContent = unarmoredDefenseFromContent(definition, catalog);
-  if (fromContent) return fromContent;
+  const fromContent = unarmoredDefensesFromContent(definition, catalog);
+  if (fromContent.length > 0) return fromContent;
   const extension = definition.extensions?.["open5e.srd-2024"];
-  if (extension && typeof extension === "object") {
-    const value = (extension as { unarmoredDefense?: unknown }).unarmoredDefense;
-    if (value && typeof value === "object") {
-      const { ability, allowShield } = value as { ability?: unknown; allowShield?: unknown };
-      if (typeof ability === "string" && (ABILITIES as readonly string[]).includes(ability)) {
-        return {
-          bonus: abilityModifier(definition.abilityScores[ability as Ability]),
-          allowShield: allowShield === true
-        };
-      }
-    }
-  }
-  return null;
+  if (!extension || typeof extension !== "object") return [];
+  const { unarmoredDefense, unarmoredDefenses } = extension as {
+    unarmoredDefense?: unknown;
+    unarmoredDefenses?: unknown;
+  };
+  return (Array.isArray(unarmoredDefenses) ? unarmoredDefenses : [unarmoredDefense]).flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const { ability, allowShield } = value as { ability?: unknown; allowShield?: unknown };
+    return typeof ability === "string" && (ABILITIES as readonly string[]).includes(ability)
+      ? [{ bonus: abilityModifier(definition.abilityScores[ability as Ability]), allowShield: allowShield === true }]
+      : [];
+  });
 }
 
 /**
@@ -207,17 +215,22 @@ export function unarmoredDefenseOf(definition: ActorDefinition, catalog?: Equipm
  * (SRD: with no armor or Shield, 10 + Dex, or its Unarmored Defense), plus the standing `armor-class` riders of its
  * items and features (Defense applies only while armor is worn). A printed total (a stat block, an imported sheet)
  * already counts the armor it was printed with, so it stands until body armor is equipped; a Shield alone can't be
- * told apart from one it already counts.
+ * told apart from one it already counts. With several ways to calculate AC (a Monk/Barbarian's two Unarmored
+ * Defenses) only one applies at a time (SRD Multiclassing): the best.
  */
 export function storedArmorClass(actor: Actor, definition: ActorDefinition, catalog?: EquipmentCatalog): number {
   if (actor.armorClassOverride !== undefined) return actor.armorClassOverride;
   const derivation = deriveEquipment(actor, definition, catalog);
   const dex = abilityModifier(definition.abilityScores.dex);
   const items = withResolvedSlots(actor.inventory, catalog);
-  const unarmored = unarmoredDefenseOf(definition, catalog);
-  const equipmentAc = armorClassFromEquipment(dex, items, unarmored, { shield: derivation.untrainedShield === null });
+  const unarmored = unarmoredDefensesOf(definition, catalog);
+  const training = { shield: derivation.untrainedShield === null };
+  const worn = [null, ...unarmored]
+    .map((option) => armorClassFromEquipment(dex, items, option, training))
+    .filter((value): value is number => value !== null);
+  const equipmentAc = worn.length > 0 ? Math.max(...worn) : null;
   if (armorClassFromLoadout(definition))
-    return (equipmentAc ?? 10 + dex + (unarmored?.bonus ?? 0)) + derivation.armorClass;
+    return (equipmentAc ?? 10 + dex + Math.max(0, ...unarmored.map((option) => option.bonus))) + derivation.armorClass;
   const base =
     equipmentAc !== null && wornBodyArmor(items) ? equipmentAc + armorClassRiderOf(definition) : definition.armorClass;
   return base + derivation.armorClass;
@@ -261,24 +274,25 @@ export function fillMissingSpeeds(
   return changed;
 }
 
-/** Unarmored Defense from the sheet's features then feats (last wins, like `interpretFeature`); fails open to null. */
-function unarmoredDefenseFromContent(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense | null {
-  if (!catalog) return null;
+/** Every Unarmored Defense the sheet's features and feats carry; fails open to none. */
+function unarmoredDefensesFromContent(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense[] {
+  if (!catalog) return [];
   const blocks = [
     ...(definition.character?.features ?? []).map((held) => catalog.featureRecord?.(held)),
     ...(definition.character?.feats ?? []).map((held) => catalog.featRecord?.(held.id)?.feature)
   ];
-  let found: UnarmoredDefense | null = null;
-  for (const block of blocks) {
-    for (const modifier of block?.modifiers ?? []) {
-      if (modifier.type !== "unarmored-defense" || modifier.ability === undefined) continue;
-      found = {
-        bonus: abilityModifier(definition.abilityScores[modifier.ability]),
-        allowShield: modifier.allowShield === true
-      };
-    }
-  }
-  return found;
+  return blocks.flatMap((block) =>
+    (block?.modifiers ?? []).flatMap((modifier) =>
+      modifier.type === "unarmored-defense" && modifier.ability !== undefined
+        ? [
+            {
+              bonus: abilityModifier(definition.abilityScores[modifier.ability]),
+              allowShield: modifier.allowShield === true
+            }
+          ]
+        : []
+    )
+  );
 }
 
 function instantiate(
@@ -323,6 +337,7 @@ function instantiate(
     spellSlots: seedSpellSlots(definition, derivation.spellSlots),
     pactSlots: seedPactSlots(definition),
     preparedSpellIds: seedPreparedSpellIds(definition),
+    preparation: null,
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,
@@ -458,8 +473,8 @@ export function rebuildActorDefinition(
   // Carry over the old sheet's `hp-roll` rows for levels the new build doesn't cover, so levelling back
   // up restores the original rolls.
   const previous = state.definitions.find((entry) => entry.id === definitionId)?.definition;
-  // A one-class build would silently drop a sheet's other classes.
-  if ((previous?.character?.classes.length ?? 0) > (definition.character?.classes.length ?? 0))
+  // A build carrying fewer classes would silently drop one, unless it levels below where that class was taken.
+  if (dropsAClass(previous, definition))
     throw new CommandRejectedError(
       `${actor.name} has more classes than this build carries, and rebuilding would drop them.`
     );
@@ -495,6 +510,21 @@ export function rebuildActorDefinition(
     entry.id === definitionId ? { id: definitionId, definition: rebuilt } : entry
   );
   return actor;
+}
+
+/**
+ * Whether a rebuild leaves out a class the stored sheet has. Levelling below the level a class was first taken
+ * undoes that class, which is the Level flow's level-down; any other loss (a hand-added class, a single-class build
+ * sent for a multiclass sheet) is refused.
+ */
+function dropsAClass(previous: ActorDefinition | undefined, next: ActorDefinition): boolean {
+  const before = previous?.character?.classes ?? [];
+  const after = next.character?.classes ?? [];
+  if (before.length <= after.length) return false;
+  const level = after.reduce((total, entry) => total + entry.level, 0);
+  const sequence = storedClassSequence(previous?.character?.choices ?? []);
+  const kept = new Set(after.map((entry) => entry.id));
+  return before.some((entry) => !kept.has(entry.id) && !(sequence !== null && sequence.indexOf(entry.id) + 1 > level));
 }
 
 /** Spent counts kept against the new limits; a pool the new sheet no longer has is dropped. */

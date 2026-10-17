@@ -1,3 +1,5 @@
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
@@ -17,6 +19,7 @@ import {
   rememberOverride,
   type RuleId
 } from "../rules-families.js";
+import { laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
@@ -28,16 +31,20 @@ export type EconomyPlan = Readonly<{
   markAction: boolean;
   markBonus: boolean;
   markReaction: boolean;
-  /** The compound-action components remaining after this resolve (null leaves no instance). */
-  instance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
+  /** The compound-action components remaining after this resolve (null leaves no instance), with the slot a
+   *  multi-attack spell opening it was cast with. */
+  instance: Readonly<{ actorId: string; components: Record<string, number>; slotLevel?: number }> | null;
   /** The same for a compound bonus action (Flurry of Blows). */
   bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope. */
   spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions). */
   spendLegendary: Readonly<{ cost: number }> | null;
-  /** Spell slot the action spends from the bearer's own pool (an item cast with `consumesSpellSlot`). */
-  spendSpellSlot: Readonly<{ level: number }> | null;
+  /** Spell slot the action spends from the bearer's own pools: a spell slot, or a Pact Magic slot (`pact`). */
+  spendSpellSlot: Readonly<{ level: number; pact?: true }> | null;
+  /** The slot level this cast is at: the one it spends, or the one the open spell it continues spent (a later ray).
+   *  Null for anything not cast with a slot. */
+  castLevel: number | null;
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -92,7 +99,9 @@ export function evaluateActionEconomy(
   slotLevel?: number,
   /** The action rides a hit it was chosen for (Sneak Attack), rather than being taken alone. */
   asHitRider = false,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  /** The spell the action casts, for the slot, preparation and targeting checks. */
+  spell?: SpellReference
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -117,14 +126,29 @@ export function evaluateActionEconomy(
   checkScrollLegible(evaluation, definition, catalog);
   if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
+  // A later ray of a spell already cast this action spends no further slot; it rolls at the first ray's.
+  const continued = continuedSpellSlot(evaluation);
   const slots = checkActionSlots(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
-  const spendSpellSlot = checkSpellSlot(evaluation);
+  const spendSpellSlot = continued === null ? checkSpellSlot(evaluation) : null;
+  if (continued === null) {
+    const unprepared = unpreparedSpell(attacker, action, definition);
+    if (unprepared) evaluation.violations.push({ rule: "slots.not-prepared", message: unprepared });
+  }
   checkTargeting(evaluation, distanceFeet);
+  if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
+  const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
     violations: evaluation.violations,
     softViolations: evaluation.softViolations,
-    plan: { ...slots, spendUse, spendLegendary, spendSpellSlot },
+    plan: {
+      ...slots,
+      ...(opensSpell ? { instance: { ...slots.instance!, slotLevel: spendSpellSlot.level } } : {}),
+      spendUse,
+      spendLegendary,
+      spendSpellSlot,
+      castLevel: spendSpellSlot?.level ?? continued
+    },
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
   };
@@ -354,6 +378,38 @@ function multiattackParents(siblings: ReadonlyArray<DefinitionAction>, action: D
   );
 }
 
+/** The attacks left after the first of a count-based attack. Weapon attacks share a generic pool, so Extra Attack can
+ *  mix weapons legally; a spell's rays or beams are that spell's alone, never a swing of the Attack action. */
+function attackPool(action: DefinitionAction): Record<string, number> {
+  const left = (action.attack?.count ?? 1) - 1;
+  return action.spellId === undefined ? { attack: left } : { [action.id]: left };
+}
+
+/** The slot level of an open spell this resolve continues (Scorching Ray's second ray), or null when it opens a cast.
+ *  An instance from before it recorded its slot rolls at the spell's own level. */
+function continuedSpellSlot({
+  state,
+  attacker,
+  action
+}: Pick<Evaluation, "state" | "attacker" | "action">): number | null {
+  const open = state.combat.turn.actionInstance;
+  const onOwnTurn = state.combat.turnActorId === attacker.id;
+  if (!action.spellSlot || !onOwnTurn || !state.combat.turn.actionUsed || open?.actorId !== attacker.id) return null;
+  return (open.components[action.id] ?? 0) > 0 ? (open.slotLevel ?? action.spellSlot.level) : null;
+}
+
+/** The slot level a resolve of this action casts at, as the economy will plan it: the open spell's it continues, or
+ *  the slot it would spend. Null for an action cast without a slot. */
+export function castLevelOf(
+  state: GameState,
+  attacker: LiveActor,
+  action: DefinitionAction,
+  requested: number | undefined
+): number | null {
+  if (!action.spellSlot) return null;
+  return continuedSpellSlot({ state, attacker, action }) ?? castSlot(attacker, action.spellSlot.level, requested).level;
+}
+
 function componentMap(parent: DefinitionAction): Record<string, number> {
   const components: Record<string, number> = {};
   for (const entry of parent.multiattack ?? [])
@@ -433,11 +489,10 @@ function checkActionSlot({
       components = componentMap(parents[0]);
       components[action.id] = (components[action.id] ?? 1) - 1;
     } else if (parents.length > 1) {
-      if (action.attack && (action.attack.count ?? 1) > 1) components = { attack: (action.attack.count ?? 1) - 1 };
+      if (action.attack && (action.attack.count ?? 1) > 1) components = attackPool(action);
       notes.push(`${action.name} belongs to more than one Multiattack - tracking it standalone.`);
     } else if (action.attack && (action.attack.count ?? 1) > 1) {
-      // Count-based attacks open a generic pool so Extra Attack can mix weapons legally.
-      components = { attack: (action.attack.count ?? 1) - 1 };
+      components = attackPool(action);
     } else if (action.replacesAttack && attacksInAttackAction(siblings) > 1) {
       // Breath Weapon as the first attack of the Attack action: the rest stay open for weapon swings.
       components = { attack: attacksInAttackAction(siblings) - 1 };
@@ -480,7 +535,10 @@ function checkActionSlot({
       });
   } else if ((components[action.id] ?? 0) > 0) {
     components[action.id] -= 1;
-  } else if ((action.attack || action.replacesAttack) && (components["attack"] ?? 0) > 0) {
+  } else if (
+    ((action.attack && action.spellId === undefined) || action.replacesAttack) &&
+    (components["attack"] ?? 0) > 0
+  ) {
     components["attack"] -= 1;
   } else {
     const named = leftovers();
@@ -492,7 +550,14 @@ function checkActionSlot({
           : `${attacker.name} has no attacks remaining in this action.`
     });
   }
-  return { ...plan, instance: { actorId: attacker.id, components } };
+  return {
+    ...plan,
+    instance: {
+      actorId: attacker.id,
+      components,
+      ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {})
+    }
+  };
 }
 
 /** How many attacks the Attack action makes: the most any one attack action makes, which is where Extra Attack is
@@ -531,38 +596,100 @@ function checkLegendary(
 }
 
 /** A spell cast with a slot (a prepared spell, or an item cast with `consumesSpellSlot`) spends one from the
- *  caster's own pool at `castSlotLevel`; refused here if none remains or the slot is below the spell. */
-function checkSpellSlot({ attacker, action, slotLevel, violations }: Evaluation): EconomyPlan["spendSpellSlot"] {
+ *  caster's own pools at `castSlot`; refused here if none remains or the slot is below the spell. */
+function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Evaluation): EconomyPlan["spendSpellSlot"] {
   if (!action.spellSlot) return null;
-  const level = castSlotLevel(attacker, action.spellSlot.level, slotLevel);
-  const slot = attacker.spellSlots?.find((entry) => entry.level === level);
+  const { level, pact } = castSlot(attacker, action.spellSlot.level, slotLevel);
   if (level < action.spellSlot.level)
     violations.push({
-      rule: "feature.no-spell-slot",
+      rule: "slots.below-spell-level",
       message: `${action.name} needs a slot of level ${action.spellSlot.level} or higher.`
     });
-  else if (!slot || slot.remaining <= 0) {
+  else if (slotsLeft(attacker, level, pact) <= 0) {
     violations.push({
-      rule: "feature.no-spell-slot",
-      message: `${action.name} spends a level-${level} spell slot - ${attacker.name} has none left.`
+      rule: "slots.none-remaining",
+      message: `${action.name} spends a level-${level} ${pact ? "Pact Magic" : "spell"} slot - ${attacker.name} has none left.`
     });
   }
-  return { level };
+  // SRD: "On a turn, you can expend only one spell slot to cast a spell", whoever's turn it is.
+  if (state.combat.turn.spellSlotCasters?.includes(attacker.id))
+    violations.push({
+      rule: "slots.one-per-turn",
+      message: `${attacker.name} has already cast a spell with a spell slot this turn - only one per turn.`
+    });
+  return pact ? { level, pact: true } : { level };
 }
 
-/** The slot level a cast spends: the one asked for; else the spell's own level when a slot is left there; else the
- *  lowest above it with one left (a Warlock's Pact Magic slots are all one level). */
-export function castSlotLevel(
-  attacker: Pick<LiveActor, "spellSlots">,
+/** Why a spell cast with a slot is refused for not being prepared (SRD: you cast the spells you have prepared), or
+ *  null. Cantrips, always-prepared spells, anything not on the sheet's list (an item's cast) and a sheet that keeps
+ *  no prepared list (an import with no prepared cap) need nothing. */
+export function unpreparedSpell(
+  actor: Pick<LiveActor, "name" | "preparedSpellIds">,
+  action: Pick<DefinitionAction, "id" | "spellSlot" | "spellId">,
+  definition: ActorDefinition | undefined
+): string | null {
+  if (action.spellId === undefined) return null;
+  // A slot cast, or a Ritual ("To cast a spell as a Ritual, a spellcaster must have it prepared").
+  if (!action.spellSlot && action.id !== ritualSpellActionId(action.spellId)) return null;
+  const spell = definition?.spellcasting?.spells.find((entry) => entry.id === action.spellId);
+  if (!spell || spell.level === 0 || spell.alwaysPrepared || actor.preparedSpellIds.includes(spell.id)) return null;
+  const classes = definition!.spellcasting!.classes ?? [];
+  const casting = classes.length === 1 ? classes[0] : classes.find((entry) => entry.classId === spell.classId);
+  if (casting?.prepared === undefined) return null;
+  return `${actor.name} hasn't prepared ${spell.name}.`;
+}
+
+type SlotPools = Pick<LiveActor, "spellSlots"> & Partial<Pick<LiveActor, "pactSlots">>;
+
+/** The slots left in one pool at one level. */
+export function slotsLeft(actor: SlotPools, level: number, pact: boolean): number {
+  if (pact) return actor.pactSlots?.level === level ? actor.pactSlots.remaining : 0;
+  return actor.spellSlots?.find((slot) => slot.level === level)?.remaining ?? 0;
+}
+
+/**
+ * The slot a cast spends (SRD: Pact Magic slots and spell slots each cast either class's spells): the level asked
+ * for; else the spell's own level when a slot is left there; else the lowest above it with one left. At a level both
+ * pools have, a Pact Magic slot goes first, since a Short Rest brings it back. With none left anywhere, a Pact Magic
+ * caster's refusal names its pact slot.
+ */
+export function castSlot(
+  actor: SlotPools,
   base: number,
   requested: number | undefined
-): number {
-  if (requested !== undefined) return requested;
-  const open = (attacker.spellSlots ?? [])
-    .filter((slot) => slot.level >= base && slot.remaining > 0)
-    .map((slot) => slot.level)
-    .sort((left, right) => left - right);
-  return open[0] ?? base;
+): { level: number; pact: boolean } {
+  const pact = actor.pactSlots && actor.pactSlots.level >= base ? actor.pactSlots : null;
+  if (requested !== undefined) {
+    const usePact = pact?.level === requested && (pact.remaining > 0 || slotsLeft(actor, requested, false) <= 0);
+    return { level: requested, pact: usePact };
+  }
+  const open = [
+    ...(actor.spellSlots ?? [])
+      .filter((slot) => slot.level >= base && slot.remaining > 0)
+      .map((slot) => ({ level: slot.level, pact: false })),
+    ...(pact && pact.remaining > 0 ? [{ level: pact.level, pact: true }] : [])
+  ].sort((left, right) => left.level - right.level || Number(right.pact) - Number(left.pact));
+  if (open[0]) return open[0];
+  const anySpellSlots = (actor.spellSlots ?? []).some((slot) => slot.level >= base);
+  return pact && !anySpellSlots ? { level: pact.level, pact: true } : { level: base, pact: false };
+}
+
+/** The slot level a cast spends; see `castSlot`. */
+export function castSlotLevel(actor: SlotPools, base: number, requested: number | undefined): number {
+  return castSlot(actor, base, requested).level;
+}
+
+/** Spends one slot from the pool `castSlot` picked, clamped at zero: an override spends what is there rather than
+ *  going into debt. */
+export function spendSlot(actor: SlotPools, slot: Readonly<{ level: number; pact?: boolean }>): void {
+  if (slot.pact) {
+    if (actor.pactSlots?.level === slot.level)
+      actor.pactSlots = { ...actor.pactSlots, remaining: Math.max(0, actor.pactSlots.remaining - 1) };
+    return;
+  }
+  actor.spellSlots = (actor.spellSlots ?? []).map((entry) =>
+    entry.level === slot.level ? { ...entry, remaining: Math.max(0, entry.remaining - 1) } : entry
+  );
 }
 
 /** Who and what this action may target: declared target rules, range and reach, size limits and Charmed. */
@@ -641,6 +768,48 @@ function checkTargeting(
   }
 }
 
+/**
+ * A spell's own targeting (SRD Spells, "Range" and "Targets"): a save or healing spell reaches the creatures it names
+ * only within its range (a Touch spell within 5 feet), and no more of them than it targets at this slot. An attack's
+ * range is the attack's; an area's targets are whoever the template covers; a later action's trigger is wherever the
+ * creature is.
+ */
+function checkSpellTargets(
+  { state, attacker, action, targetIds, violations }: Evaluation,
+  spell: SpellReference,
+  castLevel: number,
+  distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined
+): void {
+  if (
+    action.area ||
+    (spell.effect?.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === action.id)
+  )
+    return;
+  const targets = spell.effect?.targets;
+  const unique = [...new Set(targetIds)];
+  if (targets && action.darts === undefined) {
+    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level);
+    if (unique.length > limit)
+      violations.push({
+        rule: "target.too-many",
+        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level-${castLevel} slot` : ""}; ${unique.length} were chosen.`
+      });
+  }
+  if (action.attack !== undefined || !distanceFeet) return;
+  const range = spellRangeFeet(spell.range) ?? (/^touch\b/i.test(spell.range.text ?? "") ? 5 : null);
+  if (range === null) return;
+  for (const targetId of unique) {
+    if (targetId === attacker.id) continue;
+    const distance = distanceFeet(attacker.id, targetId);
+    if (distance === null || distance <= range + DISTANCE_TOLERANCE_FEET) continue;
+    const targetName = state.actors.find((candidate) => candidate.id === targetId)?.name ?? "The target";
+    violations.push({
+      rule: "range.out-of-range",
+      message: `${targetName} is ${Math.round(distance * 10) / 10} ft away, beyond ${spell.name}'s ${range === 5 ? "touch" : `${range} ft range`}.`
+    });
+  }
+}
+
 /** Range/reach (SRD): checked only when distance is measurable. A thrown weapon is legal in either
  *  envelope; long-range disadvantage lives in the attack roll's sources. */
 function checkRange(
@@ -694,7 +863,8 @@ export function planEconomy(
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
   siblings: ReadonlyArray<DefinitionAction>,
   asHitRider = false,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  spell?: SpellReference
 ): { plan: EconomyPlan; overridden: { rule: RuleId; reason: string } | null } {
   const { violations, softViolations, plan, proseMultiattack, notes } = evaluateActionEconomy(
     state,
@@ -706,7 +876,8 @@ export function planEconomy(
     siblings,
     input.slotLevel,
     asHitRider,
-    catalog
+    catalog,
+    spell
   );
   warnings.push(...notes);
 
@@ -741,7 +912,11 @@ export function commitEconomy({
   input: Pick<ResolveInput, "override">;
 }): void {
   const instance = plan.instance
-    ? { actorId: plan.instance.actorId, components: { ...plan.instance.components } }
+    ? {
+        actorId: plan.instance.actorId,
+        components: { ...plan.instance.components },
+        ...(plan.instance.slotLevel !== undefined ? { slotLevel: plan.instance.slotLevel } : {})
+      }
     : null;
   if (plan.markAction || plan.markBonus) {
     state.combat = {
@@ -780,11 +955,13 @@ export function commitEconomy({
     };
   }
   if (plan.spendSpellSlot) {
-    const level = plan.spendSpellSlot.level;
-    // Clamped at zero: an override spends what is there rather than going into debt.
-    attacker.spellSlots = (attacker.spellSlots ?? []).map((entry) =>
-      entry.level === level ? { ...entry, remaining: Math.max(0, entry.remaining - 1) } : entry
-    );
+    spendSlot(attacker, plan.spendSpellSlot);
+    const casters = state.combat.turn.spellSlotCasters ?? [];
+    if (!casters.includes(attacker.id))
+      state.combat = {
+        ...state.combat,
+        turn: { ...state.combat.turn, spellSlotCasters: [...casters, attacker.id] }
+      };
   }
   if (plan.spendUse) {
     if (plan.spendUse.per === "turn") {

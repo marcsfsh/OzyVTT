@@ -182,6 +182,12 @@ const warlockInput = (): MutableCreateInput => ({
       id: "repelling-blast",
       payload: { featureId: "eldritch-invocations" }
     },
+    // Agonizing Blast, Eldritch Spear and Repelling Blast each need a known Warlock cantrip that deals damage, and
+    // each points at one.
+    { level: 1, classId: "warlock", kind: "cantrip", id: "eldritch-blast" },
+    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
+    { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "eldritch-spear" } },
+    { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
     { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
@@ -961,8 +967,14 @@ describe("extra picks raise the budget the server validates against", () => {
   ];
   const warlockWithInvocations = (count: number): MutableCreateInput => {
     const input = warlockInput();
+    const taken = INVOCATIONS.slice(0, count);
     input.choices = input.choices
       .filter((row) => row.kind !== "eldritch-invocation")
+      // An invocation not taken has no cantrip of its own to point at.
+      .filter((row) => {
+        const featureId = row.payload?.featureId;
+        return typeof featureId !== "string" || !INVOCATIONS.includes(featureId) || taken.includes(featureId);
+      })
       .concat(
         INVOCATIONS.slice(0, count).map((id) => ({
           level: 1,
@@ -1620,8 +1632,10 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
 
   it("gives a Warlock its Pact Magic slots - all at one level, not a sparse row", () => {
     const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
-    // SRD: a Warlock 5 has two level-3 slots and no level-1 or level-2 slots.
-    expect(definition.spellcasting?.slots).toEqual([{ level: 3, max: 2 }]);
+    // SRD: a Warlock 5 has two level-3 Pact Magic slots and no level-1 or level-2 slots. They are their own pool
+    // (back on a Short Rest), so none of them is a spell slot.
+    expect(definition.spellcasting?.pact).toEqual({ level: 3, max: 2 });
+    expect(definition.spellcasting?.slots).toEqual([]);
     expect(definition.spellcasting?.ability).toBe("cha");
     expect(definition.hitPoints.maximum).toBe(38); // d8: 8 + 4x5, then +2 Con x5
   });

@@ -47,15 +47,16 @@ const SPELLS = loadSpells().map((spell) => ({
 })) as unknown as readonly ContentSpellSummary[];
 
 const emit = socket.emit as unknown as ReturnType<typeof vi.fn>;
-/** Answers the catalog and spell reads, the sheet's derived numbers (`attunementSlots`), and every command with ok. */
-function serve(attunementSlots = 3) {
+/** Answers the catalog and spell reads, the sheet's action rows and derived numbers (`attunementSlots`), and every
+ *  command with ok. */
+function serve(attunementSlots = 3, actions: readonly unknown[] = []) {
   emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
     if (event === "content:equipment") ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." });
     else if (event === "content:spells") ack?.({ ok: true, spells: SPELLS, attribution: "SRD 5.2.1, CC BY 4.0." });
     else if (event === "actor:available-actions")
       ack?.({
         ok: true,
-        actions: [],
+        actions,
         derived: {
           proficiencyBonus: 3,
           armorClass: 12,
@@ -202,7 +203,10 @@ describe("the sheet's inventory", () => {
     expect(sent("character:recover-ammunition")).toEqual([expect.objectContaining({ actorId: HERO })]);
     unmount();
     // In the fight they come back when it ends, so the sheet offers nothing yet.
-    const fighting = { ...stateWith(archer), combat: { active: true, initiative: [{ actorId: HERO }] } } as GmView;
+    const fighting = {
+      ...stateWith(archer),
+      combat: { active: true, rulesMode: "strict", ruleExceptions: {}, initiative: [{ actorId: HERO }] }
+    } as unknown as GmView;
     render(<CharacterSheet actor={archer} role="gm" state={fighting} onClose={() => {}} />, {
       wrapper: ToastProvider
     });
@@ -275,6 +279,71 @@ describe("the sheet's inventory", () => {
       actorId: HERO,
       item: { id: "spell-scroll-2", spellId: "fireball" }
     });
+  });
+
+  it("casts a scroll's spell on the player's turn with the spell's own choices", async () => {
+    // The server's row for a scroll of Chromatic Orb: an attack whose caster picks the damage type.
+    serve(3, [
+      {
+        id: "item-spell-scroll-read",
+        name: "Cast Chromatic Orb (Spell Scroll)",
+        activation: "action",
+        available: true,
+        violations: [],
+        usesRemaining: null,
+        componentsRemaining: null,
+        description: "Read the scroll to cast Chromatic Orb.",
+        attackBonus: 5,
+        reachFeet: null,
+        rangeFeet: 90,
+        rangeNormalFeet: null,
+        attackCount: null,
+        saveAbility: null,
+        saveDc: null,
+        damage: [{ formula: "3d8", type: "acid" }],
+        usesLimit: null,
+        usesPer: null,
+        usesPool: null,
+        requiresEffectTag: null,
+        multiattack: null,
+        reaction: null,
+        healing: null,
+        targeting: "single",
+        darts: null,
+        damageTypes: ["acid", "cold", "fire", "lightning", "poison", "thunder"]
+      }
+    ]);
+    const reader = hero();
+    const myTurn = {
+      ...stateWith(reader),
+      revision: 3,
+      combat: {
+        active: true,
+        rulesMode: "strict",
+        ruleExceptions: {},
+        turnActorId: HERO,
+        playerDamageMode: "proposal",
+        pendingSaves: [],
+        initiative: [
+          { actorId: HERO, name: "Aria" },
+          { actorId: FRIEND, name: "Brann" }
+        ]
+      }
+    } as unknown as GmView;
+    render(<CharacterSheet actor={reader} role="player" state={myTurn} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    await userEvent.setup().click(await screen.findByRole("button", { name: /Cast Chromatic Orb/ }));
+    const picker = screen.getByRole("group", { name: "Targets for Cast Chromatic Orb (Spell Scroll)" });
+    const pick = within(picker).getByRole("combobox", { name: "Damage type" }) as HTMLSelectElement;
+    expect([...pick.options].map((option) => option.value)).toEqual([
+      "acid",
+      "cold",
+      "fire",
+      "lightning",
+      "poison",
+      "thunder"
+    ]);
   });
 });
 

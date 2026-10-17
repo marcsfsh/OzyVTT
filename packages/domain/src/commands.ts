@@ -19,6 +19,7 @@ import {
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
+  DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
   ProficienciesSchema
@@ -358,6 +359,8 @@ export const ActionResolveSchema = z
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
      *  above it with a slot left. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The damage type picked for an action that lets its caster choose (Chromatic Orb); absent, its first. */
+    damageType: DamageTypeSchema.optional(),
     /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
      *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
@@ -539,6 +542,8 @@ export const ActionUseSchema = z
     override: RulesOverrideSchema.optional(),
     /** The spell slot to cast with; see `action.resolve`. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The damage type picked; see `action.resolve`. */
+    damageType: DamageTypeSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -736,6 +741,8 @@ export const CharacterSetSlotSchema = z
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
+    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -745,6 +752,14 @@ export const CharacterSetPreparedSchema = z
     actorId: z.uuid(),
     spellId: z.string().min(1).max(80),
     prepared: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Closes the prepare step a Long Rest opened: the prepared list stands until the next one. */
+export const CharacterFinishPreparingSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -801,6 +816,17 @@ export const CharacterSetProficienciesSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The class each character level went to, in order: index 0 is level 1, the starting class. */
+const ClassLevelsSchema = z
+  .array(
+    z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+  )
+  .min(1)
+  .max(20);
+
 /** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
@@ -824,6 +850,9 @@ export const CharacterCreateSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** A multiclass build: the class each character level went to, in order. Index 0 is level 1 and must be
+     *  `classId`; the list is `level` long. Absent when every level is `classId`. */
+    classLevels: ClassLevelsSchema.optional(),
     abilityMethod: BuilderAbilityMethodSchema,
     baseScores: z
       .object({
@@ -865,6 +894,7 @@ export const BuilderOffersSchema = z
     backgroundId: BuilderContentIdSchema.optional(),
     classId: BuilderContentIdSchema.optional(),
     level: z.number().int().min(1).max(20),
+    classLevels: ClassLevelsSchema.optional(),
     picks: z
       .record(OfferKeySchema, z.array(BuilderContentIdSchema).max(40))
       .refine((picks) => Object.keys(picks).length <= 200)
@@ -876,7 +906,23 @@ export const BuilderOffersSchema = z
       )
       .refine((increases) => Object.keys(increases).length <= 40)
       .optional(),
-    choices: z.array(CharacterChoiceSchema).max(200).optional()
+    choices: z.array(CharacterChoiceSchema).max(200).optional(),
+    sheet: z
+      .object({
+        level: z.number().int().min(1).max(20),
+        abilityScores: z
+          .object({
+            str: z.number().int().min(1).max(30),
+            dex: z.number().int().min(1).max(30),
+            con: z.number().int().min(1).max(30),
+            int: z.number().int().min(1).max(30),
+            wis: z.number().int().min(1).max(30),
+            cha: z.number().int().min(1).max(30)
+          })
+          .strict()
+      })
+      .strict()
+      .optional()
   })
   .strict()
   .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
@@ -898,6 +944,22 @@ export const CharacterGenerateSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80)
+      .optional(),
+    /** A multiclass character: each class with its levels, the starting class first; the levels add up to `level`. */
+    classes: z
+      .array(
+        z
+          .object({
+            classId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(80),
+            level: z.number().int().min(1).max(20)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(4)
       .optional(),
     name: z.string().trim().min(1).max(120).optional(),
     expectedRevision: z.number().int().nonnegative().optional()

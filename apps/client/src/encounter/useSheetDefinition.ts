@@ -34,6 +34,8 @@ type AvailabilityRow = Readonly<{
   reaction?: ContentActionSummary["reaction"];
   healing?: Readonly<{ formula: string }> | null;
   targeting?: "none" | "single" | "multi" | null;
+  darts?: number | null;
+  damageTypes?: ContentActionSummary["damageTypes"] | null;
 }>;
 
 /** The wire row in the shape every action surface here already speaks. */
@@ -61,7 +63,10 @@ function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
     grants: false,
     reaction: row.reaction ?? null,
     ...(row.healing ? { healing: row.healing } : {}),
-    ...(row.targeting ? { targeting: row.targeting } : {})
+    ...(row.targeting ? { targeting: row.targeting } : {}),
+    // A spell an item casts picks as the spell's own cast does (Magic Missile's darts, Chromatic Orb's type).
+    ...(row.darts ? { darts: row.darts } : {}),
+    ...(row.damageTypes ? { damageTypes: row.damageTypes } : {})
   };
 }
 

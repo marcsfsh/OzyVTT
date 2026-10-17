@@ -38,7 +38,8 @@ import {
   withoutOngoingDamage
 } from "./save-outcomes.js";
 import { areaOfProse, withProseFacts } from "../src/action-prose.js";
-import { spellEffectFor } from "./spell-effects.js";
+import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-effects.js";
+import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
@@ -665,13 +666,8 @@ const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   ...Object.fromEntries(MEDIUM_OR_SMALL_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "medium" }]))
 };
 
-/**
- * Same idea for spells. greater-invisibility ships with an empty `desc` upstream; the text is
- * the printed SRD 5.2.1 sentence.
- */
-const SPELL_CORRECTIONS: Record<string, Partial<SpellFields>> = {
-  "srd-2024_greater-invisibility": { desc: "A creature you touch has the Invisible condition until the spell ends." }
-};
+/** Same idea for spells: reviewed against the SRD 5.2.1 spells chapter (`spell-corrections.ts`). */
+const SPELL_CORRECTIONS: Readonly<Record<string, Partial<SpellFields>>> = SPELL_FIELD_CORRECTIONS;
 
 for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
   if (!creatures.some((creature) => creature.pk === pk))
@@ -1050,12 +1046,17 @@ const spellRecords = onlySrd(spells).map((spell) => {
   const fields = { ...spell.fields, ...correction };
   if (fields.saving_throw_ability && !abilityShort[fields.saving_throw_ability])
     throw new Error(`${spell.pk}: unexpected save ability ${fields.saving_throw_ability}`);
+  const effect = spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
+    distance: fields.range,
+    unit: fields.range_unit,
+    text: fields.range_text || null
+  });
   return {
     id: slugOf(spell.pk),
     name: fields.name,
     level: fields.level,
     school: fields.school,
-    castingTime: fields.casting_time,
+    castingTime: castingTimeText(fields.casting_time),
     reactionCondition: fields.reaction_condition || null,
     range: { distance: fields.range, unit: fields.range_unit, text: fields.range_text || null },
     components: {
@@ -1068,7 +1069,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     duration: fields.duration,
     concentration: fields.concentration,
     ritual: fields.ritual,
-    attackRoll: fields.attack_roll,
+    attackRoll: makesSpellAttack(fields.desc, effect),
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
     save: fields.saving_throw_ability
       ? { ability: abilityShort[fields.saving_throw_ability], ...spellSaveOutcomeFor(slugOf(spell.pk), fields.desc) }
@@ -1078,18 +1079,19 @@ const spellRecords = onlySrd(spells).map((spell) => {
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
     area: areaOfProse(fields.desc),
-    effect: spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types),
+    effect,
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,
-    castingOptions: (spellOptionsBySpell.get(spell.pk) ?? [])
-      .sort((left, right) => left.fields.type.localeCompare(right.fields.type))
-      .map((option) => ({
+    castingOptions: castingOptionsFor(
+      slugOf(spell.pk),
+      (spellOptionsBySpell.get(spell.pk) ?? []).map((option) => ({
         type: option.fields.type,
         damageRoll: option.fields.damage_roll || null,
         targetCount: option.fields.target_count,
         description: option.fields.desc || null
       }))
+    )
   };
 });
 

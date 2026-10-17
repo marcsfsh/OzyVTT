@@ -116,6 +116,46 @@ describe("character-builder content records", () => {
     }
   });
 
+  it("gives every class the multiclass proficiencies its 'As a Multiclass Character' section prints", () => {
+    const multiclass = Object.fromEntries(classes.map((entry) => [entry.id, entry.multiclassProficiencies]));
+    const classSkills = (id: string) => classes.find((entry) => entry.id === id)!.skillChoices.from;
+    // No class keeps its saving throws, and only the Barbarian, Fighter, Paladin and Ranger keep a weapon group:
+    // Martial weapons alone, since every starting class already has Simple ones.
+    expect(multiclass).toEqual({
+      barbarian: { armor: ["shields"], weapons: ["martial"], tools: [] },
+      bard: {
+        armor: ["light"],
+        weapons: [],
+        tools: [],
+        skills: { choose: 1, from: classSkills("bard") },
+        toolChoices: { choose: 1, from: expect.arrayContaining(["instrument-lute", "instrument-viol"]) }
+      },
+      cleric: { armor: ["light", "medium", "shields"], weapons: [], tools: [] },
+      druid: { armor: ["light", "shields"], weapons: [], tools: [] },
+      fighter: { armor: ["light", "medium", "shields"], weapons: ["martial"], tools: [] },
+      monk: { armor: [], weapons: [], tools: [] },
+      paladin: { armor: ["light", "medium", "shields"], weapons: ["martial"], tools: [] },
+      ranger: {
+        armor: ["light", "medium", "shields"],
+        weapons: ["martial"],
+        tools: [],
+        skills: { choose: 1, from: classSkills("ranger") }
+      },
+      rogue: {
+        armor: ["light"],
+        weapons: [],
+        tools: ["thieves-tools"],
+        skills: { choose: 1, from: classSkills("rogue") }
+      },
+      sorcerer: { armor: [], weapons: [], tools: [] },
+      warlock: { armor: ["light"], weapons: [], tools: [] },
+      wizard: { armor: [], weapons: [], tools: [] }
+    });
+    // The Bard's instrument pick is the ten instruments, nothing else from the tools catalog.
+    expect(multiclass.bard?.toolChoices?.from).toHaveLength(10);
+    expect(multiclass.bard?.toolChoices?.from.every((id) => id.startsWith("instrument-"))).toBe(true);
+  });
+
   it("transcribes the Fighter faithfully (spot check)", () => {
     const fighter = classes.find((entry) => entry.id === "fighter")!;
     expect(fighter.hitDie).toBe("d10");

@@ -92,7 +92,13 @@ describe("save outcomes in the shipped content", () => {
 
   it("reads spells' running prose the same way", () => {
     expect(spellSave("fireball")).toEqual({ ability: "dex", successDamage: "half", failureConditions: [] });
-    expect(spellSave("sacred-flame")).toEqual({ ability: "dex", successDamage: "none", failureConditions: [] });
+    // A reviewed override: "no benefit from Half Cover or Three-Quarters Cover for this save".
+    expect(spellSave("sacred-flame")).toEqual({
+      ability: "dex",
+      successDamage: "none",
+      failureConditions: [],
+      ignoresCover: true
+    });
     expect(spellSave("hold-person")).toEqual({
       ability: "wis",
       successDamage: "none",

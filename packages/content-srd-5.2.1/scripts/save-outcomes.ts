@@ -23,6 +23,7 @@ export type SaveOutcome = {
   rangeFeet?: number;
   failsAtHitPoints?: number;
   ongoingDamage?: OngoingDamage;
+  ignoresCover?: true;
 };
 
 const CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
@@ -218,7 +219,9 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "power-word-stun": { failureConditions: ["stunned"], repeatSave: true, failsAtHitPoints: 150 },
   // Three successes or three failures, not one repeat: the GM keeps count.
   "flesh-to-stone": { repeatSave: undefined },
-  contagion: { repeatSave: undefined }
+  contagion: { repeatSave: undefined },
+  // "The target gains no benefit from Half Cover or Three-Quarters Cover for this save."
+  "sacred-flame": { ignoresCover: true }
 };
 
 /** `spellSaveOutcome` with the reviewed corrections applied. Unset fields an override names are dropped. */

@@ -46,7 +46,6 @@ const RULE_FAMILIES = {
   "legendary.no-actions-remaining": "resources",
   "feature.no-uses-remaining": "resources",
   "feature.requires-effect": "resources",
-  "feature.no-spell-slot": "resources",
   "range.out-of-range": "targeting",
   "range.out-of-reach": "targeting",
   "range.underwater": "targeting",
@@ -56,12 +55,18 @@ const RULE_FAMILIES = {
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",
   "attack.cleave-too-far": "targeting",
+  // A spell aimed at more creatures than it can target (Hold Person at two Humanoids from a 2nd-level slot).
+  "target.too-many": "targeting",
   // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
   "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction, not an economy one.
   "condition.charmed-charmer": "targeting",
-  // Nothing raises it yet; the slots family is already part of the GM's exceptions.
-  "slots.none-remaining": "slots"
+  // Spellcasting is its own family, so "Don't police spell slots or prepared spells" relaxes these and nothing else.
+  "slots.none-remaining": "slots",
+  "slots.below-spell-level": "slots",
+  "slots.one-per-turn": "slots",
+  // Casting a spell the character hasn't prepared is spellcasting bookkeeping too.
+  "slots.not-prepared": "slots"
 } as const satisfies Record<string, RuleFamily>;
 
 export type RuleId = keyof typeof RULE_FAMILIES;

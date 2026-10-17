@@ -106,7 +106,8 @@ export const paladin: ClassMechanicsModule = {
           type: "extra-damage",
           formula: "1d8",
           damageType: "radiant",
-          when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["melee", "unarmed"] }]
+          // A melee weapon or an Unarmed Strike: a melee spell attack is melee but no weapon.
+          when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["melee-weapon", "unarmed"] }]
         }
       ]
     },

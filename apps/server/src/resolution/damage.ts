@@ -1,5 +1,12 @@
-import { owedDamageParts, type ActionResolution, type ActionResolutionAttack } from "@vtt/domain";
-import { collectRiders, parseDiceFormula, resolveDice, type DiceExpression, type RiderMoment } from "@vtt/rules-5e";
+import { owedDamageParts, type ActionResolution, type ActionResolutionAttack, type DamageTarget } from "@vtt/domain";
+import {
+  collectRiders,
+  parseDiceFormula,
+  resolveDice,
+  type DiceExpression,
+  type RiderCarrier,
+  type RiderMoment
+} from "@vtt/rules-5e";
 import { endEffect } from "../effects.js";
 import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
 
@@ -71,11 +78,24 @@ function damageInForce(ctx: ResolveContext): ResolveContext["action"]["damage"] 
   return [...base, ...variants.filter((variant) => variant.mode === "plus").flatMap((variant) => variant.damage)];
 }
 
-/** The action's own damage dice: crit-doubled, Savage Attacks on the first part. */
+/** The action's own damage dice: crit-doubled, Savage Attacks on the first part. A darts action rolls each dart on
+ *  its own and assigns it: dart i strikes the i-th target listed, the list wrapping round when darts remain. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
-  const { action, deps, damage } = ctx;
+  const { action, deps, damage, input } = ctx;
   const parts = damageInForce(ctx);
   if (parts.length === 0 || !rollsDamage(ctx.attack)) return;
+  if (action.darts !== undefined && input.targetIds.length > 0) {
+    for (let dart = 0; dart < action.darts; dart += 1) {
+      const targetId = input.targetIds[dart % input.targetIds.length]!;
+      for (const part of parts) {
+        const rolled = resolveDice(parseDiceFormula(part.formula), deps.random);
+        recordRoll(ctx, rolled, "damage");
+        damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+        ctx.dartTargetIds.push(targetId);
+      }
+    }
+    return;
+  }
   parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
@@ -85,20 +105,57 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
   });
 }
 
-/** Riders that add damage, from every carrier (items, feats, features, live effects): typed `extra-damage` as
- *  its own `damage[]` entry (crit-doubled unless `doubleOnCritical` is false: a Critical Hit rolls the attack's
- *  other damage dice twice too) and moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on
- *  every damage roll of its action; `on-hit`/`on-critical-hit` narrow it. The moments collected here are
- *  `DAMAGE_ROLL_MOMENTS`. */
+/** What a darts action owes each creature its darts struck (`damageTargets`); anything a rider added beyond the
+ *  darts goes to the first. Null for any other action. */
+export function dartDamageTargetsOf(ctx: ResolveContext): DamageTarget[] | null {
+  if (ctx.dartTargetIds.length === 0) return null;
+  const first = ctx.dartTargetIds[0]!;
+  const struck = [...new Set(ctx.dartTargetIds)];
+  return struck.map((targetId) => {
+    const parts = owedDamageParts({
+      damage: ctx.damage.filter((_, index) => (ctx.dartTargetIds[index] ?? first) === targetId),
+      bonusDamage: targetId === first ? ctx.bonusDamage : []
+    });
+    return {
+      targetId,
+      targetName: ctx.targets.find((target) => target.id === targetId)?.name ?? "The target",
+      parts,
+      total: parts.reduce((sum, part) => sum + part.amount, 0)
+    };
+  });
+}
+
+/** The effects the attacker put on the creature its attack roll hit, as carriers of the attacker's riders against it
+ *  alone (Hunter's Mark's extra 1d6): read with `fromEffectSource`, so only `by-effect-source` riders pass. */
+function markCarriers(ctx: ResolveContext): RiderCarrier[] {
+  const { attack, attacker, targets } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit")) return [];
+  const target = targets.find((candidate) => candidate.id === attack.targetId);
+  return (target?.effects ?? [])
+    .filter((effect) => effect.sourceActorId === attacker.id && effect.modifiers.length > 0)
+    .map((effect) => ({ label: effect.name, modifiers: effect.modifiers, sourceEffectId: effect.id }));
+}
+
+/** Riders that add damage, from every carrier (items, feats, features, live effects, and the marks the attacker
+ *  put on the creature it hit): typed `extra-damage` as its own `damage[]` entry (crit-doubled unless
+ *  `doubleOnCritical` is false: a Critical Hit rolls the attack's other damage dice twice too) and moment-gated flat
+ *  `damage-bonus` as a bonus line. A rider with no `when` fires on every damage roll of its action;
+ *  `on-hit`/`on-critical-hit` narrow it. The moments collected here are `DAMAGE_ROLL_MOMENTS`. */
 export function rollRiderDamage(ctx: ResolveContext): void {
   const { attack, crit, derivation, riderFilters, deps, damage, bonusDamage, warnings } = ctx;
   if (!rollsDamage(attack)) return;
   const passes: Array<RiderMoment | null> = [null, "on-damage-roll"];
   if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") passes.push("on-hit");
   if (crit) passes.push("on-critical-hit");
+  const marks = markCarriers(ctx);
   const already = new Set<unknown>();
   for (const moment of passes) {
-    for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {
+    const context = { ...derivation.context, ...riderFilters, moment };
+    const riders = [
+      ...collectRiders(derivation.carriers, context),
+      ...(marks.length > 0 ? collectRiders(marks, { ...context, fromEffectSource: true }) : [])
+    ];
+    for (const rider of riders) {
       const modifier = rider.modifier;
       // Standing flat bonuses (moment null) were already folded into the formula by `withStandingRiders`.
       if (modifier.type === "damage-bonus") {

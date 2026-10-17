@@ -303,7 +303,8 @@ describe("generated OpenAPI components", () => {
       "spell-id-is": { spellIds: ["eldritch-blast"] },
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large", "huge"] },
-      "versus-condition": { conditionIds: ["prone"] }
+      "versus-condition": { conditionIds: ["prone"] },
+      "by-effect-source": {}
     };
 
     /** One payload per modifier. */

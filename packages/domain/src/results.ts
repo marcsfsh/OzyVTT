@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { ActionReactionSchema, CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
+import { ActionReactionSchema, CharacterChoiceSchema, DamageTypeSchema, type CharacterChoice } from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
-import { AbilityIdSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
+import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
 import type { Wire } from "./wire.js";
 
 /**
@@ -54,6 +54,9 @@ export type ActionResolutionAttack = Readonly<{
     amount: number;
     source: string;
   }>;
+  /** Dice an effect adds to the roll, in `total` (Bless +1d4, Bane -1d4). A preview leaves `total` null: they roll
+   *  when the attack is confirmed. */
+  bonusDice?: ReadonlyArray<Readonly<{ label: string; dice: string; total: number | null }>>;
 }>;
 /** Every source behind an attack's advantage/disadvantage, so the table can see the math (ADR-0020). */
 export type ActionRollMode = Readonly<{
@@ -158,7 +161,8 @@ export type ActionResolution = Readonly<{
   preview?: boolean;
   /** On a previewed hit, the extras the attacker may add when confirming (`hitOptions`). */
   hitOffers?: readonly HitOffer[];
-  /** No attack roll and no save, but damage (Magic Missile): what each target is owed, applied or proposed like a hit. */
+  /** No attack roll and no save, but damage: what each target is owed, applied or proposed like a hit. A darts action
+   *  (Magic Missile) owes each creature only what its own darts dealt. */
   damageTargets?: readonly DamageTarget[];
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
@@ -265,7 +269,11 @@ export const ActionAvailabilitySchema = z.strictObject({
   /** The hit points it restores (a potion's 2d4 + 2), for display. */
   healing: z.strictObject({ formula: z.string() }).nullable().optional(),
   /** Who a tap picks: one creature, several, or none (it acts on its user); null when nothing structured resolves. */
-  targeting: z.enum(["none", "single", "multi"]).nullable().optional()
+  targeting: z.enum(["none", "single", "multi"]).nullable().optional(),
+  /** Darts it makes, each assigned to a target (Magic Missile read from a scroll or cast from a wand). */
+  darts: z.number().int().nullable().optional(),
+  /** The damage types its caster picks from (Chromatic Orb). */
+  damageTypes: z.array(DamageTypeSchema).nullable().optional()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
 /** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. */
@@ -383,10 +391,24 @@ export type BuilderOffersRequest = Readonly<{
   backgroundId?: string;
   classId?: string;
   level: number;
+  /** The class each character level went to, in order (index 0 is level 1); absent for one class. */
+  classLevels?: readonly string[];
   picks?: Readonly<Record<string, readonly string[]>>;
   asiIncreases?: Readonly<Record<string, readonly BuilderAbilityIncrease[]>>;
   choices?: readonly CharacterChoice[];
+  /** With `choices`, the stored sheet's level and ability scores: the reply then says how those scores were made. */
+  sheet?: Readonly<{ level: number; abilityScores: Readonly<Record<BuilderAbility, number>> }>;
 }>;
+type BuilderAbility = z.infer<typeof AbilityIdSchema>;
+
+/** How a stored character's ability scores were made: the ledger's record, or for a sheet built before the ledger
+ *  kept one, the base scores and background increase that rebuild its totals (`derived`). */
+const BuilderSheetAbilitiesSchema = z.strictObject({
+  abilityMethod: BuilderAbilityMethodSchema,
+  baseScores: z.record(AbilityIdSchema, z.number().int()),
+  backgroundBonusAllocation: z.array(z.strictObject({ ability: AbilityIdSchema, amount: z.number().int() })),
+  derived: z.boolean()
+});
 
 /** What the build offers, the answers it still accepts (picks it no longer offers are dropped), and the
  *  ledger rows those answers make, which `character.create` carries. */
@@ -395,7 +417,10 @@ export const BuilderOffersReplySchema = z.strictObject({
   picks: z.record(z.string(), z.array(z.string())),
   asiIncreases: z.record(z.string(), BuilderAbilityIncreasesSchema),
   subclassId: z.string().nullable(),
-  choices: z.array(CharacterChoiceSchema)
+  choices: z.array(CharacterChoiceSchema),
+  /** For a draft that sent `sheet`: how that sheet's scores were made. Null when not asked, or when no base scores
+   *  and background increase reproduce them. */
+  abilities: BuilderSheetAbilitiesSchema.nullable()
 });
 export type BuilderOffersReply = Wire<z.infer<typeof BuilderOffersReplySchema>>;
 export type BuilderOffersResult = MutationResult & Partial<BuilderOffersReply>;

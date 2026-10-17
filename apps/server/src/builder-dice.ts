@@ -9,6 +9,7 @@ import {
   type HitDie
 } from "@vtt/rules-5e";
 import { storedAbilityScores, type CharacterCreateRequestInput } from "./character-build.js";
+import { storedClassSequence } from "./character-offers.js";
 import { CommandRejectedError } from "./game-store.js";
 import { recordRoll } from "./roll-history.js";
 
@@ -35,13 +36,40 @@ export type BuilderDiceContext = Readonly<{
   sessionId: string;
   /** The sheet being rebuilt, whose recorded rolls and ability scores a rebuild may re-send. */
   previous: ActorDefinition | undefined;
-  /** The class's hit die, or null when the class is unknown (the build then refuses it). */
-  hitDie: HitDie | null;
+  /** A class's hit die, or null when the class is unknown (the build then refuses it). */
+  hitDieOf: (classId: string) => HitDie | null;
+  /** Whether these are the base scores the previous sheet's own totals imply, for a sheet that recorded none. */
+  derivedScoresMatch?: (request: BuilderDiceRequest) => boolean;
   random: (sides: number) => number;
 }>;
 
+/** One hit-point die the server threw for a level, at that level's class die. */
+export type ThrownHitPointDie = Readonly<{ faces: number; roll: number }>;
+
 function reject(message: string): never {
   throw new CommandRejectedError(message);
+}
+
+/** The class each level of a request goes to (its build checks the list itself). */
+const sequenceOf = (request: Pick<CharacterCreateRequestInput, "classId" | "level" | "classLevels">) =>
+  request.classLevels ?? Array.from({ length: request.level }, () => request.classId);
+
+/**
+ * The rolls a stored sheet recorded, by level, where the level still goes to the class each was rolled for: a respec
+ * into another class there rolls afresh. A single-class sheet's rows name no class; they are its class's.
+ */
+function storedRolls(previous: ActorDefinition | undefined, sequence: readonly string[]): Map<number, number> {
+  const ledger: readonly CharacterChoice[] = previous?.character?.choices ?? [];
+  const previousSequence = storedClassSequence(ledger);
+  const previousClass = previous?.character?.classes?.[0]?.id;
+  const stored = new Map<number, number>();
+  for (const row of ledger) {
+    const roll = row.payload?.roll;
+    if (row.kind !== "hp-roll" || typeof roll !== "number" || !Number.isInteger(roll) || roll < 1) continue;
+    const rolledFor = row.classId ?? previousSequence?.[row.level - 1] ?? previousClass;
+    if (rolledFor !== undefined && rolledFor === sequence[row.level - 1]) stored.set(row.level, roll);
+  }
+  return stored;
 }
 
 /** The build input with its hit points settled, and the dice the server threw for them (levels in order). */
@@ -49,21 +77,19 @@ export function settleBuilderDice(
   state: GameState,
   request: BuilderDiceRequest,
   context: BuilderDiceContext
-): { input: CharacterCreateRequestInput; thrown: readonly number[] } {
+): { input: CharacterCreateRequestInput; thrown: readonly ThrownHitPointDie[] } {
   const { abilityRollId: _rollId, hp, ...rest } = request;
   const ledger: readonly CharacterChoice[] = context.previous?.character?.choices ?? [];
-  // A stored roll belongs to the class it was rolled for, so a respec into another class rolls afresh.
-  const sameClass = context.previous?.character?.classes?.[0]?.id === request.classId;
-  const stored = new Map<number, number>();
-  if (sameClass)
-    for (const row of ledger) {
-      const roll = row.payload?.roll;
-      if (row.kind === "hp-roll" && typeof roll === "number" && Number.isInteger(roll) && roll >= 1)
-        stored.set(row.level, roll);
-    }
+  const sequence = sequenceOf(request);
+  const stored = storedRolls(context.previous, sequence);
+  // A rebuild re-sending the values its sheet recorded (or, for a sheet that recorded none, the ones its totals imply)
+  // keeps their method, whatever the table allows today.
+  const keepsRecordedScores =
+    sendsRecordedScores(request, ledger) ||
+    (storedAbilityScores(ledger) === null && context.derivedScoresMatch?.(request) === true);
 
   if (!context.gm && state.builderPolicy.typedRolls !== "open") {
-    requireServerAbilityRoll(state, request, context, ledger);
+    if (!keepsRecordedScores) requireServerAbilityRoll(state, request, context);
     if (hp.mode === "entries")
       (hp.entries ?? []).forEach((entry, index) => {
         if (stored.get(index + 2) !== entry)
@@ -73,37 +99,29 @@ export function settleBuilderDice(
       });
   }
 
-  // A rebuild re-sending the values its sheet recorded keeps their method, whatever the table allows today.
-  const keepsRecordedScores = sendsRecordedScores(request, ledger);
   const base = { ...rest, ...(keepsRecordedScores ? { keepsRecordedScores } : {}) };
-  if (hp.mode !== "roll" || !context.hitDie) {
+  const dice = sequence.map((classId) => context.hitDieOf(classId));
+  if (hp.mode !== "roll" || dice.some((die) => die === null)) {
     return {
       input: { ...base, hp: hp.mode === "roll" ? { mode: "average" } : (hp as CharacterCreateRequestInput["hp"]) },
       thrown: []
     };
   }
-  const faces = hitDieFaces(context.hitDie);
-  const thrown: number[] = [];
-  const entries = Array.from({ length: Math.max(0, request.level - 1) }, (_, index) => {
+  const thrown: ThrownHitPointDie[] = [];
+  const entries = dice.slice(1).map((die, index) => {
+    const faces = hitDieFaces(die!);
     const recorded = stored.get(index + 2);
     if (recorded !== undefined && recorded <= faces) return recorded;
     const roll = context.random(faces);
-    thrown.push(roll);
+    thrown.push({ faces, roll });
     return roll;
   });
   return { input: { ...base, hp: { mode: "entries", entries } }, thrown };
 }
 
-/** Rolled scores a player sends must be the six totals of their own server roll, unless a rebuild re-sends the
- *  values its sheet recorded (in any order: reassigning the same six is a respec, not a new roll). */
-function requireServerAbilityRoll(
-  state: GameState,
-  request: BuilderDiceRequest,
-  context: BuilderDiceContext,
-  ledger: readonly CharacterChoice[]
-): void {
+/** Rolled scores a player sends must be the six totals of their own server roll. */
+function requireServerAbilityRoll(state: GameState, request: BuilderDiceRequest, context: BuilderDiceContext): void {
   if (request.abilityMethod !== "roll" && request.abilityMethod !== "custom") return;
-  if (sendsRecordedScores(request, ledger)) return;
   const formula =
     request.abilityMethod === "custom"
       ? (state.builderPolicy.customFormula ?? ABILITY_ROLL_FORMULA)
@@ -124,7 +142,8 @@ function requireServerAbilityRoll(
 
 const sortedValues = (values: readonly number[]) => [...values].sort((left, right) => left - right).join(",");
 
-/** Whether a rebuild sends the six values its sheet recorded, under the same method, in any order. */
+/** Whether a rebuild sends the six values its sheet recorded, under the same method, in any order: reassigning the
+ *  same six is a respec, not a new roll. */
 function sendsRecordedScores(request: BuilderDiceRequest, ledger: readonly CharacterChoice[]): boolean {
   const recorded = storedAbilityScores(ledger);
   return (
@@ -144,7 +163,7 @@ export function abilityRollTotals(record: RollRecord, formula: string): number[]
   });
 }
 
-/** The hit-point dice a build threw, into the table feed like any roll. */
+/** The hit-point dice a build threw, into the table feed like any roll: one group per die size ("2d10 + 1d6"). */
 export function recordHitPointRoll(
   state: GameState,
   roll: Readonly<{
@@ -154,11 +173,12 @@ export function recordHitPointRoll(
     gm: boolean;
     actorId: string;
     label: string;
-    faces: number;
-    rolls: readonly number[];
+    dice: readonly ThrownHitPointDie[];
   }>
 ): void {
-  if (roll.rolls.length === 0) return;
+  if (roll.dice.length === 0) return;
+  const sizes = [...new Set(roll.dice.map((die) => die.faces))];
+  const formula = sizes.map((faces) => `${roll.dice.filter((die) => die.faces === faces).length}d${faces}`).join(" + ");
   recordRoll(state, {
     id: roll.id,
     commandId: roll.commandId,
@@ -169,11 +189,17 @@ export function recordHitPointRoll(
     actorId: roll.actorId,
     purpose: "manual",
     visibility: "public",
-    formula: `${roll.rolls.length}d${roll.faces}`,
-    normalizedFormula: `${roll.rolls.length}d${roll.faces}`,
-    dice: roll.rolls.map((face) => ({ group: 0, sides: roll.faces, face, kept: true, sign: 1 as const })),
+    formula,
+    normalizedFormula: formula,
+    dice: roll.dice.map((die) => ({
+      group: sizes.indexOf(die.faces),
+      sides: die.faces,
+      face: die.roll,
+      kept: true,
+      sign: 1 as const
+    })),
     modifiers: [],
-    total: roll.rolls.reduce((sum, face) => sum + face, 0),
+    total: roll.dice.reduce((sum, die) => sum + die.roll, 0),
     createdAt: new Date().toISOString()
   });
 }

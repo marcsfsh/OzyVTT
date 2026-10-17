@@ -45,10 +45,16 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "spell-id-is": "One specific spell",
   "versus-size": "A target's size",
   "versus-condition": "A target's condition",
-  "versus-creature-type": "A target's kind"
+  "versus-creature-type": "A target's kind",
+  "by-effect-source": "The creature that put this effect on"
 };
 
+/** Read only on an effect the engine puts on another creature (Hunter's Mark), never on an item or a feature, so the
+ *  editor doesn't offer it. */
+const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set(["by-effect-source"]);
+
 const TRIGGER_TYPES: readonly SelectOption[] = (Object.keys(TRIGGER_LABELS) as RiderTrigger["type"][])
+  .filter((type) => !ENGINE_ONLY_TRIGGERS.has(type))
   .map((type) => grouped(TRIGGER_GROUPS[RIDER_TRIGGER_KINDS[type]])(type, TRIGGER_LABELS[type]))
   .sort((a, b) => GROUP_ORDER.indexOf(a.group ?? "") - GROUP_ORDER.indexOf(b.group ?? ""));
 
@@ -273,6 +279,8 @@ export const whenField = (): FieldDef => ({
         opt("ranged", "Ranged"),
         opt("spell", "Spell"),
         opt("weapon", "Weapon"),
+        opt("melee-weapon", "Melee weapon"),
+        opt("ranged-weapon", "Ranged weapon"),
         opt("unarmed", "Unarmed"),
         opt("thrown", "Thrown"),
         opt("reaction", "Reaction"),

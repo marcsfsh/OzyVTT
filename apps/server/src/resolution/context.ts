@@ -58,11 +58,15 @@ export type ResolveInput = Readonly<{
   pushFeet?: number;
   /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */
   slotLevel?: number;
+  /** The damage type picked for an action whose caster chooses one (`ActorAction.damageTypes`); absent, its first. */
+  damageType?: string | null;
   /** A parked attack finishing (see `parkForAcReaction`): its economy was checked and spent when it rolled, so it is
    *  neither checked nor spent again, and its target is not offered the AC reaction a second time. */
   economyPaid?: boolean;
   /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */
   reactionAcBonus?: Readonly<{ amount: number; source: string }>;
+  /** A parked attack's effect dice as they rolled (Bless's d4), reused by the replay instead of rolling again. */
+  attackBonusDice?: ReadonlyArray<Readonly<{ label: string; dice: string; total: number }>>;
   /** Extras to add to the hit, chosen from the preview's offers (Sneak Attack, a smite and its slot, a charge). */
   hitOptions?: readonly HitOptionChoice[];
 }>;
@@ -137,6 +141,8 @@ export type ResolveContext = {
   /** The roll-specific facts riders filter on (attack kind, target size, damage types...). */
   riderFilters: Omit<Partial<RiderContext>, "moment">;
   readonly damage: Array<{ formula: string; type: string; total: number; source?: string }>;
+  /** Who each of a darts action's darts strikes, in order (`damage[i]` is dart i). Empty for any other action. */
+  readonly dartTargetIds: string[];
   readonly bonusDamage: Array<{ amount: number; type: string; source: string }>;
   /** The weapon mastery in force on this swing; null unless a mastery applies to an attack that rolled. */
   masterySwing: MasterySwing | null;
@@ -162,10 +168,17 @@ export type ResolveContext = {
   readonly damageEffectIds: string[];
 };
 
-/** Records one rolled formula in the shared history, attributed like every roll of this resolve. */
-export function recordRoll(ctx: ResolveContext, resolution: DiceResolution, purpose: RollRecord["purpose"]): void {
+/** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die
+ *  that is not the action's own (Bless's d4). */
+export function recordRoll(
+  ctx: ResolveContext,
+  resolution: DiceResolution,
+  purpose: RollRecord["purpose"],
+  label?: string
+): void {
   const record: RollRecord = {
     ...ctx.rollBase,
+    ...(label !== undefined ? { label } : {}),
     id: ctx.deps.newRollId(),
     purpose,
     formula: resolution.expression.source,

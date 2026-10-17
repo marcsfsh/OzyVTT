@@ -12488,7 +12488,12 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage."
+    "reminder": "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage.",
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 20,
+     "widthFeet": null
+    }
    },
    {
     "id": "spellcasting",
@@ -36982,6 +36987,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 10,
+     "widthFeet": null
     }
    },
    {

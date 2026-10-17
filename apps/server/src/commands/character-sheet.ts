@@ -8,6 +8,7 @@ import {
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
+  CharacterFinishPreparingSchema,
   CharacterSetPreparedSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
@@ -16,7 +17,7 @@ import {
 import { recoverAmmunition } from "../ammunition.js";
 import { CommandRejectedError } from "../game-store.js";
 import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
-import { setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
+import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -69,12 +70,12 @@ export const characterSheetCommands = [
     type: "character.set-slot",
     operationId: "setSpellSlot",
     description:
-      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum) - spend or restore a slot during play. Player sessions may target only their claimed character.",
+      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum) - spend or restore a slot during play. With `pact`, it sets the Warlock's Pact Magic slots at that level instead. Player sessions may target only their claimed character.",
     summary: "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).",
     schema: CharacterSetSlotSchema,
     malformed: "The spell-slot command is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { actorId, level, remaining } = request;
+      const { actorId, level, remaining, pact } = request;
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "resource");
         setSpellSlotRemaining(
@@ -83,7 +84,8 @@ export const characterSheetCommands = [
           level,
           remaining,
           (definitionId) => kit.resolveDefinitionIn(state, definitionId),
-          kit.equipmentCatalog()
+          kit.equipmentCatalog(),
+          pact === true
         );
       });
     }
@@ -93,7 +95,7 @@ export const characterSheetCommands = [
     type: "character.set-prepared",
     operationId: "setPreparedSpell",
     description:
-      "Prepares or un-prepares one of a character's known spells (cantrips and always-prepared spells can't be toggled). Player sessions may target only their claimed character.",
+      "Prepares or un-prepares one of a character's known spells (cantrips and always-prepared spells can't be toggled), within the sheet's prepared cap. A player session may target only their claimed character, and only in the prepare step a Long Rest opens for a Cleric, Druid, Wizard, Paladin or Ranger (Paladins and Rangers swap in one spell), never mid-fight; the GM may change it any time.",
     summary: "Prepare or un-prepare one of a character's known spells.",
     schema: CharacterSetPreparedSchema,
     malformed: "The prepared-spell command is malformed.",
@@ -101,9 +103,30 @@ export const characterSheetCommands = [
       const { actorId, spellId, prepared } = request;
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "resource");
-        setPreparedSpell(state, actorId, spellId, prepared, (definitionId) =>
-          kit.resolveDefinitionIn(state, definitionId)
+        setPreparedSpell(
+          state,
+          actorId,
+          spellId,
+          prepared,
+          (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+          initiatorOf(principal).role
         );
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "character.finish-preparing",
+    operationId: "finishPreparing",
+    description:
+      "Closes the prepare step a Long Rest opened for a character: its prepared spells stand until the next Long Rest. Player sessions may target only their claimed character.",
+    summary: "Close a character's prepare step after a Long Rest.",
+    schema: CharacterFinishPreparingSchema,
+    malformed: "The finish-preparing command is malformed.",
+    async run({ principal, request, execute }) {
+      await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, request.actorId, "resource");
+        finishPreparing(state, request.actorId);
       });
     }
   }),

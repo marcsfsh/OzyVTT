@@ -57,8 +57,7 @@
    "save": {
     "ability": "dex",
     "dc": 15,
-    "successDamage": "half",
-    "failureCondition": null
+    "successDamage": "half"
    },
    "damage": [
     {
@@ -75,8 +74,7 @@
    "save": {
     "ability": "dex",
     "dc": 15,
-    "successDamage": "half",
-    "failureCondition": null
+    "successDamage": "half"
    },
    "damage": [
     {
@@ -93,8 +91,7 @@
    "save": {
     "ability": "wis",
     "dc": 15,
-    "successDamage": "none",
-    "failureCondition": null
+    "successDamage": "none"
    },
    "damage": []
   }

@@ -364,7 +364,7 @@ const featureChoiceBase = {
   fromPicks: z
     .object({
       offer: PickBudgetKeySchema,
-      where: z.enum(["deals-damage", "attack-roll", "ranged"]).optional()
+      where: z.enum(["deals-damage", "attack-roll", "ranged", "ranged-damage"]).optional()
     })
     .strict()
     .optional(),
@@ -654,13 +654,15 @@ export const ClassReferenceSchema = z
     toolProficiencies: z.array(ContentIdSchema).max(20).default([]),
     toolChoices: ChoiceListSchema.optional(),
     startingEquipment: z.array(StartingEquipmentOptionSchema).max(6).default([]),
-    /** Proficiencies gained when the class is taken as a multiclass (narrower than the level-1 set). */
+    /** Proficiencies gained when the class is taken as a multiclass (narrower than the level-1 set): the Rogue's
+     *  skill from its list, the Bard's instrument of choice. */
     multiclassProficiencies: z
       .object({
         armor: z.array(ContentIdSchema).max(10).default([]),
         weapons: z.array(ContentIdSchema).max(40).default([]),
         tools: z.array(ContentIdSchema).max(20).default([]),
-        skills: ChoiceListSchema.optional()
+        skills: ChoiceListSchema.optional(),
+        toolChoices: ChoiceListSchema.optional()
       })
       .strict()
       .optional(),

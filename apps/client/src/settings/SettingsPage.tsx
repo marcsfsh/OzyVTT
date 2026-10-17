@@ -70,7 +70,7 @@ const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>
   { family: "economy", label: "Don't police action economy" },
   { family: "resources", label: "Don't police limited uses" },
   { family: "targeting", label: "Don't police targeting, range & cover" },
-  { family: "slots", label: "Don't police spell slots" }
+  { family: "slots", label: "Don't police spell slots or prepared spells" }
 ];
 
 const ABILITY_METHODS: ReadonlyArray<Readonly<{ id: BuilderAbilityMethod; label: string }>> = [

@@ -90,3 +90,9 @@ export function tokensInTemplate(
 export function cellCenterImage(calibration: SquareGridCalibration, column: number, row: number): AnnotationPoint {
   return gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
 }
+
+/** SRD areas of effect: an Emanation's creature, and the point a Cone or Line starts from, aren't in the area, nor is
+ *  the caster of a Self spell (Thunderwave's Cube); a Sphere, Cylinder or Cube placed over its caster catches them. */
+export function areaOriginatesFromCaster(shape: string, spellRange: string | null | undefined): boolean {
+  return shape === "emanation" || shape === "cone" || shape === "line" || /^self\b/i.test(spellRange ?? "");
+}

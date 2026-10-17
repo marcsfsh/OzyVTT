@@ -12,10 +12,10 @@ import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
 import { consumableRowFor } from "./consumables.js";
-import { rollAttack } from "./resolution/attack.js";
+import { rollAttack, spendUntilAttacked } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
-import { rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
+import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { readScroll } from "./resolution/scroll.js";
@@ -58,10 +58,12 @@ export function resolveDefinitionAction(
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
-  // The roll is made, so a Vex marker or a Sap it read is spent; a finishing replay already spent them.
+  // The roll is made, so a Vex marker, a Sap or Guiding Bolt's light it read is spent; a finishing replay already
+  // spent them.
   if (input.economyPaid !== true) {
     spendVex(ctx);
     spendSap(ctx);
+    spendUntilAttacked(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
@@ -87,8 +89,8 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   applyMasteryForces(ctx);
-  applyGrant(ctx);
   startConcentration(ctx);
+  applyGrant(ctx);
   applyHealing(ctx);
 
   parkReaction(ctx);
@@ -135,10 +137,13 @@ function previewOf(ctx: ResolveContext): ActionResolution {
 
 const withOffers = (offers: ReturnType<typeof hitOffersOf>) => (offers.length > 0 ? { hitOffers: offers } : {});
 
-/** With no attack roll and no save, every target takes the damage (SRD Magic Missile: "A dart deals 1d4 + 1 Force
- *  damage to its target"), owed like a hit's: the GM's Apply, or a player's proposal or direct damage. */
+/** With no attack roll and no save, every target takes the damage, owed like a hit's: the GM's Apply, or a player's
+ *  proposal or direct damage. A darts action owes each creature what its own darts dealt (SRD Magic Missile: "A dart
+ *  deals 1d4 + 1 Force damage to its target"). */
 function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"] {
   if (ctx.attack !== null || ctx.action.save || ctx.builtinSave) return undefined;
+  const darts = dartDamageTargetsOf(ctx);
+  if (darts) return darts;
   const parts = owedDamageParts(ctx);
   const total = parts.reduce((sum, part) => sum + part.amount, 0);
   if (total <= 0 || ctx.targets.length === 0) return undefined;
@@ -261,18 +266,21 @@ export function actionAvailability(
       // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
       targeting: builtin
         ? (BUILTIN_TARGETING[action.id] ?? "none")
-        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null)
+        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null),
+      // A spell cast from an item picks as the spell's own cast does: darts by target, the type to deal.
+      darts: action.darts ?? null,
+      damageTypes: action.damageTypes ? [...action.damageTypes] : null
     };
   });
 }
 
 /** Who a tap of this action picks, as the resolver will take it: one creature for an attack, a grant aimed at a
- *  target or a heal (a potion: the drinker); several for a save or damage with no attack roll, or a divided heal;
- *  none for what acts on its user (a self heal, Rage, a scroll of Detect Magic). Null for an action with nothing
- *  structured to resolve. */
+ *  target or a heal (a potion: the drinker); several for a save, damage with no attack roll, a grant on each
+ *  creature it targets (a scroll of Bless) or a divided heal; none for what acts on its user (a self heal, Rage, a
+ *  scroll of Detect Magic). Null for an action with nothing structured to resolve. */
 function tapTargeting(action: DefinitionAction, usesUpItem: boolean): "none" | "single" | "multi" | null {
   if (action.attack || action.grants?.target === "target") return "single";
-  if (action.save || action.damage.length > 0) return "multi";
+  if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
   const structured =
     action.grants !== undefined ||

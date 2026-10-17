@@ -276,7 +276,12 @@ function lingerOn(
     const type = DamageTypeSchema.safeParse(part.type);
     return formula.success && type.success ? [{ formula: formula.data, type: type.data }] : [];
   });
-  if (damage.length === 0 || !action.save) return;
+  // The spell asks for no save when it is cast, so its action carries none: the save is the spell's own, at the
+  // caster's spell save DC.
+  const spell = action.spellId ? ctx.deps.catalog?.spellRecord?.(action.spellId) : undefined;
+  const ability = action.save?.ability ?? spell?.save?.ability;
+  const dc = action.save?.dc ?? ctx.deps.definition?.spellcasting?.saveDc;
+  if (damage.length === 0 || ability === undefined || dc === undefined) return;
   const effect = addEffect(
     ctx.state,
     target.id,
@@ -291,7 +296,7 @@ function lingerOn(
       ongoingDamage: {
         damage: damage.slice(0, 2),
         at: "bearer-turn-start",
-        saveToEnd: { ability: action.save.ability, dc: action.save.dc }
+        saveToEnd: { ability, dc }
       }
     }),
     undefined,

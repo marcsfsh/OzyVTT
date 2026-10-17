@@ -549,6 +549,36 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].damageTypes",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Chromatic Orb), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].save.ignoresCover",
+    types: ACTION_CARRIERS,
+    reason: "one SRD author (Sacred Flame), copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.ignoresCover",
+    types: ["spell"],
+    reason: "one SRD author (Sacred Flame), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.failureEffect.**",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Bane, Faerie Fire), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].darts",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Magic Missile), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].area.**",
     types: ACTION_CARRIERS,
     reason: "read from the action's description as the catalog is built; the editor writes the description",
@@ -825,13 +855,15 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "multiclassProficiencies.**",
     types: ["class"],
-    reason: "the builder does not multiclass — no reader on the build path and no control",
+    reason:
+      "the builder grants these to a class taken after the first, but its skill and instrument picks (a Bard's, Ranger's or Rogue's) have no control",
     status: "gap"
   },
   {
     at: "multiclassPrerequisites.**",
     types: ["class"],
-    reason: "the builder does not multiclass — the schema key has no reader on the build path and no control",
+    reason:
+      "the builder checks these minimums when a class is taken, but no control authors the mode or the minimums list the rows sit in",
     status: "gap"
   },
   {

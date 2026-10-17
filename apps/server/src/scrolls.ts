@@ -207,7 +207,8 @@ export function scrollCastAction(
         12000
       ),
     ...mechanics,
-    ...(spell.area ? { area: spell.area } : {}),
+    // A healing area heals the creatures the reader picks, as the spell's own cast does, so it isn't templated.
+    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
     spellId: spell.id
   };
 }

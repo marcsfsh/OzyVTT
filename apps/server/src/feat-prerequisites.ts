@@ -21,20 +21,24 @@ export type FeatQualification = Readonly<{
 
 /**
  * The half of a qualification that does not change from slot to slot. Features are read at the build's own
- * level rather than the slot's, which no SRD prerequisite tells apart.
+ * level rather than the slot's, which no SRD prerequisite tells apart. The starting class brings its own armor and
+ * weapon training, a later class only what it gives a multiclass character.
  */
 export function featHoldings(
   build: Readonly<{
-    classRecord: ClassReference | null;
-    subclass: SubclassReference | null;
+    /** Every class, the starting class first. */
+    classes: ReadonlyArray<Readonly<{ record: ClassReference; subclass: SubclassReference | null }>>;
     /** `origin: null` marks a feat's own feature, which is not a feature the character holds for this. */
     granted: ReadonlyArray<Readonly<{ record: FeatureRecord; origin: unknown }>>;
   }>
 ): Pick<FeatQualification, "spellcasting" | "held"> {
-  const held = new Set<string>([
-    ...(build.classRecord?.armorProficiencies ?? []),
-    ...(build.classRecord?.weaponProficiencies ?? [])
-  ]);
+  const held = new Set<string>(
+    build.classes.flatMap(({ record }, index) =>
+      index === 0
+        ? [...record.armorProficiencies, ...record.weaponProficiencies]
+        : [...(record.multiclassProficiencies?.armor ?? []), ...(record.multiclassProficiencies?.weapons ?? [])]
+    )
+  );
   for (const { record, origin } of build.granted) {
     if (origin === null) continue;
     held.add(record.id);
@@ -42,7 +46,7 @@ export function featHoldings(
     for (const id of [...(record.grants?.armor ?? []), ...(record.grants?.weapons ?? [])]) held.add(id);
   }
   return {
-    spellcasting: Boolean(build.subclass?.spellcasting ?? build.classRecord?.spellcasting),
+    spellcasting: build.classes.some(({ record, subclass }) => Boolean(subclass?.spellcasting ?? record.spellcasting)),
     held
   };
 }

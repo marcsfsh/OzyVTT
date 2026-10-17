@@ -1,10 +1,23 @@
 import { useMemo, useState } from "react";
-import type { GmView, PlayerView } from "@vtt/domain";
+import type { ContentClassSummary, GmView, PlayerView } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { Alert, Button, useToast } from "@vtt/ui";
-import { useBuilderCatalogs } from "../content/catalogs";
+import { multiclassShortfalls, multiclassShortfallText } from "@vtt/rules-5e";
+import { Alert, Button, ChoiceGrid, useToast, type ChoiceOption } from "@vtt/ui";
+import { useBuilderCatalogs, type BuilderCatalogs } from "../content/catalogs";
+import { MAX_CLASSES } from "./build-payload";
 import { CharacterBuilder } from "./CharacterBuilder";
-import { choicesAbove, draftFromLedger, hpRollGap, identityOf, ledgerOf, recordedAbilities } from "./level-ledger";
+import {
+  choicesAbove,
+  classOrderUnknown,
+  draftFromLedger,
+  hpRollGap,
+  identityOf,
+  keptClasses,
+  ledgerOf,
+  recordedAbilities,
+  targetClassLevels,
+  type LedgerIdentity
+} from "./level-ledger";
 import { useBuilderOffers } from "./useBuilderOffers";
 import "./character-builder.css";
 
@@ -14,13 +27,17 @@ import "./character-builder.css";
  * levelling back up restores earlier choices and HP rolls exactly.
  *
  * Gates: no ledger (a PDF import or pre-wizard sheet) cannot be rebuilt; up stops at the table's max
- * level, down always reaches 1; missing HP rolls use the average and say so. The table reads the ledger
+ * level, down always reaches 1; missing HP rolls use the average and say so. A level up goes to one of the
+ * character's classes or, when the scores qualify, a new one (SRD Multiclassing). The table reads the ledger
  * back onto the offers at the chosen level before the wizard opens.
  * The server authorizes `character.rebuild` (`canInitiateForActor`) and re-checks cap and policy;
  * this surface mirrors those rules so a player is not walked into a rejection.
  */
 
 type LevelState = GmView | PlayerView;
+
+/** Ledger rows the build writes itself, which a level-down preview does not list as choices. */
+const BUILD_RECORDS: ReadonlySet<string> = new Set(["hp-roll", "class-levels", "ability-scores"]);
 
 export function LevelFlow({
   state,
@@ -39,7 +56,9 @@ export function LevelFlow({
 }>) {
   const catalogs = useBuilderCatalogs();
   const { toast } = useToast();
-  const [target, setTarget] = useState<number | null>(null);
+  const [target, setTarget] = useState<{ level: number; classLevels: string[] } | null>(null);
+  /** The class the next level goes to; null keeps the class of the last level taken. */
+  const [nextClass, setNextClass] = useState<string | null>(null);
 
   const actor = state.actors.find((entry) => entry.id === actorId) ?? null;
   /**
@@ -60,13 +79,16 @@ export function LevelFlow({
   const ledger = ledgerOf(definition);
   const current = identity?.level ?? 1;
   const reading = useBuilderOffers(
-    target !== null && identity && ledger
+    target !== null && identity && ledger && definition
       ? {
           speciesId: identity.speciesId,
           backgroundId: identity.backgroundId,
           classId: identity.classId,
-          level: target,
-          choices: ledger
+          level: target.level,
+          ...(new Set(target.classLevels).size > 1 ? { classLevels: target.classLevels } : {}),
+          choices: ledger,
+          // The sheet's own scores, so the table can say how they were made even where the ledger never recorded it.
+          sheet: { level: current, abilityScores: definition.abilityScores }
         }
       : null
   );
@@ -82,6 +104,14 @@ export function LevelFlow({
     return (
       <Gate title="Your GM builds the characters at this table" onClose={onClose}>
         Ask them to level {actor.name} for you.
+      </Gate>
+    );
+
+  if (classOrderUnknown(definition))
+    return (
+      <Gate title={`${actor.name}'s classes were added by hand`} onClose={onClose}>
+        The sheet lists its classes but not which level went to which, so it can&rsquo;t be releveled step-by-step.
+        Rebuild it in the builder to level it here.
       </Gate>
     );
 
@@ -102,34 +132,35 @@ export function LevelFlow({
 
   if (target !== null && (!reading.current || !reading.reply || !catalogs.loaded))
     return (
-      <div className="cb-page cb-level">
+      <LevelPage>
         <p className="cb-note" role="status">
-          Reading {actor.name}&rsquo;s choices at level {target}…
+          Reading {actor.name}&rsquo;s choices at level {target.level}…
         </p>
         <Button variant="ghost" onClick={() => setTarget(null)}>
           Back
         </Button>
-      </div>
+      </LevelPage>
     );
 
   if (target !== null && reading.reply) {
     const seed = draftFromLedger(identity, ledger, definition, catalogs, target, state.builderPolicy, reading.reply);
-    const gap = hpRollGap(ledger, target);
-    const recorded = recordedAbilities(ledger);
+    const gap = hpRollGap(ledger, target, identity.classLevels);
+    const recordedMethod = reading.reply.abilities?.abilityMethod ?? recordedAbilities(ledger)?.method;
     return (
       <CharacterBuilder
         state={state}
         connection={connection}
         onClose={() => setTarget(null)}
         onCreated={(name) => {
-          toast(`${name} is level ${target}.`, { tone: "success" });
+          toast(`${name} is level ${target.level}.`, { tone: "success" });
           onDone(name);
         }}
         rebuild={{
           actorId,
           name: actor.name,
           seed,
-          ...(recorded ? { recordedMethod: recorded.method } : {}),
+          heldClasses: keptClasses(identity, target.level),
+          ...(recordedMethod ? { recordedMethod } : {}),
           ...(gap
             ? {
                 notice: (
@@ -145,16 +176,25 @@ export function LevelFlow({
     );
   }
 
-  const removed = choicesAbove(ledger, current - 1);
+  // The rows the build writes for itself (the rolls, the class order) are not choices to give up.
+  const removed = choicesAbove(ledger, current - 1).filter((row) => !BUILD_RECORDS.has(row.kind));
   const atCap = current >= cap;
+  const classes = classesOf(identity, catalogs);
+  const multiclass = classes.length > 1;
+  const lastClass = identity.classLevels[current - 1];
+  const upClass = nextClass ?? lastClass;
+  const nameOf = (id: string) => catalogs.choice.classes.find((entry) => entry.id === id)?.name ?? id;
+  const lastName = nameOf(lastClass);
+  const onlyLevel = identity.classLevels.filter((id) => id === lastClass).length === 1;
 
   return (
-    <div className="cb-page cb-level">
+    <LevelPage>
       <header className="cb-level-head">
         <span className="nh-eyebrow">Level</span>
         <h2>{actor.name}</h2>
         <p>
           Level {current}
+          {multiclass ? ` · ${classes.map(({ name, levels }) => `${name} ${levels}`).join(" / ")}` : ""}
           {cap < 20 ? ` · the table's cap is ${cap}` : ""}
         </p>
       </header>
@@ -172,11 +212,45 @@ export function LevelFlow({
         ))}
       </ol>
 
+      {!atCap && (
+        <section className="cb-offer cb-level-class">
+          <div className="cb-offer-head">
+            <h3 className="cb-offer-title">Level {current + 1} goes to</h3>
+          </div>
+          <p className="cb-offer-help">
+            One of your classes, or a new one. A new class needs 13 in its primary ability and in each class you already
+            have.
+          </p>
+          <ChoiceGrid
+            ariaLabel={`Level ${current + 1} goes to`}
+            options={classChoices(identity, definition, catalogs)}
+            value={upClass}
+            onChange={setNextClass}
+            /* Capped, so the level buttons stay near the classes on a phone. */
+            bounded
+            searchable={catalogs.choice.classes.length > 8}
+            searchPlaceholder="Search classes…"
+          />
+        </section>
+      )}
+
       <div className="cb-level-actions">
-        <Button variant="primary" disabled={atCap} onClick={() => setTarget(current + 1)}>
+        <Button
+          variant="primary"
+          disabled={atCap}
+          onClick={() =>
+            setTarget({ level: current + 1, classLevels: targetClassLevels(identity, current + 1, upClass) })
+          }
+        >
           Level up to {Math.min(cap, current + 1)}
         </Button>
-        <Button variant="secondary" disabled={current <= 1} onClick={() => setTarget(current - 1)}>
+        <Button
+          variant="secondary"
+          disabled={current <= 1}
+          onClick={() =>
+            setTarget({ level: current - 1, classLevels: targetClassLevels(identity, current - 1, lastClass) })
+          }
+        >
           Level down to {Math.max(1, current - 1)}
         </Button>
         <Button variant="ghost" onClick={onClose}>
@@ -190,6 +264,12 @@ export function LevelFlow({
         <section className="cb-level-preview">
           <h3>Leveling down to {current - 1}</h3>
           <p>
+            {multiclass && (
+              <>
+                Level {current} went to {lastName}.
+                {onlyLevel ? ` It is your only ${lastName} level, so ${lastName} comes off the sheet.` : ""}{" "}
+              </>
+            )}
             {removed.length > 0 ? (
               <>
                 Leveling down removes:{" "}
@@ -206,12 +286,74 @@ export function LevelFlow({
             ) : (
               <>Level {current} added no choices of its own.</>
             )}{" "}
-            Your level-{current} choices and HP roll are kept — leveling back up restores them exactly.
+            Your level {current} choices and HP roll are kept, and leveling back up restores them exactly.
           </p>
         </section>
       )}
+    </LevelPage>
+  );
+}
+
+/** The flow's page: a full-width region that scrolls inside the pane (the page itself never does), holding the
+ *  centred column. */
+function LevelPage({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <div className="cb-level-page scroll-y">
+      <div className="cb-level">{children}</div>
     </div>
   );
+}
+
+/** The character's classes in the order taken, with their levels. */
+function classesOf(identity: LedgerIdentity, catalogs: BuilderCatalogs) {
+  const counts = new Map<string, number>();
+  for (const id of identity.classLevels) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return [...counts].map(([id, levels]) => ({
+    id,
+    levels,
+    name: catalogs.choice.classes.find((entry) => entry.id === id)?.name ?? id,
+    record: catalogs.choice.classes.find((entry) => entry.id === id) ?? null
+  }));
+}
+
+/**
+ * Where the next level can go: each class the character has, then every other class, unavailable with the reason
+ * when the scores don't qualify (SRD: 13 in the primary ability of the new class and of each current class, with
+ * the scores as they stand now) or the character has its most classes.
+ */
+function classChoices(
+  identity: LedgerIdentity,
+  definition: ActorDefinition,
+  catalogs: BuilderCatalogs
+): ChoiceOption[] {
+  const taken = classesOf(identity, catalogs);
+  const current = taken.flatMap(({ record }) => (record ? [record] : []));
+  const held: ChoiceOption[] = taken.map(({ id, name, levels, record }) => ({
+    value: id,
+    title: name,
+    description: `${name} level ${levels + 1}`,
+    meta: record?.hitDie
+  }));
+  const fresh = catalogs.choice.classes
+    .filter((record) => !taken.some((entry) => entry.id === record.id))
+    .map((record: ContentClassSummary): ChoiceOption => {
+      const shortfalls = multiclassShortfalls(definition.abilityScores, record, current);
+      const reason =
+        taken.length >= MAX_CLASSES
+          ? `A character can have at most ${MAX_CLASSES} classes.`
+          : shortfalls.length > 0
+            ? multiclassShortfallText(definition.abilityScores, record, shortfalls)
+            : null;
+      return {
+        value: record.id,
+        title: record.name,
+        description: `New class · ${record.name} level 1`,
+        meta: record.hitDie,
+        keywords: record.primaryAbilities.join(" "),
+        ...(reason ? { disabled: true, disabledReason: reason } : {})
+      };
+    });
+  return [...held, ...fresh];
 }
 
 function Gate({
@@ -220,7 +362,7 @@ function Gate({
   onClose
 }: Readonly<{ title: string; children: React.ReactNode; onClose: () => void }>) {
   return (
-    <div className="cb-page cb-level">
+    <LevelPage>
       <section className="cb-level-gate">
         <h2>{title}</h2>
         <p>{children}</p>
@@ -228,6 +370,6 @@ function Gate({
           Back
         </Button>
       </section>
-    </div>
+    </LevelPage>
   );
 }

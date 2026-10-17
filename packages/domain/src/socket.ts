@@ -72,6 +72,7 @@ import type {
   CharacterGiveItemSchema,
   CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
+  CharacterFinishPreparingSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
@@ -433,6 +434,10 @@ export interface ClientToServerEvents {
   ) => void;
   "character:set-prepared": (
     payload: CommandPayload<typeof CharacterSetPreparedSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:finish-preparing": (
+    payload: CommandPayload<typeof CharacterFinishPreparingSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   // Optional item keys are declared so the type states the whole wire contract; the server validates `baseId`.

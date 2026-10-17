@@ -796,6 +796,25 @@
   padding-top: 0.8rem;
   border-top: 1px dashed color-mix(in srgb, var(--line-strong) 55%, transparent);
 }
+/* The prepare step a Long Rest opens: what may change, and Done. */
+.sheet-prepare-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0.4rem 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+.sheet-prepare-step p {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.sheet-prepare-step button {
+  min-height: 44px;
+}
 .sheet-spell-group-head {
   display: flex;
   align-items: center;

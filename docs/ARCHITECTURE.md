@@ -217,7 +217,10 @@ names no family is the GM's own ruling on the whole command.
 - Characters are built server-side (`character-build.ts`) from content and the choices made in
   the guided builder. What a build may pick is one survey (`character-offers.ts`): a create
   validates against it, the random generator answers it, and the builder is served it for each
-  draft (`builder-offers.ts`), so the client holds no copy of the build rules. An unfinished build
+  draft (`builder-offers.ts`), so the client holds no copy of the build rules. A multiclass build
+  names the class each level went to (`classLevels`, kept in the choice ledger so a rebuild keeps the
+  order); each class's features read that class's own level, and the server checks the SRD
+  multiclass prerequisites with the scores of the moment each class is taken. An unfinished build
   is parked on the server (`character-drafts.ts`), one per player session and one for the GM, beside
   the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
   imported as an actor definition.

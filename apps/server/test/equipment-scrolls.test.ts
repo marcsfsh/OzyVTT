@@ -28,8 +28,13 @@ import {
 
 const READ = "item-spell-scroll-read";
 const scrollOf = (spellId: string, over = {}) => catalogRow("spell-scroll", { equipped: false, spellId, ...over });
-/** A second scroll row of the same record, as the sheet adds one bearing another spell. */
-const secondScroll = (spellId: string) => ({ ...scrollOf(spellId), id: "spell-scroll-2", recordId: "spell-scroll" });
+/** Another scroll row of the same record, as the sheet adds one bearing another spell. */
+const nthScroll = (spellId: string, n: number) => ({
+  ...scrollOf(spellId),
+  id: `spell-scroll-${n}`,
+  recordId: "spell-scroll"
+});
+const secondScroll = (spellId: string) => nthScroll(spellId, 2);
 const rowOf = (table: ReturnType<typeof tableOf>, actorId: string, id = "spell-scroll") =>
   table.actor(actorId).inventory.find((entry) => entry.id === id);
 const blockedRule = (attempt: () => unknown): string | null => {
@@ -177,6 +182,45 @@ describe("reading a scroll in a fight", () => {
       activation: "bonus-action",
       healing: { formula: "2d4" }
     });
+  });
+});
+
+describe("a scroll's spell, cast as the spell's own cast is", () => {
+  it("heals the creatures its reader picks rather than a template, and tells the turn its darts, types and targets", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    write(table, IDS.wizard, scrollOf("mass-cure-wounds"));
+    // A 30-foot sphere that heals six creatures the caster chooses: picked, never templated.
+    expect(actionOf(table, IDS.wizard, READ).area).toBeUndefined();
+    expect(actionOf(table, IDS.wizard, READ).healing).toBeDefined();
+    write(table, IDS.wizard, nthScroll("magic-missile", 2));
+    write(table, IDS.wizard, nthScroll("chromatic-orb", 3));
+    write(table, IDS.wizard, nthScroll("bless", 4));
+    const reads = [2, 3, 4].map((n) => actionOf(table, IDS.wizard, `item-spell-scroll-${n}-read`));
+    const rows = actionAvailability(
+      table.state,
+      table.actor(IDS.wizard),
+      reads,
+      table.definition(IDS.wizard),
+      false,
+      undefined,
+      catalog
+    );
+    expect(rows.map((row) => [row.darts, row.damageTypes?.length ?? null, row.targeting])).toEqual([
+      [3, null, "multi"],
+      [null, 6, "single"],
+      // Bless on each creature it targets.
+      [null, null, "multi"]
+    ]);
+  });
+
+  it("reminds the GM that an interrupted long casting keeps the scroll", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    write(table, IDS.wizard, scrollOf("identify"));
+    fight(table, IDS.wizard);
+    const read = resolveAt(table, IDS.wizard, READ, [], { targetIds: [] });
+    expect(read.warnings?.find((line) => line.startsWith("Identify takes 1 minute to cast"))).toContain(
+      "the scroll isn't lost - give it back on the sheet"
+    );
   });
 });
 
