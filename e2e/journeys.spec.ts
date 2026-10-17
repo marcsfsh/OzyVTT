@@ -338,14 +338,16 @@ test("a save on the player's own turn leaves the bar under the thumb on screen",
   });
   const slot = player.getByRole("region", { name: "Answer now" });
   await expect(slot.getByRole("heading", { name: /Dexterity saving throw/ })).toBeVisible();
+  // The prompt throws the die as it opens and shows a disabled Roll until the server answers. A new Confirm button
+  // then takes its place, so the check waits for Confirm, the button the player presses.
+  const confirm = slot.getByRole("button", { name: "Confirm" });
+  await expect(confirm).toBeVisible();
   // The save's own button leads the view, and the bar with End turn stays inside the viewport, uncovered.
-  const answer = slot.getByRole("button", { name: /^(Confirm|Roll)$/ });
-  await expectUncovered(answer);
+  await expectUncovered(confirm);
   await expectUncovered(player.getByRole("button", { name: "End turn" }));
   await expectPageFits(player);
-  // Answered (a Roll shows the die and Confirm applies it), the prompt leaves the slot.
-  if ((await answer.textContent()) === "Roll") await press(answer);
-  await press(slot.getByRole("button", { name: "Confirm" }));
+  // Answered, the prompt leaves the slot.
+  await press(confirm);
   await expect(slot.getByRole("heading", { name: /Dexterity saving throw/ })).toBeHidden();
 });
 

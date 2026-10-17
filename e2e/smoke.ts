@@ -129,17 +129,24 @@ export async function expectPageFits(page: Page) {
  */
 export async function expectUncovered(control: Locator) {
   await expect(control).toBeVisible();
-  const found = await control.evaluate((element: HTMLElement) => {
-    const box = element.getBoundingClientRect();
-    const x = box.left + box.width / 2;
-    const y = box.top + box.height / 2;
-    const hit = document.elementFromPoint(x, y);
-    return {
-      inside: box.top >= 0 && box.left >= 0 && box.bottom <= window.innerHeight && box.right <= window.innerWidth,
-      hit: hit !== null && (hit === element || element.contains(hit)),
-      at: hit ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join(".")}` : "nothing"
-    };
-  });
+  const measure = () =>
+    control.evaluate((element: HTMLElement) => {
+      const box = element.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      return {
+        connected: element.isConnected,
+        inside: box.top >= 0 && box.left >= 0 && box.bottom <= window.innerHeight && box.right <= window.innerWidth,
+        hit: hit !== null && (hit === element || element.contains(hit)),
+        at: hit ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join(".")}` : "nothing"
+      };
+    });
+  // Playwright finds the control and measures it in two calls, and a render between them can replace it. A detached
+  // node measures as an empty box at the page's top-left corner, so the control is found and measured again.
+  let found = await measure();
+  for (let attempt = 1; !found.connected && attempt < 5; attempt++) found = await measure();
+  expect.soft(found.connected, `${control} stays in the page while it is measured`).toBe(true);
   expect.soft(found.inside, `${control} inside the viewport`).toBe(true);
   expect.soft(found.hit, `${control} is uncovered (the centre hits ${found.at})`).toBe(true);
 }
