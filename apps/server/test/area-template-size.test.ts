@@ -171,4 +171,41 @@ describe("an area template's size", () => {
     const saves = server.store.snapshot.combat.pendingSaves.map((save) => save.targetActorId).sort();
     expect(saves).toEqual([NEAR, FAR, OUTSIDE].sort());
   });
+
+  it("is the spell's own when the GM places a lingering area: Moonbeam's 5-foot-radius Cylinder", async () => {
+    const { base, server, gmToken } = await fightOnTheGrid();
+    const zoneId = "moonbeam-cast";
+    await server.store.execute({ id: randomUUID(), type: "test.moonbeam" }, (state) => {
+      state.combat.spellZones = [
+        {
+          id: zoneId,
+          spellId: "moonbeam",
+          name: "Moonbeam",
+          laterActionId: "spell-moonbeam-then-save",
+          casterId: MAGE,
+          castId: null,
+          rounds: null,
+          startedRound: 1,
+          level: 2,
+          dc: 13,
+          annotationId: null,
+          area: { shape: "cylinder", sizeFeet: 5, widthFeet: null },
+          damageDealt: 0,
+          entered: [],
+          affected: []
+        }
+      ];
+    });
+    // A drag of three cells still places a 5-foot-radius circle.
+    const response = await post(base, GAME_PATHS.spellZonePlace.replace("{zoneId}", zoneId), gmToken, {
+      commandId: randomUUID(),
+      zoneId,
+      template: { shape: "circle", origin: cell(10, 5), target: cell(13, 5) }
+    });
+    expect(response.status, await response.clone().text()).toBe(200);
+    expect(server.store.snapshot.combat.annotations.at(-1)).toMatchObject({
+      shape: "circle",
+      geometry: { sizeFeet: 5 }
+    });
+  });
 });

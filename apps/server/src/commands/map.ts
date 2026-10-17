@@ -7,6 +7,7 @@ import {
   setAnnotationColor,
   setAnnotationMovable,
   setAnnotationVisibility,
+  templateOfArea,
   type AnnotationActor
 } from "../annotations.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
@@ -254,16 +255,18 @@ export const mapCommands = [
       const { commandId, zoneId, template } = request;
       await execute((state) => {
         requireSameMap(state.combat.mapAssetId, mapAssetId);
-        if (!state.combat.spellZones.some((zone) => zone.id === zoneId))
-          throw new CommandRejectedError("That spell's area has already ended.");
+        const zone = state.combat.spellZones.find((candidate) => candidate.id === zoneId);
+        if (!zone) throw new CommandRejectedError("That spell's area has already ended.");
+        // The spell's own area decides the shape and the size; the drag only places and points it.
+        const placed = zone.area ? templateOfArea(geometry.calibration!, template, zone.area) : template;
         addAnnotation(
           state,
           {
             id: commandId,
             kind: "shape",
-            shape: template.shape,
-            origin: template.origin,
-            target: template.target,
+            shape: placed.shape,
+            origin: placed.origin,
+            target: placed.target,
             visibility: "public",
             actor: annotationActorOf(principal),
             now: Date.now()
