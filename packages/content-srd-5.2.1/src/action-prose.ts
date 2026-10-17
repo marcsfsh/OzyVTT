@@ -48,6 +48,147 @@ export function acReactionOfProse(description: string): ActionReaction | null {
   };
 }
 
+/** One place in a Multiattack: an action, how many times, and the others that can fill it instead ("using Scimitar or
+ *  Shortbow in any combination", "uses Charm or Draining Kiss"). */
+export type MultiattackComponent = { actionId: string; count: number; or?: string[] };
+/** "It can replace one attack with a use of Roar": what can take the place of attacks, how many each use replaces,
+ *  whether every attack may be replaced (`any`), and the one attack it replaces when the text names it (`of`). */
+export type MultiattackReplacement = { actionIds: string[]; attacks: number; any?: true; of?: string };
+/** A Multiattack as data: its plan, the plans it can be instead ("or it makes two Hurl Flame attacks"), and its
+ *  replacements. */
+export type MultiattackOfProse = {
+  plan: MultiattackComponent[];
+  alternatives: MultiattackComponent[][];
+  replacements: MultiattackReplacement[];
+};
+
+const COUNT_WORDS: Readonly<Record<string, number>> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+const NAME = "[A-Z][A-Za-z'’-]*(?: [A-Z][A-Za-z'’-]*)*";
+const NAMES = `${NAME}(?:(?:,\\s*(?:or\\s+|and\\s+)?|\\s+or\\s+|\\s+and\\s+)${NAME})*`;
+const COUNT = "one|two|three|four|five|six|[1-6]";
+/** The clauses of a plan, tried in order at each position: an any-combination pool, "two X or Y attacks", "two X
+ *  attacks", and "uses X" (with "either", "twice", "to cast ..." and "if available"). */
+const CLAUSES: ReadonlyArray<Readonly<{ pattern: RegExp; kind: "pool" | "either" | "attack" | "use" }>> = [
+  {
+    kind: "pool",
+    pattern: new RegExp(
+      `(?:makes\\s+)?(${COUNT})\\s+(?:other\\s+)?attacks,\\s+using\\s+(${NAMES})\\s+in any combination`,
+      "y"
+    )
+  },
+  {
+    kind: "either",
+    pattern: new RegExp(`(?:makes\\s+)?(${COUNT})\\s+(${NAME})\\s+or\\s+(${NAME})\\s+attacks?\\b`, "y")
+  },
+  { kind: "attack", pattern: new RegExp(`(?:makes\\s+)?(${COUNT})\\s+(${NAME})\\s+attacks?\\b`, "y") },
+  {
+    kind: "use",
+    pattern: new RegExp(
+      `(?:can\\s+)?uses?\\s+(?:either\\s+)?(${NAMES})(?:\\s+to cast\\s+${NAME}(?:\\s+\\([^)]*\\))?)?(\\s+twice)?(?:\\s+if available)?`,
+      "y"
+    )
+  }
+];
+const SEPARATOR = /\s*(?:,\s*)?(?:and\s+)?(?:it\s+)?/y;
+
+const countOf = (word: string) => COUNT_WORDS[word.toLowerCase()] ?? Number.parseInt(word, 10);
+const namesOf = (list: string) => list.split(/\s*,\s*(?:or\s+|and\s+)?|\s+or\s+|\s+and\s+/).filter(Boolean);
+
+/** One plan's components, or null when any part of it isn't a clause the reader knows or names no action. */
+function planOf(text: string, idOf: (name: string) => string | undefined): MultiattackComponent[] | null {
+  const components: MultiattackComponent[] = [];
+  const add = (names: readonly string[], count: number): boolean => {
+    const ids = names.map((name) => idOf(name));
+    if (ids.some((id) => id === undefined) || !Number.isInteger(count) || count < 1 || count > 6) return false;
+    const [first, ...others] = [...new Set(ids as string[])];
+    const same = components.find((component) => component.actionId === first && !component.or && others.length === 0);
+    if (same) same.count += count;
+    else components.push({ actionId: first, count, ...(others.length > 0 ? { or: others } : {}) });
+    return true;
+  };
+  let at = 0;
+  while (at < text.length) {
+    SEPARATOR.lastIndex = at;
+    at += SEPARATOR.exec(text)?.[0].length ?? 0;
+    if (at >= text.length) break;
+    let matched = false;
+    for (const { pattern, kind } of CLAUSES) {
+      pattern.lastIndex = at;
+      const match = pattern.exec(text);
+      if (!match) continue;
+      const ok =
+        kind === "pool"
+          ? add(namesOf(match[2]), countOf(match[1]))
+          : kind === "either"
+            ? add([match[2], match[3]], countOf(match[1]))
+            : kind === "attack"
+              ? add([match[2]], countOf(match[1]))
+              : add(namesOf(match[1]), match[2] ? 2 : 1);
+      if (!ok) return null;
+      at = pattern.lastIndex;
+      matched = true;
+      break;
+    }
+    if (!matched) return null;
+  }
+  return components.length > 0 && components.length <= 6 ? components : null;
+}
+
+/** "It can replace one attack with a use of Roar", "... with a Tail attack", "... with a use of (A) Sleep Breath or (B)
+ *  Spellcasting to cast Scorching Ray", "It can replace the Claw attack with ...". A name nothing answers is skipped. */
+function replacementOf(sentence: string, idOf: (name: string) => string | undefined): MultiattackReplacement | null {
+  const match =
+    /^It can replace (one|two|any) attacks? with (.+?)(?: if available)?\.$/i.exec(sentence) ??
+    /^It can replace the (.+?) attack with (.+?)(?: if available)?\.$/i.exec(sentence);
+  if (!match) return null;
+  const options = match[2].split(/\s+or\s+(?=\(B\))/).map((option) =>
+    option
+      .replace(/^(?:a use of|an?)\s+/i, "")
+      .replace(/^\([AB]\)\s*/, "")
+      .replace(/\s+to cast\s+.*$/i, "")
+      .replace(/\s+attack$/i, "")
+      .trim()
+  );
+  const actionIds = [...new Set(options.map((option) => idOf(option)).filter((id): id is string => id !== undefined))];
+  if (actionIds.length === 0) return null;
+  const which = match[1].toLowerCase();
+  if (which === "one" || which === "two" || which === "any")
+    return { actionIds, attacks: which === "two" ? 2 : 1, ...(which === "any" ? { any: true as const } : {}) };
+  const of = idOf(match[1]);
+  return of ? { actionIds, attacks: 1, of } : null;
+}
+
+/**
+ * A Multiattack's plan from its SRD 2024 text, against the stat block's other actions (`idOf` maps a printed name to
+ * an action id): "makes two Claw attacks and one Infernal Sting attack", "makes two attacks, using Scimitar or
+ * Shortbow in any combination", "makes one Bite attack and uses Constrict", with an alternative plan ("..., or it
+ * makes two Hurl Flame attacks", "or uses Holy Burst twice") and replacements ("It can replace one attack with a use
+ * of Roar"). Null when the main plan isn't one the reader can say for sure (a hydra's "as many Bite attacks as it
+ * has heads"), which leaves the Multiattack prose.
+ */
+export function multiattackOfProse(
+  description: string,
+  idOf: (name: string) => string | undefined
+): MultiattackOfProse | null {
+  const sentences = description.trim().split(/(?<=\.)\s+/);
+  const main = /^The [^.]*? (makes .+?)\.$/.exec(sentences[0] ?? "")?.[1];
+  if (!main) return null;
+  // An alternative plan starts at "or (it) makes" / "or uses"; a condition on it ("if it used Hasten this turn") is the
+  // GM's to judge.
+  const [first, ...others] = main.split(/,?\s+or\s+(?:it\s+)?(?=makes\s|uses\s)/);
+  const plan = planOf(first, idOf);
+  if (!plan) return null;
+  const alternatives = others.flatMap((text) => {
+    const alternative = planOf(text.replace(/\s+if it\b.*$/i, ""), idOf);
+    return alternative ? [alternative] : [];
+  });
+  const replacements = sentences.slice(1).flatMap((sentence) => {
+    const replacement = replacementOf(sentence, idOf);
+    return replacement ? [replacement] : [];
+  });
+  return { plan, alternatives, replacements };
+}
+
 /** The action with its prose facts filled: the area (an authored one wins), whether it is a Multiattack whose
  *  attacks nothing structured names, and a Parry's AC reaction (an authored reaction wins). The same object when
  *  nothing changes. */

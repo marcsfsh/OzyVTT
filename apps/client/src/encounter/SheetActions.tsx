@@ -1,7 +1,7 @@
 import type { RefObject } from "react";
 import type { ActorDefinition, ContentActionSummary, GmActor, PlayerActor } from "@vtt/domain";
 import { abilityModifier as modifierOf, weaponAbilityModifierFrom } from "@vtt/rules-5e";
-import { useRollPreference } from "../dice/roll-preference";
+import { usesScopeLabel } from "./action-summary";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { RichText } from "./RichText";
 import { ordinal, signed } from "./format";
@@ -56,7 +56,6 @@ export function SheetActions({
   onLooseUse: ((actionId: string) => void) | null;
 }>) {
   const { rolling, rollD20, rollFlat } = rolls;
-  const { rollMode, bonusMode } = useRollPreference();
   const spellcasting = definition.spellcasting;
   const inventory = actor.inventory ?? [];
   // Equipped weapons become rollable attacks on the sheet: to-hit = ability mod + PB, damage = weapon
@@ -118,13 +117,25 @@ export function SheetActions({
         type ActionT = (typeof definition.actions)[number];
         const renderAction = (action: ActionT) => {
           const atk = action.attack;
+          // Outside a fight a heal is used here (Second Wind, Lay on Hands), and the server moves the hit points.
+          const looseHeal = onLooseUse !== null && action.healing !== undefined && !atk;
           return (
             <div key={action.id} className="sheet-entry">
               <p>
                 <strong>{action.name}.</strong> <RichText text={action.description} />
               </p>
-              {(atk || action.damage.length > 0) && (
+              {(atk || action.damage.length > 0 || looseHeal) && (
                 <div className="sheet-roll-row">
+                  {looseHeal && (
+                    <button
+                      type="button"
+                      className="sheet-roll-chip"
+                      disabled={rolling}
+                      onClick={() => onLooseUse(action.id)}
+                    >
+                      Use
+                    </button>
+                  )}
                   {atk && (
                     <button
                       type="button"
@@ -183,10 +194,10 @@ export function SheetActions({
                   definition={definition}
                   extraActions={derivedActions}
                   revision={inline.revision}
-                  rollMode={rollMode}
-                  bonusMode={bonusMode}
+                  inspired={"heroicInspiration" in actor && actor.heroicInspiration === true}
                   playerDamageMode={inline.playerDamageMode}
                   targets={inline.targets}
+                  effectTags={actor.effects.flatMap((effect) => effect.tags)}
                 />
               </div>
             )}
@@ -277,7 +288,7 @@ export function SheetActions({
                             · {left !== null ? `${left} of ` : ""}
                             {row.usesLimit} {row.usesLimit === 1 ? "charge" : "charges"}
                             {left !== null ? " left" : ""}
-                            {row.usesPer ? ` per ${row.usesPer.replace(/-/g, " ")}` : ""}
+                            {row.usesPer ? ` per ${usesScopeLabel(row.usesPer)}` : ""}
                           </span>
                         )}
                       </p>

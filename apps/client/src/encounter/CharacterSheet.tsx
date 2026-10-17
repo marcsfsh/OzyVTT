@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type {
-  ActorDefinition,
-  GmActor,
+import {
+  rosterActors,
+  type ActorDefinition,
+  type GmActor,
   GmView,
-  PendingSave,
-  PlayerActor,
-  PlayerPendingSave,
-  PlayerView
+  type PendingSave,
+  type PlayerActor,
+  type PlayerPendingSave,
+  type PlayerView,
+  type RollVisibility
 } from "@vtt/domain";
-import { Button, IconButton, Modal, SegmentedControl, IconX, useToast } from "@vtt/ui";
+import { Button, IconButton, Modal, SegmentedControl, Select, IconX, useToast } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
 import { SavePrompt } from "./SavePrompt";
 import { RichText } from "./RichText";
-import { DicePanel } from "../dice/DicePanel";
-import { useRollPreference } from "../dice/roll-preference";
+import { DicePanel, ROLL_VISIBILITY_WORD, VISIBILITY_OPTIONS } from "../dice/DicePanel";
+import { rollModeOf, useRollPreference } from "../dice/roll-preference";
+import { DyingTracker } from "./DyingTracker";
+import { HealTargetPicker, type LooseHeal } from "./HealTargetPicker";
+import { isKnockedOut, partyHelpers, StabilizeControl } from "./StabilizeControl";
 import { summaryOfOwnAction } from "./PlayerActionRunner";
 import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
 import { formatChallenge, titleCase } from "./format";
@@ -23,8 +28,10 @@ import { initialsOf } from "../scene/tokenGlyph";
 import { SheetAbilities } from "./SheetAbilities";
 import { SheetActions } from "./SheetActions";
 import { SheetIdentityEditor } from "./SheetIdentityEditor";
+import { SheetInspiration } from "./SheetInspiration";
 import { SheetInventory } from "./SheetInventory";
-import { SheetProficiencies } from "./SheetProficiencies";
+import { SheetProficiencies, type Quarry } from "./SheetProficiencies";
+import { SheetPools } from "./SheetPools";
 import { SheetRest } from "./SheetRest";
 import { SheetSpells } from "./SheetSpells";
 import { SheetVitals } from "./SheetVitals";
@@ -83,7 +90,17 @@ export function CharacterSheet({
 }>) {
   const [feedback, setFeedback] = useState("");
   const { toast } = useToast();
-  const { definitionId, definition, serverActions, derived, showEdited } = useSheetDefinition(actor, role, setFeedback);
+  // The GM's state carries every stored sheet (a built character's), which stays current when the sheet is rebuilt.
+  const liveDefinition =
+    role === "gm" && state && "definitions" in state && "definitionId" in actor
+      ? state.definitions.find((entry) => entry.id === actor.definitionId)?.definition
+      : undefined;
+  const { definitionId, definition, serverActions, derived, rechoices, spellChoices, showEdited } = useSheetDefinition(
+    actor,
+    role,
+    setFeedback,
+    liveDefinition
+  );
   // On the player's own turn, targeted stat-block actions resolve through the shared structured flow
   // (pick target -> roll -> resolve). Combat context is the `combat` prop when embedded in the
   // initiative panel, else derived from the player's `state`, so it works from any sheet surface.
@@ -102,12 +119,23 @@ export function CharacterSheet({
           };
         })()
       : undefined);
-  const savesOwed: ReadonlyArray<PendingSave | PlayerPendingSave> = (state?.combat.pendingSaves ?? []).filter(
-    (save) => save.targetActorId === actor.id
+  // A save the GM called for is answered on the player's call card, so their sheet does not prompt it twice.
+  const calledSaveIds = new Set(
+    role === "player"
+      ? (state?.rollCalls ?? []).flatMap((call) =>
+          call.entries.flatMap((entry) => (entry.saveId ? [entry.saveId] : []))
+        )
+      : []
   );
+  const savesOwed: ReadonlyArray<PendingSave | PlayerPendingSave> = (state?.combat.pendingSaves ?? []).filter(
+    (save) => save.targetActorId === actor.id && !calledSaveIds.has(save.id)
+  );
+  // Readied, a character acts off its turn with its Reaction (a readied spell is released by casting it), so the sheet
+  // resolves its actions then too.
+  const readied = actor.effects.some((effect) => effect.tags.includes("readied"));
   const structuredAttacks =
     liveCombat?.active === true &&
-    liveCombat.myTurn === true &&
+    (liveCombat.myTurn === true || readied) &&
     actor.kind === "player-character" &&
     definition !== null;
   // Outside the fight an item's action goes to the server's loose route, which rolls it and spends its charges.
@@ -118,23 +146,79 @@ export function CharacterSheet({
   const inFight = state
     ? state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)
     : liveCombat?.active === true;
+  const sendLoose = (actionId: string, extra: Readonly<Record<string, unknown>>, failure: string) =>
+    void command("action:use", { actorId: actor.id, actionId, ...extra }).then((response) => {
+      if (!response.ok) toast(response.message ?? failure, { tone: "error" });
+    });
+  // Who a heal outside a fight may land on, as the server allows: this character, then the party (for the GM, anyone
+  // on the roster).
+  const healCandidates = [
+    { id: actor.id, name: actor.name },
+    ...rosterActors<GmActor | PlayerActor>(state?.actors ?? [])
+      .filter(
+        (other) =>
+          other.id !== actor.id &&
+          !("archived" in other && other.archived) &&
+          (role === "gm" || other.kind === "player-character")
+      )
+      .sort((left, right) => Number(right.kind === "player-character") - Number(left.kind === "player-character"))
+      .map((other) => ({ id: other.id, name: other.name }))
+  ];
+  const [looseHeal, setLooseHeal] = useState<LooseHeal | null>(null);
+  // A heal outside a fight asks who regains the hit points, unless it only heals its user (Second Wind).
+  const looseHealOf = (actionId: string, slotLevel?: number, includeDamage?: boolean): LooseHeal | null => {
+    const own = definition?.actions.find((candidate) => candidate.id === actionId);
+    const row = serverActions.find((candidate) => candidate.id === actionId);
+    if (!(own?.healing ?? row?.healing) || own?.healing?.self || (!own && row?.targeting === "none")) return null;
+    const limit = row?.usesLimit ?? own?.uses?.limit ?? null;
+    const spent = actor.actionUses?.[row?.usesPool ?? own?.uses?.pool ?? actionId] ?? 0;
+    return {
+      actionId,
+      name: own?.name ?? row?.name ?? "Heal",
+      most: own?.healing?.divided ? healCandidates.length : (row?.healTargets ?? 1),
+      spendUpTo: (own?.useCost ?? row?.useCost) === "chosen" && limit !== null ? Math.max(1, limit - spent) : null,
+      ...(slotLevel !== undefined ? { slotLevel } : {}),
+      ...(includeDamage ? { includeDamage } : {})
+    };
+  };
   const onLooseUse = inFight
     ? null
-    : (actionId: string) =>
-        void command("action:use", { actorId: actor.id, actionId }).then((response) => {
-          if (!response.ok) toast(response.message ?? "That could not be used.", { tone: "error" });
-        });
+    : (actionId: string) => {
+        const heal = looseHealOf(actionId);
+        if (heal) setLooseHeal(heal);
+        else sendLoose(actionId, {}, "That could not be used.");
+      };
+  const healDialog = looseHeal ? (
+    <HealTargetPicker
+      heal={looseHeal}
+      candidates={healCandidates}
+      defaultId={actor.id}
+      onClose={() => setLooseHeal(null)}
+      onConfirm={(targetIds, spend) => {
+        setLooseHeal(null);
+        sendLoose(
+          looseHeal.actionId,
+          {
+            targetIds,
+            ...(spend !== null ? { spend } : {}),
+            ...(looseHeal.slotLevel !== undefined ? { slotLevel: looseHeal.slotLevel } : {}),
+            ...(looseHeal.includeDamage ? { includeDamage: true } : {})
+          },
+          "That could not be used."
+        );
+      }}
+    />
+  ) : null;
   const { busy, edit } = useSheetEdit(setFeedback);
   const rolls = useSheetRolls(actor.id, setFeedback);
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
-  // The shared per-browser dice-input preference: digital vs manual entry, and whether a typed d20
-  // gets its bonus added.
+  // The shared per-browser dice-input preference: thrown by the server, or a typed face from a physical die. A
+  // player at a table that keeps players' dice on the server has no choice to make.
   const {
     rollInput,
-    bonusMode,
+    mayType,
     sheetAttackMode,
     setRollInput: chooseRollInput,
-    setBonusMode: chooseBonusMode,
     setSheetAttackMode: chooseSheetAttackMode
   } = useRollPreference();
   // Only the embedded panel can jump to the initiative view and back, so elsewhere the picker is
@@ -151,6 +235,25 @@ export function CharacterSheet({
   };
   // The latest roll from this character, shown under the rolls bar (hidden when the log is visible).
   const latestRoll = state ? ([...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null) : null;
+  // A check this sheet rolled is rerolled while it is still the character's latest roll: with Heroic Inspiration for a
+  // player, freely by the GM. Without the roll history (the embedded sheet) the server judges that.
+  const holdsInspiration = "heroicInspiration" in actor && actor.heroicInspiration === true;
+  const canReroll =
+    rolls.lastCheck !== null &&
+    (state === undefined || rolls.lastCheck.rollId === latestRoll?.id) &&
+    (role === "gm" || holdsInspiration);
+  // The creatures this character's Hunter's Mark is on: its Perception and Survival checks to find them have Advantage.
+  const quarry: Quarry[] = (state?.actors ?? []).flatMap((other: GmActor | PlayerActor) =>
+    other.id !== actor.id &&
+    other.effects.some(
+      (effect) =>
+        effect.tags.includes("hunters-mark") &&
+        (("yours" in effect && effect.yours === true) ||
+          ("sourceActorId" in effect && effect.sourceActorId === actor.id))
+    )
+      ? [{ id: other.id, name: other.name }]
+      : []
+  );
   // "modal" is the docked main panel; "floating" detaches it into a movable, resizable in-tab panel.
   const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
   const [rect, setRect] = useState({ x: 48, y: 48, width: 760, height: 620 });
@@ -193,22 +296,36 @@ export function CharacterSheet({
     beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel, darts);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
+  // A smite is added to a hit in a fight, so its Cast tap says where to find it rather than starting a refused cast.
+  const hitExtraNote = (actionId: string | null | undefined): string | null => {
+    const row = inFight && actionId ? serverActions.find((candidate) => candidate.id === actionId) : undefined;
+    return row?.ridesAHit
+      ? `${row.name} is added to a hit: choose it on the attack's result, before you confirm.`
+      : null;
+  };
   // A leveled spell's cast: on your turn it goes through targeting with its slot; otherwise the server routes it,
   // spending the slot and rolling its dice outside a fight, or refusing off turn.
   const castSpellAction = (actionId: string, slotLevel?: number) => {
+    const note = hitExtraNote(actionId);
+    if (note) {
+      toast(note);
+      return;
+    }
     const structured = structuredAttacks ? definition?.actions.find((action) => action.id === actionId) : undefined;
     if (structured) {
       routeAttack(structured, slotLevel);
       return;
     }
-    void command("action:use", {
-      actorId: actor.id,
+    const heal = inFight ? null : looseHealOf(actionId, slotLevel, true);
+    if (heal) {
+      setLooseHeal(heal);
+      return;
+    }
+    sendLoose(
       actionId,
-      includeDamage: true,
-      ...(slotLevel !== undefined ? { slotLevel } : {})
-    }).then((response) => {
-      if (!response.ok) toast(response.message ?? "The spell could not be cast.", { tone: "error" });
-    });
+      { includeDamage: true, ...(slotLevel !== undefined ? { slotLevel } : {}) },
+      "The spell could not be cast."
+    );
   };
   // The player's own server-resolvable action (has an attack, a save or damage) for an equipped
   // weapon (by name) or a spell (by linked actionId); null falls back to the quick roll.
@@ -260,7 +377,14 @@ export function CharacterSheet({
           onDone={() => setEditMode(null)}
         />
       )}
-      <SheetVitals actor={actor} role={role} definition={definition} extension={extension} onFeedback={setFeedback} />
+      <SheetVitals
+        actor={actor}
+        role={role}
+        definition={definition}
+        extension={extension}
+        speedFeet={derived?.speedFeet ?? null}
+        onFeedback={setFeedback}
+      />
       <div className="sheet-conditions">
         <span className="sheet-section-label">Conditions</span>
         <ConditionEditor
@@ -272,6 +396,15 @@ export function CharacterSheet({
           onFeedback={setFeedback}
         />
       </div>
+      {actor.kind === "player-character" && (role === "gm" || "heroicInspiration" in actor) && (
+        <SheetInspiration
+          actorId={actor.id}
+          name={actor.name}
+          held={holdsInspiration}
+          role={role}
+          onFeedback={setFeedback}
+        />
+      )}
       {/* A save owed outside a fight (a concentration check after a trap): in a fight it waits on the
         initiative row instead. */}
       {state && !state.combat.active && savesOwed.length > 0 && (
@@ -285,15 +418,70 @@ export function CharacterSheet({
               canDismiss={role === "gm"}
               onFeedback={setFeedback}
               rollMode="auto"
+              viewer={role}
+              inspired={holdsInspiration}
             />
           ))}
         </div>
       )}
-      {actor.kind === "player-character" && (
+      {/* Dying or knocked out outside a fight: the death saves, and for the GM the aid that ends it. In a fight
+        both live on the turn order. */}
+      {!inFight && (actor.deathSaves || isKnockedOut(actor)) && (
+        <div className="sheet-dying-block">
+          {actor.deathSaves ? (
+            <DyingTracker
+              actorId={actor.id}
+              name={actor.name}
+              deathSaves={actor.deathSaves}
+              canRoll
+              onFeedback={setFeedback}
+              rollMode={rollModeOf(rollInput)}
+              isActingTurn={false}
+              viewer={role}
+              inspired={holdsInspiration}
+              aid={
+                role === "gm" && state ? (
+                  <StabilizeControl
+                    targetId={actor.id}
+                    targetName={actor.name}
+                    helpers={partyHelpers(state as GmView, actor.id)}
+                    gm
+                    onFeedback={setFeedback}
+                  />
+                ) : undefined
+              }
+            />
+          ) : (
+            role === "gm" &&
+            state && (
+              <StabilizeControl
+                targetId={actor.id}
+                targetName={actor.name}
+                helpers={partyHelpers(state as GmView, actor.id)}
+                gm
+                knockedOut
+                onFeedback={setFeedback}
+              />
+            )
+          )}
+        </div>
+      )}
+      {/* The GM rests monsters and NPCs too (a Long Rest re-arms Legendary Resistance and per-day uses), without
+          Hit Dice to spend. */}
+      {(actor.kind === "player-character" || role === "gm") && (
         <div className="sheet-rest-block">
           <span className="sheet-section-label">Rest</span>
-          <SheetRest actorId={actor.id} hitDice={"hitDice" in actor ? actor.hitDice : null} onFeedback={setFeedback} />
+          <SheetRest
+            actorId={actor.id}
+            role={role}
+            hitDice={actor.kind === "player-character" && "hitDice" in actor ? actor.hitDice : null}
+            asked={state?.rest?.requests.includes(actor.id) ?? false}
+            onFeedback={setFeedback}
+          />
         </div>
+      )}
+      {actor.actionUses && (role === "gm" || actor.kind === "player-character") && (
+        <SheetPools actorId={actor.id} role={role} actions={serverActions} spent={actor.actionUses} />
       )}
 
       {definition && (
@@ -304,6 +492,7 @@ export function CharacterSheet({
             definition={definition}
             derived={derived}
             rolls={rolls}
+            quarry={quarry}
             editing={editMode === "prof"}
             onEditingChange={(editing) => setEditMode(editing ? "prof" : null)}
             busy={busy}
@@ -320,8 +509,19 @@ export function CharacterSheet({
             spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
             policeSlots={slotsPoliced}
             canPrepare={role === "gm" || Boolean(actor.preparation)}
+            rechoices={rechoices}
+            spellChoices={spellChoices}
+            gm={role === "gm"}
+            readiedActionId={
+              actor.effects.flatMap((effect) => (effect.readiedSpell ? [effect.readiedSpell.actionId] : []))[0] ?? null
+            }
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
+              const note = hitExtraNote(spell.actionId);
+              if (note) {
+                toast(note);
+                return true;
+              }
               const structured = structuredAttacks
                 ? structuredActionFor({ actionId: spell.actionId ?? undefined, name: spell.name })
                 : null;
@@ -336,6 +536,7 @@ export function CharacterSheet({
               edit={edit}
               role={role}
               attunementSlots={derived?.attunementSlots ?? 3}
+              inFight={inFight}
               others={
                 role === "gm" && state
                   ? state.actors
@@ -481,28 +682,30 @@ export function CharacterSheet({
   const rollbar = definition ? (
     <div className="sheet-rollbar" role="group" aria-label="Roll entry settings">
       <span className="sheet-settings-label">Rolls</span>
-      <SegmentedControl
-        size="sm"
-        ariaLabel="Roll input mode"
-        value={rollInput}
-        onChange={(mode) => chooseRollInput(mode as "digital" | "manual")}
-        options={[
-          { value: "digital", label: "Digital" },
-          { value: "manual", label: "Manual" }
-        ]}
-      />
-      {rollInput === "manual" && (
+      {mayType && (
         <SegmentedControl
           size="sm"
-          ariaLabel="Typed bonus handling"
-          value={bonusMode}
-          onChange={(mode) => chooseBonusMode(mode as "auto" | "total")}
+          ariaLabel="Roll input mode"
+          value={rollInput}
+          onChange={(mode) => chooseRollInput(mode as "digital" | "manual")}
           options={[
-            { value: "auto", label: "Auto-add bonus" },
-            { value: "total", label: "Final total" }
+            { value: "digital", label: "Digital" },
+            { value: "manual", label: "Manual" }
           ]}
         />
       )}
+      <Select
+        className="sheet-roll-visibility"
+        aria-label="Who sees the sheet's rolls"
+        value={rolls.visibility}
+        onChange={(event) => rolls.setVisibility(event.target.value as RollVisibility)}
+      >
+        {VISIBILITY_OPTIONS[role].map((value) => (
+          <option key={value} value={value}>
+            {ROLL_VISIBILITY_WORD[value]}
+          </option>
+        ))}
+      </Select>
       {/* Mid-fight only: whether an attack tapped here resolves inline or on the initiative view. */}
       {liveCombat?.active === true && actor.kind === "player-character" && onJumpToInitiative && (
         <>
@@ -550,6 +753,13 @@ export function CharacterSheet({
           </span>
         </button>
       )}
+      {canReroll && (
+        <div className="sheet-last-reroll">
+          <Button size="sm" variant="secondary" disabled={rolls.rolling} onClick={() => void rolls.rerollCheck()}>
+            {role === "gm" ? "Reroll" : "Reroll · Heroic Inspiration"}
+          </Button>
+        </div>
+      )}
       <div className="sheet-workspace-cols">
         {/* The sheet's pane is the declared scroll region in all four presentations. */}
         <div className="sheet-workspace-pane sheet-pane scroll-y">{sheetScroll}</div>
@@ -569,6 +779,7 @@ export function CharacterSheet({
       <>
         <div className="sheet-embedded">{buildWorkspace(false)}</div>
         {rolls.dialog}
+        {healDialog}
       </>
     );
 
@@ -582,6 +793,7 @@ export function CharacterSheet({
           {standaloneActions && <div className="sheet-standalone-actions">{standaloneActions}</div>}
         </div>
         {rolls.dialog}
+        {healDialog}
       </>
     );
 
@@ -601,6 +813,7 @@ export function CharacterSheet({
           <div className="sheet-float-resize" aria-hidden="true" onPointerDown={beginDrag("resize")} />
         </div>
         {rolls.dialog}
+        {healDialog}
       </>
     );
   }
@@ -616,6 +829,7 @@ export function CharacterSheet({
         {buildWorkspace(false)}
       </Modal>
       {rolls.dialog}
+      {healDialog}
     </>
   );
 }

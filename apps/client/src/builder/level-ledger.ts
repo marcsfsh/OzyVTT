@@ -24,20 +24,56 @@ export type LedgerIdentity = Readonly<{
   classId: string;
   subclassId: string | null;
   level: number;
+  /** The class each level went to, in order (index 0 is level 1); every entry is `classId` for one class. */
+  classLevels: readonly string[];
 }>;
 
-/** The identity a rebuild must re-send, read off the stored sheet; null when incomplete. */
+/** The identity a rebuild must re-send, read off the stored sheet; null when incomplete, or when the sheet lists
+ *  several classes but not which level went to which (`classOrderUnknown`). */
 export function identityOf(definition: ActorDefinition | null | undefined): LedgerIdentity | null {
   const character = definition?.character;
   const primary = character?.classes?.[0];
   if (!character || !primary || !character.race || !character.background) return null;
+  const level = character.classes.reduce((total, entry) => total + entry.level, 0);
+  const classLevels = storedClassLevels(character.choices ?? [], primary.id, level);
+  if (!classLevels && character.classes.length > 1) return null;
   return {
     speciesId: character.race.id,
     backgroundId: character.background.id,
     classId: primary.id,
     subclassId: primary.subclass?.id ?? null,
-    level: character.classes.reduce((total, entry) => total + entry.level, 0)
+    level,
+    classLevels: classLevels ?? Array.from({ length: level }, () => primary.id)
   };
+}
+
+/** A sheet with several classes and no record of their order (classes added by hand): the builder can't tell
+ *  which level went to which class, so it can't rebuild one. */
+export function classOrderUnknown(definition: ActorDefinition | null | undefined): boolean {
+  const character = definition?.character;
+  // A sheet with no ledger was never built here at all, which the flow says instead.
+  if (!character?.choices || character.classes.length < 2) return false;
+  const level = character.classes.reduce((total, entry) => total + entry.level, 0);
+  return storedClassLevels(character.choices ?? [], character.classes[0].id, level) === null;
+}
+
+/** The ledger's `class-levels` row, when it agrees with the sheet. Mirrors the server's `storedClassSequence`. */
+function storedClassLevels(choices: readonly CharacterChoice[], startingId: string, level: number): string[] | null {
+  const recorded = choices.find((row) => row.kind === "class-levels")?.payload?.classes;
+  if (!Array.isArray(recorded) || !recorded.every((id) => typeof id === "string")) return null;
+  return recorded.length === level && recorded[0] === startingId ? (recorded as string[]) : null;
+}
+
+/** The class sequence a rebuild at a new level sends: a level-up appends `classId`, a level-down drops the last. */
+export function targetClassLevels(identity: LedgerIdentity, level: number, classId: string): string[] {
+  return level > identity.level
+    ? [...identity.classLevels, ...Array(level - identity.level).fill(classId)]
+    : identity.classLevels.slice(0, level);
+}
+
+/** The classes the character keeps at a rebuilt level: all it has, less one a level-down takes off. */
+export function keptClasses(identity: LedgerIdentity, level: number): string[] {
+  return [...new Set(identity.classLevels.slice(0, Math.min(level, identity.level)))];
 }
 
 /**
@@ -49,13 +85,22 @@ export function draftFromLedger(
   choices: readonly CharacterChoice[],
   definition: ActorDefinition,
   catalogs: BuilderCatalogs,
-  targetLevel: number,
+  target: Readonly<{ level: number; classLevels: readonly string[] }>,
   policy: BuilderPolicy,
   read: BuilderOffersReply
 ): BuilderDraft {
+  const targetLevel = target.level;
   // Recorded rolls are re-sent verbatim so a level-down/level-up round trip restores the same max HP.
   const hp = hpPlan(choices, targetLevel);
-  const recorded = recordedAbilities(choices);
+  // The table's reading of how the sheet's scores were made (recorded, or worked out from its totals) wins over the
+  // client's own reading, which cannot see riders such as Primal Champion's +4.
+  const recorded = read.abilities
+    ? {
+        method: read.abilities.abilityMethod,
+        base: read.abilities.baseScores as Readonly<Record<Ability, number>>,
+        backgroundBonus: read.abilities.backgroundBonusAllocation as BuilderDraft["backgroundBonus"]
+      }
+    : recordedAbilities(choices);
   const draft: BuilderDraft = {
     ...emptyDraft(),
     speciesId: identity.speciesId,
@@ -63,6 +108,7 @@ export function draftFromLedger(
     classId: identity.classId,
     subclassId: read.subclassId,
     level: targetLevel,
+    ...(new Set(target.classLevels).size > 1 ? { classLevels: [...target.classLevels] } : {}),
     name: definition.name,
     abilityMethod: recorded?.method ?? methodFor(policy),
     backgroundBonus: recorded?.backgroundBonus ?? [],
@@ -150,13 +196,28 @@ export function hpRolls(choices: readonly CharacterChoice[], level: number): num
   return rolls;
 }
 
-/** The levels the table will roll hit points for on a rebuild: those with no recorded roll, when the sheet was
- *  rolled. Null when nothing is rolled (all recorded, or the average was taken). */
-export function hpRollGap(choices: readonly CharacterChoice[], targetLevel: number): readonly number[] | null {
-  if (hpPlan(choices, targetLevel).mode !== "roll") return null;
+/**
+ * The levels the table will roll hit points for on a rebuild, when the sheet was rolled: those with no roll recorded
+ * for the class the level now goes to, since a roll belongs to its class's die. A multiclass sheet's rows name their
+ * class; an older row was rolled for the class the sheet had at that level (`recordedLevels`), or its starting class
+ * past them. Null when nothing is rolled (all recorded, or the average was taken). Mirrors the server's reuse rule.
+ */
+export function hpRollGap(
+  choices: readonly CharacterChoice[],
+  target: Readonly<{ level: number; classLevels: readonly string[] }>,
+  recordedLevels: readonly string[]
+): readonly number[] | null {
+  if (hpPlan(choices, target.level).mode !== "roll") return null;
   const missing: number[] = [];
-  for (let level = 2; level <= targetLevel; level += 1)
-    if (!choices.some((row) => row.kind === "hp-roll" && row.level === level)) missing.push(level);
+  for (let level = 2; level <= target.level; level += 1) {
+    const kept = choices.some((row) => {
+      const roll = row.payload?.roll;
+      if (row.kind !== "hp-roll" || row.level !== level) return false;
+      if (typeof roll !== "number" || !Number.isInteger(roll) || roll < 1) return false;
+      return (row.classId ?? recordedLevels[level - 1] ?? recordedLevels[0]) === target.classLevels[level - 1];
+    });
+    if (!kept) missing.push(level);
+  }
   return missing.length > 0 ? missing : null;
 }
 

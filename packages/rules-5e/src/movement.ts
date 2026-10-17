@@ -20,33 +20,33 @@ export function footprintCenter(origin: GridCell, sizeCells: number): Readonly<{
   return { column: origin.column + size / 2, row: origin.row + size / 2 };
 }
 
-/** Which side of the table a creature is on for movement. Player characters and monsters oppose each other;
- *  an NPC has no fixed side, so the GM rules on its space. */
-type MovementSide = "party" | "foes" | null;
-function sideOf(kind: string): MovementSide {
-  if (kind === "player-character") return "party";
-  if (kind === "monster") return "foes";
-  return null;
-}
+const SIZE_RANK: Readonly<Record<string, number>> = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gargantuan: 5 };
 
-/** SRD: another creature's space is Difficult Terrain for you unless that creature is Tiny or your ally. */
-export function spaceIsDifficultFor(
-  mover: Readonly<{ kind: string }>,
-  occupant: Readonly<{ kind: string; size?: string | undefined }>
-): boolean {
-  if (occupant.size === "tiny") return false;
-  const moverSide = sideOf(mover.kind);
-  const occupantSide = sideOf(occupant.kind);
-  return moverSide !== null && occupantSide !== null && moverSide !== occupantSide;
+/** What another creature's space is to a mover (SRD "Moving around Other Creatures"): an ally's or a Tiny creature's
+ *  is open ground; anyone else's is Difficult Terrain, and the mover may pass through it only when that creature is
+ *  Incapacitated or two sizes larger or smaller. */
+export type SpacePassage = "open" | "difficult" | "blocked";
+
+export function spacePassage(
+  input: Readonly<{ ally: boolean; incapacitated: boolean; moverSize?: string; occupantSize?: string }>
+): SpacePassage {
+  if (input.ally || input.occupantSize === "tiny") return "open";
+  const gap = Math.abs(
+    (SIZE_RANK[input.moverSize ?? "medium"] ?? 2) - (SIZE_RANK[input.occupantSize ?? "medium"] ?? 2)
+  );
+  return input.incapacitated || gap >= 2 ? "difficult" : "blocked";
 }
 
 export type MovementPath = Readonly<{
   /** Footprint origins from start to end, both included. */
   steps: readonly GridCell[];
-  /** Movement spent, in cells: one per step, two for a step into difficult terrain. */
+  /** Movement spent, in cells: one per step, two for a step into difficult terrain, and `extraPerStep` more on every
+   *  step (crawling, climbing or swimming without the speed, dragging a grappled creature). */
   costCells: number;
   /** How many steps entered difficult terrain (each cost one extra cell). */
   difficultSteps: number;
+  /** No way there: creatures the mover can't pass, or the map's edge, close it off. `steps` is empty. */
+  blocked?: true;
 }>;
 
 type Node = { key: number; column: number; row: number; cost: number; priority: number; tie: number };
@@ -121,6 +121,8 @@ export function movementPath(
     isDifficult: (column: number, row: number) => boolean;
     /** Whether a footprint may stand on this cell, such as being on the map at all. Every cell is open when absent. */
     isOpen?: (column: number, row: number) => boolean;
+    /** Cells added to every step's cost (1 while crawling, climbing or swimming without the speed). */
+    extraPerStep?: number;
     maxNodes?: number;
   }>
 ): MovementPath | null {
@@ -184,6 +186,7 @@ export function movementPath(
   });
   const goalKey = keyOf(to.column, to.row);
   const limit = input.maxNodes ?? 40_000;
+  const extraPerStep = Math.max(0, input.extraPerStep ?? 0);
   let expanded = 0;
 
   while (queue.size > 0) {
@@ -196,7 +199,7 @@ export function movementPath(
       const row = node.row + stepRow;
       if (!inBox(column, row) || !footprintFits(column, row)) continue;
       const difficult = enteringIsDifficult(column, row);
-      const cost = node.cost + (difficult ? 2 : 1);
+      const cost = node.cost + (difficult ? 2 : 1) + extraPerStep;
       const key = keyOf(column, row);
       const known = best.get(key);
       if (known !== undefined && known <= cost) continue;
@@ -208,7 +211,9 @@ export function movementPath(
   }
 
   const cost = best.get(goalKey);
-  if (cost === undefined) return null;
+  // The whole box was searched and nothing reached the goal: the way is shut, not merely long.
+  if (cost === undefined)
+    return queue.size === 0 ? { steps: [], costCells: 0, difficultSteps: 0, blocked: true } : null;
   const steps: GridCell[] = [];
   for (let key: number | undefined = goalKey; key !== undefined; key = parent.get(key)) {
     const column = (key % width) - radius + from.column;

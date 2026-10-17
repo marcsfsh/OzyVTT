@@ -16,6 +16,8 @@ export function effectDurationLabel(effect: Pick<PlayerEffect, "duration">): str
       return `${duration.remaining} ${duration.remaining === 1 ? "round" : "rounds"} left`;
     case "until-source-next-turn":
       return "until its source's next turn";
+    case "until-bearer-next-turn":
+      return "until the start of its next turn";
     case "until-bearer-turn-end":
       return duration.skipsCurrentTurn ? "until the end of its next turn" : "until the end of its turn";
     case "until-source-turn-end":
@@ -41,17 +43,26 @@ function endingNotes(effect: ChipEffect): string[] {
 
 const capitalised = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
-/** What it deals at the start of a turn while it lasts ("6d6 Acid at the start of each of its source's turns"). */
+/** What it deals as a turn starts or ends while it lasts ("6d6 Acid at the start of each of its source's turns", "loses
+ *  1d10 hit points at the start of each of its turns"). */
 function ongoingDamageNote(effect: ChipEffect): string | null {
   const ongoing = effect.ongoingDamage;
   if (!ongoing) return null;
-  const dice = ongoing.damage.map((part) => `${part.formula} ${capitalised(part.type)}`).join(" + ");
-  const when = ongoing.at === "bearer-turn-start" ? "its turns" : "its source's turns";
+  const dice = ongoing.damage
+    .map((part) => (part.type ? `${part.formula} ${capitalised(part.type)}` : part.formula))
+    .join(" + ");
+  const what = ongoing.hitPointLoss ? `loses ${dice} hit points` : dice;
+  const when = ongoing.at.startsWith("bearer-") ? "its turns" : "its source's turns";
+  const edge = ongoing.at.endsWith("-end") ? "end" : "start";
   const save = ongoing.saveToEnd
     ? `, then a ${ongoing.saveToEnd.ability.toUpperCase()} save DC ${ongoing.saveToEnd.dc} that ends it`
     : "";
-  return `${dice} at the start of each of ${when}${save}`;
+  return `${what} at the ${edge} of each of ${when}${save}`;
 }
+
+/** The SRD Burning hazard's tag, and the builtin action that puts the fire out on its bearer. */
+const BURNING_TAG = "burning";
+const PUT_OUT_FIRE_ACTION_ID = "extinguish-fire";
 
 /**
  * Active rules-engine effects (Rage, a grapple, Concentration) as chips beside the condition chips. Tapping one
@@ -59,18 +70,21 @@ function ongoingDamageNote(effect: ChipEffect): string | null {
  * an explicit button there. Ending is a real engine transition: linked conditions clear and on-end grants fire
  * server-side (ADR-0020). `canEnd` is the GM's right to end anything; a player may end what their own character is
  * the source of (`yours`), and asks the GM about anything imposed on them (in a fight, where the GM's queue is).
+ * `canAct` (the GM, or the bearer's owner) may put out a fire the bearer is burning in, which takes its action.
  */
 export function EffectChips({
   actorId,
   effects,
   canEnd,
   canAsk = false,
+  canAct = canEnd,
   onFeedback
 }: Readonly<{
   actorId: string;
   effects: ReadonlyArray<ChipEffect>;
   canEnd: boolean;
   canAsk?: boolean;
+  canAct?: boolean;
   onFeedback: (text: string) => void;
 }>) {
   const [busy, setBusy] = useState(false);
@@ -82,6 +96,15 @@ export function EffectChips({
     void command("effect:end", { actorId, effectId }).then((result) => {
       setBusy(false);
       onFeedback(result.ok ? `${name} ended.` : (result.message ?? "The effect could not be ended."));
+      if (result.ok) setShown(null);
+    });
+  };
+  // The server routes it: the bearer's action in its turn, a question for the GM off it, free outside a fight.
+  const putOut = () => {
+    setBusy(true);
+    void command("action:use", { actorId, actionId: PUT_OUT_FIRE_ACTION_ID }).then((result) => {
+      setBusy(false);
+      onFeedback(result.ok ? "The fire is out." : (result.message ?? "The fire could not be put out."));
       if (result.ok) setShown(null);
     });
   };
@@ -121,8 +144,22 @@ export function EffectChips({
             {effectDurationLabel(open)}
             {endingNotes(open).length > 0 ? ` · ${endingNotes(open).join(" · ")}` : ""}
           </p>
-          {ongoingDamageNote(open) && <p className="effect-detail-line">{ongoingDamageNote(open)}</p>}
+          {ongoingDamageNote(open) ? (
+            <p className="effect-detail-line">{ongoingDamageNote(open)}</p>
+          ) : open.tags.includes(BURNING_TAG) ? (
+            <p className="effect-detail-line">1d4 Fire at the start of each of its turns until the fire is put out</p>
+          ) : null}
+          {canAct && open.tags.includes(BURNING_TAG) && (
+            <p className="effect-detail-line">
+              Rolling on the ground puts it out: it takes an action and leaves it Prone.
+            </p>
+          )}
           <div className="effect-detail-actions">
+            {canAct && open.tags.includes(BURNING_TAG) && (
+              <Button size="sm" variant="secondary" disabled={busy} onClick={putOut}>
+                Put out the fire
+              </Button>
+            )}
             {canEnd || open.yours ? (
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => end(open.id, open.name)}>
                 End {open.name}

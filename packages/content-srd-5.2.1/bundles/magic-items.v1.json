@@ -48,7 +48,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -74,7 +83,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -131,7 +149,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -188,7 +215,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -523,10 +559,31 @@
   },
   "cursed": true,
   "casts": [],
+  "damageTypeChoice": [
+   "bludgeoning",
+   "piercing",
+   "slashing"
+  ],
+  "vulnerableToOtherChoices": true,
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "bludgeoning"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -5258,9 +5315,39 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Flying",
+    "activation": "bonus-action",
+    "description": "Drink it: you gain a Fly Speed equal to your Speed for 1 hour and can hover. If you're in the air when it wears off, you fall unless you have some other means of staying aloft. End it on your sheet once the hour is up.",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Flying (1 hour)",
+     "tags": [
+      "potion-of-flying"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "fly",
+       "equalToSpeed": true,
+       "hover": true
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5339,6 +5426,120 @@
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "potion-of-healing-greater",
+  "name": "Potion of Healing (greater)",
+  "source": "srd",
+  "category": "consumable",
+  "costGp": null,
+  "weightLb": null,
+  "description": "Potion, Uncommon. You regain Hit Points when you drink this potion. The number of Hit Points depends on the potion's rarity, as shown in the table below. Whatever its potency, the potion's red liquid glimmers when agitated. Potion Potion of Healing: HP Regained 2d4 + 2, Rarity Common; Potion Potion of Healing (greater): HP Regained 4d4 + 4, Rarity Uncommon; Potion Potion of Healing (superior): HP Regained 8d4 + 8, Rarity Rare; Potion Potion of Healing (supreme): HP Regained 10d4 + 20, Rarity Very Rare.",
+  "weapon": null,
+  "armor": null,
+  "slot": "consumable",
+  "appliesTo": null,
+  "rarity": "uncommon",
+  "isMagic": true,
+  "attunement": {
+   "required": false,
+   "restrictedTo": []
+  },
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Healing (greater)",
+    "activation": "bonus-action",
+    "description": "Drink it, or give it to a creature within 5 feet of you. The drinker regains 4d4 + 4 Hit Points.",
+    "damage": [],
+    "healing": {
+     "formula": "4d4 + 4"
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "potion-of-healing-superior",
+  "name": "Potion of Healing (superior)",
+  "source": "srd",
+  "category": "consumable",
+  "costGp": null,
+  "weightLb": null,
+  "description": "Potion, Rare. You regain Hit Points when you drink this potion. The number of Hit Points depends on the potion's rarity, as shown in the table below. Whatever its potency, the potion's red liquid glimmers when agitated. Potion Potion of Healing: HP Regained 2d4 + 2, Rarity Common; Potion Potion of Healing (greater): HP Regained 4d4 + 4, Rarity Uncommon; Potion Potion of Healing (superior): HP Regained 8d4 + 8, Rarity Rare; Potion Potion of Healing (supreme): HP Regained 10d4 + 20, Rarity Very Rare.",
+  "weapon": null,
+  "armor": null,
+  "slot": "consumable",
+  "appliesTo": null,
+  "rarity": "rare",
+  "isMagic": true,
+  "attunement": {
+   "required": false,
+   "restrictedTo": []
+  },
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Healing (superior)",
+    "activation": "bonus-action",
+    "description": "Drink it, or give it to a creature within 5 feet of you. The drinker regains 8d4 + 8 Hit Points.",
+    "damage": [],
+    "healing": {
+     "formula": "8d4 + 8"
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "potion-of-healing-supreme",
+  "name": "Potion of Healing (supreme)",
+  "source": "srd",
+  "category": "consumable",
+  "costGp": null,
+  "weightLb": null,
+  "description": "Potion, Very Rare. You regain Hit Points when you drink this potion. The number of Hit Points depends on the potion's rarity, as shown in the table below. Whatever its potency, the potion's red liquid glimmers when agitated. Potion Potion of Healing: HP Regained 2d4 + 2, Rarity Common; Potion Potion of Healing (greater): HP Regained 4d4 + 4, Rarity Uncommon; Potion Potion of Healing (superior): HP Regained 8d4 + 8, Rarity Rare; Potion Potion of Healing (supreme): HP Regained 10d4 + 20, Rarity Very Rare.",
+  "weapon": null,
+  "armor": null,
+  "slot": "consumable",
+  "appliesTo": null,
+  "rarity": "very-rare",
+  "isMagic": true,
+  "attunement": {
+   "required": false,
+   "restrictedTo": []
+  },
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Healing (supreme)",
+    "activation": "bonus-action",
+    "description": "Drink it, or give it to a creature within 5 feet of you. The drinker regains 10d4 + 20 Hit Points.",
+    "damage": [],
+    "healing": {
+     "formula": "10d4 + 20"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5589,32 +5790,6 @@
   "slot": "consumable",
   "appliesTo": null,
   "rarity": "uncommon",
-  "isMagic": true,
-  "attunement": {
-   "required": false,
-   "restrictedTo": []
-  },
-  "cursed": false,
-  "casts": [],
-  "grantsFeatIds": [],
-  "tags": [],
-  "actions": [],
-  "effects": [],
-  "modifiers": []
- },
- {
-  "id": "potions-of-healing",
-  "name": "Potions of Healing",
-  "source": "srd",
-  "category": "consumable",
-  "costGp": null,
-  "weightLb": null,
-  "description": "Potion, Rarity Varies. You regain Hit Points when you drink this potion. The number of Hit Points depends on the potion's rarity, as shown in the table below. Whatever its potency, the potion's red liquid glimmers when agitated. Potion Potion of Healing: HP Regained 2d4 + 2, Rarity Common; Potion Potion of Healing (greater): HP Regained 4d4 + 4, Rarity Uncommon; Potion Potion of Healing (superior): HP Regained 8d4 + 8, Rarity Rare; Potion Potion of Healing (supreme): HP Regained 10d4 + 20, Rarity Very Rare.",
-  "weapon": null,
-  "armor": null,
-  "slot": "consumable",
-  "appliesTo": null,
-  "rarity": "varies",
   "isMagic": true,
   "attunement": {
    "required": false,
@@ -6217,7 +6392,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "swim",
+    "feet": 40
+   }
+  ]
  },
  {
   "id": "ring-of-telekinesis",
@@ -6643,9 +6824,9 @@
       "type": "on-ability-check"
      },
      {
-      "type": "ability-is",
-      "abilities": [
-       "wis"
+      "type": "skill-is",
+      "skills": [
+       "perception"
       ]
      }
     ]
@@ -6997,9 +7178,9 @@
       "type": "on-ability-check"
      },
      {
-      "type": "ability-is",
-      "abilities": [
-       "wis"
+      "type": "skill-is",
+      "skills": [
+       "perception"
       ]
      }
     ]
@@ -7214,7 +7395,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "climb",
+    "equalToSpeed": true
+   }
+  ]
  },
  {
   "id": "sovereign-glue",
@@ -7262,6 +7449,11 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
+  "spellScroll": {
+   "minLevel": 0,
+   "maxLevel": 9
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -9441,8 +9633,28 @@
     "id": "fly",
     "name": "Winged Flight",
     "activation": "action",
-    "description": "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
+    "description": "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land. End it on your sheet once the hour is up.",
     "damage": [],
+    "grants": {
+     "name": "Winged Flight (1 hour)",
+     "tags": [
+      "winged-flight"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "fly",
+       "feet": 30
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
     "uses": {
      "limit": 4,
      "per": "long-rest",

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ActionAreaSchema,
   ActorDefinitionSchema,
   ActorSchema,
   EffectInstanceSchema,
@@ -57,6 +58,8 @@ export const RollRecordSchema = z.object({
   ),
   modifiers: z.array(z.object({ value: z.number().int().nonnegative(), sign: z.union([z.literal(1), z.literal(-1)]) })),
   total: z.number().int(),
+  /** The d20 was typed from a physical die rather than thrown by the server. */
+  typed: z.literal(true).optional(),
   createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
@@ -170,6 +173,59 @@ export type Annotation = z.infer<typeof AnnotationSchema>;
 
 export const AbilityIdSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof AbilityIdSchema>;
+/** What a save's outcome leaves on its target, e.g. Grappled with its escape DC from an Unarmed Strike grapple. */
+const PendingSaveEffectSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    tags: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40)
+      )
+      .max(8)
+      .default([]),
+    linkedConditionIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .max(4)
+      .default([]),
+    escapeDc: z.number().int().min(1).max(40).nullable().default(null),
+    sourceActorId: z.uuid().nullable().default(null),
+    sourceName: z.string().max(120).nullable().default(null),
+    /** How long it lasts, as the text prints it; absent is until ended. */
+    duration: SaveFailureDurationSchema.optional(),
+    /** The save the target repeats at the end of each of its turns, a success ending the effect. */
+    repeatSave: EffectInstanceSchema.shape.repeatSave,
+    endsOnDamage: z.boolean().optional(),
+    speedZero: z.boolean().optional(),
+    /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
+    endsWhenSourceDefeated: z.boolean().optional(),
+    rangeFeet: EffectInstanceSchema.shape.rangeFeet,
+    /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
+     * once that has ended. */
+    castId: z.string().min(1).max(120).optional(),
+    /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
+    sourceActionId: z.string().max(120).optional(),
+    /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
+    ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
+    /** A spell's or a magic item's, so the save repeated against it is one Magic Resistance helps with. */
+    magical: EffectInstanceSchema.shape.magical,
+    /** It ends when a spell restores the bearer's hit points (an infernal wound). */
+    endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
+    /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
+    modifiers: EffectModifiersSchema.default([]),
+    /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
+     *  where "until the end of its next turn" would run a turn longer. */
+    currentTurn: z.literal(true).optional()
+  })
+  .strict();
+
 /** A saving throw a target still owes (GM answers for anyone, a player for their own character). The
  * answer auto-applies: fail = full damage + condition, success = half or none (ADR-0008 carve-out). */
 export const PendingSaveSchema = z
@@ -207,60 +263,131 @@ export const PendingSaveSchema = z
       .max(8)
       .optional(),
     /** Effect applied on a failed save, e.g. Grappled with its escape DC from an Unarmed Strike grapple. */
-    onFailEffect: z
-      .object({
-        name: z.string().min(1).max(120),
-        tags: z
-          .array(
-            z
-              .string()
-              .regex(/^[a-z0-9-]+$/)
-              .max(40)
-          )
-          .max(8)
-          .default([]),
-        linkedConditionIds: z
-          .array(
-            z
-              .string()
-              .regex(/^[a-z0-9-]+$/)
-              .max(60)
-          )
-          .max(4)
-          .default([]),
-        escapeDc: z.number().int().min(1).max(40).nullable().default(null),
-        sourceActorId: z.uuid().nullable().default(null),
-        sourceName: z.string().max(120).nullable().default(null),
-        /** How long it lasts, as the text prints it; absent is until ended. */
-        duration: SaveFailureDurationSchema.optional(),
-        /** The save the target repeats at the end of each of its turns, a success ending the effect. */
-        repeatSave: EffectInstanceSchema.shape.repeatSave,
-        endsOnDamage: z.boolean().optional(),
-        speedZero: z.boolean().optional(),
-        /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
-        endsWhenSourceDefeated: z.boolean().optional(),
-        rangeFeet: EffectInstanceSchema.shape.rangeFeet,
-        /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
-         * once that has ended. */
-        castId: z.string().min(1).max(120).optional(),
-        /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
-        sourceActionId: z.string().max(120).optional(),
-        /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
-        ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
-        /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
-        modifiers: EffectModifiersSchema.default([])
-      })
-      .strict()
-      .optional(),
+    onFailEffect: PendingSaveEffectSchema.optional(),
+    /** What a success leaves instead (Heat Metal: holding on to the red-hot object brings Disadvantage). The same shape
+     *  as `onFailEffect`. GM bookkeeping, never projected. */
+    onSuccessEffect: PendingSaveEffectSchema.optional(),
+    /** A line for the table when the save fails, for what the engine can't do (Heat Metal: it drops the object, if it
+     *  can). */
+    failureNote: z.string().min(1).max(300).optional(),
+    /** A failure also breaks the creature's Concentration (Sleet Storm). */
+    breaksConcentration: z.literal(true).optional(),
+    /** The spell area that raised it (`SpellZone`), which counts the damage it deals toward its cap. Never projected. */
+    zoneId: z.string().min(1).max(120).optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
     repeatOf: z
       .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
       .strict()
       .optional(),
+    /** The GM's call for a roll this save answers; the outcome is written back to the call. */
+    callId: z.uuid().optional(),
+    /** Against a spell or another magical effect (a magic item's): Magic Resistance gives Advantage on it. */
+    magical: z.literal(true).optional(),
+    /** A success makes the target immune to this source's trait for the rest of the fight ("immune to this ghast's
+     * Stench for 24 hours"). */
+    immuneOnSuccess: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
 export type PendingSave = z.infer<typeof PendingSaveSchema>;
+
+/** What an ability check is made with: the ability, and a skill or a tool (or both) when one applies. */
+export const CheckSubjectSchema = z
+  .object({
+    ability: AbilityIdSchema,
+    skill: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(60)
+      .optional(),
+    tool: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
+  })
+  .strict();
+export type CheckSubject = z.infer<typeof CheckSubjectSchema>;
+
+/**
+ * Dice thrown before they count, held so a second look at the same roll returns the same dice (ADR-0012): a previewed
+ * save, death save, attack or opportunity attack, and the latest check, which Heroic Inspiration may still reroll.
+ * GM-only; the player saw the dice in the roll itself.
+ */
+export const HeldRollSchema = z
+  .object({
+    /** What the dice belong to: `save:<saveId>`, `death-save:<actorId>`, `attack:<actorId>`, `reaction:<reactionId>`
+     *  or `check:<actorId>`. */
+    key: z.string().min(1).max(200),
+    actorId: z.uuid(),
+    /** The d20 faces thrown so far, in order. */
+    faces: z.array(z.number().int().min(1).max(20)).min(1).max(2),
+    /** The roll's other dice as thrown (Bless's d4), kept with the d20s. */
+    others: z
+      .array(z.object({ sides: z.number().int().min(2).max(100), face: z.number().int().min(1).max(100) }).strict())
+      .max(20)
+      .default([]),
+    /** The roll the faces were recorded under. */
+    rollId: z.uuid().nullable().default(null),
+    /** Typed from a physical die rather than thrown by the server. */
+    typed: z.boolean().default(false),
+    /** The round and turn they were thrown in: a die held for one turn's attack is not reused on a later turn. */
+    round: z.number().int().nonnegative(),
+    turnActorId: z.uuid().nullable(),
+    /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
+    check: z
+      .object({
+        subject: CheckSubjectSchema,
+        dc: z.number().int().min(1).max(40).nullable(),
+        visibility: RollVisibilitySchema,
+        /** The GM's forced mode, which a reroll keeps. */
+        rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+        callId: z.uuid().optional(),
+        findActorId: z.uuid().optional()
+      })
+      .strict()
+      .optional(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type HeldRoll = z.infer<typeof HeldRollSchema>;
+
+/** One character's part of a call for a roll: who, the pending save a save call opened, and the result once rolled. */
+export const RollCallEntrySchema = z
+  .object({
+    actorId: z.uuid(),
+    saveId: z.uuid().optional(),
+    result: z
+      .object({
+        natural: z.number().int().min(0).max(20),
+        total: z.number().int(),
+        /** Null when the call set no DC. */
+        success: z.boolean().nullable(),
+        /** The condition that made a Strength or Dexterity save fail without a roll. */
+        autoFailed: z.string().max(60).optional(),
+        rollId: z.uuid().optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+/**
+ * The GM's call for a roll: a check or a save from one or several characters, with an optional DC. A save call opens a
+ * pending save for each character; a check call is answered with `roll-call.answer`. A blind call's rolls are hidden from
+ * the players who make them. Closed by the GM.
+ */
+export const RollCallSchema = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(["check", "save"]),
+    subject: CheckSubjectSchema,
+    dc: z.number().int().min(1).max(40).nullable(),
+    blind: z.boolean().default(false),
+    entries: z.array(RollCallEntrySchema).min(1).max(20),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type RollCall = z.infer<typeof RollCallSchema>;
 
 /** An attack a reaction (Parry, Shield) may still turn into a miss, held at the roll until the prompt is answered and
  * then replayed with the same die. The economy it spent was committed when it rolled. GM-only. */
@@ -474,8 +601,8 @@ export const RuleExceptionsSchema = z.object({
 });
 export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
 
-/** `slots` defaults to "assisted" regardless of the dial; the GM opts into strict slot tracking. */
-export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = { slots: "assisted" };
+/** Every family follows the dial (the campaign's Enforce, Advise or Off) until the GM turns one off. */
+export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = {};
 
 /** Closed list: `rules.answer` replays the parked payload under GM authority. */
 export const AskableCommandSchema = z.enum([
@@ -507,6 +634,44 @@ export const PendingRuleAskSchema = z
   .strict();
 export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
 
+/**
+ * An area a spell left on the map that acts on creatures later (Spirit Guardians, Moonbeam, a wall of fire): the
+ * server raises its save or deals its damage when a creature enters it or starts or ends its turn there. When and how
+ * it acts is the spell's (`laterActionId` names the spell's later action with the zone); the numbers are the cast's.
+ * GM-only: it names the caster, which may be hidden.
+ */
+export const SpellZoneSchema = z
+  .object({
+    /** The cast's command id. */
+    id: z.string().min(1).max(120),
+    spellId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    name: z.string().min(1).max(120),
+    laterActionId: z.string().min(1).max(120),
+    casterId: z.uuid(),
+    /** The Concentration cast it ends with; null for a spell that lasts `rounds` from `startedRound`, or until ended. */
+    castId: z.string().min(1).max(120).nullable(),
+    rounds: z.number().int().min(1).max(100).nullable().default(null),
+    startedRound: z.number().int().positive(),
+    /** The slot level it was cast at, which its damage rolls at. */
+    level: z.number().int().min(0).max(9),
+    dc: z.number().int().min(1).max(40),
+    /** The area placed on the map (an annotation); null until the GM places one. An Emanation needs none. */
+    annotationId: z.string().min(1).max(120).nullable(),
+    /** The template the GM places it with: the spell's own area. Null for an Emanation, which is its caster's. */
+    area: ActionAreaSchema.nullable().default(null),
+    /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
+    damageDealt: z.number().int().nonnegative().max(100000).default(0),
+    /** This turn's marks: who has entered it, and who has made its save or taken its damage. Cleared as each turn
+     *  begins. */
+    entered: z.array(z.uuid()).max(200).default([]),
+    affected: z.array(z.uuid()).max(200).default([])
+  })
+  .strict();
+export type SpellZone = z.infer<typeof SpellZoneSchema>;
+
 /** Combat fields shared by the live combat and each parked scene: everything except the map and scene bookkeeping. */
 const sceneCombatShape = {
   active: z.boolean().default(false),
@@ -515,6 +680,8 @@ const sceneCombatShape = {
   initiative: z.array(InitiativeEntrySchema).max(200).default([]),
   tokens: z.array(EncounterTokenSchema).max(200).default([]),
   annotations: z.array(AnnotationSchema).max(300).default([]),
+  /** The spell areas that act on creatures later (see SpellZoneSchema). GM-only. */
+  spellZones: z.array(SpellZoneSchema).max(20).default([]),
   /** Action economy of the current turn's actor, reset on turn change. `actionInstance` holds remaining components
    * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound bonus action (Flurry of
    * Blows); `turnUses` is keyed `${actorId}:${actionId}`. */
@@ -522,12 +689,16 @@ const sceneCombatShape = {
     .object({
       actionUsed: z.boolean().default(false),
       bonusActionUsed: z.boolean().default(false),
-      /** `slotLevel`: the slot a multi-attack spell (Scorching Ray) was cast with, which its later rays roll at. */
+      /** `slotLevel`: the slot a multi-attack spell (Scorching Ray) was cast with, which its later rays roll at. A
+       *  component keyed "a|b" is filled by either action. A Multiattack's instance names it (`parentId`) and the
+       *  replacements it has left, keyed by their actions ("roar": 1); neither is projected. */
       actionInstance: z
         .object({
           actorId: z.uuid(),
           components: z.record(z.string(), z.number().int().nonnegative()),
-          slotLevel: z.number().int().min(1).max(9).optional()
+          slotLevel: z.number().int().min(1).max(9).optional(),
+          parentId: z.string().max(120).optional(),
+          replacements: z.record(z.string(), z.number().int().nonnegative()).optional()
         })
         .strict()
         .nullable()
@@ -547,6 +718,9 @@ const sceneCombatShape = {
       spellSlotCasters: z.array(z.uuid()).max(200).optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
+      /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
+       *  bookkeeping, never projected. */
+      attackRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
        *  fire again in it. Engine bookkeeping, never projected. */
@@ -567,6 +741,19 @@ const sceneCombatShape = {
             .strict()
             .nullable()
             .default(null)
+        })
+        .strict()
+        .optional(),
+      /** The turn's actor's actions beyond its one (SRD Action Surge, Haste): Action Surges taken and not yet used,
+       *  whether Haste's limited action is used, and the Magic actions taken (Action Surge's isn't a second one).
+       *  Engine bookkeeping, never projected. */
+      extraActions: z
+        .object({
+          actorId: z.uuid(),
+          surges: z.number().int().min(0).max(4).default(0),
+          surgedThisTurn: z.boolean().default(false),
+          hasteUsed: z.boolean().default(false),
+          magicActions: z.number().int().min(0).max(10).default(0)
         })
         .strict()
         .optional()
@@ -724,6 +911,7 @@ export const CombatStateSchema = z
         active.combat.initiative.length > 0 ||
         active.combat.tokens.length > 0 ||
         active.combat.annotations.length > 0 ||
+        active.combat.spellZones.length > 0 ||
         active.combat.reactionsUsed.length > 0 ||
         Object.keys(active.combat.legendaryUsed).length > 0 ||
         active.combat.fog.enabled ||
@@ -762,9 +950,11 @@ export const BuilderPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).default("open"),
     /** Whether players may roll a random character; "gm-only" by default because it fills a roster slot in one tap. */
     playerRandom: z.enum(["open", "gm-only"]).default("gm-only"),
-    /** Whether players may type what their own dice showed for rolled ability scores and hit points. Closed by
-     *  default: a player's rolls are then thrown by the server (the GM may always type). */
-    typedRolls: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** The table's one setting for typed dice (ADR-0012): whether players may type what their physical dice show, for
+     *  every roll (checks, saves, attacks, damage, death saves, initiative, and rolled scores and hit points in the
+     *  builder). Open by default, for tables that roll physical dice; "gm-only" refuses a player's typed faces and the
+     *  server throws them. The GM may always type. */
+    typedRolls: z.enum(["open", "gm-only"]).default("open"),
     /** A table rule raising a rolled hit-point level to the class average; "none" is the SRD (the roll stands). */
     hitPointRollFloor: z.enum(["none", "average"]).default("none")
   })
@@ -798,6 +988,30 @@ export type StagingDefaults = z.infer<typeof StagingDefaultsSchema>;
 export const PartyVisibilitySchema = z.enum(["off", "name-and-class", "full-sheet", "sheet-and-resources"]);
 export type PartyVisibility = z.infer<typeof PartyVisibilitySchema>;
 
+/** A Short Rest the GM runs for several characters at once. Each player spends Hit Dice on their own device and
+ *  says when they are done; the benefits land when the GM finishes it. */
+export const PartyShortRestSchema = z
+  .object({
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    /** Members whose players are done choosing. The GM may finish without them. */
+    done: z.array(z.uuid()).max(12).default([])
+  })
+  .strict();
+export type PartyShortRest = z.infer<typeof PartyShortRestSchema>;
+
+/** Game time and the rests waiting on the GM. The clock exists for the 16-hour rule between Long Rests; the GM
+ *  moves it, and a party rest moves it by the rest's length. */
+export const RestStateSchema = z
+  .object({
+    /** Whole hours of game time since the campaign's clock started. */
+    clockHours: z.number().int().min(0).max(10_000_000).default(0),
+    /** Characters whose players asked for a Long Rest, oldest first. */
+    requests: z.array(z.uuid()).max(50).default([]),
+    shortRest: PartyShortRestSchema.nullable().default(null)
+  })
+  .strict();
+export type RestState = z.infer<typeof RestStateSchema>;
+
 export const GameStateSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().nonnegative().default(0),
@@ -823,6 +1037,12 @@ export const GameStateSchema = z.object({
   /** Table defaults for staging new combatants. GM-set, GM-read. */
   stagingDefaults: StagingDefaultsSchema.prefault({}),
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */
-  partyVisibility: PartyVisibilitySchema.default("name-and-class")
+  partyVisibility: PartyVisibilitySchema.default("name-and-class"),
+  /** Dice thrown before they count (see HeldRollSchema). GM-only. */
+  heldRolls: z.array(HeldRollSchema).max(100).default([]),
+  /** The GM's open calls for a roll. A player reads only their own part of each. */
+  rollCalls: z.array(RollCallSchema).max(20).default([]),
+  /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */
+  rest: RestStateSchema.prefault({})
 });
 export type GameState = z.infer<typeof GameStateSchema>;

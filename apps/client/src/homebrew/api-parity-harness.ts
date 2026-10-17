@@ -443,7 +443,8 @@ const SAVE_LIFETIME_KEYS = [
   "speedZero",
   "rangeFeet",
   "failsAtHitPoints",
-  "ongoingDamage.**"
+  "ongoingDamage.**",
+  "failureHazard"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
@@ -456,9 +457,30 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].useCost",
+    types: ACTION_CARRIERS,
+    reason:
+      "how many uses one activation spends (Lay on Hands' points, its 5-point cure) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsConditions",
+    types: ACTION_CARRIERS,
+    reason:
+      "conditions an action ends on its target (Lay on Hands' cure) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].legendary.cost",
     types: ACTION_CARRIERS,
     reason: "the per-round pool cost — the record has actionsPerRound, the action has no cost",
+    status: "gap"
+  },
+  {
+    at: "actions[].legendary.oncePerRound",
+    types: ACTION_CARRIERS,
+    reason:
+      "a legendary action that can't be taken again until the creature's next turn - read from stat-block prose; no editor control yet",
     status: "gap"
   },
   {
@@ -525,7 +547,21 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "actions[].multiattack[].**",
     types: ACTION_CARRIERS,
-    reason: "126 SRD authors; owned outside this program (census row at vocabulary-parity.mirror.test.ts:3416)",
+    reason: "177 SRD authors; owned outside this program (census row in vocabulary-parity.mirror.test.ts)",
+    status: "gap"
+  },
+  {
+    at: "actions[].multiattackAlternatives",
+    types: ACTION_CARRIERS,
+    reason:
+      'a Multiattack\'s other plan ("or it makes two Hurl Flame attacks") - read from stat-block prose like the plan',
+    status: "gap"
+  },
+  {
+    at: "actions[].multiattackReplacements[].**",
+    types: ACTION_CARRIERS,
+    reason:
+      'an action a Multiattack lets replace one of its attacks ("it can replace one attack with a use of Roar") - read from stat-block prose like the plan',
     status: "gap"
   },
   {
@@ -600,6 +636,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "a stat block's damage under a printed condition (Bloodied swarms, a charge), read from the hit clause as the catalog is built; no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castsSpells.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spells a stat block's action casts (a Spellcasting list, a Misty Step), read from its text as the catalog is built and made cast actions on a stat block; no editor control yet",
     status: "gap"
   },
   {
@@ -682,6 +725,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "effects[].voidWhileIncapacitated",
     types: FEATURE_CARRIERS,
     reason: "effect linkage vocabulary with no control — no program unit authors it",
+    status: "gap"
+  },
+  {
+    at: "effects[].damageUses",
+    types: FEATURE_CARRIERS,
+    reason:
+      "how many hits an effect's damage riders last (a coat of poison); authored in the item overlay, no control yet",
     status: "gap"
   },
   {
@@ -847,13 +897,15 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "multiclassProficiencies.**",
     types: ["class"],
-    reason: "the builder does not multiclass — no reader on the build path and no control",
+    reason:
+      "the builder grants these to a class taken after the first, but its skill and instrument picks (a Bard's, Ranger's or Rogue's) have no control",
     status: "gap"
   },
   {
     at: "multiclassPrerequisites.**",
     types: ["class"],
-    reason: "the builder does not multiclass — the schema key has no reader on the build path and no control",
+    reason:
+      "the builder checks these minimums when a class is taken, but no control authors the mode or the minimums list the rows sit in",
     status: "gap"
   },
   {
@@ -908,6 +960,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "^extensions",
     types: ["monster"],
     reason: "the opaque bag itself — the census's structural blind spot, since the walk cannot see its keys",
+    status: "gap"
+  },
+  {
+    at: "traitMechanics[].**",
+    types: ["monster"],
+    reason:
+      "what a stat block's traits do (Regeneration, auras, Death Burst), read from the trait text as the catalog is built; no editor control yet",
     status: "gap"
   },
   {

@@ -6,13 +6,23 @@ import type {
   RuleExceptions,
   RuleMode
 } from "@vtt/domain";
+import { abilityCheckClaims } from "./ability-checks.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { aggregateRollMode } from "@vtt/rules-5e";
 import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
-import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
+import {
+  endConcentrationSustainedBy,
+  endEffect,
+  endEffectsSustainedBy,
+  expireEffectsAtTurnStart,
+  type EffectNarration
+} from "./effects.js";
+import { leaveShortRest } from "./short-rest-interruptions.js";
+import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
+import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 
@@ -38,7 +48,8 @@ const EMPTY_TURN = {
   movementUsedFeet: 0
 } as const;
 
-/** A fresh fight refreshes per-encounter pools (Frenzy) and recharge pools (a dragon's breath starts ready); long-rest pools persist. */
+/** A fresh fight refreshes per-encounter pools (Frenzy), recharge pools (a dragon's breath starts ready) and uses that
+ *  come back with the bearer's turn (Peerless Aim); long-rest pools persist. */
 function clearPerEncounterUses(
   state: GameState,
   combatantIds: ReadonlySet<string>,
@@ -50,7 +61,8 @@ function clearPerEncounterUses(
     const definition = resolveDefinition(actor.definitionId);
     if (!definition) continue;
     for (const action of effectiveActions(definition, actor, catalog)) {
-      if (action.uses?.per !== "encounter" && action.uses?.per !== "recharge") continue;
+      if (action.uses?.per !== "encounter" && action.uses?.per !== "recharge" && action.uses?.per !== "own-turn")
+        continue;
       const key = action.uses.pool ?? action.id;
       if (actor.actionUses[key] !== undefined) {
         const { [key]: _cleared, ...rest } = actor.actionUses;
@@ -72,9 +84,10 @@ export type InitiativeRollDeps = Readonly<{
 
 /**
  * The roll mode and penalty of one combatant's initiative (a Dexterity check, so a D20 Test). Advantage comes
- * from `roll-mode {roll: "initiative"}` riders (Feral Instinct, items) and Invisible; Disadvantage from riders,
- * Surprise and any Incapacitated condition. 2024 cancellation applies via `aggregateRollMode`: any Advantage
- * plus any Disadvantage is a normal roll. Exhaustion takes 2 per level off the total.
+ * from `roll-mode {roll: "initiative"}` riders (Feral Instinct, items), Dexterity check riders and Invisible;
+ * Disadvantage from those riders, Surprise, any Incapacitated condition, Poisoned and Frightened. 2024 cancellation
+ * applies via `aggregateRollMode`: any Advantage plus any Disadvantage is a normal roll. Exhaustion takes 2 per level
+ * off the total.
  */
 export function initiativeRollFor(
   state: GameState,
@@ -85,7 +98,14 @@ export function initiativeRollFor(
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return { mode: "normal", penalty: 0, reasons: [] };
   const definition = actor.definitionId ? deps.resolveDefinition?.(actor.definitionId) : undefined;
-  const claims = rollModeClaims(deriveEquipment(actor, definition, deps.catalog), ["initiative"], "on-initiative-roll");
+  const derivation = deriveEquipment(actor, definition, deps.catalog);
+  const claims = rollModeClaims(derivation, ["initiative"], "on-initiative-roll");
+  // Initiative is a Dexterity check, so what the rules give Dexterity checks reaches it (Poisoned, Frightened, Hex). A
+  // carrier that also names initiative itself (armor worn without training) counts once.
+  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" });
+  for (const side of ["advantage", "disadvantage"] as const)
+    for (const claim of asCheck[side])
+      if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);
   if (actor.conditions.some((condition) => condition.id === "invisible"))
     claims.advantage.push({ source: "invisible", label: "Invisible" });
   if (surprised) claims.disadvantage.push({ source: "surprised", label: "Surprised" });
@@ -256,6 +276,7 @@ export function startEncounter(
       tokenGeometry
     ).map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
     annotations: [],
+    spellZones: [],
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
     ruleExceptions: input.ruleExceptions ?? state.combat.ruleExceptions,
@@ -273,6 +294,60 @@ export function startEncounter(
     historyDirty: false
   };
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
+  // Rolling Initiative stops a Short Rest; the GM's rest panel shows who left it.
+  leaveShortRest(state, actorIds, "rolled Initiative");
+}
+
+/**
+ * The GM takes a combatant out of a running fight (it fled, was dismissed, or lies dead and is in the way): its
+ * initiative entry, token and prompts go, and what it sustains ends - its grapples and Concentration, what lasts only
+ * until its next turn, and a creature it swallowed climbs out. The caller advances the turn first when it is this
+ * combatant's (so the history records the boundary).
+ */
+export function removeCombatant(
+  state: GameState,
+  actorId: string,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): EffectNarration[] {
+  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before taking a combatant out of it.");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || !state.combat.initiative.some((entry) => entry.actorId === actorId))
+    throw new CommandRejectedError("That combatant is not in this encounter.");
+  if (state.combat.initiative.length === 1)
+    throw new CommandRejectedError("It is the last combatant - end the encounter instead.");
+  if (state.combat.turnActorId === actorId)
+    throw new CommandRejectedError("Advance past its turn before taking it out of the fight.");
+  const events: EffectNarration[] = [
+    ...releaseSwallowedBy(state, actorId, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined),
+    ...endEffectsSustainedBy(state, actorId),
+    ...endConcentrationSustainedBy(state, actorId)
+  ];
+  // Its turns won't come again, so what lasts until one of them (a Help, Vex, a "until the end of its next turn")
+  // ends now.
+  for (const bearer of state.actors)
+    for (const effect of [...bearer.effects])
+      if (
+        effect.sourceActorId === actorId &&
+        bearer.id !== actorId &&
+        (effect.duration.type === "until-source-next-turn" || effect.duration.type === "until-source-turn-end") &&
+        bearer.effects.some((candidate) => candidate.id === effect.id)
+      )
+        events.push(...endEffect(state, bearer.id, effect.id));
+  const others = (id: string | null | undefined) => id !== actorId;
+  state.combat = {
+    ...state.combat,
+    initiative: state.combat.initiative.filter((entry) => others(entry.actorId)),
+    tokens: state.combat.tokens.filter((token) => others(token.actorId)),
+    pendingInitiative: state.combat.pendingInitiative.filter(others),
+    reactionsUsed: state.combat.reactionsUsed.filter(others),
+    legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, actorId),
+    // Its own reactions go, and so do opportunity attacks against it; damage it dealt stays owed.
+    pendingReactions: state.combat.pendingReactions.filter(
+      (prompt) => others(prompt.actorId) && !(prompt.kind === "leaves-reach" && prompt.targetActorId === actorId)
+    ),
+    pendingSaves: state.combat.pendingSaves.filter((save) => others(save.targetActorId))
+  };
+  return events;
 }
 
 /** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its
@@ -318,6 +393,7 @@ export function addCombatant(
     ]
   };
   if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
+  leaveShortRest(state, new Set([actorId]), "rolled Initiative");
 }
 
 export function endEncounter(state: GameState) {
@@ -335,6 +411,8 @@ export function endEncounter(state: GameState) {
     turnActorId: null,
     turn: { ...EMPTY_TURN },
     underwater: false,
+    // The fight's spell areas end with it; Concentration on them is the caster's to keep or drop.
+    spellZones: [],
     reactionsUsed: [],
     legendaryUsed: {},
     pendingSaves: [],
@@ -470,6 +548,10 @@ export type TurnAdvanceDeps = Readonly<{
   /** Mint the repeat saves the ending turn opens; absent, effects still expire but no save is opened. */
   newId?: () => string;
   now?: () => string;
+  /** The live map, so the spell areas a creature starts or ends its turn in act on it; absent, they wait for a map. */
+  geometry?: TokenMapGeometry | null;
+  /** Creature-to-creature distance on the map, for the auras that reach creatures as turns start and end. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /** SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the spent
@@ -508,6 +590,41 @@ function rollRecharges(state: GameState, actorId: string, deps: TurnAdvanceDeps,
   }
 }
 
+/** "You can't use it again until the start of your next turn" (Peerless Aim): such a use comes back as the bearer's
+ *  turn starts. */
+function refreshOwnTurnUses(state: GameState, actorId: string, deps: TurnAdvanceDeps) {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId) return;
+  const definition = deps.resolveDefinition(actor.definitionId);
+  if (!definition) return;
+  for (const action of effectiveActions(definition, actor, deps.catalog)) {
+    if (action.uses?.per !== "own-turn") continue;
+    const key = action.uses.pool ?? action.id;
+    if (actor.actionUses[key] === undefined) continue;
+    const { [key]: _spent, ...rest } = actor.actionUses;
+    actor.actionUses = rest;
+  }
+}
+
+/** A creature's legendary pool refills at the start of its turn, and so do the actions it couldn't take again until
+ *  then (marked `<actorId>:<actionId>`). */
+function legendaryRefilled(used: GameState["combat"]["legendaryUsed"], actorId: string) {
+  return Object.fromEntries(Object.entries(used).filter(([key]) => key !== actorId && !key.startsWith(`${actorId}:`)));
+}
+
+/** The spell areas' deps from a turn change's, when it has dice and ids to act with. */
+function zoneDepsOf(deps: TurnAdvanceDeps | undefined): ZoneDeps | null {
+  if (!deps?.newId) return null;
+  return {
+    geometry: deps.geometry ?? null,
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    rollDie: deps.rollDie,
+    newId: deps.newId,
+    now: deps.now ?? (() => new Date().toISOString())
+  };
+}
+
 export function nextInitiativeTurn(state: GameState, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   if (!state.combat.active || !state.combat.turnActorId || state.combat.initiative.length === 0)
     throw new CommandRejectedError("Start an encounter before advancing Initiative.");
@@ -519,12 +636,16 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const wraps = currentIndex === state.combat.initiative.length - 1;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
+  const outgoingId = state.combat.turnActorId;
   endOfTurn(
     state,
-    state.combat.turnActorId,
+    outgoingId,
     ending,
-    deps?.newId ? { newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
+    deps?.newId ? { ...deps, newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
   );
+  // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
+  const zones = zoneDepsOf(deps);
+  if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
   events?.push(...ending);
   // A new round sorts the whole order again, settling any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
@@ -537,9 +658,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
     turn: { ...EMPTY_TURN },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
-    legendaryUsed: Object.fromEntries(
-      Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== nextActorId)
-    )
+    legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
@@ -548,8 +667,12 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Then what lands at the start of its turn: a swallow's acid, Searing Smite's fire.
   const starting: EffectNarration[] = [];
   startOfTurn(state, nextActorId, starting, deps);
+  // Then the spell areas: each counts "once per turn" afresh, a spell's duration runs out at its caster's turn, and
+  // the incoming creature starting its turn inside one (Web, Stinking Cloud) meets it.
+  if (zones) starting.push(...zonesAtTurnStart(state, nextActorId, zones));
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
+  refreshOwnTurnUses(state, nextActorId, deps);
 }
 
 export function previousInitiativeTurn(state: GameState) {
@@ -568,8 +691,6 @@ export function previousInitiativeTurn(state: GameState) {
     // timeline restore is the real undo.
     turn: { ...EMPTY_TURN },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
-    legendaryUsed: Object.fromEntries(
-      Object.entries(state.combat.legendaryUsed).filter(([actorId]) => actorId !== previousActorId)
-    )
+    legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, previousActorId)
   };
 }

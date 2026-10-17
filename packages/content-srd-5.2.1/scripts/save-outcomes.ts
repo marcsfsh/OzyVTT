@@ -120,6 +120,51 @@ function ongoingDamageOf(clause: string): OngoingDamage | undefined {
   return { damage, at: match[5] === "its" ? "bearer-turn-start" : "source-turn-start" };
 }
 
+/**
+ * Hit points a failed save's lasting harm takes each turn, and what ends it: "The target receives an infernal wound.
+ * While wounded, the target loses 5 (1d10) Hit Points at the start of each of its turns. The wound closes after 1
+ * minute, after a spell restores Hit Points to the target, or after the target or a creature within 5 feet of it takes
+ * an action to stanch the wound, doing so by succeeding on a DC 12 Wisdom (Medicine) check." The loss is no damage,
+ * so it has no type; the stanching check is the GM's, said in `reminder`. Null when the text prints no such loss.
+ */
+export function hitPointLossOf(description: string): Readonly<{
+  failureEffect: {
+    name: string;
+    tags: string[];
+    duration?: { type: "rounds"; rounds: number };
+    endsOnSpellHealing?: true;
+    modifiers: [];
+  };
+  ongoingDamage: OngoingDamage;
+  reminder: string | null;
+}> | null {
+  const loss = /\bloses \d+ \((\d+d\d+(?: [+-] \d+)?)\) Hit Points at the start of each of its turns\b/.exec(
+    description
+  );
+  if (!loss) return null;
+  const named = /\breceives an? ([a-z]+) wound\b/.exec(description);
+  const name = named ? `${named[1]![0]!.toUpperCase()}${named[1]!.slice(1)} Wound` : "Wounded";
+  const stanch =
+    /\btakes an action to stanch the wound, doing so by succeeding on a DC (\d+) Wisdom \(Medicine\) check\b/.exec(
+      description
+    );
+  return {
+    failureEffect: {
+      name,
+      tags: [],
+      ...(/\bcloses after 1 minute\b/.test(description) ? { duration: { type: "rounds" as const, rounds: 10 } } : {}),
+      ...(/\bafter a spell restores Hit Points to the target\b/.test(description)
+        ? { endsOnSpellHealing: true as const }
+        : {}),
+      modifiers: []
+    },
+    ongoingDamage: { damage: [{ formula: loss[1]! }], at: "bearer-turn-start", hitPointLoss: true },
+    reminder: stanch
+      ? `The ${name.toLowerCase()} also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC ${stanch[1]} Wisdom (Medicine) check: end it by hand.`
+      : null
+  };
+}
+
 /** The reminder text without the ongoing damage the engine now deals: the clause is cut from its sentence, and a
  *  sentence that was only that damage goes. Null when nothing is left to remind. */
 export function withoutOngoingDamage(text: string): string | null {

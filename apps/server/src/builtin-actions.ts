@@ -9,7 +9,8 @@ type BuiltinAction = ActorDefinition["actions"][number];
  *
  * Ids are a frozen replay contract (journaled payloads reference them); a stat-block action with the
  * same id wins on lookup. What the declarative vocabulary can't express (check rolls, unarmed strike
- * math) is a handler keyed by id in `resolution/builtins.ts`. Descriptions quote the SRD rule.
+ * math) is a handler keyed by id in `resolution/builtins.ts`. Descriptions quote the SRD rule. The Unarmed Strike
+ * options are attacks of the Attack action (`replacesAttack`), so Extra Attack covers them as it covers a weapon.
  */
 export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
   {
@@ -79,13 +80,14 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Help",
     activation: "action",
     description:
-      "Choose one ally: they gain Advantage on their attack rolls until the start of your next turn (the SRD's distract variant, simplified from next-attack-only - documented). The Help action also covers assisting a check or stabilizing a dying creature; adjudicate those narratively. (SRD 5.2.1, Help [Action])",
+      "Distract an enemy within 5 feet of you: the next attack roll one of your allies makes against it has Advantage. The benefit expires at the start of your next turn. Help can also assist an ally's ability check with one of your skill or tool proficiencies; adjudicate that one at the table. (SRD 5.2.1, Help [Action])",
     damage: [],
+    // The effect sits on the distracted enemy; the attack roll reads and spends it (`resolution/attack.ts`).
     grants: {
-      name: "Helped",
-      tags: ["helped"],
+      name: "Distracted",
+      tags: ["distracted"],
       duration: { type: "until-source-next-turn" },
-      modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage" }],
+      modifiers: [],
       onEnd: [],
       target: "target",
       voidWhileIncapacitated: false,
@@ -113,7 +115,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Magic",
     activation: "action",
     description:
-      "Cast a spell with a casting time of an action, or use a feature or magic item that requires the Magic action. Spell mechanics stay with the GM (slots and effects aren't modeled yet). (SRD 5.2.1, Magic [Action])",
+      "Cast a spell with a casting time of an action, or use a feature or magic item that requires the Magic action. A spell's own row casts it and spends its slot; this row takes the action for anything else. (SRD 5.2.1, Magic [Action])",
     damage: []
   },
   {
@@ -121,7 +123,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Ready",
     activation: "action",
     description:
-      "Choose a perceivable trigger and a response: the response is taken as a Reaction before the start of your next turn. Resolving any action off-turn while Readied spends your Reaction and releases the ready. (SRD 5.2.1, Ready [Action])",
+      "Choose a perceivable trigger and a response: the response is taken as a Reaction before the start of your next turn. Resolving any action off-turn while Readied spends your Reaction and releases the ready; a readied move goes up to your Speed. A spell is readied by casting it with Ready: its slot is spent now, and it is held with Concentration until the start of your next turn. (SRD 5.2.1, Ready [Action])",
     damage: [],
     grants: {
       name: "Readied",
@@ -164,7 +166,8 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "A melee attack within 5 feet using your body: attack roll is Strength modifier + Proficiency Bonus; on a hit the target takes Bludgeoning damage equal to 1 + your Strength modifier. (SRD 5.2.1, Unarmed Strike)",
-    damage: []
+    damage: [],
+    replacesAttack: true
   },
   {
     id: "unarmed-grapple",
@@ -172,7 +175,8 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or it has the Grappled condition (that DC is also the escape DC). Only targets no more than one size larger, and you need a hand free - the GM adjudicates the hand. (SRD 5.2.1, Unarmed Strike / Grappling)",
-    damage: []
+    damage: [],
+    replacesAttack: true
   },
   {
     id: "unarmed-shove-prone",
@@ -180,7 +184,8 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or it has the Prone condition. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
-    damage: []
+    damage: [],
+    replacesAttack: true
   },
   {
     id: "unarmed-shove-push",
@@ -188,7 +193,8 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away - on a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
-    damage: []
+    damage: [],
+    replacesAttack: true
   },
   {
     id: "escape-grapple",
@@ -197,6 +203,15 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     description:
       "Use your action to make a Strength (Athletics) or Dexterity (Acrobatics) check (your best) against the grapple's escape DC, ending the Grappled condition on a success. (SRD 5.2.1, Grappling)",
     damage: []
+  },
+  {
+    id: "extinguish-fire",
+    name: "Put Out the Fire",
+    activation: "action",
+    description:
+      "As an action, you can extinguish fire on yourself by giving yourself the Prone condition and rolling on the ground. The fire also goes out if it is doused, submerged, or suffocated; the GM ends it then. (SRD 5.2.1, Burning [Hazard])",
+    damage: [],
+    requiresEffectTag: "burning"
   }
 ] as const;
 
@@ -204,11 +219,150 @@ export function builtinAction(actionId: string): BuiltinAction | undefined {
   return BUILTIN_ACTIONS.find((action) => action.id === actionId);
 }
 
-/** Builtins that resolve against exactly one chosen combatant; everything else is a single direct tap. */
+/** The generic actions a feature can turn into a Bonus Action. */
+type BonusBase =
+  "dash" | "disengage" | "hide" | "unarmed-strike" | "unarmed-grapple" | "unarmed-shove-prone" | "unarmed-shove-push";
+const UNARMED: readonly BonusBase[] = [
+  "unarmed-strike",
+  "unarmed-grapple",
+  "unarmed-shove-prone",
+  "unarmed-shove-push"
+];
+
+/** The id a generic action takes as a Bonus Action ("dash-bonus"); its handler is the base action's. */
+export const BONUS_SUFFIX = "-bonus";
+
+/** "The goblin takes the Disengage or Hide action": the generic actions a stat block's Bonus Action offers one of. A
+ *  row that takes two at once ("the Dash and Disengage actions") is `withTakenActions`'s. */
+function offeredActions(description: string): BonusBase[] {
+  const match = /\btakes the ((?:Dash|Disengage|Hide)(?:,? (?:or )?(?:Dash|Disengage|Hide))*) action\b/i.exec(
+    description
+  );
+  if (!match) return [];
+  return [...match[1].matchAll(/Dash|Disengage|Hide/gi)].map((found) => found[0].toLowerCase() as BonusBase);
+}
+
+/** The generic actions whose whole effect is a grant, so two taken at once can share one effect. */
+type GrantedBase = "dash" | "disengage" | "dodge";
+
+/** Feature actions that take two generic actions at once, by id: the Focus Point forms of Patient Defense and Step of
+ *  the Wind (SRD 5.2.1 Monk's Focus). Keyed by id so sheets built before this table get them too. */
+const TAKEN_TOGETHER: Readonly<Record<string, readonly GrantedBase[]>> = {
+  "patient-defense": ["disengage", "dodge"],
+  "step-of-the-wind": ["disengage", "dash"]
+};
+
+function takenTogether(action: BuiltinAction): readonly GrantedBase[] {
+  const listed = TAKEN_TOGETHER[action.id];
+  if (listed) return listed;
+  // A stat block's row: "The golem takes the Dash and Disengage actions."
+  const match = /\btakes the (Dash|Disengage|Dodge) and (?:the )?(Dash|Disengage|Dodge) actions\b/i.exec(
+    action.description
+  );
+  return match ? [match[1].toLowerCase() as GrantedBase, match[2].toLowerCase() as GrantedBase] : [];
+}
+
+/**
+ * An action that takes two generic actions at once grants both: one effect carrying each one's tags and modifiers
+ * (Dash's measured movement, Disengage's no-provoke, Dodge's Disadvantage), lasting as they do. An action that grants
+ * something of its own keeps it.
+ */
+export function withTakenActions(action: BuiltinAction): BuiltinAction {
+  if (action.grants !== undefined) return action;
+  const taken = takenTogether(action);
+  if (taken.length < 2) return action;
+  const grants = taken.flatMap((id) => {
+    const grant = builtinAction(id)?.grants;
+    return grant ? [grant] : [];
+  });
+  return {
+    ...action,
+    grants: {
+      name: action.name,
+      tags: [...new Set(grants.flatMap((grant) => grant.tags))],
+      duration: { type: "until-source-next-turn" },
+      modifiers: grants.flatMap((grant) => grant.modifiers),
+      onEnd: [],
+      target: "self",
+      // Dodge's half lapses while Incapacitated or at Speed 0; the tags still answer for Dash and Disengage.
+      voidWhileIncapacitated: grants.some((grant) => grant.voidWhileIncapacitated),
+      concentration: false
+    }
+  };
+}
+
+/**
+ * The generic actions this creature may take as a Bonus Action, and the feature that lets it: Cunning Action (Dash,
+ * Disengage or Hide), a stat block's Nimble Escape and the like, the free Dash of Step of the Wind and Disengage of
+ * Patient Defense, and Martial Arts' Unarmed Strike (SRD 5.2.1). Read from the sheet's features and actions, so a
+ * sheet built before this list gets them too. The first feature offering one names it.
+ */
+function bonusSources(definition: ActorDefinition | undefined): ReadonlyMap<BonusBase, string> {
+  const offered = new Map<BonusBase, string>();
+  const offer = (bases: readonly BonusBase[], source: string) => {
+    for (const base of bases) if (!offered.has(base)) offered.set(base, source);
+  };
+  const features = definition?.character?.features ?? [];
+  const actions = definition?.actions ?? [];
+  const holds = (id: string) =>
+    features.some((feature) => feature.id === id) || actions.some((action) => action.id === id);
+  if (holds("cunning-action")) offer(["dash", "disengage", "hide"], "Cunning Action");
+  if (features.some((feature) => feature.id === "martial-arts")) offer(UNARMED, "Martial Arts");
+  if (holds("step-of-the-wind")) offer(["dash"], "Step of the Wind");
+  if (holds("patient-defense")) offer(["disengage"], "Patient Defense");
+  for (const action of actions)
+    if (action.activation === "bonus-action") offer(offeredActions(action.description), action.name);
+  return offered;
+}
+
+/** A generic action taken as a Bonus Action through a feature. Martial Arts' strike keeps the Monk's own numbers
+ *  (its die, Dexterity) when the sheet has them; it is one attack, not part of the Attack action, so Extra Attack's
+ *  count and the attack it replaces don't come along. */
+function bonusVariant(base: BonusBase, source: string, definition: ActorDefinition | undefined): BuiltinAction {
+  const generic = builtinAction(base)!;
+  const own =
+    base === "unarmed-strike"
+      ? definition?.actions.find((action) => action.id === base && action.attack !== undefined)
+      : undefined;
+  const { replacesAttack: _attack, ...shape } = own ?? generic;
+  const { count: _count, ...attack } = shape.attack ?? { bonus: 0 };
+  return {
+    ...shape,
+    ...(shape.attack ? { attack } : {}),
+    id: `${base}${BONUS_SUFFIX}`,
+    name: `${source}: ${generic.name}`,
+    activation: "bonus-action",
+    description: `${source} lets you take this as a Bonus Action. ${generic.description}`
+  };
+}
+
+/** The generic actions every combatant has, then the Bonus Action forms its features give it. */
+export function builtinActionsFor(definition: ActorDefinition | undefined): readonly BuiltinAction[] {
+  const variants = [...bonusSources(definition)].map(([base, source]) => bonusVariant(base, source, definition));
+  return [...BUILTIN_ACTIONS, ...variants];
+}
+
+/** One generic action this combatant can take, by id. */
+export function builtinActionFor(definition: ActorDefinition | undefined, actionId: string): BuiltinAction | undefined {
+  return builtinActionsFor(definition).find((action) => action.id === actionId);
+}
+
+/** The id of the generic action a Bonus Action form is taken from ("hide" for "hide-bonus"), or the id itself. */
+export function builtinBaseId(actionId: string): string {
+  return actionId.endsWith(BONUS_SUFFIX) ? actionId.slice(0, -BONUS_SUFFIX.length) : actionId;
+}
+
+/** Builtins that resolve against exactly one chosen combatant; everything else is a single direct tap. Influence
+ *  targets the creature it would sway, whose Intelligence can raise its DC. */
 export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   help: "single",
+  influence: "single",
   "unarmed-strike": "single",
   "unarmed-grapple": "single",
   "unarmed-shove-prone": "single",
-  "unarmed-shove-push": "single"
+  "unarmed-shove-push": "single",
+  "unarmed-strike-bonus": "single",
+  "unarmed-grapple-bonus": "single",
+  "unarmed-shove-prone-bonus": "single",
+  "unarmed-shove-push-bonus": "single"
 };

@@ -5,7 +5,7 @@ import { loadArmor, loadEquipment, loadMagicItems, loadWeapons } from "../src/in
 /**
  * What `scripts/build-magic-items.ts` decides, pinned where a reading of the SRD is a choice: the
  * ladder expansion, the worn/carried slot split, the browse categories and the base-item column.
- * Counts the ETL already refuses on (268 rows, slots and rarities in their enums) are not repeated.
+ * Counts the ETL already refuses on (270 rows, slots and rarities in their enums) are not repeated.
  */
 
 const rows = loadMagicItems();
@@ -38,7 +38,6 @@ const VARIES_ROWS = [
   "Figurine of Wondrous Power",
   "Ioun Stone",
   "Potion of Giant Strength",
-  "Potions of Healing",
   "Spell Scroll"
 ];
 
@@ -46,7 +45,8 @@ describe("the generated magic-item bundle", () => {
   it("expands the five +1/+2/+3 ladders to one row per tier, and keeps each Rarity Varies table whole", () => {
     const ladders = rows.filter((row) => /, \+[123]$/.test(row.name));
     expect(ladders.map((row) => row.name).sort()).toEqual([...LADDER_ROWS].sort());
-    // The seven that deliberately did not expand are each still exactly one row.
+    // The six that deliberately did not expand are each still exactly one row (Potions of Healing expands into
+    // its strengths, below).
     for (const name of VARIES_ROWS) {
       expect(
         rows.filter((row) => row.name === name),
@@ -74,7 +74,7 @@ describe("the generated magic-item bundle", () => {
     expect(histogram(rows.map((row) => row.category))).toEqual({
       "wondrous-item": 127,
       weapon: 33,
-      consumable: 25,
+      consumable: 27,
       ring: 22,
       wand: 15,
       armor: 14,
@@ -185,15 +185,15 @@ describe("the generated magic-item bundle", () => {
 
   it("reads each printed rarity, and a d100 rung as varies", () => {
     expect(histogram(rows.map((row) => row.rarity!))).toEqual({
-      rare: 87,
-      uncommon: 77,
-      "very-rare": 60,
+      rare: 88,
+      uncommon: 78,
+      "very-rare": 61,
       legendary: 33,
-      varies: 8,
+      varies: 7,
       common: 2,
       artifact: 1
     });
-    // `Horn of Valhalla`'s rung is a d100 roll in its description, so it is `varies` (eight, not seven).
+    // `Horn of Valhalla`'s rung is a d100 roll in its description, so it is `varies` (seven, not six).
     expect(rows.find((row) => row.name === "Horn of Valhalla")!.rarity).toBe("varies");
     expect(rows.find((row) => row.name === "Horn of Valhalla")!.description).toContain(
       "Rare (Silver or Brass), Very Rare (Bronze), or Legendary (Iron)"
@@ -296,19 +296,34 @@ describe("the generated magic-item bundle", () => {
     expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
   });
 
-  it("keeps the grouped Potions of Healing row and leaves the mundane potion alone", () => {
+  it("mints a row for each stronger Potion of Healing, and leaves the common one to the gear catalog", () => {
     /**
-     * The mundane priced `potion-of-healing` and the magic `Potions of Healing` table are both kept;
-     * replacing the hand-authored row would make this ETL edit its own sibling input.
+     * The table's common strength is the priced gear `potion-of-healing`; minting it again would make this ETL
+     * edit its own sibling input. Each other strength is its own item, with its own rarity and dice.
      */
     const catalog = loadEquipment();
     expect(catalog.find((item) => item.id === "potion-of-healing")).toMatchObject({ isMagic: false, costGp: 50 });
-    expect(catalog.find((item) => item.id === "potions-of-healing")).toMatchObject({
-      isMagic: true,
-      rarity: "varies",
-      costGp: null
-    });
-    expect(rows.filter((row) => /^Potion of Healing/.test(row.name))).toEqual([]);
+    expect(catalog.find((item) => item.id === "potions-of-healing")).toBeUndefined();
+    const strengths = rows
+      .filter((row) => /^Potion of Healing/.test(row.name))
+      .map((row) => ({
+        id: row.id,
+        rarity: row.rarity,
+        heals: row.actions.map((action) => [action.activation, action.healing?.formula]),
+        used: row.consumedOnUse
+      }));
+    expect(strengths).toEqual([
+      { id: "potion-of-healing-greater", rarity: "uncommon", heals: [["bonus-action", "4d4 + 4"]], used: true },
+      { id: "potion-of-healing-superior", rarity: "rare", heals: [["bonus-action", "8d4 + 8"]], used: true },
+      { id: "potion-of-healing-supreme", rarity: "very-rare", heals: [["bonus-action", "10d4 + 20"]], used: true }
+    ]);
+    // Each heals what its own row of the printed table says.
+    for (const row of rows.filter((candidate) => /^Potion of Healing/.test(candidate.name))) {
+      const printed = new RegExp(`${row.name.replace(/[()]/g, "\\$&")}: HP Regained ([0-9d+ ]+),`).exec(
+        row.description ?? ""
+      )?.[1];
+      expect(printed, row.id).toBe(row.actions[0].healing?.formula);
+    }
   });
 
   it("gives every magic shield the plain shield's armor block, so its own bonus stacks on the +2", () => {
@@ -341,14 +356,18 @@ describe("the generated magic-item bundle", () => {
 });
 
 /**
- * `appliesTo` is the data basis for binding a magic weapon/armor to a base item; the player's pick is
- * validated against `baseIds` server-side. Pinned per row (label) and per form (resolution).
+ * `appliesTo` is the data basis for binding a magic weapon, armor or piece of ammunition to a base item; the
+ * player's pick is validated against `baseIds` server-side. Pinned per row (label) and per form (resolution).
  */
 describe("the eligibility column", () => {
-  it("carries the printed base qualifier for every weapon and armor row, by name", () => {
+  it("carries the printed base qualifier for every weapon, armor and ammunition row, by name", () => {
     const labels = Object.fromEntries(rows.filter((row) => row.appliesTo).map((row) => [row.id, row.appliesTo!.label]));
     expect(labels, "a rebuild changed or dropped the appliesTo LABEL column").toEqual({
       "adamantine-armor": "Any Medium or Heavy, Except Hide Armor",
+      "ammunition-1": "Any Ammunition",
+      "ammunition-2": "Any Ammunition",
+      "ammunition-3": "Any Ammunition",
+      "ammunition-of-slaying": "Any Ammunition",
       "armor-1": "Any Light, Medium, or Heavy",
       "armor-2": "Any Light, Medium, or Heavy",
       "armor-3": "Any Light, Medium, or Heavy",
@@ -409,6 +428,14 @@ describe("the eligibility column", () => {
       byLabel.set(row.appliesTo.label, row.appliesTo.baseIds);
     }
     expect(Object.fromEntries(byLabel), "a rebuild changed a form's RESOLVED base list").toEqual({
+      // The kinds the gear table sells: a magic arrow fits a bow, a magic bolt a crossbow.
+      "Any Ammunition": [
+        "arrows-20",
+        "crossbow-bolts-20",
+        "sling-bullets-20",
+        "blowgun-needles-50",
+        "firearm-bullets-10"
+      ],
       "Any Light, Medium, or Heavy": [
         "breastplate",
         "chain-mail",
@@ -548,28 +575,34 @@ describe("the eligibility column", () => {
     // Every resolved id is a row of the base bundle it points into - the cross-bundle half.
     const weaponIds = new Set(loadWeapons().map((weapon) => weapon.id));
     const armorIds = new Set(loadArmor().map((piece) => piece.id));
+    const ammunitionIds = new Set(
+      loadEquipment()
+        .filter((item) => item.ammunition)
+        .map((item) => item.id)
+    );
     for (const row of rows) {
       if (!row.appliesTo) continue;
-      const pool = row.category === "weapon" ? weaponIds : armorIds;
+      const pool = row.category === "weapon" ? weaponIds : row.category === "ammunition" ? ammunitionIds : armorIds;
       for (const id of row.appliesTo.baseIds)
         expect(pool.has(id), `${row.id}: base "${id}" is not in its base bundle`).toBe(true);
     }
   });
 
-  it("is total on weapons and body armor, and absent everywhere else - the ammunition ruling included", () => {
+  it("is total on weapons, body armor and ammunition, and absent everywhere else", () => {
+    const templates = new Set(["weapon", "armor", "ammunition"]);
     // Sun Blade and Energy Bow are more than their base (damage type conversion), so binding them to a
     // bare base would derive a wrong attack. Not bound until weapon-swing overrides exist.
     expect(
       rows
-        .filter((row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo)
+        .filter((row) => templates.has(row.category) && !row.appliesTo)
         .map((row) => row.id)
         .sort()
     ).toEqual(["energy-bow", "sun-blade"]);
-    expect(rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo)).toEqual([]);
-    // Magic ammunition is unbound (no ammunition model), and a shield carries its own block.
+    expect(rows.filter((row) => !templates.has(row.category) && row.appliesTo)).toEqual([]);
+    // Magic ammunition is a piece of one kind, picked like a magic weapon's base; a shield carries its own block.
     expect(
       rows
-        .filter((row) => row.category === "ammunition")
+        .filter((row) => row.category === "ammunition" && row.appliesTo)
         .map((row) => row.id)
         .sort()
     ).toEqual(["ammunition-1", "ammunition-2", "ammunition-3", "ammunition-of-slaying"]);

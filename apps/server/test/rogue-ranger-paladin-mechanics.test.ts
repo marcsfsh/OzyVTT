@@ -10,7 +10,8 @@ import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
-import { startEncounter } from "../src/encounter.js";
+import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { currentSpeedFeet } from "../src/speed.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { asiRows } from "./asi-rows.js";
@@ -289,6 +290,67 @@ describe("Rogue - Sneak Attack rides a qualifying hit", () => {
   });
 });
 
+describe("Rogue - Sneak Attack on an opportunity attack", () => {
+  it("is offered on the swing's preview and rides the confirmed hit, on the mover's turn", () => {
+    const built = table(rogueInput(5));
+    // The foe's turn: it leaves the Rogue's reach.
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.foe };
+    const prompt = "40000000-0000-4000-8000-0000000000ac";
+    built.state.combat = {
+      ...built.state.combat,
+      pendingReactions: [
+        {
+          id: prompt,
+          kind: "leaves-reach",
+          actorId: IDS.hero,
+          actionId: "opportunity-attack",
+          actionName: "Opportunity Attack",
+          sourceActorId: IDS.foe,
+          sourceName: "Foe",
+          targetActorId: IDS.foe,
+          triggerCommandId: nextCommandId(),
+          proposedDamage: 0,
+          proposedDamageParts: [],
+          critical: false,
+          weighed: null,
+          acBonus: null,
+          rollsAttack: true,
+          parkedAttack: null,
+          createdAt: 0
+        }
+      ]
+    };
+    const answer = (faces: number[], options: Parameters<typeof answerReaction>[7]) =>
+      answerReaction(
+        built.state,
+        nextCommandId(),
+        prompt,
+        true,
+        "item-shortsword",
+        GM_SCOPE,
+        { ...deps(built, faces), resolveDefinition: (id) => resolveIn(built.state, id) },
+        options
+      );
+    const preview = answer([15, 2], { commit: false, rollMode: "advantage" });
+    expect(preview.resolution?.hitOffers).toEqual([
+      expect.objectContaining({ id: "sneak-attack", dice: "3d6 Piercing" })
+    ]);
+    const hit = answer([4, 4, 4, 4], {
+      commit: true,
+      attackNatural: 15,
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack" }]
+    });
+    expect(hit.used).toBe(true);
+    expect(hit.resolution?.damage.find((part) => part.source === "Sneak Attack")).toMatchObject({
+      formula: "3d6",
+      type: "piercing",
+      total: 12
+    });
+    expect(built.state.combat.turn.turnUses[`${IDS.hero}:sneak-attack`]).toBe(1);
+  });
+});
+
 describe("Rogue - Sneak Attack from an ally beside the target", () => {
   const ALLY = "10000000-0000-4000-8000-0000000000aa";
   const withAlly = (level: number) => {
@@ -404,6 +466,8 @@ describe("Rogue - Uncanny Dodge halves the damage that hit", () => {
       attack: { bonus: 20 }
     };
     const before = built.hero.hp.current;
+    // The foe bites on its own turn.
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.foe };
     const hit = resolveDefinitionAction(
       built.state,
       bite,
@@ -438,6 +502,7 @@ describe("Rogue - Uncanny Dodge halves the damage that hit", () => {
       damage: [{ formula: "2d6", type: "piercing" }],
       attack: { bonus: 20 }
     };
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.foe };
     resolveDefinitionAction(
       built.state,
       bite,
@@ -492,6 +557,33 @@ describe("Rogue - the flat grants and the pick", () => {
     resolve(built, "steady-aim", [], []);
     const granted = built.hero.effects.find((effect) => effect.tags.includes("steady-aim"));
     expect(granted?.modifiers).toEqual([{ type: "roll-mode", roll: "attack", mode: "advantage" }]);
+  });
+
+  it("spends Steady Aim's Advantage on the next attack roll, and holds Speed at 0 until the turn ends", () => {
+    const built = table(rogueInput(11));
+    resolve(built, "steady-aim", [], []);
+    const aiming = () => built.hero.effects.find((effect) => effect.tags.includes("steady-aim"));
+    // "Your Speed is 0 until the end of the current turn", and the Advantage is for this turn only.
+    expect(aiming()).toMatchObject({
+      speedZero: true,
+      duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+    });
+    expect(currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, built.catalog))).toBe(0);
+    const swung = swing(built, "item-shortsword", [4, 15, 3]);
+    expect(swung.rollMode).toMatchObject({ mode: "advantage" });
+    expect(swung.attack!.naturalRoll).toBe(15);
+    // The roll spent the Advantage; Speed 0 stays to the end of the turn.
+    expect(aiming()).toMatchObject({ name: "Steady Aim (Speed 0)", modifiers: [], speedZero: true });
+    nextInitiativeTurn(built.state);
+    expect(aiming()).toBeUndefined();
+  });
+
+  it("refuses Steady Aim once the Rogue has moved this turn", () => {
+    const built = table(rogueInput(11));
+    built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, movementUsedFeet: 10 } };
+    expect(() => resolve(built, "steady-aim", [], [])).toThrowError(
+      /has moved this turn - Steady Aim is only for a creature that hasn't/
+    );
   });
 
   it("makes the Thief's Fast Hands a Bonus Action", () => {
@@ -656,6 +748,31 @@ describe("Ranger - the rest of the kit", () => {
   it("adds Roving's 10 feet at level 6 and not at level 5", () => {
     expect(table(rangerInput(6)).definition.speedFeet).toBe(40);
     expect(table(rangerInput(5)).definition.speedFeet).toBe(30);
+  });
+
+  it("takes Roving's 10 feet away while Heavy armor is worn", () => {
+    const built = table(rangerInput(6));
+    const speed = () => currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, built.catalog));
+    expect(speed()).toBe(40);
+    built.hero.inventory = [
+      ...built.hero.inventory.map((item) => (item.armor ? { ...item, equipped: false } : item)),
+      {
+        id: "plate",
+        name: "Plate Armor",
+        quantity: 1,
+        equipped: true,
+        attuned: false,
+        category: "armor",
+        armor: {
+          acBase: 18,
+          addDexModifier: false,
+          dexModifierCap: null,
+          stealthDisadvantage: true,
+          strengthRequired: null
+        }
+      }
+    ];
+    expect(speed()).toBe(30);
   });
 
   it("scales Tireless off the FINAL Wisdom modifier, so an ASI moves the pool", () => {

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { armorClassInPlay, type GameState } from "@vtt/domain";
-import type { ActorAction } from "@vtt/schemas";
+import { InventoryItemSchema, type ActorAction } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { endEffect } from "../src/effects.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
+import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 import { currentSpeedFeet } from "../src/speed.js";
 import {
@@ -238,6 +239,37 @@ describe("Hex and Hunter's Mark", () => {
     expect(strike(state, FOE, HERO, [18, 4, 6]).damage.map((part) => part.type)).toEqual(["slashing"]);
   });
 
+  it("move Hex to a new creature with a Bonus Action once the cursed one drops to 0 Hit Points", () => {
+    const warlock = build(warlockInput(["hex", "hellish-rebuke"]));
+    const { state, resolve, action } = fight(warlock);
+    resolve("spell-hex", { targetIds: [FOE] });
+    expect(action("spell-hex-then-move")).toMatchObject({ name: "Hex: move", activation: "bonus-action" });
+    heroTurnAgain(state);
+    expect(() => resolve("spell-hex-then-move", { targetIds: [FOE2] })).toThrowError(
+      /Hex moves only once its creature drops to 0 Hit Points - Goblin hasn't/
+    );
+    actorOf(state, FOE).hp = { ...actorOf(state, FOE).hp, current: 0 };
+    const moved = resolve("spell-hex-then-move", { targetIds: [FOE2] });
+    expect(moved.tableNarration?.map((line) => line.text)).toContain("Vex moves Hex to Orc.");
+    expect(actorOf(state, FOE).effects).toEqual([]);
+    const curse = actorOf(state, FOE2).effects[0]!;
+    expect(curse).toMatchObject({ name: "Hex", sourceActorId: HERO, tags: ["hexed"] });
+    // Still held by the caster's Concentration on that cast: ending it ends the moved curse.
+    const concentration = actorOf(state, HERO).effects.find((effect) => effect.tags.includes("concentrating"))!;
+    expect(curse.castId).toBe(concentration.castId);
+    endEffect(state, HERO, concentration.id);
+    expect(actorOf(state, FOE2).effects).toEqual([]);
+  });
+
+  it("refuse to move a mark the caster no longer concentrates on", () => {
+    const warlock = build(warlockInput(["hex", "hellish-rebuke"]));
+    const { state, resolve } = fight(warlock);
+    expect(() => resolve("spell-hex-then-move", { targetIds: [FOE2] })).toThrowError(
+      /isn't concentrating on Hex, so there is no mark to move/
+    );
+    expect(state.combat.turn.bonusActionUsed).toBe(false);
+  });
+
   it("read Hunter's Mark's Force damage from the spell", () => {
     expect(view.spellRecord("hunters-mark")!.effect!.grant).toMatchObject({
       target: "target",
@@ -301,6 +333,27 @@ describe("Mage Armor", () => {
     const cast = resolve("spell-mage-armor", { targetIds: [FOE] });
     expect(cast.warnings?.join(" ")).toMatch(/Goblin is wearing armor, so Mage Armor does nothing/);
     expect(goblin.effects).toEqual([]);
+  });
+
+  it("ends when the creature dons armor, and not for a Shield", () => {
+    const { state, resolve } = fight(wizard);
+    resolve("spell-mage-armor", { targetIds: [HERO] });
+    const resolveDefinition = definitions(state);
+    const shield = { id: "shield", name: "Shield", quantity: 1, equipped: true, attuned: false, category: "shield" };
+    setInventoryItem(state, HERO, InventoryItemSchema.parse(shield), resolveDefinition, { catalog });
+    expect(actorOf(state, HERO).effects.map((effect) => effect.name)).toEqual(["Mage Armor"]);
+    const leather = { id: "leather-armor", name: "Leather Armor", quantity: 1, equipped: true, attuned: false };
+    const ended = setInventoryItem(
+      state,
+      HERO,
+      InventoryItemSchema.parse({ ...leather, category: "armor" }),
+      resolveDefinition,
+      {
+        catalog
+      }
+    );
+    expect(ended.map((event) => event.text)).toContain("Mage Armor ended on Ansel.");
+    expect(actorOf(state, HERO).effects).toEqual([]);
   });
 });
 

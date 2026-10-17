@@ -3,15 +3,21 @@ import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { requireGm, type Initiator } from "./authorization.js";
+import { releaseHeldRoll } from "./held-rolls.js";
 import { adjustableActor, applyDamageDetailed, halvedDamageParts, type DamageInput } from "./hit-points.js";
 import { addEffect, makeEffect, type EffectNarration } from "./effects.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "./action-resolution.js";
-import { builtinAction } from "./builtin-actions.js";
+import { builtinAction, builtinActionFor } from "./builtin-actions.js";
 import { effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import type { LiveActor } from "./resolution/context.js";
+import type { DefinitionAction, LiveActor, ResolveInput } from "./resolution/context.js";
 import { damagePartsOf } from "./resolution/damage.js";
 import { commitEconomy, planEconomy } from "./resolution/economy.js";
+import { checkPlan } from "./ability-checks.js";
+import { rollSettledCheck } from "./check-rolls.js";
+import { withOneUsedUp } from "./consumables.js";
+import { deriveEquipment } from "./equipment-derivation.js";
+import { scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "./scrolls.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -52,14 +58,24 @@ export type ReactionOutcome = Readonly<{
   events: readonly EffectNarration[];
 }>;
 
-/** Preview/confirm options for a strike that rolls an attack (an opportunity attack, Retaliation). */
+/** Preview/confirm options for a strike that rolls an attack (an opportunity attack, Retaliation). The strike's d20 is
+ *  held on the prompt between a preview and its confirm (ADR-0012). */
 export type OpportunityAttackOptions = Readonly<{
   commit?: boolean;
+  /** The GM's forced mode; a player's is never passed. */
   rollMode?: "advantage" | "disadvantage" | "normal";
+  /** A typed d20, already checked against the table's setting. */
   attackNatural?: number;
+  /** Throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
+  reroll?: boolean;
   /** Push mastery's chosen distance on a hit (0 declines). */
   pushFeet?: number;
+  /** The extras chosen for the hit on its preview (Sneak Attack). */
+  hitOptions?: ResolveInput["hitOptions"];
 }>;
+
+/** The key a reaction's strike holds its d20 under. */
+export const reactionHoldKey = (reactionId: string) => `reaction:${reactionId}`;
 
 /** What every answer path reads: the prompt, who answers it, and how to close it. */
 type Answer = Readonly<{
@@ -68,6 +84,7 @@ type Answer = Readonly<{
   pending: PendingReaction;
   reactor: LiveActor;
   use: boolean;
+  scope: Initiator;
   deps: ReactionAnswerDependencies;
   base: Pick<ReactionOutcome, "actorId" | "actorName" | "actionName" | "sourceName" | "proposedDamage" | "kind">;
   /** Drops the prompt; `markUsed` also spends the reactor's reaction. */
@@ -113,6 +130,7 @@ export function answerReaction(
     pending,
     reactor,
     use,
+    scope,
     deps,
     base: {
       actorId: reactor.id,
@@ -156,6 +174,7 @@ function applyAnswerDamage(answer: Answer, targetId: string, input: DamageInput)
       newId: deps.newRollId,
       now: deps.now,
       commandId,
+      rollDie: deps.random,
       ...(deps.catalog ? { catalog: deps.catalog } : {}),
       ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
     }
@@ -196,17 +215,40 @@ function answerParkedDamage(answer: Answer): ReactionOutcome {
   return { ...base, used: use, appliedDamage, events, ...detailOf(application) };
 }
 
+/** The Unarmed Strike's options: each is one melee attack an opportunity attack can be. */
+const UNARMED_OPTIONS: readonly string[] = [
+  "unarmed-strike",
+  "unarmed-grapple",
+  "unarmed-shove-prone",
+  "unarmed-shove-push"
+];
+
+/** SRD Opportunity Attacks (and Retaliation): "one melee attack with a weapon or an Unarmed Strike". A spell attack,
+ *  a ranged shot, a Multiattack plan, a legendary action or an extra attack that rides the Attack action isn't. */
+function meleeSwing(candidate: DefinitionAction): boolean {
+  if (UNARMED_OPTIONS.includes(candidate.id)) return true;
+  return (
+    candidate.attack?.reachFeet !== undefined &&
+    candidate.spellId === undefined &&
+    candidate.multiattack === undefined &&
+    candidate.legendary === undefined &&
+    candidate.extraAttack === undefined
+  );
+}
+
 /** An opportunity attack or a strike back: one action against the creature the prompt names. A melee attack is the
  *  chosen one, else the first melee attack, else Unarmed Strike; Hellish Rebuke strikes with itself. An attack can be
- *  previewed (commit:false) before it lands. */
+ *  previewed (commit:false) before it lands, and the extras its hit can carry (Sneak Attack) are chosen with the
+ *  confirm. */
 function answerStrike(
   answer: Answer,
   actionId: string | undefined,
   options: OpportunityAttackOptions
 ): ReactionOutcome {
-  const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
+  const { state, commandId, pending, reactor, use, scope, deps, base, clearPrompt } = answer;
   if (!use) {
     clearPrompt(false);
+    releaseHeldRoll(state, reactionHoldKey(pending.id));
     return { ...base, used: false, appliedDamage: 0, events: [] };
   }
   const struck = pending.targetActorId
@@ -228,13 +270,20 @@ function answerStrike(
   let chosen = declared;
   let isBuiltin = false;
   if (!strikesWithItself) {
-    const picked = actionId ? available.find((candidate) => candidate.id === actionId) : undefined;
-    const fallbackMelee = available.find(
-      (candidate) => candidate.attack !== undefined && candidate.attack.reachFeet !== undefined
-    );
+    // An Unarmed Strike's options (Grapple, Shove) are the generic ones unless the sheet has its own strike.
+    const unarmedOption = actionId !== undefined && UNARMED_OPTIONS.includes(actionId);
+    const picked = actionId
+      ? (available.find((candidate) => candidate.id === actionId) ??
+        (unarmedOption ? builtinAction(actionId) : undefined))
+      : undefined;
+    if (picked && !meleeSwing(picked))
+      throw new CommandRejectedError(
+        `${pending.kind === "leaves-reach" ? "An opportunity attack" : pending.actionName} is one melee attack with a weapon or an Unarmed Strike - ${picked.name} isn't one.`
+      );
+    const fallbackMelee = available.find(meleeSwing);
     // The swing is the reaction, so it spends the reaction slot even on the reactor's own turn.
     chosen = { ...(picked ?? fallbackMelee ?? builtinAction("unarmed-strike")!), activation: "reaction" };
-    isBuiltin = picked === undefined && fallbackMelee === undefined;
+    isBuiltin = picked ? !available.includes(picked) : fallbackMelee === undefined;
   }
   if (!chosen) throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
   const commit = chosen.attack === undefined ? true : (options.commit ?? true);
@@ -252,14 +301,22 @@ function answerStrike(
       override: null,
       commit,
       attackNatural: options.attackNatural,
+      ...(options.attackNatural !== undefined ? { typedFace: true } : {}),
+      // The strike's d20 is held on its prompt between a preview and the confirm.
+      holdKey: reactionHoldKey(pending.id),
+      ...(options.reroll === true ? { reroll: true } : {}),
       // The resolver can't infer how the attack was made from the action, so announce it for `attack-kind-is` riders.
       attackKinds: pending.kind === "leaves-reach" ? ["reaction", "opportunity"] : ["reaction"],
-      ...(options.pushFeet !== undefined ? { pushFeet: options.pushFeet } : {})
+      ...(options.pushFeet !== undefined ? { pushFeet: options.pushFeet } : {}),
+      ...(options.hitOptions ? { hitOptions: options.hitOptions } : {})
     },
     {
       random: deps.random,
       newRollId: deps.newRollId,
       gmSessionId: deps.gmSessionId,
+      // The answerer's own: a player's reroll spends their character's Heroic Inspiration.
+      initiatorRole: scope.role,
+      ...(scope.role === "player" ? { initiatorSessionId: scope.sessionId } : {}),
       now: deps.now,
       definition,
       resolveDefinition: deps.resolveDefinition,
@@ -306,6 +363,41 @@ function answerStrike(
   };
 }
 
+/**
+ * A Spell Scroll read as the reaction (Shield from a scroll): the scroll is used up, and a spell above the reader's
+ * levels needs its check first, a failure losing the spell with the scroll (SRD Spell Scroll). Null when the spell is
+ * cast (or no scroll was read), else the line the table reads.
+ */
+function scrollReadAsReaction(answer: Answer, declared: DefinitionAction): EffectNarration | null {
+  const { state, commandId, reactor, scope, deps } = answer;
+  const scroll = scrollOfAction(declared, reactor.inventory, deps.catalog);
+  if (!scroll) return null;
+  reactor.inventory = withOneUsedUp(reactor.inventory, scroll.row.id);
+  const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
+  const reading = scrollReading(definition, scroll.spell, deps.catalog);
+  if (!reading.readable || reading.check === null) return null;
+  const check = scrollCheckOf(reading.check, scroll.spell.name);
+  const plan = checkPlan(reactor, definition, deriveEquipment(reactor, definition, deps.catalog), check.subject);
+  const rolled = rollSettledCheck(
+    state,
+    reactor,
+    plan,
+    {
+      id: deps.newRollId(),
+      commandId,
+      sessionId: scope.role === "player" ? scope.sessionId : deps.gmSessionId,
+      role: scope.role,
+      label: check.label,
+      visibility: reactor.visibility === "gm-only" ? "gm-only" : "public",
+      createdAt: deps.now()
+    },
+    deps.random
+  );
+  return rolled.total >= reading.check.dc
+    ? null
+    : { kind: "reaction", text: scrollLostLine(reactor.name, scroll.spell.name), actorId: reactor.id };
+}
+
 /** Parry or Shield: the attack stopped at its roll. "use" spends the reaction and what the action costs and raises AC
  *  (against this attack, or until the reactor's next turn); either answer then finishes the attack with the same die,
  *  and a hit's damage lands. */
@@ -319,7 +411,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
   const action =
     attacker && parked
       ? parked.builtin
-        ? builtinAction(parked.actionId)
+        ? builtinActionFor(attackerDefinition, parked.actionId)
         : effectiveActions(attackerDefinition, attacker, deps.catalog).find(
             (candidate) => candidate.id === parked.actionId
           )
@@ -329,6 +421,9 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
 
   clearPrompt(false);
   let effectName: string | null = null;
+  // Whether the AC rises: the reaction is used, and a scroll it was read from didn't lose the spell.
+  let raised = use;
+  let scrollLost: EffectNarration | null = null;
   if (use) {
     const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
     const siblings = effectiveActions(definition, reactor, deps.catalog);
@@ -346,7 +441,9 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       siblings
     );
     commitEconomy({ state, attacker: reactor, input: {}, plan: economy.plan, overridden: economy.overridden });
-    if (parked.untilNextTurn && pending.acBonus !== null) {
+    scrollLost = scrollReadAsReaction(answer, declared);
+    raised = scrollLost === null;
+    if (raised && parked.untilNextTurn && pending.acBonus !== null) {
       // Lasts until the reactor's next turn starts, so later attacks this round meet it too.
       effectName = addEffect(
         state,
@@ -386,7 +483,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       attackBonusDice: parked.bonusDice,
       ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
       economyPaid: true,
-      ...(use && effectName === null && pending.acBonus !== null
+      ...(raised && effectName === null && pending.acBonus !== null
         ? { reactionAcBonus: { amount: pending.acBonus, source: pending.actionName } }
         : {})
     },
@@ -427,7 +524,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
     appliedDamage,
     other: { id: attacker.id, name: attacker.name },
     resolution,
-    events,
+    events: scrollLost ? [scrollLost, ...events] : events,
     ...detailOf(application)
   };
 }
@@ -441,4 +538,5 @@ export function dismissReaction(state: GameState, reactionId: string, scope: Ini
     ...state.combat,
     pendingReactions: state.combat.pendingReactions.filter((entry) => entry.id !== reactionId)
   };
+  releaseHeldRoll(state, reactionHoldKey(reactionId));
 }

@@ -1,7 +1,9 @@
-import type { GmActor, GmView, MutationResult } from "@vtt/domain";
+import { useState } from "react";
+import { isDead, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
 import { Button, Field, Select } from "@vtt/ui";
 import { command } from "../lib/command";
 import { ConditionEditor } from "./conditions";
+import { ConfirmRow } from "./ConfirmRow";
 import { CoverControl } from "./CoverControl";
 import { HpAdjust } from "./HpAdjust";
 import { EffectChips } from "./EffectChips";
@@ -33,13 +35,19 @@ export function RowTools({
   onClose: () => void;
   onFeedback: (text: string) => void;
 }>) {
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+  // The last combatant ends the encounter instead, and a fight under review can't change its order.
+  const removable =
+    state.combat.initiative.length > 1 &&
+    state.combat.historyCursor === null &&
+    state.combat.initiative.some((entry) => entry.actorId === actor.id);
   return (
     <>
       <div className="encounter-overlay-backdrop" onPointerDown={onClose} />
       <div className="row-tools-popover" role="dialog" aria-label={`Tools for ${actor.name}`}>
         <HpAdjust
           actor={actor}
-          controls={["damage", "nonlethal", "heal", "temp", "set", "max"]}
+          controls={isDead(actor) ? ["revive", "max"] : ["damage", "nonlethal", "heal", "temp", "set", "max"]}
           revision={state.revision}
           damageType={hpDamageType}
           onDamageTypeChange={onHpDamageTypeChange}
@@ -152,10 +160,32 @@ export function RowTools({
           >
             Open sheet
           </Button>
+          {removable && !confirmingRemoval && (
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirmingRemoval(true)}>
+              Take out of fight
+            </Button>
+          )}
           <Button type="button" variant="secondary" onClick={onClose}>
             Close
           </Button>
         </div>
+        {removable && confirmingRemoval && (
+          <ConfirmRow
+            ariaLabel={`Take ${actor.name} out of the fight`}
+            confirmLabel="Take out"
+            busy={busy}
+            onCancel={() => setConfirmingRemoval(false)}
+            onConfirm={() => {
+              setConfirmingRemoval(false);
+              void run(
+                () => command("encounter:remove-combatant", { actorId: actor.id, expectedRevision: state.revision }),
+                `${actor.name} left the fight.`
+              ).then(onClose);
+            }}
+          >
+            Take {actor.name} out of the fight? Its turn and token go, and what it holds lets go.
+          </ConfirmRow>
+        )}
       </div>
     </>
   );

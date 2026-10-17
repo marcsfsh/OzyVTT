@@ -843,13 +843,14 @@ describe("what an effect DOES — through both paths, across two carriers", () =
       modifiers: RECKLESS.srdModifiers
     });
 
-    // Only two bundled records (both Barbarian features) author `effects[].modifiers`.
+    // Only one bundled class feature authors `effects[].modifiers`. Superior Defense grants its effect from an
+    // action instead, which is what lets it cost 3 Focus Points.
     const library = new ContentLibrary().forAudience("gm");
     const carriers = library
       .classSummaries()
       .flatMap((summary) => library.classRecord(summary.id)?.features ?? [])
       .filter((entry) => entry.effects.some((effect) => effect.modifiers.length > 0));
-    expect(carriers.map((entry) => entry.id).sort()).toEqual(["reckless-attack", "superior-defense"]);
+    expect(carriers.map((entry) => entry.id).sort()).toEqual(["reckless-attack"]);
   });
 
   it("3. one assertion body over both: the swing rolls two d20s and keeps the higher", () => {
@@ -2922,7 +2923,7 @@ const LEDGER = {
   srdOffers: [
     ["feature:agonizing-blast", "deals-damage"],
     ["feature:repelling-blast", "attack-roll"],
-    ["feature:eldritch-spear", "ranged"]
+    ["feature:eldritch-spear", "ranged-damage"]
   ],
   invocations: [
     "agonizing-blast",
@@ -3133,9 +3134,9 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
       from: ["guidance"]
     });
 
-    // `where` is closed because the schema is: three slugs the resolver reads by name.
+    // `where` is closed because the schema is: four slugs the resolver reads by name.
     const whereField = fieldsWithin("feat", ["feature", "choices"]).find((field) => field.key === "fromPicks.where");
-    expect(optionValues(whereField)).toEqual(["deals-damage", "attack-roll", "ranged"]);
+    expect(optionValues(whereField)).toEqual(["deals-damage", "attack-roll", "ranged", "ranged-damage"]);
   });
 
   it("2. SRD content authors the same shape — three invocations, three predicates, one budget", () => {
@@ -3159,7 +3160,7 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     // Exactly three at the time of writing: Warlock invocations over one budget, each asking a different question.
     expect(found.map((entry) => `${entry.id}: ${entry.source.offer} where ${entry.source.where}`).sort()).toEqual([
       "agonizing-blast: class-cantrips where deals-damage",
-      "eldritch-spear: class-cantrips where ranged",
+      "eldritch-spear: class-cantrips where ranged-damage",
       "repelling-blast: class-cantrips where attack-roll"
     ]);
   });
@@ -3193,10 +3194,11 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     expect(offeredIds(srd, "feature:repelling-blast")).toEqual([...LEDGER.attackRoll]);
     expect(offeredIds(srd, "feature:eldritch-spear")).toEqual([...LEDGER.ranged]);
 
-    // Change the known cantrips and every list moves, with no content record changing.
+    // Change the known cantrips and every list moves, with no content record changing. Eldritch Spear wants damage at
+    // 10+ feet, so the reach of Mage Hand and Minor Illusion alone is not enough.
     const other = surveyOf(blastWarlock(undefined, ["eldritch-blast", "mage-hand", "minor-illusion"]), srdView);
     expect(offeredIds(other, "feature:agonizing-blast")).toEqual(["eldritch-blast"]);
-    expect(offeredIds(other, "feature:eldritch-spear")).toEqual(["eldritch-blast", "mage-hand", "minor-illusion"]);
+    expect(offeredIds(other, "feature:eldritch-spear")).toEqual(["eldritch-blast"]);
 
     // Negative controls: without the predicate the list widens to every class cantrip...
     const wide = surveyOf(blastWarlock(LEDGER.featId), featView(authoredBorrowedBlast({}), LEDGER.featId));
@@ -3829,7 +3831,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
         reachable key is caught by the row tests above. */
     const owed: ReadonlyArray<readonly [HomebrewType, string, readonly string[], string]> = [
       // [type, key, container path, the unit that closes it]
-      ["monster", "multiattack", ["actions"], "126 SRD records author it"],
+      ["monster", "multiattack", ["actions"], "177 SRD records author it"],
       ["class", "widensPicks", [], "Bard row 55, Magical Secrets"]
     ];
     const stillOwed = owed.filter(([type, key, within]) => !hasControl(type, key, within));

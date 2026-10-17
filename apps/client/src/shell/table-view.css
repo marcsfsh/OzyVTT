@@ -113,7 +113,8 @@
     align-items: center;
     gap: var(--space-2);
   }
-  .table-topline > .party-strip {
+  .table-topline > .party-strip,
+  .table-topline > .table-party-row {
     flex: 1 1 5rem;
     min-width: 0;
     margin: 0;
@@ -151,6 +152,18 @@
   .table-topline {
     display: contents;
   }
+}
+/* The GM's party strip with the rest button at its end; the strip scrolls, the button keeps its size. */
+.table-party-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0 0 0.9rem;
+}
+.table-party-row > .party-strip {
+  flex: 1 1 auto;
+  margin: 0;
 }
 .table-topline:empty {
   display: none;

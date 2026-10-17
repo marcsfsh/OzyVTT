@@ -125,6 +125,67 @@ export function d20TestFormula(mode: RollMode, modifier: number): string {
   return `${d20Die(mode)} ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`;
 }
 
+/** How many d20s a test throws: two with Advantage or Disadvantage, one otherwise. */
+export function d20Count(mode: RollMode): 1 | 2 {
+  return mode === "advantage" || mode === "disadvantage" ? 2 : 1;
+}
+
+/** The d20 that counts among a test's faces: the higher with Advantage, the lower with Disadvantage, else the first. */
+export function keptD20(faces: readonly number[], mode: RollMode): number {
+  if (faces.length === 0) throw new RangeError("A d20 test needs at least one face.");
+  if (mode === "advantage") return Math.max(...faces.slice(0, 2));
+  if (mode === "disadvantage") return Math.min(...faces.slice(0, 2));
+  return faces[0];
+}
+
+/**
+ * The d20s a test uses when some were already thrown for it (a held preview): the held faces, topped up with fresh
+ * ones to the count `mode` needs. A die once thrown stays thrown, so a second look at the same roll can't re-roll it.
+ */
+export function d20FacesFor(mode: RollMode, held: readonly number[], random: RandomSource): number[] {
+  const faces = held.slice(0, 2);
+  while (faces.length < d20Count(mode)) faces.push(random(20));
+  return faces;
+}
+
+/** Rerolls one d20 of a test (SRD Heroic Inspiration: "reroll one of those dice, not both"): the lowest, the only one
+ *  whose reroll can help under either mode. */
+export function rerollLowestD20(faces: readonly number[], random: RandomSource): number[] {
+  if (faces.length === 0) throw new RangeError("A d20 test needs at least one face.");
+  const lowest = faces.indexOf(Math.min(...faces));
+  return faces.map((face, index) => (index === lowest ? random(20) : face));
+}
+
+/** A die other than the test's d20 (Bless's d4), as thrown. */
+export type ThrownDie = Readonly<{ sides: number; face: number }>;
+
+/**
+ * Resolves a d20 test's formula with its d20s already decided (`faces`, in order), so the recorded roll shows the dice
+ * that count. Its other dice (Bless's d4) take the `held` faces of their size first, so a held roll keeps them too, and
+ * are thrown with `random` otherwise.
+ */
+export function resolveWithD20s(
+  formula: string,
+  faces: readonly number[],
+  random: RandomSource,
+  held: readonly ThrownDie[] = []
+): DiceResolution {
+  const d20s = [...faces];
+  const others = [...held];
+  return resolveDice(parseDiceFormula(formula), (sides) => {
+    if (sides === 20 && d20s.length > 0) return d20s.shift()!;
+    const index = others.findIndex((die) => die.sides === sides);
+    return index >= 0 ? others.splice(index, 1)[0].face : random(sides);
+  });
+}
+
+/** The dice of a resolution other than its d20s, to hold beside them. */
+export function otherDiceOf(resolution: DiceResolution): ThrownDie[] {
+  return resolution.terms.flatMap((term) =>
+    term.kind === "dice" && term.sides !== 20 ? term.dice.map((die) => ({ sides: term.sides, face: die.face })) : []
+  );
+}
+
 /** A "XdY + N" or flat formula with a modifier folded into its one constant ("2d8" + 3 = "2d8 + 3"), so the result
  *  stays a single safe formula. */
 export function formulaPlus(formula: string, modifier: number): string {

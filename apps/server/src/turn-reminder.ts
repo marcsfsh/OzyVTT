@@ -13,6 +13,8 @@ function timeLeft(effect: Effect, bearerId: string, sourceName: string): string 
       return `${duration.remaining} ${duration.remaining === 1 ? "round" : "rounds"} left`;
     case "until-source-next-turn":
       return `until ${sourceName}'s next turn starts`;
+    case "until-bearer-next-turn":
+      return "until the start of its next turn";
     case "until-bearer-turn-end":
       return duration.skipsCurrentTurn ? "until the end of its next turn" : "ends at the end of this turn";
     case "until-source-turn-end":

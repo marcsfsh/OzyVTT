@@ -24,6 +24,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     initiative: combat.initiative,
     tokens: combat.tokens,
     annotations: combat.annotations,
+    spellZones: combat.spellZones,
     turn: combat.turn,
     rulesMode: combat.rulesMode,
     ruleExceptions: combat.ruleExceptions,
@@ -52,6 +53,7 @@ function emptySceneCombat(): SceneCombat {
     initiative: [],
     tokens: [],
     annotations: [],
+    spellZones: [],
     turn: {
       actionUsed: false,
       bonusActionUsed: false,

@@ -140,6 +140,7 @@ export const usesField = (label: string, scope: RiderScope): FieldDef => ({
       kind: "select",
       options: [
         opt("turn", "Every turn"),
+        opt("own-turn", "At the start of its next turn"),
         opt("encounter", "Every encounter"),
         opt("short-rest", "On a short rest"),
         opt("long-rest", "On a long rest")
@@ -211,6 +212,7 @@ const spellDcFields = (scope: RiderScope): readonly FieldDef[] =>
  */
 const ACTION_USES_PER: readonly SelectOption[] = [
   opt("turn", "Every turn"),
+  opt("own-turn", "At the start of its next turn"),
   opt("encounter", "Every encounter"),
   opt("short-rest", "On a short rest"),
   opt("long-rest", "On a long rest"),

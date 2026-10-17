@@ -6,7 +6,13 @@ import { useConfirm } from "../components/feedback";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { command } from "../lib/command";
+import { aidGiverOf, isKnockedOut, StabilizeControl } from "../encounter/StabilizeControl";
+import { ShortRestPrompt } from "../rest/ShortRestPrompt";
 import "./my-character.css";
+
+/** Dying and not yet stable: what first aid, a Healer's Kit or Spare the Dying is for. */
+const needsAid = (actor: PlayerActor) =>
+  actor.deathSaves !== null && !actor.deathSaves.stable && actor.deathSaves.failures < 3;
 
 /**
  * The player's "My character" tab: who they play, how they are doing, and the door to the sheet.
@@ -177,6 +183,8 @@ export function MyCharacter({
       </div>
 
       <div className="my-character-body scroll-y frame-fill">
+        {/* The party's Short Rest, when the GM opened one with this player's character in it. */}
+        <ShortRestPrompt state={state} />
         {mine ? (
           <div className="my-character-card">
             <Avatar name={mine.name} size="lg" presence={mine.presence ? presenceDot(mine.presence) : undefined} />
@@ -252,6 +260,21 @@ export function MyCharacter({
                         {body}
                       </span>
                     )}
+                    {/* Outside a fight your character can stabilize a dying ally or wake a knocked-out one; in a
+                      fight that happens on the turn order. */}
+                    {mine &&
+                      !state.combat.active &&
+                      (mine.hp.kind !== "exact" || mine.hp.current > 0) &&
+                      (needsAid(actor) || isKnockedOut(actor)) && (
+                        <StabilizeControl
+                          targetId={actor.id}
+                          targetName={actor.name}
+                          helpers={[aidGiverOf(mine, mine.definition)]}
+                          gm={false}
+                          knockedOut={isKnockedOut(actor)}
+                          onFeedback={(text) => toast(text)}
+                        />
+                      )}
                   </li>
                 );
               })}

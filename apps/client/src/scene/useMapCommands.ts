@@ -1,6 +1,14 @@
 import { useState } from "react";
-import type { AnnotationShapeKind, AnnotationVisibility, EncounterTokenPosition, MutationResult } from "@vtt/domain";
+import type {
+  AnnotationShapeKind,
+  AnnotationVisibility,
+  EncounterTokenPosition,
+  MutationResult,
+  RulesBlocked
+} from "@vtt/domain";
 import { command } from "../lib/command";
+import { newId } from "../lib/ids";
+import type { MoveMode } from "./movePreview";
 import type { Point } from "./useMapView";
 
 /**
@@ -8,11 +16,20 @@ import type { Point } from "./useMapView";
  * a refusal lands on the map's feedback line. Moves and fog target the privately staged scene while
  * the GM arranges one (`sceneId`), else the live table.
  */
+/** A token move a movement rule refused, kept so the GM can move it anyway or a player can ask the GM. */
+export type BlockedMove = Readonly<{
+  actorId: string;
+  position: EncounterTokenPosition;
+  mode: MoveMode | undefined;
+  blocked: RulesBlocked;
+}>;
+
 export function useMapCommands({
   revision,
   sceneId,
   size,
   canMove,
+  moveModeFor = () => undefined,
   drawing,
   onShapeAdded
 }: Readonly<{
@@ -20,6 +37,8 @@ export function useMapCommands({
   sceneId?: string;
   size: Readonly<{ width: number; height: number }> | null;
   canMove: (actorId: string) => boolean;
+  /** How a creature's drag travels (the mode picked for the acting creature); walking when undefined. */
+  moveModeFor?: (actorId: string) => MoveMode | undefined;
   /** How a new drawing is shared, and in which colour. */
   drawing: Readonly<{ visibility: AnnotationVisibility; visibleToActorId: string | null; color: string }>;
   /** A new shape is selected for editing as soon as the server stores it. */
@@ -30,13 +49,26 @@ export function useMapCommands({
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
   const [fogBusy, setFogBusy] = useState(false);
   const [terrainBusy, setTerrainBusy] = useState(false);
+  const [blockedMove, setBlockedMove] = useState<BlockedMove | null>(null);
   const scene = sceneId !== undefined ? { sceneId } : {};
 
-  const submitMove = async (actorId: string, position: EncounterTokenPosition | null) => {
-    if (busyActorId || !canMove(actorId)) return;
+  const sendMove = async (
+    actorId: string,
+    position: EncounterTokenPosition | null,
+    mode: MoveMode | undefined,
+    override?: Readonly<{ reason: string }>
+  ) => {
     setBusyActorId(actorId);
     setMessage("");
-    const result = await command("token:move", { actorId, position, ...scene, expectedRevision: revision });
+    setBlockedMove(null);
+    const result = await command("token:move", {
+      actorId,
+      position,
+      ...(mode && mode !== "walk" && position ? { mode } : {}),
+      ...(override ? { override } : {}),
+      ...scene,
+      expectedRevision: revision
+    });
     setMessage(
       result.ok
         ? position
@@ -44,7 +76,40 @@ export function useMapCommands({
           : "Token returned to the tray."
         : (result.message ?? "The token move was rejected.")
     );
+    if (!result.ok && result.blocked?.overridable && position)
+      setBlockedMove({ actorId, position, mode, blocked: result.blocked });
     setBusyActorId(null);
+  };
+  const submitMove = async (actorId: string, position: EncounterTokenPosition | null) => {
+    if (busyActorId || !canMove(actorId)) return;
+    await sendMove(actorId, position, moveModeFor(actorId));
+  };
+  /** The GM's ruling on a refused move: the same move again, with an audited override. */
+  const moveAnyway = async () => {
+    if (!blockedMove || busyActorId) return;
+    await sendMove(blockedMove.actorId, blockedMove.position, blockedMove.mode, { reason: "GM ruling on the map" });
+  };
+  /** A player's question about a refused move, parked for the GM to allow or deny. */
+  const askAboutMove = async () => {
+    if (!blockedMove) return;
+    const { actorId, position, mode } = blockedMove;
+    const result = await command("rules:ask", {
+      type: "token.move",
+      payload: {
+        commandId: newId(),
+        actorId,
+        position,
+        ...(mode && mode !== "walk" ? { mode } : {})
+      }
+    });
+    setBlockedMove(null);
+    setMessage(
+      !result.ok
+        ? (result.message ?? "That question could not be sent.")
+        : result.ran
+          ? "That worked this time - no question needed."
+          : "Asked the GM. Waiting for their call."
+    );
   };
   const placeAtCenter = (actorId: string) => {
     if (size) void submitMove(actorId, { x: size.width / 2, y: size.height / 2 });
@@ -203,6 +268,10 @@ export function useMapCommands({
     busyActorId,
     submitMove,
     placeAtCenter,
+    blockedMove,
+    moveAnyway,
+    askAboutMove,
+    dismissBlockedMove: () => setBlockedMove(null),
     annotationBusy,
     addAnnotation,
     ping,

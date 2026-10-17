@@ -22,7 +22,6 @@ const card = (result: ActionResolution, onAgain = vi.fn(), applyDamage = vi.fn()
       actions={[action("item-greataxe", "Greataxe"), action("item-greataxe-cleave", "Greataxe (Cleave)")]}
       busy={false}
       resolveBusy={false}
-      rollMode="auto"
       onFeedback={() => {}}
       resolve={() => {}}
       onAgain={onAgain}

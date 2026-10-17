@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { type PendingSave, type PlayerPendingSave } from "@vtt/domain";
+import { type ActionRollMode, type PendingSave, type PlayerPendingSave } from "@vtt/domain";
+import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { RollControls, type DieMode } from "./RollControls";
 import { damageAdjustments } from "./format";
+import { modeWords } from "./roll-mode-notes";
 import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
 import "./prompts.css";
 
@@ -14,9 +16,10 @@ import "./prompts.css";
 const RECHECK_AMEND_MS = 350;
 
 /**
- * A saving throw a combatant still owes, inside its initiative row. Roll = the server rolls d20 +
- * its best-known modifier; a typed total covers proficient/situational saves. The outcome applies
- * server-side (fail: damage + condition; success: half or none) and the prompt clears.
+ * A saving throw a combatant still owes, inside its initiative row. Roll = the server throws the d20,
+ * or takes the face a physical die shows, and adds the save's bonus; it holds the die, so Confirm
+ * applies the die shown. The outcome applies server-side (fail: damage + condition; success: half or
+ * none) and the prompt clears.
  *
  * The damage field is editable: pre-filled in auto mode, empty with the rolled number as its
  * placeholder in manual mode. It holds the proposal before halving (`damageOverride` is applied
@@ -34,6 +37,8 @@ export function SavePrompt({
   canDismiss,
   onFeedback,
   rollMode,
+  viewer,
+  inspired = false,
   legendaryResistanceLeft
 }: Readonly<{
   save: PendingSave | PlayerPendingSave;
@@ -41,21 +46,34 @@ export function SavePrompt({
   canDismiss: boolean;
   onFeedback: (text: string) => void;
   rollMode: "auto" | "manual";
+  /** The GM may force a mode and reroll freely; a player rerolls with Heroic Inspiration. */
+  viewer: "gm" | "player";
+  /** The saving character holds Heroic Inspiration. */
+  inspired?: boolean;
   /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number;
 }>) {
   const [busy, setBusy] = useState(false);
+  // A player's typed damage stands in for dice, so it follows the table's setting for typed dice.
+  const { mayType } = useRollPreference();
   // A rolled-but-not-applied result: the server records the die and returns the projected outcome,
   // shown until the answerer confirms. `basis` is the pre-halving damage that preview used, so a later
   // amend is detectable; `defences` says what resistances and the like did to it.
   const [rolled, setRolled] = useState<{
     total: number;
+    natural?: number;
     success: boolean;
     damage: number;
     defences: string;
     condition: boolean;
-    mode?: DieMode;
+    rollMode?: ActionRollMode;
+    autoFailed?: boolean;
+    autoSucceeded?: string;
     basis: number;
   } | null>(null);
+  // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
+  const [forced, setForced] = useState<DieMode | undefined>(undefined);
+  // The shown die was typed from a physical die, so a reroll is typed too.
+  const [typed, setTyped] = useState(false);
   // null = untouched: the field falls back to the proposal (auto) or nothing (manual).
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
   // The background recheck of an amend typed after the roll: `pending` while out, `failed` after a
@@ -76,26 +94,30 @@ export function SavePrompt({
   // Read through a ref so a parent passing a fresh closure each render cannot restart the timer.
   const feedbackRef = useRef(onFeedback);
   feedbackRef.current = onFeedback;
-  // Outcome feedback goes to the parent, since committing unmounts this prompt. `dieMode` is the
-  // answerer's explicit adv/disadv.
+  // Outcome feedback goes to the parent, since committing unmounts this prompt. Every send reads the held die, or
+  // throws it the first time; `face` is a typed die and `reroll` throws it again.
   const send = (
-    method: "roll" | "manual",
-    total: number | undefined,
-    commit: boolean,
-    legendaryResistance = false,
-    dieMode?: DieMode
+    options: Readonly<{
+      commit: boolean;
+      face?: number;
+      reroll?: boolean;
+      legendaryResistance?: boolean;
+      mode?: DieMode;
+    }>
   ) => {
     setBusy(true);
-    // The amend rides every send (preview, manual apply, Confirm, Legendary Resistance).
+    const mode = "mode" in options ? options.mode : forced;
+    // The amend rides every send (preview, Confirm, Legendary Resistance).
     void command(
       "save:answer",
       saveAnswerPayload({
         saveId: save.id,
-        method,
-        commit,
-        legendaryResistance,
-        ...(total !== undefined ? { total } : {}),
-        ...(dieMode ? { dieMode } : {}),
+        method: "roll",
+        commit: options.commit,
+        legendaryResistance: options.legendaryResistance ?? false,
+        ...(options.face !== undefined ? { face: options.face } : {}),
+        ...(options.reroll ? { reroll: true } : {}),
+        ...(mode ? { dieMode: mode } : {}),
         ...(damageOverride !== undefined ? { damageOverride } : {})
       })
     ).then((result) => {
@@ -107,13 +129,19 @@ export function SavePrompt({
       const outcome = result.outcome;
       if (!outcome) return;
       if (!outcome.committed) {
+        // A typed die stays typed until a reroll the server throws (the GM's) replaces it.
+        if (options.face !== undefined) setTyped(true);
+        else if (options.reroll) setTyped(false);
         setRolled({
           total: outcome.total,
+          ...(outcome.natural !== undefined ? { natural: outcome.natural } : {}),
           success: outcome.success,
           damage: outcome.appliedDamage,
           defences: damageAdjustments(outcome.parts, outcome.flatReduction),
           condition: outcome.conditionApplied,
-          mode: outcome.rollMode?.mode,
+          ...(outcome.rollMode ? { rollMode: outcome.rollMode } : {}),
+          ...(outcome.autoFailed ? { autoFailed: true } : {}),
+          ...(outcome.autoSucceeded ? { autoSucceeded: outcome.autoSucceeded } : {}),
           basis: proposal
         });
         return;
@@ -136,10 +164,9 @@ export function SavePrompt({
   const stale = rolled !== null && proposal !== rolled.basis;
   useEffect(() => {
     if (rolled === null || !stale || busy || recheck !== "idle") return;
-    // Confirm's payload with `commit: false`: same total, same amend. It records no die and applies
+    // Confirm's payload with `commit: false`: the held die, the same amend. It records no die and applies
     // nothing (`answerSave` returns before writing the outcome), so the answer is exactly what Confirm
     // would do.
-    const { total } = rolled;
     const basis = proposal;
     const timer = setTimeout(() => {
       setRecheck("pending");
@@ -147,9 +174,9 @@ export function SavePrompt({
         "save:answer",
         saveAnswerPayload({
           saveId: save.id,
-          method: "manual",
+          method: "roll",
           commit: false,
-          total,
+          ...(forced ? { dieMode: forced } : {}),
           ...(damageOverride !== undefined ? { damageOverride } : {})
         })
       ).then((result) => {
@@ -178,7 +205,7 @@ export function SavePrompt({
       });
     }, RECHECK_AMEND_MS);
     return () => clearTimeout(timer);
-  }, [rolled, stale, busy, recheck, proposal, damageOverride, save.id]);
+  }, [rolled, stale, busy, recheck, proposal, damageOverride, save.id, forced]);
   return (
     <div className="save-prompt" role="group" aria-label={`Saving throw for ${targetName}`}>
       <span className="save-prompt-label">
@@ -187,7 +214,7 @@ export function SavePrompt({
         </strong>{" "}
         vs {save.actionName} ({save.sourceName})
       </span>
-      {save.proposedDamage > 0 && (
+      {save.proposedDamage > 0 && (viewer === "gm" || mayType) && (
         <label className="save-damage-amend">
           <span>Damage on a failure{save.halfOnSuccess ? ", half on a success" : ""}</span>
           <input
@@ -210,24 +237,35 @@ export function SavePrompt({
         rollMode={rollMode}
         busy={busy}
         rolled={rolled !== null}
-        currentMode={rolled?.mode}
-        manualLabel="Rolled save total"
-        onInvalidManual={onFeedback}
-        onRoll={(mode) => send("roll", undefined, false, false, mode)}
-        onManual={(total) => send("manual", total, true)}
-        onConfirm={() => rolled && send("manual", rolled.total, true)}
-        onReroll={() => setRolled(null)}
+        viewer={viewer}
+        inspired={inspired}
+        typed={typed}
+        rerollable={!rolled?.autoFailed && !rolled?.autoSucceeded}
+        currentMode={forced}
+        faceLabel="Your save d20"
+        onInvalidFace={onFeedback}
+        onRoll={() => send({ commit: false })}
+        onTyped={(face) => send({ commit: false, face })}
+        onConfirm={() => send({ commit: true })}
+        onReroll={(face) => send({ commit: false, reroll: true, ...(face !== undefined ? { face } : {}) })}
+        onForce={(mode) => {
+          const next = mode === "normal" ? undefined : mode;
+          setForced(next);
+          send({ commit: false, mode: next });
+        }}
         onDismiss={canDismiss ? dismiss : undefined}
         summary={
           rolled ? (
             <>
               {/* The rolled total and what it will do; an explicit Confirm applies it. */}
               <strong className={rolled.success ? "save-pass" : "save-fail"}>
-                Rolled {rolled.total}
-                {rolled.mode && rolled.mode !== "normal"
-                  ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})`
-                  : ""}{" "}
-                - {rolled.success ? "Success" : "Failure"}
+                {rolled.autoFailed
+                  ? "Fails without a roll"
+                  : rolled.autoSucceeded
+                    ? `Succeeds without a roll (${rolled.autoSucceeded})`
+                    : `Rolled ${rolled.total}`}
+                {rolled.natural !== undefined ? ` (d20 ${rolled.natural})` : ""}
+                {modeWords(rolled.rollMode)} - {rolled.success ? "Success" : "Failure"}
               </strong>
               {/* `rolled.damage` is always the server's projection for the field's number, never local
             arithmetic. While a recheck is out, show only what was typed. */}
@@ -247,7 +285,7 @@ export function SavePrompt({
               className="save-legendary"
               disabled={busy}
               title="SRD Legendary Resistance: when it fails a save, it can choose to succeed instead"
-              onClick={() => send("manual", rolled.total, true, true)}
+              onClick={() => send({ commit: true, legendaryResistance: true })}
             >
               Legendary Resistance ({legendaryResistanceLeft} left)
             </button>

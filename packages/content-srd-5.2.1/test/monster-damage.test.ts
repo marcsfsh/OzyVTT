@@ -31,11 +31,29 @@ function printedHit(description: string): Printed[] {
 }
 
 describe("SRD monster attack damage matches the stat block", () => {
+  // Rows that print their own attack roll; a legendary action that makes another's attack is checked against it below.
   const attacks = monsters.flatMap((monster) =>
     monster.actions
-      .filter((action) => action.attack !== undefined)
+      .filter((action) => action.attack !== undefined && /Attack Roll:/.test(action.description))
       .map((action) => ({ key: `${monster.source.externalId}/${action.id}`, action }))
   );
+
+  it("gives a legendary action that makes another action's attack that attack's roll and damage", () => {
+    const wrong = monsters.flatMap((monster) =>
+      monster.actions
+        .filter((action) => action.legendary && action.attack && !/Attack Roll:/.test(action.description))
+        .flatMap((action) => {
+          const named = /makes one ([A-Z][A-Za-z' ]*?) attack/.exec(action.description)?.[1];
+          const source = monster.actions.find((candidate) => candidate.name.replace(/\s*\(.*\)$/, "") === named);
+          return source &&
+            JSON.stringify(source.attack) === JSON.stringify(action.attack) &&
+            JSON.stringify(source.damage) === JSON.stringify(action.damage)
+            ? []
+            : [`${monster.source.externalId}/${action.id}`];
+        })
+    );
+    expect(wrong).toEqual([]);
+  });
 
   it("covers every attack in the bundle", () => {
     expect(attacks.length).toBeGreaterThanOrEqual(420);

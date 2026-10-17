@@ -1,20 +1,28 @@
+import { randomUUID } from "node:crypto";
 import { requireActorAccess } from "../authorization.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "../character-claims.js";
 import { setCharacterIdentity, setCharacterProficiencies } from "../character-edit.js";
 import {
   ActorRemoveSchema,
   CharacterGiveItemSchema,
+  CharacterRecoverAmmunitionSchema,
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterFinishPreparingSchema,
+  CharacterSwapSpellSchema,
+  CharacterAddToSpellbookSchema,
   CharacterSetPreparedSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CommandIdentitySchema
 } from "@vtt/domain/commands";
+import { recoverAmmunition } from "../ammunition.js";
+import type { EffectNarration } from "../effects.js";
+import { CommandRejectedError } from "../game-store.js";
 import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
 import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
+import { addToSpellbook, swapClassSpell } from "../spell-choices.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -129,6 +137,71 @@ export const characterSheetCommands = [
   }),
 
   defineCommand({
+    type: "character.swap-spell",
+    operationId: "swapSpell",
+    description:
+      "Puts a spell on a character's prepared list in place of one its class chose (`replaces`), and rebuilds the sheet from its choices ledger (SRD Spell Preparation by Class): a Cleric, Druid, Paladin or Ranger takes another spell of its class's list for which it has slots, a Wizard another spell from its spellbook, and the Wizard's replaced spell stays in the book. A player session may target only their claimed character, in the prepare step a Long Rest opens (a Paladin or Ranger once); the GM any time. Never mid-fight, and only on a sheet built here (it records its choices ledger).",
+    summary: "Swap a spell onto a prepared caster's list in place of one its class chose.",
+    schema: CharacterSwapSpellSchema,
+    malformed: "The swap-spell command is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, spellId, replaces } = request;
+      let line = "";
+      const { duplicate } = await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        const swapped = swapClassSpell(state, actorId, spellId, replaces, initiatorOf(principal).role, {
+          library: kit.contentLibrary.forAudience("gm"),
+          policy: state.builderPolicy,
+          catalog: kit.equipmentCatalog()
+        });
+        line = `${kit.actorName(actorId)} prepares ${swapped.added} in place of ${swapped.removed}.`;
+      });
+      if (!duplicate)
+        kit.context.appendLog({ kind: "encounter", text: line, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
+    }
+  }),
+
+  defineCommand({
+    type: "character.add-to-spellbook",
+    operationId: "addToSpellbook",
+    description:
+      "Adds a Wizard spell of a level the Wizard can prepare to its spellbook. `from: \"level\"` is one of the spells the Wizard's levels give (six at level 1, two more each level after), free. `scroll` copies it from a Spell Scroll of that spell the character carries (`itemId`): 2 hours and 50 GP for each level of the spell, then an Intelligence (Arcana) check against DC 10 + its level, and the scroll is destroyed whether it succeeds or fails. `book` copies it from another spellbook for the same price, GM-grade only, since the GM knows what that book holds. The clock is the GM's to move. A player session may target only their claimed character; never mid-fight, and only on a sheet built here.",
+    summary: "Add a spell to a Wizard's spellbook, free from its levels or copied from a scroll or another book.",
+    schema: CharacterAddToSpellbookSchema,
+    malformed: "The spellbook command is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, spellId, from, itemId, commandId } = request;
+      let line = "";
+      const { duplicate } = await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        line = addToSpellbook(
+          state,
+          actorId,
+          { spellId, from, ...(itemId !== undefined ? { itemId } : {}) },
+          initiatorOf(principal),
+          {
+            library: kit.contentLibrary.forAudience("gm"),
+            policy: state.builderPolicy,
+            catalog: kit.equipmentCatalog(),
+            random: (sides) => kit.context.random(sides),
+            roll: {
+              id: randomUUID(),
+              commandId,
+              sessionId: sessionIdOf(principal),
+              createdAt: new Date().toISOString()
+            }
+          }
+        );
+      });
+      if (!duplicate)
+        kit.context.appendLog({ kind: "encounter", text: line, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
+      // A scroll's copy can fail its check, so the reply says where the spell ended up.
+      const actor = kit.read().actors.find((candidate) => candidate.id === actorId);
+      return { inBook: actor?.spellbook.some((entry) => entry.id === spellId) ?? false };
+    }
+  }),
+
+  defineCommand({
     type: "character.set-inventory",
     operationId: "setInventory",
     description:
@@ -138,13 +211,17 @@ export const characterSheetCommands = [
     malformed: "The inventory command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, item } = request;
-      await execute((state) => {
+      let ended: EffectNarration[] = [];
+      const { duplicate } = await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
-        setInventoryItem(state, actorId, item, (definitionId) => kit.resolveDefinitionIn(state, definitionId), {
+        // Donning armor ends Mage Armor, which the table is told.
+        ended = setInventoryItem(state, actorId, item, (definitionId) => kit.resolveDefinitionIn(state, definitionId), {
           catalog: kit.equipmentCatalog(),
-          role: initiatorOf(principal).role
+          role: initiatorOf(principal).role,
+          pickableSpell: (spellId) => kit.catalogFor(principal).spellRecord(spellId)
         });
       });
+      if (!duplicate) kit.publishNarrations(ended);
     }
   }),
 
@@ -184,6 +261,39 @@ export const characterSheetCommands = [
   }),
 
   defineCommand({
+    type: "character.recover-ammunition",
+    operationId: "recoverAmmunition",
+    description:
+      "Picks up the ammunition a character fired outside a fight: half the pieces fired from each row come back, rounded down, and the rest are lost (SRD Ammunition). A fight's pieces come back when the encounter ends, so this is refused while the character is in a running fight. Player sessions may target only their claimed character.",
+    summary: "Pick up half the ammunition a character fired outside a fight.",
+    schema: CharacterRecoverAmmunitionSchema,
+    malformed: "The recover-ammunition command is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId } = request;
+      let lines: ReturnType<typeof recoverAmmunition> = [];
+      const { duplicate } = await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
+        if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
+          throw new CommandRejectedError("Ammunition is picked up after the fight.");
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That character no longer exists.");
+        if (!actor.inventory.some((row) => row.ammunitionFired !== undefined))
+          throw new CommandRejectedError(`${actor.name} has no fired ammunition to pick up.`);
+        lines = recoverAmmunition(state, [actorId], kit.equipmentCatalog());
+      });
+      if (duplicate) return;
+      const said = lines.length > 0 ? lines : [{ actorId, text: `${kit.actorName(actorId)} finds none of it.` }];
+      for (const line of said)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: line.text,
+          actorIds: [line.actorId],
+          gmOnly: kit.actorHidden(line.actorId)
+        });
+    }
+  }),
+
+  defineCommand({
     type: "character.set-currency",
     operationId: "setCurrency",
     description:
@@ -208,10 +318,16 @@ export const characterSheetCommands = [
       "Edit a character's identity (class/level/race/background/feats) on its imported sheet; players only rename.",
     schema: CharacterSetIdentitySchema,
     malformed: "The identity command is malformed.",
-    async run({ principal, request, execute }) {
+    async run({ principal, request, execute }, kit) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterIdentity(state, request.actorId, request.character, { gm: isGmGrade(principal) });
+        setCharacterIdentity(
+          state,
+          request.actorId,
+          request.character,
+          { gm: isGmGrade(principal) },
+          kit.equipmentCatalog()
+        );
       });
     }
   }),
@@ -224,10 +340,10 @@ export const characterSheetCommands = [
     summary: "Edit a character's save and skill proficiency selections on its imported sheet.",
     schema: CharacterSetProficienciesSchema,
     malformed: "The proficiencies command is malformed.",
-    async run({ principal, request, execute }) {
+    async run({ principal, request, execute }, kit) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterProficiencies(state, request.actorId, request.proficiencies);
+        setCharacterProficiencies(state, request.actorId, request.proficiencies, kit.equipmentCatalog());
       });
     }
   })

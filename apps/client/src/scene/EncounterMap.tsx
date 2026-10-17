@@ -10,7 +10,7 @@ import type {
   PlayerAnnotation,
   PlayerView
 } from "@vtt/domain";
-import { useToastMute } from "@vtt/ui";
+import { Button, useToastMute } from "@vtt/ui";
 import { CharacterSheet } from "../encounter/CharacterSheet";
 import type { DockPosition } from "../encounter/DockPicker";
 import { useTargeting } from "../encounter/targeting";
@@ -23,7 +23,8 @@ import { MapToken } from "./MapToken";
 import { MapTokenTray } from "./MapTokenTray";
 import { MapToolbar } from "./MapToolbar";
 import type { MapTool } from "./mapTools";
-import { moveLabel, previewMove } from "./movePreview";
+import { alliesByKind, extraPerStepFor, moveLabel, previewMove, type MoveMode } from "./movePreview";
+import { MoveModeBar } from "./MoveModeBar";
 import { useMovementBudget } from "./useMovementBudget";
 import { SceneControls } from "./SceneControls";
 import { ShapeEditor } from "./ShapeEditor";
@@ -58,6 +59,41 @@ type TerrainState = Readonly<{
 // On-brand annotation swatches. Concrete hexes, not theme vars: the colour travels over the wire and
 // must read the same on every screen.
 const PLAYER_COLORS = ["#2de2ff", "#5b6ef5", "#a45cff", "#ff2e9a", "#ff2d5e", "#ff8cc6", "#7cefff", "#ffffff"];
+
+/** Whether two creatures fight on the same side, as the view can tell: the GM reads each stat block's disposition,
+ *  a player goes by kind (an NPC's side is the GM's to know). Mirrors the server's `areAllies`. */
+function sidesFrom(state: GmView | PlayerView | undefined) {
+  if (!state || !("definitions" in state)) return alliesByKind;
+  const sideOf = (actor: Actor) => {
+    if (actor.kind === "player-character") return "party";
+    const disposition = actor.definitionId
+      ? state.definitions.find((entry) => entry.id === actor.definitionId)?.definition.token.disposition
+      : undefined;
+    if (disposition === "friendly") return "party";
+    if (disposition === "hostile") return "foes";
+    return actor.kind === "monster" ? "foes" : null;
+  };
+  return (mover: Actor, occupant: Actor) => {
+    const side = sideOf(mover);
+    return side !== null && side === sideOf(occupant);
+  };
+}
+
+/** The creatures a mover grapples, which it drags along: the GM sees each grapple's source, a player only their own
+ *  character's (`yours`). */
+function grappledBy(actors: readonly Actor[], moverId: string, role: "gm" | "player"): string[] {
+  return actors
+    .filter((actor) =>
+      actor.effects.some(
+        (effect) =>
+          effect.tags.includes("grapple") &&
+          (role === "gm"
+            ? "sourceActorId" in effect && effect.sourceActorId === moverId
+            : "yours" in effect && effect.yours === true)
+      )
+    )
+    .map((actor) => actor.id);
+}
 
 function isMine(annotation: AnyAnnotation, role: "gm" | "player") {
   return role === "gm" || ("mine" in annotation && annotation.mine);
@@ -180,11 +216,26 @@ export function EncounterMap({
   const effectiveVisibility: AnnotationVisibility = role === "gm" && gmLayer ? "gm-only" : defaultVisibility;
 
   const view = useMapView({ assetId, size, svgRef, stageRef, dock });
+  // How the mover's next drag travels: the acting creature's for the GM, the player's own character's for a player,
+  // on the live table only. Each turn starts on foot.
+  const ownActorId =
+    role === "player"
+      ? (actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null)
+      : null;
+  const moverId = moveSceneId ? null : role === "gm" ? activeActorId : ownActorId;
+  const moverPlaced = moverId !== null && (tokensById.get(moverId)?.position ?? null) !== null;
+  const [modeChoice, setModeChoice] = useState<{ actorId: string; mode: MoveMode } | null>(null);
+  useEffect(() => {
+    setModeChoice(null);
+  }, [activeActorId]);
+  const moveMode: MoveMode = modeChoice && modeChoice.actorId === moverId ? modeChoice.mode : "walk";
+  const moverBudget = useMovementBudget(moverPlaced ? moverId : null, revision);
   const commands = useMapCommands({
     revision,
     sceneId: moveSceneId,
     size,
     canMove,
+    moveModeFor: (actorId) => (actorId === moverId ? moveMode : undefined),
     drawing: { visibility: effectiveVisibility, visibleToActorId: defaultActorId, color: sessionColor },
     onShapeAdded: (annotationId) => {
       setTool("select");
@@ -269,6 +320,8 @@ export function EncounterMap({
   // The drag's path and cost, as the server will charge it, and what that leaves of the mover's turn. Only the
   // combatant whose turn it is spends movement, so only that drag asks for the budget.
   const difficult = terrain?.difficult ?? [];
+  const draggedMode: MoveMode = dragging?.actorId === moverId ? moveMode : "walk";
+  const draggedBudget = dragging?.actorId === moverId ? moverBudget : null;
   const liveMove =
     calibration && size && dragSnappedPoint && dragging?.origin && !dragging.fromTray
       ? previewMove({
@@ -279,14 +332,15 @@ export function EncounterMap({
           actorsById,
           moverId: dragging.actorId,
           from: dragging.origin,
-          to: dragSnappedPoint
+          to: dragSnappedPoint,
+          isAlly: sidesFrom(state),
+          extraPerStep: extraPerStepFor(draggedBudget, draggedMode),
+          carried: grappledBy(actors, dragging.actorId, role),
+          free: draggedMode === "teleport" || draggedMode === "forced"
         })
       : null;
-  const budget = useMovementBudget(
-    dragging && dragging.actorId === activeActorId && !moveSceneId ? dragging.actorId : null,
-    revision
-  );
-  const liveLabel = liveMove && liveMove.feet > 0 ? moveLabel(liveMove, budget) : null;
+  const liveLabel =
+    liveMove && (liveMove.feet > 0 || liveMove.blocked) ? moveLabel(liveMove, draggedBudget, draggedMode) : null;
   const labelSize = sizes.labelSize;
   // The label must stay readable on a phone, where the whole map is drawn small: at least 14 screen pixels, and
   // kept inside the map so a drag near an edge doesn't cut it off.
@@ -519,10 +573,40 @@ export function EncounterMap({
           Saving move…
         </p>
       )}
+      {moverId && image.status === "ready" && (
+        <MoveModeBar
+          name={actorsById.get(moverId)?.name ?? "token"}
+          budget={moverBudget}
+          mode={moveMode}
+          onChange={(mode) => setModeChoice({ actorId: moverId, mode })}
+          gm={role === "gm"}
+        />
+      )}
       {image.status === "ready" && (
         <p className="encounter-map-feedback" role="status" aria-live="polite">
           {message}
         </p>
+      )}
+      {commands.blockedMove && (
+        <div className="encounter-move-blocked" role="group" aria-label="Refused move">
+          {role === "gm" ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={busyActorId !== null}
+              onClick={() => void commands.moveAnyway()}
+            >
+              Move anyway
+            </Button>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={() => void commands.askAboutMove()}>
+              Ask the GM
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={commands.dismissBlockedMove}>
+            Never mind
+          </Button>
+        </div>
       )}
       {contextMenu &&
         (() => {

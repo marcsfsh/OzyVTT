@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type MutationResult, type PlayerView } from "@vtt/domain";
 import { Button, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
+import { useMovementBudget } from "../scene/useMovementBudget";
 import { MyPendingAsks } from "./RuleAsk";
 import { useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
@@ -12,6 +13,7 @@ import { SavePrompt } from "./SavePrompt";
 import { ReactionPrompt } from "./ReactionPrompt";
 import { EffectChips } from "./EffectChips";
 import { DyingTracker } from "./DyingTracker";
+import { aidGiverOf, isKnockedOut, StabilizeControl } from "./StabilizeControl";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { InitiativePrompt } from "./InitiativePrompt";
 
@@ -38,14 +40,25 @@ function OwnFeedback({
   );
 }
 
-/** A player's own economy: Action/Bonus only on their turn; the reaction is markable any time. Pressed = spent. */
-function PlayerTurnEconomy({
+/** A player's own economy: Action/Bonus only on their turn; the reaction is markable any time. Pressed = spent. Only
+ *  the GM gives a spent one back while the table polices the action economy, so a pressed slot is locked then. */
+export function PlayerTurnEconomy({
   combat,
   myId,
   myTurn,
-  mySpeedFeet
-}: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean; mySpeedFeet?: number }>) {
+  mySpeedFeet,
+  revision
+}: Readonly<{
+  combat: PlayerView["combat"];
+  myId: string;
+  myTurn: boolean;
+  mySpeedFeet?: number;
+  /** The game's revision: this turn's movement budget (Dash and Slow included) is asked again as it changes. */
+  revision?: number;
+}>) {
   const [busy, setBusy] = useState(false);
+  const budget = useMovementBudget(myTurn && revision !== undefined ? myId : null, revision ?? 0);
+  const moveBudget = budget?.speedFeet ?? mySpeedFeet;
   const [feedback, setFeedback] = useState("");
   const emit = (run: () => Promise<MutationResult>, failure: string) => {
     setBusy(true);
@@ -55,6 +68,8 @@ function PlayerTurnEconomy({
     });
   };
   const reactionUsed = combat.reactionsUsed.includes(myId);
+  const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
+  const lockedTitle = "Spent - only the GM can give it back";
   return (
     <div className="turn-economy" role="group" aria-label="Your turn resources">
       {myTurn && (
@@ -63,7 +78,8 @@ function PlayerTurnEconomy({
             type="button"
             className="economy-slot"
             aria-pressed={combat.turn.actionUsed}
-            disabled={busy}
+            disabled={busy || (combat.turn.actionUsed && giveBackLocked)}
+            title={combat.turn.actionUsed && giveBackLocked ? lockedTitle : undefined}
             onClick={() =>
               emit(
                 () => command("turn:use", { slot: "action", used: !combat.turn.actionUsed }),
@@ -77,7 +93,8 @@ function PlayerTurnEconomy({
             type="button"
             className="economy-slot"
             aria-pressed={combat.turn.bonusActionUsed}
-            disabled={busy}
+            disabled={busy || (combat.turn.bonusActionUsed && giveBackLocked)}
+            title={combat.turn.bonusActionUsed && giveBackLocked ? lockedTitle : undefined}
             onClick={() =>
               emit(
                 () =>
@@ -91,14 +108,19 @@ function PlayerTurnEconomy({
           >
             Bonus
           </button>
+          {combat.turn.extraActionReady && (
+            <span className="economy-movement" title="Action Surge or Haste gives you another action this turn">
+              +1 action
+            </span>
+          )}
         </>
       )}
       <button
         type="button"
         className="economy-slot"
         aria-pressed={reactionUsed}
-        disabled={busy}
-        title="Reactions refresh when your turn starts"
+        disabled={busy || (reactionUsed && giveBackLocked)}
+        title={reactionUsed && giveBackLocked ? lockedTitle : "Reactions refresh when your turn starts"}
         onClick={() =>
           emit(
             () => command("turn:use-reaction", { actorId: myId, used: !reactionUsed }),
@@ -108,9 +130,9 @@ function PlayerTurnEconomy({
       >
         Reaction
       </button>
-      {myTurn && mySpeedFeet !== undefined && (
-        <span className="economy-movement" title="Movement spent this turn / base walking speed">
-          Move {Math.round(combat.turn.movementUsedFeet)}/{mySpeedFeet} ft
+      {myTurn && moveBudget !== undefined && moveBudget !== null && (
+        <span className="economy-movement" title="Movement spent this turn / this turn's movement">
+          Move {Math.round(combat.turn.movementUsedFeet)}/{moveBudget} ft
         </span>
       )}
       {myTurn && (
@@ -144,7 +166,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
   // and combat context so its actions resolve as real attacks.
   const [view, setView] = useState<"initiative" | "sheet">("initiative");
   // The shared per-browser dice-input preference.
-  const { rollMode, bonusMode } = useRollPreference();
+  const { rollMode } = useRollPreference();
   // "Jump" sheet-attack mode: an attack tapped on the sheet comes here to pick and confirm, then
   // returns to the sheet once it commits.
   const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
@@ -156,6 +178,9 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
     }
   }, [returnToSheetAfterAttack, jumpAttackResult]);
   const myActor = state.actors.find((actor) => actor.id === myId) ?? null;
+  const calledSaveIds = new Set(
+    state.rollCalls.flatMap((call) => call.entries.flatMap((entry) => (entry.saveId ? [entry.saveId] : [])))
+  );
   if (!combat.active)
     return (
       <section className="encounter-panel compact" aria-labelledby="player-initiative-title">
@@ -233,7 +258,12 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
             {orderedInitiative.map((entry) => {
               const isMe = entry.actorId === myId;
               const rowActor = state.actors.find((actor) => actor.id === entry.actorId);
-              const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
+              // A save the GM called for is answered on the call's card, so it is not prompted twice.
+              const mySaves = isMe
+                ? combat.pendingSaves.filter(
+                    (save) => save.targetActorId === entry.actorId && !calledSaveIds.has(save.id)
+                  )
+                : [];
               const myReactions = isMe
                 ? combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)
                 : [];
@@ -247,7 +277,13 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                   {/* The row shared with the shared-screen viewer, so the two lists never drift. */}
                   <InitiativeRow entry={entry} self={isMe} />
                   {isMe && myId !== null && (
-                    <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />
+                    <PlayerTurnEconomy
+                      combat={combat}
+                      myId={myId}
+                      myTurn={myTurn}
+                      mySpeedFeet={rowActor?.speedFeet}
+                      revision={state.revision}
+                    />
                   )}
                   {/* On your turn, the interactive action console. */}
                   {isMe && myTurn && myId !== null && rowActor?.definition && (
@@ -255,8 +291,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                       actorId={myId}
                       definition={rowActor.definition}
                       revision={state.revision}
-                      rollMode={rollMode}
-                      bonusMode={bonusMode}
+                      inspired={rowActor.heroicInspiration === true}
                       playerDamageMode={combat.playerDamageMode}
                       targets={combat.initiative.map((initiativeEntry) => ({
                         actorId: initiativeEntry.actorId,
@@ -272,6 +307,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           effects={rowActor.effects}
                           canEnd={false}
                           canAsk={combat.active}
+                          canAct
                           onFeedback={onFeedback}
                         />
                       )}
@@ -294,6 +330,43 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                       )}
                     </OwnFeedback>
                   )}
+                  {/* On your turn your character can give a dying or knocked-out ally aid: that is its action. */}
+                  {!isMe && myTurn && myActor && rowActor && (rowActor.deathSaves || isKnockedOut(rowActor)) && (
+                    <OwnFeedback className="own-dying">
+                      {(onFeedback) =>
+                        rowActor.deathSaves ? (
+                          <DyingTracker
+                            actorId={entry.actorId}
+                            name={entry.name}
+                            deathSaves={rowActor.deathSaves}
+                            canRoll={false}
+                            onFeedback={onFeedback}
+                            rollMode={rollMode}
+                            isActingTurn={false}
+                            viewer="player"
+                            aid={
+                              <StabilizeControl
+                                targetId={entry.actorId}
+                                targetName={entry.name}
+                                helpers={[aidGiverOf(myActor, myActor.definition)]}
+                                gm={false}
+                                onFeedback={onFeedback}
+                              />
+                            }
+                          />
+                        ) : (
+                          <StabilizeControl
+                            targetId={entry.actorId}
+                            targetName={entry.name}
+                            helpers={[aidGiverOf(myActor, myActor.definition)]}
+                            gm={false}
+                            knockedOut
+                            onFeedback={onFeedback}
+                          />
+                        )
+                      }
+                    </OwnFeedback>
+                  )}
                   {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && (
                     <OwnFeedback className="own-dying">
                       {(onFeedback) => (
@@ -306,6 +379,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           onFeedback={onFeedback}
                           rollMode={rollMode}
                           isActingTurn={myTurn}
+                          viewer="player"
+                          inspired={rowActor.heroicInspiration === true}
                         />
                       )}
                     </OwnFeedback>
@@ -321,6 +396,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                             canDismiss={false}
                             onFeedback={onFeedback}
                             rollMode={rollMode}
+                            viewer="player"
+                            inspired={rowActor?.heroicInspiration === true}
                           />
                         ))
                       }
@@ -337,6 +414,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                             canDismiss={false}
                             onFeedback={onFeedback}
                             rollMode={rollMode}
+                            viewer="player"
+                            inspired={rowActor?.heroicInspiration === true}
                           />
                         ))
                       }

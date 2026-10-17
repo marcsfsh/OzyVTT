@@ -29,7 +29,14 @@ const DODGE: PlayerPendingReaction = {
 
 const mount = (reaction: PlayerPendingReaction) =>
   render(
-    <ReactionPrompt reaction={reaction} actorName="Borin" canDismiss={false} onFeedback={() => {}} rollMode="auto" />
+    <ReactionPrompt
+      reaction={reaction}
+      actorName="Borin"
+      canDismiss={false}
+      onFeedback={() => {}}
+      rollMode="auto"
+      viewer="player"
+    />
   );
 
 describe("the reaction prompt's buttons", () => {
@@ -75,7 +82,14 @@ describe("the prompt for each trigger", () => {
       weighed: null
     };
     const { unmount } = render(
-      <ReactionPrompt reaction={rebuke} actorName="Borin" canDismiss={false} onFeedback={() => {}} rollMode="manual" />
+      <ReactionPrompt
+        reaction={rebuke}
+        actorName="Borin"
+        canDismiss={false}
+        onFeedback={() => {}}
+        rollMode="manual"
+        viewer="player"
+      />
     );
     expect(screen.getByText(/Dragon damaged you/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Use" })).toBeTruthy();
@@ -88,6 +102,7 @@ describe("the prompt for each trigger", () => {
         canDismiss={false}
         onFeedback={() => {}}
         rollMode="manual"
+        viewer="player"
       />
     );
     expect(screen.getByRole("button", { name: "Attack" })).toBeTruthy();

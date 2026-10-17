@@ -1,4 +1,12 @@
-import type { Actor, ActorDerivedSheet, DamageApplication, DerivedDefence, GameState, HealthBand } from "@vtt/domain";
+import {
+  isDead,
+  type Actor,
+  type ActorDerivedSheet,
+  type DamageApplication,
+  type DerivedDefence,
+  type GameState,
+  type HealthBand
+} from "@vtt/domain";
 import {
   adjustDamageParts,
   collectRiders,
@@ -10,6 +18,7 @@ import {
   rescaleDamageParts,
   type DamagePart,
   type DamageReduction,
+  type RandomSource,
   type ResolvedRider
 } from "@vtt/rules-5e";
 import { DAMAGE_TYPE_IDS } from "@vtt/content-srd-5.2.1/schemas";
@@ -20,17 +29,30 @@ import {
   addEffect,
   applyCondition,
   endConcentrationSustainedBy,
+  endEffect,
   endEffectsOnDamage,
   endEffectsSustainedBy,
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
+  reduceExhaustion,
   removeConditionDirect,
   type EffectNarration
 } from "./effects.js";
+import { reconcileEquipment } from "./inventory.js";
 import { offerDamageReaction } from "./damage-reactions.js";
+import { releaseSwallowedBy } from "./swallow.js";
+import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import { oilIgnition, OILED_TAG } from "./hazards.js";
+import {
+  deathBurst,
+  holdOnAtZero,
+  REGENERATING_AT_ZERO_TAG,
+  stopRegeneration,
+  undeadFortitude
+} from "./statblock-traits.js";
 
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
   if (hp.current <= 0) return "down";
@@ -73,6 +95,9 @@ export type DamageDeps = Readonly<{
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
   /** The command applying the damage, recorded on a reaction prompt it opens. */
   commandId?: string;
+  /** The server's dice, for what a stat block rolls as damage lands (Undead Fortitude's save, a Death Burst's damage);
+   *  without them those traits are left to the GM. */
+  rollDie?: RandomSource;
 }>;
 export type DamageOutcome = Readonly<{ application: DamageApplication; events: EffectNarration[] }>;
 
@@ -198,7 +223,10 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
   let totalAdjusted: number;
   let flatReduction = 0;
   let parts: DamageApplication["parts"] = [];
-  const typed = damagePartsOf(input);
+  const given = damagePartsOf(input);
+  // Fire reaching a creature covered in oil burns the oil too (SRD Oil).
+  const ignition = given !== null ? oilIgnition(actor, given) : null;
+  const typed = given !== null && ignition !== null ? [...given, ignition] : given;
   if (typed !== null) {
     const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
     // A rest-time re-choice replaces the build-time pick, so it both adds and subtracts defences.
@@ -282,7 +310,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     totalAdjusted = totalRequested;
   }
 
-  return { totalRequested, totalAdjusted, flatReduction, parts };
+  return { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited: ignition !== null };
 }
 
 type DamageWeighing = Readonly<{
@@ -290,6 +318,8 @@ type DamageWeighing = Readonly<{
   totalAdjusted: number;
   flatReduction: number;
   parts: DamageApplication["parts"];
+  /** The hit's Fire set the bearer's oil alight, which adds its 5 Fire and uses the oil up. */
+  oilIgnited: boolean;
 }>;
 
 /** Half the hit (Uncanny Dodge), rounded down once on the total and spread back over its types. */
@@ -315,6 +345,70 @@ export function previewDamage(
   };
 }
 
+/**
+ * What dropping to 0 Hit Points does, by damage or by hit points lost: a character falls Unconscious and is dying (or
+ * dies outright when the overflow reaches its maximum), any other creature is defeated (a troll lies down until its
+ * turn, a Death Burst goes off), and nobody at 0 sustains effects or Concentration.
+ */
+function fallToZero(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  overflow: number,
+  deps: DamageDeps | undefined,
+  events: EffectNarration[]
+): Readonly<{ instantDeath: boolean; defeated: boolean }> {
+  let instantDeath = false;
+  let defeated = false;
+  if (actor.kind === "player-character") {
+    const outcome = droppedToZero(overflow, actor.hp.maximum);
+    actor.deathSaves = outcome.state;
+    instantDeath = outcome.instantDeath;
+    applyCondition(actor, "unconscious", { immunities: deps });
+    applyCondition(actor, "prone", { immunities: deps });
+    events.push({
+      kind: "condition",
+      text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
+      actorId: actor.id
+    });
+  } else {
+    defeated = true;
+    // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
+    events.push(...releaseSwallowedBy(state, actor.id, definition));
+    // A troll lies down until its next turn says whether it regenerates; anything else dies, and a Death Burst goes
+    // off as it does.
+    if (!holdOnAtZero(state, actor, definition, events) && deps) deathBurst(state, actor, definition, deps, events);
+  }
+  // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
+  // concentration (SRD Concentration).
+  events.push(...endEffectsSustainedBy(state, actor.id));
+  events.push(...endConcentrationSustainedBy(state, actor.id));
+  return { instantDeath, defeated };
+}
+
+/**
+ * Hit points lost rather than damage taken (an infernal wound: "the target loses 5 (1d10) Hit Points"): no type, no
+ * defence, no Temporary Hit Points and no Concentration save, since none of those meet damage that isn't dealt. A
+ * creature it drops to 0 falls as damage would drop it, with no overflow to kill it outright. Returns what it lost.
+ */
+export function loseHitPoints(
+  state: GameState,
+  actorId: string,
+  amount: number,
+  deps?: DamageDeps
+): Readonly<{ lost: number; events: EffectNarration[] }> {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || amount <= 0 || actor.hp.current <= 0) return { lost: 0, events: [] };
+  const before = actor.hp.current;
+  actor.hp.current = Math.max(0, before - amount);
+  const events: EffectNarration[] = [];
+  if (actor.hp.current === 0) {
+    const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
+    fallToZero(state, actor, definition, 0, deps, events);
+  }
+  return { lost: before - actor.hp.current, events };
+}
+
 /** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
  *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
  *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
@@ -327,7 +421,13 @@ export function applyDamageDetailed(
 ): DamageOutcome {
   const actor = adjustableActor(state, actorId, scope);
   const events: EffectNarration[] = [];
-  const { totalRequested, totalAdjusted, flatReduction, parts } = weighDamage(state, actor, input, deps);
+  const { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited } = weighDamage(state, actor, input, deps);
+  // Burning oil is spent once it flares.
+  if (oilIgnited) {
+    events.push({ kind: "damage", text: `The oil on ${actor.name} catches fire (5 Fire damage).`, actorId: actor.id });
+    for (const oil of actor.effects.filter((effect) => effect.tags.includes(OILED_TAG)))
+      events.push(...endEffect(state, actor.id, oil.id));
+  }
 
   const hpBefore = actor.hp.current;
   const wasAtZero = hpBefore <= 0;
@@ -338,13 +438,27 @@ export function applyDamageDetailed(
   // SRD Knocking Out a Creature: a melee attack that would drop it to 0 can leave it at 1 HP and Unconscious instead.
   const knockedOut = input.nonlethal === true && !wasAtZero && actor.hp.current === 0 && damageToHp > 0;
   if (knockedOut) actor.hp.current = 1;
-  // Sleep, Turn Undead and the like end the moment the bearer takes any damage.
-  if (totalAdjusted > 0) events.push(...endEffectsOnDamage(state, actor));
+  const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
+  const isPlayerCharacter = actor.kind === "player-character";
+  // What its stat block does as the damage lands: Acid or Fire stops a troll's Regeneration, and Undead Fortitude may
+  // leave a zombie at 1 Hit Point instead of 0.
+  if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
+  if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
+    undeadFortitude(
+      state,
+      actor,
+      definition,
+      { taken: totalAdjusted, parts, critical: input.critical === true },
+      deps,
+      events
+    );
+  // Sleep, Turn Undead and the like end the moment the bearer takes any damage, and so does a Short Rest.
+  if (totalAdjusted > 0)
+    events.push(...endEffectsOnDamage(state, actor), ...leaveShortRest(state, new Set([actor.id]), "took damage"));
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
   let defeated = false;
-  const isPlayerCharacter = actor.kind === "player-character";
 
   if (isPlayerCharacter && wasAtZero && totalAdjusted > 0) {
     // Damage while dying: automatic failures (two on a crit), even when Temporary Hit Points soak it all ("If
@@ -380,25 +494,9 @@ export function applyDamageDetailed(
       actorId
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    if (isPlayerCharacter) {
-      const overflow = damageToHp - hpBefore;
-      const outcome = droppedToZero(overflow, actor.hp.maximum);
-      actor.deathSaves = outcome.state;
-      instantDeath = outcome.instantDeath;
-      applyCondition(actor, "unconscious", { immunities: deps });
-      applyCondition(actor, "prone", { immunities: deps });
-      events.push({
-        kind: "condition",
-        text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
-        actorId
-      });
-    } else {
-      defeated = true;
-    }
-    // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
-    // concentration (SRD Concentration).
-    events.push(...endEffectsSustainedBy(state, actor.id));
-    events.push(...endConcentrationSustainedBy(state, actor.id));
+    const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
+    instantDeath = fell.instantDeath;
+    defeated = fell.defeated;
   }
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
@@ -472,9 +570,14 @@ export function applyDamage(state: GameState, actorId: string, amount: number, s
   applyDamageDetailed(state, actorId, { amount }, scope);
 }
 
-/** Healing caps at maximum and never restores temp HP; healing from 0 clears dying and Unconscious (not Prone). */
+/** Why a dead creature's hit points can't go up. */
+export const deadCantHealLine = (name: string) => `${name} is dead and can't regain hit points until revived.`;
+
+/** Healing caps at maximum and never restores temp HP; healing from 0 clears dying and Unconscious (not Prone). The
+ *  dead regain nothing (SRD "Dead"): the line says so, and only a revival brings them back. */
 export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
+  if (isDead(actor)) return [{ kind: "condition", text: deadCantHealLine(actor.name), actorId }];
   const before = actor.hp.current;
   const wasDying = actor.hp.current <= 0 && actor.deathSaves !== null;
   actor.hp.current = Math.min(actor.hp.maximum, actor.hp.current + amount);
@@ -492,6 +595,9 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
 function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNarration[] {
   if (actor.hp.current <= before) return [];
   const events = endKnockOut(state, actor);
+  // A troll healed off 0 Hit Points no longer waits on its turn to live or die.
+  for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(REGENERATING_AT_ZERO_TAG)))
+    events.push(...endEffect(state, actor.id, effect.id));
   // A creature knocked out before the 1-HP rule (at 0, with no dying state) wakes the same way.
   if (
     before <= 0 &&
@@ -512,10 +618,13 @@ export function setTemporaryHp(state: GameState, actorId: string, amount: number
   actor.hp.temporary = amount;
 }
 
-/** GM correction: set current HP (clamped), running the same zero-HP transitions. */
+/** GM correction: set current HP (clamped), running the same zero-HP transitions. Raising a dead creature's hit
+ *  points would revive it, which is Revive's job, so that is refused. */
 export function setCurrentHp(state: GameState, actorId: string, current: number, scope: Initiator): EffectNarration[] {
   requireGm(scope, "Only the GM can set hit points directly.");
   const actor = adjustableActor(state, actorId, scope);
+  if (current > 0 && isDead(actor))
+    throw new CommandRejectedError(`${actor.name} is dead - revive them to give them hit points again.`);
   const before = actor.hp.current;
   actor.hp.current = Math.max(0, Math.min(actor.hp.maximum, current));
   const events: EffectNarration[] = [];
@@ -535,6 +644,45 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
   }
   events.push(...wakeOnHealing(state, actor, before));
   return events;
+}
+
+/**
+ * SRD "Dead": the one way back. The GM applies the revival (Revivify, Raise Dead, a story), naming the hit points it
+ * gives. The dying state and the Unconscious it brought end, a creature that died with Exhaustion comes back one
+ * level lower, and it is no longer attuned to any magic item. Other conditions stay.
+ */
+export function reviveActor(
+  state: GameState,
+  actorId: string,
+  hitPoints: number,
+  scope: Initiator,
+  deps: Readonly<{
+    resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+    catalog?: EquipmentCatalog;
+  }>
+): EffectNarration[] {
+  requireGm(scope, "Only the GM can revive a creature.");
+  const actor = adjustableActor(state, actorId, scope);
+  if (!isDead(actor)) throw new CommandRejectedError(`${actor.name} isn't dead.`);
+  actor.hp.current = Math.max(1, Math.min(actor.hp.maximum, hitPoints));
+  actor.deathSaves = null;
+  if (!actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious")))
+    removeConditionDirect(actor, "unconscious");
+  reduceExhaustion(actor);
+  if (actor.inventory.some((item) => item.attuned)) {
+    actor.inventory = actor.inventory.map((item) => (item.attuned ? { ...item, attuned: false } : item));
+    // Attunement feeds stored AC and slot maxima, so the loadout is reconciled as an inventory write would be.
+    const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+    reconcileEquipment(actor, definition, { catalog: deps.catalog, role: "gm" });
+  }
+  const regained = actor.hp.current;
+  return [
+    {
+      kind: "condition",
+      text: `${actor.name} returns to life with ${regained} ${regained === 1 ? "hit point" : "hit points"}.`,
+      actorId
+    }
+  ];
 }
 
 /** The GM sets a creature's hit point maximum. Current HP never exceeds it. A character's sheet sets the

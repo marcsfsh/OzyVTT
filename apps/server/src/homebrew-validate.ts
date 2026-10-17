@@ -383,7 +383,8 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
     );
 }
 
-/** A template's `appliesTo.baseIds` must resolve to items with the stats the bind copies (weapon or armor). */
+/** A template's `appliesTo.baseIds` must resolve to items with the stats the bind copies (weapon or armor), or to
+ *  the kinds of ammunition a piece of magic ammunition can be. */
 function equipmentIssues(item: EquipmentReference, checks: Checks) {
   riderBlockIssues(item, [], item.name, checks);
   // An item's riders reach the sheet through equipment derivation, which has no arm for granted spells.
@@ -394,10 +395,20 @@ function equipmentIssues(item: EquipmentReference, checks: Checks) {
     );
   const appliesTo = item.appliesTo;
   if (!appliesTo) return;
+  if (item.category === "ammunition") {
+    appliesTo.baseIds.forEach((baseId, index) => {
+      if (checks.catalog.equipmentRecord(baseId)?.ammunition === undefined)
+        checks.add(
+          ["appliesTo", "baseIds", index],
+          `"${baseId}" is not a kind of ammunition (Arrows, Crossbow Bolts...), so "${item.name}" could never be bound to it.`
+        );
+    });
+    return;
+  }
   if (item.category !== "weapon" && item.category !== "armor") {
     checks.add(
       ["appliesTo"],
-      `"${item.name}" has an "applies to" list but its category is "${item.category}" - a template must be a weapon or an armor, because those are the stats a bind copies.`
+      `"${item.name}" has an "applies to" list but its category is "${item.category}" - a template must be a weapon, an armor or ammunition, because those are what a bind can make it.`
     );
     return;
   }

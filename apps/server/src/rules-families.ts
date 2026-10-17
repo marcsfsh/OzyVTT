@@ -12,10 +12,22 @@ const RULE_FAMILIES = {
   "movement.stand-up-cost": "movement",
   // Standing spends movement, which a creature has only on its own turn.
   "movement.stand-up-off-turn": "movement",
+  // Steady Aim is only for a creature that hasn't moved this turn.
+  "movement.already-moved": "movement",
+  // A player's move off their turn, and a player's teleport, are the GM's to allow.
+  "movement.off-turn": "movement",
+  "movement.teleport": "movement",
+  // "You can't willingly end a move in a space occupied by another creature."
+  "movement.occupied": "movement",
+  // Flying or burrowing without the speed, and a path that hostile creatures shut.
+  "movement.no-speed": "movement",
+  "movement.blocked-path": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
   "economy.not-your-turn": "economy",
+  // Only the GM gives back a spent action, Bonus Action or Reaction: un-marking it would let a creature act twice.
+  "economy.spent-slot": "economy",
   // Wait mode: no one acts until every player has rolled initiative.
   "initiative.gathering": "economy",
   // Being incapacitated or down means you have no actions: an economy block, not a targeting one.
@@ -30,25 +42,37 @@ const RULE_FAMILIES = {
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",
+  // Reckless Attack is decided with the first attack roll on the Barbarian's turn.
+  "attack.after-first-roll": "economy",
   // A Loading weapon fires once per action, however many attacks the action allows.
   "attack.loading": "economy",
   "attack.no-ammunition": "economy",
   // A Two-Handed weapon can't swing while a Shield takes one hand.
   "attack.two-handed": "economy",
   // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot
-  // (the slots family is advisory by default, and this rule is not).
+  // (the GM can stop policing slots, and this rule stays).
   "spell.untrained-armor": "economy",
+  // A Spell Scroll in a spell the reader's lists don't have is unintelligible.
+  "spell.scroll-unreadable": "economy",
   // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed, not taken alone.
   "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
+  // "Can't take this action again until the start of its next turn": spent for the round, like the pool.
+  "legendary.once-per-round": "resources",
   "feature.no-uses-remaining": "resources",
   "feature.requires-effect": "resources",
+  // "Once per turn" or "only once on a turn" (Action Surge with two uses, Stunning Strike): a per-turn limit.
+  "feature.once-per-turn": "resources",
   "range.out-of-range": "targeting",
   "range.out-of-reach": "targeting",
   "range.underwater": "targeting",
   "target.grappled-by-source": "targeting",
   "target.too-large-to-grapple": "targeting",
+  // Help distracts an enemy, so not the helper or one of its allies.
+  "target.not-an-enemy": "targeting",
+  // Hunter's Mark and Hex move only once the marked creature drops to 0 Hit Points.
+  "target.mark-still-standing": "targeting",
   "cover.total": "targeting",
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",

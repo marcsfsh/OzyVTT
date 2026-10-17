@@ -8,10 +8,12 @@ export const barbarian: ClassMechanicsModule = {
      * Rage's gate read, and what the engine's Rage rules key on: it lasts until the end of the Barbarian's next
      * turn, each attack roll or forced save extends it (so does re-declaring it as a Bonus Action, for no use),
      * and Incapacitation or Heavy armor ends it. Rage Damage reads the second column at build (`grantScaling`) onto
-     * the damage bonus of attacks using Strength. The 10-minute cap and Persistent Rage's longer form stay prose.
+     * the damage bonus of attacks using Strength. The engine holds the 10-minute cap, and Persistent Rage's form.
+     * "You regain one expended use when you finish a Short Rest."
      */
     rage: {
       uses: { scaling: { type: "class-resource", id: "rage" }, per: "long-rest" },
+      modifiers: [{ type: "short-rest-regain", poolId: "rage", amount: 1 }],
       actions: [
         {
           id: "rage",
@@ -79,8 +81,9 @@ export const barbarian: ClassMechanicsModule = {
         }
       ]
     },
-    // Authored as `effects` so an activation is synthesised; it lasts until the start of your next turn. "Using
-    // Strength" stays prose: attack advantage cannot be gated on the attack's ability.
+    // Authored as `effects` so an activation is synthesised; it lasts until the start of your next turn. Advantage on
+    // "attack rolls using Strength", any attack roll against you; the engine takes it only with the first attack roll
+    // on your turn (its `reckless-attack` tag).
     "reckless-attack": {
       effects: [
         {
@@ -88,7 +91,12 @@ export const barbarian: ClassMechanicsModule = {
           tags: ["reckless-attack"],
           duration: { type: "until-source-next-turn" },
           modifiers: [
-            { type: "roll-mode", roll: "attack", mode: "advantage" },
+            {
+              type: "roll-mode",
+              roll: "attack",
+              mode: "advantage",
+              when: [{ type: "on-attack-roll" }, { type: "ability-is", abilities: ["str"] }]
+            },
             { type: "roll-mode", roll: "incoming-attack", mode: "advantage" }
           ]
         }
@@ -102,15 +110,20 @@ export const barbarian: ClassMechanicsModule = {
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
-    // Ungated: a Barbarian is not proficient with Heavy armor (and `speed` is baked without reading `when`).
+    // "While you aren't wearing Heavy armor": the +10 is in the sheet's Speed, and a live -10 takes it back while
+    // Heavy armor is worn, so sheets built with the +10 stay right.
     "fast-movement": {
-      modifiers: [{ type: "speed", amount: 10 }]
+      modifiers: [
+        { type: "speed", amount: 10 },
+        { type: "speed", amount: -10, when: [{ type: "while-armored", weights: ["heavy"] }] }
+      ]
     },
     /** "Your instincts are so honed that you have Advantage on Initiative rolls." */
     "feral-instinct": {
       modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }]
     },
-    // The once-per-Long-Rest permission only; refilling Rage uses is done by hand.
+    // Once per Long Rest; using it regains every expended Rage. The engine reads the feature by its id for the Rage
+    // that lasts 10 minutes outright and ends early only on Unconscious.
     "persistent-rage": {
       uses: { limit: 1, per: "long-rest" }
     },

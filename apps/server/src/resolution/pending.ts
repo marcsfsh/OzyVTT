@@ -1,7 +1,9 @@
 import type { PendingSave } from "@vtt/domain";
-import type { ActionReaction } from "@vtt/schemas";
+import { catalogIdOf, type ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
+import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
+import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
@@ -145,20 +147,37 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
   return true;
 }
 
+/** What the magic test reads: the action, its user, the item it rides, and the catalog. */
+type MagicalSource = Pick<ResolveContext, "action" | "attacker" | "riderItemId"> &
+  Readonly<{ deps: Pick<ResolveContext["deps"], "catalog"> }>;
+
+/** A spell's save, or a magic item's (a wand's), is one against magic: Magic Resistance meets it with Advantage. */
+export function isMagicalAction(ctx: MagicalSource): boolean {
+  if (ctx.action.spellId !== undefined) return true;
+  const item = ctx.riderItemId === null ? undefined : ctx.attacker.inventory.find((row) => row.id === ctx.riderItemId);
+  return item !== undefined && ctx.deps.catalog?.equipmentRecord(catalogIdOf(item))?.isMagic === true;
+}
+
 /** Conditions a failed save leaves on their own rather than on its effect: Prone ends by standing up, and
  *  Exhaustion stacks and leaves with rests. */
 const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
+
+/** SRD restraints a creature escapes with an action and a Strength (Athletics) check against the spell save DC
+ *  (Entangle, Web, Black Tentacles): the restraint carries the DC, and escaping takes Athletics alone. */
+const ATHLETICS_ESCAPES: ReadonlySet<string> = new Set(["entangle", "web", "black-tentacles"]);
+/** SRD Stinking Cloud: "While Poisoned in this way, the creature can't take an action or a Bonus Action." */
+const NO_ACTIONS_FAILURES: ReadonlySet<string> = new Set(["stinking-cloud"]);
 
 /**
  * What a failed save puts on its target, as one source-linked effect (SRD: each condition ends by its own rules):
  * the conditions with their printed duration, the save repeated at the end of each of the target's turns, a
  * grapple's escape DC and range, ending on damage, the damage it deals at the start of each turn, and the
- * Concentration the cast is sustained by, and what the action declares a failure leaves besides (Bane's -1d4).
- * Charmed's "can't attack the charmer" and Grappled's "except the grappler" read the source from it. Undefined when
- * every condition stays bare and the action declares nothing more.
+ * Concentration the cast is sustained by, what the action declares a failure leaves besides (Bane's -1d4), and the
+ * hazard it starts (Alchemist's Fire's burning). Charmed's "can't attack the charmer" and Grappled's "except the
+ * grappler" read the source from it. Undefined when every condition stays bare and the action declares nothing more.
  */
 export function failureEffectFor(
-  ctx: Pick<ResolveContext, "action" | "attacker" | "castId">,
+  ctx: MagicalSource & Pick<ResolveContext, "castId">,
   conditionIds: readonly string[]
 ): PendingSave["onFailEffect"] {
   const { action, attacker, castId } = ctx;
@@ -167,28 +186,49 @@ export function failureEffectFor(
   const linked = conditionIds.filter((id) => !BARE_FAILURE_CONDITIONS.has(id));
   // What the failure leaves besides conditions (Bane's -1d4, Faerie Fire's outline), declared by the action.
   const declared = save.failureEffect;
-  if (linked.length === 0 && !declared) return undefined;
+  // Alchemist's Fire sets its target burning, Oil covers it: an effect of its own, or riding the conditions.
+  const hazard = save.failureHazard ? HAZARDS[save.failureHazard] : undefined;
+  if (linked.length === 0 && !declared && !hazard) return undefined;
   const grapple = linked.includes("grappled");
-  const duration = save.failureDuration ?? declared?.duration;
+  const athletics =
+    action.spellId !== undefined && ATHLETICS_ESCAPES.has(action.spellId) && linked.includes("restrained");
+  const duration = save.failureDuration ?? declared?.duration ?? hazard?.duration;
+  const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
   return {
-    name: declared?.name ?? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})`.slice(0, 120),
-    tags: [...(grapple ? ["grapple"] : []), ...(declared?.tags ?? [])].slice(0, 8),
+    name: (
+      declared?.name ??
+      (linked.length > 0 ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})` : hazard!.name)
+    ).slice(0, 120),
+    tags: [
+      ...(grapple ? ["grapple"] : []),
+      ...(athletics ? [ESCAPE_ATHLETICS_TAG] : []),
+      ...(action.spellId !== undefined && NO_ACTIONS_FAILURES.has(action.spellId) ? [NO_ACTIONS_TAG] : []),
+      ...(declared?.tags ?? []),
+      ...(hazard ? [hazard.tag] : [])
+    ].slice(0, 8),
     modifiers: [...(declared?.modifiers ?? [])],
     linkedConditionIds: linked,
-    // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it.
-    escapeDc: grapple ? (save.escapeDc ?? save.dc) : null,
+    // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it; a spell's restraint is
+    // escaped against the spell save DC.
+    escapeDc: grapple ? (save.escapeDc ?? save.dc) : athletics ? save.dc : null,
     sourceActorId: attacker.id,
     sourceName: attacker.name,
     ...(duration ? { duration } : {}),
     ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
-    ...(save.ongoingDamage ? { ongoingDamage: save.ongoingDamage } : {}),
+    ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
+    ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
     sourceActionId: action.id
   };
 }
+
+/** SRD Power Word Stun: a target over its hit-point gate isn't Stunned - "Otherwise, its Speed is 0 until the start
+ *  of your next turn". */
+const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"]);
 
 /**
  * A save action parks one pending save per target; the outcome auto-applies (see saving-throws.ts). When the
@@ -210,6 +250,27 @@ export function parkActionSave(ctx: ResolveContext): void {
     saving = [];
     for (const target of targets) {
       if (target.hp.current > threshold) {
+        if (action.spellId !== undefined && SPEED_ZERO_OVER_THE_GATE.has(action.spellId)) {
+          addEffect(
+            state,
+            target.id,
+            makeEffect({
+              id: `${input.commandId}:${target.id}:speed`,
+              name: action.name,
+              sourceActorId: attacker.id,
+              sourceName: attacker.name,
+              sourceActionId: action.id,
+              startedRound: state.combat.round,
+              duration: { type: "until-source-next-turn" },
+              speedZero: true
+            })
+          );
+          ctx.tableNarration.push({
+            kind: "effect",
+            text: `${target.name}'s Speed is 0 until the start of ${attacker.name}'s next turn.`,
+            actorIds: [target.id]
+          });
+        }
         ctx.warnings.push(
           `${target.name} has more than ${threshold} hit points - ${action.name} doesn't affect it that way.`
         );
@@ -255,6 +316,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       halfOnSuccess: action.save.successDamage === "half",
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
+      magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
@@ -264,3 +326,67 @@ const conditionDeps = (deps: ResolveContext["deps"]) => ({
   ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {}),
   ...(deps.catalog ? { catalog: deps.catalog } : {})
 });
+
+/** SRD Heat Metal, after its damage: "If a creature is holding or wearing the object and takes the damage from it, the
+ *  creature must succeed on a Constitution saving throw or drop the object if it can. If it doesn't drop the object,
+ *  it has Disadvantage on attack rolls and ability checks until the start of your next turn." */
+const HELD_OBJECT_SAVES: ReadonlySet<string> = new Set(["heat-metal"]);
+
+/**
+ * The Constitution save a creature burned by a heated object makes to keep holding it, after the cast's damage and
+ * each Bonus Action's: keeping hold (a success) brings the Disadvantage, a failure drops the object if it can, which
+ * the table is told; a creature that can't drop it (armor it wears) is the GM's to give the Disadvantage.
+ */
+export function parkHeldObjectSave(ctx: ResolveContext): void {
+  const { state, action, attacker, targets, deps } = ctx;
+  if (action.spellId === undefined || !HELD_OBJECT_SAVES.has(action.spellId) || ctx.damage.length === 0) return;
+  const spell = deps.catalog?.spellRecord?.(action.spellId);
+  const dc = casterSaveDc(ctx, action.spellId);
+  const name = spell?.name ?? action.name;
+  const castId =
+    ctx.castId ??
+    attacker.effects.find((effect) => effect.spell?.id === action.spellId && effect.castId !== undefined)?.castId;
+  for (const target of targets)
+    createPendingSaves(state, {
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      actionName: `${name}: keep hold`,
+      ability: "con",
+      dc,
+      targetIds: [target.id],
+      proposedDamage: 0,
+      halfOnSuccess: false,
+      conditionIds: [],
+      // A save against a spell, which Magic Resistance meets with Advantage.
+      magical: true,
+      extra: {
+        onSuccessEffect: {
+          name: `${name}: holding the red-hot object`,
+          tags: ["heat-metal"],
+          linkedConditionIds: [],
+          escapeDc: null,
+          sourceActorId: attacker.id,
+          sourceName: attacker.name,
+          duration: { type: "until-source-next-turn" },
+          ...(castId !== undefined ? { castId } : {}),
+          sourceActionId: action.id,
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
+            { type: "roll-mode", roll: "check", mode: "disadvantage", when: [{ type: "on-ability-check" }] }
+          ]
+        },
+        failureNote: `${target.name} drops the heated object, if it can. If it can't (armor it wears), give it Disadvantage on attack rolls and ability checks until the start of ${attacker.name}'s next turn.`
+      },
+      newSaveId: deps.newRollId,
+      createdAt: Date.parse(deps.now())
+    });
+}
+
+/** The caster's spell save DC for a spell on its sheet: the casting class's, else the sheet's, else 8 + proficiency +
+ *  the spellcasting modifier. */
+function casterSaveDc(ctx: ResolveContext, spellId: string): number {
+  const casting = ctx.deps.definition?.spellcasting;
+  const entry = casting?.spells.find((spell) => spell.id === spellId);
+  const byClass = casting?.classes?.find((row) => row.classId === entry?.classId)?.saveDc;
+  return byClass ?? casting?.saveDc ?? 10;
+}

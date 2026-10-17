@@ -32,10 +32,30 @@
     "name": "Lash",
     "activation": "other",
     "description": "Legendary Action. The aboleth makes one Tentacle attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 5",
+      "type": "bludgeoning"
+     }
+    ],
     "legendary": {
      "cost": 1
-    }
+    },
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 15
+    },
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
+     }
+    ]
    },
    {
     "id": "multiattack",
@@ -47,6 +67,13 @@
      {
       "actionId": "tentacle",
       "count": 2
+     },
+     {
+      "actionId": "consume-memories",
+      "count": 1,
+      "or": [
+       "dominate-mind"
+      ]
      }
     ]
    },
@@ -55,9 +82,20 @@
     "name": "Psychic Drain",
     "activation": "other",
     "description": "Legendary Action. If the aboleth has at least one creature Charmed or Grappled, it uses Consume Memories and regains 5 (1d10) Hit Points.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "psychic"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "save": {
+     "ability": "int",
+     "dc": 16,
+     "successDamage": "half",
+     "failureConditions": []
     }
    },
    {
@@ -245,7 +283,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -259,6 +298,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-acid-arrow-level-3"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -268,7 +315,21 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightful-presence",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    },
    {
@@ -324,9 +385,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon can move up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -334,7 +408,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Fear, Acid Arrow\n- **1/Day Each:** Speak with Dead, Vitriolic Sphere",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-fear",
+       "spellId": "fear",
+       "name": "Fear"
+      },
+      {
+       "id": "spellcasting-acid-arrow",
+       "spellId": "acid-arrow",
+       "name": "Acid Arrow"
+      },
+      {
+       "id": "spellcasting-speak-with-dead",
+       "spellId": "speak-with-dead",
+       "name": "Speak with Dead",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-vitriolic-sphere",
+       "spellId": "vitriolic-sphere",
+       "name": "Vitriolic Sphere",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-acid-arrow-level-3",
+       "spellId": "acid-arrow",
+       "name": "Acid Arrow",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -438,7 +552,21 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "self": true,
+     "spells": [
+      {
+       "id": "cloaked-flight",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
     }
    },
    {
@@ -451,6 +579,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-shatter"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -481,7 +617,21 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Shatter. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "self": true,
+     "spells": [
+      {
+       "id": "sonic-boom",
+       "spellId": "shatter",
+       "name": "Shatter"
+      }
+     ]
     }
    },
    {
@@ -517,9 +667,22 @@
     "name": "Tail Swipe",
     "activation": "other",
     "description": "Legendary Action. The dragon makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 7",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 10
     }
    },
    {
@@ -527,7 +690,46 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):\n\n- **At Will:** Detect Magic, Invisibility, Mage Hand, Shatter\n- **1/Day Each:** Scrying, Sending",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-shatter",
+       "spellId": "shatter",
+       "name": "Shatter"
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-sending",
+       "spellId": "sending",
+       "name": "Sending",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -628,6 +830,19 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "self": true,
+     "spells": [
+      {
+       "id": "blazing-light",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      }
+     ]
     }
    },
    {
@@ -641,6 +856,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "sleep-breath",
+       "spellcasting-scorching-ray"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -648,9 +872,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -719,7 +956,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -750,7 +988,51 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Detect Magic, Minor Illusion, Scorching Ray, Shapechange, Speak with Animals\n- **1/Day Each:** Detect Thoughts, Control Weather",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-scorching-ray",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -853,6 +1135,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 10,
+     "self": true,
+     "spells": [
+      {
+       "id": "guiding-light",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -866,6 +1162,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "repulsion-breath",
+       "spellcasting-guiding-bolt-level-2"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -873,9 +1178,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 7",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 10
     }
    },
    {
@@ -982,7 +1300,57 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17, +10 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Guiding Bolt, Shapechange, Speak with Animals, Thaumaturgy\n- **1/Day Each:** Detect Thoughts, Water Breathing",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 10,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-guiding-bolt",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-water-breathing",
+       "spellId": "water-breathing",
+       "name": "Water Breathing",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-guiding-bolt-level-2",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1098,7 +1466,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1112,6 +1481,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "slowing-breath",
+       "spellcasting-mind-spike-level-4"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -1121,7 +1499,22 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 4 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "mind-jolt",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 4
+      }
+     ]
     }
    },
    {
@@ -1177,9 +1570,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -1205,7 +1611,52 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n\n- **At Will:** Detect Magic, Mind Spike, Minor Illusion, Shapechange\n- **1/Day Each:** Greater Restoration, Major Image",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mind-spike",
+       "spellId": "mind-spike",
+       "name": "Mind Spike"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-greater-restoration",
+       "spellId": "greater-restoration",
+       "name": "Greater Restoration",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-spike-level-4",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 4
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1322,7 +1773,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1336,6 +1788,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-guiding-bolt-level-2",
+       "weakening-breath"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -1346,6 +1807,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "self": true,
+     "spells": [
+      {
+       "id": "guiding-light",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -1401,9 +1876,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 10
     }
    },
    {
@@ -1429,7 +1917,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21, +13 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Guiding Bolt, Shapechange\n- **1/Day Each:** Flame Strike, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-guiding-bolt",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-flame-strike",
+       "spellId": "flame-strike",
+       "name": "Flame Strike",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-guiding-bolt-level-2",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1536,6 +2064,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "mind-invasion",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 3
+      }
+     ]
     }
    },
    {
@@ -1548,6 +2090,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-mind-spike-level-3"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -1569,7 +2119,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -1630,9 +2181,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -1640,7 +2204,36 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n- **At Will:** Detect Magic, Mind Spike\n- **1/Day Each:** Geas",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mind-spike",
+       "spellId": "mind-spike",
+       "name": "Mind Spike"
+      },
+      {
+       "id": "spellcasting-geas",
+       "spellId": "geas",
+       "name": "Geas",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-spike-level-3",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1749,7 +2342,22 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "commanding-presence",
+       "spellId": "command",
+       "name": "Command",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -1763,6 +2371,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-scorching-ray"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -1772,7 +2388,21 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "fiery-rays",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      }
+     ]
     }
    },
    {
@@ -1828,9 +2458,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d4",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 10
     }
    },
    {
@@ -1838,7 +2481,35 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 20, +12 to hit with spell attacks):\n\n- **At Will:** Command, Detect Magic, Scorching Ray\n- **1/Day Each:** Fireball",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-command",
+       "spellId": "command",
+       "name": "Command"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-scorching-ray",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      },
+      {
+       "id": "spellcasting-fireball",
+       "spellId": "fireball",
+       "name": "Fireball",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1938,7 +2609,21 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 19,
+     "attackBonus": 11,
+     "self": true,
+     "spells": [
+      {
+       "id": "chill",
+       "spellId": "hold-monster",
+       "name": "Hold Monster"
+      }
+     ]
     }
    },
    {
@@ -1951,6 +2636,15 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "paralyzing-breath",
+       "spellcasting-ice-knife"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -1972,7 +2666,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "line",
@@ -2033,9 +2728,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 13,
+     "reachFeet": 10
     }
    },
    {
@@ -2066,7 +2774,46 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 19, +11 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Hold Monster, Ice Knife, Shapechange\n- **1/Day Each:** Ice Storm, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 19,
+     "attackBonus": 11,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-hold-monster",
+       "spellId": "hold-monster",
+       "name": "Hold Monster"
+      },
+      {
+       "id": "spellcasting-ice-knife",
+       "spellId": "ice-knife",
+       "name": "Ice Knife"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-ice-storm",
+       "spellId": "ice-storm",
+       "name": "Ice Storm",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -2178,7 +2925,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -2204,9 +2952,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -2264,7 +3025,21 @@
     "description": "Legendary Action. The dragon casts Fear, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightful-presence",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    }
   ],
@@ -2638,7 +3413,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2652,6 +3428,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-acid-arrow-level-4"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -2661,7 +3445,21 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightful-presence",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    },
    {
@@ -2717,9 +3515,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -2727,7 +3538,53 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21, +13 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Fear, Acid Arrow\n- **1/Day Each:** Create Undead, Speak with Dead, Vitriolic Sphere",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-fear",
+       "spellId": "fear",
+       "name": "Fear"
+      },
+      {
+       "id": "spellcasting-acid-arrow",
+       "spellId": "acid-arrow",
+       "name": "Acid Arrow"
+      },
+      {
+       "id": "spellcasting-create-undead",
+       "spellId": "create-undead",
+       "name": "Create Undead",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-speak-with-dead",
+       "spellId": "speak-with-dead",
+       "name": "Speak with Dead",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-vitriolic-sphere",
+       "spellId": "vitriolic-sphere",
+       "name": "Vitriolic Sphere",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-acid-arrow-level-4",
+       "spellId": "acid-arrow",
+       "name": "Acid Arrow",
+       "atLevel": 4
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -2831,7 +3688,21 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "self": true,
+     "spells": [
+      {
+       "id": "cloaked-flight",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
     }
    },
    {
@@ -2844,6 +3715,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-shatter-level-3"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -2874,7 +3753,22 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Shatter (level 3 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "self": true,
+     "spells": [
+      {
+       "id": "sonic-boom",
+       "spellId": "shatter",
+       "name": "Shatter",
+       "atLevel": 3
+      }
+     ]
     }
    },
    {
@@ -2910,9 +3804,22 @@
     "name": "Tail Swipe",
     "activation": "other",
     "description": "Legendary Action. The dragon makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 9",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 16,
+     "reachFeet": 15
     }
    },
    {
@@ -2920,7 +3827,52 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 22):\n\n- **At Will:** Detect Magic, Invisibility, Mage Hand, Shatter\n- **1/Day Each:** Scrying, Sending",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-shatter",
+       "spellId": "shatter",
+       "name": "Shatter"
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-sending",
+       "spellId": "sending",
+       "name": "Sending",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-shatter-level-3",
+       "spellId": "shatter",
+       "name": "Shatter",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3021,6 +3973,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "blazing-light",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray",
+       "atLevel": 3
+      }
+     ]
     }
    },
    {
@@ -3034,6 +4000,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "sleep-breath",
+       "spellcasting-scorching-ray-level-3"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -3041,9 +4016,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 15
     }
    },
    {
@@ -3112,7 +4100,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3143,7 +4132,57 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 20):\n\n- **At Will:** Detect Magic, Minor Illusion, Scorching Ray, Shapechange, Speak with Animals\n- **1/Day Each:** Control Weather, Detect Thoughts",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-scorching-ray",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scorching-ray-level-3",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3246,6 +4285,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "self": true,
+     "spells": [
+      {
+       "id": "guiding-light",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -3259,6 +4312,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "repulsion-breath",
+       "spellcasting-guiding-bolt-level-2"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -3266,9 +4328,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 9",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 16,
+     "reachFeet": 15
     }
    },
    {
@@ -3375,7 +4450,69 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 22, +14 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Guiding Bolt, Shapechange, Speak with Animals, Thaumaturgy\n- **1/Day Each:** Detect Thoughts, Control Water, Scrying, Water Breathing",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-guiding-bolt",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-control-water",
+       "spellId": "control-water",
+       "name": "Control Water",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-water-breathing",
+       "spellId": "water-breathing",
+       "name": "Water Breathing",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-guiding-bolt-level-2",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3491,7 +4628,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3505,6 +4643,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "slowing-breath",
+       "spellcasting-mind-spike-level-5"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -3514,7 +4661,22 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 5 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "self": true,
+     "spells": [
+      {
+       "id": "mind-jolt",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 5
+      }
+     ]
     }
    },
    {
@@ -3570,9 +4732,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -3598,7 +4773,58 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21):\n\n- **At Will:** Detect Magic, Mind Spike, Minor Illusion, Shapechange\n- **1/Day Each:** Greater Restoration, Major Image, Project Image",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mind-spike",
+       "spellId": "mind-spike",
+       "name": "Mind Spike"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-greater-restoration",
+       "spellId": "greater-restoration",
+       "name": "Greater Restoration",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-project-image",
+       "spellId": "project-image",
+       "name": "Project Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-spike-level-5",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 5
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3715,7 +4941,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3729,6 +4956,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-guiding-bolt-level-4",
+       "weakening-breath"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -3739,6 +4975,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 24,
+     "attackBonus": 16,
+     "self": true,
+     "spells": [
+      {
+       "id": "guiding-light",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 4
+      }
+     ]
     }
    },
    {
@@ -3794,9 +5044,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -3822,7 +5085,53 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 24, +16 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Guiding Bolt, Shapechange\n- **1/Day Each:** Flame Strike, Word of Recall, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 24,
+     "attackBonus": 16,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-guiding-bolt",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-flame-strike",
+       "spellId": "flame-strike",
+       "name": "Flame Strike",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-word-of-recall",
+       "spellId": "word-of-recall",
+       "name": "Word of Recall",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-guiding-bolt-level-4",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 4
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3929,6 +5238,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "self": true,
+     "spells": [
+      {
+       "id": "mind-invasion",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 5
+      }
+     ]
     }
    },
    {
@@ -3941,6 +5264,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-mind-spike-level-5"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -3962,7 +5293,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -4023,9 +5355,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -4033,7 +5378,42 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21):\n\n- **At Will:** Detect Magic, Mind Spike\n- **1/Day Each:** Geas, Modify Memory",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mind-spike",
+       "spellId": "mind-spike",
+       "name": "Mind Spike"
+      },
+      {
+       "id": "spellcasting-geas",
+       "spellId": "geas",
+       "name": "Geas",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-modify-memory",
+       "spellId": "modify-memory",
+       "name": "Modify Memory",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-spike-level-5",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 5
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -4142,7 +5522,22 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "self": true,
+     "spells": [
+      {
+       "id": "commanding-presence",
+       "spellId": "command",
+       "name": "Command",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -4156,6 +5551,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-scorching-ray-level-3"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -4165,7 +5568,22 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray (level 3 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "self": true,
+     "spells": [
+      {
+       "id": "fiery-rays",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray",
+       "atLevel": 3
+      }
+     ]
     }
    },
    {
@@ -4221,9 +5639,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -4231,7 +5662,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):\n\n- **At Will:** Command, Detect Magic, Scorching Ray\n- **1/Day Each:** Fireball, Scrying",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "spells": [
+      {
+       "id": "spellcasting-command",
+       "spellId": "command",
+       "name": "Command"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-scorching-ray",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      },
+      {
+       "id": "spellcasting-fireball",
+       "spellId": "fireball",
+       "name": "Fireball",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scorching-ray-level-3",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -4331,7 +5802,21 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "self": true,
+     "spells": [
+      {
+       "id": "chill",
+       "spellId": "hold-monster",
+       "name": "Hold Monster"
+      }
+     ]
     }
    },
    {
@@ -4344,6 +5829,15 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "paralyzing-breath",
+       "spellcasting-ice-knife-level-2"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -4365,7 +5859,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "line",
@@ -4426,9 +5921,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -4459,7 +5967,64 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Hold Monster, Ice Knife, Shapechange\n- **1/Day Each:** Control Weather, Ice Storm, Teleport, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-hold-monster",
+       "spellId": "hold-monster",
+       "name": "Hold Monster"
+      },
+      {
+       "id": "spellcasting-ice-knife",
+       "spellId": "ice-knife",
+       "name": "Ice Knife"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-ice-storm",
+       "spellId": "ice-storm",
+       "name": "Ice Storm",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-teleport",
+       "spellId": "teleport",
+       "name": "Teleport",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-ice-knife-level-2",
+       "spellId": "ice-knife",
+       "name": "Ice Knife",
+       "atLevel": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -4571,7 +6136,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -4597,9 +6163,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 15
     }
    },
    {
@@ -4657,7 +6236,21 @@
     "description": "Legendary Action. The dragon casts Fear, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightful-presence",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    }
   ],
@@ -4989,6 +6582,33 @@
      {
       "formula": "2d6 + 3",
       "type": "bludgeoning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       },
+       {
+        "id": "blinded"
+       },
+       {
+        "id": "restrained"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "medium",
+      "ongoingDamage": {
+       "damage": [
+        {
+         "formula": "2d6 + 3",
+         "type": "bludgeoning"
+        }
+       ],
+       "at": "bearer-turn-start"
+      },
+      "insteadOfDamage": true
      }
     ]
    }
@@ -5577,6 +7197,19 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "misty-step-3-day",
+       "spellId": "misty-step",
+       "name": "Misty Step"
+      }
+     ]
     }
    },
    {
@@ -5631,7 +7264,90 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The archmage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 17):\n\n- **At Will:** Detect Magic, Detect Thoughts, Disguise Self, Invisibility, Light, Mage Armor, Mage Hand, Prestidigitation\n- **2/Day Each:** Fly, Lightning Bolt\n- **1/Day Each:** Cone of Cold, Mind Blank, Scrying, Teleport",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      },
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-mage-armor",
+       "spellId": "mage-armor",
+       "name": "Mage Armor"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-prestidigitation",
+       "spellId": "prestidigitation",
+       "name": "Prestidigitation"
+      },
+      {
+       "id": "spellcasting-fly",
+       "spellId": "fly",
+       "name": "Fly",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-lightning-bolt",
+       "spellId": "lightning-bolt",
+       "name": "Lightning Bolt",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-cone-of-cold",
+       "spellId": "cone-of-cold",
+       "name": "Cone of Cold",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-blank",
+       "spellId": "mind-blank",
+       "name": "Mind Blank",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-teleport",
+       "spellId": "teleport",
+       "name": "Teleport",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -5734,7 +7450,15 @@
     "activation": "action",
     "description": "The assassin makes three attacks, using Shortsword or Light Crossbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "shortsword",
+      "count": 3,
+      "or": [
+       "light-crossbow"
+      ]
+     }
+    ]
    },
    {
     "id": "shortsword",
@@ -6176,6 +7900,22 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Fire Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "chosen",
+    "notWhileIncapacitated": true,
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -6528,6 +8268,42 @@
   "legendary": {
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Throes",
+    "rangeFeet": 30,
+    "save": {
+     "ability": "dex",
+     "dc": 20,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "9d6",
+      "type": "fire"
+     },
+     {
+      "formula": "9d6",
+      "type": "force"
+     }
+    ]
+   },
+   {
+    "kind": "aura",
+    "name": "Fire Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "all",
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 19,
@@ -6726,7 +8502,15 @@
     "activation": "action",
     "description": "The bandit makes two attacks, using Scimitar and Pistol in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scimitar",
+      "count": 2,
+      "or": [
+       "pistol"
+      ]
+     }
+    ]
    },
    {
     "id": "parry",
@@ -6865,6 +8649,14 @@
       "actionId": "tail",
       "count": 1
      }
+    ],
+    "multiattackAlternatives": [
+     [
+      {
+       "actionId": "hurl-flame",
+       "count": 2
+      }
+     ]
     ]
    },
    {
@@ -6943,6 +8735,21 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Barbed Hide",
+    "trigger": "bearer-turn-start",
+    "rangeFeet": 5,
+    "affects": "grapple-partners",
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "piercing"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -7297,14 +9104,34 @@
      "ability": "con",
      "dc": 12,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Infernal Wound",
+      "tags": [],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "endsOnSpellHealing": true,
+      "modifiers": []
+     },
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "1d10"
+       }
+      ],
+      "at": "bearer-turn-start",
+      "hitPointLoss": true
+     }
     },
     "damage": [
      {
       "formula": "1d10 + 3",
       "type": "slashing"
      }
-    ]
+    ],
+    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 12 Wisdom (Medicine) check: end it by hand."
    }
   ],
   "token": {
@@ -7403,7 +9230,16 @@
     "activation": "action",
     "description": "The behir makes one Bite attack and uses Constrict.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "constrict",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "swallow",
@@ -7976,6 +9812,18 @@
    "prone",
    "restrained"
   ],
+  "traitMechanics": [
+   {
+    "kind": "melee-hit-damage",
+    "name": "Corrosive Form",
+    "damage": [
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -8534,6 +10382,10 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "infernal-sting",
+      "count": 1
      }
     ]
    },
@@ -9137,7 +10989,15 @@
     "activation": "action",
     "description": "The bugbear makes two Javelin or Morningstar attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "javelin",
+      "count": 2,
+      "or": [
+       "morningstar"
+      ]
+     }
+    ]
    },
    {
     "id": "quick-grapple",
@@ -9731,7 +11591,15 @@
     "activation": "action",
     "description": "The centaur makes two attacks, using Pike or Longbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "pike",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ]
    },
    {
     "id": "trampling-charge-recharge-5-6",
@@ -9877,6 +11745,10 @@
      {
       "actionId": "chain",
       "count": 2
+     },
+     {
+      "actionId": "conjure-infernal-chain",
+      "count": 1
      }
     ]
    },
@@ -10040,7 +11912,29 @@
     "activation": "action",
     "description": "The chimera makes one Ram attack, one Bite attack, and one Claw attack. It can replace the Claw attack with a use of Fire Breath if available.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "ram",
+      "count": 1
+     },
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "claw",
+      "count": 1
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "fire-breath"
+      ],
+      "attacks": 1,
+      "of": "claw"
+     }
+    ]
    },
    {
     "id": "bite",
@@ -10227,6 +12121,10 @@
      {
       "actionId": "pincer",
       "count": 2
+     },
+     {
+      "actionId": "paralyzing-tentacles",
+      "count": 1
      }
     ]
    },
@@ -10393,6 +12291,14 @@
       "actionId": "slam",
       "count": 2
      }
+    ],
+    "multiattackAlternatives": [
+     [
+      {
+       "actionId": "slam",
+       "count": 3
+      }
+     ]
     ]
    },
    {
@@ -10435,6 +12341,13 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "berserk",
+    "name": "Berserk",
+    "on": 6
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -10549,7 +12462,16 @@
     "activation": "action",
     "description": "The cloaker makes one Attach attack and two Tail attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "attach",
+      "count": 1
+     },
+     {
+      "actionId": "tail",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "attach",
@@ -10565,6 +12487,17 @@
       "formula": "3d6 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "blinded"
+       }
+      ],
+      "name": "Attached",
+      "maxTargetSize": "large"
+     }
     ]
    },
    {
@@ -10576,6 +12509,19 @@
     "uses": {
      "limit": 1,
      "per": "short-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "self": true,
+     "spells": [
+      {
+       "id": "phantasms-recharge-after-a-short-or-long-rest",
+       "spellId": "mirror-image",
+       "name": "Mirror Image"
+      }
+     ]
     }
    },
    {
@@ -10681,7 +12627,20 @@
     "name": "Misty Step",
     "activation": "bonus-action",
     "description": "The giant casts the Misty Step spell, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "self": true,
+     "spells": [
+      {
+       "id": "misty-step",
+       "spellId": "misty-step",
+       "name": "Misty Step"
+      }
+     ]
+    }
    },
    {
     "id": "multiattack",
@@ -10689,7 +12648,23 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Thunderous Mace or Thundercloud in any combination. It can replace one attack with a use of Spellcasting to cast Fog Cloud.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "thunderous-mace",
+      "count": 2,
+      "or": [
+       "thundercloud"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-fog-cloud"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "thunderous-mace",
@@ -10744,7 +12719,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The giant casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\n\n- **At Will:** Detect Magic, Fog Cloud, Light\n- **1/Day Each:** Control Weather, Gaseous Form, Telekinesis",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-fog-cloud",
+       "spellId": "fog-cloud",
+       "name": "Fog Cloud"
+      },
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-gaseous-form",
+       "spellId": "gaseous-form",
+       "name": "Gaseous Form",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-telekinesis",
+       "spellId": "telekinesis",
+       "name": "Telekinesis",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -11312,6 +13327,28 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "spells": [
+      {
+       "id": "divine-aid-2-day-bless",
+       "spellId": "bless",
+       "name": "Bless"
+      },
+      {
+       "id": "divine-aid-2-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      },
+      {
+       "id": "divine-aid-2-day-sanctuary",
+       "spellId": "sanctuary",
+       "name": "Sanctuary"
+      }
+     ]
     }
    },
    {
@@ -11342,7 +13379,64 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The couatl casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 15):\n\n- **At Will:** Detect Evil and Good, Detect Magic, Detect Thoughts, Shapechange\n- **1/Day Each:** Create Food and Water, Dream, Greater Restoration, Scrying, Sleep",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-create-food-and-water",
+       "spellId": "create-food-and-water",
+       "name": "Create Food and Water",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dream",
+       "spellId": "dream",
+       "name": "Dream",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-greater-restoration",
+       "spellId": "greater-restoration",
+       "name": "Greater Restoration",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-sleep",
+       "spellId": "sleep",
+       "name": "Sleep",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -11761,6 +13855,19 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "self": true,
+     "spells": [
+      {
+       "id": "spiritual-weapon-2-day",
+       "spellId": "spiritual-weapon",
+       "name": "Spiritual Weapon"
+      }
+     ]
     }
    },
    {
@@ -11768,7 +13875,36 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 12, +4 to hit with spell attacks):\n\n- **At Will:** Light, Thaumaturgy\n- **1/Day Each:** Hold Person\n- **2/Day Each:** Command",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-hold-person",
+       "spellId": "hold-person",
+       "name": "Hold Person",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-command",
+       "spellId": "command",
+       "name": "Command",
+       "perDay": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -12178,6 +14314,28 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "divine-aid-2-day-cure-wounds",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds"
+      },
+      {
+       "id": "divine-aid-2-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      },
+      {
+       "id": "divine-aid-2-day-remove-curse",
+       "spellId": "remove-curse",
+       "name": "Remove Curse"
+      }
+     ]
     }
    },
    {
@@ -12218,7 +14376,36 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The deva casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n\n- **At Will:** Detect Evil and Good, Shapechange\n- **1/Day Each:** Commune, Raise Dead",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-commune",
+       "spellId": "commune",
+       "name": "Commune",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-raise-dead",
+       "spellId": "raise-dead",
+       "name": "Raise Dead",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -12425,7 +14612,15 @@
     "activation": "action",
     "description": "The djinni makes three attacks, using Storm Blade or Storm Bolt in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "storm-blade",
+      "count": 3,
+      "or": [
+       "storm-bolt"
+      ]
+     }
+    ]
    },
    {
     "id": "storm-blade",
@@ -12500,7 +14695,72 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n\n- **At Will:** Detect Evil and Good, Detect Magic\n- **2/Day Each:** Create Food and Water, Tongues, Wind Walk\n- **1/Day Each:** Creation, Gaseous Form, Invisibility, Major Image, Plane Shift",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-create-food-and-water",
+       "spellId": "create-food-and-water",
+       "name": "Create Food and Water",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-tongues",
+       "spellId": "tongues",
+       "name": "Tongues",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-wind-walk",
+       "spellId": "wind-walk",
+       "name": "Wind Walk",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-creation",
+       "spellId": "creation",
+       "name": "Creation",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-gaseous-form",
+       "spellId": "gaseous-form",
+       "name": "Gaseous Form",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -12604,6 +14864,10 @@
      {
       "actionId": "slam",
       "count": 2
+     },
+     {
+      "actionId": "unsettling-visage",
+      "count": 1
      }
     ]
    },
@@ -12665,7 +14929,20 @@
     "name": "Read Thoughts",
     "activation": "action",
     "description": "The doppelganger casts Detect Thoughts, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 12).\n\n- **At Will:** Detect Thoughts",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "self": true,
+     "spells": [
+      {
+       "id": "read-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -12844,6 +15121,14 @@
      {
       "actionId": "bite",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "tail"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -13143,6 +15428,28 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "magic-of-the-spider-queen-recharge-5-6-darkness",
+       "spellId": "darkness",
+       "name": "Darkness"
+      },
+      {
+       "id": "magic-of-the-spider-queen-recharge-5-6-faerie-fire",
+       "spellId": "faerie-fire",
+       "name": "Faerie Fire"
+      },
+      {
+       "id": "magic-of-the-spider-queen-recharge-5-6-web",
+       "spellId": "web",
+       "name": "Web"
+      }
+     ]
     }
    },
    {
@@ -13151,7 +15458,15 @@
     "activation": "action",
     "description": "The drider makes three attacks, using Foreleg or Poison Burst in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "foreleg",
+      "count": 3,
+      "or": [
+       "poison-burst"
+      ]
+     }
+    ]
    },
    {
     "id": "foreleg",
@@ -13282,7 +15597,15 @@
     "activation": "action",
     "description": "The druid makes two attacks, using Vine Staff or Verdant Wisp in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "vine-staff",
+      "count": 2,
+      "or": [
+       "verdant-wisp"
+      ]
+     }
+    ]
    },
    {
     "id": "vine-staff",
@@ -13325,7 +15648,54 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The druid casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 13):\n\n- **At Will:** Druidcraft, Speak with Animals\n- **2/Day Each:** Entangle, Thunderwave\n- **1/Day Each:** Animal Messenger, Longstrider, Moonbeam",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "spellcasting-druidcraft",
+       "spellId": "druidcraft",
+       "name": "Druidcraft"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-entangle",
+       "spellId": "entangle",
+       "name": "Entangle",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-thunderwave",
+       "spellId": "thunderwave",
+       "name": "Thunderwave",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-animal-messenger",
+       "spellId": "animal-messenger",
+       "name": "Animal Messenger",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-longstrider",
+       "spellId": "longstrider",
+       "name": "Longstrider",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-moonbeam",
+       "spellId": "moonbeam",
+       "name": "Moonbeam",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -13410,7 +15780,19 @@
     "activation": "action",
     "description": "The dryad makes one Vine Lash or Thorn Burst attack, and it can use Spellcasting to cast Charm Monster.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "vine-lash",
+      "count": 1,
+      "or": [
+       "thorn-burst"
+      ]
+     },
+     {
+      "actionId": "spellcasting-charm-monster",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "tree-stride",
@@ -13456,7 +15838,41 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dryad casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Animal Friendship, Charm Monster, Druidcraft\n- **1/Day Each:** Entangle, Pass without Trace",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-animal-friendship",
+       "spellId": "animal-friendship",
+       "name": "Animal Friendship"
+      },
+      {
+       "id": "spellcasting-charm-monster",
+       "spellId": "charm-monster",
+       "name": "Charm Monster"
+      },
+      {
+       "id": "spellcasting-druidcraft",
+       "spellId": "druidcraft",
+       "name": "Druidcraft"
+      },
+      {
+       "id": "spellcasting-entangle",
+       "spellId": "entangle",
+       "name": "Entangle",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-pass-without-trace",
+       "spellId": "pass-without-trace",
+       "name": "Pass without Trace",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -13598,6 +16014,19 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 10,
+     "attackBonus": 2,
+     "self": true,
+     "spells": [
+      {
+       "id": "sleep-1-day",
+       "spellId": "sleep",
+       "name": "Sleep"
+      }
+     ]
     }
    }
   ],
@@ -13614,6 +16043,25 @@
   "conditionImmunities": [
    "exhaustion",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 5,
+    "save": {
+     "ability": "dex",
+     "dc": 10,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d4",
+      "type": "bludgeoning"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -13787,7 +16235,15 @@
     "activation": "action",
     "description": "The elemental makes two attacks, using Slam or Rock Launch in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2,
+      "or": [
+       "rock-launch"
+      ]
+     }
+    ]
    },
    {
     "id": "slam",
@@ -13932,7 +16388,15 @@
     "activation": "action",
     "description": "The efreeti makes three attacks, using Heated Blade or Hurl Flame in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "heated-blade",
+      "count": 3,
+      "or": [
+       "hurl-flame"
+      ]
+     }
+    ]
    },
    {
     "id": "heated-blade",
@@ -13975,7 +16439,60 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The efreeti casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Detect Magic, Elementalism\n- **1/Day Each:** Gaseous Form, Invisibility, Major Image, Plane Shift, Tongues, Wall of Fire",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-elementalism",
+       "spellId": "elementalism",
+       "name": "Elementalism"
+      },
+      {
+       "id": "spellcasting-gaseous-form",
+       "spellId": "gaseous-form",
+       "name": "Gaseous Form",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-tongues",
+       "spellId": "tongues",
+       "name": "Tongues",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-wall-of-fire",
+       "spellId": "wall-of-fire",
+       "name": "Wall of Fire",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -14308,6 +16825,10 @@
      {
       "actionId": "withering-sword",
       "count": 3
+     },
+     {
+      "actionId": "entangling-rope",
+      "count": 1
      }
     ]
    },
@@ -14832,6 +17353,22 @@
    "restrained",
    "unconscious"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Fire Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 10,
+    "affects": "all",
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "fire"
+     }
+    ],
+    "hazard": "burning"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -14922,7 +17459,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Flame Sword or Hammer Throw in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "flame-sword",
+      "count": 2,
+      "or": [
+       "hammer-throw"
+      ]
+     }
+    ]
    },
    {
     "id": "flame-sword",
@@ -15096,6 +17641,13 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "berserk",
+    "name": "Berserk",
+    "on": 6
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -15394,7 +17946,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Frost Axe or Great Bow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "frost-axe",
+      "count": 2,
+      "or": [
+       "great-bow"
+      ]
+     }
+    ]
    },
    {
     "id": "war-cry-recharge-5-6",
@@ -15854,6 +18414,27 @@
    "exhaustion",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Stench",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 5,
+    "affects": "all",
+    "save": {
+     "ability": "con",
+     "dc": 10,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-next-turn"
+     },
+     "immuneOnSuccess": true
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -16008,7 +18589,20 @@
     "name": "Etherealness",
     "activation": "action",
     "description": "The ghost casts the Etherealness spell, requiring no spell components and using Charisma as the spellcasting ability. The ghost is visible on the Material Plane while on the Border Ethereal and vice versa, but it can't affect or be affected by anything on the other plane.\n\n- **At Will:** Etherealness",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "self": true,
+     "spells": [
+      {
+       "id": "etherealness",
+       "spellId": "etherealness",
+       "name": "Etherealness"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -16809,7 +19403,16 @@
     "activation": "action",
     "description": "The snake makes one Bite attack and uses Constrict.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "constrict",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "bite",
@@ -18101,7 +20704,30 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The owl casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability:\n\n- **At Will:** Detect Evil and Good, Detect Magic\n- **1/Day Each:** Clairvoyance",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-clairvoyance",
+       "spellId": "clairvoyance",
+       "name": "Clairvoyance",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -18298,6 +20924,10 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "sting",
+      "count": 1
      }
     ]
    },
@@ -19471,6 +22101,23 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Gibbering",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 20,
+    "affects": "all",
+    "notWhileIncapacitated": true,
+    "save": {
+     "ability": "wis",
+     "dc": 10,
+     "successDamage": "none",
+     "failureConditions": []
+    },
+    "reminder": "On a failed save: The target rolls 1d8 to determine what it does during the current turn:\n\n- 1-4: The target does nothing.\n- 5-6: The target takes no action or Bonus Action and uses all its movement to move in a random direction.\n- 7-8: The target makes a melee attack against a randomly determined creature within its reach or does nothing if it can't make such an attack."
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -19557,6 +22204,18 @@
      {
       "actionId": "pincer",
       "count": 2
+     },
+     {
+      "actionId": "pummel",
+      "count": 1,
+      "or": [
+       "spellcasting-darkness",
+       "spellcasting-detect-magic",
+       "spellcasting-dispel-magic",
+       "spellcasting-confusion",
+       "spellcasting-fly",
+       "spellcasting-power-word-stun"
+      ]
      }
     ]
    },
@@ -19610,7 +22269,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The glabrezu casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Darkness, Detect Magic, Dispel Magic\n- **1/Day Each:** Confusion, Fly, Power Word Stun",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-darkness",
+       "spellId": "darkness",
+       "name": "Darkness"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic"
+      },
+      {
+       "id": "spellcasting-confusion",
+       "spellId": "confusion",
+       "name": "Confusion",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-fly",
+       "spellId": "fly",
+       "name": "Fly",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-power-word-stun",
+       "spellId": "power-word-stun",
+       "name": "Power Word Stun",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -19720,6 +22419,14 @@
      {
       "actionId": "spear",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "shield-bash"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -20081,7 +22788,15 @@
     "activation": "action",
     "description": "The goblin makes two attacks, using Scimitar or Shortbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scimitar",
+      "count": 2,
+      "or": [
+       "shortbow"
+      ]
+     }
+    ]
    },
    {
     "id": "nimble-escape",
@@ -21068,7 +23783,39 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The hag casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12, +4 to hit with spell attacks):\n\n- **At Will:** Dancing Lights, Disguise Self, Invisibility, Minor Illusion, Ray of Sickness",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "spellcasting-dancing-lights",
+       "spellId": "dancing-lights",
+       "name": "Dancing Lights"
+      },
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-ray-of-sickness",
+       "spellId": "ray-of-sickness",
+       "name": "Ray of Sickness"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -21611,7 +24358,15 @@
     "activation": "action",
     "description": "The guard makes two attacks, using Javelin or Longsword in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "javelin",
+      "count": 2,
+      "or": [
+       "longsword"
+      ]
+     }
+    ]
    },
    {
     "id": "javelin",
@@ -21734,6 +24489,15 @@
       "actionId": "bite",
       "count": 2
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "poisonous-spittle"
+      ],
+      "attacks": 1,
+      "any": true
+     }
     ]
    },
    {
@@ -21784,7 +24548,49 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The naga casts one of the following spells, requiring no Somatic or Material components and using Wisdom as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Thaumaturgy\n- **1/Day Each:** Clairvoyance, Cure Wounds, Flame Strike, Geas, True Seeing",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-clairvoyance",
+       "spellId": "clairvoyance",
+       "name": "Clairvoyance",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-cure-wounds",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-flame-strike",
+       "spellId": "flame-strike",
+       "name": "Flame Strike",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-geas",
+       "spellId": "geas",
+       "name": "Geas",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-true-seeing",
+       "spellId": "true-seeing",
+       "name": "True Seeing",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -22430,6 +25236,26 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Stench",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 10,
+    "affects": "all",
+    "save": {
+     "ability": "con",
+     "dc": 16,
+     "successDamage": "none",
+     "failureConditions": [
+      "poisoned"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-next-turn"
+     }
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -22516,7 +25342,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Tree Club or Trash Lob in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "tree-club",
+      "count": 2,
+      "or": [
+       "trash-lob"
+      ]
+     }
+    ]
    },
    {
     "id": "tree-club",
@@ -22872,7 +25706,15 @@
     "activation": "action",
     "description": "The hobgoblin makes two attacks, using Greatsword or Longbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "greatsword",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ]
    },
    {
     "id": "greatsword",
@@ -23232,7 +26074,23 @@
     "activation": "action",
     "description": "The devil makes three attacks, using Searing Fork or Hurl Flame in any combination. It can replace one attack with a use of Infernal Tail.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "searing-fork",
+      "count": 3,
+      "or": [
+       "hurl-flame"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "infernal-tail"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "searing-fork",
@@ -23279,14 +26137,34 @@
      "ability": "dex",
      "dc": 17,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Infernal Wound",
+      "tags": [],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "endsOnSpellHealing": true,
+      "modifiers": []
+     },
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6"
+       }
+      ],
+      "at": "bearer-turn-start",
+      "hitPointLoss": true
+     }
     },
     "damage": [
      {
       "formula": "1d8 + 6",
       "type": "necrotic"
      }
-    ]
+    ],
+    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 17 Wisdom (Medicine) check: end it by hand."
    }
   ],
   "token": {
@@ -23700,6 +26578,14 @@
       "actionId": "ice-spear",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "tail"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -23754,6 +26640,20 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "ice-wall",
+       "spellId": "wall-of-ice",
+       "name": "Wall of Ice",
+       "atLevel": 8
+      }
+     ]
     }
    }
   ],
@@ -23909,6 +26809,19 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 11,
+     "attackBonus": 3,
+     "self": true,
+     "spells": [
+      {
+       "id": "fog-cloud",
+       "spellId": "fog-cloud",
+       "name": "Fog Cloud"
+      }
+     ]
     }
    }
   ],
@@ -23926,6 +26839,25 @@
   "conditionImmunities": [
    "exhaustion",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 5,
+    "save": {
+     "ability": "con",
+     "dc": 10,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d4",
+      "type": "cold"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -24034,7 +26966,20 @@
     "name": "Invisibility",
     "activation": "action",
     "description": "The imp casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.\n\n- **At Will:** Invisibility",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "self": true,
+     "spells": [
+      {
+       "id": "invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -24183,7 +27128,36 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The incubus casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\n\n- **At Will:** Disguise Self, Etherealness\n- **1/Day Each:** Dream, Hypnotic Pattern",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "spells": [
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-etherealness",
+       "spellId": "etherealness",
+       "name": "Etherealness"
+      },
+      {
+       "id": "spellcasting-dream",
+       "spellId": "dream",
+       "name": "Dream",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-hypnotic-pattern",
+       "spellId": "hypnotic-pattern",
+       "name": "Hypnotic Pattern",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -24287,6 +27261,14 @@
      {
       "actionId": "wind-swipe",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "vortex"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -24443,7 +27425,15 @@
     "activation": "action",
     "description": "The golem makes two attacks, using Bladed Arm or Fiery Bolt in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bladed-arm",
+      "count": 2,
+      "or": [
+       "fiery-bolt"
+      ]
+     }
+    ]
    },
    {
     "id": "bladed-arm",
@@ -24809,7 +27799,15 @@
     "activation": "action",
     "description": "The knight makes two attacks, using Greatsword or Heavy Crossbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "greatsword",
+      "count": 2,
+      "or": [
+       "heavy-crossbow"
+      ]
+     }
+    ]
    },
    {
     "id": "parry",
@@ -25050,6 +28048,14 @@
      {
       "actionId": "tentacle",
       "count": 2
+     },
+     {
+      "actionId": "fling",
+      "count": 1,
+      "or": [
+       "lightning-strike",
+       "swallow"
+      ]
      }
     ]
    },
@@ -25058,9 +28064,20 @@
     "name": "Storm Bolt",
     "activation": "other",
     "description": "Legendary Action. The kraken uses Lightning Strike.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 23,
+     "successDamage": "half",
+     "failureConditions": []
     }
    },
    {
@@ -25111,7 +28128,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -25310,6 +28328,14 @@
       "actionId": "claw",
       "count": 2
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "corrupting-touch"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -25358,7 +28384,42 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The lamia casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n\n- **At Will:** Disguise Self, Minor Illusion\n- **1/Day Each:** Geas, Major Image, Scrying",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-geas",
+       "spellId": "geas",
+       "name": "Geas",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -25563,7 +28624,15 @@
     "activation": "action",
     "description": "The lich makes three attacks, using Eldritch Burst or Paralyzing Touch in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "eldritch-burst",
+      "count": 3,
+      "or": [
+       "paralyzing-touch"
+      ]
+     }
+    ]
    },
    {
     "id": "protective-magic",
@@ -25596,7 +28665,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -25628,7 +28698,21 @@
     "description": "Legendary Action. The lich casts Fear, using the same spellcasting ability as Spellcasting. The lich can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightening-gaze",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    },
    {
@@ -25664,7 +28748,96 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The lich casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 20):\n\n- **At Will:** Detect Magic, Detect Thoughts, Dispel Magic, Fireball, Invisibility, Lightning Bolt, Mage Hand, Prestidigitation\n- **2/Day Each:** Animate Dead, Dimension Door, Plane Shift\n- **1/Day Each:** Chain Lightning, Finger of Death, Power Word Kill, Scrying",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      },
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic"
+      },
+      {
+       "id": "spellcasting-fireball",
+       "spellId": "fireball",
+       "name": "Fireball"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-lightning-bolt",
+       "spellId": "lightning-bolt",
+       "name": "Lightning Bolt"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-prestidigitation",
+       "spellId": "prestidigitation",
+       "name": "Prestidigitation"
+      },
+      {
+       "id": "spellcasting-animate-dead",
+       "spellId": "animate-dead",
+       "name": "Animate Dead",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-dimension-door",
+       "spellId": "dimension-door",
+       "name": "Dimension Door",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-chain-lightning",
+       "spellId": "chain-lightning",
+       "name": "Chain Lightning",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-finger-of-death",
+       "spellId": "finger-of-death",
+       "name": "Finger of Death",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-power-word-kill",
+       "spellId": "power-word-kill",
+       "name": "Power Word Kill",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -25784,6 +28957,14 @@
      {
       "actionId": "rend",
       "count": 2
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "roar"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -26013,6 +29194,19 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "self": true,
+     "spells": [
+      {
+       "id": "misty-step-3-day",
+       "spellId": "misty-step",
+       "name": "Misty Step"
+      }
+     ]
     }
    },
    {
@@ -26067,7 +29261,63 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The mage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Detect Magic, Light, Mage Armor, Mage Hand, Prestidigitation\n- **2/Day Each:** Fireball, Invisibility\n- **1/Day Each:** Cone of Cold, Fly",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-mage-armor",
+       "spellId": "mage-armor",
+       "name": "Mage Armor"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-prestidigitation",
+       "spellId": "prestidigitation",
+       "name": "Prestidigitation"
+      },
+      {
+       "id": "spellcasting-fireball",
+       "spellId": "fireball",
+       "name": "Fireball",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-cone-of-cold",
+       "spellId": "cone-of-cold",
+       "name": "Cone of Cold",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-fly",
+       "spellId": "fly",
+       "name": "Fly",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -26210,6 +29460,25 @@
    "exhaustion",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 5,
+    "save": {
+     "ability": "dex",
+     "dc": 11,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -26317,6 +29586,25 @@
   },
   "damageImmunities": [
    "fire"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 10,
+    "save": {
+     "ability": "dex",
+     "dc": 11,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -26516,7 +29804,15 @@
     "activation": "action",
     "description": "The manticore makes three attacks, using Rend or Tail Spike in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3,
+      "or": [
+       "tail-spike"
+      ]
+     }
+    ]
    },
    {
     "id": "rend",
@@ -26632,7 +29928,16 @@
     "activation": "action",
     "description": "The marilith makes six Pact Blade attacks and uses Constrict.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "pact-blade",
+      "count": 6
+     },
+     {
+      "actionId": "constrict",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "parry",
@@ -26916,7 +30221,19 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "snake-hair",
+      "count": 1
      }
+    ],
+    "multiattackAlternatives": [
+     [
+      {
+       "actionId": "poison-ray",
+       "count": 3
+      }
+     ]
     ]
    },
    {
@@ -27181,7 +30498,16 @@
     "activation": "action",
     "description": "The merrow makes two attacks, using Bite, Claw, or Harpoon in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2,
+      "or": [
+       "claw",
+       "harpoon"
+      ]
+     }
+    ]
    },
    {
     "id": "bite",
@@ -27854,6 +31180,10 @@
      {
       "actionId": "rotting-fist",
       "count": 2
+     },
+     {
+      "actionId": "dreadful-glare",
+      "count": 1
      }
     ]
    },
@@ -27986,9 +31316,26 @@
     "name": "Glare",
     "activation": "other",
     "description": "Legendary Action. The mummy uses Dreadful Glare. The mummy can't take this action again until the start of its next turn.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d6 + 4",
+      "type": "psychic"
+     }
+    ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 17,
+     "successDamage": "none",
+     "failureConditions": [
+      "paralyzed"
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     }
    },
    {
@@ -27997,7 +31344,19 @@
     "activation": "action",
     "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack, and it uses Dreadful Glare.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "rotting-fist",
+      "count": 1,
+      "or": [
+       "channel-negative-energy"
+      ]
+     },
+     {
+      "actionId": "dreadful-glare",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "whirlwind-of-sand",
@@ -28064,7 +31423,22 @@
     "description": "Legendary Action. The mummy casts Command (level 2 version), using the same spellcasting ability as Spellcasting. The mummy can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "dread-command",
+       "spellId": "command",
+       "name": "Command",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -28095,7 +31469,42 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The mummy casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):\n\n- **At Will:** Dispel Magic, Thaumaturgy\n- **1/Day Each:** Animate Dead, Harm, Insect Plague",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-animate-dead",
+       "spellId": "animate-dead",
+       "name": "Animate Dead",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-harm",
+       "spellId": "harm",
+       "name": "Harm",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-insect-plague",
+       "spellId": "insect-plague",
+       "name": "Insect Plague",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -28423,7 +31832,41 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Detect Magic, Etherealness, Magic Missile\n- **2/Day Each:** Phantasmal Killer, Plane Shift",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-etherealness",
+       "spellId": "etherealness",
+       "name": "Etherealness"
+      },
+      {
+       "id": "spellcasting-magic-missile",
+       "spellId": "magic-missile",
+       "name": "Magic Missile"
+      },
+      {
+       "id": "spellcasting-phantasmal-killer",
+       "spellId": "phantasmal-killer",
+       "name": "Phantasmal Killer",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 2
+      }
+     ]
+    }
    },
    {
     "id": "nightmare-haunting",
@@ -28434,6 +31877,19 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "self": true,
+     "spells": [
+      {
+       "id": "nightmare-haunting",
+       "spellId": "dream",
+       "name": "Dream"
+      }
+     ]
     }
    }
   ],
@@ -29128,6 +32584,18 @@
    "exhaustion",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "undead-fortitude",
+    "name": "Undead Fortitude",
+    "ability": "con",
+    "dcBase": 5,
+    "exceptDamageTypes": [
+     "radiant"
+    ],
+    "exceptCritical": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -29205,7 +32673,20 @@
     "name": "Invisibility",
     "activation": "bonus-action",
     "description": "The oni casts Invisibility on itself, requiring no spell components and using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "self": true,
+     "spells": [
+      {
+       "id": "invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
+    }
    },
    {
     "id": "multiattack",
@@ -29213,7 +32694,26 @@
     "activation": "action",
     "description": "The oni makes two Claw or Nightmare Ray attacks. It can replace one attack with a use of Spellcasting.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2,
+      "or": [
+       "nightmare-ray"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting-charm-person",
+       "spellcasting-darkness",
+       "spellcasting-gaseous-form",
+       "spellcasting-sleep"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "claw",
@@ -29275,7 +32775,38 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n\n- **At Will:**\n- **1/Day Each:** Charm Person, Darkness, Gaseous Form, Sleep",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "spellcasting-charm-person",
+       "spellId": "charm-person",
+       "name": "Charm Person",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-darkness",
+       "spellId": "darkness",
+       "name": "Darkness",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-gaseous-form",
+       "spellId": "gaseous-form",
+       "name": "Gaseous Form",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-sleep",
+       "spellId": "sleep",
+       "name": "Sleep",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -29287,6 +32818,14 @@
   },
   "damageResistances": [
    "cold"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "regeneration",
+    "name": "Regeneration",
+    "hitPoints": 10,
+    "needsHitPoints": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -29370,7 +32909,16 @@
     "activation": "action",
     "description": "The otyugh makes one Bite attack and two Tentacle attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "tentacle",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -30161,6 +33709,14 @@
       "actionId": "dagger",
       "count": 2
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "enthralling-panache"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -30296,7 +33852,15 @@
     "activation": "action",
     "description": "The pirate makes three attacks, using Rapier or Pistol in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "rapier",
+      "count": 3,
+      "or": [
+       "pistol"
+      ]
+     }
+    ]
    },
    {
     "id": "riposte",
@@ -30426,7 +33990,20 @@
     "activation": "action",
     "description": "The pit fiend makes one Bite attack, two Devilish Claw attacks, and one Fiery Mace attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "devilish-claw",
+      "count": 2
+     },
+     {
+      "actionId": "fiery-mace",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "bite",
@@ -30536,6 +34113,28 @@
   "legendary": {
    "resistancesPerDay": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Fear Aura",
+    "trigger": "turn-start-inside",
+    "rangeFeet": 20,
+    "affects": "enemies",
+    "notWhileIncapacitated": true,
+    "save": {
+     "ability": "wis",
+     "dc": 21,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "until-bearer-next-turn"
+     },
+     "immuneOnSuccess": true
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 20,
@@ -30632,6 +34231,33 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "divine-aid-2-day-cure-wounds",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds"
+      },
+      {
+       "id": "divine-aid-2-day-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "divine-aid-2-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      },
+      {
+       "id": "divine-aid-2-day-remove-curse",
+       "spellId": "remove-curse",
+       "name": "Remove Curse"
+      }
+     ]
     }
    },
    {
@@ -30645,6 +34271,14 @@
       "actionId": "radiant-sword",
       "count": 3
      }
+    ],
+    "multiattackAlternatives": [
+     [
+      {
+       "actionId": "holy-burst",
+       "count": 2
+      }
+     ]
     ]
    },
    {
@@ -30695,7 +34329,43 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):\n\n- **At Will:** Detect Evil and Good\n- **1/Day Each:** Commune, Control Weather, Dispel Evil and Good, Raise Dead",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-commune",
+       "spellId": "commune",
+       "name": "Commune",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dispel-evil-and-good",
+       "spellId": "dispel-evil-and-good",
+       "name": "Dispel Evil and Good",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-raise-dead",
+       "spellId": "raise-dead",
+       "name": "Raise Dead",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -31095,6 +34765,33 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "divine-aid-3-day-bless",
+       "spellId": "bless",
+       "name": "Bless"
+      },
+      {
+       "id": "divine-aid-3-day-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic"
+      },
+      {
+       "id": "divine-aid-3-day-healing-word",
+       "spellId": "healing-word",
+       "name": "Healing Word"
+      },
+      {
+       "id": "divine-aid-3-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      }
+     ]
     }
    },
    {
@@ -31103,7 +34800,15 @@
     "activation": "action",
     "description": "The priest makes two attacks, using Mace or Radiant Flame in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "mace",
+      "count": 2,
+      "or": [
+       "radiant-flame"
+      ]
+     }
+    ]
    },
    {
     "id": "mace",
@@ -31146,7 +34851,30 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:\n\n- **At Will:** Light, Thaumaturgy\n- **1/Day Each:** Spirit Guardians",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-spirit-guardians",
+       "spellId": "spirit-guardians",
+       "name": "Spirit Guardians",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -31234,6 +34962,28 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "divine-aid-1-day-bless",
+       "spellId": "bless",
+       "name": "Bless"
+      },
+      {
+       "id": "divine-aid-1-day-healing-word",
+       "spellId": "healing-word",
+       "name": "Healing Word"
+      },
+      {
+       "id": "divine-aid-1-day-sanctuary",
+       "spellId": "sanctuary",
+       "name": "Sanctuary"
+      }
+     ]
     }
    },
    {
@@ -31277,7 +35027,24 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:\n\n- **At Will:** Light, Thaumaturgy",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -31822,7 +35589,20 @@
     "name": "Invisibility",
     "activation": "action",
     "description": "The quasit casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 10,
+     "attackBonus": 2,
+     "self": true,
+     "spells": [
+      {
+       "id": "invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -31989,7 +35769,63 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The rakshasa casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):\n\n- **At Will:** Detect Magic, Detect Thoughts, Disguise Self, Mage Hand, Minor Illusion\n- **1/Day Each:** Fly, Invisibility, Major Image, Plane Shift",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      },
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-fly",
+       "spellId": "fly",
+       "name": "Fly",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -32594,6 +36430,21 @@
    "cold",
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Heat Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "all",
+    "damage": [
+     {
+      "formula": "3d10",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -32873,6 +36724,14 @@
       "actionId": "beak",
       "count": 2
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "talons"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -33018,6 +36877,14 @@
      {
       "actionId": "tentacle",
       "count": 2
+     },
+     {
+      "actionId": "reel",
+      "count": 1
+     },
+     {
+      "actionId": "bite",
+      "count": 2
      }
     ]
    },
@@ -33157,7 +37024,16 @@
     "activation": "action",
     "description": "The rust monster makes one Bite attack and uses Antennae twice.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "antennae",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "reflexive-antennae",
@@ -33547,6 +37423,14 @@
       "actionId": "flame-spear",
       "count": 2
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "constrict"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -33608,6 +37492,21 @@
   },
   "damageImmunities": [
    "fire"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Fire Aura",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "chosen",
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -33898,7 +37797,15 @@
     "activation": "action",
     "description": "The scout makes two attacks, using Shortsword and Longbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "shortsword",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ]
    },
    {
     "id": "shortsword",
@@ -34051,7 +37958,20 @@
     "name": "Illusory Appearance",
     "activation": "action",
     "description": "The hag casts Disguise Self, using Constitution as the spellcasting ability (spell save DC 13). The spell's duration is 24 hours.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "con",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "self": true,
+     "spells": [
+      {
+       "id": "illusory-appearance",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -34367,6 +38287,14 @@
       "actionId": "charged-tendril",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "engulf"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -34569,6 +38497,14 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "regeneration",
+    "name": "Regeneration",
+    "hitPoints": 10,
+    "needsHitPoints": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -35029,7 +38965,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -35041,6 +38978,29 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 25,
+     "attackBonus": 17,
+     "spells": [
+      {
+       "id": "divine-aid-3-day-cure-wounds-level-2",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds",
+       "atLevel": 2
+      },
+      {
+       "id": "divine-aid-3-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      },
+      {
+       "id": "divine-aid-3-day-remove-curse",
+       "spellId": "remove-curse",
+       "name": "Remove Curse"
+      }
+     ]
     }
    },
    {
@@ -35053,6 +39013,14 @@
      {
       "actionId": "flying-sword",
       "count": 2
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "slaying-bow"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -35122,7 +39090,43 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The solar casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 25):\n\n- **At Will:** Detect Evil and Good\n- **1/Day Each:** Commune, Control Weather, Dispel Evil and Good, Resurrection",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 25,
+     "attackBonus": 17,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-commune",
+       "spellId": "commune",
+       "name": "Commune",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dispel-evil-and-good",
+       "spellId": "dispel-evil-and-good",
+       "name": "Dispel Evil and Good",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-resurrection",
+       "spellId": "resurrection",
+       "name": "Resurrection",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -35359,9 +39363,18 @@
     "name": "Arcane Prowl",
     "activation": "other",
     "description": "Legendary Action. The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6 + 4",
+      "type": "slashing"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 8,
+     "reachFeet": 5
     }
    },
    {
@@ -35406,7 +39419,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -35447,7 +39461,75 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The sphinx casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Detect Magic, Identify, Mage Hand, Minor Illusion, Prestidigitation\n- **1/Day Each:** Dispel Magic, Legend Lore, Locate Object, Plane Shift, Remove Curse, Tongues",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-identify",
+       "spellId": "identify",
+       "name": "Identify"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-prestidigitation",
+       "spellId": "prestidigitation",
+       "name": "Prestidigitation"
+      },
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-legend-lore",
+       "spellId": "legend-lore",
+       "name": "Legend Lore",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-locate-object",
+       "spellId": "locate-object",
+       "name": "Locate Object",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-remove-curse",
+       "spellId": "remove-curse",
+       "name": "Remove Curse",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-tongues",
+       "spellId": "tongues",
+       "name": "Tongues",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -35558,9 +39640,18 @@
     "name": "Arcane Prowl",
     "activation": "other",
     "description": "Legendary Action. The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d6 + 6",
+      "type": "slashing"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 5
     }
    },
    {
@@ -35573,6 +39664,10 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "roar",
+      "count": 1
      }
     ]
    },
@@ -35605,7 +39700,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -35642,7 +39738,54 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The sphinx casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20):\n\n- **At Will:** Detect Evil and Good, Thaumaturgy\n- **1/Day Each:** Detect Magic, Dispel Magic, Greater Restoration, Heroes' Feast, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-greater-restoration",
+       "spellId": "greater-restoration",
+       "name": "Greater Restoration",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-heroes-feast",
+       "spellId": "heroes-feast",
+       "name": "Heroes' Feast",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -35979,7 +40122,15 @@
     "activation": "action",
     "description": "The naga makes three attacks, using Bite or Necrotic Ray in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 3,
+      "or": [
+       "necrotic-ray"
+      ]
+     }
+    ]
    },
    {
     "id": "bite",
@@ -36022,7 +40173,58 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The naga casts one of the following spells, requiring no Somatic or Material components and using Intelligence as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Detect Magic, Mage Hand, Minor Illusion, Water Breathing\n- **2/Day Each:** Detect Thoughts, Dimension Door, Hold Person, Lightning Bolt",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-water-breathing",
+       "spellId": "water-breathing",
+       "name": "Water Breathing"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-dimension-door",
+       "spellId": "dimension-door",
+       "name": "Dimension Door",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-hold-person",
+       "spellId": "hold-person",
+       "name": "Hold Person",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-lightning-bolt",
+       "spellId": "lightning-bolt",
+       "name": "Lightning Bolt",
+       "perDay": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -36174,7 +40376,20 @@
     "name": "Invisibility",
     "activation": "action",
     "description": "The sprite casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 10,
+     "attackBonus": 2,
+     "self": true,
+     "spells": [
+      {
+       "id": "invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -36444,6 +40659,25 @@
    "exhaustion",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "death-burst",
+    "name": "Death Burst",
+    "rangeFeet": 5,
+    "save": {
+     "ability": "dex",
+     "dc": 10,
+     "successDamage": "half",
+     "failureConditions": []
+    },
+    "damage": [
+     {
+      "formula": "2d4",
+      "type": "fire"
+     }
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.25,
@@ -36535,6 +40769,21 @@
      {
       "formula": "1d6 + 3",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Attached",
+      "ongoingDamage": {
+       "damage": [
+        {
+         "formula": "2d4",
+         "type": "necrotic"
+        }
+       ],
+       "at": "source-turn-start"
+      }
      }
     ]
    }
@@ -36631,7 +40880,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Stone Club or Boulder in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "stone-club",
+      "count": 2,
+      "or": [
+       "boulder"
+      ]
+     }
+    ]
    },
    {
     "id": "stone-club",
@@ -36761,7 +41018,15 @@
     "activation": "action",
     "description": "The golem makes two attacks, using Slam or Force Bolt in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2,
+      "or": [
+       "force-bolt"
+      ]
+     }
+    ]
    },
    {
     "id": "slow-recharge-5-6",
@@ -36773,6 +41038,19 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "castsSpells": {
+     "ability": "con",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "slow-recharge-5-6",
+       "spellId": "slow",
+       "name": "Slow"
+      }
+     ]
     }
    },
    {
@@ -36913,7 +41191,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Storm Sword or Thunderbolt in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "storm-sword",
+      "count": 2,
+      "or": [
+       "thunderbolt"
+      ]
+     }
+    ]
    },
    {
     "id": "storm-sword",
@@ -36999,7 +41285,30 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18):\n\n- **At Will:** Detect Magic, Light\n- **1/Day Each:** Control Weather",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -37100,7 +41409,19 @@
     "activation": "action",
     "description": "The succubus makes one Fiendish Touch attack and uses Charm or Draining Kiss.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "fiendish-touch",
+      "count": 1
+     },
+     {
+      "actionId": "charm",
+      "count": 1,
+      "or": [
+       "draining-kiss"
+      ]
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -37130,7 +41451,21 @@
     "name": "Charm",
     "activation": "action",
     "description": "The succubus casts Dominate Person (level 8 version), requiring no spell components and using Charisma as the spellcasting ability (spell save DC 15).",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "self": true,
+     "spells": [
+      {
+       "id": "charm",
+       "spellId": "dominate-person",
+       "name": "Dominate Person",
+       "atLevel": 8
+      }
+     ]
+    }
    },
    {
     "id": "draining-kiss",
@@ -38066,7 +42401,19 @@
     "activation": "action",
     "description": "The tarrasque makes one Bite attack and three other attacks, using Claw or Tail in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "claw",
+      "count": 3,
+      "or": [
+       "tail"
+      ]
+     }
+    ]
    },
    {
     "id": "onslaught",
@@ -38140,7 +42487,8 @@
     "description": "Legendary Action. The tarrasque moves up to its Speed. At the end of this movement, the tarrasque creates an instantaneous shock wave in a 60-foot Emanation originating from itself. Creatures in that area lose Concentration and, if Medium or smaller, have the Prone condition. The tarrasque can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -38561,7 +42909,15 @@
     "activation": "action",
     "description": "The tough makes two attacks, using Warhammer or Heavy Crossbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "warhammer",
+      "count": 2,
+      "or": [
+       "heavy-crossbow"
+      ]
+     }
+    ]
    },
    {
     "id": "warhammer",
@@ -38971,6 +43327,18 @@
     "height": 2
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "regeneration",
+    "name": "Regeneration",
+    "hitPoints": 15,
+    "stoppedBy": [
+     "acid",
+     "fire"
+    ],
+    "deathWaitsForTurn": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -39073,6 +43441,18 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "regeneration",
+    "name": "Regeneration",
+    "hitPoints": 5,
+    "stoppedBy": [
+     "acid",
+     "fire"
+    ],
+    "deathWaitsForTurn": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.5,
@@ -39220,6 +43600,9 @@
       ],
       "maxTargetSize": "huge"
      }
+    ],
+    "targetRules": [
+     "not-grappled-by-source"
     ]
    }
   ],
@@ -39302,9 +43685,18 @@
     "name": "Charging Horn",
     "activation": "other",
     "description": "Legendary Action. The unicorn moves up to half its Speed without provoking Opportunity Attacks, and it makes one Radiant Horn attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d10 + 4",
+      "type": "radiant"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 7,
+     "reachFeet": 5
     }
    },
    {
@@ -39333,6 +43725,23 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "unicorn-s-blessing-3-day-cure-wounds",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds"
+      },
+      {
+       "id": "unicorn-s-blessing-3-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      }
+     ]
     }
    },
    {
@@ -39358,7 +43767,8 @@
     "description": "Legendary Action. The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary Hit Points, and its AC increases by 2 until the end of the unicorn's next turn. The unicorn can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -39382,7 +43792,54 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The unicorn casts one of the following spells, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Detect Evil and Good, Druidcraft\n- **1/Day Each:** Calm Emotions, Dispel Evil and Good, Entangle, Pass without Trace, Word of Recall",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-druidcraft",
+       "spellId": "druidcraft",
+       "name": "Druidcraft"
+      },
+      {
+       "id": "spellcasting-calm-emotions",
+       "spellId": "calm-emotions",
+       "name": "Calm Emotions",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dispel-evil-and-good",
+       "spellId": "dispel-evil-and-good",
+       "name": "Dispel Evil and Good",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-entangle",
+       "spellId": "entangle",
+       "name": "Entangle",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-pass-without-trace",
+       "spellId": "pass-without-trace",
+       "name": "Pass without Trace",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-word-of-recall",
+       "spellId": "word-of-recall",
+       "name": "Word of Recall",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -39485,10 +43942,34 @@
     "name": "Deathless Strike",
     "activation": "other",
     "description": "Legendary Action. The vampire moves up to half its Speed, and it makes one Grave Strike attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d8 + 4",
+      "type": "bludgeoning"
+     },
+     {
+      "formula": "2d6",
+      "type": "necrotic"
+     }
+    ],
     "legendary": {
      "cost": 1
-    }
+    },
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 5
+    },
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
+     }
+    ]
    },
    {
     "id": "multiattack",
@@ -39500,6 +43981,10 @@
      {
       "actionId": "grave-strike",
       "count": 2
+     },
+     {
+      "actionId": "bite-bat-or-vampire-form-only",
+      "count": 1
      }
     ]
    },
@@ -39517,7 +44002,21 @@
     "description": "Legendary Action. The vampire casts Command, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 17). The vampire can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "beguile",
+       "spellId": "command",
+       "name": "Command"
+      }
+     ]
     }
    },
    {
@@ -39530,6 +44029,19 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "charm-recharge-5-6",
+       "spellId": "charm-person",
+       "name": "Charm Person"
+      }
+     ]
     }
    },
    {
@@ -39833,6 +44345,10 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "bite",
+      "count": 1
      }
     ]
    },
@@ -40771,7 +45287,15 @@
     "activation": "action",
     "description": "The warrior makes two Greatsword or Heavy Crossbow attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "greatsword",
+      "count": 2,
+      "or": [
+       "heavy-crossbow"
+      ]
+     }
+    ]
    },
    {
     "id": "parry",
@@ -41173,7 +45697,23 @@
     "activation": "action",
     "description": "The werebear makes two attacks, using Handaxe or Rend in any combination. It can replace one attack with a Bite attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "handaxe",
+      "count": 2,
+      "or": [
+       "rend"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "bite"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -41321,7 +45861,23 @@
     "activation": "action",
     "description": "The wereboar makes two attacks, using Javelin or Tusk in any combination. It can replace one attack with a Gore attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "javelin",
+      "count": 2,
+      "or": [
+       "tusk"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "gore"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -41484,7 +46040,23 @@
     "activation": "action",
     "description": "The wererat makes two attacks, using Scratch or Hand Crossbow in any combination. It can replace one attack with a Bite attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scratch",
+      "count": 2,
+      "or": [
+       "hand-crossbow"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "bite"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -41632,7 +46204,23 @@
     "activation": "action",
     "description": "The weretiger makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scratch",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "bite"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "prowl-tiger-or-hybrid-form-only",
@@ -41787,7 +46375,23 @@
     "activation": "action",
     "description": "The werewolf makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scratch",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "bite"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -42088,7 +46692,23 @@
     "activation": "action",
     "description": "The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. It can replace one attack with a use of Life Drain.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "necrotic-sword",
+      "count": 2,
+      "or": [
+       "necrotic-bow"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "life-drain"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "necrotic-sword",
@@ -43008,7 +47628,16 @@
     "activation": "action",
     "description": "The xorn makes one Bite attack and three Claw attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "claw",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "bite",
@@ -43440,6 +48069,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "sleep-breath"
+      ],
+      "attacks": 2
+     }
     ]
    },
    {
@@ -43602,6 +48239,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "repulsion-breath"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -43768,6 +48413,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "slowing-breath"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -43925,6 +48578,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "weakening-breath"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -44385,6 +49046,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "paralyzing-breath"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -44715,6 +49384,18 @@
   "conditionImmunities": [
    "exhaustion",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "undead-fortitude",
+    "name": "Undead Fortitude",
+    "ability": "con",
+    "dcBase": 5,
+    "exceptDamageTypes": [
+     "radiant"
+    ],
+    "exceptCritical": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {

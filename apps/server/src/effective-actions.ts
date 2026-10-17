@@ -1,6 +1,8 @@
 import type { Actor } from "@vtt/domain";
-import type { ActorAction, ActorDefinition } from "@vtt/schemas";
+import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
+import { withTakenActions } from "./builtin-actions.js";
+import { atSpellUpLevel } from "./lasting-spells.js";
 import {
   deriveEquipment,
   sourceItemOf,
@@ -10,18 +12,28 @@ import {
 
 /** The action list every actor-scoped consumer must read instead of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
- *  reads. Nothing is written back. Moment-gated riders are collected on the roll path instead (the two sets
- *  are disjoint). */
+ *  reads, and the effects of a row that takes two generic actions at once (`withTakenActions`). Nothing is written
+ *  back. Moment-gated riders are collected on the roll path instead (the two sets are disjoint). */
 export function effectiveActions(
   definition: ActorDefinition | undefined,
   actor: Actor | undefined,
   catalog: EquipmentCatalog | undefined
 ): readonly ActorAction[] {
-  const base = definition?.actions ?? [];
+  const declared = definition?.actions ?? [];
+  // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a 3rd-level slot).
+  const taken = declared.map((action) => atLevelUp(withTakenActions(action), actor, catalog));
+  // The definition's own list when nothing changed, so a caller holding it sees the same array.
+  const base = taken.every((action, index) => action === declared[index]) ? declared : taken;
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
   return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor));
+}
+
+/** A later action of a spell its caster has up at a higher level, rolled at that level; anything else unchanged. */
+function atLevelUp(action: ActorAction, actor: Actor | undefined, catalog: EquipmentCatalog | undefined): ActorAction {
+  const spell = actor && action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined;
+  return spell && actor ? atSpellUpLevel(action, spell, actor) : action;
 }
 
 /** Folds the standing riders that apply to one action into the numbers the resolver reads. */
@@ -66,7 +78,7 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
       ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } }
       : {}),
     ...(action.uses && poolBonus !== 0
-      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } }
+      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(MAX_ACTION_USES, action.uses.limit + poolBonus)) } }
       : {}),
     // A standing `damage-bonus` (a +1 weapon) folds into the first damage part's formula, so sheet, roll
     // and resolver read one number; the constant is never crit-doubled. Moment-gated ones are added by
@@ -149,26 +161,23 @@ export function criticalThreshold(
 export function actionPools(
   actions: readonly ActorAction[]
 ): Array<{ id: string; name: string; limit: number; per: string }> {
-  const pools = new Map<string, { id: string; name: string; limit: number; per: string }>();
+  const pools = new Map<string, { id: string; name: string; limit: number; per: string; named: boolean }>();
   for (const action of actions) {
     if (!action.uses) continue;
     const id = action.uses.pool ?? action.id;
     const existing = pools.get(id);
     if (!existing) {
-      pools.set(id, {
-        id,
-        name: action.id === id ? action.name : titleCase(id),
-        limit: action.uses.limit,
-        per: action.uses.per
-      });
+      // A pool one action spends reads as that action ("Divine Smite (no slot)") until a second shares it.
+      pools.set(id, { id, name: action.name, limit: action.uses.limit, per: action.uses.per, named: action.id === id });
       continue;
     }
     // Same rule as `useLimitFor`: only a sibling in the same rest scope raises the ceiling.
     if (existing.per === action.uses.per) existing.limit = Math.max(existing.limit, action.uses.limit);
-    // An action whose own id is the pool key names it better than the derived title.
-    if (action.id === id) existing.name = action.name;
+    // An action whose own id is the pool key names it; several others share the derived title.
+    if (action.id === id) Object.assign(existing, { name: action.name, named: true });
+    else if (!existing.named) existing.name = titleCase(id);
   }
-  return [...pools.values()];
+  return [...pools.values()].map(({ named: _named, ...pool }) => pool);
 }
 
 const titleCase = (slug: string): string =>

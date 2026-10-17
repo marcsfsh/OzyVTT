@@ -1,5 +1,9 @@
 import type { CombatState, EncounterTokenPosition, GameState } from "@vtt/domain";
-import { footprintOrigin, movementPath, pointInRects, spaceIsDifficultFor } from "@vtt/rules-5e";
+import type { ActorDefinition } from "@vtt/schemas";
+import { footprintCenter, footprintOrigin, movementPath, pointInRects, spacePassage } from "@vtt/rules-5e";
+import { isIncapacitated } from "./condition-rules.js";
+import { areAllies } from "./creature-sides.js";
+import { holdsFeature } from "./class-features.js";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
@@ -55,40 +59,78 @@ export function visibleTerrain(combat: Pick<CombatState, "fog" | "terrain">): Co
   return { difficult: revealed === "everything" ? difficult : intersectRegions(difficult, revealed) };
 }
 
+type Point = Readonly<{ x: number; y: number }>;
+
 export type MovementCost = Readonly<{
   feet: number;
   /** Feet of `feet` spent on difficult terrain (the extra cell each such step costs). */
   difficultFeet: number;
+  /** The mover's centre at each step, start to end, in image pixels; a straight segment sampled every half cell on
+   *  a gridless map. Opportunity attacks are read along it; absent, at its two ends. */
+  path?: readonly Point[];
+  /** No way there: creatures the mover can't pass close it off (SRD "Moving around Other Creatures"). */
+  blocked?: true;
+}>;
+
+export type MovementCostOptions = Readonly<{
+  /** Feet added to every foot moved: 1 while crawling, climbing or swimming without the speed, or dragging. */
+  extraPerStep?: number;
+  /** Creatures that move with the mover (those it drags), whose spaces are no obstacle. */
+  carried?: readonly string[];
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+  /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
+  passesCreatures?: boolean;
 }>;
 
 /**
  * What a move costs the mover. On a calibrated grid: the cheapest path between the two snapped positions, with
- * painted terrain and enemies' spaces difficult (`spaceIsDifficultFor`), so walking round a patch costs only the
- * steps taken. Hidden creatures never count, because a player's preview can't know they're there. A scaled
- * gridless map measures straight; an unmeasurable map returns null.
+ * painted terrain difficult and other creatures' spaces open, difficult or closed as the SRD's "Moving around Other
+ * Creatures" says (`spacePassage`; allies by `areAllies`), so walking round a patch costs only the steps taken.
+ * Hidden creatures never count, because a player's preview can't know they're there. A scaled gridless map measures
+ * straight; an unmeasurable map returns null.
  */
 export function movementCost(
   state: GameState,
   geometry: TokenMapGeometry,
   actorId: string,
   from: EncounterTokenPosition,
-  to: EncounterTokenPosition
+  to: EncounterTokenPosition,
+  options: MovementCostOptions = {}
 ): MovementCost | null {
+  const extra = Math.max(0, options.extraPerStep ?? 0);
   const calibration = geometry.calibration;
   if (!calibration) {
     const straight = mapDistance(geometry, from, to);
-    return straight ? { feet: straight.value, difficultFeet: 0 } : null;
+    return straight
+      ? { feet: straight.value * (1 + extra), difficultFeet: 0, path: sampled(from, to, straight.value) }
+      : null;
   }
   const mover = state.actors.find((candidate) => candidate.id === actorId);
   const sizeCells = state.combat.tokens.find((token) => token.actorId === actorId)?.sizeCells ?? 1;
-  const occupied = new Set<string>();
+  const difficultCells = new Set<string>();
+  const closedCells = new Set<string>();
   for (const token of state.combat.tokens) {
-    if (token.actorId === actorId || !token.position) continue;
+    if (token.actorId === actorId || !token.position || options.carried?.includes(token.actorId)) continue;
     const occupant = state.actors.find((candidate) => candidate.id === token.actorId);
-    if (!mover || !occupant || occupant.visibility === "gm-only" || !spaceIsDifficultFor(mover, occupant)) continue;
+    if (!mover || !occupant || occupant.visibility === "gm-only") continue;
+    const printed = spacePassage({
+      ally: areAllies(mover, occupant, options.resolveDefinition),
+      incapacitated: isIncapacitated(occupant),
+      moverSize: mover.size,
+      occupantSize: occupant.size
+    });
+    // A mover that can stop in a creature's space, or a swarm's space ("and vice versa"), is never barred; it is still
+    // another creature's space, so it costs as Difficult Terrain.
+    const swarm =
+      occupant.definitionId !== null &&
+      occupant.definitionId !== undefined &&
+      holdsFeature(options.resolveDefinition?.(occupant.definitionId), "swarm", "Swarm");
+    const passage = printed === "blocked" && (options.passesCreatures || swarm) ? "difficult" : printed;
+    if (passage === "open") continue;
+    const cells = passage === "blocked" ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGrid(calibration, token.position), token.sizeCells);
     for (let column = 0; column < token.sizeCells; column++)
-      for (let row = 0; row < token.sizeCells; row++) occupied.add(`${origin.column + column},${origin.row + row}`);
+      for (let row = 0; row < token.sizeCells; row++) cells.add(`${origin.column + column},${origin.row + row}`);
   }
   const terrain = state.combat.terrain.difficult;
   const path = movementPath({
@@ -96,21 +138,36 @@ export function movementCost(
     to: footprintOrigin(imageToGrid(calibration, to), sizeCells),
     sizeCells,
     isDifficult: (column, row) =>
-      occupied.has(`${column},${row}`) ||
+      difficultCells.has(`${column},${row}`) ||
       pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain),
-    // A path can't leave the map to walk round something.
+    // A path can't leave the map to walk round something, nor pass a creature that bars the way.
     isOpen: (column, row) => {
+      if (closedCells.has(`${column},${row}`)) return false;
       const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
-    }
+    },
+    extraPerStep: extra
   });
   if (!path) {
     // Past the search budget (a very long drag): fall back to the straight count, as before terrain existed.
     const straight = mapDistance(geometry, from, to);
-    return straight ? { feet: straight.value, difficultFeet: 0 } : null;
+    return straight
+      ? { feet: straight.value * (1 + extra), difficultFeet: 0, path: sampled(from, to, straight.value) }
+      : null;
   }
+  if (path.blocked) return { feet: 0, difficultFeet: 0, path: [], blocked: true };
   return {
     feet: path.costCells * calibration.distancePerCell,
-    difficultFeet: path.difficultSteps * calibration.distancePerCell
+    difficultFeet: path.difficultSteps * calibration.distancePerCell,
+    path: path.steps.map((step) => gridToImage(calibration, footprintCenter(step, sizeCells)))
   };
+}
+
+/** Points along a straight move, every 2.5 feet or so, start and end included. */
+function sampled(from: Point, to: Point, feet: number): Point[] {
+  const count = Math.max(1, Math.ceil(feet / 2.5));
+  return Array.from({ length: count + 1 }, (_, index) => ({
+    x: from.x + ((to.x - from.x) * index) / count,
+    y: from.y + ((to.y - from.y) * index) / count
+  }));
 }

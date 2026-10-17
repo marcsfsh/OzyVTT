@@ -4,6 +4,8 @@ import { Button } from "@vtt/ui";
 import { ABILITIES, saveBonus, skillBonus, type Ability } from "@vtt/rules-5e";
 import { useSkillCatalog } from "../content/catalogs";
 import { signed } from "./format";
+import { modeLabel } from "./roll-mode-notes";
+import { RollModeTag } from "./RollModeTag";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
 
@@ -11,12 +13,26 @@ import type { SheetRolls } from "./useSheetRolls";
 type SheetSkill = Readonly<{ id: string; name: string; ability: Ability | null }>;
 type ProficiencyDraft = { saves: string[]; skills: Record<string, "proficient" | "expertise"> };
 
-/** Saving throws and skills as roll chips, and their light hand-edit (owner and GM, server-enforced). */
+const ABILITY_WORDS: Readonly<Record<Ability, string>> = {
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma"
+};
+
+/** A creature this character's Hunter's Mark is on: its Perception and Survival checks to find it have Advantage. */
+export type Quarry = Readonly<{ id: string; name: string }>;
+
+/** Saving throws, skills and tools as roll chips, and their light hand-edit (owner and GM, server-enforced). A monster's
+ *  chips read its stat block's printed saves and skills. */
 export function SheetProficiencies({
   actor,
   definition,
   derived,
   rolls,
+  quarry = [],
   editing,
   onEditingChange,
   busy,
@@ -27,6 +43,7 @@ export function SheetProficiencies({
   definition: ActorDefinition;
   derived: ActorDerivedSheet | null;
   rolls: SheetRolls;
+  quarry?: readonly Quarry[];
   /** The sheet opens one editor at a time, so it owns this flag. */
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
@@ -35,7 +52,7 @@ export function SheetProficiencies({
   /** Shows the edited definition before the server's broadcast arrives. */
   onEdited: (next: ActorDefinition) => void;
 }>) {
-  const { rolling, rollD20 } = rolls;
+  const { rolling, rollCheck, rollSave } = rolls;
   const proficiencies = definition.proficiencies;
   const [profDraft, setProfDraft] = useState<ProficiencyDraft>({ saves: [], skills: {} });
   // Skills and the ability each check uses come from the catalog, ordered by name. A row whose
@@ -49,6 +66,7 @@ export function SheetProficiencies({
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
   const derivedAbility = (ability: Ability) => derived?.abilities.find((row) => row.ability === ability) ?? null;
+  const tools = derived?.tools ?? [];
   const openProfEditor = () => {
     setProfDraft({
       saves: proficiencies?.saves ? [...proficiencies.saves] : [],
@@ -85,11 +103,6 @@ export function SheetProficiencies({
     setProfDraft(next);
     persistProficiencies(next);
   };
-  if (
-    !(proficiencies && (proficiencies.saves.length > 0 || proficiencies.skills.length > 0)) &&
-    actor.kind !== "player-character"
-  )
-    return null;
   return (
     <section className="sheet-section">
       <h3>
@@ -154,16 +167,26 @@ export function SheetProficiencies({
               const bonus =
                 row?.save ?? saveBonus(definition.abilityScores[ability], definition.proficiencyBonus, isProf);
               const fromItems = row?.saveFromItems ?? 0;
+              // Paralyzed, Stunned, Petrified or Unconscious: a Strength or Dexterity save fails without a roll.
+              const fails = row?.saveAutoFails ?? null;
+              const name = `${ABILITY_WORDS[ability]} saving throw`;
               return (
                 <button
                   type="button"
                   key={ability}
-                  className={`sheet-roll-chip${isProf ? " is-proficient" : ""}`}
+                  className={`sheet-roll-chip${isProf ? " is-proficient" : ""}${fails ? " is-failing" : ""}`}
                   disabled={rolling}
-                  title={`Roll a ${ability.toUpperCase()} saving throw${isProf ? " (proficient)" : ""}${fromItems !== 0 ? ` - includes ${signed(fromItems)} from your equipment` : ""}`}
-                  onClick={() => void rollD20(bonus, "save", `${ability.toUpperCase()} save`)}
+                  aria-label={`Roll a ${name}, ${signed(bonus)}${isProf ? ", proficient" : ""}${fromItems !== 0 ? `, ${signed(fromItems)} from equipment` : ""}${fails ? ", fails automatically" : modeLabel(row?.saveMode)}`}
+                  onClick={() => void rollSave(ability)}
                 >
                   {ability.toUpperCase()} {signed(bonus)}
+                  {fails ? (
+                    <span className="roll-mode-tag is-disadvantage" aria-hidden="true">
+                      Fails
+                    </span>
+                  ) : (
+                    <RollModeTag mode={row?.saveMode} />
+                  )}
                 </button>
               );
             })}
@@ -182,7 +205,7 @@ export function SheetProficiencies({
                   : null;
               return (
                 <li key={skill.id}>
-                  {bonus === null ? (
+                  {bonus === null || !skill.ability ? (
                     <span
                       className="sheet-roll-chip"
                       title={`${skill.name} names no governing ability, so it has no rollable bonus`}
@@ -194,10 +217,16 @@ export function SheetProficiencies({
                       type="button"
                       className="sheet-roll-chip"
                       disabled={rolling}
-                      title={`Roll ${skill.name}`}
-                      onClick={() => void rollD20(bonus, "check", `${skill.name} check`)}
+                      aria-label={`Roll ${skill.name}, ${signed(bonus)}${modeLabel(row?.mode)}${row?.reliableTalent ? ", Reliable Talent" : ""}`}
+                      onClick={() =>
+                        void rollCheck(
+                          { ability: skill.ability!, skill: skill.id },
+                          `${ABILITY_WORDS[skill.ability!]} (${skill.name})`
+                        )
+                      }
                     >
                       {signed(bonus)}
+                      <RollModeTag mode={row?.mode} />
                     </button>
                   )}
                   <span
@@ -214,6 +243,52 @@ export function SheetProficiencies({
               );
             })}
           </ul>
+          {tools.length > 0 && (
+            <div className="sheet-roll-row">
+              <span className="sheet-roll-label">Tools</span>
+              {tools.map((tool) => (
+                <button
+                  type="button"
+                  key={tool.id}
+                  className="sheet-roll-chip is-proficient"
+                  disabled={rolling}
+                  aria-label={`Roll ${tool.name}, ${signed(tool.bonus)}${modeLabel(tool.mode)}`}
+                  onClick={() =>
+                    void rollCheck(
+                      { ability: tool.ability, tool: tool.id },
+                      `${tool.name} (${ABILITY_WORDS[tool.ability]})`
+                    )
+                  }
+                >
+                  {tool.name} {signed(tool.bonus)}
+                  <RollModeTag mode={tool.mode} />
+                </button>
+              ))}
+            </div>
+          )}
+          {quarry.map((creature) => (
+            <div key={creature.id} className="sheet-roll-row" role="group" aria-label={`Find ${creature.name}`}>
+              <span className="sheet-roll-label">Find {creature.name}</span>
+              {(["perception", "survival"] as const).map((skill) => (
+                <button
+                  type="button"
+                  key={skill}
+                  className="sheet-roll-chip"
+                  disabled={rolling}
+                  aria-label={`Roll Wisdom (${skill === "perception" ? "Perception" : "Survival"}) to find ${creature.name} (Hunter's Mark)`}
+                  onClick={() =>
+                    void rollCheck(
+                      { ability: "wis", skill },
+                      `Wisdom (${skill === "perception" ? "Perception" : "Survival"})`,
+                      creature.id
+                    )
+                  }
+                >
+                  {skill === "perception" ? "Perception" : "Survival"}
+                </button>
+              ))}
+            </div>
+          ))}
         </>
       )}
     </section>

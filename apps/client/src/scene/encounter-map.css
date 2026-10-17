@@ -859,3 +859,37 @@
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
+
+/* How the mover's next drag travels: one tap per mode, under the map so it never covers a token. The modes wrap
+   at 390px: a sideways-scrolling strip hid Teleport off the edge with nothing to say it was there. */
+.encounter-move-modes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  min-width: 0;
+}
+.encounter-move-modes-label {
+  flex: none;
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.encounter-move-modes .nh-segmented {
+  min-width: 0;
+  max-width: 100%;
+}
+.encounter-move-modes .nh-segmented-option {
+  flex: none;
+  min-height: var(--tap-min);
+  white-space: nowrap;
+}
+/* A refused move's follow-up: the GM moves it anyway, a player asks the GM. */
+.encounter-move-blocked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}

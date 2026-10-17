@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import { read } from "../lib/command";
 import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
+import { CommonActionChips } from "./CommonActionChips";
+import { ReadyChooser, readyableSpells } from "./ReadyChooser";
 import { damageBreakdown } from "./format";
+import { modeWords } from "./roll-mode-notes";
 import { AskTheGmPrompt } from "./RuleAsk";
+import { awaitsItsSpell, summaryOfAvailability, type AvailabilityRow } from "./useSheetDefinition";
 import {
   beginTargeting,
   clearTargeting,
@@ -40,6 +45,7 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     usesPer: action.uses?.per ?? null,
     usesRecharge: action.uses?.recharge ?? null,
     usesPool: action.uses?.pool ?? null,
+    ...(action.useCost !== undefined ? { useCost: action.useCost } : {}),
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack
       ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count }))
@@ -48,16 +54,51 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     reaction: action.reaction ?? null,
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
+    ...(choosesAbility(action) ? { choosesAbility: true } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
-      : {})
+      : {}),
+    // So does a touch that ends a condition (Lay on Hands' cure).
+    ...(action.endsConditions && !action.healing ? { targeting: "single" as const } : {})
   };
+}
+
+/** What the server lists for this character beyond its own rows: the generic actions it can take (with the Bonus
+ *  Action forms its features give) and which of its rows are added to a hit rather than taken alone. Read once per
+ *  sheet; the server still decides each use. */
+function useServerActionFacts(actorId: string, definition: ActorDefinition, effectsKey: string) {
+  const [facts, setFacts] = useState<{
+    common: readonly ContentActionSummary[];
+    ridesAHit: ReadonlySet<string>;
+    /** A spell's later actions whose spell isn't up, which aren't offered until it is. */
+    awaiting: ReadonlySet<string>;
+    /** The damage the server rolls for a row, where it differs (a spell's later action at the level it was cast). */
+    damage: ReadonlyMap<string, ContentActionSummary["damage"]>;
+  }>({ common: [], ridesAHit: new Set(), awaiting: new Set(), damage: new Map() });
+  useEffect(() => {
+    let live = true;
+    void read("actor:available-actions", { actorId }).then((result) => {
+      if (!live || !result.ok) return;
+      const rows: readonly AvailabilityRow[] = result.actions ?? [];
+      setFacts({
+        common: rows.filter((row) => row.builtin).map(summaryOfAvailability),
+        ridesAHit: new Set(rows.filter((row) => row.ridesAHit).map((row) => row.id)),
+        awaiting: new Set(rows.filter(awaitsItsSpell).map((row) => row.id)),
+        damage: new Map(rows.flatMap((row) => (row.damage ? [[row.id, row.damage] as const] : [])))
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, [actorId, definition, effectsKey]);
+  return facts;
 }
 
 /**
  * A player's action console on their own turn, mirroring the GM's ActionRunner for their claimed
- * character: pick an action and targets, preview the d20 (Adv/Disadv or a typed die), and confirm.
+ * character: pick an action and targets, roll the d20 (or type the face a physical die shows), see why
+ * it has Advantage or Disadvantage, and confirm.
  * Per the table's player-damage policy the server either hands the damage to the GM (proposal) or
  * applies it (direct); the player never applies damage directly.
  */
@@ -66,52 +107,77 @@ export function PlayerActionRunner({
   definition,
   extraActions = [],
   revision,
-  rollMode,
-  bonusMode,
+  inspired = false,
   playerDamageMode,
-  targets
+  targets,
+  effectTags = []
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
   /** Actions the server derived from the equipped loadout (a wand's charge, an amulet's cast); they are never in `definition.actions`. Numbers include item riders; resolution goes by id. */ extraActions?: readonly ContentActionSummary[];
   revision: number;
-  rollMode: "auto" | "manual";
-  bonusMode: "auto" | "total";
+  /** The character holds Heroic Inspiration, which can reroll the attack's d20. */
+  inspired?: boolean;
   playerDamageMode: "proposal" | "direct";
   targets: readonly { actorId: string; name: string }[];
+  /** The tags of the character's effects, which bring forward a generic action that needs one (Put Out the Fire). */
+  effectTags?: readonly string[];
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
+  // The Ready action asks what is readied when a spell could be: a spell is cast now and held.
+  const [readying, setReadying] = useState(false);
+  const readySpells = readyableSpells(definition);
+  const slotLevels = (definition.spellcasting?.slots ?? []).filter((slot) => slot.max > 0).map((slot) => slot.level);
+  // Casting a spell, or its Concentration ending, changes which of its later actions are offered.
+  const facts = useServerActionFacts(actorId, definition, effectTags.join(","));
   // A limited use is a structured effect the server resolves, so Action Surge and the like get a
-  // targetless Use tap here too.
+  // targetless Use tap here too. Sneak Attack, a smite and the like are added to a hit instead, so they aren't
+  // offered as a tap that would be refused.
   const actions = useMemo(
     () => [
       ...definition.actions
         .filter(
           (action) =>
-            action.attack ||
-            action.save ||
-            action.damage.length > 0 ||
-            action.uses !== undefined ||
-            // A feature's heal (Second Wind); a spell's heal is cast from the spell list.
-            (action.healing !== undefined && action.spellId === undefined)
+            !facts.ridesAHit.has(action.id) &&
+            !facts.awaiting.has(action.id) &&
+            // What a spell's area does later is the server's or the GM's to run, not a player's tap.
+            !(action.activation === "other" && /^spell-.+-then-/.test(action.id)) &&
+            (action.attack ||
+              action.save ||
+              action.damage.length > 0 ||
+              action.uses !== undefined ||
+              // A feature's heal (Second Wind); a spell's heal is cast from the spell list.
+              (action.healing !== undefined && action.spellId === undefined))
         )
-        .map(summaryOfOwnAction),
+        .map(summaryOfOwnAction)
+        .map((action) => {
+          const rolled = facts.damage.get(action.id);
+          return rolled && rolled.length === action.damage.length ? { ...action, damage: rolled } : action;
+        }),
       // Item-derived actions are appended: their `item-<inventory id>` keys cannot collide with
-      // stat-block ids.
+      // stat-block ids. The server says which resolve (a potion, a scroll, a coat of poison).
       ...extraActions.filter(
         (action) =>
+          (action.targeting !== undefined && action.targeting !== null) ||
           action.attackBonus !== null ||
           action.saveAbility !== null ||
           action.damage.length > 0 ||
           action.usesLimit !== null
       )
     ],
-    [definition, extraActions]
+    [definition, extraActions, facts]
+  );
+  const hitExtras = definition.actions.filter(
+    (action) => facts.ridesAHit.has(action.id) && action.spellId === undefined
   );
   const healingOf = (action: ContentActionSummary) => definition.actions.find((own) => own.id === action.id)?.healing;
-  // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first.
+  // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first. An item's action carries the
+  // server's word on it (a scroll of Detect Magic is a tap, a potion picks its drinker).
   const isTargetlessOwn = (action: ContentActionSummary) => {
+    if (action.targeting === "none") return true;
+    // A touch that ends a condition picks who it touches.
+    if (action.targeting === "single" || action.targeting === "multi") return false;
     const healing = healingOf(action);
     if (healing) return healing.self === true;
     return (
@@ -135,7 +201,7 @@ export function PlayerActionRunner({
     []
   );
 
-  if (actions.length === 0) return null;
+  if (actions.length === 0 && facts.common.length === 0) return null;
   const onOutcome = (ok: boolean, message?: string) => {
     if (!ok && message) onFeedback(message);
   };
@@ -166,29 +232,70 @@ export function PlayerActionRunner({
               </li>
             ))}
           </ul>
+          {hitExtras.length > 0 && (
+            <p className="action-result-hint">
+              {hitExtras.map((action) => action.name).join(", ")}: add {hitExtras.length === 1 ? "it" : "them"} to a hit
+              on the attack's result, before you confirm it.
+            </p>
+          )}
+          <CommonActionChips
+            actions={facts.common}
+            busy={busy}
+            effectTags={effectTags}
+            onUse={(action, targetless) => {
+              setTargetingResult(null);
+              if (action.id === "ready" && readySpells.length > 0) setReadying(true);
+              else if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
+              else beginTargeting(action, actorId);
+            }}
+          />
         </>
+      )}
+      {readying && (
+        <ReadyChooser
+          spells={readySpells}
+          slotLevels={slotLevels}
+          busy={busy}
+          onClose={() => setReadying(false)}
+          onReady={(spell) => {
+            setReadying(false);
+            if (spell)
+              resolveActionDirect(actorId, spell.actionId, revision, onOutcome, undefined, {
+                ...(spell.slotLevel !== undefined ? { slotLevel: spell.slotLevel } : {})
+              });
+            else resolveActionDirect(actorId, "ready", revision, onOutcome);
+          }}
+        />
       )}
       {picking && !result?.preview && (
         <ActionTargetPicker
           picking={picking}
           targets={targets
-            .filter((target) => target.actorId !== actorId)
+            // A heal may be for the healer too (a potion drunk, not handed over).
+            .filter(
+              (target) =>
+                target.actorId !== actorId || picking.action.healing != null || healingOf(picking.action) !== undefined
+            )
             .map((target) => ({ id: target.actorId, label: target.name }))}
           busy={busy}
-          onRoll={() => resolveTargeting(revision, onOutcome)}
+          onInvalidFace={onFeedback}
+          onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}
         />
       )}
       {result && (
         <div className="action-result" role="status">
           <ActionResultHead result={result} />
+          {/* Why the d20 had Advantage or Disadvantage, before the player confirms it. */}
+          {result.attack && result.rollMode && result.rollMode.mode !== "normal" && (
+            <p className="action-rollmode">{modeWords(result.rollMode).replace(/^ · /, "")}</p>
+          )}
           {result.attack && <AttackOutcome attack={result.attack} audience="player" />}
           {result.preview && result.attack && (
             <AttackPreview
               attack={result.attack}
-              mode={result.rollMode?.mode}
               busy={busy}
-              rollMode={rollMode}
-              bonusMode={bonusMode}
+              viewer="player"
+              inspired={inspired}
               onFeedback={onFeedback}
               push={result.push}
               {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}

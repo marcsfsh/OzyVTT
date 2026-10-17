@@ -29,7 +29,14 @@ export function useBuilderOffers(request: BuilderOffersRequest | null): BuilderO
         const { offers, picks, asiIncreases, choices } = result;
         setAnswer({
           key,
-          reply: { offers, picks, asiIncreases, subclassId: result.subclassId ?? null, choices },
+          reply: {
+            offers,
+            picks,
+            asiIncreases,
+            subclassId: result.subclassId ?? null,
+            choices,
+            abilities: result.abilities ?? null
+          },
           refusal: null
         });
       } else {

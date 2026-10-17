@@ -5,9 +5,9 @@ import { DamageTypeField } from "./DamageTypeField";
 import { manualDamagePayload, manualDamageType } from "./manual-damage";
 import "./hp-adjust.css";
 
-/** The hit point changes a door offers: damage, a nonlethal knock-out, heal, temporary HP, an exact value, and
- *  a new maximum. */
-export type HpControl = "damage" | "nonlethal" | "heal" | "temp" | "set" | "max";
+/** The hit point changes a door offers: damage, a nonlethal knock-out, heal, temporary HP, an exact value, a new
+ *  maximum, and bringing the dead back with that many hit points. */
+export type HpControl = "damage" | "nonlethal" | "heal" | "temp" | "set" | "max" | "revive";
 
 const LABELS: Record<HpControl, { label: string; title?: string }> = {
   damage: { label: "Dmg", title: "Apply as damage (or press Enter)" },
@@ -18,7 +18,8 @@ const LABELS: Record<HpControl, { label: string; title?: string }> = {
   heal: { label: "Heal" },
   temp: { label: "Temp", title: "Set temporary hit points" },
   set: { label: "Set", title: "Set current hit points" },
-  max: { label: "Max", title: "Set the hit point maximum (current hit points stay, up to the new maximum)" }
+  max: { label: "Max", title: "Set the hit point maximum (current hit points stay, up to the new maximum)" },
+  revive: { label: "Revive", title: "Bring them back to life with this many hit points (Revivify, Raise Dead)" }
 };
 
 /**
@@ -64,24 +65,26 @@ export function HpAdjust({
     const typed = control === "damage" || control === "nonlethal" ? manualDamageType(chosenType) : undefined;
     const guard = revision !== undefined ? { expectedRevision: revision } : {};
     const sent =
-      control === "set"
-        ? command("actor:set-hp", { actorId: actor.id, current: value, ...guard })
-        : control === "max"
-          ? command("actor:set-hp", { actorId: actor.id, maximum: value, ...guard })
-          : control === "heal"
-            ? command("actor:heal", { actorId: actor.id, amount: value, ...guard })
-            : control === "temp"
-              ? command("actor:set-temp-hp", { actorId: actor.id, amount: value, ...guard })
-              : command(
-                  "actor:apply-damage",
-                  manualDamagePayload({
-                    actorId: actor.id,
-                    amount: value,
-                    damageType: typed,
-                    nonlethal: control === "nonlethal",
-                    expectedRevision: revision
-                  })
-                );
+      control === "revive"
+        ? command("actor:revive", { actorId: actor.id, hitPoints: value, ...guard })
+        : control === "set"
+          ? command("actor:set-hp", { actorId: actor.id, current: value, ...guard })
+          : control === "max"
+            ? command("actor:set-hp", { actorId: actor.id, maximum: value, ...guard })
+            : control === "heal"
+              ? command("actor:heal", { actorId: actor.id, amount: value, ...guard })
+              : control === "temp"
+                ? command("actor:set-temp-hp", { actorId: actor.id, amount: value, ...guard })
+                : command(
+                    "actor:apply-damage",
+                    manualDamagePayload({
+                      actorId: actor.id,
+                      amount: value,
+                      damageType: typed,
+                      nonlethal: control === "nonlethal",
+                      expectedRevision: revision
+                    })
+                  );
     const type = typed ? ` ${typed}` : "";
     const done = {
       damage: `${actor.name} took ${value}${type} damage.`,
@@ -89,7 +92,8 @@ export function HpAdjust({
       heal: `${actor.name} healed ${value}.`,
       temp: `${actor.name} has ${value} temporary HP.`,
       set: `${actor.name} set to ${value} HP.`,
-      max: `${actor.name}'s hit point maximum is now ${value}.`
+      max: `${actor.name}'s hit point maximum is now ${value}.`,
+      revive: `${actor.name} is back with ${value} HP.`
     }[control];
     setBusy(true);
     void sent.then((result) => {
@@ -117,6 +121,7 @@ export function HpAdjust({
         onChange={(event) => setAmount(event.target.value.replace(/[^0-9]/g, ""))}
         onKeyDown={(event) => {
           if (event.key === "Enter" && controls.includes("damage")) adjust("damage");
+          else if (event.key === "Enter" && controls.includes("revive")) adjust("revive");
           else if (event.key === "Escape") onEscape?.();
         }}
       />
@@ -132,7 +137,9 @@ export function HpAdjust({
         </button>
       ))}
       {/* Below the buttons, which already fill this row at 375px: `DamageTypeField` takes its own line. */}
-      <DamageTypeField value={chosenType} disabled={busy} onChange={chooseType} />
+      {(controls.includes("damage") || controls.includes("nonlethal")) && (
+        <DamageTypeField value={chosenType} disabled={busy} onChange={chooseType} />
+      )}
     </div>
   );
 }

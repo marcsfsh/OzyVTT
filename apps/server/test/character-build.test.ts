@@ -182,6 +182,12 @@ const warlockInput = (): MutableCreateInput => ({
       id: "repelling-blast",
       payload: { featureId: "eldritch-invocations" }
     },
+    // Agonizing Blast, Eldritch Spear and Repelling Blast each need a known Warlock cantrip that deals damage, and
+    // each points at one.
+    { level: 1, classId: "warlock", kind: "cantrip", id: "eldritch-blast" },
+    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
+    { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "eldritch-spear" } },
+    { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
     { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
@@ -961,8 +967,14 @@ describe("extra picks raise the budget the server validates against", () => {
   ];
   const warlockWithInvocations = (count: number): MutableCreateInput => {
     const input = warlockInput();
+    const taken = INVOCATIONS.slice(0, count);
     input.choices = input.choices
       .filter((row) => row.kind !== "eldritch-invocation")
+      // An invocation not taken has no cantrip of its own to point at.
+      .filter((row) => {
+        const featureId = row.payload?.featureId;
+        return typeof featureId !== "string" || !INVOCATIONS.includes(featureId) || taken.includes(featureId);
+      })
       .concat(
         INVOCATIONS.slice(0, count).map((id) => ({
           level: 1,
@@ -1280,9 +1292,10 @@ describe("a feature whose only rider is limited USES still lands as a trackable 
       state,
       {
         mapAssetId: "20000000-0000-5000-8000-000000000001",
+        // Action Surge is taken "on your turn", so the Fighter goes first.
         entries: [
-          { actorId: other, score: 20 },
-          { actorId: ACTOR_ID, score: 5 }
+          { actorId: ACTOR_ID, score: 20 },
+          { actorId: other, score: 5 }
         ]
       },
       () => 1,
@@ -1331,7 +1344,7 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
       definitionId: undefined,
       actionUses: {}
     });
-    // The foe holds the turn, so the action-economy slot never masks the limited-use gate.
+    // The action economy is off, so neither the turn nor the action slot masks the limited-use gate.
     startEncounter(
       state,
       {
@@ -1344,6 +1357,7 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
       () => 1,
       { width: 900, height: 600, calibration: null }
     );
+    state.combat = { ...state.combat, ruleExceptions: { economy: "freeform" } };
     return state;
   }
   const deps = (): ResolveDependencies => ({

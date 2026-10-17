@@ -36,7 +36,8 @@ describe("one spell slot per turn", () => {
   });
 
   it("only warns while the table leaves spell slots on Advise", () => {
-    const { resolve } = fight(wizard);
+    const { state, resolve } = fight(wizard);
+    state.combat = { ...state.combat, ruleExceptions: { slots: "assisted" } };
     resolve("spell-magic-missile", {});
     expect(resolve("spell-misty-step", { targetIds: [] }).warnings?.join(" ")).toMatch(/only one per turn/);
   });

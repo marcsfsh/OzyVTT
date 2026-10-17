@@ -5,15 +5,27 @@ import {
   collectRiders,
   d20TestFormula,
   diceRiders,
+  keptD20,
   parseDiceFormula,
   resolveDice,
+  resolveWithD20s,
   sumRiders,
   weaponAbilityFrom,
   type AttackKind
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
+import { CommandRejectedError } from "../game-store.js";
+import {
+  heldD20s,
+  heldRollFor,
+  holdRoll,
+  releaseHeldRoll,
+  requireTypedReroll,
+  spendRerollRight
+} from "../held-rolls.js";
+import { GM_CHOICE, magicResistanceOf } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
-import { endEffect } from "../effects.js";
+import { endEffect, STEADY_AIM_TAG } from "../effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
@@ -21,10 +33,14 @@ import {
   type EquipmentDerivation,
   type RollModeClaims
 } from "../equipment-derivation.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { VEXED_TAG } from "../weapon-mastery.js";
-import { areEnemies } from "../creature-sides.js";
+import { areAllies, areEnemies } from "../creature-sides.js";
+import { holdsFeature } from "../class-features.js";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
+import { auraOfAuthority } from "../statblock-traits.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
@@ -45,8 +61,8 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
   const { action, input, attacker } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
-  // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
-  const unarmed = action.id === UNARMED_STRIKE_ACTION_ID;
+  // Matched by id so a Monk's own strike (which shadows the builtin) and a Bonus Action strike count as unarmed.
+  const unarmed = builtinBaseId(action.id) === UNARMED_STRIKE_ACTION_ID;
   if (attack) {
     const melee = attack.reachFeet !== undefined;
     const ranged = attack.rangeFeet !== undefined;
@@ -83,7 +99,7 @@ function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
   const str = scoreModifier(scores.str);
   const dex = scoreModifier(scores.dex);
   // Martial Arts lets a Monk's strike use Dexterity; the builtin strike is Strength.
-  if (ctx.action.id === UNARMED_STRIKE_ACTION_ID)
+  if (builtinBaseId(ctx.action.id) === UNARMED_STRIKE_ACTION_ID)
     return ctx.deps.definition?.character?.martialArts && dex > str ? "dex" : "str";
   const weapon = ctx.attacker.inventory.find((item) => item.id === ctx.riderItemId)?.weapon;
   return weapon ? weaponAbilityFrom(weapon.properties ?? [], weapon.rangeFeet, str, dex) : undefined;
@@ -117,6 +133,19 @@ const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) 
 export const OUTLINED_TAG = "outlined";
 /** An effect that lasts until the next attack roll against its bearer, whoever makes it (Guiding Bolt's light). */
 export const UNTIL_ATTACKED_TAG = "until-attacked";
+/** The Help action's mark on the distracted enemy: the next attack roll against it by an ally of the helper. */
+export const DISTRACTED_TAG = "distracted";
+
+/** The Help the attacker's side put on this target, if any: one of its allies distracted it (SRD Help: "giving
+ *  Advantage to the next attack roll by one of your allies against that enemy"). The helper gets nothing from it. */
+function distractionOf(ctx: ResolveContext, target: LiveActor) {
+  return target.effects.find((effect) => {
+    if (!effect.tags.includes(DISTRACTED_TAG) || effect.sourceActorId === null) return false;
+    if (effect.sourceActorId === ctx.attacker.id) return false;
+    const helper = ctx.state.actors.find((actor) => actor.id === effect.sourceActorId);
+    return helper !== undefined && areAllies(ctx.attacker, helper, ctx.deps.resolveDefinition);
+  });
+}
 const outlined = (actor: LiveActor) => actor.effects.some((effect) => effect.tags.includes(OUTLINED_TAG));
 
 /** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
@@ -155,6 +184,16 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
   // Vex: the attacker's earlier hit marked this creature for their next attack roll (spent by it, `spendVex`).
   if (target.effects.some((effect) => effect.tags.includes(VEXED_TAG) && effect.sourceActorId === attacker.id))
     sources.advantage.push({ source: "vex", label: `Vex (${attacker.name}'s earlier hit)` });
+  // Help: an ally distracted it, for this attack roll alone (spent by it, `spendDistraction`). A helper the table
+  // can't see isn't named.
+  const distraction = distractionOf(ctx, target);
+  if (distraction) {
+    const helper = ctx.state.actors.find((actor) => actor.id === distraction.sourceActorId);
+    sources.advantage.push({
+      source: "help",
+      label: helper?.visibility === "public" ? `Help (${helper.name})` : "Help"
+    });
+  }
   // 2024 rule: advantage within 5 feet, disadvantage beyond. Unknown distance contributes nothing.
   if (has(target, "prone") && distance !== null) {
     if (distance <= 5) sources.advantage.push({ source: "target-prone", label: "Target is Prone (within 5 ft)" });
@@ -204,6 +243,38 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
   }
 }
 
+/** Stat-block traits that give an attack roll Advantage: Bloodied Fury and Frenzy, Blood Frenzy, an ally's Aura of
+ *  Authority, and Pack Tactics ("if at least one of the [attacker's] allies is within 5 feet of the creature and the ally
+ *  doesn't have the Incapacitated condition"), read from the tokens. Where the map can't measure, the GM's roll mode
+ *  decides. */
+function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeClaims): void {
+  const { state, attacker, deps } = ctx;
+  const bloodied = attacker.hp.current > 0 && attacker.hp.current * 2 <= attacker.hp.maximum;
+  // SRD Bloodied Fury (boars) and Bloodied Frenzy (the berserker): "While Bloodied, ... Advantage on attack rolls".
+  for (const name of ["Bloodied Fury", "Bloodied Frenzy"])
+    if (bloodied && holdsFeature(deps.definition, name.toLowerCase().replace(" ", "-"), name))
+      sources.advantage.push({ source: "bloodied-fury", label: `${name} (Bloodied)` });
+  // SRD Blood Frenzy (the sahuagin): "Advantage on attack rolls against any creature that doesn't have all its Hit
+  // Points."
+  if (target.hp.current < target.hp.maximum && holdsFeature(deps.definition, "blood-frenzy", "Blood Frenzy"))
+    sources.advantage.push({ source: "blood-frenzy", label: "Blood Frenzy (target is hurt)" });
+  const authority = auraOfAuthority(state, attacker, deps);
+  if (authority) sources.advantage.push(authority);
+  if (!deps.distanceFeet || !holdsFeature(deps.definition, "pack-tactics", "Pack Tactics")) return;
+  for (const entry of state.combat.initiative) {
+    const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
+    if (!ally || ally.id === attacker.id || ally.id === target.id) continue;
+    if (!areAllies(attacker, ally, deps.resolveDefinition) || ally.hp.current <= 0 || isIncapacitated(ally)) continue;
+    // An ally the players can't see never gives a visible attacker Advantage: the roll would reveal it.
+    if (ally.visibility !== "public" && attacker.visibility === "public") continue;
+    const apart = deps.distanceFeet(ally.id, target.id);
+    if (apart !== null && apart <= 5 + DISTANCE_TOLERANCE_FEET) {
+      sources.advantage.push({ source: "pack-tactics", label: `Pack Tactics (${ally.name} within 5 ft)` });
+      return;
+    }
+  }
+}
+
 /** Advantage/disadvantage sources the engine can see; the explicit GM rollMode choice wins over all of them. */
 function attackRollSources(
   ctx: ResolveContext,
@@ -215,21 +286,27 @@ function attackRollSources(
   riderClaims(ctx, targetDerivation, sources);
   conditionClaims(ctx, target, distance, sources);
   positionClaims(ctx, distance, sources);
+  traitClaims(ctx, target, sources);
   return sources;
 }
 
-/** The natural d20 and the total: a hand-entered total is used verbatim (its crit declared, its die
- *  unknown), a supplied natural replaces the roll, otherwise the d20 is rolled. A preview records the
- *  shown die; a confirm reuses it and records nothing new. */
+/**
+ * The natural d20 and the total. The GM's hand-entered total is used verbatim (its crit declared, its die unknown); a
+ * supplied natural (a typed die, a parked attack's replay) replaces the roll; otherwise the d20 is thrown. With a
+ * `holdKey` the die is held between a preview and its confirm (ADR-0012): a second preview shows the same die, the
+ * confirm uses it and records nothing new, and only a reroll throws again (a player's Heroic Inspiration rerolls one
+ * die; the GM throws afresh).
+ */
 function rollD20(
   ctx: ResolveContext,
   mode: "advantage" | "disadvantage" | "normal",
   bonus: number
 ): { naturalRoll: number; total: number; declaredCrit: boolean } {
-  const { input, deps } = ctx;
+  const { input, deps, state } = ctx;
   const isPreview = input.commit === false;
+  const key = input.holdKey;
   if (input.attackTotal !== undefined) {
-    // naturalRoll 0 means "not a rolled die", so no misleading "nat" is shown.
+    // naturalRoll 0 means "not a rolled die", so no misleading "nat" is shown; a declared 20 or 1 is that die.
     const total = input.attackTotal;
     const declaredCrit = input.critical === true;
     if (isPreview)
@@ -238,17 +315,54 @@ function rollD20(
         resolveDice(parseDiceFormula(String(total)), () => total),
         "attack"
       );
-    return { naturalRoll: declaredCrit ? 20 : 0, total, declaredCrit };
+    return { naturalRoll: declaredCrit ? 20 : input.fumble === true ? 1 : 0, total, declaredCrit };
   }
+  const scope =
+    deps.initiatorRole === "player"
+      ? { role: "player" as const, sessionId: deps.initiatorSessionId ?? "" }
+      : { role: "gm" as const };
   if (input.attackNatural !== undefined) {
     const naturalRoll = input.attackNatural;
-    if (isPreview)
+    const held = key ? heldRollFor(state, key) : undefined;
+    // A typed reroll: Heroic Inspiration, then the face the physical reroll shows.
+    if (input.reroll) {
+      requireTypedReroll(state, scope, held);
+      spendRerollRight(ctx.attacker, scope);
+    }
+    // A typed die is recorded once, when first shown; the confirm of a held one records nothing new.
+    const seen = input.reroll !== true && held?.typed === true && held.faces[0] === naturalRoll;
+    if (isPreview && !seen)
       recordRoll(
         ctx,
         resolveDice(parseDiceFormula(d20TestFormula("normal", bonus)), () => naturalRoll),
-        "attack"
+        "attack",
+        undefined,
+        { typed: input.typedFace === true }
       );
+    if (key && isPreview) holdRoll(state, { key, actorId: ctx.attacker.id, faces: [naturalRoll], typed: true });
+    if (key && !isPreview) releaseHeldRoll(state, key);
     return { naturalRoll, total: naturalRoll + bonus, declaredCrit: false };
+  }
+  if (key) {
+    const held = heldRollFor(state, key);
+    // A typed die stands until a typed reroll replaces it; only the GM may have the server throw over it.
+    if (held?.typed && !(input.reroll && scope.role === "gm")) {
+      if (input.reroll) throw new CommandRejectedError("Type the die your reroll shows.");
+      if (!isPreview) releaseHeldRoll(state, key);
+      return { naturalRoll: held.faces[0], total: held.faces[0] + bonus, declaredCrit: false };
+    }
+    let reroll: "none" | "one" | "all" = "none";
+    if (input.reroll) {
+      if (!held) throw new CommandRejectedError("Roll the attack first: a reroll throws again a die that was thrown.");
+      spendRerollRight(ctx.attacker, scope);
+      reroll = scope.role === "gm" ? "all" : "one";
+    }
+    const { faces, thrown } = heldD20s(held, mode, deps.random, reroll);
+    const resolution = resolveWithD20s(d20TestFormula(mode, bonus), faces, deps.random);
+    if (thrown) recordRoll(ctx, resolution, "attack");
+    if (isPreview) holdRoll(state, { key, actorId: ctx.attacker.id, faces });
+    else releaseHeldRoll(state, key);
+    return { naturalRoll: keptD20(faces, mode), total: resolution.total, declaredCrit: false };
   }
   const resolution = resolveDice(parseDiceFormula(d20TestFormula(mode, bonus)), deps.random);
   recordRoll(ctx, resolution, "attack");
@@ -316,14 +430,17 @@ export function rollAttack(ctx: ResolveContext): void {
   };
   const sources = attackRollSources(ctx, target, targetDerivation, distance);
   const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
-  const mode = input.rollMode ?? aggregated.mode;
-  ctx.rollMode = input.rollMode
-    ? {
-        mode: input.rollMode,
-        advantage: input.rollMode === "advantage" ? ["GM choice"] : [],
-        disadvantage: input.rollMode === "disadvantage" ? ["GM choice"] : []
-      }
-    : aggregated;
+  // Only the GM's choice reaches here (a player's is stripped by the command); it wins and is named as the GM's.
+  const forced = input.rollMode ?? undefined;
+  const mode = forced ?? aggregated.mode;
+  ctx.rollMode =
+    forced === undefined
+      ? aggregated
+      : {
+          mode: forced,
+          advantage: forced === "advantage" ? [GM_CHOICE] : [],
+          disadvantage: forced === "disadvantage" ? [GM_CHOICE] : []
+        };
   // A standing `attack-bonus` is already folded into `action.attack.bonus` by `effectiveActions`; only
   // momentary riders are added here. The two sets are disjoint.
   const atRoll = collectRiders(derivation.carriers, {
@@ -349,18 +466,26 @@ export function rollAttack(ctx: ResolveContext): void {
   const inPlay = armorClassInPlay(target);
   const targetAc = inPlay !== undefined ? inPlay + ctx.coverBonus + reactionBonus : null;
   // A declared crit (total mode) or a natural roll at or above the threshold crits (a `critical-range`
-  // rider can widen it); a nat 1 fumbles only when a natural die is known.
+  // rider can widen it); a nat 1 fumbles when the die is known or, with a typed total, declared.
   ctx.crit =
     declaredCrit || (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action, ctx.riderFilters));
   let outcome = ctx.crit
     ? ("crit" as const)
-    : !manualTotal && naturalRoll === 1
+    : naturalRoll === 1
       ? ("fumble" as const)
       : targetAc === null
         ? ("unknown" as const)
         : total >= targetAc
           ? ("hit" as const)
           : ("miss" as const);
+  // SRD Greater Magic Resistance: "the attack rolls of spells automatically miss it". Said to the GM only, since the
+  // reason names a trait of the stat block.
+  if (action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds") {
+    outcome = "miss";
+    ctx.crit = false;
+    if (deps.initiatorRole !== "player")
+      warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
+  }
   if (outcome === "hit" && (has(target, "unconscious") || has(target, "paralyzed"))) {
     if ((distance !== null && distance <= 5) || (distance === null && action.attack.reachFeet !== undefined)) {
       outcome = "crit";
@@ -378,6 +503,30 @@ export function rollAttack(ctx: ResolveContext): void {
     ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {}),
     ...(bonusDice.length > 0 ? { bonusDice } : {})
   };
+}
+
+/** The attack roll spends the Help it had, hit or miss: Help gives Advantage to one attack roll. */
+export function spendDistraction(ctx: ResolveContext): void {
+  const { state, attack, targets, effectsEnded } = ctx;
+  if (attack === null) return;
+  const target = targets[0];
+  const distraction = distractionOf(ctx, target);
+  if (!distraction) return;
+  endEffect(state, target.id, distraction.id);
+  effectsEnded.push({ actorId: target.id, actorName: target.name, name: distraction.name });
+}
+
+/** Steady Aim gives Advantage on the next attack roll this turn: the roll spends it, hit or miss, while the Speed 0 it
+ *  holds lasts until the turn ends. */
+export function spendSteadyAim(ctx: ResolveContext): void {
+  const { attacker, attack } = ctx;
+  if (attack === null) return;
+  const aiming = (effect: LiveActor["effects"][number]) =>
+    effect.tags.includes(STEADY_AIM_TAG) && effect.modifiers.length > 0;
+  if (!attacker.effects.some(aiming)) return;
+  attacker.effects = attacker.effects.map((effect) =>
+    aiming(effect) ? { ...effect, name: `${effect.name} (Speed 0)`, modifiers: [] } : effect
+  );
 }
 
 /** The attack roll spends what lasts only until the next attack roll against its bearer (Guiding Bolt's light), hit

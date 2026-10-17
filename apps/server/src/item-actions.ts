@@ -8,7 +8,7 @@ import {
   weaponAbilityModifierFrom,
   type RiderAbility
 } from "@vtt/rules-5e";
-import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, MAX_ACTION_USES, type ActorAction, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 
 /**
  * Actions synthesised from what a character carries: an equipped weapon's swing, an item's declared actions and
@@ -49,7 +49,7 @@ export function itemPool(item: CarriedItem, pool: string): string {
   return key.length <= 60 ? key : `${item.id.slice(0, Math.max(1, 59 - suffix.length))}-${suffix}`.slice(0, 60);
 }
 
-/** Authored uses to `ActionUsesSchema`, clamped to 1-20 like `resolvedUseLimit`; below 1 means no charges. An
+/** Authored uses to `ActionUsesSchema`, clamped to its range like `resolvedUseLimit`; below 1 means no charges. An
  *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). A shared pool
  *  is counted per carried copy (`itemPool`); an unpooled use is already, by the action's own id. */
 function usesOf(
@@ -61,7 +61,7 @@ function usesOf(
   const limit = uses.limit ?? ("scaling" in uses ? scaledLimit(uses.scaling, definition) : undefined);
   if (limit === undefined || limit < 1) return undefined;
   return {
-    limit: Math.min(20, limit),
+    limit: Math.min(MAX_ACTION_USES, limit),
     per: uses.per,
     ...(uses.pool ? { pool: itemPool(item, uses.pool) } : {}),
     ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})
@@ -130,7 +130,12 @@ export function itemAction(
     damage: declared.damage.map((part) => ({ ...part })),
     // A Potion of Healing's 2d4 + 2.
     ...(declared.healing ? { healing: { ...declared.healing } } : {}),
-    ...(uses ? { uses } : {})
+    ...(uses ? { uses } : {}),
+    // A thrown flask takes one attack of the Attack action, not the whole action.
+    ...(declared.replacesAttack ? { replacesAttack: true } : {}),
+    // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
+    ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
+    ...(declared.area ? { area: { ...declared.area } } : {})
   };
 }
 
@@ -274,6 +279,14 @@ export const isLongCastingTime = (castingTime: string): boolean => /\b\d+\s*(?:m
 export const laterSpellActionId = (spellId: string, name: string): string =>
   `spell-${spellId}-then-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
+/** The later action of a spell this action id names, if it is one. */
+export function laterRowOf(
+  spell: SpellReference,
+  actionId: string
+): NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number] | undefined {
+  return (spell.effect?.laterActions ?? []).find((row) => laterSpellActionId(spell.id, row.name) === actionId);
+}
+
 /** One of the things a spell lets its caster do after the cast (`SpellReference.effect.laterActions`), as an action
  *  with the caster's numbers: no slot, the spell's own level (a cantrip's tier through `scaled.roll`). */
 export function laterSpellAction(
@@ -304,6 +317,8 @@ export function laterSpellAction(
         : {}),
     ...(spell.effect?.damageTypes && damage.length > 0 ? { damageTypes: [...spell.effect.damageTypes] } : {}),
     ...(later.area ? { area: later.area } : {}),
+    // Moving a mark lands the cast's grant on the new creature (`moveMark`).
+    ...(later.movesGrant && spell.effect?.grant ? { grants: structuredClone(spell.effect.grant) } : {}),
     spellId: spell.id
   };
 }

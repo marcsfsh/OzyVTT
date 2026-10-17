@@ -101,7 +101,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     statPriority:
       "All six abilities, best first - the random generator's core input as DATA, so a homebrew class supplies its own without touching @vtt/rules-5e",
     multiclassProficiencies:
-      "Proficiencies gained when the class is taken as a MULTICLASS - narrower than the level-1 set",
+      "Proficiencies gained when the class is taken as a MULTICLASS - narrower than the level-1 set. The builder grants them to every class after the first",
     subclassLabel: 'What this class calls its subclass ("Martial Archetype")',
     levelTable:
       "Exactly 20 rows, row N at level N. Each row's `features` must resolve against this record's own `features[]` - the server refuses the record otherwise, which is why re-minting an id on import never rewrites intra-record ids"
@@ -193,7 +193,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     armor: "Populated for armor and shields only",
     slot: "WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield)",
     appliesTo:
-      "Makes the item a TEMPLATE (the SRD's \"Weapon, +1 (Any Simple or Martial)\"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from - publish refuses an id the merged catalog cannot resolve, a non-weapon/armor category, and fixed stats alongside a template. The picked base's stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`.",
+      'Makes the item a TEMPLATE (the SRD\'s "Weapon, +1 (Any Simple or Martial)"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from - publish refuses an id the merged catalog cannot resolve, a category other than weapon, armor or ammunition, and fixed stats alongside a template. The picked base\'s stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`. Magic AMMUNITION names the gear table\'s ammunition ("Any Ammunition": Arrows, Crossbow Bolts...): its pick copies no stats and says which launchers fire it.',
     rarity:
       'Display and filtering only ("uncommon", "legendary"). An OPEN slug: rarity is identity, not a mechanical hook',
     attunement: "Attunement requirement and its advisory class/species restriction",
@@ -210,6 +210,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'This row is ammunition sold in bundles: each one of its quantity is `count` pieces of `kind` ("Arrows (20)" is 20 arrows). A shot from a weapon that fires that kind spends a piece, and half the pieces fired come back when the encounter ends. Absent on magic ammunition, counted one piece per quantity',
     damageTypeChoice:
       '"The GM chooses the type" (Ring of Resistance, Dragon Scale Mail): the types the GM may pick for the ONE resistance in `grants.damageResistances`, which is the printed default until the GM picks. The pick is stored per carried copy as the row\'s `chosenDamageType`, which only the GM can set',
+    vulnerableToOtherChoices:
+      "Armor of Vulnerability's curse: while the bearer is attuned, worn or not, Vulnerability to every `damageTypeChoice` type except the one it resists. Needs `cursed` and `damageTypeChoice`",
+    spellScroll:
+      "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`",
     grantsFeatIds:
       "Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional - nothing ever grants an item back - so a cycle cannot be drawn rather than merely being checked for",
     tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
@@ -378,7 +382,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     modifiers: "Typed numeric riders"
   },
   ReplaceableChoice: {
-    "": 'ONE "you can replace…" clause. `offer` is the same offer-key namespace `extraPicks` uses, and a key naming no pick this build has is a loud build rejection. `when: "level-up"` is a build-time permission over the choices ledger (the replaced row is deleted, never tombstoned); `"short-rest"` / `"long-rest"` are runtime state on the actor, set by actor.rechoose and cleared by the matching rest - a short-rest clause is satisfied by a long rest too.',
+    "": 'ONE "you can replace…" clause. `offer` is the same offer-key namespace `extraPicks` uses, and a key naming no pick this build has is a loud build rejection. `when: "level-up"` is a build-time permission over the choices ledger (the replaced row is deleted, never tombstoned); `"short-rest"` / `"long-rest"` are re-made with actor.rechoose: runtime state on the actor, cleared by the matching rest, unless the build reads the answer (its options grant spells, or another pick depends on it, as a land does), which rewrites the ledger row and rebuilds the sheet - a short-rest clause is satisfied by a long rest too.',
     amount: "How many of that offer's answers may be swapped at once"
   },
   ExtraPick: {
@@ -423,7 +427,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
     replacesAttack:
-      'Taken in place of ONE attack of the Attack action (Breath Weapon): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
+      'Taken in place of ONE attack of the Attack action (Breath Weapon, a thrown flask of Acid): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
       "Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge",
     spellId:
@@ -458,7 +462,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
     replacesAttack:
-      'Taken in place of ONE attack of the Attack action (Breath Weapon): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
+      'Taken in place of ONE attack of the Attack action (Breath Weapon, a thrown flask of Acid): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
       "Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge",
     spellId:
@@ -484,7 +488,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "save.failsAtHitPoints":
       "No save when it lands: a target with this many hit points or fewer has the failure outright and only the repeated save ends it (Power Word Stun)",
     "save.ongoingDamage":
-      "Damage the failure's conditions bring at the start of each turn while they last, rolled and applied by the engine: on the target's own turns (bearer-turn-start) or the source's (source-turn-start, a swallow's acid)"
+      "Damage the failure's conditions bring at the start of each turn while they last, rolled and applied by the engine: on the target's own turns (bearer-turn-start) or the source's (source-turn-start, a swallow's acid)",
+    "save.failureHazard":
+      'A hazard a failure starts, by the SRD\'s own rules: "burning" (1d4 Fire at the start of each of its turns until the burning creature uses an action to put it out, Alchemist\'s Fire) or "oil" (Fire damage it takes in the next minute deals 5 more Fire damage, Oil)'
   },
   FeatureAttack: {
     "": 'An attack a FEATURE grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is DERIVED: the feature names the ability (or "spellcasting") and the builder resolves the number.'
@@ -700,7 +706,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     endsWithTag:
       "The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage)",
     target: "Who receives it: the acting creature, or the action's single chosen target (Help)",
-    voidWhileIncapacitated: "Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)"
+    voidWhileIncapacitated: "Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)",
+    damageUses:
+      "The effect ends once its damage riders have landed this many times (a coat of Basic Poison: one weapon hit, or three pieces of ammunition)"
   },
   EffectDurationRounds: {
     "": "A fixed number of rounds."
@@ -1372,8 +1380,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "What an Ammunition weapon fires (the Weapons table's \"Ammunition (Range 150/600; Arrow)\"); a Sling's bullets and a firearm's are different items",
     "equipment[].damageTypeChoice":
       "The damage types the GM may pick for the item's resistance, as the SRD prints them (absent when the item has no such choice)",
+    "equipment[].spellScroll":
+      "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else",
     "equipment[].appliesTo":
-      'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
+      'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon, armor and ammunition templates (the bases of magic ammunition are the kinds of ammunition, which decide the launchers that fire it). A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
   },
   ContentFeature: {
     "": "The browse-and-pick projection of a bundle FeatureRecord. Prose is the display source of truth; a feature's structured riders (granted actions, effects, modifiers, limited uses) stay server-side - the server applies them when it builds the character, so the wizard never becomes a second rules engine.",
@@ -1430,6 +1440,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "classes[].multiclassProficiencies":
       "Proficiencies gained when this class is taken as a MULTICLASS (narrower than the level-1 set); null when the record declares none",
     "classes[].multiclassProficiencies.skillChoices.fromCatalog": CHOICE_CATALOG,
+    "classes[].multiclassProficiencies.toolChoices":
+      '"One Musical Instrument of your choice" (Bard); null when the class keeps no tool pick',
+    "classes[].multiclassProficiencies.toolChoices.fromCatalog": CHOICE_CATALOG,
     "classes[].multiclassPrerequisites":
       'Ability minimums for multiclassing INTO this class; mode "any" covers "STR 13 or DEX 13". null = always allowed. Display data - the server re-validates',
     "classes[].subclassLabel": 'What this class calls its subclass ("Martial Archetype")',
@@ -1504,14 +1517,27 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "DISPLAY ONLY, and the sheet's single source for every number beside a roll button. Derived from the actor's LIVE loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts - a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this REQUEST rather than the broadcast game-state projection on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see.",
     "derived.armorClass": "Live AC, already reconciled against worn armour and item riders",
     "derived.initiative": "Live initiative bonus including item riders",
-    "derived.abilities[].check": "Ability-check bonus INCLUDING item check-bonus riders",
-    "derived.abilities[].checkWithProficiency":
-      "The same check plus proficiency, for a GM-called check against no named skill",
-    "derived.abilities[].save": "The save the server will actually roll, minus only per-save cover",
+    "derived.abilities[].check":
+      "The ability-check bonus the server rolls: item check-bonus riders and Exhaustion included",
+    "derived.abilities[].checkMode":
+      "Advantage or Disadvantage the rules give this ability's checks, with what grants each side (Poisoned, armor worn without training, Hex)",
+    "derived.abilities[].save":
+      "The save the server will actually roll, minus only per-save cover and an ally Paladin's aura (both depend on the moment)",
+    "derived.abilities[].saveMode": "Advantage or Disadvantage the rules give this save, with its sources",
     "derived.abilities[].saveFromItems": "The equipment share of `save`, so a sheet can say where the bonus came from",
+    "derived.abilities[].saveAutoFails":
+      "The condition that makes a Strength or Dexterity save fail without a roll (Paralyzed, Stunned); null otherwise",
     "derived.skills[].tier": "The EFFECTIVE tier: the sheet's base tier raised by any item grant",
-    "derived.skills[].bonus": "Null only when the skill names no ability, the one case a sheet cannot roll it",
+    "derived.skills[].bonus":
+      "What the server adds to the d20 (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, riders, Exhaustion). Null only when the skill names no ability, the one case a sheet cannot roll it",
     "derived.skills[].sources": 'Item names that raised the tier, e.g. ["Circlet of Shadows"]',
+    "derived.skills[].mode": "Advantage or Disadvantage the rules give this skill's checks, with its sources",
+    "derived.skills[].reliableTalent": "A d20 of 9 or lower counts as 10 on this check (Reliable Talent)",
+    "derived.tools":
+      "The tools the character is proficient with that the SRD names an ability for, each with its check bonus",
+    "derived.passivePerception":
+      "10 plus the Wisdom (Perception) bonus, 5 more with Advantage on such checks or 5 less with Disadvantage",
+    "derived.speedFeet": "Speed now, before Dash: Exhaustion, Slow, heavy armor and Speed-0 conditions included",
     "derived.defences":
       "The damage defences in force outside any one hit, as the damage pipeline applies them: the stat block's, chosen features', items' and effects'. Petrified and underwater resistance are added per hit and are not listed.",
     "derived.defences.resistances[].type": DEFENCE_TYPE,
@@ -1536,7 +1562,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "actions[].rangeNormalFeet": "Normal range band; shots beyond it up to rangeFeet roll at disadvantage",
     "actions[].saveDc": "Save DC including item riders",
     "actions[].usesLimit": "Total limited uses including any item that raised the pool; null when unlimited",
-    "actions[].usesPool": "Shared pool key; actions naming one pool spend one counter"
+    "actions[].usesPool": "Shared pool key; actions naming one pool spend one counter",
+    "actions[].healing": "The hit points the action restores (a potion's 2d4 + 2); null when it heals nothing",
+    "actions[].targeting":
+      'Who a tap picks, as resolution takes it: "single" (an attack, a heal such as a potion, a grant aimed at a target), "multi" (a save, damage with no attack roll, or a grant on each creature it targets), "none" (it acts on its user: a self heal, Rage, a scroll of a spell with no target); null when nothing structured resolves. A builtin reports the targeting the stat block list gives it',
+    "actions[].darts":
+      "Darts the action makes, each dealing its damage to a target the caller assigns (Magic Missile, read from a scroll or cast from a wand); null otherwise",
+    "actions[].damageTypes":
+      "The damage types the caster picks one of when it resolves (Chromatic Orb), sent as the resolve's `damageType`; null when the action deals its own"
   },
   BuilderOffersData: {
     "offers[].key": "Stable key the draft's answers are filed under",
@@ -1544,7 +1577,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "offers[].unavailable": "Option id -> why this build cannot usefully take it (already held, or no proficiency)",
     picks: "The answers the build still accepts, by offer key",
     subclassId: "The subclass offer's answer",
-    choices: "The ledger rows these answers make: a create's `choices`"
+    choices: "The ledger rows these answers make: a create's `choices`",
+    abilities:
+      "For a draft that sent `sheet`: how that sheet's ability scores were made, which a rebuild re-sends as the scores the character already has. The ledger's own record, or for a sheet built before the ledger kept one, the base scores and background increase that rebuild its totals exactly. Null when not asked, or when nothing reproduces them.",
+    "abilities.derived":
+      "True when worked out from the sheet's totals rather than read from its ledger. A rebuild may re-send these whatever ability methods the table allows today."
   },
   MapAssetMetadata: {
     folder: MAP_FOLDER

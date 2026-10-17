@@ -1,8 +1,9 @@
 import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from "@vtt/domain/commands";
+import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
 import { pushTokenAway } from "../forced-movement.js";
-import { answerReaction, dismissReaction, type ReactionOutcome } from "../reactions.js";
+import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome } from "../reactions.js";
 import { initiatorOf, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -69,7 +70,7 @@ export const reactionCommands = [
     type: "reaction.answer",
     operationId: "answerReaction",
     description:
-      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge): the hit's parked damage applies either way, each typed part halved first on use. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature, a melee attack previewable with `commit: false`, and damage that lands applies. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
+      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge): the hit's parked damage applies either way, each typed part halved first on use. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature with one melee attack with a weapon or an Unarmed Strike (another action is refused), previewable with `commit: false`, the confirm carrying the `hitOptions` its preview offered (Sneak Attack), and damage that lands applies. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
     summary: "Answer a pending reaction prompt: use it (spend the reaction) or decline it.",
     schema: ReactionAnswerSchema,
     malformed: "The reaction answer is malformed.",
@@ -82,14 +83,22 @@ export const reactionCommands = [
         commit,
         rollMode,
         attackNatural,
-        pushFeet
+        reroll,
+        pushFeet,
+        hitOptions
       } = request;
+      const initiator = initiatorOf(principal);
+      // The rules count a player's Advantage and Disadvantage; only the GM may force a mode.
+      const forcedMode = initiator.role === "gm" ? rollMode : undefined;
       // The grid, fetched up front like `action.resolve`'s, so Push on an opportunity attack moves the token.
       const mapAssetId = kit.read().combat.mapAssetId;
       const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
       const distance = await kit.creatureDistance();
       let outcome: ReturnType<typeof answerReaction> | undefined;
       const { state, duplicate } = await execute((draft) => {
+        // A typed die must be one the table takes, and not one typed over the strike's thrown die.
+        if (attackNatural !== undefined && reroll !== true)
+          requireTypedDie(draft, initiator, heldRollFor(draft, reactionHoldKey(reactionId)), attackNatural);
         outcome = answerReaction(
           draft,
           commandId,
@@ -108,7 +117,14 @@ export const reactionCommands = [
               draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null,
             distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
           },
-          { commit, rollMode, attackNatural, ...(pushFeet !== undefined ? { pushFeet } : {}) }
+          {
+            commit,
+            ...(forcedMode !== undefined ? { rollMode: forcedMode } : {}),
+            ...(attackNatural !== undefined ? { attackNatural } : {}),
+            ...(reroll === true ? { reroll: true } : {}),
+            ...(pushFeet !== undefined ? { pushFeet } : {}),
+            ...(hitOptions ? { hitOptions } : {})
+          }
         );
       });
       if (duplicate || !outcome) return;
@@ -173,7 +189,8 @@ export const reactionCommands = [
             newId: kit.context.newId,
             now: () => Date.now(),
             catalog: kit.equipmentCatalog(),
-            distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
+            distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB),
+            rollDie: (sides) => kit.context.random(sides)
           }) ?? undefined;
       });
       if (duplicate || !applied) return;

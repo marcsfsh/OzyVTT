@@ -156,7 +156,10 @@ async function breatheOnBorin(base: string, gmToken: string, mapAssetId: string)
   const started = await post(base, GAME_PATHS.encounterStart, gmToken, {
     commandId: randomUUID(),
     mapAssetId,
-    entries: [{ actorId: DRAGON }, { actorId: BORIN }]
+    entries: [
+      { actorId: DRAGON, score: 20 },
+      { actorId: BORIN, score: 10 }
+    ]
   });
   expect(started.status).toBe(200);
   const resolved = await post(base, GAME_PATHS.actionResolve, gmToken, {
@@ -236,7 +239,10 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
         await post(base, GAME_PATHS.encounterStart, gmToken, {
           commandId: randomUUID(),
           mapAssetId,
-          entries: [{ actorId: DRAGON }, { actorId: BORIN }]
+          entries: [
+            { actorId: DRAGON, score: 20 },
+            { actorId: BORIN, score: 10 }
+          ]
         })
       ).status
     ).toBe(200);
@@ -322,7 +328,10 @@ describe("the opportunity-attack path narrates it too", () => {
         await post(base, GAME_PATHS.encounterStart, gmToken, {
           commandId: randomUUID(),
           mapAssetId,
-          entries: [{ actorId: DRAGON }, { actorId: BORIN }]
+          entries: [
+            { actorId: DRAGON, score: 20 },
+            { actorId: BORIN, score: 10 }
+          ]
         })
       ).status
     ).toBe(200);
@@ -524,11 +533,12 @@ describe("save.answer takes a hand-entered damage total", () => {
     expect((await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: BORIN })).status).toBe(
       200
     );
+    // A player types the face their die shows: a 2 fails the save.
     const allowed = await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), playerToken, {
       commandId: randomUUID(),
       saveId: save.id,
-      method: "manual",
-      total: 5,
+      method: "roll",
+      face: 2,
       commit: true,
       damageOverride: 3
     });

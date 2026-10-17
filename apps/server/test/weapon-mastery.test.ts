@@ -217,8 +217,21 @@ const swing = (built: Built, actionId: string, faces: number[]) =>
   );
 
 /** The foe swings back at the hero, which is where Sap has to show up. */
-const swingBack = (built: Built, faces: number[]) =>
-  resolveDefinitionAction(
+/** The foe swings back on its own turn, with a fresh action. */
+const swingBack = (built: Built, faces: number[]) => {
+  built.state.combat = {
+    ...built.state.combat,
+    turnActorId: IDS.foe,
+    turn: {
+      actionUsed: false,
+      bonusActionUsed: false,
+      actionInstance: null,
+      bonusActionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    }
+  };
+  return resolveDefinitionAction(
     built.state,
     FOE_DEFINITION.actions.find((action) => action.id === "claw")!,
     {
@@ -228,6 +241,7 @@ const swingBack = (built: Built, faces: number[]) =>
     },
     deps(built, FOE_DEFINITION, faces)
   );
+};
 
 describe("every SRD weapon names its mastery", () => {
   it("covers all 38 rows with the eight printed properties, and spot-checks the table", () => {

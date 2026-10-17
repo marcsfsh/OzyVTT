@@ -144,10 +144,14 @@ hidden things are stripped by the projections regardless of what fog covers.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
   reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
-  A move is charged along the cheapest grid path, where terrain and enemies' spaces cost double
-  (`movementPath` in `@vtt/rules-5e`). The map's drag preview runs the same function, and a
-  mirror test checks the two agree. Players and the table screen get only the terrain the fog
-  reveals.
+  A move is charged along the cheapest grid path, where terrain costs double, other creatures'
+  spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
+  dragging a grappled creature, add a foot per foot (`movementPath` and `spacePassage` in
+  `@vtt/rules-5e`). How a token travels (walking, a special speed, teleporting, moved by force)
+  rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
+  read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
+  and a mirror test checks the two agree. Players and the table screen get only the terrain the
+  fog reveals.
 
 ## Rules engine
 
@@ -163,7 +167,14 @@ write goes through `applyCondition` in `effects.ts`, which honours innate and it
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
 Concentration and its grapples). Effects end by their duration at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
-(`turn-boundaries.ts`).
+(`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
+(`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
+Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A stat block's spells
+(`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`). A spell that leaves an area acting later (Moonbeam, Spirit Guardians, a
+wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
+runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
+such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
+(`lasting-spells.ts`).
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and
@@ -182,12 +193,32 @@ A magic item's charges are an `actionUses` pool keyed by the carried row (`itemP
 it over (`character.give-item`). A long rest gives back the item's printed dice (`charges.regain`), not
 every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
-and spends one, and half of the pieces fired come back when the encounter ends. A potion or a flask whose
-record is `consumedOnUse` acts from the pack and leaves the stack one smaller each time (`consumables.ts`).
+and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
+kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only
+the shot that draws it. A shot outside a fight spends a piece too, and `character.recover-ammunition` picks up
+half of them. A potion, a flask or a Spell Scroll whose record is `consumedOnUse` acts from the pack and leaves
+the stack one smaller each time (`consumables.ts`). A Spell Scroll's row bears the one spell picked when it was
+added (`spellId`). Reading it casts that spell like an item's cast, at the spell's own level with the scroll
+table's save DC and attack bonus and no slot, for a reader whose class spell lists have it; a spell above the
+levels the reader can cast takes a spellcasting ability check (DC 10 + its level) first, and a failure loses the
+scroll with nothing cast (`scrolls.ts`). A thrown flask takes one attack of the Attack action (`replacesAttack`).
+Alchemist's Fire sets its target burning and Oil covers it (`save.failureHazard`, `hazards.ts`): a burning
+creature takes 1d4 Fire at the start of each of its turns until it uses the Put Out the Fire action, which leaves
+it Prone, and Fire damage on an oiled creature within the minute deals 5 more. Antitoxin and a coat of Basic
+Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
+or out of one.
 
 What a save does is data on the action's save block, not read from its description: `successDamage`
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
+
+Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
+(`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
+player sees before it counts (a previewed attack, save or death save) is held on the server
+(`held-rolls.ts`, ADR-0012): a second look shows the same die, and Heroic Inspiration is a player's only
+reroll. Players type die faces, never totals, and only while the table allows typed dice. On the client every
+roll prompt shares one set of controls (`RollControls.tsx`), and the GM's calls for a roll
+(`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).
 
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
 off, with per-family exceptions (`rules-families.ts`). A player blocked by a rule can ask the GM
@@ -205,7 +236,10 @@ names no family is the GM's own ruling on the whole command.
 - Characters are built server-side (`character-build.ts`) from content and the choices made in
   the guided builder. What a build may pick is one survey (`character-offers.ts`): a create
   validates against it, the random generator answers it, and the builder is served it for each
-  draft (`builder-offers.ts`), so the client holds no copy of the build rules. An unfinished build
+  draft (`builder-offers.ts`), so the client holds no copy of the build rules. A multiclass build
+  names the class each level went to (`classLevels`, kept in the choice ledger so a rebuild keeps the
+  order); each class's features read that class's own level, and the server checks the SRD
+  multiclass prerequisites with the scores of the moment each class is taken. An unfinished build
   is parked on the server (`character-drafts.ts`), one per player session and one for the GM, beside
   the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
   imported as an actor definition.

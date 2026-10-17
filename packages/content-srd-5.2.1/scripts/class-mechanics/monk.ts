@@ -1,8 +1,8 @@
 /**
  * Monk and Warrior of the Open Hand mechanics, merged over the ETL-generated prose.
  *
- * Uses count one per spend, so only features costing exactly 1 Focus Point ride the `focus-points`
- * pool; features costing 3 or 4 keep their price in prose rather than debiting the wrong amount.
+ * Every Focus Point spender rides the shared `focus-points` pool; one costing more than a point says so with
+ * `useCost` (Superior Defense 3, Quivering Palm 4).
  */
 import type { ClassMechanicsModule } from "./overlay.js";
 
@@ -64,7 +64,7 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
-    // The once-per-Long-Rest permission only; refilling Focus Points is done by hand.
+    // The once-per-Long-Rest permission only; the GM gives the Focus Points back from the sheet's Limited uses.
     "uncanny-metabolism": {
       uses: { limit: 1, per: "long-rest" }
     },
@@ -80,7 +80,7 @@ export const monk: ClassMechanicsModule = {
     /**
      * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. A failed save is
      * Stunned until the start of the Monk's next turn; the success rider (halved Speed, Advantage) stays prose.
-     * "Once per turn" is not expressible alongside the pool, so the scarcer Focus Point is what is tracked.
+     * The engine holds "once per turn" beside the Focus Point, keyed by the action's id.
      */
     "stunning-strike": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -106,15 +106,24 @@ export const monk: ClassMechanicsModule = {
     "disciplined-survivor": {
       grants: { saves: ["str", "dex", "con", "int", "wis", "cha"] }
     },
-    // Authored as `effects` so an activation is synthesised. The 3-point price and the Incapacitated
-    // end condition stay prose.
+    // "At the start of your turn, you can expend 3 Focus Points"; the Incapacitated end condition stays prose.
     "superior-defense": {
-      effects: [
+      uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
+      actions: [
         {
+          id: "superior-defense",
           name: "Superior Defense",
-          tags: ["superior-defense"],
-          duration: { type: "rounds", rounds: 10 },
-          modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
+          activation: "other",
+          description:
+            "At the start of your turn, expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to every damage type except Force.",
+          damage: [],
+          useCost: 3,
+          grants: {
+            name: "Superior Defense",
+            tags: ["superior-defense"],
+            duration: { type: "rounds", rounds: 10 },
+            modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
+          }
         }
       ]
     },
@@ -167,8 +176,10 @@ export const monk: ClassMechanicsModule = {
           }
         ]
       },
-      // Flat 10d12 against the Monk's derived DC. The 4-point price, duration and one-target rule stay prose.
+      // Flat 10d12 against the Monk's derived DC, for the 4 Focus Points the vibrations cost. Their duration and the
+      // one-target rule stay prose.
       "quivering-palm": {
+        uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
         actions: [
           {
             id: "quivering-palm",
@@ -177,6 +188,7 @@ export const monk: ClassMechanicsModule = {
             description:
               "End the vibrations you set in a creature. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one.",
             damage: [{ formula: "10d12", type: "force" }],
+            useCost: 4,
             save: {
               ability: "con",
               dc: { base: 8, ability: "wis", proficiencyBonus: true },

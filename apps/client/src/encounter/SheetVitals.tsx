@@ -4,6 +4,7 @@ import { Button, Input, Meter } from "@vtt/ui";
 import { command } from "../lib/command";
 import { HpAdjust } from "./HpAdjust";
 import { signed } from "./format";
+import { isDeadOnSheet } from "./mortality";
 import type { SrdExtension } from "./sheet-extension";
 
 /** HP with its tracker, AC, initiative and speeds, the numbers read most often mid-fight. */
@@ -12,31 +13,40 @@ export function SheetVitals({
   role,
   definition,
   extension,
+  speedFeet = null,
   onFeedback
 }: Readonly<{
   actor: GmActor | PlayerActor;
   role: "gm" | "player";
   definition: ActorDefinition | null;
   extension: SrdExtension;
+  /** The walking Speed now, from the server (Exhaustion, Slow, Grappled and the like); null until it answers. */
+  speedFeet?: number | null;
   onFeedback: (text: string) => void;
 }>) {
   const [editingAc, setEditingAc] = useState(false);
   const hp = actor.hp;
   const exactHp = "kind" in hp ? (hp.kind === "exact" ? hp : null) : hp;
+  const dead = isDeadOnSheet(actor);
+  const baseWalk =
+    ("speedFeet" in actor ? actor.speedFeet : undefined) ?? extension.speeds?.walk ?? definition?.speedFeet;
+  const walk = speedFeet ?? baseWalk;
+  // A walking Speed of 0 is still shown (Grappled); another mode at 0 is no mode at all.
   const speeds = extension.speeds
     ? (["walk", "swim", "fly", "climb", "burrow"] as const)
         .flatMap((mode) => {
-          const feet = extension.speeds?.[mode];
-          return feet
+          const feet = mode === "walk" ? walk : extension.speeds?.[mode];
+          return feet || (mode === "walk" && feet === 0)
             ? [
                 `${mode === "walk" ? "" : `${mode} `}${feet} ft.${mode === "fly" && extension.speeds?.hover ? " (hover)" : ""}`
               ]
             : [];
         })
         .join(", ")
-    : definition
-      ? `${definition.speedFeet} ft.`
+    : walk !== undefined
+      ? `${walk} ft.`
       : null;
+  const changed = speedFeet !== null && baseWalk !== undefined && speedFeet !== baseWalk;
   return (
     <div className="sheet-vitals">
       <div className="sheet-vital sheet-vital-hp">
@@ -49,11 +59,20 @@ export function SheetVitals({
           </strong>
         </div>
         {exactHp && <Meter className="sheet-hp-meter" tone="health" value={exactHp.current} max={exactHp.maximum} />}
-        <HpAdjust
-          actor={actor}
-          controls={role === "gm" ? ["damage", "heal", "temp", "set"] : ["damage", "heal", "temp"]}
-          onFeedback={onFeedback}
-        />
+        {/* The dead regain nothing until revived, and only the GM revives. */}
+        {dead ? (
+          role === "gm" ? (
+            <HpAdjust actor={actor} controls={["revive"]} onFeedback={onFeedback} />
+          ) : (
+            <p className="sheet-vital-note">Dead. Only a revival brings them back - ask the GM.</p>
+          )
+        ) : (
+          <HpAdjust
+            actor={actor}
+            controls={role === "gm" ? ["damage", "heal", "temp", "set"] : ["damage", "heal", "temp"]}
+            onFeedback={onFeedback}
+          />
+        )}
       </div>
       {role === "gm" ? (
         <button
@@ -84,6 +103,7 @@ export function SheetVitals({
         <div className="sheet-vital">
           <span>Speed</span>
           <strong>{speeds}</strong>
+          {changed && <small className="sheet-vital-note">Base {baseWalk} ft.</small>}
         </div>
       )}
       {role === "gm" && editingAc && (

@@ -38,8 +38,9 @@ ability-only`. The builder later _fills the same fields_; no consumer changes. (
    `spellSlots`/`pactSlots`/`preparedSpellIds`/`inventory`/`currency` live on `Actor`, seeded
    in `instantiate()` and projected **owner-only**. (Since 2026-10-16 a Long Rest keeps the
    prepared list and opens a prepare step, `Actor.preparation`, in which a Cleric, Druid or
-   Wizard player changes it within the cap, a Paladin or Ranger one spell; the GM may change it
-   any time, and `character.finish-preparing` closes the step.)
+   Wizard player changes it within the cap, a Paladin or Ranger one spell, and a Circle of the Land
+   Druid chooses its land; the GM may change either any time, and `character.finish-preparing` closes
+   the step.)
 
 4. **Players initiate their own rolls; the server still resolves and authorizes.** Damage to
    monsters stays a GM-applied step — players never reduce another creature's HP. All
@@ -77,6 +78,19 @@ frozen at build: with no armor or Shield it is 10 + Dex (or its Unarmored Defens
 A Shield adds its +2 only with Shield training. A printed total (a stat block, a PDF import) stands
 until body armor is equipped, since it may already count a Shield. The GM can set an AC by hand
 (`actor.set-armor-class`), shown to the party as set by the GM, until cleared.
+
+**Amendment (2026-10-17): the prepare step reaches the whole list, and a Wizard keeps a spellbook.** A
+built sheet lists the spells its class chose, so the prepare step also swaps one of them for another
+(`character.swap-spell`): a Cleric, Druid, Paladin or Ranger takes any spell of its class's list for which
+it has slots, a Wizard any spell in its spellbook. The swap re-makes that spell's row in the choices ledger
+and rebuilds the sheet, as a re-chosen land does, so the new spell gets its cast action and counts toward the
+cap; a Paladin's or Ranger's one change a rest covers it. A Wizard's book is the Wizard spells on its sheet
+plus `Actor.spellbook` (owner-only): the rest of the six spells at level 1 and two a level the SRD gives,
+added free, and spells copied in (`character.add-to-spellbook`), each 2 hours and 50 GP a spell level, from a
+Spell Scroll after an Intelligence (Arcana) check against DC 10 + the spell's level that destroys the scroll
+either way, or, by the GM, from another book. The copy doesn't move the clock; the table log says how long
+it took. What a character may swap in and add rides `actor:available-actions` (`spellChoices`). A sheet
+imported without its ledger keeps the old toggles only.
 
 ## Consequences
 

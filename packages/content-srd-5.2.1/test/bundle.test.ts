@@ -146,6 +146,43 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(tail.targetRules).toEqual(["not-grappled-by-source"]);
   });
 
+  it("reads every Multiattack the SRD prints but the hydra's, with its replacements and other plans", () => {
+    const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
+    const multiattackOf = (id: string) => byId(id).actions.find((action) => action.id === "multiattack")!;
+    expect(multiattackOf("bone-devil").multiattack).toEqual([
+      { actionId: "claw", count: 2 },
+      { actionId: "infernal-sting", count: 1 }
+    ]);
+    expect(multiattackOf("lion").multiattackReplacements).toEqual([{ actionIds: ["roar"], attacks: 1 }]);
+    expect(multiattackOf("barbed-devil").multiattackAlternatives).toEqual([[{ actionId: "hurl-flame", count: 2 }]]);
+    expect(multiattackOf("goblin-boss").multiattack).toEqual([{ actionId: "scimitar", count: 2, or: ["shortbow"] }]);
+    const prose = monsters.flatMap((monster) =>
+      monster.actions
+        .filter((action) => /multiattack/i.test(action.name) && action.activation === "action" && !action.multiattack)
+        .map(() => monster.source.externalId)
+    );
+    expect(prose).toEqual(["hydra"]);
+  });
+
+  it("keeps the tyrannosaurus's Tail off the creature its Bite grapples, read from the Bite's text", () => {
+    const rex = monsters.find((monster) => monster.source.externalId === "tyrannosaurus-rex")!;
+    expect(rex.actions.find((action) => action.id === "tail")!.targetRules).toEqual(["not-grappled-by-source"]);
+  });
+
+  it("marks legendary actions taken once a round, and gives one that makes an attack that attack", () => {
+    const legendary = monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary);
+    expect(legendary.filter((action) => action.legendary!.oncePerRound).length).toBe(41);
+    const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
+    const pounce = dragon.actions.find((action) => action.id === "pounce")!;
+    const rend = dragon.actions.find((action) => action.id === "rend")!;
+    expect(pounce.attack).toEqual(rend.attack);
+    expect(pounce.damage).toEqual(rend.damage);
+    expect(dragon.actions.find((action) => action.id === "fiery-rays")!.legendary).toEqual({
+      cost: 1,
+      oncePerRound: true
+    });
+  });
+
   it("carries structured limited-use pools (recharge and rest scopes)", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
     expect(byId("white-dragon-wyrmling").actions.find((action) => action.id === "cold-breath")!.uses).toEqual({
@@ -496,9 +533,10 @@ describe("SRD 5.2.1 reference bundles", () => {
     // Each of the four sources is counted from its own bundle: gear, non-improvised weapons, armor and
     // the generated magic items.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
-    expect(loadMagicItems().length).toBe(268);
-    // 139 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets and two gaming sets.
-    expect(equipment.length).toBe(139 + nonImprovisedWeapons + loadArmor().length + 268);
+    expect(loadMagicItems().length).toBe(270);
+    // 141 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets, two gaming sets and
+    // the two Spell Scrolls the gear table sells (Cantrip and Level 1).
+    expect(equipment.length).toBe(141 + nonImprovisedWeapons + loadArmor().length + 270);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).
