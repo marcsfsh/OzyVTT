@@ -286,3 +286,28 @@
     justify-self: start;
   }
 }
+
+/* The random character dialog: its notes, and a multiclass character's classes, each with its levels. */
+.random-character-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.random-character-classes {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.random-character-class {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+@media (max-width: 560px) {
+  .random-character-class {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

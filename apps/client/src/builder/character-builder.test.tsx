@@ -452,6 +452,7 @@ import { socket } from "../socket";
 import { emptyDraft, type BuilderDraft } from "./build-payload";
 import { CharacterBuilder } from "./CharacterBuilder";
 import { LevelFlow } from "./LevelFlow";
+import { RandomCharacterModal } from "./RandomCharacter";
 
 const gmView = {
   revision: 1,
@@ -1001,5 +1002,40 @@ describe("the Level flow's class choice", () => {
       })
     );
     expect(await screen.findByRole("heading", { name: "Mira's classes were added by hand" })).toBeInTheDocument();
+  });
+});
+
+describe("rolling a random character", () => {
+  it("rolls a multiclass character from the classes and levels the GM picks", async () => {
+    vi.mocked(socket.emit).mockClear();
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <RandomCharacterModal open maxLevel={20} onClose={() => {}} />
+      </ToastProvider>
+    );
+    const dialog = screen.getByRole("dialog", { name: "Roll a random character" });
+    // The dice's own choice of class can't take a second one, so the way to add one waits for a class.
+    expect(within(dialog).queryByRole("button", { name: "Add another class" })).toBeNull();
+    await user.selectOptions(await within(dialog).findByRole("combobox", { name: "Class" }), "cleric");
+    await user.click(within(dialog).getByRole("button", { name: "Add another class" }));
+    expect(within(dialog).getByRole("combobox", { name: "Starting class" })).toHaveValue("cleric");
+    expect(within(dialog).getByRole("combobox", { name: "Class 2" })).toHaveValue("fighter");
+    await user.click(
+      within(within(dialog).getByRole("group", { name: "Cleric levels" })).getByRole("button", { name: "Increase" })
+    );
+    expect(
+      within(dialog).getByText("Level 3 in all. The first class is the one taken at level 1.")
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Roll it up" }));
+    const generate = vi.mocked(socket.emit).mock.calls.find(([event]) => event === "character:generate");
+    expect(generate?.[1]).toMatchObject({
+      level: 3,
+      classId: "cleric",
+      classes: [
+        { classId: "cleric", level: 2 },
+        { classId: "fighter", level: 1 }
+      ]
+    });
   });
 });
