@@ -459,7 +459,7 @@ describe("a proficiency an item hands out, on the swing", () => {
     expect(without.attack!.bonus).toBe(2); // Dex +2, untrained
     expect(withBracers.attack!.bonus).toBe(5); // + the proficiency bonus 3, from the bracers
 
-    // The grant is the two bows the SRD names, not "weapons": a Longsword from the same catalog stays
+    // The grant is the two bows the SRD names: a Longsword from the same catalog stays
     // untrained with the bracers on, which `grants.weapons: ["martial"]` would fail.
     const swing = effectiveActions(
       definition,

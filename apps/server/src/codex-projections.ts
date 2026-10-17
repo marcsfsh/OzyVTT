@@ -439,7 +439,7 @@ export type GmChronicleContext = Readonly<{
   proposedDate?: CodexInWorldDate | null;
 }>;
 
-/** `publishedInstant`, not `campaignInstant`, so the GM context is not assignable here by accident. */
+/** `publishedInstant`, so the GM context (`campaignInstant`) is not assignable here by accident. */
 export type PlayerChronicleContext = PlayerSessionNumberContext &
   Readonly<{
     publishedInstant?: number | null;
@@ -795,7 +795,7 @@ function auditRow(record: CodexRevealAuditRecord): CodexRevealAuditRow | null {
       return projected === null ? null : { kind: "map", id: projected.id, title: projected.name, journalKind: null };
     }
     case "marker": {
-      // `projectPlayerPageMarker`, not `projectPlayerMarker`: the map gate applies here too.
+      // `projectPlayerPageMarker`, so the map gate applies here too.
       const projected = projectPlayerPageMarker(record);
       return projected === null
         ? null

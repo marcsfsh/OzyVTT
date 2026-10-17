@@ -1068,7 +1068,7 @@ describe("Fighter: EXTRA ATTACK is a second swing that really resolves", () => {
     expect(actionOf(built, "item-greatsword").attack?.count).toBe(3);
     expect(use(built, "item-greatsword", [IDS.foe], [9, 5, 5]).componentsRemaining).toEqual({ attack: 2 });
     expect(use(built, "item-flail", [IDS.foe], [14, 6]).componentsRemaining).toEqual({ attack: 1 });
-    // Exhausted reads as `null`, not `{ attack: 0 }`: the resolver reports remaining components only while
+    // Exhausted reads as `null`: the resolver reports remaining components only while
     // some remain.
     expect(use(built, "item-spear", [IDS.foe], [16, 4]).componentsRemaining).toBeNull();
     expect(() => use(built, "item-greatsword", [IDS.foe], [18, 5, 5])).toThrow(/no attacks remaining in this action/);
