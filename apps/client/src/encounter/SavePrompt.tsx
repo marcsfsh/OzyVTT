@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type ActionRollMode, type PendingSave, type PlayerPendingSave } from "@vtt/domain";
+import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { RollControls, type DieMode } from "./RollControls";
 import { damageAdjustments } from "./format";
@@ -52,6 +53,8 @@ export function SavePrompt({
   /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number;
 }>) {
   const [busy, setBusy] = useState(false);
+  // A player's typed damage stands in for dice, so it follows the table's setting for typed dice.
+  const { mayType } = useRollPreference();
   // A rolled-but-not-applied result: the server records the die and returns the projected outcome,
   // shown until the answerer confirms. `basis` is the pre-halving damage that preview used, so a later
   // amend is detectable; `defences` says what resistances and the like did to it.
@@ -209,7 +212,7 @@ export function SavePrompt({
         </strong>{" "}
         vs {save.actionName} ({save.sourceName})
       </span>
-      {save.proposedDamage > 0 && (
+      {save.proposedDamage > 0 && (viewer === "gm" || mayType) && (
         <label className="save-damage-amend">
           <span>Damage on a failure{save.halfOnSuccess ? ", half on a success" : ""}</span>
           <input

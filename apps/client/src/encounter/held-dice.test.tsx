@@ -186,8 +186,19 @@ describe("typing dice at the table", () => {
 
   it("is offered to a player only while the table lets players type their dice", () => {
     followTable(closedTable);
-    const { unmount } = mountSave("player");
+    const { unmount } = render(
+      <SavePrompt
+        save={{ ...SAVE, proposedDamage: 17 }}
+        targetName="Borin"
+        canDismiss={false}
+        onFeedback={() => {}}
+        rollMode="manual"
+        viewer="player"
+      />
+    );
     expect(screen.queryByLabelText("Your save d20")).toBeNull();
+    // Typed damage stands in for dice too.
+    expect(screen.queryByLabelText(/Damage on a failure/)).toBeNull();
     unmount();
     // The GM may always type.
     followTable({ ...closedTable, definitions: [] } as unknown as GmView);
