@@ -179,13 +179,15 @@ describe("a player's panel", () => {
       expect(document.getElementById(tab.getAttribute("aria-controls")!)?.getAttribute("role")).toBe("tabpanel");
   });
 
-  it("while someone else acts: who is acting, and no End turn", () => {
+  it("while someone else acts: their HP and Reaction in the bar, who acts left to the header, and no End turn", () => {
     render(
       <ToastProvider>
         <EncounterPanel role="player" state={playerView(true, false)} slots={slots} />
       </ToastProvider>
     );
-    expect(screen.getAllByText("Goblin 1 is acting", { exact: false }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Goblin 1 is acting/)).toBeNull();
+    expect(screen.getByText("HP 37/44")).toBeTruthy();
+    expect(screen.getByText("Your actions show here on your turn.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "End turn" })).toBeNull();
     expect(screen.getByRole("button", { name: "Reaction" })).toBeTruthy();
   });

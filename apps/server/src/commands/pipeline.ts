@@ -2,6 +2,7 @@ import type { z } from "zod";
 import type { GameCommandType, IntegrationScope } from "@vtt/api-contract";
 import type { ClientToServerEvents, GameState } from "@vtt/domain";
 import { GameAccessDeniedError } from "../authorization.js";
+import { isIncapacitated } from "../condition-rules.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -122,10 +123,48 @@ type StoreCommand = Parameters<GameStore["execute"]>[0];
 
 /** The one path every command takes, whichever transport carried it: authorize the role, parse the payload,
  *  run the command (whose writes commit and publish through `execute`), and project the reply. */
+/** The table itself answers for a creature that can no longer answer. It is GM-grade and holds no person's session. */
+const TABLE_PRINCIPAL: GamePrincipal = { kind: "gm", sessionId: "00000000-0000-4000-8000-000000000000" };
+
+/** A reactor that can't take a reaction any more: at 0 hit points, or with a condition that includes Incapacitated. */
+function cannotReact(state: GameState, actorId: string): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  return actor === undefined || actor.hp.current <= 0 || isIncapacitated(actor);
+}
+
 export function createCommandRunner(context: CommandContext, kit: Kit, commands: readonly AnyCommand[]) {
   const byType = new Map(commands.map((command) => [command.type, command]));
 
-  async function dispatch(type: GameCommandType, principal: GamePrincipal, raw: unknown): Promise<GameReply> {
+  /**
+   * A reaction prompt whose creature dropped (0 HP, Unconscious, Stunned) since it opened is withdrawn: the table
+   * declines it, so a held attack finishes with its own die and nobody waits on an answer that can't come. A prompt
+   * whose attack can't be finished any more is dropped.
+   */
+  async function settleDownedReactions() {
+    for (let guard = 0; guard < 10; guard++) {
+      const state = context.readState();
+      if (!state.combat.active) return;
+      const owed = state.combat.pendingReactions.find((entry) => cannotReact(state, entry.actorId));
+      if (!owed) return;
+      try {
+        await dispatch(
+          "reaction.answer",
+          TABLE_PRINCIPAL,
+          { commandId: context.newId(), reactionId: owed.id, use: false },
+          false
+        );
+      } catch {
+        await dispatch("reaction.dismiss", TABLE_PRINCIPAL, { commandId: context.newId(), reactionId: owed.id }, false);
+      }
+    }
+  }
+
+  async function dispatch(
+    type: GameCommandType,
+    principal: GamePrincipal,
+    raw: unknown,
+    settle = true
+  ): Promise<GameReply> {
     const command = byType.get(type);
     if (!command) throw new Error(`No command is registered for ${type}.`);
     if (command.gmOnly !== undefined && !isGmGrade(principal)) throw new GameAccessDeniedError(command.gmOnly);
@@ -155,12 +194,14 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
         request,
         execute: async (mutate, journal) => publish(await context.store.execute(header(journal), mutate)),
         executeTimeline: async (plan, journal) => publish(await context.store.executeTimeline(header(journal), plan)),
-        dispatch: (next, payload) => dispatch(next, principal, payload)
+        dispatch: (next, payload) => dispatch(next, principal, payload, false)
       },
       kit
     );
     const accepted = committed ? { revision: committed.state.revision, duplicate: committed.duplicate } : {};
-    return projectReply(principal, { ...accepted, ...extras });
+    const reply = projectReply(principal, { ...accepted, ...extras });
+    if (settle && committed && !committed.duplicate) await settleDownedReactions();
+    return reply;
   }
 
   return { dispatch };

@@ -117,6 +117,7 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
         weighed: null,
         acBonus: offer.reaction.amount,
         rollsAttack: false,
+        attackTotal: attack.total,
         parkedAttack: {
           actionId: ctx.action.id,
           builtin: input.builtin === true,

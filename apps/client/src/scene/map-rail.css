@@ -247,7 +247,7 @@
 .map-toolbar-actions-row .nh-btn {
   flex: 1;
 }
-/* Switches stack, so their paint grows to 44px rather than overlapping `::after` hit boxes. */
+/* Switches stack, so their paint grows to 44px and their `::after` hit boxes never overlap. */
 .map-toolbar-switch {
   align-self: flex-start;
   min-height: var(--tap-min);

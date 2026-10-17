@@ -46,3 +46,17 @@ export function damageBreakdown(result: Pick<ActionResolution, "damage" | "bonus
     ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
   ].join(" + ");
 }
+
+const SPELL_LEVEL_NOTE = /\s*\((?:Cantrip|\d+(?:st|nd|rd|th))\b[^)]*\)\s*$/i;
+
+/** An action's name without the spell level its list adds ("Shield (1st, Reaction)" reads "Shield", "Fire Bolt
+ *  (Cantrip)" reads "Fire Bolt"), for buttons and headings that already say what kind of action it is. An item's
+ *  name in brackets stays, since it says where the spell comes from, and so does "(ritual)". */
+export function plainActionName(name: string): string {
+  return name.replace(SPELL_LEVEL_NOTE, "").trim() || name;
+}
+/** Whether an action casts a spell, so its button says "Cast": a built character's spell action, or a stat block's
+ *  action that carries a spell level. */
+export function castsSpell(actionId: string, name: string): boolean {
+  return actionId.startsWith("spell-") || SPELL_LEVEL_NOTE.test(name);
+}

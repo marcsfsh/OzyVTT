@@ -265,7 +265,7 @@ export function SavePrompt({
                     ? `Succeeds without a roll (${rolled.autoSucceeded})`
                     : `Rolled ${rolled.total}`}
                 {rolled.natural !== undefined ? ` (d20 ${rolled.natural})` : ""}
-                {modeWords(rolled.rollMode)} - {rolled.success ? "Success" : "Failure"}
+                {modeWords(rolled.rollMode)} · {rolled.success ? "Success" : "Failure"}
               </strong>
               {/* `rolled.damage` is always the server's projection for the field's number, never local
             arithmetic. While a recheck is out, show only what was typed. */}

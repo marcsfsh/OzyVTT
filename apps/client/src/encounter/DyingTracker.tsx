@@ -131,7 +131,7 @@ export function DyingTracker({
                 <strong className={passed ? "save-pass" : "save-fail"}>
                   Rolled {rolled.naturalRoll}
                   {total !== null ? ` (total ${total})` : ""}
-                  {modeWords(rolled.rollModeSources)} -{" "}
+                  {modeWords(rolled.rollModeSources)} ·{" "}
                   {rolled.regainedConsciousness
                     ? "Natural 20"
                     : rolled.naturalRoll === 1

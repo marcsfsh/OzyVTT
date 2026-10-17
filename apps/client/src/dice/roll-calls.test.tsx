@@ -251,7 +251,7 @@ describe("the player's card for a call", () => {
     render(<RollCallPrompts state={playerState([call], {}, [save])} />, { wrapper: ToastProvider });
     expect(screen.getByText("Dexterity saving throw", { selector: "strong" })).toBeTruthy();
     // This browser rolls digitally, so the server throws the die as the card appears; Confirm applies it.
-    expect(await screen.findByText("Rolled 14 (d20 12) - Success")).toBeTruthy();
+    expect(await screen.findByText("Rolled 14 (d20 12) · Success")).toBeTruthy();
     expect(sent("save:answer")).toEqual([{ saveId: SAVE_ID, method: "roll", commit: false }]);
     await user.click(screen.getByRole("button", { name: "Confirm" }));
     expect(sent("save:answer").at(-1)).toEqual({ saveId: SAVE_ID, method: "roll", commit: true });

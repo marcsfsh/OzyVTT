@@ -66,7 +66,7 @@ export function MoveModeChoice({
     {
       value: "teleport",
       label: MOVE_MODE_NAMES.teleport,
-      title: "Spends no movement and provokes no opportunity attack"
+      title: "Spends no movement and provokes no Opportunity Attack"
     },
     ...(gm
       ? [

@@ -9,7 +9,7 @@ import {
 import { Button, IconX } from "@vtt/ui";
 import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
-import { damageAdjustments } from "./format";
+import { castsSpell, damageAdjustments, plainActionName } from "./format";
 import { HitOfferChoices, PushChoice } from "./AttackPreview";
 import { modeWords } from "./roll-mode-notes";
 import { FaceEntry, ForceModeButtons, RerollControl, type DieMode } from "./RollControls";
@@ -173,33 +173,36 @@ export function ReactionPrompt({
       setBusy(false);
       onFeedback(
         result.ok
-          ? "Reaction prompt dismissed - nothing applied."
+          ? "The reaction prompt is dismissed, and nothing was applied."
           : (result.message ?? "The prompt could not be dismissed.")
       );
     });
   };
   const hit = rolled ? rolled.attack.outcome === "hit" || rolled.attack.outcome === "crit" : false;
   const letGo = reaction.kind === "leaves-reach" ? "Let them go" : "Decline";
+  const name = plainActionName(reaction.actionName);
+  // A spell is cast, anything else used: "Cast Shield", "Use Parry".
+  const useLabel = `${castsSpell(reaction.actionId, reaction.actionName) ? "Cast" : "Use"} ${name}`;
   return (
     <div className="save-prompt reaction-prompt" role="group" aria-label={`Reaction for ${actorName}`}>
       <span className="save-prompt-label">
         {reaction.kind === "leaves-reach" ? (
           <>
-            <strong>Opportunity Attack</strong> - {reaction.sourceName} is leaving reach
+            <strong>Opportunity Attack</strong> · {reaction.sourceName} is leaving reach
           </>
         ) : reaction.kind === "damaged-by-creature" ? (
           <>
-            <strong>{reaction.actionName}</strong> - {reaction.sourceName} damaged you
+            <strong>{name}</strong> · {reaction.sourceName} damaged {actorName}
           </>
         ) : reaction.kind === "attack-would-hit" ? (
           <>
-            <strong>{reaction.actionName}</strong> - {reaction.sourceName}'s attack would hit; +{reaction.acBonus} AC
-            turns it into a miss
+            <strong>{name}</strong> · {reaction.sourceName}'s attack would hit {actorName}. +{reaction.acBonus} AC turns
+            it into a miss.
           </>
         ) : (
           <>
-            <strong>{reaction.actionName}</strong> vs {reaction.sourceName}
-            {reaction.critical ? " (crit)" : ""} · {reaction.proposedDamage} dmg incoming
+            <strong>{name}</strong> against {reaction.sourceName}
+            {reaction.critical ? " · critical hit" : ""} · {reaction.proposedDamage} damage incoming
           </>
         )}
       </span>
@@ -214,9 +217,9 @@ export function ReactionPrompt({
           <strong className={hit ? "save-pass" : "save-fail"}>
             Rolled {rolled.attack.total}
             {modeWords(rolled.rollMode)}
-            {rolled.attack.targetAc !== null ? ` vs AC ${rolled.attack.targetAc}` : ""} -{" "}
-            {rolled.attack.outcome === "crit" ? "CRIT" : rolled.attack.outcome.toUpperCase()} (nat{" "}
-            {rolled.attack.naturalRoll})
+            {rolled.attack.targetAc !== null ? ` against AC ${rolled.attack.targetAc}` : ""} ·{" "}
+            {rolled.attack.outcome === "crit" ? "CRIT" : rolled.attack.outcome.toUpperCase()} · d20{" "}
+            {rolled.attack.naturalRoll}
           </strong>
           {viewer === "gm" && (
             <ForceModeButtons
@@ -300,28 +303,30 @@ export function ReactionPrompt({
             </>
           ) : reaction.kind === "attack-would-hit" || reaction.kind === "damaged-by-creature" ? (
             <>
-              <button
+              {/* Taking the hit comes first; using the reaction is the prompt's one primary. */}
+              <Button
                 type="button"
-                className="save-prompt-roll"
+                variant="secondary"
                 disabled={busy}
                 title={
-                  reaction.kind === "attack-would-hit"
-                    ? `Spend the reaction: +${reaction.acBonus} AC against the attack`
-                    : `Spend the reaction against ${reaction.sourceName}`
-                }
-                onClick={() => answer(true)}
-              >
-                {reaction.kind === "attack-would-hit" ? `Use - +${reaction.acBonus} AC` : "Use"}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                title={
-                  reaction.kind === "attack-would-hit" ? "Keep the reaction; the attack hits" : "Keep the reaction"
+                  reaction.kind === "attack-would-hit" ? "Keep the reaction. The attack hits." : "Keep the reaction."
                 }
                 onClick={() => answer(false)}
               >
-                {reaction.kind === "attack-would-hit" ? "Decline - take the hit" : "Decline"}
+                {reaction.kind === "attack-would-hit" ? "Take the hit" : "Decline"}
+              </Button>
+              <button
+                type="button"
+                className="encounter-primary reaction-use"
+                disabled={busy}
+                title={
+                  reaction.kind === "attack-would-hit"
+                    ? `Spend the reaction for +${reaction.acBonus} AC against the attack.`
+                    : `Spend the reaction against ${reaction.sourceName}.`
+                }
+                onClick={() => answer(true)}
+              >
+                {useLabel}
               </button>
             </>
           ) : (
@@ -330,18 +335,18 @@ export function ReactionPrompt({
                 type="button"
                 className="save-prompt-roll"
                 disabled={busy}
-                title={`Spend the reaction; half damage${weighed ? ", after your defences" : ", before resistances"}`}
+                title={`Spend the reaction to halve the damage${weighed ? " after your defences" : " before resistances"}.`}
                 onClick={() => answer(true)}
               >
-                Use - take {takeIfUsed}
+                {useLabel} · take {takeIfUsed}
               </button>
               <button
                 type="button"
                 disabled={busy}
-                title={`Keep the reaction; full damage${weighed ? ", after your defences" : ", before resistances"}`}
+                title={`Keep the reaction and take full damage${weighed ? " after your defences" : " before resistances"}.`}
                 onClick={() => answer(false)}
               >
-                Decline - take {takeIfDeclined}
+                Take {takeIfDeclined}
               </button>
             </>
           )}

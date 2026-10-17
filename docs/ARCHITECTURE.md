@@ -71,7 +71,9 @@ catalogs, the character builder's offers, action availability, the combat log) a
 `commands/reads.ts`.
 
 Commands run one at a time through a promise queue. Add new capability to the command table,
-never to one transport.
+never to one transport. After each command that commits, the pipeline withdraws any reaction prompt
+whose creature can no longer react (dropped to 0 HP or Incapacitated) by answering it for the table,
+so a held attack finishes without the reaction.
 
 ## Realtime
 
@@ -117,7 +119,9 @@ audience. There are four:
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
   owner identity, GM notes and hidden turns are removed. A live scene's map reaches players before
   its fight, with the public tokens the GM has placed; the turn order and the tray wait for the
-  fight. A player's reply to an area they aimed names only the creatures they may see.
+  fight. A player's reply to an area they aimed names only the creatures they may see. A player's
+  reaction prompt names the attack total it answers only when the attack's own roll is in that
+  player's dice log.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. It follows the live scene, before and during its fight, unless
   the GM paused it. Only public actors with a position become tokens; annotations

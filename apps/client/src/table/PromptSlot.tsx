@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import type { PlayerActor, PlayerPendingReaction, PlayerView } from "@vtt/domain";
 import { useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
+import { plainActionName } from "../encounter/format";
 import { InitiativePrompt } from "../encounter/InitiativePrompt";
 import { ReactionPrompt } from "../encounter/ReactionPrompt";
 import { RollCallCard, useRollCallCards, type RollCallCardModel } from "../encounter/RollCallPrompt";
@@ -25,11 +26,21 @@ function slotCost(actor: PlayerActor, actionId: string): string | null {
 /** The headline and the one-line why of a reaction, from the side of the character who may take it. */
 function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
   switch (reaction.kind) {
-    case "attack-would-hit":
+    case "attack-would-hit": {
+      const ac = actor.armorClass;
+      // The roll only when the player already saw it in their dice log; the server leaves it out otherwise.
+      const roll =
+        reaction.attackRoll !== undefined && ac !== undefined
+          ? `The roll is ${reaction.attackRoll} against your AC ${ac}. `
+          : ac !== undefined
+            ? `The attack hits your AC ${ac}. `
+            : "";
+      const lasts = reaction.lastsUntilNextTurn ? " until the start of your next turn" : " against it";
       return {
         title: `${reaction.sourceName}'s attack would hit you`,
-        detail: `${reaction.actionName} gives you +${reaction.acBonus} AC against it, so the hit becomes a miss.`
+        detail: `${roll}${plainActionName(reaction.actionName)} gives you +${reaction.acBonus} AC${lasts}, so this hit becomes a miss.`
       };
+    }
     case "leaves-reach":
       return {
         title: `${reaction.sourceName} is leaving your reach`,
@@ -38,12 +49,12 @@ function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
     case "damaged-by-creature":
       return {
         title: `${reaction.sourceName} damaged you`,
-        detail: `${reaction.actionName} strikes back with your Reaction.`
+        detail: `${plainActionName(reaction.actionName)} strikes back with your Reaction.`
       };
     default:
       return {
         title: `${reaction.sourceName}'s hit deals ${reaction.proposedDamage} damage to ${actor.name}`,
-        detail: `${reaction.actionName} uses your Reaction to halve it.`
+        detail: `${plainActionName(reaction.actionName)} uses your Reaction to halve it.`
       };
   }
 }

@@ -75,3 +75,23 @@ export function useTokenFocusRequests(onFocus: (actorId: string) => void) {
     };
   }, []);
 }
+
+/* A request to open one of the map's tool groups, from the header's fog and vision chips. */
+export type MapToolGroupRequest = "fog" | "light";
+const groupListeners = new Set<(group: MapToolGroupRequest) => void>();
+
+export function openMapToolGroup(group: MapToolGroupRequest) {
+  for (const listener of groupListeners) listener(group);
+}
+
+/** Runs `onOpen` whenever something asks the map's rail to open a tool group. */
+export function useMapToolGroupRequests(onOpen: (group: MapToolGroupRequest) => void) {
+  const handle = useEffectEvent(onOpen);
+  useEffect(() => {
+    const listener = (group: MapToolGroupRequest) => handle(group);
+    groupListeners.add(listener);
+    return () => {
+      groupListeners.delete(listener);
+    };
+  }, []);
+}

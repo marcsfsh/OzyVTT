@@ -458,7 +458,7 @@ export function ViewGroup({
       </div>
       <div className="map-toolbar-actions">
         <Button variant="secondary" block onClick={onResetView}>
-          Show the whole map
+          Fit map
         </Button>
         <Button variant="secondary" block onClick={onToggleFullscreen}>
           {fullscreen ? "Exit fullscreen" : "Fullscreen"}

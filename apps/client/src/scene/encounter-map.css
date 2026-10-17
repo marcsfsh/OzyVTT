@@ -41,7 +41,7 @@
     flex-direction: column;
   }
   .encounter-map-interaction {
-    padding: var(--space-1) var(--space-2) 0;
+    padding: 0;
   }
 }
 /* Staging tray chips: neutral plate, team colour on a 1px edge and the round avatar disc, painted on a
@@ -182,7 +182,7 @@
 .tray-token.hidden {
   opacity: 0.76;
 }
-/* The stage: a 2px rim and corner ticks painted in front; nothing is painted behind the map. */
+/* The stage: the map fills it edge to edge, since the camera's view takes the stage's own shape. */
 .encounter-map-stage {
   position: relative;
   flex: 1;
@@ -190,45 +190,8 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: var(--rim-w) solid var(--rim-color);
-  border-radius: var(--radius-md);
   background: var(--void);
   touch-action: none;
-}
-/* The corner ticks: eight background layers on one `::after` (`::before` is left free for the
-   material utilities). `pointer-events: none` is required: this box spans the stage and would
-   otherwise swallow every press on the map. z-index 1 is above the map svg. */
-.encounter-map-stage::after {
-  content: "";
-  position: absolute;
-  inset: var(--space-1);
-  z-index: 1;
-  pointer-events: none;
-  --map-tick-len: 1.1rem;
-  --map-tick-w: 2px;
-  --map-tick: linear-gradient(var(--rim-color-hi), var(--rim-color-hi));
-  background-image:
-    var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick), var(--map-tick),
-    var(--map-tick), var(--map-tick);
-  background-repeat: no-repeat;
-  background-size:
-    var(--map-tick-len) var(--map-tick-w),
-    var(--map-tick-w) var(--map-tick-len),
-    var(--map-tick-len) var(--map-tick-w),
-    var(--map-tick-w) var(--map-tick-len),
-    var(--map-tick-len) var(--map-tick-w),
-    var(--map-tick-w) var(--map-tick-len),
-    var(--map-tick-len) var(--map-tick-w),
-    var(--map-tick-w) var(--map-tick-len);
-  background-position:
-    left top,
-    left top,
-    right top,
-    right top,
-    left bottom,
-    left bottom,
-    right bottom,
-    right bottom;
 }
 /* No viewport cap: the stage takes the frame's leftover height (below 980px it states its own band
    height, end of file). `> svg` only: @vtt/ui glyphs in the stage are `<svg width="1em">`, and a
@@ -610,8 +573,11 @@
   .encounter-map-stage {
     min-height: 6rem;
   }
-  .encounter-map-feedback {
+  /* The column has no gutter on a phone, so the rows under the map keep their own. */
+  .encounter-map-feedback,
+  .encounter-move-blocked {
     margin: var(--space-1) 0 0;
+    padding: 0 var(--space-2);
   }
   .encounter-token-tray {
     flex-direction: row;
@@ -763,7 +729,7 @@
   vector-effect: non-scaling-stroke;
 }
 
-/* A monster's number among its kind, on a square badge at the token's top left, matching every list. */
+/* A monster's number among its kind sits on a square badge at the token's top left. Every list shows the same number. */
 .token-number rect {
   fill: var(--void);
   stroke: var(--magenta-hi);
