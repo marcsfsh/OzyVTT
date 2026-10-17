@@ -1406,7 +1406,7 @@ export function buildCharacterDefinition(
   const size: ActorDefinition["size"] = sizeRow
     ? (species.sizes as readonly string[]).includes(sizeRow.id)
       ? (sizeRow.id as ActorDefinition["size"])
-      : reject(`${species.name} may be ${species.sizes.join(" or ")}, not "${sizeRow.id}".`)
+      : reject(`${species.name} may be ${species.sizes.join(" or ")}. Choose one of those sizes.`)
     : species.sizes.includes("medium")
       ? "medium"
       : species.sizes[0];

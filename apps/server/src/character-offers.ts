@@ -82,7 +82,7 @@ export function classSequenceOf(input: ClassSequenceInput): string[] {
   if (sequence.length !== input.level)
     reject(`The class levels name ${sequence.length} levels, but the character is level ${input.level}.`);
   if (sequence[0] !== input.classId)
-    reject(`The first level must be the starting class "${input.classId}", not "${sequence[0]}".`);
+    reject(`The first level must be the starting class "${input.classId}". This build starts with "${sequence[0]}".`);
   if (new Set(sequence).size > MAX_CLASSES) reject(`A character can have at most ${MAX_CLASSES} classes.`);
   return sequence;
 }
