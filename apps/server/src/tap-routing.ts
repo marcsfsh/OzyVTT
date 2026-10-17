@@ -4,6 +4,7 @@ import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { effectiveModeFor, familyModeFor, overrideCovers, type RuleId } from "./rules-families.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { castSlot, noUsesRemaining, slotsLeft, spendSlot, unpreparedSpell, useLimitFor } from "./resolution/economy.js";
+import { notEnoughUses, useCostOf } from "./use-cost.js";
 
 /**
  * Where an action tap goes, decided by the server. The sheet sends intent; the server answers:
@@ -62,7 +63,9 @@ export function looseRollPlan(
       label: action.name
     });
   }
-  if (action.healing) plan.push({ formula: action.healing.formula, purpose: "healing", label: action.name });
+  // A heal counted per use spent (Lay on Hands' points) has no die of its own to roll.
+  if (action.healing && !action.healing.perUse)
+    plan.push({ formula: action.healing.formula, purpose: "healing", label: action.name });
   if (options.includeDamage) {
     for (const part of action.damage)
       plan.push({ formula: part.formula, purpose: "damage", label: `${action.name} (${part.type})` });
@@ -86,7 +89,9 @@ export function spendLooseUses(
   const key = uses ? (uses.pool ?? action.id) : null;
   const limit = uses ? useLimitFor(siblings, action) : 0;
   const used = key ? (actor.actionUses[key] ?? 0) : 0;
+  const cost = useCostOf(action);
   if (key && used >= limit) throw new CommandRejectedError(noUsesRemaining(action, limit));
+  if (key && used + cost > limit) throw new CommandRejectedError(notEnoughUses(action.name, limit - used, cost));
   const slot = action.spellSlot ? castSlot(actor, action.spellSlot.level, slotLevel) : null;
   const slotRefusal =
     slot && action.spellSlot && slot.level < action.spellSlot.level
@@ -96,11 +101,11 @@ export function spendLooseUses(
         : null;
   const refusal = unpreparedSpell(actor, action, definition) ?? slotRefusal;
   if (refusal !== null && slots === "strict") throw new CommandRejectedError(refusal);
-  if (key) actor.actionUses = { ...actor.actionUses, [key]: used + 1 };
+  if (key) actor.actionUses = { ...actor.actionUses, [key]: used + cost };
   const spendsSlot = slot !== null && slotRefusal === null;
   if (spendsSlot) spendSlot(actor, slot);
   return {
-    usesLeft: key ? limit - used - 1 : null,
+    usesLeft: key ? limit - used - cost : null,
     spent: key !== null || spendsSlot,
     ...(refusal !== null && slots === "assisted" ? { warning: refusal } : {})
   };

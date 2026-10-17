@@ -13,6 +13,7 @@ import { aggregateRollMode } from "@vtt/rules-5e";
 import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
+import { leaveShortRest } from "./short-rest-interruptions.js";
 import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
@@ -282,6 +283,8 @@ export function startEncounter(
     historyDirty: false
   };
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
+  // Rolling Initiative stops a Short Rest; the GM's rest panel shows who left it.
+  leaveShortRest(state, actorIds, "rolled Initiative");
 }
 
 /** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its
@@ -327,6 +330,7 @@ export function addCombatant(
     ]
   };
   if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
+  leaveShortRest(state, new Set([actorId]), "rolled Initiative");
 }
 
 export function endEncounter(state: GameState) {

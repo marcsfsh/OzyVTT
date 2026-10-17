@@ -77,10 +77,11 @@
 }
 
 /* Bounded region (`ChoiceGrid bounded`): caps the list and scrolls it in place, keeping every option mounted.
-   The cap sits on the grid itself, which is safe because `max-height` isn't a definite block size (auto rows
-   still size from their cards). 21rem matches `.map-picker-grid`. `overscroll-behavior: contain` stops scroll
-   chaining; the padding leaves room for the focus ring, which `overflow` would clip. */
+   Rows are `max-content`: with `auto` rows, a list taller than the cap shrinks every row to its cards' minimum
+   height and clips their descriptions. 21rem matches `.map-picker-grid`. `overscroll-behavior: contain` stops
+   scroll chaining; the padding leaves room for the focus ring, which `overflow` would clip. */
 .nh-choicegrid-items--bounded {
+  grid-auto-rows: max-content;
   max-height: 21rem;
   padding: var(--space-1);
   overscroll-behavior: contain;

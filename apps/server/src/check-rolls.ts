@@ -1,4 +1,4 @@
-import type { CheckRollOutcome, GameState, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
+import type { Actor, CheckRollOutcome, GameState, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
 import { d20FacesFor, otherDiceOf, rerollLowestD20, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, type CheckNames, type CheckPlan, type CheckSubject, totalCheck } from "./ability-checks.js";
@@ -149,6 +149,44 @@ function recordCheck(
     },
     hiddenFromRoller: visibility === "blind" && scope.role !== "gm"
   };
+}
+
+/** A check that settles something on the spot (first aid, reading a scroll), rolled once with its plan's bonus and
+ *  Advantage or Disadvantage and recorded. Nothing holds it for a reroll: what it decided has already happened. */
+export function rollSettledCheck(
+  state: GameState,
+  actor: Actor,
+  plan: CheckPlan,
+  record: Readonly<{
+    id: string;
+    commandId: string;
+    sessionId: string;
+    role: "gm" | "player";
+    label: string;
+    visibility: RollVisibility;
+    createdAt: string;
+  }>,
+  random: RandomSource
+): Readonly<{ natural: number; total: number }> {
+  const mode = plan.rollMode.mode;
+  const roll = totalCheck(plan, d20FacesFor(mode, [], random), mode, random);
+  recordRoll(state, {
+    id: record.id,
+    commandId: record.commandId,
+    initiatorSessionId: record.sessionId,
+    initiatorRole: record.role,
+    initiatorLabel: actor.name,
+    label: `${record.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}`.slice(0, 80),
+    actorId: actor.id,
+    purpose: "check",
+    visibility: record.visibility,
+    formula: roll.resolution.expression.source,
+    normalizedFormula: roll.resolution.expression.normalized,
+    ...rolledTerms(roll.resolution),
+    total: roll.total,
+    createdAt: record.createdAt
+  });
+  return { natural: roll.natural, total: roll.total };
 }
 
 /** Rolls one ability check on the server: the rules' bonus and Advantage or Disadvantage, the d20 thrown here or typed

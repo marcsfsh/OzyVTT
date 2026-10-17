@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { catalogIdOf, type ContentEquipmentSummary, type GmActor, type PlayerActor } from "@vtt/domain";
 import { Badge, Button, IconButton, Select, Stepper, IconX } from "@vtt/ui";
-import { BindItemModal, EquipmentPicker, inventoryWeaponFrom, useEquipmentReference } from "./equipment";
+import {
+  ammunitionKindName,
+  BindItemModal,
+  EquipmentPicker,
+  inventoryWeaponFrom,
+  ScrollSpellModal,
+  useEquipmentReference
+} from "./equipment";
+import { useSpellReference } from "./spells";
 import { slugify, titleCase } from "./format";
 import type { SheetEdit } from "./useSheetEdit";
 
@@ -15,7 +23,8 @@ export function SheetInventory({
   edit,
   role = "player",
   others = [],
-  attunementSlots = 3
+  attunementSlots = 3,
+  inFight = false
 }: Readonly<{
   actor: GmActor | PlayerActor;
   busy: boolean;
@@ -25,6 +34,8 @@ export function SheetInventory({
   attunementSlots?: number;
   /** The characters the GM can hand an item to. */
   others?: readonly Readonly<{ id: string; name: string }>[];
+  /** In a running fight its fired ammunition comes back when the fight ends, so there is nothing to pick up yet. */
+  inFight?: boolean;
 }>) {
   const inventory = actor.inventory ?? [];
   const currency = actor.currency ?? null;
@@ -33,6 +44,9 @@ export function SheetInventory({
   // Which unbound template row (a magic weapon/armor with no base picked) has its chooser open, and
   // the catalog its detail resolves against.
   const [bindingRowId, setBindingRowId] = useState<string | null>(null);
+  // Which scroll row with no spell yet has its spell list open.
+  const [scrollRowId, setScrollRowId] = useState<string | null>(null);
+  const spells = useSpellReference();
   const [giveItemId, setGiveItemId] = useState("");
   const [giveTo, setGiveTo] = useState("");
   const { catalog: equipmentCatalog } = useEquipmentReference();
@@ -48,17 +62,25 @@ export function SheetInventory({
     });
   }, [currency?.cp, currency?.sp, currency?.ep, currency?.gp, currency?.pp]);
   const attunedCount = inventory.filter((item) => item.attuned).length;
+  const fired = inventory.reduce((sum, item) => sum + (item.ammunitionFired ?? 0), 0);
+  // The pick a template row was bound to: magic ammunition names its kind ("Arrows"), a weapon or armor its base.
+  const baseLabel = (baseId: string) => {
+    const base = equipmentCatalog.find((entry) => entry.id === baseId);
+    return base?.category === "ammunition" ? ammunitionKindName(base) : baseId.split("-").map(titleCase).join(" ");
+  };
   // The server upserts by id, so adding to an existing stack resends the whole item with quantity+1
   // (keeping equipped/attuned); a new pick starts at 1 with the catalog's category, weight and text.
   const ownedCounts = new Map<string, number>();
   for (const item of inventory)
     ownedCounts.set(catalogIdOf(item), (ownedCounts.get(catalogIdOf(item)) ?? 0) + item.quantity);
-  const addFromCatalog = (item: ContentEquipmentSummary, baseId?: string) => {
+  const addFromCatalog = (item: ContentEquipmentSummary, baseId?: string, spellId?: string) => {
     const copies = inventory.filter((entry) => catalogIdOf(entry) === item.id);
     // A template copy bound to another base is its own row (a +1 longsword beside a +1 dagger); the same base, or a
-    // row still waiting for its pick, grows the stack.
+    // row still waiting for its pick, grows the stack. A scroll of another spell is its own row too.
     const existing = copies.find(
-      (entry) => !item.appliesTo || baseId === undefined || entry.baseId === undefined || entry.baseId === baseId
+      (entry) =>
+        (!item.appliesTo || baseId === undefined || entry.baseId === undefined || entry.baseId === baseId) &&
+        (!item.spellScroll || entry.spellId === spellId)
     );
     const taken = new Set(inventory.map((entry) => entry.id));
     let rowId = existing?.id ?? item.id;
@@ -75,6 +97,7 @@ export function SheetInventory({
         // The template pick from the chooser, or the one the owned row already has (a re-add must not
         // unbind it). The server validates the pick and copies the base's stats.
         ...(baseId ? { baseId } : existing?.baseId ? { baseId: existing.baseId } : {}),
+        ...(spellId ? { spellId } : {}),
         ...(item.weightLb != null ? { weightEach: item.weightLb } : {}),
         ...(item.description ? { description: item.description } : {}),
         // Carry the weapon/armor stats so equipping matters. The weapon block is narrowed, not spread: the
@@ -132,9 +155,28 @@ export function SheetInventory({
                   recorded pick. An unbound template row keeps the item and offers the base chooser. */}
               <span className="sheet-item-name">
                 {item.name}
-                {item.baseId ? (
-                  <span className="sheet-item-cat">({item.baseId.split("-").map(titleCase).join(" ")})</span>
+                {item.baseId ? <span className="sheet-item-cat">({baseLabel(item.baseId)})</span> : null}
+                {item.spellId ? (
+                  <span className="sheet-item-cat">
+                    (
+                    {spells.find((spell) => spell.id === item.spellId)?.name ??
+                      titleCase(item.spellId.replace(/-/g, " "))}
+                    )
+                  </span>
                 ) : null}
+                {(() => {
+                  const summary = equipmentCatalog.find((entry) => entry.id === catalogIdOf(item));
+                  return !item.spellId && summary?.spellScroll ? (
+                    <button
+                      type="button"
+                      className="sheet-toggle-btn tap-target"
+                      disabled={busy}
+                      onClick={() => setScrollRowId(item.id)}
+                    >
+                      Choose its spell
+                    </button>
+                  ) : null;
+                })()}
                 {item.category ? (
                   <span className="sheet-item-cat">{item.category.split("-").map(titleCase).join(" ")}</span>
                 ) : null}
@@ -183,6 +225,7 @@ export function SheetInventory({
                 {item.ammunitionLeft !== undefined ? (
                   <span className="sheet-item-cat">{item.ammunitionLeft} left</span>
                 ) : null}
+                {item.ammunitionFired ? <span className="sheet-item-cat">{item.ammunitionFired} fired</span> : null}
                 {role === "player" && item.chosenDamageType ? (
                   <span className="sheet-item-cat">Resists {titleCase(item.chosenDamageType)}</span>
                 ) : null}
@@ -252,6 +295,20 @@ export function SheetInventory({
           ))}
         </div>
       )}
+      {/* SRD Ammunition: a minute after shooting, half the pieces fired can be picked up again. */}
+      {fired > 0 && !inFight && (
+        <p className="sheet-recover-ammunition">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void edit("character:recover-ammunition", { actorId: actor.id })}
+          >
+            Pick up fired ammunition
+          </Button>
+          <span className="sheet-item-cat">Half of the {fired} fired come back, rounded down.</span>
+        </p>
+      )}
       {role === "gm" && others.length > 0 && inventory.length > 0 && (
         <form
           className="sheet-give"
@@ -302,6 +359,24 @@ export function SheetInventory({
           onClose={() => setPickerOpen(false)}
         />
       )}
+      {(() => {
+        if (!scrollRowId) return null;
+        const rowItem = inventory.find((entry) => entry.id === scrollRowId);
+        const summary = rowItem ? equipmentCatalog.find((entry) => entry.id === catalogIdOf(rowItem)) : undefined;
+        if (!rowItem || !summary) return null;
+        // The server checks the spell against the scroll's levels and keeps the pick.
+        return (
+          <ScrollSpellModal
+            scroll={summary}
+            busy={busy}
+            onClose={() => setScrollRowId(null)}
+            onPick={(spellId) => {
+              void edit("character:set-inventory", { actorId: actor.id, item: { ...rowItem, spellId } });
+              setScrollRowId(null);
+            }}
+          />
+        );
+      })()}
       {(() => {
         if (!bindingRowId) return null;
         const rowItem = inventory.find((entry) => entry.id === bindingRowId);

@@ -41,6 +41,7 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     usesPer: action.uses?.per ?? null,
     usesRecharge: action.uses?.recharge ?? null,
     usesPool: action.uses?.pool ?? null,
+    ...(action.useCost !== undefined ? { useCost: action.useCost } : {}),
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack
       ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count }))
@@ -53,7 +54,9 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
-      : {})
+      : {}),
+    // So does a touch that ends a condition (Lay on Hands' cure).
+    ...(action.endsConditions && !action.healing ? { targeting: "single" as const } : {})
   };
 }
 
@@ -100,9 +103,10 @@ export function PlayerActionRunner({
         )
         .map(summaryOfOwnAction),
       // Item-derived actions are appended: their `item-<inventory id>` keys cannot collide with
-      // stat-block ids.
+      // stat-block ids. The server says which resolve (a potion, a scroll, a coat of poison).
       ...extraActions.filter(
         (action) =>
+          (action.targeting !== undefined && action.targeting !== null) ||
           action.attackBonus !== null ||
           action.saveAbility !== null ||
           action.damage.length > 0 ||
@@ -112,8 +116,12 @@ export function PlayerActionRunner({
     [definition, extraActions]
   );
   const healingOf = (action: ContentActionSummary) => definition.actions.find((own) => own.id === action.id)?.healing;
-  // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first.
+  // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first. An item's action carries the
+  // server's word on it (a scroll of Detect Magic is a tap, a potion picks its drinker).
   const isTargetlessOwn = (action: ContentActionSummary) => {
+    if (action.targeting === "none") return true;
+    // A touch that ends a condition picks who it touches.
+    if (action.targeting === "single" || action.targeting === "multi") return false;
     const healing = healingOf(action);
     if (healing) return healing.self === true;
     return (
@@ -174,7 +182,11 @@ export function PlayerActionRunner({
         <ActionTargetPicker
           picking={picking}
           targets={targets
-            .filter((target) => target.actorId !== actorId)
+            // A heal may be for the healer too (a potion drunk, not handed over).
+            .filter(
+              (target) =>
+                target.actorId !== actorId || picking.action.healing != null || healingOf(picking.action) !== undefined
+            )
             .map((target) => ({ id: target.actorId, label: target.name }))}
           busy={busy}
           onInvalidFace={onFeedback}

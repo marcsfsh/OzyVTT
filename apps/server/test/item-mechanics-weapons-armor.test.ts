@@ -509,20 +509,24 @@ describe("the authored riders are present in the shipped bundle", () => {
     // Two authoring mistakes pinned so they do not return:
     // 1. `demon-armor`'s "you know Abyssal": an item's `grants.languages` lands in
     //    `derivation.languages`, which nothing reads; sheet languages are built at character-build time.
-    // 2. `armor-of-vulnerability`: the resistance and vulnerabilities hang on a type the GM picks per
-    //    copy, so neither half is authored. The curse's attunement lock is (SRD: attunement to a cursed
-    //    item can't be ended voluntarily).
+    // 2. `armor-of-vulnerability`: both halves hang on the type the GM picks per copy, so the resistance is
+    //    the chosen one and the curse's vulnerabilities are the other two, never a fixed modifier. The curse's
+    //    attunement lock holds too (SRD: attunement to a cursed item can't be ended voluntarily).
     expect(
       shipped("demon-armor").grants?.languages ?? [],
       "demon-armor's Abyssal has no reader; it is a named absence, not a grant"
     ).toEqual([]);
     const vulnerable = shipped("armor-of-vulnerability") as unknown as {
       modifiers: unknown[];
-      grants: unknown;
+      grants: { damageResistances?: string[] } | undefined;
       cursed: boolean;
+      damageTypeChoice: string[];
+      vulnerableToOtherChoices: boolean;
     };
-    expect(vulnerable.modifiers, "armor-of-vulnerability must author nothing until both halves can land").toEqual([]);
+    expect(vulnerable.modifiers, "a fixed vulnerability would ignore the GM's pick").toEqual([]);
     expect(vulnerable.cursed, "attuning locks the cursed armor on").toBe(true);
-    expect((vulnerable.grants as { damageResistances?: string[] } | undefined)?.damageResistances ?? []).toEqual([]);
+    expect(vulnerable.grants?.damageResistances).toEqual(["bludgeoning"]);
+    expect(vulnerable.damageTypeChoice).toEqual(["bludgeoning", "piercing", "slashing"]);
+    expect(vulnerable.vulnerableToOtherChoices).toBe(true);
   });
 });

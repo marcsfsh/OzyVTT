@@ -1,11 +1,18 @@
 import type { LooseSaveOutcome } from "@vtt/domain";
 import { aggregateRollMode, otherDiceOf } from "@vtt/rules-5e";
-import { requireActorAccess, requireGm } from "../authorization.js";
+import { GameAccessDeniedError, requireActorAccess, requireGm } from "../authorization.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "../condition-rules.js";
 import { rollDeathSave } from "../death-saves.js";
 import type { EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
-import { DeathSaveRollSchema, SaveAnswerSchema, SaveDismissSchema, SaveRollSchema } from "@vtt/domain/commands";
+import { stabilizeCreature } from "../stabilize.js";
+import {
+  ActorStabilizeSchema,
+  DeathSaveRollSchema,
+  SaveAnswerSchema,
+  SaveDismissSchema,
+  SaveRollSchema
+} from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { heldRollFor, holdRoll, releaseHeldRoll, rollHeldTest } from "../held-rolls.js";
 import { damageAdjustmentDetail, healActor } from "../hit-points.js";
@@ -251,7 +258,7 @@ export const saveCommands = [
           throw new CommandRejectedError("That character isn't dying.");
         if (actor.deathSaves.stable) throw new CommandRejectedError("A stable character doesn't roll death saves.");
         if (actor.deathSaves.failures >= 3)
-          throw new CommandRejectedError("That character is dead - heal or revive them through the GM.");
+          throw new CommandRejectedError("That character is dead - only a revival brings them back.");
         // In a fight a death save comes once, at the start of the dying creature's turn. The GM may roll
         // one any time, as a correction.
         const inFight = draft.combat.active && draft.combat.initiative.some((entry) => entry.actorId === actorId);
@@ -350,6 +357,57 @@ export const saveCommands = [
           ...(rollModeSources ? { rollModeSources } : {})
         }
       };
+    }
+  }),
+
+  defineCommand({
+    type: "actor.stabilize",
+    operationId: "stabilizeActor",
+    description:
+      'Stabilizes a creature at 0 hit points (SRD Stabilizing a Character), or wakes one knocked out, by the aid `helperId` gives. `method` "medicine" is the Help action\'s first aid: the server rolls the helper\'s Wisdom (Medicine) check (its sheet bonus, Exhaustion, check riders) against DC 10, and a knocked-out creature wakes on a success. "healers-kit" spends one from the helper\'s Healer\'s Kit stack, "spare-the-dying" needs the helper to know the cantrip; neither checks. "gm" is the GM\'s own ruling, with no helper. A Stable creature keeps its Unconscious and stops making death saves. In a fight the aid is the helper\'s action on its own turn, within reach (Spare the Dying: its range), through the rules ladder (`override` is the GM\'s). The response carries `stabilize`. GM-grade with any helper; a player only with their own claimed character, on a creature they can see.',
+    summary: "Stabilize a creature at 0 hit points with first aid, a Healer's Kit or Spare the Dying.",
+    schema: ActorStabilizeSchema,
+    malformed: "The stabilize command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      if (request.override && !isGmGrade(principal))
+        throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
+      const initiator = initiatorOf(principal);
+      const distance = await kit.creatureDistance();
+      let outcome: ReturnType<typeof stabilizeCreature> | undefined;
+      const { state, duplicate } = await execute((draft) => {
+        outcome = stabilizeCreature(
+          draft,
+          {
+            targetId: request.actorId,
+            method: request.method,
+            ...(request.helperId ? { helperId: request.helperId } : {}),
+            override: request.override ?? null,
+            commandId: request.commandId
+          },
+          initiator,
+          {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+            catalog: kit.equipmentCatalog(),
+            random: (sides) => kit.context.random(sides),
+            newRollId: kit.context.newId,
+            now: () => new Date().toISOString(),
+            sessionId: sessionIdOf(principal),
+            role: initiator.role,
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+          }
+        );
+      });
+      if (duplicate || !outcome) return;
+      kit.publishRolls(state, request.commandId);
+      if (outcome.overridden)
+        kit.context.appendLog({
+          kind: "override",
+          text: `OVERRIDE (${outcome.overridden.rule}): aid for ${kit.actorName(request.actorId)} - ${outcome.overridden.reason}`,
+          actorIds: [request.actorId]
+        });
+      kit.publishNarrations(outcome.events);
+      return { stabilize: { stabilized: outcome.stabilized, woke: outcome.woke, check: outcome.check } };
     }
   })
 ];

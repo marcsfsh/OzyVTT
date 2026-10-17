@@ -396,6 +396,13 @@
               ],
               "additionalProperties": false
             },
+            "failureHazard": {
+              "type": "string",
+              "enum": [
+                "burning",
+                "oil"
+              ]
+            },
             "failureEffect": {
               "type": "object",
               "properties": {
@@ -475,12 +482,37 @@
               "type": "number",
               "minimum": 0.1,
               "maximum": 1
+            },
+            "perUse": {
+              "type": "boolean",
+              "const": true
             }
           },
           "required": [
             "formula"
           ],
           "additionalProperties": false
+        },
+        "useCost": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 100
+            },
+            {
+              "type": "string",
+              "const": "chosen"
+            }
+          ]
+        },
+        "endsConditions": {
+          "minItems": 1,
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema35"
+          }
         },
         "darts": {
           "type": "integer",
@@ -500,14 +532,14 @@
           "maxItems": 4,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema35"
+            "$ref": "#/$defs/__schema36"
           }
         },
         "onHit": {
           "maxItems": 2,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema36"
+            "$ref": "#/$defs/__schema37"
           }
         },
         "targetRules": {
@@ -639,6 +671,11 @@
             "concentration": {
               "default": false,
               "type": "boolean"
+            },
+            "damageUses": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
             },
             "onHit": {
               "type": "boolean"
@@ -1332,6 +1369,34 @@
             "type",
             "poolId",
             "amount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "short-rest-regain"
+            },
+            "poolId": {
+              "$ref": "#/$defs/__schema26"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "when": {
+              "$ref": "#/$defs/__schema23"
+            },
+            "scope": {
+              "$ref": "#/$defs/__schema31"
+            }
+          },
+          "required": [
+            "type",
+            "poolId"
           ],
           "additionalProperties": false
         },
@@ -2396,6 +2461,11 @@
       "pattern": "^(?:\\d+d(?:4|6|8|10|12|20|100)(?:\\s*[+-]\\s*\\d+)?|\\d+)$"
     },
     "__schema35": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema36": {
       "type": "object",
       "properties": {
         "actionId": {
@@ -2414,7 +2484,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema36": {
+    "__schema37": {
       "type": "object",
       "properties": {
         "conditions": {
@@ -2422,7 +2492,7 @@
           "maxItems": 3,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema37"
+            "$ref": "#/$defs/__schema38"
           }
         },
         "escapeDc": {
@@ -2450,11 +2520,11 @@
       ],
       "additionalProperties": false
     },
-    "__schema37": {
+    "__schema38": {
       "type": "object",
       "properties": {
         "id": {
-          "$ref": "#/$defs/__schema38"
+          "$ref": "#/$defs/__schema35"
         },
         "level": {
           "type": "integer",
@@ -2466,11 +2536,6 @@
         "id"
       ],
       "additionalProperties": false
-    },
-    "__schema38": {
-      "type": "string",
-      "maxLength": 60,
-      "pattern": "^[a-z0-9-]+$"
     },
     "__schema39": {
       "type": "string",
@@ -2486,7 +2551,7 @@
           "const": "condition"
         },
         "conditionId": {
-          "$ref": "#/$defs/__schema38"
+          "$ref": "#/$defs/__schema35"
         },
         "level": {
           "type": "integer",
@@ -2503,7 +2568,7 @@
     "__schema41": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 20
+      "maximum": 100
     },
     "__schema42": {
       "type": "string",
@@ -2570,7 +2635,7 @@
           "maxItems": 2,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema38"
+            "$ref": "#/$defs/__schema35"
           }
         }
       },
@@ -2683,7 +2748,7 @@
       "maxItems": 20,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema38"
+        "$ref": "#/$defs/__schema35"
       }
     },
     "__schema55": {
@@ -3436,6 +3501,11 @@
         },
         "chosenDamageType": {
           "$ref": "#/$defs/__schema19"
+        },
+        "spellId": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
         },
         "ammunitionLeft": {
           "type": "integer",

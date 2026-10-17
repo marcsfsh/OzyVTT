@@ -72,6 +72,15 @@
     "goldPieces": 75
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -624,6 +633,13 @@
      },
      "per": "long-rest"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "rage",
+      "amount": 1
+     }
+    ],
     "actions": [
      {
       "id": "rage",
@@ -1032,6 +1048,51 @@
     "goldPieces": 90
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": [],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "acrobatics",
+     "animal-handling",
+     "arcana",
+     "athletics",
+     "deception",
+     "history",
+     "insight",
+     "intimidation",
+     "investigation",
+     "medicine",
+     "nature",
+     "perception",
+     "performance",
+     "persuasion",
+     "religion",
+     "sleight-of-hand",
+     "stealth",
+     "survival"
+    ]
+   },
+   "toolChoices": {
+    "choose": 1,
+    "from": [
+     "instrument-bagpipes",
+     "instrument-drum",
+     "instrument-dulcimer",
+     "instrument-flute",
+     "instrument-horn",
+     "instrument-lute",
+     "instrument-lyre",
+     "instrument-pan-flute",
+     "instrument-shawm",
+     "instrument-viol"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -1686,7 +1747,13 @@
     "id": "font-of-inspiration",
     "name": "Font Of Inspiration",
     "level": 5,
-    "description": "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration."
+    "description": "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration.",
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "bardic-inspiration"
+     }
+    ]
    },
    {
     "id": "countercharm",
@@ -2606,7 +2673,14 @@
        }
       ]
      }
-    }
+    },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "channel-divinity",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "cleric-subclass",
@@ -2859,6 +2933,14 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "shields"
+   ],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -3482,6 +3564,13 @@
      },
      "per": "long-rest"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "wild-shape",
+      "amount": 1
+     }
+    ],
     "actions": [
      {
       "id": "wild-shape",
@@ -3779,7 +3868,6 @@
     "shields"
    ],
    "weapons": [
-    "simple",
     "martial"
    ],
    "tools": []
@@ -4417,7 +4505,14 @@
        }
       ]
      }
-    }
+    },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "second-wind",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "weapon-mastery",
@@ -4670,6 +4765,11 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -5458,35 +5558,51 @@
     "name": "Superior Defense",
     "level": 18,
     "description": "At the start of your turn, you can expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to all damage except Force damage.",
-    "effects": [
+    "uses": {
+     "scaling": {
+      "type": "class-resource",
+      "id": "focus-points"
+     },
+     "per": "short-rest",
+     "pool": "focus-points"
+    },
+    "actions": [
      {
+      "id": "superior-defense",
       "name": "Superior Defense",
-      "tags": [
-       "superior-defense"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 10
-      },
-      "modifiers": [
-       {
-        "type": "damage-resistance",
-        "damageTypes": [
-         "acid",
-         "bludgeoning",
-         "cold",
-         "fire",
-         "lightning",
-         "necrotic",
-         "piercing",
-         "poison",
-         "psychic",
-         "radiant",
-         "slashing",
-         "thunder"
-        ]
-       }
-      ]
+      "activation": "other",
+      "description": "At the start of your turn, expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to every damage type except Force.",
+      "damage": [],
+      "useCost": 3,
+      "grants": {
+       "name": "Superior Defense",
+       "tags": [
+        "superior-defense"
+       ],
+       "duration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "acid",
+          "bludgeoning",
+          "cold",
+          "fire",
+          "lightning",
+          "necrotic",
+          "piercing",
+          "poison",
+          "psychic",
+          "radiant",
+          "slashing",
+          "thunder"
+         ]
+        }
+       ]
+      }
      }
     ]
    },
@@ -5685,6 +5801,17 @@
     "goldPieces": 150
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "medium",
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -6224,7 +6351,121 @@
     "id": "lay-on-hands",
     "name": "Lay On Hands",
     "level": 1,
-    "description": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you finish a Long Rest. With that pool, you can restore a total number of Hit Points equal to five times your Paladin level. As a Bonus Action, you can touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool. You can also expend 5 Hit Points from the pool of healing power to remove the Poisoned condition from the creature; those points don't also restore Hit Points to the creature."
+    "description": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you finish a Long Rest. With that pool, you can restore a total number of Hit Points equal to five times your Paladin level. As a Bonus Action, you can touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool. You can also expend 5 Hit Points from the pool of healing power to remove the Poisoned condition from the creature; those points don't also restore Hit Points to the creature.",
+    "uses": {
+     "scaling": {
+      "type": "by-level",
+      "table": [
+       {
+        "level": 1,
+        "limit": 5
+       },
+       {
+        "level": 2,
+        "limit": 10
+       },
+       {
+        "level": 3,
+        "limit": 15
+       },
+       {
+        "level": 4,
+        "limit": 20
+       },
+       {
+        "level": 5,
+        "limit": 25
+       },
+       {
+        "level": 6,
+        "limit": 30
+       },
+       {
+        "level": 7,
+        "limit": 35
+       },
+       {
+        "level": 8,
+        "limit": 40
+       },
+       {
+        "level": 9,
+        "limit": 45
+       },
+       {
+        "level": 10,
+        "limit": 50
+       },
+       {
+        "level": 11,
+        "limit": 55
+       },
+       {
+        "level": 12,
+        "limit": 60
+       },
+       {
+        "level": 13,
+        "limit": 65
+       },
+       {
+        "level": 14,
+        "limit": 70
+       },
+       {
+        "level": 15,
+        "limit": 75
+       },
+       {
+        "level": 16,
+        "limit": 80
+       },
+       {
+        "level": 17,
+        "limit": 85
+       },
+       {
+        "level": 18,
+        "limit": 90
+       },
+       {
+        "level": 19,
+        "limit": 95
+       },
+       {
+        "level": 20,
+        "limit": 100
+       }
+      ]
+     },
+     "per": "long-rest",
+     "pool": "lay-on-hands"
+    },
+    "actions": [
+     {
+      "id": "lay-on-hands",
+      "name": "Lay on Hands",
+      "activation": "bonus-action",
+      "description": "As a Bonus Action, touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool.",
+      "damage": [],
+      "useCost": "chosen",
+      "healing": {
+       "formula": "1",
+       "perUse": true
+      }
+     },
+     {
+      "id": "lay-on-hands-cure-poison",
+      "name": "Lay on Hands: Cure Poison",
+      "activation": "bonus-action",
+      "description": "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove the Poisoned condition from it; those points don't also restore Hit Points to the creature.",
+      "damage": [],
+      "useCost": 5,
+      "endsConditions": [
+       "poisoned"
+      ]
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -6300,6 +6541,13 @@
      "per": "long-rest",
      "pool": "channel-divinity"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "channel-divinity",
+      "amount": 1
+     }
+    ],
     "tags": [
      "channel-divinity"
     ],
@@ -6585,6 +6833,30 @@
     "goldPieces": 150
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "medium",
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": [],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "animal-handling",
+     "athletics",
+     "insight",
+     "investigation",
+     "nature",
+     "perception",
+     "stealth",
+     "survival"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -7465,6 +7737,30 @@
     "goldPieces": 100
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": [
+    "thieves-tools"
+   ],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "acrobatics",
+     "athletics",
+     "deception",
+     "insight",
+     "intimidation",
+     "investigation",
+     "perception",
+     "persuasion",
+     "sleight-of-hand",
+     "stealth"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -8120,6 +8416,11 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -8992,6 +9293,13 @@
     "goldPieces": 100
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -9542,7 +9850,7 @@
         "choose": 1,
         "fromPicks": {
          "offer": "class-cantrips",
-         "where": "ranged"
+         "where": "ranged-damage"
         }
        }
       },

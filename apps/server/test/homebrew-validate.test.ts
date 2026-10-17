@@ -146,6 +146,27 @@ describe("tier 1 - the record's own schema", () => {
     expect(validateForPublish("equipment", shape({}), contextWith()).valid).toBe(true);
     expect(validateForPublish("equipment", shape({ slot: null }), contextWith()).valid).toBe(false);
   });
+
+  it("takes magic ammunition as a template over the kinds of ammunition, and refuses a base that isn't one", () => {
+    const arrows = (baseIds: readonly string[]) => ({
+      id: "hb-seeking-arrow-a1b2c3",
+      name: "Seeking Arrow",
+      source: "homebrew",
+      category: "ammunition",
+      slot: "ammunition",
+      costGp: 0,
+      weightLb: 0,
+      description: "A magic arrow.",
+      isMagic: true,
+      appliesTo: { label: "Arrow", baseIds }
+    });
+    expect(validateForPublish("equipment", arrows(["arrows-20"]), contextWith()).valid).toBe(true);
+    const refused = validateForPublish("equipment", arrows(["longsword"]), contextWith());
+    expect(refused.valid).toBe(false);
+    expect(messages(refused)).toContain(
+      '"longsword" is not a kind of ammunition (Arrows, Crossbow Bolts...), so "Seeking Arrow" could never be bound to it.'
+    );
+  });
 });
 
 describe("tier 2 - identity", () => {

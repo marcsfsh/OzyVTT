@@ -173,7 +173,7 @@ describe("a chosen option's own pick", () => {
     );
   });
 
-  it("offers Agonizing Blast only the damaging cantrips this Warlock knows, and waits until there is one", () => {
+  it("offers Agonizing Blast once this Warlock knows a damaging cantrip, and then only those cantrips", () => {
     const warlock = (cantrips: readonly string[]) =>
       offers({
         speciesId: "human",
@@ -182,7 +182,15 @@ describe("a chosen option's own pick", () => {
         level: 2,
         picks: { "feature:eldritch-invocations": ["agonizing-blast"], "class-cantrips": cantrips }
       });
-    expect(offerNamed(warlock([]), "feature:agonizing-blast")?.unresolvable).toMatch(/deals damage/);
+    // SRD prerequisite: "a Warlock Cantrip That Deals Damage". Without one the invocation stays listed, greyed, and
+    // its own pick is not asked.
+    for (const known of [[], ["prestidigitation"]]) {
+      const reply = warlock(known);
+      expect(offerNamed(reply, "feature:eldritch-invocations")?.unavailable?.["agonizing-blast"]).toBe(
+        "unavailable until you know a Warlock cantrip that deals damage"
+      );
+      expect(offerNamed(reply, "feature:agonizing-blast")).toBeUndefined();
+    }
     const blast = offerNamed(warlock(["eldritch-blast", "prestidigitation"]), "feature:agonizing-blast");
     expect(blast?.unresolvable).toBeNull();
     expect(ids(blast)).toEqual(["eldritch-blast"]);
@@ -278,6 +286,24 @@ describe("answers follow the build", () => {
     });
     expect(lower.choices.every((row) => row.level <= 2)).toBe(true);
     expect(lower.subclassId).toBeNull();
+  });
+
+  it("offers Magical Discoveries a cantrip as well as a spell, and reads a cantrip taken there back", () => {
+    // SRD College of Lore: "A spell you choose must be a cantrip or a spell for which you have spell slots."
+    const lore = { speciesId: "human", backgroundId: "soldier", classId: "bard", level: 6 };
+    const card = offerNamed(
+      offers({ ...lore, picks: { "feature:bard-subclass": ["college-of-lore"] } }),
+      "feature:magical-discoveries"
+    );
+    expect(ids(card)).toEqual(expect.arrayContaining(["mage-hand", "spiritual-weapon"]));
+    const reread = offers({
+      ...lore,
+      choices: [
+        { level: 3, classId: "bard", kind: "subclass", id: "college-of-lore", payload: { featureId: "bard-subclass" } },
+        { level: 6, classId: "bard", kind: "spell", id: "mage-hand", payload: { featureId: "magical-discoveries" } }
+      ]
+    });
+    expect(reread.picks["feature:magical-discoveries"]).toEqual(["mage-hand"]);
   });
 });
 

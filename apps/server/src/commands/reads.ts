@@ -12,6 +12,7 @@ import { builtinCheckSkills } from "../resolution/builtins.js";
 import { actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
+import { rechoicesOf } from "../ledger-rechoice.js";
 import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
@@ -162,7 +163,9 @@ export const gameReads = [
           deriveEquipment(actor, definition, catalog),
           kit.catalogFor(principal).skillSummaries(),
           catalog
-        )
+        ),
+        // Read against the GM's content, as `actor.rechoose` checks them.
+        rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm"))
       };
     }
   },

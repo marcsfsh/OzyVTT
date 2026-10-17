@@ -32,6 +32,43 @@ export const paladin: ClassMechanicsModule = {
       }
     },
 
+    /**
+     * A pool of five times the Paladin level, back on a Long Rest. Healing spends the points its user picks and
+     * restores that many; curing a poison spends 5 and restores none. Restoring Touch's other conditions stay prose.
+     */
+    "lay-on-hands": {
+      uses: {
+        scaling: {
+          type: "by-level",
+          table: Array.from({ length: 20 }, (_, index) => ({ level: index + 1, limit: 5 * (index + 1) }))
+        },
+        per: "long-rest",
+        pool: "lay-on-hands"
+      },
+      actions: [
+        {
+          id: "lay-on-hands",
+          name: "Lay on Hands",
+          activation: "bonus-action",
+          description:
+            "As a Bonus Action, touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool.",
+          damage: [],
+          useCost: "chosen",
+          healing: { formula: "1", perUse: true }
+        },
+        {
+          id: "lay-on-hands-cure-poison",
+          name: "Lay on Hands: Cure Poison",
+          activation: "bonus-action",
+          description:
+            "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove the Poisoned condition from it; those points don't also restore Hit Points to the creature.",
+          damage: [],
+          useCost: 5,
+          endsConditions: ["poisoned"]
+        }
+      ]
+    },
+
     // Divine Smite always prepared, plus one free casting per Long Rest.
     "paladins-smite": {
       uses: { limit: 1, per: "long-rest" },
@@ -40,11 +77,11 @@ export const paladin: ClassMechanicsModule = {
 
     /**
      * Uses read off the printed column (2 at level 3, 3 from 11). The explicit `pool` lets Abjure Foes
-     * and Sacred Weapon spend the same counter. The SRD returns one use on a Short Rest and all on a
-     * Long Rest; with one `per`, the stingier long-rest reading is used (as for the Cleric).
+     * and Sacred Weapon spend the same counter. One use comes back on a Short Rest, all on a Long Rest.
      */
     "channel-divinity": {
       uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
+      modifiers: [{ type: "short-rest-regain", poolId: "channel-divinity", amount: 1 }],
       tags: ["channel-divinity"],
       actions: [
         {

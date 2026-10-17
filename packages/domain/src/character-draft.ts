@@ -23,6 +23,9 @@ export const CharacterDraftSchema = z
     backgroundId: DraftSlug.nullable(),
     classId: DraftSlug.nullable(),
     level: z.number().int().min(1).max(20),
+    /** A multiclass build: the class each level went to, in order (index 0 is level 1, `classId`). Absent for one
+     *  class. */
+    classLevels: z.array(DraftSlug).min(1).max(20).optional(),
     subclassId: DraftSlug.nullable(),
     abilityMethod: BuilderAbilityMethodSchema,
     abilityPool: z

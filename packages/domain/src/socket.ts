@@ -34,7 +34,8 @@ import type {
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
-  SceneCreateResult
+  SceneCreateResult,
+  StabilizeResult
 } from "./results.js";
 import type { ClientRole, CombatLogEntry, GmView, PlayerView } from "./views.js";
 
@@ -49,10 +50,14 @@ import type {
   ActorRechooseSchema,
   ActorRemoveSchema,
   ActorRestSchema,
+  ActorReviveSchema,
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
   ActorSetHeroicInspirationSchema,
+  ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
+  ActorSpendUsesSchema,
+  ActorRestoreUsesSchema,
   AddCombatantSchema,
   AnnotationAddSchema,
   AnnotationClearSchema,
@@ -73,6 +78,7 @@ import type {
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
+  CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
   CharacterSetProficienciesSchema,
@@ -105,6 +111,11 @@ import type {
   RollCallAnswerSchema,
   RollCallCloseSchema,
   RollCallStartSchema,
+  RestAnswerSchema,
+  RestAskSchema,
+  RestFinishSchema,
+  RestMarkDoneSchema,
+  RestPartySchema,
   RulesAnswerSchema,
   RulesAskSchema,
   RulesSetPolicySchema,
@@ -132,6 +143,7 @@ import type {
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema,
   TempHpSchema,
+  TimePassSchema,
   TokenMoveSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
@@ -433,6 +445,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof DeathSaveRollSchema>,
     acknowledgement: (result: DeathSaveResult) => void
   ) => void;
+  /** Stabilize a creature at 0 HP (first aid, a Healer's Kit, Spare the Dying, or the GM's ruling). */
+  "actor:stabilize": (
+    payload: CommandPayload<typeof ActorStabilizeSchema>,
+    acknowledgement: (result: StabilizeResult) => void
+  ) => void;
   "encounter:set-rules-mode": (
     payload: CommandPayload<typeof SetRulesModeSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -461,6 +478,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorRestSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** GM-only: bring a dead creature back with the hit points the revival gives. */
+  "actor:revive": (
+    payload: CommandPayload<typeof ActorReviveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   /** Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type, Fiendish Resilience's damage type). `offer` is the offer key the build already uses. */
   "actor:rechoose": (
     payload: CommandPayload<typeof ActorRechooseSchema>,
@@ -468,6 +490,46 @@ export interface ClientToServerEvents {
   ) => void;
   "actor:spend-hit-dice": (
     payload: CommandPayload<typeof ActorSpendHitDiceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Spend several uses of a limited-use pool at once (the character's player or the GM). */
+  "actor:spend-uses": (
+    payload: CommandPayload<typeof ActorSpendUsesSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: give back spent uses of a limited-use pool. */
+  "actor:restore-uses": (
+    payload: CommandPayload<typeof ActorRestoreUsesSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A player asks the GM for a Long Rest for their character, or takes the ask back. */
+  "rest:ask": (
+    payload: CommandPayload<typeof RestAskSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: approve a Long Rest request (the rest happens now) or turn it down. */
+  "rest:answer": (
+    payload: CommandPayload<typeof RestAnswerSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: rest several characters at once; a Short Rest stays open until the GM finishes it. */
+  "rest:party": (
+    payload: CommandPayload<typeof RestPartySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A member of the party's Short Rest is done spending Hit Dice. */
+  "rest:mark-done": (
+    payload: CommandPayload<typeof RestMarkDoneSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: end the party's Short Rest, with its benefits or without. */
+  "rest:finish": (
+    payload: CommandPayload<typeof RestFinishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: move game time forward. */
+  "time:pass": (
+    payload: CommandPayload<typeof TimePassSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (
@@ -489,6 +551,10 @@ export interface ClientToServerEvents {
   ) => void;
   "character:give-item": (
     payload: CommandPayload<typeof CharacterGiveItemSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:recover-ammunition": (
+    payload: CommandPayload<typeof CharacterRecoverAmmunitionSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-currency": (

@@ -382,6 +382,20 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
   });
 }
 
+/** Resting as one player sees it: their own characters' requests, and the party's Short Rest only when one of their
+ *  characters is in it, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
+function playerRest(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["rest"] {
+  const shortRest = state.rest.shortRest;
+  const members = shortRest?.actorIds.filter((id) => yourActorIds.has(id)) ?? [];
+  return {
+    requests: state.rest.requests.filter((id) => yourActorIds.has(id)),
+    shortRest:
+      shortRest && members.length > 0
+        ? { actorIds: members, done: shortRest.done.filter((id) => yourActorIds.has(id)) }
+        : null
+  };
+}
+
 /** "Fighter 5 / Rogue 2" for the identity card; null (field omitted) when the sheet records no class. */
 function classLineOf(definition: GameState["definitions"][number]["definition"] | undefined): string | null {
   const classes = definition?.character?.classes ?? [];
@@ -423,6 +437,7 @@ const PLAYER_ACTOR_FIELDS = {
   heroicInspiration: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
+  lastLongRestAt: "never",
   spellSlots: "derived",
   pactSlots: "derived",
   preparedSpellIds: "derived",
@@ -481,7 +496,8 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
- * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, archived, sheetPreview: never, at any tier. |
+ * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, archived, sheetPreview, lastLongRestAt:   |
+ * | never, at any tier.                                                                                            |
  *
  * `off` keeps the base entry: initiative and tokens still reference the ally, and the map renders
  * nothing for a token whose actor is missing. Rules for new fields: never gate `mine` on the tier;
@@ -527,6 +543,7 @@ export function projectPlayerView(
       .map((actor) => ({ id: actor.id, name: actor.name })),
     rollCalls: projectPlayerRollCalls(state, playerSessionId),
     combat: projectPlayerCombat(state, playerSessionId, now),
+    rest: playerRest(state, yourActorIds),
     // Tiers subtract fields, never entries; only gm-only visibility and archiving remove an actor.
     actors: state.actors
       .filter((actor) => actor.visibility === "public" && !actor.archived)

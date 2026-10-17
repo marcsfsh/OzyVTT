@@ -443,7 +443,8 @@ const SAVE_LIFETIME_KEYS = [
   "speedZero",
   "rangeFeet",
   "failsAtHitPoints",
-  "ongoingDamage.**"
+  "ongoingDamage.**",
+  "failureHazard"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
@@ -453,6 +454,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "actions[].onHit[].**",
     types: ACTION_CARRIERS,
     reason: "a hit that lands a condition — no rows control on the action row",
+    status: "gap"
+  },
+  {
+    at: "actions[].useCost",
+    types: ACTION_CARRIERS,
+    reason:
+      "how many uses one activation spends (Lay on Hands' points, its 5-point cure) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsConditions",
+    types: ACTION_CARRIERS,
+    reason:
+      "conditions an action ends on its target (Lay on Hands' cure) - authored in the class overlays; no editor control yet",
     status: "gap"
   },
   {
@@ -685,6 +700,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "effects[].damageUses",
+    types: FEATURE_CARRIERS,
+    reason:
+      "how many hits an effect's damage riders last (a coat of poison); authored in the item overlay, no control yet",
+    status: "gap"
+  },
+  {
     at: "modifiers[].**",
     types: FEATURE_CARRIERS,
     reason:
@@ -847,13 +869,15 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "multiclassProficiencies.**",
     types: ["class"],
-    reason: "the builder does not multiclass — no reader on the build path and no control",
+    reason:
+      "the builder grants these to a class taken after the first, but its skill and instrument picks (a Bard's, Ranger's or Rogue's) have no control",
     status: "gap"
   },
   {
     at: "multiclassPrerequisites.**",
     types: ["class"],
-    reason: "the builder does not multiclass — the schema key has no reader on the build path and no control",
+    reason:
+      "the builder checks these minimums when a class is taken, but no control authors the mode or the minimums list the rows sit in",
     status: "gap"
   },
   {

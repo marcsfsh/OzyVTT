@@ -1304,7 +1304,7 @@ describe("public game API over /api/v1", () => {
     const rows = body.data.actions as ReadonlyArray<{
       id: string;
       available: boolean;
-      violations: readonly unknown[];
+      violations: ReadonlyArray<{ rule: string }>;
       builtin?: boolean;
     }>;
     // Stat-block rows first, then the SRD builtin generic actions flagged builtin: true.
@@ -1317,8 +1317,14 @@ describe("public game API over /api/v1", () => {
     for (const id of ["dodge", "dash", "disengage", "help", "hide", "ready", "unarmed-grapple", "escape-grapple"]) {
       expect(rows.find((row) => row.id === id)?.builtin).toBe(true);
     }
-    // No encounter running: nothing is spent, so everything reports available with no violations.
-    expect(rows.every((row) => row.available && row.violations.length === 0)).toBe(true);
+    // No encounter running: nothing is spent, so everything reports available with no violations, but an action
+    // that needs an effect the crocodile doesn't have: putting out a fire needs it to be burning.
+    const putOut = rows.find((row) => row.id === "extinguish-fire");
+    expect(putOut?.available).toBe(false);
+    expect(putOut?.violations.map((violation) => violation.rule)).toEqual(["feature.requires-effect"]);
+    expect(rows.filter((row) => row !== putOut).every((row) => row.available && row.violations.length === 0)).toBe(
+      true
+    );
   });
 });
 

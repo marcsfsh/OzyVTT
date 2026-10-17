@@ -902,6 +902,30 @@ export type StagingDefaults = z.infer<typeof StagingDefaultsSchema>;
 export const PartyVisibilitySchema = z.enum(["off", "name-and-class", "full-sheet", "sheet-and-resources"]);
 export type PartyVisibility = z.infer<typeof PartyVisibilitySchema>;
 
+/** A Short Rest the GM runs for several characters at once. Each player spends Hit Dice on their own device and
+ *  says when they are done; the benefits land when the GM finishes it. */
+export const PartyShortRestSchema = z
+  .object({
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    /** Members whose players are done choosing. The GM may finish without them. */
+    done: z.array(z.uuid()).max(12).default([])
+  })
+  .strict();
+export type PartyShortRest = z.infer<typeof PartyShortRestSchema>;
+
+/** Game time and the rests waiting on the GM. The clock exists for the 16-hour rule between Long Rests; the GM
+ *  moves it, and a party rest moves it by the rest's length. */
+export const RestStateSchema = z
+  .object({
+    /** Whole hours of game time since the campaign's clock started. */
+    clockHours: z.number().int().min(0).max(10_000_000).default(0),
+    /** Characters whose players asked for a Long Rest, oldest first. */
+    requests: z.array(z.uuid()).max(50).default([]),
+    shortRest: PartyShortRestSchema.nullable().default(null)
+  })
+  .strict();
+export type RestState = z.infer<typeof RestStateSchema>;
+
 export const GameStateSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().nonnegative().default(0),
@@ -931,6 +955,8 @@ export const GameStateSchema = z.object({
   /** Dice thrown before they count (see HeldRollSchema). GM-only. */
   heldRolls: z.array(HeldRollSchema).max(100).default([]),
   /** The GM's open calls for a roll. A player reads only their own part of each. */
-  rollCalls: z.array(RollCallSchema).max(20).default([])
+  rollCalls: z.array(RollCallSchema).max(20).default([]),
+  /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */
+  rest: RestStateSchema.prefault({})
 });
 export type GameState = z.infer<typeof GameStateSchema>;

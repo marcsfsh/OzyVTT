@@ -216,24 +216,20 @@ describe("the rider families held only by a bundle assertion, driven", () => {
         deps([9, 4], definition)
       ).attack!.total;
     };
-    // The bow and the mace come from the shipped catalog; the ammunition is picker-minted. d20 = 9.
-    expect(
-      shot([fromCatalog("longbow"), picked("ammunition-3")], "item-longbow"),
-      "the +3 did not reach the shot"
-    ).toBe(14);
+    // The bow and the mace come from the shipped catalog; the ammunition is picker-minted, picked as arrows (a +3
+    // still waiting for its kind fits no launcher). d20 = 9.
+    const arrows3 = picked("ammunition-3", { baseId: "arrows-20" });
+    expect(shot([fromCatalog("longbow"), arrows3], "item-longbow"), "the +3 did not reach the shot").toBe(14);
     expect(shot([fromCatalog("longbow"), picked("arrows-20")], "item-longbow"), "the control: Dex +2 alone").toBe(11);
     // `weapon-property-is: ["ammunition"]` keeps this from being a blanket +3.
-    expect(shot([fromCatalog("mace"), picked("ammunition-3")], "item-mace"), "the arrow reached a melee swing").toBe(9);
+    expect(shot([fromCatalog("mace"), arrows3], "item-mace"), "the arrow reached a melee swing").toBe(9);
     // A thrown dagger is a ranged attack that fires no ammunition: d20 9 + Dex 2 + PB 3.
-    expect(
-      shot([fromCatalog("dagger"), picked("ammunition-3")], "item-dagger"),
-      "the arrow reached a thrown dagger"
-    ).toBe(11);
+    expect(shot([fromCatalog("dagger"), arrows3], "item-dagger"), "the arrow reached a thrown dagger").toBe(11);
   });
 
   it("ammunition's damage half lands on the launcher's hit", () => {
     const definition = definitionOf();
-    const state = fight(stateWith([fromCatalog("longbow"), picked("ammunition-2")]));
+    const state = fight(stateWith([fromCatalog("longbow"), picked("ammunition-2", { baseId: "arrows-20" })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-longbow")!;
     const resolution = resolveDefinitionAction(
       state,

@@ -9,6 +9,24 @@ import { PendingDamagePrompt } from "./PendingDamagePrompt";
 import { ReactionPrompt } from "./ReactionPrompt";
 import { RowTools } from "./RowTools";
 import { SavePrompt } from "./SavePrompt";
+import { aidGiverOf, isKnockedOut, StabilizeControl, type AidGiver } from "./StabilizeControl";
+
+/** Who in the fight could give a dying creature aid, the creature whose turn it is first (the aid is its action):
+ *  conscious characters and NPCs, not the dying one. */
+function fightHelpers(state: GmView, targetId: string): AidGiver[] {
+  const turn = state.combat.turnActorId;
+  return state.combat.initiative
+    .flatMap((entry) => {
+      const candidate = state.actors.find((actor) => actor.id === entry.actorId);
+      return candidate && candidate.id !== targetId && candidate.kind !== "monster" && candidate.hp.current > 0
+        ? [candidate]
+        : [];
+    })
+    .sort((left, right) => Number(right.id === turn) - Number(left.id === turn))
+    .map((candidate) =>
+      aidGiverOf(candidate, state.definitions?.find((entry) => entry.id === candidate.definitionId)?.definition)
+    );
+}
 
 const validInitiativeScore = (value: string | undefined) =>
   value !== undefined &&
@@ -202,7 +220,30 @@ export function GmInitiativeRow({
           rollMode={rollMode}
           isActingTurn={state.combat.turnActorId === actor.id}
           viewer="gm"
+          aid={
+            <StabilizeControl
+              targetId={actor.id}
+              targetName={actor.name}
+              helpers={fightHelpers(state, actor.id)}
+              gm
+              onFeedback={onFeedback}
+            />
+          }
         />
+      )}
+      {/* A creature knocked out stays Unconscious until healed or given first aid. */}
+      {actor && isKnockedOut(actor) && (
+        <div className="dying-tracker" role="group" aria-label={`${actor.name} is knocked out`}>
+          <span className="dying-label">Knocked out</span>
+          <StabilizeControl
+            targetId={actor.id}
+            targetName={actor.name}
+            helpers={fightHelpers(state, actor.id)}
+            gm
+            knockedOut
+            onFeedback={onFeedback}
+          />
+        </div>
       )}
       {actor &&
         state.combat.pendingSaves

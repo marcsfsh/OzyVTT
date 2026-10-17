@@ -152,6 +152,17 @@ export function removeConditionDirect(actor: Actor, conditionId: string) {
   actor.conditions = actor.conditions.filter((condition) => condition.id !== conditionId);
 }
 
+/** One fewer Exhaustion level, and none from level 1 (a Long Rest; coming back from death). */
+export function reduceExhaustion(actor: Actor): void {
+  const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
+  if (!exhaustion) return;
+  if ((exhaustion.level ?? 1) <= 1) removeConditionDirect(actor, "exhaustion");
+  else
+    actor.conditions = actor.conditions.map((condition) =>
+      condition.id === "exhaustion" ? { ...condition, level: (condition.level ?? 1) - 1 } : condition
+    );
+}
+
 export function hasEffectTag(actor: Actor, tag: string): boolean {
   return actor.effects.some((effect) => effect.tags.includes(tag));
 }

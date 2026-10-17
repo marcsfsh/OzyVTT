@@ -4,8 +4,10 @@ import {
   type ActorDefinition,
   type ContentSpellSummary,
   type GmActor,
-  type PlayerActor
+  type PlayerActor,
+  type Rechoice
 } from "@vtt/domain";
+import { Select } from "@vtt/ui";
 import { cantripTierAt } from "@vtt/content-srd-5.2.1/schemas";
 import { spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { SpellCard, useSpellReference } from "./spells";
@@ -241,7 +243,8 @@ export function SheetSpells({
   castSpellAction,
   spellSaveDcBonus = 0,
   policeSlots = true,
-  canPrepare = true
+  canPrepare = true,
+  rechoices = []
 }: Readonly<{
   actor: GmActor | PlayerActor;
   definition: ActorDefinition;
@@ -260,6 +263,9 @@ export function SheetSpells({
   policeSlots?: boolean;
   /** Whether the prepared toggles work now: the GM's always do, a player's in the step a Long Rest opens. */
   canPrepare?: boolean;
+  /** Picks the character may re-make on a rest; one made after a Long Rest (a Land Druid's land) is chosen here, when
+   *  the prepared spells are. */
+  rechoices?: readonly Rechoice[];
 }>) {
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
@@ -414,6 +420,34 @@ export function SheetSpells({
             </button>
           </div>
         )}
+        {canPrepare &&
+          rechoices
+            .filter((choice) => choice.per === "long-rest")
+            .map((choice) => (
+              <label key={choice.offer} className="sheet-rechoice">
+                <span>{choice.label}</span>
+                <Select
+                  value={choice.chosen ?? ""}
+                  disabled={busy}
+                  onChange={(event) => {
+                    const picked = choice.options.find((option) => option.id === event.target.value);
+                    if (!picked) return;
+                    void edit("actor:rechoose", { actorId: actor.id, offer: choice.offer, id: picked.id }).then(
+                      (result) => {
+                        if (result.ok) onFeedback(`${choice.label}: ${picked.name}.`);
+                      }
+                    );
+                  }}
+                >
+                  {choice.chosen === null && <option value="">None</option>}
+                  {choice.options.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            ))}
         {pact && pact.max > 0 && (
           <div className="sheet-spell-group-head">
             <h4>Pact Magic · {ordinal(pact.level)} level</h4>

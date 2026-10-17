@@ -197,6 +197,15 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     description:
       "Use your action to make a Strength (Athletics) or Dexterity (Acrobatics) check (your best) against the grapple's escape DC, ending the Grappled condition on a success. (SRD 5.2.1, Grappling)",
     damage: []
+  },
+  {
+    id: "extinguish-fire",
+    name: "Put Out the Fire",
+    activation: "action",
+    description:
+      "As an action, you can extinguish fire on yourself by giving yourself the Prone condition and rolling on the ground. The fire also goes out if it is doused, submerged, or suffocated; the GM ends it then. (SRD 5.2.1, Burning [Hazard])",
+    damage: [],
+    requiresEffectTag: "burning"
   }
 ] as const;
 

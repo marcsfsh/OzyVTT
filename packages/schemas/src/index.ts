@@ -213,6 +213,8 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
     .object({ type: z.literal("versus-creature-type"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) })
     .strict(),
   z.object({ type: z.literal("versus-size"), sizes: z.array(SizeSchema).min(1).max(6) }).strict(),
+  /** On an attack, a condition the target has; on a saving throw, one the save would impose or end ("saving throws
+   * to avoid or end the Poisoned condition"). */
   z.object({ type: z.literal("versus-condition"), conditionIds: z.array(ConditionSchema).min(1).max(6) }).strict(),
   /** On an effect, its riders fire only for the creature that put the effect on its bearer, never for the bearer:
    * Hunter's Mark's extra damage when its caster hits the marked creature. */
@@ -406,6 +408,16 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       type: z.literal("resource-bonus"),
       poolId: RiderSlugSchema,
       amount: z.number().int().min(-20).max(20),
+      ...riderGate
+    })
+    .strict(),
+  /** A pool a Short Rest refills beyond its own recharge: `amount` expended uses back ("you regain one expended use
+   *  when you finish a Short Rest", Rage), or every one when absent (Font of Inspiration). Read when the rest ends. */
+  z
+    .object({
+      type: z.literal("short-rest-regain"),
+      poolId: RiderSlugSchema,
+      amount: z.number().int().min(1).max(20).optional(),
       ...riderGate
     })
     .strict(),
@@ -657,7 +669,9 @@ export const EffectInstanceSchema = z
         .optional()
     })
       .strict()
-      .optional()
+      .optional(),
+    /** How many more times its damage riders may land before it ends (a coat of Basic Poison). */
+    damageUses: z.number().int().min(1).max(10).optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -780,6 +794,13 @@ export const InventoryItemSchema = z
     /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
      *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
     chosenDamageType: DamageTypeSchema.optional(),
+    /** The spell a Spell Scroll bears, picked when it is added. The server checks it against the scroll's levels;
+     *  every copy in the row bears it. */
+    spellId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
      *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
     ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
@@ -980,6 +1001,9 @@ export const ActorSchema = z.object({
     .optional(),
   /** Short-rest healing pool (SRD Hit Point Dice); null = not modeled. Reaches players only on their own claimed character. */
   hitDice: HitDicePoolSchema.default(null),
+  /** The game hour (`rest.clockHours`) this creature's last Long Rest ended; null before its first. Another may start
+   * 16 hours later (SRD Resting). GM-only: a refused rest explains the wait. */
+  lastLongRestAt: z.number().int().min(0).max(10_000_000).nullable().default(null),
   /** Per-token health-display override; absent = inherit `combat.healthDisplay`. Audience-gated in the player/viewer projections. */
   healthDisplay: HealthDisplaySchema.optional(),
   /** Epoch ms when this actor last entered a fight; powers the scene-setup "Recent" list. GM-only, stripped from the player projection. */
@@ -1045,7 +1069,10 @@ export const EffectGrantSchema = z
     /** Dodge: benefits lapse while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
     /** The granter concentrates to sustain the effect (SRD Concentration). */
-    concentration: z.boolean().default(false)
+    concentration: z.boolean().default(false),
+    /** Its damage riders land this many times, then it ends (Basic Poison: one coated weapon's hit, or three
+     *  pieces of ammunition). */
+    damageUses: z.number().int().min(1).max(10).optional()
   })
   .strict();
 
@@ -1058,11 +1085,14 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   armorClassBonus: z.number().int().min(1).max(10).optional()
 }).strict();
 
+/** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
+export const MAX_ACTION_USES = 100;
+
 /** Limited uses. "turn"/"encounter"/rests reset as named; "recharge" on a start-of-turn d6 >= `recharge`.
  * `pool` shares one counter across actions (Sneak Attack once per turn regardless of weapon). */
 export const ActionUsesSchema = z
   .object({
-    limit: z.number().int().min(1).max(20),
+    limit: z.number().int().min(1).max(MAX_ACTION_USES),
     per: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]),
     pool: z
       .string()
@@ -1134,7 +1164,11 @@ export const SaveOutcomeFields = {
    * repeated save can end it (Power Word Stun's 150); one with more is spared. */
   failsAtHitPoints: z.number().int().min(1).max(1000).optional(),
   /** Damage the failure's conditions bring at the start of each turn while they last (a swallow's acid). */
-  ongoingDamage: OngoingDamageSchema.optional()
+  ongoingDamage: OngoingDamageSchema.optional(),
+  /** What else a failure starts, from the SRD's own rules: "burning" (Rules Glossary Burning: 1d4 Fire at the start of
+   * each of its turns until it is put out) or "oil" (covered in Oil: Fire damage before the oil dries, within 1
+   * minute, brings 5 more Fire damage). */
+  failureHazard: z.enum(["burning", "oil"]).optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -1245,10 +1279,17 @@ export const ActionSchema = z.object({
       /** The roll is one pool divided among the targets (Preserve Life), not regained by each. */
       divided: z.literal(true).optional(),
       /** No target is healed past this fraction of its maximum (Preserve Life: half). */
-      upToFractionOfMaximum: z.number().min(0.1).max(1).optional()
+      upToFractionOfMaximum: z.number().min(0.1).max(1).optional(),
+      /** The formula is regained once for each use spent (Lay on Hands: 1 hit point per point of its pool). */
+      perUse: z.literal(true).optional()
     })
     .strict()
     .optional(),
+  /** How many of its uses one activation spends: a fixed number (Lay on Hands' 5 points to cure a poison), or
+   *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
+  useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
+  /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
+  endsConditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
   /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
    *  The resolve's targets assign them in order, a target named twice taking two. */
   darts: z.number().int().min(2).max(20).optional(),

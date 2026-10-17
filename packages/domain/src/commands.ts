@@ -384,6 +384,8 @@ export const ActionResolveSchema = z
     /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
      *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
+    /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. */
+    spend: z.number().int().min(1).max(100).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -558,6 +560,22 @@ export const DeathSaveRollSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Stabilize a creature at 0 hit points (`actorId`), or wake one knocked out, by the aid `helperId` gives: first aid
+ *  (a DC 10 Wisdom (Medicine) check), a Healer's Kit use, Spare the Dying, or the GM's own ruling (no helper). */
+export const ActorStabilizeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    method: z.enum(["medicine", "healers-kit", "spare-the-dying", "gm"]),
+    helperId: z.uuid().optional(),
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.method !== "gm" && value.helperId === undefined)
+      context.addIssue({ code: "custom", path: ["helperId"], message: "Choose who gives the aid." });
+  });
 /** Change the live fight's rules mode and optionally its per-family exceptions. Omitted `exceptions` leaves the stored ones. */
 export const SetRulesModeSchema = z
   .object({
@@ -585,6 +603,8 @@ export const ActionUseSchema = z
     override: RulesOverrideSchema.optional(),
     /** The spell slot to cast with; see `action.resolve`. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** How much of its pool an action that lets its user choose spends; see `action.resolve`. */
+    spend: z.number().int().min(1).max(100).optional(),
     /** The damage type picked; see `action.resolve`. */
     damageType: DamageTypeSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -863,6 +883,15 @@ export const ActorRestSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Bring a dead creature back (GM): the hit points the revival gives, clamped to 1 and the maximum. */
+export const ActorReviveSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    hitPoints: z.number().int().min(1).max(10000),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** Re-make a pick a feature allows on a rest (`replaces`); `id` must be one the original pick allowed. */
 export const ActorRechooseSchema = z
   .object({
@@ -885,6 +914,78 @@ export const ActorSpendHitDiceSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     count: z.number().int().min(1).max(40),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A limited-use pool, as its counter is keyed (`uses.pool ?? action.id`), and how many uses to move. */
+const PoolAmountFields = {
+  commandId: z.uuid(),
+  actorId: z.uuid(),
+  poolId: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .max(120),
+  amount: z.number().int().min(1).max(100),
+  expectedRevision: z.number().int().nonnegative().optional()
+} as const;
+/** Spend several uses of a pool at once: the character's player or the GM. */
+export const ActorSpendUsesSchema = z.object(PoolAmountFields).strict();
+/** Give back spent uses of a pool (GM). */
+export const ActorRestoreUsesSchema = z.object(PoolAmountFields).strict();
+/** A player asks the GM for a Long Rest for their character, or takes the ask back (`withdraw`). */
+export const RestAskSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    withdraw: z.boolean().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM answers a Long Rest request: `approve` gives the rest now, otherwise it is turned down. */
+export const RestAnswerSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    approve: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM rests several characters at once. Long: the rest happens now and 8 hours pass. Short: it opens, each
+ *  player spends Hit Dice on their own device, and it ends when the GM finishes it. */
+export const RestPartySchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["short", "long"]),
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((value) => new Set(value.actorIds).size === value.actorIds.length, {
+    message: "Each character can rest only once.",
+    path: ["actorIds"]
+  });
+/** A member of the party's Short Rest is done choosing (or not, with `done: false`). */
+export const RestMarkDoneSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    done: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM ends the party's Short Rest: `apply` gives its benefits and an hour passes; otherwise it is called off. */
+export const RestFinishSchema = z
+  .object({
+    commandId: z.uuid(),
+    apply: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM moves game time forward, which the 16-hour rule between Long Rests reads. */
+export const TimePassSchema = z
+  .object({
+    commandId: z.uuid(),
+    hours: z.number().int().min(1).max(720),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -921,6 +1022,14 @@ export const CharacterSetInventorySchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     item: InventoryItemSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Picks up the ammunition a character fired outside a fight: half of each row's fired pieces come back. */
+export const CharacterRecoverAmmunitionSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -961,6 +1070,17 @@ export const CharacterSetProficienciesSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The class each character level went to, in order: index 0 is level 1, the starting class. */
+const ClassLevelsSchema = z
+  .array(
+    z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+  )
+  .min(1)
+  .max(20);
+
 /** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
@@ -984,6 +1104,9 @@ export const CharacterCreateSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** A multiclass build: the class each character level went to, in order. Index 0 is level 1 and must be
+     *  `classId`; the list is `level` long. Absent when every level is `classId`. */
+    classLevels: ClassLevelsSchema.optional(),
     abilityMethod: BuilderAbilityMethodSchema,
     baseScores: z
       .object({
@@ -1025,6 +1148,7 @@ export const BuilderOffersSchema = z
     backgroundId: BuilderContentIdSchema.optional(),
     classId: BuilderContentIdSchema.optional(),
     level: z.number().int().min(1).max(20),
+    classLevels: ClassLevelsSchema.optional(),
     picks: z
       .record(OfferKeySchema, z.array(BuilderContentIdSchema).max(40))
       .refine((picks) => Object.keys(picks).length <= 200)
@@ -1036,7 +1160,23 @@ export const BuilderOffersSchema = z
       )
       .refine((increases) => Object.keys(increases).length <= 40)
       .optional(),
-    choices: z.array(CharacterChoiceSchema).max(200).optional()
+    choices: z.array(CharacterChoiceSchema).max(200).optional(),
+    sheet: z
+      .object({
+        level: z.number().int().min(1).max(20),
+        abilityScores: z
+          .object({
+            str: z.number().int().min(1).max(30),
+            dex: z.number().int().min(1).max(30),
+            con: z.number().int().min(1).max(30),
+            int: z.number().int().min(1).max(30),
+            wis: z.number().int().min(1).max(30),
+            cha: z.number().int().min(1).max(30)
+          })
+          .strict()
+      })
+      .strict()
+      .optional()
   })
   .strict()
   .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
@@ -1058,6 +1198,22 @@ export const CharacterGenerateSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80)
+      .optional(),
+    /** A multiclass character: each class with its levels, the starting class first; the levels add up to `level`. */
+    classes: z
+      .array(
+        z
+          .object({
+            classId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(80),
+            level: z.number().int().min(1).max(20)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(4)
       .optional(),
     name: z.string().trim().min(1).max(120).optional(),
     expectedRevision: z.number().int().nonnegative().optional()

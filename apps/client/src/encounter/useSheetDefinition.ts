@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary, GmActor, PlayerActor } from "@vtt/domain";
+import type {
+  ActorDefinition,
+  ActorDerivedSheet,
+  ContentActionSummary,
+  GmActor,
+  PlayerActor,
+  Rechoice
+} from "@vtt/domain";
 import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 
@@ -29,9 +36,14 @@ type AvailabilityRow = Readonly<{
   usesLimit?: number | null;
   usesPer?: ContentActionSummary["usesPer"];
   usesPool?: string | null;
+  useCost?: number | "chosen" | null;
   requiresEffectTag?: string | null;
   multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
   reaction?: ContentActionSummary["reaction"];
+  healing?: Readonly<{ formula: string }> | null;
+  targeting?: "none" | "single" | "multi" | null;
+  darts?: number | null;
+  damageTypes?: ContentActionSummary["damageTypes"] | null;
 }>;
 
 /** The wire row in the shape every action surface here already speaks. */
@@ -54,25 +66,33 @@ function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
     usesPer: row.usesPer ?? null,
     usesRecharge: null,
     usesPool: row.usesPool ?? null,
+    ...(row.useCost !== undefined && row.useCost !== null ? { useCost: row.useCost } : {}),
     requiresEffectTag: row.requiresEffectTag ?? null,
     multiattack: row.multiattack ?? null,
     grants: false,
-    reaction: row.reaction ?? null
+    reaction: row.reaction ?? null,
+    ...(row.healing ? { healing: row.healing } : {}),
+    ...(row.targeting ? { targeting: row.targeting } : {}),
+    // A spell an item casts picks as the spell's own cast does (Magic Missile's darts, Chromatic Orb's type).
+    ...(row.darts ? { darts: row.darts } : {}),
+    ...(row.damageTypes ? { damageTypes: row.damageTypes } : {})
   };
 }
 
 /**
  * What the sheet draws from: the actor's stat block, the server's action list and the server's
  * derived numbers. The GM fetches bundled definitions; a player's own definition comes on the live
- * actor and wins, so identity and proficiency edits show at once.
+ * actor and wins, so identity and proficiency edits show at once. `liveDefinition` is the GM's copy of a
+ * stored sheet from the game state, which wins over the fetch the same way, so a rebuilt sheet shows at once.
  */
 export function useSheetDefinition(
   actor: GmActor | PlayerActor,
   role: "gm" | "player",
-  onFeedback: (text: string) => void
+  onFeedback: (text: string) => void,
+  liveDefinition?: ActorDefinition | null
 ) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
-  const ownDefinition = "definition" in actor ? (actor.definition ?? null) : null;
+  const ownDefinition = "definition" in actor ? (actor.definition ?? liveDefinition ?? null) : (liveDefinition ?? null);
   const [fetched, setFetched] = useState<ActorDefinition | null>(
     definitionId ? (sheetCache.get(definitionId) ?? null) : null
   );
@@ -89,9 +109,14 @@ export function useSheetDefinition(
    * effects, conditions and HP as well as inventory, since riders can depend on them.
    */
   const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);
+  /** The picks this character may re-make on a rest (a land after a Long Rest), from the same read. */
+  const [rechoices, setRechoices] = useState<readonly Rechoice[]>([]);
   const loadoutSignature = [
     (actor.inventory ?? [])
-      .map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`)
+      .map(
+        (item) =>
+          `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}:${item.baseId ?? ""}:${item.spellId ?? ""}`
+      )
       .join(","),
     // Exhaustion's level changes the numbers too.
     (actor.conditions ?? [])
@@ -102,12 +127,15 @@ export function useSheetDefinition(
       ? actor.hp.kind === "exact"
         ? String(actor.hp.current)
         : actor.hp.kind
-      : String(actor.hp.current)
+      : String(actor.hp.current),
+    // A pick re-made into the ledger rebuilds the sheet: its actions and re-choices are read again.
+    (ownDefinition?.character?.choices ?? []).map((row) => `${row.kind}:${row.id}`).join(",")
   ].join("|");
   useEffect(() => {
     if (!definitionId) {
       setServerActions([]);
       setDerived(null);
+      setRechoices([]);
       return;
     }
     let live = true;
@@ -118,6 +146,7 @@ export function useSheetDefinition(
       if (rows) setServerActions(rows.filter((row) => !row.builtin).map(summaryOfAvailability));
       // Absent only from an older server; the fallback covers that.
       if (result.derived) setDerived(result.derived);
+      setRechoices(result.rechoices ?? []);
     });
     return () => {
       live = false;
@@ -140,5 +169,5 @@ export function useSheetDefinition(
     sheetCache.set(definitionId, next);
     setFetched(next);
   };
-  return { definitionId, definition, serverActions, derived, showEdited };
+  return { definitionId, definition, serverActions, derived, rechoices, showEdited };
 }

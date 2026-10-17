@@ -26,6 +26,8 @@ describe("Heroic Inspiration is tracked on the character", () => {
     applyRest(table.state, IDS.wizard, "long", table.resolve, catalog);
     expect(table.actor(IDS.fighter).heroicInspiration).toBe(true);
     expect(table.actor(IDS.wizard).heroicInspiration).toBe(false);
+    // A day later (a Long Rest waits 16 hours after the last), another rest still leaves only the one.
+    table.state.rest = { ...table.state.rest, clockHours: table.state.rest.clockHours + 24 };
     applyRest(table.state, IDS.fighter, "long", table.resolve, catalog);
     expect(table.actor(IDS.fighter).heroicInspiration).toBe(true);
   });

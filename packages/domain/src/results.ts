@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { ActionReactionSchema, CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
+import { ActionReactionSchema, CharacterChoiceSchema, DamageTypeSchema, type CharacterChoice } from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
-import { AbilityIdSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
+import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
 import type { Wire } from "./wire.js";
 
 /**
@@ -229,6 +229,15 @@ export type CheckRollOutcome = Readonly<{
   rollId: string;
 }>;
 export type CheckRollResult = MutationResult & { check?: CheckRollOutcome; hiddenFromRoller?: boolean };
+/** Outcome of giving aid to a creature at 0 hit points: stabilized, woken from a knock-out, or neither (a failed
+ *  check). `check` is the Wisdom (Medicine) roll when first aid was the method. */
+export type StabilizeResult = MutationResult & {
+  stabilize?: Readonly<{
+    stabilized: boolean;
+    woke: boolean;
+    check: Readonly<{ natural: number; total: number; dc: number }> | null;
+  }>;
+};
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
 export type SaveAnswerResult = MutationResult & {
   outcome?: {
@@ -292,9 +301,19 @@ export const ActionAvailabilitySchema = z.strictObject({
   usesLimit: z.number().int().nullable(),
   usesPer: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
   usesPool: z.string().nullable(),
+  /** How many uses one activation spends when it is more than one, or `chosen` when the user picks it each time. */
+  useCost: z.union([z.number().int(), z.literal("chosen")]).nullable(),
   requiresEffectTag: z.string().nullable(),
   multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
-  reaction: ActionReactionSchema.nullable()
+  reaction: ActionReactionSchema.nullable(),
+  /** The hit points it restores (a potion's 2d4 + 2), for display. */
+  healing: z.strictObject({ formula: z.string() }).nullable().optional(),
+  /** Who a tap picks: one creature, several, or none (it acts on its user); null when nothing structured resolves. */
+  targeting: z.enum(["none", "single", "multi"]).nullable().optional(),
+  /** Darts it makes, each assigned to a target (Magic Missile read from a scroll or cast from a wand). */
+  darts: z.number().int().nullable().optional(),
+  /** The damage types its caster picks from (Chromatic Orb). */
+  damageTypes: z.array(DamageTypeSchema).nullable().optional()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
 /** A roll's mode as the rules count it, with what grants each side, so the sheet can say why before the roll. */
@@ -368,11 +387,23 @@ const ActorDerivedSheetSchema = z.strictObject({
   attunementSlots: z.number().int().min(1).max(10)
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
-/** What `actor:available-actions` answers: the table's rules mode, each action's availability, and the sheet. */
+/** A pick this character may re-make on a rest (Circle of the Land's land after a Long Rest), with its options and
+ *  the answer in force. */
+const RechoiceSchema = z.strictObject({
+  offer: z.string(),
+  label: z.string(),
+  per: z.enum(["short-rest", "long-rest"]),
+  options: z.array(z.strictObject({ id: z.string(), name: z.string() })),
+  chosen: z.string().nullable()
+});
+export type Rechoice = Wire<z.infer<typeof RechoiceSchema>>;
+/** What `actor:available-actions` answers: the table's rules mode, each action's availability, the sheet, and the
+ *  picks the character may re-make on a rest. */
 export const AvailableActionsReplySchema = z.strictObject({
   rulesMode: z.enum(["strict", "assisted", "freeform"]),
   actions: z.array(ActionAvailabilitySchema),
-  derived: ActorDerivedSheetSchema
+  derived: ActorDerivedSheetSchema,
+  rechoices: z.array(RechoiceSchema)
 });
 export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;
@@ -441,10 +472,24 @@ export type BuilderOffersRequest = Readonly<{
   backgroundId?: string;
   classId?: string;
   level: number;
+  /** The class each character level went to, in order (index 0 is level 1); absent for one class. */
+  classLevels?: readonly string[];
   picks?: Readonly<Record<string, readonly string[]>>;
   asiIncreases?: Readonly<Record<string, readonly BuilderAbilityIncrease[]>>;
   choices?: readonly CharacterChoice[];
+  /** With `choices`, the stored sheet's level and ability scores: the reply then says how those scores were made. */
+  sheet?: Readonly<{ level: number; abilityScores: Readonly<Record<BuilderAbility, number>> }>;
 }>;
+type BuilderAbility = z.infer<typeof AbilityIdSchema>;
+
+/** How a stored character's ability scores were made: the ledger's record, or for a sheet built before the ledger
+ *  kept one, the base scores and background increase that rebuild its totals (`derived`). */
+const BuilderSheetAbilitiesSchema = z.strictObject({
+  abilityMethod: BuilderAbilityMethodSchema,
+  baseScores: z.record(AbilityIdSchema, z.number().int()),
+  backgroundBonusAllocation: z.array(z.strictObject({ ability: AbilityIdSchema, amount: z.number().int() })),
+  derived: z.boolean()
+});
 
 /** What the build offers, the answers it still accepts (picks it no longer offers are dropped), and the
  *  ledger rows those answers make, which `character.create` carries. */
@@ -453,7 +498,10 @@ export const BuilderOffersReplySchema = z.strictObject({
   picks: z.record(z.string(), z.array(z.string())),
   asiIncreases: z.record(z.string(), BuilderAbilityIncreasesSchema),
   subclassId: z.string().nullable(),
-  choices: z.array(CharacterChoiceSchema)
+  choices: z.array(CharacterChoiceSchema),
+  /** For a draft that sent `sheet`: how that sheet's scores were made. Null when not asked, or when no base scores
+   *  and background increase reproduce them. */
+  abilities: BuilderSheetAbilitiesSchema.nullable()
 });
 export type BuilderOffersReply = Wire<z.infer<typeof BuilderOffersReplySchema>>;
 export type BuilderOffersResult = MutationResult & Partial<BuilderOffersReply>;

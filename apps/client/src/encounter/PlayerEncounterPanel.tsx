@@ -12,6 +12,7 @@ import { SavePrompt } from "./SavePrompt";
 import { ReactionPrompt } from "./ReactionPrompt";
 import { EffectChips } from "./EffectChips";
 import { DyingTracker } from "./DyingTracker";
+import { aidGiverOf, isKnockedOut, StabilizeControl } from "./StabilizeControl";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { InitiativePrompt } from "./InitiativePrompt";
 
@@ -279,6 +280,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           effects={rowActor.effects}
                           canEnd={false}
                           canAsk={combat.active}
+                          canAct
                           onFeedback={onFeedback}
                         />
                       )}
@@ -299,6 +301,43 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           onFeedback={onFeedback}
                         />
                       )}
+                    </OwnFeedback>
+                  )}
+                  {/* On your turn your character can give a dying or knocked-out ally aid: that is its action. */}
+                  {!isMe && myTurn && myActor && rowActor && (rowActor.deathSaves || isKnockedOut(rowActor)) && (
+                    <OwnFeedback className="own-dying">
+                      {(onFeedback) =>
+                        rowActor.deathSaves ? (
+                          <DyingTracker
+                            actorId={entry.actorId}
+                            name={entry.name}
+                            deathSaves={rowActor.deathSaves}
+                            canRoll={false}
+                            onFeedback={onFeedback}
+                            rollMode={rollMode}
+                            isActingTurn={false}
+                            viewer="player"
+                            aid={
+                              <StabilizeControl
+                                targetId={entry.actorId}
+                                targetName={entry.name}
+                                helpers={[aidGiverOf(myActor, myActor.definition)]}
+                                gm={false}
+                                onFeedback={onFeedback}
+                              />
+                            }
+                          />
+                        ) : (
+                          <StabilizeControl
+                            targetId={entry.actorId}
+                            targetName={entry.name}
+                            helpers={[aidGiverOf(myActor, myActor.definition)]}
+                            gm={false}
+                            knockedOut
+                            onFeedback={onFeedback}
+                          />
+                        )
+                      }
                     </OwnFeedback>
                   )}
                   {isMe && rowActor && "deathSaves" in rowActor && rowActor.deathSaves && (
