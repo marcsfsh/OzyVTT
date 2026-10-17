@@ -15,7 +15,7 @@ import { blocksSight, pixelsPerFootOf, segmentOf } from "./sight.js";
 
 const MAX_WALLS = 1000;
 const MAX_LIGHTS = 100;
-const LIVE_REFUSAL = "That scene is live - edit its vision on the table.";
+const LIVE_REFUSAL = "That scene is live. Edit its vision on the table.";
 
 type Point2 = Readonly<{ x: number; y: number }>;
 
@@ -80,7 +80,9 @@ const rounded = (value: number) => Math.round(value * 100) / 100;
 function snapWallPoint(point: Point2, geometry: TokenMapGeometry, ends: readonly Point2[]): Point2 {
   const inside = { x: clamp(point.x, geometry.width), y: clamp(point.y, geometry.height) };
   const calibration = geometry.calibration;
-  const tolerance = calibration ? calibration.cellSizePx * 0.25 : Math.max(6, Math.min(geometry.width, geometry.height) / 150);
+  const tolerance = calibration
+    ? calibration.cellSizePx * 0.25
+    : Math.max(6, Math.min(geometry.width, geometry.height) / 150);
   let best: Point2 | null = null;
   for (const end of ends) {
     const gap = distance(end, inside);
@@ -122,7 +124,7 @@ export function addWalls(
   }
   if (added.length === 0) throw new CommandRejectedError("Drag a longer wall.");
   if (target.vision.walls.length + added.length > MAX_WALLS)
-    throw new CommandRejectedError(`A scene holds up to ${MAX_WALLS} walls - remove some first.`);
+    throw new CommandRejectedError(`A scene holds up to ${MAX_WALLS} walls. Remove some first.`);
   target.write({ walls: [...target.vision.walls, ...added] });
   return added.map((wall) => wall.id);
 }
@@ -162,7 +164,9 @@ export function setDoorOpen(state: GameState, sceneId: string | undefined, wallI
   const target = slice(state, sceneId, null);
   const wall = requireWall(target.vision, wallId);
   if (wall.kind !== "door") throw new CommandRejectedError("Only a door opens and closes.");
-  target.write({ walls: target.vision.walls.map((candidate) => (candidate.id === wallId ? { ...candidate, open } : candidate)) });
+  target.write({
+    walls: target.vision.walls.map((candidate) => (candidate.id === wallId ? { ...candidate, open } : candidate))
+  });
 }
 
 /** Feet of reach to a door: within 5 feet of the creature's space, as for anything it handles. */
@@ -185,7 +189,8 @@ export function doorWithinReach(state: GameState, wallId: string, actorIds: read
     const halfSpace = ((token.gridSizePx ?? token.sizePx) * token.sizeCells) / 2;
     if (gap > halfSpace + (DOOR_REACH_FEET + 0.5) * pixelsPerFoot) return false;
     // Stop a pixel short, so the door's own neighbours at its hinge don't count as in the way.
-    const short: Point = gap > 1 ? { x: nearest.x + ((at.x - nearest.x) / gap) * 1, y: nearest.y + ((at.y - nearest.y) / gap) * 1 } : at;
+    const short: Point =
+      gap > 1 ? { x: nearest.x + ((at.x - nearest.x) / gap) * 1, y: nearest.y + ((at.y - nearest.y) / gap) * 1 } : at;
     return clearLine(at, short, others);
   });
 }
@@ -210,7 +215,7 @@ export function addLight(
 ) {
   const target = slice(state, sceneId, geometry);
   if (target.vision.lights.length >= MAX_LIGHTS)
-    throw new CommandRejectedError(`A scene holds up to ${MAX_LIGHTS} lights - remove some first.`);
+    throw new CommandRejectedError(`A scene holds up to ${MAX_LIGHTS} lights. Remove some first.`);
   if (input.brightFeet + input.dimFeet <= 0) throw new CommandRejectedError("A light needs some radius.");
   if (input.actorId !== undefined && !sceneTokens(state, sceneId).some((token) => token.actorId === input.actorId))
     throw new CommandRejectedError("That creature has no token in this scene.");

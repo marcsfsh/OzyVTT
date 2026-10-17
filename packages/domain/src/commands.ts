@@ -972,7 +972,7 @@ export const LightAddSchema = z
   })
   .strict()
   .refine((light) => (light.position === undefined) !== (light.actorId === undefined), {
-    message: "Place the light on the map or give it to a token, not both."
+    message: "Give the light a place on the map or a token to carry it. It can't have both."
   });
 export const LightMoveSchema = z
   .object({

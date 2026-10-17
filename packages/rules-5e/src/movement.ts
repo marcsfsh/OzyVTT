@@ -248,7 +248,10 @@ export function segmentsMeet(p1: GridPoint, p2: GridPoint, q1: GridPoint, q2: Gr
   const d2 = orient(q1, q2, p2);
   const d3 = orient(p1, p2, q1);
   const d4 = orient(p1, p2, q2);
-  if (((d1 > slack && d2 < -slack) || (d1 < -slack && d2 > slack)) && ((d3 > slack && d4 < -slack) || (d3 < -slack && d4 > slack)))
+  if (
+    ((d1 > slack && d2 < -slack) || (d1 < -slack && d2 > slack)) &&
+    ((d3 > slack && d4 < -slack) || (d3 < -slack && d4 > slack))
+  )
     return true;
   return (
     (Math.abs(d1) <= slack && within(q1, q2, p1, slack)) ||
@@ -268,7 +271,7 @@ export function wallCrossing(segments: readonly GridSegment[]): (from: GridPoint
     const right = Math.floor(Math.max(segment.a.column, segment.b.column) + 1e-6);
     const top = Math.floor(Math.min(segment.a.row, segment.b.row) - 1e-6);
     const bottom = Math.floor(Math.max(segment.a.row, segment.b.row) + 1e-6);
-    // A wall across most of the map is checked everywhere rather than filed under thousands of cells.
+    // A wall across most of the map is checked on every step. Filing it under thousands of cells would cost more.
     if ((right - left + 1) * (bottom - top + 1) > 4096) {
       const everywhere = buckets.get("*") ?? [];
       everywhere.push(segment);

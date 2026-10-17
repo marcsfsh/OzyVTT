@@ -919,7 +919,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "^light.**",
     types: ["equipment"],
     reason:
-      "the light an item sheds (a Torch's 20 feet bright, 20 dim) - read by dynamic vision; no editor control yet",
+      "the light an item sheds (a Torch's 20 feet bright, 20 dim), which dynamic vision reads; no editor control yet",
     status: "gap"
   },
   {

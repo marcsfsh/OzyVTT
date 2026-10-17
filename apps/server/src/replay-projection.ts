@@ -75,7 +75,11 @@ function turnLabel(turn: EncounterArchiveTurn, sight: AudienceSight): string {
 }
 
 /** Whether a public roll may be replayed: not one made, during its turn, by a creature the party couldn't perceive. */
-function rollShown(roll: RollRecord, turns: readonly EncounterArchiveTurn[], sights: readonly AudienceSight[]): boolean {
+function rollShown(
+  roll: RollRecord,
+  turns: readonly EncounterArchiveTurn[],
+  sights: readonly AudienceSight[]
+): boolean {
   if (roll.visibility !== "public") return false;
   if (roll.actorId === null) return true;
   let index = -1;

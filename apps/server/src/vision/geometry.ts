@@ -7,7 +7,7 @@ export type Segment = Readonly<{ ax: number; ay: number; bx: number; by: number 
 export type Polygon = readonly Point[];
 export type Bounds = Readonly<{ width: number; height: number }>;
 
-/** Rays either side of a wall's end, so the polygon turns the corner instead of stopping on it. */
+/** Rays either side of a wall's end, so the polygon turns the corner there. */
 const CORNER_NUDGE = 1e-5;
 /** How finely a sight radius is drawn: one vertex every 3.75 degrees keeps the chord within 0.06% of the radius. */
 const ARC_STEPS = 96;
@@ -19,7 +19,8 @@ export function nearestOnSegment(point: Point, segment: Segment): Point {
   const ex = segment.bx - segment.ax;
   const ey = segment.by - segment.ay;
   const length = ex * ex + ey * ey;
-  const t = length === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - segment.ax) * ex + (point.y - segment.ay) * ey) / length));
+  const t =
+    length === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - segment.ax) * ex + (point.y - segment.ay) * ey) / length));
   return { x: segment.ax + t * ex, y: segment.ay + t * ey };
 }
 
@@ -82,7 +83,12 @@ function circleCrossings(center: Point, radius: number, segment: Segment): numbe
  * ending at the first wall it meets, plus an arc where the radius runs out. The map's edges close it. Star-shaped
  * about `origin`, vertices in angle order.
  */
-export function visibilityPolygon(origin: Point, segments: readonly Segment[], bounds: Bounds, radius?: number): Point[] {
+export function visibilityPolygon(
+  origin: Point,
+  segments: readonly Segment[],
+  bounds: Bounds,
+  radius?: number
+): Point[] {
   const edges: Segment[] = [
     { ax: 0, ay: 0, bx: bounds.width, by: 0 },
     { ax: bounds.width, ay: 0, bx: bounds.width, by: bounds.height },

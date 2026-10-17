@@ -170,7 +170,7 @@ export function openResolve(
     const watchers = enemiesWatching(state, attacker, deps);
     const mode = effectiveModeFor(state.combat, "hide.seen");
     if (watchers.length > 0 && mode !== "freeform") {
-      const message = `${watchers.join(" and ")} can see ${attacker.name} - hide out of every enemy's sight.`;
+      const message = `${watchers.join(" and ")} can see ${attacker.name}. Hide out of every enemy's sight.`;
       const waived = overrideWaives(input.override, "hide.seen");
       if (mode === "strict" && !waived && !overrideCovers(state.combat.turn, "hide.seen"))
         throw new RulesBlockedError("hide.seen", message);

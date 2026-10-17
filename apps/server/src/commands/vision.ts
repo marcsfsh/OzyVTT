@@ -38,7 +38,9 @@ import { defineCommand } from "./pipeline.js";
 async function sceneGeometry(kit: Kit, sceneId: string | undefined) {
   const combat = kit.read().combat;
   const mapAssetId =
-    sceneId === undefined ? combat.mapAssetId : (combat.scenes.find((scene) => scene.id === sceneId)?.mapAssetId ?? null);
+    sceneId === undefined
+      ? combat.mapAssetId
+      : (combat.scenes.find((scene) => scene.id === sceneId)?.mapAssetId ?? null);
   if (!mapAssetId) throw new CommandRejectedError("Pick a map before setting up its vision.");
   return kit.context.tokenGeometryFor(mapAssetId);
 }
@@ -63,8 +65,8 @@ export const visionCommands = [
         kit.context.appendLog({
           kind: "scene",
           text: enabled
-            ? "Dynamic vision on - each player sees only what their characters can."
-            : "Dynamic vision off.",
+            ? "Dynamic vision is on. Each player sees only what their characters can."
+            : "Dynamic vision is off.",
           gmOnly: true
         });
     }
@@ -151,7 +153,8 @@ export const visionCommands = [
   defineCommand({
     type: "wall.clear",
     operationId: "clearWalls",
-    description: "Removes every wall, door and window from the scene (GM-grade only). `sceneId` targets a prepared scene.",
+    description:
+      "Removes every wall, door and window from the scene (GM-grade only). `sceneId` targets a prepared scene.",
     summary: "Remove every wall, door and window (GM).",
     schema: WallClearSchema,
     malformed: "The wall command is malformed.",

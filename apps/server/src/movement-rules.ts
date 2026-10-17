@@ -321,8 +321,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       input,
       "movement.blocked-path",
       state.combat.vision.enabled && state.combat.vision.walls.length > 0
-        ? `${mover.name} can't get there - walls or other creatures bar the way.`
-        : `${mover.name} can't get there - other creatures bar the way.`,
+        ? `${mover.name} can't get there. Walls or other creatures bar the way.`
+        : `${mover.name} can't get there. Other creatures bar the way.`,
       outcome
     );
     charge = straight();

@@ -198,7 +198,7 @@ describe("dynamic vision end to end", () => {
     ).toMatchObject({ ok: true });
     expect(await emit(gm, "scene:activate", { sceneId: SCENE })).toMatchObject({ ok: true });
     expect(await emit(gm, "encounter:start", { mapAssetId })).toMatchObject({ ok: true });
-    // A few turns pass, the goblin moving about behind the wall.
+    // A few turns pass. The goblin moves about behind the wall.
     for (let turn = 0; turn < 3; turn++) {
       if (server.store.snapshot.combat.turnActorId === GOBLIN)
         expect(
@@ -258,7 +258,7 @@ describe("dynamic vision end to end", () => {
     const { server, gm, player, received, http, gmToken, playerToken, mapAssetId } = await table(true, "fog");
     expect(await emit(gm, "scene:activate", { sceneId: SCENE })).toMatchObject({ ok: true });
     expect(await emit(gm, "encounter:start", { mapAssetId })).toMatchObject({ ok: true });
-    // A few turns pass, the goblin moving about under the fog.
+    // A few turns pass. The goblin moves about under the fog.
     for (let turn = 0; turn < 3; turn++) {
       if (server.store.snapshot.combat.turnActorId === GOBLIN)
         expect(

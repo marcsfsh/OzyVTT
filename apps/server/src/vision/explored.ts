@@ -96,7 +96,12 @@ export function markedRects(grid: ExploredGrid, bytes: Uint8Array): VisionRect[]
         above.height += grid.cellPx;
         next.set(key, above);
       } else {
-        const rect = { x: from * grid.cellPx, y: row * grid.cellPx, width: (to - from + 1) * grid.cellPx, height: grid.cellPx };
+        const rect = {
+          x: from * grid.cellPx,
+          y: row * grid.cellPx,
+          width: (to - from + 1) * grid.cellPx,
+          height: grid.cellPx
+        };
         rects.push(rect);
         next.set(key, rect);
       }

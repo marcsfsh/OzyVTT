@@ -190,15 +190,14 @@ describe("movement over a square grid", () => {
 });
 
 describe("walls in the way of a move", () => {
-  // A wall along the grid line x = 2 from row 0 to row 3, leaving the way round below it open.
+  // A wall along the grid line x = 2 from row 0 to row 3. The way round below it is open.
   const wall = { a: { column: 2, row: 0 }, b: { column: 2, row: 3 } };
   const crosses = wallCrossing([wall]);
   const blockedBy =
-    (sizeCells: number) =>
-    (from: { column: number; row: number }, to: { column: number; row: number }) =>
+    (sizeCells: number) => (from: { column: number; row: number }, to: { column: number; row: number }) =>
       !footprintStepBlocked(from, to, sizeCells, crosses);
 
-  it("walks round a wall instead of through it", () => {
+  it("walks round the end of a wall", () => {
     const path = movementPath({
       from: { column: 0, row: 1 },
       to: { column: 4, row: 1 },

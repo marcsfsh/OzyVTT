@@ -55,7 +55,7 @@ describe("walls in the way of a move", () => {
     const cost = (enabled: boolean) =>
       movementCost(visionGame({ enabled, walls: [blocker()] }), GEOMETRY, HERO, cell(1, 5), cell(6, 5));
     expect(cost(false)?.feet).toBe(25);
-    // Round the wall's end at row 2: up 3 rows and across 5 columns, grazing no end.
+    // Round the wall's end at row 2: up 3 rows and across 5 columns. The path grazes no end.
     expect(cost(true)?.feet).toBeGreaterThan(25);
     expect(cost(true)?.blocked).toBeUndefined();
   });
@@ -87,15 +87,14 @@ describe("walls in the way of a move", () => {
         now: () => 0,
         commandId: commandId()
       })
-    ).toThrowError(new RulesBlockedError("movement.blocked-path", "Borin can't get there - walls or other creatures bar the way."));
+    ).toThrowError(
+      new RulesBlockedError("movement.blocked-path", "Borin can't get there. Walls or other creatures bar the way.")
+    );
   });
 
   it("walks past a creature the mover doesn't perceive, as past a hidden one", () => {
     // The goblin stands in the hero's way at (3,5), in a one-row corridor.
-    const corridor = [
-      wall({ x: 0, y: 250 }, { x: 1000, y: 250 }),
-      wall({ x: 0, y: 300 }, { x: 1000, y: 300 })
-    ];
+    const corridor = [wall({ x: 0, y: 250 }, { x: 1000, y: 250 }), wall({ x: 0, y: 300 }, { x: 1000, y: 300 })];
     const state = visionGame({ walls: corridor, positions: { [GOBLIN]: cell(3, 5) } });
     expect(movementCost(state, GEOMETRY, HERO, cell(1, 5), cell(6, 5))?.blocked).toBe(true);
     const unaware = movementCost(state, GEOMETRY, HERO, cell(1, 5), cell(6, 5), { perceives: () => false });
@@ -106,7 +105,11 @@ describe("walls in the way of a move", () => {
 describe("who sees whom, on the attack roll", () => {
   it("gives Advantage against a target that can't see the attacker", () => {
     // Dark, and the goblin's Darkvision finds the hero beside it; the hero has none.
-    const state = visionGame({ ambient: "dark", positions: { [GOBLIN]: cell(2, 5) }, actors: { [GOBLIN]: GOBLIN_STATS } });
+    const state = visionGame({
+      ambient: "dark",
+      positions: { [GOBLIN]: cell(2, 5) },
+      actors: { [GOBLIN]: GOBLIN_STATS }
+    });
     const swing = goblinSwing(state);
     expect(swing.rollMode?.advantage).toContain("Target can't see the attacker");
     expect(swing.rollMode?.disadvantage).toEqual([]);
@@ -168,7 +171,11 @@ describe("Hide, out of every enemy's sight", () => {
     });
     expect(hide(walled).check?.dc).toBe(15);
     // In the dark the goblin's Darkvision finds the hero, but the hero can't see the goblin, so nothing says so.
-    const dark = visionGame({ ambient: "dark", positions: { [GOBLIN]: cell(4, 5) }, actors: { [GOBLIN]: GOBLIN_STATS } });
+    const dark = visionGame({
+      ambient: "dark",
+      positions: { [GOBLIN]: cell(4, 5) },
+      actors: { [GOBLIN]: GOBLIN_STATS }
+    });
     expect(hide(dark).check?.dc).toBe(15);
   });
 });

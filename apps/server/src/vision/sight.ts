@@ -161,9 +161,8 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
   }
 
   const polygonFrom = (at: Point, radiusPx?: number) =>
-    cachedPolygon(
-      `${key}|${bounds.width}x${bounds.height}|${at.x},${at.y}|${radiusPx ?? "-"}`,
-      () => visibilityPolygon(at, blockers, bounds, radiusPx)
+    cachedPolygon(`${key}|${bounds.width}x${bounds.height}|${at.x},${at.y}|${radiusPx ?? "-"}`, () =>
+      visibilityPolygon(at, blockers, bounds, radiusPx)
     );
 
   const litMemo = new Map<string, boolean>();

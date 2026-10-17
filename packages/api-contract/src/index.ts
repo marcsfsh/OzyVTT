@@ -660,7 +660,7 @@ export const GAME_COMMANDS = {
   "wall.move": { scope: "scene:write", method: "post", path: GAME_PATHS.wallMove },
   "wall.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.wallById },
   "wall.clear": { scope: "scene:write", method: "post", path: GAME_PATHS.wallsClear },
-  // Players open doors beside their own character, so it is a combat command rather than scene prep.
+  // Players open doors beside their own character, so it is a combat command.
   "door.set-open": { scope: "combat:write", method: "post", path: GAME_PATHS.doorOpen },
   "light.add": { scope: "scene:write", method: "post", path: GAME_PATHS.lights },
   "light.move": { scope: "scene:write", method: "post", path: GAME_PATHS.lightMove },

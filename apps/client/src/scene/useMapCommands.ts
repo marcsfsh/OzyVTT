@@ -301,7 +301,7 @@ export function useMapCommands({
   const setDoorOpen = (wallId: string, open: boolean) =>
     runVision(
       () => command("door:set-open", { wallId, open, ...scene, expectedRevision: revision }),
-      "The door could not be moved.",
+      open ? "The door could not be opened." : "The door could not be closed.",
       open ? "Door opened." : "Door closed."
     );
   const addLight = (position: Point, light: Readonly<{ brightFeet: number; dimFeet: number }>) =>

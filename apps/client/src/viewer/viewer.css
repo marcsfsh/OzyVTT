@@ -606,8 +606,8 @@
   stroke: var(--line-strong);
 }
 
-/* Dynamic vision on the shared screen: the same flat opaque darkness as the fog, the party's remembered ground at
-   about half strength. */
+/* Dynamic vision on the shared screen is the fog's flat opaque darkness. The party's remembered ground shows through
+   at about half strength. */
 .vision-overlay-player {
   fill: var(--void);
   fill-opacity: 1;

@@ -88,7 +88,7 @@ describe("manual fog in the projections", () => {
     expect(a.actors.map((actor) => actor.id)).toContain(FRIEND);
     expect(a.combat.initiative.map((entry) => entry.actorId)).toContain(FRIEND);
     expect(tokenIds(asPlayer(state, SESSION_B))).toEqual([FRIEND]);
-    // The table screen sees through the whole party: both characters, nothing else.
+    // The table screen sees through the whole party: the two characters only.
     const viewer = projectViewerEncounter(state, 1_000);
     expect(viewer.encounter.tokens.map((token) => token.actorId).sort()).toEqual([HERO, FRIEND].sort());
     expect(mentionsGoblin(viewer)).toBe(false);

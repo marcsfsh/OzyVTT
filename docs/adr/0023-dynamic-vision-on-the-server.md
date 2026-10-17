@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-10-17. Amends ADR-0022: its consequence that "a _public_ token inside fog is
+Accepted on 2026-10-17. Amends ADR-0022: its consequence that "a _public_ token inside fog is
 visually covered but still present in the player payload" no longer holds. A creature wholly under
 manual fog is now left out of what players receive, the same way as one out of sight.
 

@@ -97,7 +97,7 @@ describe("dynamic vision in the player projection", () => {
     // The hero's player still can't: what one character sees isn't shared out by the server.
     const heroView = asPlayer(state, SESSION_A);
     expect(mentionsGoblin(heroView)).toBe(false);
-    // The friend stays on the hero's party list, but not on the map: the wall hides where she is.
+    // Mirena stays on the hero's party list, and the wall keeps Mirena's token off the map.
     expect(heroView.actors.some((actor) => actor.id === FRIEND)).toBe(true);
     expect(heroView.combat.tokens.some((token) => token.actorId === FRIEND)).toBe(false);
   });
@@ -127,7 +127,10 @@ describe("dynamic vision in the player projection", () => {
   });
 
   it("keeps what the party has seen after it looks away, without the creatures there", () => {
-    const state = visionGame({ positions: { [HERO]: cell(6, 5) }, walls: [wall({ x: 400, y: 0 }, { x: 400, y: 600 }, "door", true)] });
+    const state = visionGame({
+      positions: { [HERO]: cell(6, 5) },
+      walls: [wall({ x: 400, y: 0 }, { x: 400, y: 600 }, "door", true)]
+    });
     rememberExplored(state, {});
     // The door shuts: the far side is remembered but no longer seen.
     state.combat.vision = {
@@ -175,7 +178,14 @@ describe("dynamic vision on the shared screen and in replays", () => {
       endedAt: "2026-10-17T11:00:00.000Z",
       turnCount: 2,
       turns: [
-        { index: 0, kind: "turn", label: `Round 1 - ${GOBLIN_NAME}`, revision: 1, at: "2026-10-17T09:00:00.000Z", state: unseen },
+        {
+          index: 0,
+          kind: "turn",
+          label: `Round 1 - ${GOBLIN_NAME}`,
+          revision: 1,
+          at: "2026-10-17T09:00:00.000Z",
+          state: unseen
+        },
         { index: 1, kind: "turn", label: "Round 1 - Borin", revision: 5, at: "2026-10-17T10:30:00.000Z", state: seen }
       ],
       log: [],

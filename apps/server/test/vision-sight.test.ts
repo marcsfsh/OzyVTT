@@ -68,7 +68,13 @@ describe("dynamic vision: light and darkness", () => {
         ambient: "dark",
         walls,
         lights: [
-          { id: "50000000-0000-4000-8000-0000000000f1", position: cell(9, 5), actorId: null, brightFeet: 10, dimFeet: 10 }
+          {
+            id: "50000000-0000-4000-8000-0000000000f1",
+            position: cell(9, 5),
+            actorId: null,
+            brightFeet: 10,
+            dimFeet: 10
+          }
         ]
       });
     expect(sceneSight(torchLight([])).perceives(HERO, GOBLIN)).toBe(true);
@@ -127,9 +133,9 @@ describe("dynamic vision: the special senses and conditions", () => {
   });
 
   it("sees nothing while Blinded without Blindsight", () => {
-    expect(sceneSight(visionGame({ actors: { [HERO]: { conditions: [{ id: "blinded" }] } } })).perceives(HERO, GOBLIN)).toBe(
-      false
-    );
+    expect(
+      sceneSight(visionGame({ actors: { [HERO]: { conditions: [{ id: "blinded" }] } } })).perceives(HERO, GOBLIN)
+    ).toBe(false);
   });
 
   it("pinpoints a creature through a wall by Tremorsense, without seeing it", () => {

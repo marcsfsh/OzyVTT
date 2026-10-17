@@ -316,7 +316,8 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
   };
 }
 
-const coordinate = (value: unknown) => typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 1_000_000;
+const coordinate = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 1_000_000;
 
 function sanitizedVision(value: ViewerVision): ViewerVision {
   const polygons = value.visible ?? [];

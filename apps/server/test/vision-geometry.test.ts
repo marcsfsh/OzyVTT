@@ -16,7 +16,7 @@ const wall = (ax: number, ay: number, bx: number, by: number): Segment => ({ ax,
 describe("vision geometry", () => {
   it("sees the whole map when nothing is in the way", () => {
     const polygon = visibilityPolygon({ x: 100, y: 100 }, [], BOUNDS);
-    // Corners come from rays a hair either side of them, so within a few square pixels.
+    // Corners come from rays a hair either side of them, so the area is off by a few square pixels at most.
     expect(Math.abs(signedArea(polygon))).toBeGreaterThan(1000 * 600 - 20);
     expect(Math.abs(signedArea(polygon))).toBeLessThanOrEqual(1000 * 600);
   });
