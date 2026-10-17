@@ -372,6 +372,8 @@ export const ActionResolveSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(60)
       .optional(),
+    /** The ability a cast chooses: Hex's target has Disadvantage on ability checks made with it. */
+    ability: AbilitySchema.optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest

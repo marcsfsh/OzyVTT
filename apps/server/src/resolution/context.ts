@@ -61,6 +61,8 @@ export type ResolveInput = Readonly<{
   fumble?: boolean;
   /** The skill a builtin check is made with (Influence, Search, Study, Escape a Grapple). */
   skill?: string | null;
+  /** The ability a cast chooses (Hex). */
+  ability?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];

@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition } from "@vtt/schemas";
+import { checkPlan } from "../src/ability-checks.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { initiativeRollFor, startEncounter } from "../src/encounter.js";
+import { deriveEquipment } from "../src/equipment-derivation.js";
 
 // The SRD's check actions use the skill they are made with (Hide, Search, Study, Influence, Escape a Grapple), Influence
-// sets its DC from the monster, and initiative is a Dexterity check.
+// sets its DC from the monster, initiative is a Dexterity check, and Hex's chosen ability carries its Disadvantage.
 
 const HERO = "10000000-0000-4000-8000-0000000000a1";
 const FOE = "10000000-0000-4000-8000-0000000000a2";
@@ -197,5 +199,58 @@ describe("initiative is a Dexterity check", () => {
     });
     const frightened = fight({ conditions: [{ id: "frightened" }] });
     expect(initiativeRollFor(frightened, HERO, false, {}).mode).toBe("disadvantage");
+  });
+});
+
+const HEX = {
+  id: "hex",
+  name: "Hex",
+  activation: "bonus-action" as const,
+  description: "Hex.",
+  damage: [],
+  grants: {
+    name: "Hex",
+    tags: ["hexed"],
+    target: "target" as const,
+    duration: { type: "manual" as const },
+    modifiers: [],
+    onEnd: [],
+    voidWhileIncapacitated: false,
+    concentration: false
+  }
+};
+
+describe("Hex", () => {
+  it("gives Disadvantage on the target's checks with the ability its caster chose, initiative included", () => {
+    const state = fight();
+    const cast = resolveDefinitionAction(
+      state,
+      HEX as unknown as ActorDefinition["actions"][number],
+      { actorId: HERO, targetIds: [FOE], commandId: COMMAND, ability: "dex" },
+      deps([])
+    );
+    expect(cast.warnings ?? []).toEqual([]);
+    const goblin = state.actors.find((actor) => actor.id === FOE)!;
+    expect(goblin.effects.map((effect) => effect.name)).toEqual(["Hex (Dexterity)"]);
+    const derivation = deriveEquipment(goblin, GOBLIN, undefined);
+    expect(checkPlan(goblin, GOBLIN, derivation, { ability: "dex", skill: "stealth" }).rollMode).toEqual({
+      mode: "disadvantage",
+      advantage: [],
+      disadvantage: ["Hex (Dexterity)"]
+    });
+    expect(checkPlan(goblin, GOBLIN, derivation, { ability: "str" }).rollMode.mode).toBe("normal");
+    expect(initiativeRollFor(state, FOE, false, { resolveDefinition: (id) => DEFINITIONS[id] }).mode).toBe(
+      "disadvantage"
+    );
+  });
+
+  it("says so when no ability was chosen", () => {
+    const cast = resolveDefinitionAction(
+      fight(),
+      HEX as unknown as ActorDefinition["actions"][number],
+      { actorId: HERO, targetIds: [FOE], commandId: COMMAND },
+      deps([])
+    );
+    expect(cast.warnings).toContain("Hex on Goblin: no ability was chosen, so its checks have no Disadvantage.");
   });
 });
