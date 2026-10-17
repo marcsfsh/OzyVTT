@@ -399,7 +399,7 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     expect(state.actors[0].healthDisplay).toBeUndefined();
   });
 
-  it("keeps the default band silent - no healthDisplay reaches players or the viewer", () => {
+  it("keeps the default band silent: no healthDisplay reaches players or the viewer", () => {
     const state = healthGame();
     expect(projectPlayerView(state, PLAYER_A, () => null).actors.every((actor) => !("healthDisplay" in actor))).toBe(
       true
@@ -411,7 +411,7 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     const state = healthGame({ style: "ring", audience: "gm" });
     const view = projectPlayerView(state, PLAYER_A, () => null);
     expect(view.actors.every((actor) => !("healthDisplay" in actor))).toBe(true);
-    // The non-owned monster is still a coarse band for players - never exact HP.
+    // The non-owned monster is still a coarse band for players, never exact HP.
     expect(view.actors.find((actor) => actor.id === GOBLIN)!.hp).toEqual({ kind: "band", band: "bloodied" });
     expect(projectViewerEncounterScene(state).tokens.every((token) => !("healthDisplay" in token))).toBe(true);
   });
@@ -454,7 +454,7 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     expect(demotedTokens.find((token) => token.actorId === PUBLIC)!.healthDisplay).toEqual({ style: "bar" });
   });
 
-  it("gates the aura style exactly like bar/ring - to everyone under audience all, hidden under gm", () => {
+  it("gates the aura style exactly like bar/ring: to everyone under audience all, hidden under gm", () => {
     const shown = healthGame({ style: "aura", audience: "all" });
     expect(projectViewerEncounterScene(shown).tokens.every((token) => token.healthDisplay?.style === "aura")).toBe(
       true

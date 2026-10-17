@@ -329,7 +329,7 @@ describe("archived characters: sharing and claims", () => {
     ).toBe(200);
     const shared = await snapshot(base, playerToken, "player");
     expect(shared.archivedCharacters).toEqual([{ id: HERO_ID, name: "Public Hero" }]);
-    // Still absent from the roster itself - archived means out of play, shared or not.
+    // Still absent from the roster itself: archived means out of play, shared or not.
     expect(shared.actors.map((actor: { id: string }) => actor.id)).not.toContain(HERO_ID);
 
     await post(base, GAME_PATHS.actorSheetPreview.replace("{actorId}", HERO_ID), gmToken, { enabled: false });

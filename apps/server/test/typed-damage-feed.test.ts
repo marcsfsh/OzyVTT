@@ -151,7 +151,7 @@ async function feed(base: string, token: string): Promise<readonly CombatLogEntr
 const hpOf = (server: Awaited<ReturnType<typeof boot>>["server"], actorId: string) =>
   server.store.snapshot.actors.find((actor) => actor.id === actorId)!.hp.current;
 
-/** Start the fight and breathe fire on Borin, returning the save prompt that opened. */
+/** Start the fight and breathe fire on Borin. Returns the save prompt that opened. */
 async function breatheOnBorin(base: string, gmToken: string, mapAssetId: string) {
   const started = await post(base, GAME_PATHS.encounterStart, gmToken, {
     commandId: randomUUID(),
@@ -199,7 +199,7 @@ describe("save.answer narrates the adjustment it used to swallow", () => {
     // The number really halved.
     expect(outcome.appliedDamage).toBe(Math.floor(proposed / 2));
     expect(before - hpOf(server, BORIN)).toBe(Math.floor(proposed / 2));
-    // The breakdown survived instead of collapsing into a bare total.
+    // The breakdown survived in full.
     expect(outcome.parts.some((part) => part.adjustment === "resistance")).toBe(true);
     // And the feed says why.
     const row = (await feed(base, gmToken)).find((entry) => entry.kind === "save" && entry.text.includes("Borin"));
@@ -293,7 +293,7 @@ describe("both reaction paths narrate the adjustment they used to swallow", () =
     const { base, server, gmToken, mapAssetId } = await boot();
     await biteBorin(base, gmToken, mapAssetId);
     const prompt = server.store.snapshot.combat.pendingReactions[0];
-    // A named failure if the bite fumbled, instead of a TypeError further down.
+    // A named failure if the bite fumbled, ahead of any TypeError further down.
     expect(prompt, "the bite parked no reaction prompt").toBeDefined();
     const parked = prompt.proposedDamage;
     const before = hpOf(server, BORIN);
@@ -336,7 +336,7 @@ describe("the opportunity-attack path narrates it too", () => {
       ).status
     ).toBe(200);
     // A leaves-reach prompt is normally minted by the movement rules; seeding it keeps this test about
-    // the answer, not reach geometry.
+    // the answer.
     const promptId = randomUUID();
     await server.store.execute(
       { id: randomUUID(), type: "test.seed-reaction", payload: {}, principal: "gm" },
@@ -479,7 +479,7 @@ describe("save.answer takes a hand-entered damage total", () => {
 
   it("refuses a fat-fingered 9999 in words a GM can act on, and moves nothing", async () => {
     // The field accepts four digits, so 1001-9999 reach the server; the schema bound must carry the
-    // GM-readable refusal rather than zod's default message.
+    // GM-readable refusal in its own words.
     const { base, server, gmToken, mapAssetId } = await boot([]);
     await breatheOnBorin(base, gmToken, mapAssetId);
     const save = server.store.snapshot.combat.pendingSaves[0];
@@ -529,7 +529,7 @@ describe("save.answer takes a hand-entered damage total", () => {
     expect(refused.status).toBeGreaterThanOrEqual(400);
     expect(hpOf(server, BORIN)).toBe(40);
 
-    // Claim Borin and the same amend goes through: the boundary is ownership, not the field.
+    // Claim Borin and the same amend goes through: the boundary is ownership.
     expect((await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: BORIN })).status).toBe(
       200
     );
@@ -573,7 +573,7 @@ describe("actor.apply-damage narrates the type the GM named", () => {
     const { base, server, gmToken } = await boot();
     const playerToken = server.auth.issuePlayerSession();
     const before = hpOf(server, BORIN);
-    // The vocabulary is open, so this lands in full rather than being refused; that is why a typo is
+    // The vocabulary is open, so this lands in full; that is why a typo is
     // worth a warning to the GM.
     expect((await damageBorin(base, gmToken, { amount: 10, damageType: "fier" })).status).toBe(200);
     expect(before - hpOf(server, BORIN)).toBe(10);

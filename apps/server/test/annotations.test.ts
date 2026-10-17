@@ -424,7 +424,7 @@ describe("authoritative annotation geometry", () => {
 
   it("points a cone in any direction: both ends snap to cell centers, not to fixed angles", () => {
     const state = activeState();
-    // Drag ~3 cells right and 1 cell down - a ~18° angle that must survive (not snap to 0/45°).
+    // Drag ~3 cells right and 1 cell down: a ~18° angle that must survive (not snap to 0/45°).
     const cone = addAnnotation(
       state,
       {

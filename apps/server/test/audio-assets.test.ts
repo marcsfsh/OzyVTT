@@ -7,7 +7,7 @@ import { AudioAssetStore, inspectAudio } from "../src/audio-assets.js";
 import { adts, flac, m4a, mp3, ogg, wav, webm } from "./audio-fixtures.js";
 import { png } from "./image-fixtures.js";
 
-/** The first part of a file, ending mid-frame: a cut exactly on a frame boundary looks like a shorter whole file. */
+/** The first part of a file, cut mid-frame: a cut exactly on a frame boundary looks like a shorter whole file. */
 const cut = (file: Buffer, keep: number) => file.subarray(0, Math.floor(file.length * keep) - 7);
 
 describe("sound file inspection", () => {

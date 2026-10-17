@@ -107,7 +107,7 @@ describe("player damage settlement", () => {
       critical: false,
       proposedDamageParts: [{ amount: 7, type: "slashing" }]
     });
-    expect(goblinHp(game)).toBe(15); // untouched - the GM applies it
+    expect(goblinHp(game)).toBe(15); // untouched: the GM applies it
   });
 
   it("applies typed damage immediately in direct mode and parks nothing", () => {
@@ -238,7 +238,7 @@ describe("player damage part/reaction helpers", () => {
         })
       )
     ).toBe(true);
-    // A parked reaction means the damage resolves in the turn order, not here - do not park/apply it.
+    // A parked reaction means the damage resolves in the turn order, so this does not park or apply it.
     expect(
       playerHitOwesDamage(
         resolutionOf({ reactionPrompts: [{ actorId: IDS.monster, actorName: "Goblin", actionName: "Uncanny Dodge" }] })
@@ -270,6 +270,6 @@ describe("player damage part/reaction helpers", () => {
     });
     expect(settlePlayerHit(game, reactionOwned, "Alpha", IDS.attacker, "direct", damageDeps())).toBeNull();
     expect(game.combat.pendingDamage).toHaveLength(0);
-    expect(goblinHp(game)).toBe(15); // untouched - the reaction handles it in the turn order
+    expect(goblinHp(game)).toBe(15); // untouched: the reaction handles it in the turn order
   });
 });

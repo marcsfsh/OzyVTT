@@ -142,7 +142,7 @@ describe("the playlist", () => {
     expect(fresh.music.current).toMatchObject({ assetId: BATTLE, startedAt: handOver, volume: 0.9 });
     nextTrack(fresh, deps(handOver + 1_000));
     expect(fresh.music.current?.assetId).toBe(DIRGE);
-    // After the server was down past a hand-over, the next track (round to the first) starts now, not in the past.
+    // After the server was down past a hand-over, the next track (round to the first) starts now.
     const missed = handOver + 1_000 + 60_000 + 3_600_000;
     expect(advanceMusic(fresh, deps(missed))).toBe(true);
     expect(fresh.music.current).toMatchObject({ assetId: TAVERN, startedAt: missed });
@@ -180,7 +180,7 @@ describe("the playlist", () => {
     expect(nextSoundEvent(fresh)).toBeNull();
     const paused = viewerSoundAt(projectViewerSound(fresh, 50_000), 50_000);
     expect(paused).toMatchObject({ paused: true, music: { positionMs: 20_000 }, ambient: [{ positionMs: 15_000 }] });
-    // Playing anything lifts the pause, moving every running sound on by the time it was held.
+    // Playing anything lifts the pause and moves every running sound on by the time it was held.
     playEffect(fresh, THUNDER, deps(80_000));
     expect(fresh.pausedAt).toBeNull();
     expect(fresh.music.current?.startedAt).toBe(60_000);

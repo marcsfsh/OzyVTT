@@ -17,11 +17,11 @@ import { deriveEquipment, equipmentCatalogOf, weaponPropertiesOf } from "../src/
 import { startEncounter } from "../src/encounter.js";
 
 // End-to-end `character.create` assembly against the real content bundles: a Fighter 5 and a Wizard 3
-// built from choices, checking HP, AC, saves, skills, slots, prepared list, rider-derived actions, the
+// built from choices. It checks HP, AC, saves, skills, slots, prepared list, rider-derived actions, the
 // hit-dice pool and `import-<actorId>` keying, plus the rejection paths (unknown ids, over-cap
 // prepared spells, invalid HP entries, policy).
 
-// `buildCharacterDefinition` takes an audience-scoped view, not the library itself; with no
+// `buildCharacterDefinition` takes an audience-scoped view of the library; with no
 // homebrew source wired in both audiences resolve to the same SRD-only catalog.
 const library = new ContentLibrary().forAudience("gm");
 const defaultPolicy = BuilderPolicySchema.parse({});
@@ -120,7 +120,7 @@ function emptyState(): GameState {
   return GameStateSchema.parse({ schemaVersion: 1 });
 }
 
-// Class feature prose must survive `interpretFeature` into the definition the sheet renders, not a
+// Class feature prose must survive `interpretFeature` into the definition the sheet renders, with no
 // "See the warlock class description in SRD 5.2.1." stub. The bundle-side guards live in
 // `packages/content-srd-5.2.1`.
 const warlockInput = (): MutableCreateInput => ({
@@ -201,7 +201,7 @@ const warlockInput = (): MutableCreateInput => ({
   ]
 });
 
-describe("2a - a built Warlock carries the SRD's real feature prose, not a pointer at the SRD", () => {
+describe("2a: a built Warlock carries the SRD's real feature prose, not a pointer at the SRD", () => {
   const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
   const traits = (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string; description: string }> })
     .traits;
@@ -221,12 +221,12 @@ describe("2a - a built Warlock carries the SRD's real feature prose, not a point
   });
 
   it('does not offer a prose-less "Subclass Feature" trait at levels the subclass fills', () => {
-    // The printed table's "Subclass feature" cell is a reminder, not a class feature, and has no text.
+    // The printed table's "Subclass feature" cell is a reminder with no class feature or text behind it.
     expect(traits.map((trait) => trait.name)).not.toContain("Subclass Feature");
   });
 });
 
-describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () => {
+describe("buildCharacterDefinition: Fighter 5 (human soldier, Champion)", () => {
   const definition = buildCharacterDefinition(fighterInput(), library, defaultPolicy);
 
   it("applies base scores + the background spread + the ASI feat's ability-score picks", () => {
@@ -260,8 +260,8 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     const chainMail = definition.startingInventory?.find((item) => item.id === "chain-mail");
     expect(chainMail?.equipped).toBe(true);
     expect(chainMail?.armor?.acBase).toBe(16);
-    // No flat rider is stored on the sheet: the live AC collects Defense from the feat itself, so it follows the
-    // armor worn later rather than the armor worn at build.
+    // No flat rider is stored on the sheet: the live AC collects Defense from the feat itself, so it follows
+    // whatever armor is worn later.
     expect((definition.extensions["open5e.srd-2024"] as { armorClassBonus?: number }).armorClassBonus).toBeUndefined();
   });
 
@@ -420,7 +420,7 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
   });
 });
 
-describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
+describe("buildCharacterDefinition: Wizard 3 (high-elf sage, Evoker)", () => {
   const definition = buildCharacterDefinition(wizardInput(), library, defaultPolicy);
 
   it("computes scores, average HP, unarmored AC, and PB", () => {
@@ -478,7 +478,7 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
       freeActionId: "spell-magic-missile-free"
     });
     expect(spells.get("mage-armor")).toMatchObject({ alwaysPrepared: false, classId: "wizard" });
-    // Evocation Savant adds to the spellbook ("add them to your spellbook for free"): known, not prepared.
+    // Evocation Savant adds to the spellbook ("add them to your spellbook for free"): known, and left unprepared.
     expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: false, alwaysPrepared: false });
   });
 
@@ -517,7 +517,7 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     // unlocking that weapon, and `ItemWeaponSchema` is strict.
     expect("mastery" in (carried("dagger").weapon ?? {})).toBe(false);
 
-    // Two swings, one character, differing only by Finesse. DEX +2, STR +0, PB +2.
+    // Two swings, one character, and only Finesse differs. DEX +2, STR +0, PB +2.
     const state = emptyState();
     importActorDefinition(state, definition, ACTOR_ID, "public");
     const derivation = deriveEquipment(state.actors[0], definition, {
@@ -554,7 +554,7 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
   });
 });
 
-describe("buildCharacterDefinition - loud rejections", () => {
+describe("buildCharacterDefinition: loud rejections", () => {
   it("rejects unknown identity ids", () => {
     expect(() =>
       buildCharacterDefinition({ ...fighterInput(), speciesId: "gnoll" }, library, defaultPolicy)
@@ -755,7 +755,7 @@ describe("always-prepared grants are not charged to the prepared count", () => {
   it("keeps a Life Domain spell the player ALSO prepared as the grant's always-prepared form", () => {
     // A domain spell the player also listed must become `alwaysPrepared: true` and not spend a prepared slot.
     expect(spells.get("cure-wounds")).toMatchObject({ level: 1, prepared: true, alwaysPrepared: true });
-    expect(spells.get("cure-wounds")).not.toHaveProperty("classId"); // the grant's entry, not a class pick
+    expect(spells.get("cure-wounds")).not.toHaveProperty("classId"); // the grant's entry, with no class pick behind it
     for (const domainSpell of ["aid", "bless", "cure-wounds", "lesser-restoration"]) {
       expect(spells.get(domainSpell)?.alwaysPrepared, domainSpell).toBe(true);
     }
@@ -808,7 +808,7 @@ describe("always-prepared grants are not charged to the prepared count", () => {
     const built = buildCharacterDefinition(thaumaturge, library, defaultPolicy);
     expect((built.spellcasting?.spells ?? []).some((spell) => spell.id === "mending")).toBe(true);
     expect(built.proficiencies?.armor).not.toContain("heavy"); // the other role's grant does not apply
-    // The fifth is still refused, and the message names the composed cap rather than the printed one.
+    // The fifth is still refused, and the message names the composed cap, which differs from the printed one.
     const overCap = clericInput();
     overCap.choices = overCap.choices.map((row) => (row.kind === "divine-order" ? { ...row, id: "thaumaturge" } : row));
     overCap.choices.push(
@@ -901,7 +901,7 @@ describe("extra picks raise the budget the server validates against", () => {
     expect(() => buildCharacterDefinition(withCantrips(6), boosted, defaultPolicy)).toThrowError(
       /Cleric knows 5 cantrips at level 3; got 6/
     );
-    // ...and the same trait on a Protector Cleric adds its +1 to the printed 3, not to 4.
+    // ...and the same trait on a Protector Cleric adds its +1 to the printed 3, for 4.
     const protector = clericInput();
     protector.choices.push({ level: 1, kind: "cantrip", id: "mending" });
     expect(() => buildCharacterDefinition(protector, boosted, defaultPolicy)).not.toThrow();
@@ -993,7 +993,7 @@ describe("extra picks raise the budget the server validates against", () => {
     expect(() => buildCharacterDefinition(warlockWithInvocations(6), library, defaultPolicy)).toThrowError(
       /exceeds what this build may choose \(Eldritch Invocations: 5\)/
     );
-    // Underfilled is as loud as overfilled, so the number really moved rather than the ceiling being lifted.
+    // Underfilled is as loud as overfilled, so the number really moved and the ceiling stayed put.
     expect(() => buildCharacterDefinition(warlockWithInvocations(4), library, defaultPolicy)).toThrowError(
       /"Eldritch Invocations" needs 5 pick\(s\)/
     );
@@ -1204,7 +1204,7 @@ describe("extra picks raise the budget the server validates against", () => {
 describe("the same feat cannot be taken twice across different offers", () => {
   it("rejects a Versatile pick that repeats the background's origin feat", () => {
     // A Human Acolyte already holds Magic Initiate (Cleric) from the background; taking it again with
-    // Versatile would interpret the feature twice (7 cantrips instead of 5).
+    // Versatile would interpret the feature twice and give 7 cantrips; the right count is 5.
     const duplicate = clericInput();
     duplicate.choices = duplicate.choices.map((row) =>
       row.kind === "feat" ? { ...row, id: "magic-initiate-cleric" } : row
@@ -1395,7 +1395,7 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
       deps()
     );
     expect(state.actors[0].actionUses["channel-divinity"]).toBe(2);
-    // Both charges spent: the third attempt is refused, naming the pool's size.
+    // Both charges spent: the third attempt is refused, and the message names the pool's size.
     expect(() =>
       resolveDefinitionAction(
         state,
@@ -1524,13 +1524,13 @@ describe("multiclass prerequisites are correct but deliberately uncalled in phas
     expect(meetsMulticlassPrerequisites({ dex: 13 }, "monk")).toBe(false); // mode "all": needs WIS 13 too
     expect(meetsMulticlassPrerequisites({ dex: 13, wis: 13 }, "monk")).toBe(true);
     expect(meetsMulticlassPrerequisites({}, "moon-warden")).toBe(true); // unknown/homebrew: no declared minimum
-    // The authored bundle drives it, not just the static table.
+    // The authored bundle drives it as well as the static table.
     expect(meetsMulticlassPrerequisites({ wis: 12 }, "cleric", library.classProgressionTable())).toBe(false);
     expect(meetsMulticlassPrerequisites({ wis: 13 }, "cleric", library.classProgressionTable())).toBe(true);
   });
 });
 
-describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
+describe("buildCharacterDefinition: Warlock 5 (Pact Magic)", () => {
   // Pact Magic is the one caster shape that is not a sparse nine-column row; the assembly must read it,
   // not just `spellSlots`.
   const warlockInput = (): CharacterCreateRequestInput & {
@@ -1632,7 +1632,7 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
     ]
   });
 
-  it("gives a Warlock its Pact Magic slots - all at one level, not a sparse row", () => {
+  it("gives a Warlock its Pact Magic slots: all at one level, not a sparse row", () => {
     const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
     // SRD: a Warlock 5 has two level-3 Pact Magic slots and no level-1 or level-2 slots. They are their own pool
     // (back on a Short Rest), so none of them is a spell slot.
@@ -1647,7 +1647,7 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
   });
 });
 
-describe("buildCharacterDefinition - derived save DCs", () => {
+describe("buildCharacterDefinition: derived save DCs", () => {
   // `FeatureSaveDcSchema` has three forms: the "spellcasting" literal, a printed number, and a derived
   // `{base, ability, proficiencyBonus}`. All must resolve to a number, since `ActionSchema` requires one.
   it("resolves a species trait's derived save DC to a number (Dragonborn Breath Weapon)", () => {

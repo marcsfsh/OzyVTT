@@ -222,7 +222,7 @@ const featCarrier = (built: Built) =>
 describe("a feat the builder put on the sheet is a rider carrier", () => {
   it("resolves the taken feat's riders through the catalog with NO sourceItemId", () => {
     const built = build({ modifiers: [{ type: "attack-bonus", amount: 2 }] });
-    // The builder recorded it: a builder-taken feat, not a hand-written definition.
+    // The builder recorded it: a builder-taken feat.
     expect(built.definition.character?.feats.map((feat) => feat.id).sort()).toEqual([
       "ability-score-improvement",
       "defense",
@@ -267,7 +267,7 @@ describe("a feat's attack-bonus reaches the rolled to-hit", () => {
     const action = actionOf(built, "item-greatsword");
     expect(action.attack!.bonus).toBe(9);
 
-    // The roll, not just the number: d20 = 10 -> 19 total against AC 12.
+    // The roll itself: d20 = 10 -> 19 total against AC 12.
     const resolution = resolveDefinitionAction(
       built.state,
       action,
@@ -352,7 +352,7 @@ describe("a feat's spell-save-dc raises the bearer's spell save DC and nothing e
       deps(built, [3, 4])
     );
     expect(resolution.save!.dc).toBe(15);
-    expect(built.state.combat.pendingSaves[0].dc).toBe(15); // the DC actually enforced, not just shown
+    expect(built.state.combat.pendingSaves[0].dc).toBe(15); // the DC actually enforced
   });
 });
 
@@ -448,7 +448,7 @@ describe("a feat's moment-gated roll-mode fires only at its moment", () => {
   });
 
   it("widens the critical range from a feat, the way a keen weapon does from an item", () => {
-    // 18 rather than 19 (and the control 19 rather than 20) because the Champion's Improved Critical is a
+    // 18 (and the control 19) because the Champion's Improved Critical is a
     // `critical-range` rider too. `criticalThreshold` takes the lowest any carrier names.
     const built = build({ modifiers: [{ type: "critical-range", threshold: 18 }] });
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
@@ -474,7 +474,7 @@ describe("a this-item-scoped rider on a feat does not become an 'always' rider",
     // "only with this weapon" into "+5 on everything", so the rider is dropped.
     const built = build({ modifiers: [{ type: "attack-bonus", amount: 5, scope: "this-item" }] });
     expect(featCarrier(built)).toBeUndefined();
-    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(7); // the base number, not 12
+    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(7); // the base number alone
     expect(actionOf(built, "item-shortbow").attack!.bonus).toBe(4);
   });
 

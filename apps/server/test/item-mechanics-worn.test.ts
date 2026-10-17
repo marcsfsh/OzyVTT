@@ -122,7 +122,7 @@ const newTurn = (state: GameState) => {
 const worn = (id: string, name: string, over: Record<string, unknown> = {}): InventoryItem =>
   item({ id, name, quantity: 1, equipped: true, attuned: true, category: "wondrous-item", ...over });
 
-// A mundane weapon row minted from the shipped catalog, copying the same keys the real builder copies
+// A mundane weapon row minted from the shipped catalog, with the same keys the real builder copies
 // (`character-build.ts`, minus `mastery`). Used for the Bracers of Archery, whose mechanic is about
 // another weapon, so its stats must not be hand-written here.
 const fromCatalog = (id: string): InventoryItem => {
@@ -162,7 +162,7 @@ describe("a Cloak of Protection moves AC and a rolled save, and both come off wi
     expect(record.armor ?? null).toBeNull();
   });
 
-  it("NUMBER ONE - the AC on the actor, through the real inventory write path, and back off again", () => {
+  it("NUMBER ONE: the AC on the actor, through the real inventory write path, and back off again", () => {
     const definition = definitionOf();
     const state = stateWith([]);
 
@@ -181,7 +181,7 @@ describe("a Cloak of Protection moves AC and a rolled save, and both come off wi
     expect(state.actors[0].armorClass).toBe(12); // deleting the row removes it too
   });
 
-  it("NUMBER TWO - a saving throw the SERVER rolls, where the cloak's +1 is the difference between fail and pass", () => {
+  it("NUMBER TWO: a saving throw the SERVER rolls, where the cloak's +1 is the difference between fail and pass", () => {
     const definition = definitionOf();
     const state = fight(stateWith([worn("cloak-of-protection", "Cloak of Protection")]));
 
@@ -282,7 +282,7 @@ describe("Boots of Elvenkind make a Stealth check keep the higher die", () => {
       deps(faces, definition)
     );
 
-  it("carries the harvested rider out of the COMMITTED bundle - the first link", () => {
+  it("carries the harvested rider out of the COMMITTED bundle: the first link", () => {
     const record = view.equipmentRecord("boots-of-elvenkind")!;
     expect(record.slot).toBe("feet");
     expect(record.modifiers).toEqual([
@@ -337,7 +337,7 @@ describe("Boots of Elvenkind make a Stealth check keep the higher die", () => {
     expect(state.actors[0].effects).toEqual([]);
   });
 
-  it("does NOT reach Search, Study or Influence - the narrow is the whole point", () => {
+  it("does NOT reach Search, Study or Influence: the narrow is the whole point", () => {
     // `skill-is: ["stealth"]` fails closed against a check that passes no skill, and `ability-is` fails
     // closed against a different ability, so three items cannot cover five checks.
     for (const [n, actionId, formula] of [
@@ -437,7 +437,7 @@ describe("a +5 that lands on ONE skill row", () => {
 describe("a proficiency an item hands out, on the swing", () => {
   it("makes a Longbow proficient through Bracers of Archery and drops it when they come off", () => {
     const definition = definitionOf();
-    // The bow's stats come from the shipped catalog, not this file.
+    // The bow's stats come from the shipped catalog.
     const bow = fromCatalog("longbow");
     expect(bow.weapon).toEqual({
       category: "martial",

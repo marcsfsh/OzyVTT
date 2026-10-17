@@ -285,7 +285,7 @@ describe("definition action resolution", () => {
     expect(critResolution.crit).toBe(true);
     expect(critResolution.damage).toEqual([{ formula: "4d6 + 5", type: "piercing", total: 29 }]);
 
-    // A crit is the declared flag, not the number: a total equal to nat-20-plus-bonus is a normal hit.
+    // A crit is the declared flag: a total equal to nat-20-plus-bonus is a normal hit.
     const notCrit = combatState();
     const notCritResolution = resolveDefinitionAction(
       notCrit,

@@ -166,7 +166,7 @@ describe("reading a scroll in a fight", () => {
   it("attacks with the scroll's +5, and grows a cantrip with its reader's level", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
     write(table, IDS.wizard, scrollOf("fire-bolt"));
-    // Wizard 3: Fire Bolt's base 1d10, at the scroll's attack bonus rather than the wizard's own.
+    // Wizard 3: Fire Bolt's base 1d10, at the scroll's own attack bonus.
     expect(actionOf(table, IDS.wizard, READ)).toMatchObject({
       attack: { bonus: 5 },
       damage: [{ formula: "1d10", type: "fire" }]

@@ -20,7 +20,7 @@ import { findCatalogRecord, rewriteForNewId } from "../src/homebrew-srd-copy.js"
 import { validateForPublish, type HomebrewValidationContext } from "../src/homebrew-validate.js";
 
 // The publish gate. Each case is a way a homebrew record can be wrong that the rest of the stack
-// accepts and then fails on later, often in front of a player rather than the GM who authored it.
+// accepts and then fails on later, often in front of a player, away from the GM who authored it.
 
 const LEVEL_TABLE = Array.from({ length: 20 }, (_, index) => ({
   level: index + 1,
@@ -78,11 +78,11 @@ function contextWith(
 const messages = (validity: { issues: ReadonlyArray<{ message: string }> }) =>
   validity.issues.map((issue) => issue.message).join(" | ");
 
-describe("tier 1 - the record's own schema", () => {
+describe("tier 1: the record's own schema", () => {
   it("reports the offending FIELD, not just a refusal", () => {
     const validity = validateForPublish("class", { id: "hb-half-formed-a1b2c3", name: "Half-Formed" }, contextWith());
     expect(validity.valid).toBe(false);
-    // Machine-addressable so a form editor can point at the input rather than parse prose.
+    // Machine-addressable so a form editor can point at the input with no prose to parse.
     expect(validity.issues.map((issue) => issue.path[0])).toContain("hitDie");
     expect(validity.issues.every((issue) => issue.recordId === null)).toBe(true);
   });
@@ -99,7 +99,7 @@ describe("tier 1 - the record's own schema", () => {
 
   // The bodies the homebrew editor produces must pass this gate. The client side of this check lives in
   // `apps/client/src/homebrew/publish-paths.test.ts` and runs the same `HOMEBREW_BODY_SCHEMAS`.
-  it("accepts a melee weapon whose ranges are null - the flagship authoring path", () => {
+  it("accepts a melee weapon whose ranges are null: the flagship authoring path", () => {
     const mace = {
       id: "hb-club-of-ruin-a1b2c3",
       name: "Club of Ruin",
@@ -169,7 +169,7 @@ describe("tier 1 - the record's own schema", () => {
   });
 });
 
-describe("tier 2 - identity", () => {
+describe("tier 2: identity", () => {
   it("refuses an id that would brick campaign load on the next boot", () => {
     // > 60 characters passes `ContentIdSchema` (which allows 80) but fails `GameStateSchema.parse` once
     // written into a persisted ActorDefinition.
@@ -183,8 +183,8 @@ describe("tier 2 - identity", () => {
   });
 });
 
-describe("tier 3 - cross-record references", () => {
-  it("refuses a subclass whose class does not exist at all - a typo that would strand it forever", () => {
+describe("tier 3: cross-record references", () => {
+  it("refuses a subclass whose class does not exist at all: a typo that would strand it forever", () => {
     const validity = validateForPublish(
       "subclass",
       { id: "hb-mutant-a1b2c3", name: "Mutant", source: "homebrew", classId: "hb-nothing-000000" },
@@ -273,8 +273,8 @@ describe("a class and its subclass publish in either order", () => {
   });
 });
 
-describe("tier 3 - cross-record references, continued", () => {
-  it("refuses a background whose origin feat does not resolve - today that rejects seven wizard steps in", () => {
+describe("tier 3: cross-record references, continued", () => {
+  it("refuses a background whose origin feat does not resolve: today that rejects seven wizard steps in", () => {
     const validity = validateForPublish(
       "background",
       { id: "hb-hermit-a1b2c3", name: "Hermit", source: "homebrew", originFeatId: "hb-nothing-000000" },
@@ -304,7 +304,7 @@ describe("tier 3 - cross-record references, continued", () => {
     expect(messages(validity)).toContain("resolves to nothing");
   });
 
-  it("refuses a starting-equipment id that resolves to nothing - it grants no attack and no AC, silently", () => {
+  it("refuses a starting-equipment id that resolves to nothing: it grants no attack and no AC, silently", () => {
     const validity = validateForPublish(
       "class",
       classBody({
@@ -345,7 +345,7 @@ describe("tier 3 - cross-record references, continued", () => {
     expect(messages(validity)).toContain("asks for 3 distinct pick(s) but offers only 2");
   });
 
-  it("refuses a choice-bearing feature that no level row grants - the wizard offers a pick the build cannot match", () => {
+  it("refuses a choice-bearing feature that no level row grants: the wizard offers a pick the build cannot match", () => {
     // A feature with empty `grantedAtLevels` that is not in the level table: the wizard offers the pick,
     // but `character-build.ts` builds offers from the level table alone, so Create always fails.
     const validity = validateForPublish(
@@ -384,7 +384,7 @@ describe("tier 3 - cross-record references, continued", () => {
     ).toBe(true);
   });
 
-  it("leaves a plain ungranted feature alone - it is dead display text, not an uncreatable character", () => {
+  it("leaves a plain ungranted feature alone: it is dead display text, not an uncreatable character", () => {
     expect(
       validateForPublish(
         "class",
@@ -466,7 +466,7 @@ describe("tier 3 - cross-record references, continued", () => {
     expect(messages(validity)).toContain("Lineage traits cannot carry choices yet");
   });
 
-  it('refuses a monster with no challenge rating or creature type - the picker would show "CR 0 unknown"', () => {
+  it('refuses a monster with no challenge rating or creature type: the picker would show "CR 0 unknown"', () => {
     const monster = (extensions: Record<string, unknown>) => ({
       id: "hb-m-4f19c8b02de7",
       schemaId: "vtt.actor-monster",
@@ -492,7 +492,7 @@ describe("tier 3 - cross-record references, continued", () => {
   });
 
   it('reads the SAME extension bag the bestiary reads, so nothing it passes can list as "CR 0 - unknown"', () => {
-    // The invariant, not the key: if the guard passes a creature, the list must be able to show its CR.
+    // The invariant itself: if the guard passes a creature, the list must be able to show its CR.
     const monster = (bag: string) => ({
       id: "hb-m-4f19c8b02de7",
       schemaId: "vtt.actor-monster",
@@ -522,7 +522,7 @@ describe("tier 3 - cross-record references, continued", () => {
     expect(passed).toBe(1);
   });
 
-  it("refuses a monster whose content id disagrees with its record id - its live tokens would resolve to nothing", () => {
+  it("refuses a monster whose content id disagrees with its record id: its live tokens would resolve to nothing", () => {
     const validity = validateForPublish(
       "monster",
       {
@@ -545,7 +545,7 @@ describe("tier 3 - cross-record references, continued", () => {
   });
 });
 
-describe("spell lists - the empty list is the failure that matters", () => {
+describe("spell lists: the empty list is the failure that matters", () => {
   const listBody = (overrides: Record<string, unknown> = {}) => ({
     id: "hb-necro-a1b2c3",
     name: "Necromancer List",
@@ -584,7 +584,7 @@ describe("spell lists - the empty list is the failure that matters", () => {
     expect(messages(validity)).toContain("loops back to itself");
   });
 
-  it("refuses a caster that names no list at all - the builder would look for one named after the class", () => {
+  it("refuses a caster that names no list at all: the builder would look for one named after the class", () => {
     const validity = validateForPublish(
       "class",
       classBody({ spellcasting: { ability: "int", prepares: "prepared" } }),
@@ -621,7 +621,7 @@ describe("spell lists - the empty list is the failure that matters", () => {
   });
 });
 
-describe("tier 4 - shapes that parse and are then read by nothing", () => {
+describe("tier 4: shapes that parse and are then read by nothing", () => {
   it("refuses a third-caster subclass rather than shipping a character with zero slots", () => {
     // A subclass's own `levelTable` is not read by the builder, not projected, and not on the wire
     // summary, so it is refused as unsupported.
@@ -826,10 +826,10 @@ describe("a duplicated SRD record still passes its own gate", () => {
     const copy = rewriteForNewId("class", wizard.body, "wizard", "hb-chronomancer-a1b2c3") as Record<string, any>;
     const slugs = (copy.features as any[]).map((feature) => feature.choice?.fromCatalog).filter(Boolean);
     // Rewritten: keeping `wizard-subclasses` would offer Wizard's subclasses, and the build then rejects
-    // ("Evocation is a wizard subclass, not a Chronomancer one").
+    // ("Evocation is a wizard subclass").
     expect(slugs).toContain("hb-chronomancer-a1b2c3-subclasses");
     expect(slugs).not.toContain("wizard-subclasses");
-    // Kept: a spell list is shared vocabulary, not a possession.
+    // Kept: a spell list is shared vocabulary that nobody owns.
     expect(slugs).toContain("wizard-spells");
     expect(copy.spellcasting.spellListId).toBe("wizard");
     expect(copy.source).toBe("homebrew");

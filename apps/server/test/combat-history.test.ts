@@ -85,7 +85,7 @@ describe("turn time-travel timeline", () => {
 
   it("rewinds the whole table to the end of the prior turn and resumes live without undoing anything", async () => {
     await next(); // capture Alpha's turn @0, now live on Goblin
-    // Goblin takes damage during its (live) turn - this must survive a rewind-and-resume round trip.
+    // Goblin takes damage during its (live) turn: this must survive a rewind-and-resume round trip.
     await store.execute({ id: randomUUID(), type: "actor.apply-damage", actorId: MON }, (state) =>
       applyDamage(state, MON, 4, GM)
     );
@@ -132,7 +132,7 @@ describe("turn time-travel timeline", () => {
     );
     expect(store.listTurnSnapshots().map((entry) => entry.kind)).toEqual(["turn"]);
     await next(); // Alpha's turn ends; Goblin's begins
-    await previous(); // a real restore, not just the turn pointer
+    await previous(); // a real restore, beyond the turn pointer
     expect(store.snapshot.combat.historyCursor).not.toBeNull();
     expect(store.snapshot.combat.turnActorId).toBe(PC);
   });
@@ -168,7 +168,7 @@ describe("turn time-travel timeline", () => {
 
     await expect(next(false)).rejects.toBeInstanceOf(TimelineConfirmationRequired);
     await expect(next(false)).rejects.toMatchObject({ confirm: "rewrite-history" });
-    // The rejected attempts burned nothing - still rewound, still dirty.
+    // The rejected attempts burned nothing: still rewound, still dirty.
     expect(store.snapshot.combat.historyCursor).toBe(0);
     expect(store.snapshot.combat.historyDirty).toBe(true);
 
@@ -295,7 +295,7 @@ describe("turn time-travel timeline", () => {
     expect(store.listEncounterArchives()).toHaveLength(0);
   });
 
-  it("does not archive - and keeps the buffer - when ending is rejected mid-review", async () => {
+  it("does not archive, and keeps the buffer, when ending is rejected mid-review", async () => {
     await next();
     await previous(); // rewound
     await expect(endAndArchive(randomUUID())).rejects.toThrow(/reviewing the combat history/i);

@@ -13,7 +13,7 @@ describe("homebrew id shapes are per type, in both directions", () => {
     expect(homebrewIdProblem(NAME_DERIVED, "monster")).toMatch(/opaque/);
   });
 
-  it("accepts that same id for a builder type - the shape is legal, the TYPE is what differs", () => {
+  it("accepts that same id for a builder type: the shape is legal, the TYPE is what differs", () => {
     expect(isMintedHomebrewId(NAME_DERIVED, "class")).toBe(true);
     expect(homebrewIdProblem(NAME_DERIVED, "class")).toBeNull();
   });

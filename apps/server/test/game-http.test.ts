@@ -26,7 +26,7 @@ import { png } from "./image-fixtures.js";
 
 // ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
 // credential, discovers capabilities, reads a safe snapshot, submits and safely retries idempotent
-// commands, hits stale-revision and confirmation conflicts, and loses access on revocation - while
+// commands, hits stale-revision and confirmation conflicts, and loses access on revocation, while
 // the hidden combatant never leaks through any player-safe response.
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
@@ -206,7 +206,7 @@ describe("public game API over /api/v1", () => {
     const startedBody = GameMutationAcceptedResponseSchema.parse(await started.json());
     expect(startedBody.data).toMatchObject({ commandId: startId, revision: 1, duplicate: false });
 
-    // Retrying the same commandId is an idempotent duplicate, not a re-execution.
+    // Retrying the same commandId is an idempotent duplicate and runs once.
     const retried = GameMutationAcceptedResponseSchema.parse(
       await (
         await post(base, GAME_PATHS.encounterStart, writer.token, {
@@ -229,7 +229,7 @@ describe("public game API over /api/v1", () => {
     expect(staleBody.error.code).toBe("conflict");
     expect(staleBody.error.currentRevision).toBe(1);
 
-    // Damage, heal, temp HP, set HP, condition - the actor routes.
+    // Damage, heal, temp HP, set HP, condition: the actor routes.
     const damaged = GameMutationAcceptedResponseSchema.parse(
       await (await post(base, GAME_PATHS.actorDamage.replace("{actorId}", HERO_ID), writer.token, { amount: 7 })).json()
     );
@@ -591,7 +591,7 @@ describe("public game API over /api/v1", () => {
     expect(typeof equipmentBody.data.attribution).toBe("string");
 
     // The six character-builder catalogs, on the same audience terms. Bundles grow over time, so these
-    // assert "at least one real row" rather than counts.
+    // assert "at least one real row" and no exact counts.
     const catalogs = [
       [CONTENT_PATHS.classes, "classes"],
       [CONTENT_PATHS.subclasses, "subclasses"],
@@ -628,7 +628,7 @@ describe("public game API over /api/v1", () => {
     expect(picks[0]).toMatchObject({ kind: expect.any(String), choose: expect.any(Number) });
     // Only the full list is served; a single `choice` field once hid a feature's second pick.
     expect(features.every((feature) => !("choice" in feature))).toBe(true);
-    // Subclasses key to their parent class, and name pools to their species - both open slugs.
+    // Subclasses key to their parent class, and name pools to their species: both open slugs.
     expect(catalogRows.subclasses.every((entry) => typeof entry.classId === "string")).toBe(true);
     expect(
       catalogRows.names.every((entry) => typeof entry.speciesId === "string" && (entry.pools as unknown[]).length > 0)
@@ -714,7 +714,7 @@ describe("public game API over /api/v1", () => {
     });
     expect(denied.status).toBe(403);
 
-    // A formula outside the 1-30 ability bounds is rejected by the shared validator, not stored.
+    // A formula outside the 1-30 ability bounds is rejected by the shared validator, and nothing is stored.
     const badFormula = await post(base, GAME_PATHS.builderPolicy, gmToken, {
       allowedAbilityMethods: ["standard-array", "custom"],
       customFormula: "50d20"
@@ -853,7 +853,7 @@ describe("public game API over /api/v1", () => {
     const playerToken = server.auth.issuePlayerSession();
     const definition = loadActorFixture("player-character") as Record<string, unknown>;
 
-    // A player session may submit - this is the player path the wizard rides on.
+    // A player session may submit: this is the player path the wizard rides on.
     const importId = randomUUID();
     const submitted = await post(base, GAME_PATHS.characterImports, playerToken, { commandId: importId, definition });
     expect(submitted.status).toBe(200);
@@ -861,7 +861,7 @@ describe("public game API over /api/v1", () => {
     expect(submitBody.data.commandId).toBe(importId);
     expect(submitBody.data.duplicate).toBe(false);
 
-    // commandId idempotency survives the second transport: the same id replays instead of re-queueing.
+    // commandId idempotency survives the second transport: the same id replays and queues nothing new.
     const replay = GameMutationAcceptedResponseSchema.parse(
       await (await post(base, GAME_PATHS.characterImports, playerToken, { commandId: importId, definition })).json()
     );
@@ -875,7 +875,7 @@ describe("public game API over /api/v1", () => {
     expect(stale.status).toBe(409);
     expect((await stale.json()).error.currentRevision).toBe(submitBody.data.revision);
 
-    // Resolving is GM-only - the operation's own role check, not the route's, refuses the player.
+    // Resolving is GM-only: the operation's own role check refuses the player.
     const resolvePath = GAME_PATHS.characterImportResolve.replace("{importId}", importId);
     const refused = await post(base, resolvePath, playerToken, { approve: true });
     expect(refused.status).toBe(403);
@@ -893,7 +893,7 @@ describe("public game API over /api/v1", () => {
     expect(actors.find((actor) => actor.id === actorId)?.definitionId).toBe(`import-${actorId}`);
     expect((snapshot.data.game as { pendingImports: readonly unknown[] }).pendingImports).toHaveLength(0);
 
-    // A second decision on the same submission is refused - it already left the queue.
+    // A second decision on the same submission is refused: it already left the queue.
     expect((await post(base, resolvePath, gmToken, { approve: false })).status).toBe(409);
   });
 
@@ -985,7 +985,7 @@ describe("public game API over /api/v1", () => {
     expect(document.rolls.length).toBe(1);
     expect(document.rolls[0].formula).toBe("1d20+5");
 
-    // Deletion needs the admin scope (or a GM session) - combat:read cannot destroy the record.
+    // Deletion needs the admin scope (or a GM session): combat:read cannot destroy the record.
     expect(
       (
         await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), {
@@ -1013,7 +1013,7 @@ describe("public game API over /api/v1", () => {
     const { base, gmToken } = await boot();
     const integration = await issueCredential(base, gmToken, "seat manager", ["game:read", "actor:write"]);
 
-    // Two players join over pure HTTP - the socketless mirror of the open LAN join.
+    // Two players join over pure HTTP: the socketless mirror of the open LAN join.
     const seatA = PlayerSessionIssuedResponseSchema.parse(
       await (await fetch(base + SESSION_PATHS.player, { method: "POST" })).json()
     );
@@ -1206,7 +1206,7 @@ describe("public game API over /api/v1", () => {
     expect(JSON.stringify(archived.data.document.log)).toContain("Public Hero moved 20 ft.");
   });
 
-  it("answers CORS preflights for /api/v1 only - never for the legacy session/login endpoints", async () => {
+  it("answers CORS preflights for /api/v1 only, never for the legacy session/login endpoints", async () => {
     const { base } = await boot();
     const preflight = await fetch(base + GAME_PATHS.snapshot, {
       method: "OPTIONS",
@@ -1304,7 +1304,7 @@ describe("public game API over /api/v1", () => {
 
     const path = GAME_PATHS.actorAvailableActions.replace("{actorId}", crocId);
     expect((await fetch(base + path)).status).toBe(401);
-    // A player who hasn't claimed this actor is refused - availability names stat-block internals.
+    // A player who hasn't claimed this actor is refused: availability names stat-block internals.
     expect((await fetch(base + path, { headers: bearer(playerToken) })).status).toBe(403);
     expect(
       (
@@ -1357,7 +1357,7 @@ describe("the codex import's 64 MB parser runs after authorization, not before i
   it("refuses an unauthorized oversized import without parsing it, and still restores an authorized one", async () => {
     const { base, gmToken } = await boot();
 
-    // No credential at all: 401 from the codex surface's own envelope, not a 413 from a parser.
+    // No credential at all: 401 from the codex surface's own envelope, ahead of any parser's 413.
     const anonymous = await fetch(`${base}/api/v1/codex/import`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1407,8 +1407,8 @@ describe("the codex import's 64 MB parser runs after authorization, not before i
       body: big
     });
     expect(authorized.status).toBe(200);
-    // >= rather than ==: a nested path registers its parent too, so 7000 leaves under one shared parent
-    // land as 7001 rows. The claim here is "the whole body arrived", not an exact folder count.
+    // >= because a nested path registers its parent too, so 7000 leaves under one shared parent
+    // land as 7001 rows. The claim here is "the whole body arrived", whatever the exact folder count.
     expect((await authorized.json()).data.counts.folders).toBeGreaterThanOrEqual(7000);
   });
 });

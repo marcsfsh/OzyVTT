@@ -170,7 +170,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
     expect(record.casts).toEqual([]);
   });
 
-  it("NUMBER ONE - the charge, spent on the real action pipeline and refused at zero", () => {
+  it("NUMBER ONE: the charge, spent on the real action pipeline and refused at zero", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("pipes-of-haunting", "Pipes of Haunting", { attuned: false })]));
     const actor = state.actors[0];
@@ -220,7 +220,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
     ).toThrow("Play the Pipes: no uses remaining (3/Long Rest).");
   });
 
-  it("NUMBER TWO - a pending save the server ENFORCES at DC 15, naming Frightened off the shipped prose", () => {
+  it("NUMBER TWO: a pending save the server ENFORCES at DC 15, naming Frightened off the shipped prose", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("pipes-of-haunting", "Pipes of Haunting", { attuned: false })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find(
@@ -264,7 +264,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
     expect(answered.outcome).toMatchObject({ total: 14, success: false });
   });
 
-  it("NUMBER THREE - the reversal: no pipes in the pack, no action and no charge at all", () => {
+  it("NUMBER THREE, the reversal: no pipes in the pack, no action and no charge at all", () => {
     const definition = definitionOf();
     const unequipped = fight(
       stateWith([carried("pipes-of-haunting", "Pipes of Haunting", { attuned: false, equipped: false })])
@@ -282,7 +282,7 @@ describe("the Pipes of Haunting spend a charge, refuse the fourth press, and for
   });
 });
 
-describe("the Stone of Good Luck - both halves reach the roll", () => {
+describe("the Stone of Good Luck: both halves reach the roll", () => {
   const ROW = { id: "stone-of-good-luck-luckstone", name: "Stone of Good Luck", category: "wondrous-item" };
 
   it("moves every skill row by +1 and the save the SERVER rolls by +1, and both come off with the stone", () => {
@@ -529,7 +529,7 @@ describe("the casts that survived the spell-record check", () => {
       const cast = effectiveActions(definition, state.actors[0], catalog).find(
         (entry) => entry.id === `item-${id}-cast-scrying`
       )!;
-      // The save Scrying's own target makes, at the item's printed DC, not the wearer's derived one.
+      // The save Scrying's own target makes, at the item's own printed DC.
       expect(cast.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureConditions: [] });
       expect(cast.damage).toEqual([]);
       expect(cast.attack).toBeUndefined();
@@ -614,7 +614,7 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "dex", dc: 15, conditionIds: ["restrained"] });
   });
 
-  it("gives the Iron Flask a DC 17 Wis save and applies NO condition - nothing spurious off the prose", () => {
+  it("gives the Iron Flask a DC 17 Wis save and applies NO condition: nothing spurious off the prose", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("iron-flask", "Iron Flask", { attuned: false })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find(
@@ -688,7 +688,7 @@ describe("what no carried item can carry", () => {
 });
 
 describe("the absences that were measured and must stay absent", () => {
-  it("the briefed far end - Potion of Resistance - carries no rider, because 'for 1 hour' cannot be said", () => {
+  it("the briefed far end, Potion of Resistance, carries no rider, because 'for 1 hour' cannot be said", () => {
     const potion = view.equipmentRecord("potion-of-resistance")!;
     expect(potion.description).toContain("Resistance to one type of damage for 1 hour");
     // An item's `effects` rider would stand while the bottle is merely carried.

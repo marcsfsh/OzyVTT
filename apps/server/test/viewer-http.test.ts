@@ -92,7 +92,7 @@ describe("viewer HTTP vertical slice", () => {
     expect(pairingResponse.headers.get("x-request-id")).toBe(correlationId);
     const code = (await json(pairingResponse)).data.pairing.code as string;
 
-    // A non-UUID token is replaced, not echoed.
+    // A non-UUID token is replaced.
     const substituted = await fetch(`${test.base}/api/v1/viewer/presentation`, {
       headers: { authorization: "Bearer gm-secret", "x-request-id": "pair-1" }
     });
@@ -212,7 +212,7 @@ describe("viewer HTTP vertical slice", () => {
     connection.disconnect();
     test.coordinator.broadcast();
     expect(received).toHaveLength(2);
-    expect(closed).toBe(false); // an explicit disconnect() does not itself call the close callback - that's for server-initiated drops.
+    expect(closed).toBe(false); // an explicit disconnect() does not itself call the close callback: that's for server-initiated drops.
     expect(() =>
       test.coordinator.connectGm(
         "not-the-gm",

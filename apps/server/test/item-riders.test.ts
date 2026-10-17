@@ -141,7 +141,7 @@ describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
     // str 16 (+3) + proficiency 2 = 5 base; the rider makes it 6.
     expect(action.attack!.bonus).toBe(6);
 
-    // The roll, not just the number: d20 = 10 -> 16 total, which beats AC 12.
+    // The roll itself: d20 = 10 -> 16 total, which beats AC 12.
     const resolution = resolveDefinitionAction(
       state,
       action,
@@ -188,7 +188,7 @@ describe("criterion 1: a magic weapon's +1 to hit and extra damage die", () => {
     expect(state.rolls.map((roll) => roll.purpose)).toEqual(["attack", "damage", "damage"]);
   });
 
-  it("applies NOTHING before attunement - the cursed-item hiding boundary", () => {
+  it("applies NOTHING before attunement: the cursed-item hiding boundary", () => {
     const definition = definitionOf();
     const catalog = catalogOf([SWORD]);
     const state = stateWith([item({ ...SWORD_ROW, attuned: false })]);
@@ -263,7 +263,7 @@ describe("criterion 2: `slot` makes an open category mechanically real", () => {
     expect(ankletState.actors[0].inventory).toHaveLength(2);
   });
 
-  it("counts only ONE shield - three equipped shields used to read +6 AC", () => {
+  it("counts only ONE shield: three equipped shields used to read +6 AC", () => {
     // A built character: a printed AC would stand under a Shield alone, since it may already count one.
     const definition = definitionOf({ source: { name: "OzyVTT Character Builder", version: "1" } });
     const state = stateWith([]);
@@ -319,7 +319,7 @@ describe("criterion 3: a ring changes AC and the change disappears on unequip", 
   });
 
   it("stacks with the builder's own flat AC rider instead of dropping it", () => {
-    // The Defense fighting style rides the extension bag; the item rider must add to it, not replace it.
+    // The Defense fighting style rides the extension bag; the item rider must add to it.
     const definition = definitionOf({ extensions: { "open5e.srd-2024": { armorClassBonus: 1 } } });
     const state = stateWith([]);
     setInventoryItem(
@@ -410,7 +410,7 @@ describe("criterion 4: an item that casts a spell on a limited pool", () => {
     expect(actor.actionUses["item-amulet-of-whispers-cast-message"]).toBeUndefined();
   });
 
-  it("re-arms a SHORT-rest item pool - the sweep site that silently strands charges", () => {
+  it("re-arms a SHORT-rest item pool: the sweep site that silently strands charges", () => {
     const wand = {
       id: "wand-of-sparks",
       name: "Wand of Sparks",
@@ -431,7 +431,7 @@ describe("criterion 4: an item that casts a spell on a limited pool", () => {
     const catalog = catalogOf([wand]);
     const state = stateWith([item({ id: "wand-of-sparks", name: "Wand of Sparks", equipped: true, category: "held" })]);
     state.actors[0].actionUses = { "item-wand-of-sparks-spark": 3 };
-    // Recharge must find item actions too, not only `definition.actions`.
+    // Recharge must find item actions as well as `definition.actions`.
     applyRest(state, IDS.hero, "short", () => definition, catalog);
     expect(state.actors[0].actionUses["item-wand-of-sparks-spark"]).toBeUndefined();
   });
@@ -602,7 +602,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
     weapon: { category: "simple", damageDice: "1d4", damageType: "piercing", rangeFeet: null, longRangeFeet: null }
   };
 
-  it("applies advantage on an OFF-TURN opportunity attack - the onOwnTurn gate must not swallow it", () => {
+  it("applies advantage on an OFF-TURN opportunity attack: the onOwnTurn gate must not swallow it", () => {
     const definition = definitionOf();
     const catalog = catalogOf([DAGGER]);
     // The foe holds the turn and the hero reacts off-turn, the moment a plain `attack-advantage` check misses.
@@ -656,7 +656,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
     expect(outcome.resolution!.attack!.naturalRoll).toBe(18); // the higher of the two dice was kept
   });
 
-  it("does NOT apply on an ordinary on-turn attack - the filter really filters", () => {
+  it("does NOT apply on an ordinary on-turn attack: the filter really filters", () => {
     const definition = definitionOf();
     const catalog = catalogOf([DAGGER]);
     const state = fight(stateWith([item(DAGGER_ROW)]));
@@ -670,7 +670,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
       deps([11, 2], catalog, definition)
     );
     expect(resolution.rollMode).toBeUndefined();
-    expect(resolution.attack!.naturalRoll).toBe(11); // one die, not two
+    expect(resolution.attack!.naturalRoll).toBe(11); // one die
   });
 
   it("finds the item weapon as the opportunity attack's fallback melee instead of an unarmed strike", () => {
@@ -926,7 +926,7 @@ describe("criterion 11: a circlet granting a skill proficiency or expertise", ()
     grants: { skills: ["perception"], expertise: ["stealth"] }
   };
 
-  it("layers over the base tier and vanishes on unequip - never written into the definition", () => {
+  it("layers over the base tier and vanishes on unequip, never written into the definition", () => {
     const definition = definitionOf();
     const catalog = catalogOf([CIRCLET]);
     const row = { id: "circlet-of-shadows", name: "Circlet of Shadows", category: "wondrous", equipped: true };
@@ -1046,7 +1046,7 @@ describe("criterion 13: curses are the negative of every rider", () => {
     expect(state.actors[0].inventory[0]).toMatchObject({ equipped: false, attuned: false });
   });
 
-  it("hides everything until attunement - the curse contributes nothing before it springs", () => {
+  it("hides everything until attunement: the curse contributes nothing before it springs", () => {
     const definition = definitionOf();
     const state = stateWith([item({ ...ROW, attuned: false })]);
     const derivation = deriveEquipment(state.actors[0], definition, catalogOf([CURSED]));
@@ -1182,7 +1182,7 @@ describe("the catalog adapter's cast is a CHECKED claim, not an assumption", () 
   it("keeps the authored content records assignable to the structural views this module reads", async () => {
     // `equipmentCatalogOf` casts the authoring schemas to these structural views. The claim is checked at
     // compile time here, so renaming or retyping a rider field in `@vtt/content-srd-5.2.1` breaks the
-    // build instead of making riders inert.
+    // build, so no rider goes inert.
     const content = await import("@vtt/content-srd-5.2.1");
     const equipment = content.EquipmentReferenceSchema.parse({
       id: "ring-of-proof",
@@ -1259,7 +1259,7 @@ describe("criterion 16: a +1 weapon's flat damage bonus", () => {
     expect(resolution.damageTotal).toBe(8);
   });
 
-  it("without the rider the formula stays 1d6 + 3 - the number moves with the value, not the field", () => {
+  it("without the rider the formula stays 1d6 + 3: the number moves with the value, not the field", () => {
     const definition = definitionOf();
     const plain = { ...PLUS_ONE, modifiers: [{ type: "attack-bonus", amount: 1 }] };
     const state = fight(stateWith([item(ROW)]));

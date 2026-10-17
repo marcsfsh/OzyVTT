@@ -239,7 +239,7 @@ const command = () => `50000000-0000-4000-8000-0000000000${String(((commandSeq +
 
 // Druid
 
-describe("Primal Order - the twin of the bug that started this area (audit row 4)", () => {
+describe("Primal Order: the twin of the bug that started this area (audit row 4)", () => {
   it("lets a MAGICIAN take a third cantrip at level 1, and refuses a WARDEN the same one", () => {
     // The printed level-1 row says two cantrips; Magician adds "one extra cantrip from the Druid spell list".
     const third: Row = { level: 1, kind: "cantrip", id: "shillelagh" };
@@ -263,7 +263,7 @@ describe("Primal Order - the twin of the bug that started this area (audit row 4
   });
 });
 
-describe("Druidic - a language and an always-prepared spell (audit row 35)", () => {
+describe("Druidic: a language and an always-prepared spell (audit row 35)", () => {
   const definition = build(druid(1, [primalOrder("magician")]));
 
   it("puts Druidic on the sheet and Speak with Animals in the spell list", () => {
@@ -292,7 +292,7 @@ describe("Druidic - a language and an always-prepared spell (audit row 35)", () 
   });
 });
 
-describe("Wild Shape - the pool, read off the printed column (audit row 54)", () => {
+describe("Wild Shape: the pool, read off the printed column (audit row 54)", () => {
   it("counts uses off the Wild Shape column and grows with it", () => {
     // 2 at level 2, 3 at level 6, 4 at level 17, from the printed column.
     expect(actionOf(build(druid(2, [primalOrder("warden")])), "wild-shape")?.uses).toEqual({
@@ -337,7 +337,7 @@ describe("Wild Shape - the pool, read off the printed column (audit row 54)", ()
   });
 });
 
-describe("Wild Companion - the level-2 Find Familiar", () => {
+describe("Wild Companion: the level-2 Find Familiar", () => {
   it("puts Find Familiar on the sheet, uncharged, and only from level 2", () => {
     const two = build(druid(2, [primalOrder("warden")]));
     expect(spellOf(two, "find-familiar")).toMatchObject({ alwaysPrepared: true });
@@ -372,7 +372,7 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
   });
 
   it("spends Wild Shape when it resolves, so the two features share one budget", () => {
-    // Cast Land's Aid once and the Druid has one shape left, not two: SRD "expend a use of your Wild
+    // Cast Land's Aid once and the Druid has one shape left: SRD "expend a use of your Wild
     // Shape" means a shared key.
     const state = encounterWith(definition);
     resolveDefinitionAction(
@@ -400,7 +400,7 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
   });
 });
 
-describe("Elemental Fury - the twin of Blessed Strikes (audit row 5)", () => {
+describe("Elemental Fury: the twin of Blessed Strikes (audit row 5)", () => {
   it("rolls Primal Strike's 1d8 at level 7 and 2d8 at level 15, once per turn", () => {
     // The level-15 step is Improved Elemental Fury's damage half, expressed with `damageByLevel` as the
     // shipped Cleric record does.
@@ -457,7 +457,7 @@ describe("Elemental Fury - the twin of Blessed Strikes (audit row 5)", () => {
   });
 
   it("refuses the build outright when the level-7 pick is missing", () => {
-    // An unanswered pick is a rejection, not a silent skip.
+    // An unanswered pick is a rejection.
     expect(() => build(druid(7, [primalOrder("warden")]))).toThrowError(/Elemental Fury/);
   });
 });
@@ -491,12 +491,12 @@ describe("Nature's Ward - the half of audit row 65 that is authorable", () => {
   it("makes a level-10 Circle of the Land Druid immune to Poisoned", () => {
     const ten = build(druid(10, [primalOrder("warden"), elementalFury("primal-strike")]));
     expect(ten.conditionImmunities).toContain("poisoned");
-    // The negative control: the immunity arrives with the level-10 feature, not with the subclass.
+    // The negative control: the immunity arrives with the level-10 feature, and the subclass alone gives none.
     expect(build(druid(3, [primalOrder("warden")])).conditionImmunities ?? []).not.toContain("poisoned");
   });
 });
 
-describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)", () => {
+describe("Epic Boon: the level-19 feat nine classes lost outright (audit row 6)", () => {
   it("makes a level-19 Druid pick one, or another feat it qualifies for", () => {
     const taken = build(
       druid(19, [
@@ -531,7 +531,7 @@ describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)
 
 // Bard
 
-describe("Bardic Inspiration - the counter the class is built around", () => {
+describe("Bardic Inspiration: the counter the class is built around", () => {
   it("hands out as many dice as the Charisma modifier, and never fewer than one", () => {
     // "A number of times equal to your Charisma modifier (minimum of once)". CHA 15 + 2 = 17 -> +3;
     // CHA 8 -> -1, floored to 1. Reading the Bardic Die column instead would yield zero uses.
@@ -592,7 +592,7 @@ describe("Bardic Inspiration - the counter the class is built around", () => {
   });
 });
 
-describe("College of Lore Bonus Proficiencies - three skills that were promised and never offered (audit row 19)", () => {
+describe("College of Lore Bonus Proficiencies: three skills that were promised and never offered (audit row 19)", () => {
   it("puts all three on the sheet, and refuses a build that answers with two", () => {
     const definition = build(bard(3, 15, loreSkills("history", "arcana", "nature")));
     const skills = new Set((definition.proficiencies?.skills ?? []).map((skill) => skill.id));
@@ -604,7 +604,7 @@ describe("College of Lore Bonus Proficiencies - three skills that were promised 
   });
 });
 
-describe("Words of Creation - the level-20 grant (audit row 34)", () => {
+describe("Words of Creation: the level-20 grant (audit row 34)", () => {
   it("hands a level-20 Bard both Power Words, always prepared and uncharged", () => {
     const definition = build(
       bard(20, 15, [...loreSkills("history", "arcana", "nature"), ...epicBoon("bard", "boon-of-spell-recall", "wis")])
@@ -624,7 +624,7 @@ describe("Words of Creation - the level-20 grant (audit row 34)", () => {
 
 // Cleric
 
-describe("Divine Intervention - a pool that now costs the action the SRD prints", () => {
+describe("Divine Intervention: a pool that now costs the action the SRD prints", () => {
   const clericInput = (): Mutable =>
     ({
       name: "Sister Ael",
@@ -704,7 +704,7 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
   });
 });
 
-describe("Circle of the Land Spells - the chosen land's spells for the Druid's level and lower", () => {
+describe("Circle of the Land Spells: the chosen land's spells for the Druid's level and lower", () => {
   const alwaysPrepared = (level: number) =>
     (
       build(druid(level, [primalOrder("warden"), ...(level >= 7 ? [elementalFury("primal-strike")] : [])])).spellcasting
@@ -739,7 +739,7 @@ describe("Circle of the Land Spells - the chosen land's spells for the Druid's l
   });
 });
 
-describe("Magical Secrets - the Bard's own picks may come from three more lists", () => {
+describe("Magical Secrets: the Bard's own picks may come from three more lists", () => {
   // Spirit Guardians is a Cleric spell, on no Bard list.
   const guardians = { level: 10, kind: "spell", id: "spirit-guardians" } as Row;
 
@@ -756,7 +756,7 @@ describe("Magical Secrets - the Bard's own picks may come from three more lists"
   });
 });
 
-describe("Magical Discoveries - a spell the Bard has slots for", () => {
+describe("Magical Discoveries: a spell the Bard has slots for", () => {
   it("refuses Wish to a Bard 6, whose highest slot is level 3", () => {
     const input = bard(6, 15);
     input.choices = [

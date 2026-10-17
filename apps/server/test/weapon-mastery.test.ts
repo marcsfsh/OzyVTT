@@ -129,7 +129,7 @@ type Built = Readonly<{ definition: ActorDefinition; state: GameState; hero: Act
 function weaponRow(weaponId: string): InventoryItem {
   const record = catalog.equipmentRecord(weaponId);
   if (!record?.weapon) throw new Error(`${weaponId} is not a catalog weapon`);
-  // Parsed rather than cast, so a row that drifted from the bundle's shape fails here.
+  // Parsed through the schema, so a row that drifted from the bundle's shape fails here.
   return InventoryItemSchema.parse({
     id: weaponId,
     name: record.name,
@@ -296,7 +296,7 @@ describe("a mastery reaches a swing only when the character unlocked THAT weapon
     expect(picked.masteryByActionId["item-flail"]).toBeUndefined();
   });
 
-  it("arms the flail instead when that is what was picked - same sheet, different three", () => {
+  it("arms the flail instead when that is what was picked: same sheet, different three", () => {
     const built = table(["flail", "longbow", "rapier"]);
     const derivation = deriveEquipment(built.hero, built.definition, catalog);
     expect(derivation.masteryByActionId["item-flail"]).toEqual({ id: "sap", abilityModifier: 3 });
@@ -334,7 +334,7 @@ describe("Graze deals the ability modifier on a miss", () => {
     expect(miss.damageTotal).toBe(0);
   });
 
-  it("does not fire on a HIT - Graze is the miss case, not a flat bonus", () => {
+  it("does not fire on a HIT: Graze is the miss case, not a flat bonus", () => {
     const built = table(["greatsword", "longbow", "rapier"]);
     const hit = swing(built, "item-greatsword", [15, 4, 4]);
     expect(hit.attack?.outcome).toBe("hit");
@@ -347,7 +347,7 @@ describe("Graze deals the ability modifier on a miss", () => {
     expect(playerHitOwesDamage(swing(built, "item-greatsword", [4]))).toBe(true);
   });
 
-  it("still grazes on a natural 1 - the SRD writes no carve-out for a fumble", () => {
+  it("still grazes on a natural 1: the SRD writes no carve-out for a fumble", () => {
     const built = table(["greatsword", "longbow", "rapier"]);
     const fumble = swing(built, "item-greatsword", [1]);
     expect(fumble.attack?.outcome).toBe("fumble");
@@ -365,7 +365,7 @@ describe("Sap makes the target's next attack roll worse", () => {
     expect(hit.effectsApplied).toEqual([
       { targetId: IDS.foe, targetName: "Foe", name: "Sapped by Borin", conditionIds: [] }
     ]);
-    // On the actor, not just in the response: this is what survives to the foe's turn.
+    // On the actor as well as in the response: this is what survives to the foe's turn.
     const sapped = built.state.actors.find((actor) => actor.id === IDS.foe)!;
     expect(sapped.effects.map((effect) => effect.name)).toEqual(["Sapped by Borin"]);
     expect(sapped.conditions).toEqual([]);
@@ -388,7 +388,7 @@ describe("Sap makes the target's next attack roll worse", () => {
     expect(back.attack?.naturalRoll).toBe(18);
   });
 
-  it("applies nothing on a MISS - Sap is an on-hit rider", () => {
+  it("applies nothing on a MISS: Sap is an on-hit rider", () => {
     const built = table(["flail", "longbow", "rapier"]);
     const miss = swing(built, "item-flail", [4]);
     expect(miss.attack?.outcome).toBe("miss");
@@ -464,7 +464,7 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     expect(built.state.combat.pendingSaves).toEqual([]);
   });
 
-  it("leaves the foe standing when it makes the save - the condition is the die's, not the hit's", () => {
+  it("leaves the foe standing when it makes the save: the condition is the die's, not the hit's", () => {
     const built = table(["quarterstaff", "longbow", "rapier"], ["quarterstaff"]);
     swing(built, "item-quarterstaff", [15, 3]);
     const outcome = answer(built, [17]).outcome;
@@ -472,7 +472,7 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     expect(built.foe.conditions).toEqual([]);
   });
 
-  it("owes a save for EVERY hit - Extra Attack's two swings do not collapse into one prompt", () => {
+  it("owes a save for EVERY hit: Extra Attack's two swings do not collapse into one prompt", () => {
     // Level 5: two swings, DC 15. The SRD puts no once-per-turn limit on Topple, so two hits owe two saves
     // even though both share the prompt's dedupe key.
     const built = table(["quarterstaff", "longbow", "rapier", "flail"], ["quarterstaff"], GEOMETRY, 5);
@@ -491,7 +491,7 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
         actorIds: [IDS.hero, IDS.foe]
       }
     ]);
-    // Two live rows in the tracker: the second hit parks beside the first instead of evicting it.
+    // Two live rows in the tracker: the second hit parks beside the first.
     expect(built.state.combat.pendingSaves).toMatchObject([
       { targetActorId: IDS.foe, ability: "con", dc: 15, conditionIds: ["prone"], actionName: "Topple" },
       { targetActorId: IDS.foe, ability: "con", dc: 15, conditionIds: ["prone"], actionName: "Topple" }
@@ -505,7 +505,7 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     expect(built.state.combat.pendingSaves).toEqual([]);
   });
 
-  it("forces nothing when the Fighter did not pick the quarterstaff - same weapon, same swing", () => {
+  it("forces nothing when the Fighter did not pick the quarterstaff: same weapon, same swing", () => {
     // Negative control: the staff is in his hands and the mastery is on the record; only the picks differ.
     const built = table(["longbow", "rapier", "greatsword"], ["quarterstaff"]);
     const hit = swing(built, "item-quarterstaff", [15, 3]);
@@ -514,7 +514,7 @@ describe("Topple forces a Constitution save, and a failure lands Prone", () => {
     expect(hit.warnings).toBeUndefined();
   });
 
-  it("forces nothing on a MISS - Topple is an on-hit rider", () => {
+  it("forces nothing on a MISS: Topple is an on-hit rider", () => {
     const built = table(["quarterstaff", "longbow", "rapier"], ["quarterstaff"]);
     const miss = swing(built, "item-quarterstaff", [2]);
     expect(miss.attack?.outcome).toBe("miss");
@@ -532,7 +532,7 @@ const GRID = {
   calibration: { kind: "square", origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 }
 } as const satisfies TokenMapGeometry;
 
-/** Cell (column, row) → its centre in image pixels, so the fixtures read as squares rather than pixels. */
+/** Cell (column, row) → its centre in image pixels, so the fixtures read as squares. */
 const cell = (column: number, row: number) => ({ x: (column + 0.5) * 50, y: (row + 0.5) * 50 });
 
 function battlefield(
@@ -590,7 +590,7 @@ describe("Push moves the target's token 10 feet straight away", () => {
     const after = positionOf(built, IDS.foe)!;
     expect(after).toEqual({ x: 275, y: 125 });
     expect(mapDistance(GRID, before, after)).toEqual({ value: 10, unit: "ft" });
-    // Away, not toward: Borin is at x=125, and the gap grew by the push.
+    // Away: Borin is at x=125, and the gap grew by the push.
     expect(after.x).toBeGreaterThan(before.x);
     expect(reachBefore).toEqual({ value: 5, unit: "ft" });
     expect(tokenCreatureDistance(built.state, GRID, IDS.hero, IDS.foe)).toEqual({ value: 15, unit: "ft" });
@@ -643,7 +643,7 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(hit.warnings).toBeUndefined();
   });
 
-  it("moves nothing when the Fighter did not pick the warhammer - same weapon, same hit", () => {
+  it("moves nothing when the Fighter did not pick the warhammer: same weapon, same hit", () => {
     const built = battlefield(["longbow", "rapier", "greatsword"], ["warhammer"], cell(2, 2), cell(3, 2));
     const before = positionOf(built, IDS.foe)!;
     const hit = pushSwing(built, "item-warhammer", [15, 4]);
@@ -652,7 +652,7 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(hit.warnings).toBeUndefined();
   });
 
-  it("moves nothing on a MISS - Push is an on-hit rider", () => {
+  it("moves nothing on a MISS: Push is an on-hit rider", () => {
     const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
     const before = positionOf(built, IDS.foe)!;
     const miss = pushSwing(built, "item-warhammer", [2]);
@@ -670,7 +670,7 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(hit.warnings).toContain("Foe is bigger than Large and can't be pushed.");
   });
 
-  it("degrades to a sentence when the map cannot measure 10 feet - never a refusal", () => {
+  it("degrades to a sentence when the map cannot measure 10 feet, never a refusal", () => {
     // An uncalibrated, unscaled map has no feet. The swing lands, the damage stands, and the GM is told to
     // move the token, as the builtin Shove does.
     const built = table(["warhammer", "longbow", "rapier"], ["warhammer"]);
@@ -721,7 +721,7 @@ describe("Push moves the target's token 10 feet straight away", () => {
     expect(hit.warnings).not.toContain("Foe is pushed 10 feet straight away from Borin. Move the token.");
   });
 
-  it("degrades when the resolver has no geometry callback at all - the reaction path today", () => {
+  it("degrades when the resolver has no geometry callback at all: the reaction path today", () => {
     const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
     const before = positionOf(built, IDS.foe)!;
     const hit = pushSwing(built, "item-warhammer", [15, 4], false);
@@ -780,7 +780,7 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
       foeMoves(built, 5);
       expect.unreachable();
     } catch (error) {
-      // A refusal, not a rules note: strict mode throws and the draft is discarded.
+      // A refusal: strict mode throws and the draft is discarded.
       expect(error).toBeInstanceOf(RulesBlockedError);
       expect((error as RulesBlockedError).rule).toBe("movement.exceeds-speed");
       expect((error as RulesBlockedError).message).toBe("Foe has 20 ft of movement left (this move needs 25 ft).");
@@ -798,7 +798,7 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     expect(built.state.combat.turn.movementUsedFeet).toBe(25);
   });
 
-  it("leaves the foe its whole 30 ft when the Fighter did not pick the javelin - same weapon, same hit", () => {
+  it("leaves the foe its whole 30 ft when the Fighter did not pick the javelin: same weapon, same hit", () => {
     // Negative control: only the three picks differ. Graze is on the unused greatsword.
     const built = battlefield(["greatsword", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
     const hit = swing(built, "item-javelin", [15, 4]);
@@ -811,7 +811,7 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     expect(built.state.combat.turn.movementUsedFeet).toBe(25);
   });
 
-  it("applies nothing on a MISS - Slow is an on-hit rider", () => {
+  it("applies nothing on a MISS: Slow is an on-hit rider", () => {
     const built = battlefield(["javelin", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
     const miss = swing(built, "item-javelin", [2]);
     expect(miss.attack?.outcome).toBe("miss");
@@ -821,7 +821,7 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     expect(foeMoves(built, 5).warning).toBeNull();
   });
 
-  it("REFRESHES on a second hit of the same weapon - Extra Attack costs 10 feet, not 20", () => {
+  it("REFRESHES on a second hit of the same weapon: Extra Attack costs 10 feet, not 20", () => {
     // Level 5: one Attack action is two swings. Both hits carry `sourceActionId: "item-javelin:slow"`, and
     // `addEffect` replaces a grant from the same source actor and action in place.
     const built = battlefield(["javelin", "longbow", "rapier", "flail"], [], cell(2, 2), cell(3, 2), 5);
@@ -844,13 +844,13 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     expect(foeMoves(built, 5).warning).toBeNull();
   });
 
-  it("a javelin AND a club from one attacker are still ONE reduction - Slow does not stack with Slow", () => {
+  it("a javelin AND a club from one attacker are still ONE reduction: Slow does not stack with Slow", () => {
     // SRD 5.2.1 "Combining Game Effects": same-named effects don't combine, so two Slow hits from any weapons
     // are 30 - 10 = 20. Level 5 for two swings, the second with a different weapon.
     const built = battlefield(["javelin", "club", "rapier", "flail"], ["club"], cell(2, 2), cell(3, 2), 5);
     expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
     expect(swing(built, "item-club", [15, 4]).attack?.outcome).toBe("hit");
-    // 20 ft, not 10, in the sentence the foe's player is shown.
+    // 20 ft in the sentence the foe's player is shown.
     nextInitiativeTurn(built.state);
     expect(() => foeMoves(built, 5)).toThrow("Foe has 20 ft of movement left (this move needs 25 ft).");
     // Two rows, one effect: the rows stay separate because each has its own duration, and the read
@@ -868,7 +868,7 @@ describe("Slow takes 10 feet off the target's Speed until the attacker's next tu
     expect(built.state.combat.turn.movementUsedFeet).toBe(30);
   });
 
-  it("a DIFFERENT game effect still stacks with the Slow - the −15 that proves the grouping is by NAME", () => {
+  it("a DIFFERENT game effect still stacks with the Slow: the −15 that proves the grouping is by NAME", () => {
     // Control: a homebrew curse is not a Slow, so it carries its own key and the two sum: 30 - 10 - 5 = 15.
     const built = battlefield(["javelin", "longbow", "rapier"], [], cell(2, 2), cell(3, 2));
     expect(swing(built, "item-javelin", [15, 4]).attack?.outcome).toBe("hit");
@@ -1107,7 +1107,7 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
       text: "Rules note: Foe is pushed 10 feet straight away from Borin. Move the token."
     });
     // ...and the swing itself still hit and narrated, and the token did not move, so the sentence is an
-    // instruction rather than a report.
+    // instruction.
     expect(
       broadcast.some(
         (line) => line.kind === "reaction" && line.text.includes("made an opportunity attack against Foe - HIT")
@@ -1149,7 +1149,7 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     });
   });
 
-  it("shoves for real down the same path when the map did NOT change - the control for the guard above", async () => {
+  it("shoves for real down the same path when the map did NOT change: the control for the guard above", async () => {
     const built = battlefield(["warhammer", "longbow", "rapier"], ["warhammer"], cell(2, 2), cell(3, 2));
     const { commands, store, logged } = await commandsFor(built);
 
@@ -1178,7 +1178,7 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
     expect(logged.filter((line) => line.text.includes("pushed 10 ft"))).toHaveLength(1);
   });
 
-  it("says nothing on a PREVIEW - the sentence lands once, on the answer that spends the reaction", async () => {
+  it("says nothing on a PREVIEW: the sentence lands once, on the answer that spends the reaction", async () => {
     const built = battlefield(["pike", "longbow", "rapier"], ["pike"], cell(2, 2), cell(3, 2));
     const reactionId = parkOpportunityAttack(built);
     const { commands, logged } = await commandsFor(built);
@@ -1229,7 +1229,7 @@ async function joinSocket(base: string, token: string) {
 const emitCommand = (socket: Socket, event: string, payload: unknown) =>
   new Promise<MutationResult>((resolve) => (socket.emit as (...args: unknown[]) => void)(event, payload, resolve));
 
-/** Wait for the player's socket to receive a matching row; a timeout is a failure, not a skip. */
+/** Wait for the player's socket to receive a matching row; a timeout is a failure. */
 async function heardLine(heard: readonly CombatLogEntry[], matches: (text: string) => boolean, what: string) {
   for (let attempt = 0; attempt < 300; attempt += 1) {
     const found = heard.find((entry) => matches(entry.text));
@@ -1334,7 +1334,7 @@ describe("the table's own line reaches a player, not just the GM", () => {
     const resolved = await swingAt(gm, "item-warhammer", IDS.foe);
     expect(resolved).toMatchObject({ ok: true });
 
-    // A payload the player's own socket received, carrying the literal sentence.
+    // A payload the player's own socket received, with the literal sentence.
     const line = await heardLine(heard, (text) => text.includes("pushed"), "the push narration");
     expect(line.text).toBe("Foe is pushed 10 ft straight away from Borin.");
     expect(line.gmOnly).toBe(false);
@@ -1418,7 +1418,7 @@ describe("the resolver stamps its own verdict on the table's line, and the ack r
     ]);
   });
 
-  it("leaves it UNSTAMPED when the same swing names only public combatants - the control", () => {
+  it("leaves it UNSTAMPED when the same swing names only public combatants: the control", () => {
     // A fresh table, since the action slot is spent once per turn. This control rules out a field
     // hardcoded to true.
     const built = hiddenAmongThem(["quarterstaff", "warhammer", "rapier"], ["quarterstaff"]);
@@ -1604,7 +1604,7 @@ describe("the Light property's extra attack, and Nick", () => {
     const built = pair();
     expect(refusal(() => act(built, "item-scimitar-light", IDS.foe, [15, 4]))).toBe("attack.light-needs-attack");
     act(built, "item-scimitar", IDS.foe, [15, 4]);
-    // The scimitar's own swing opens the shortsword's extra attack, not its own.
+    // The scimitar's own swing opens the shortsword's extra attack.
     expect(refusal(() => act(built, "item-scimitar-light", IDS.foe, [15, 4]))).toBe("attack.light-needs-attack");
   });
 

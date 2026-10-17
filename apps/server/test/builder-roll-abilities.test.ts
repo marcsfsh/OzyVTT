@@ -73,7 +73,7 @@ describe("builder.roll-abilities", () => {
     await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ["standard-array"] });
     expect((await post(base, GAME_PATHS.builderRollAbilities, gmToken, { method: "roll" })).status).toBe(409);
 
-    // "custom" without a formula is refused rather than silently falling back to the SRD dice.
+    // "custom" without a formula is refused, and the SRD dice never stand in silently.
     await post(base, GAME_PATHS.builderPolicy, gmToken, { allowedAbilityMethods: ["custom"] });
     expect((await post(base, GAME_PATHS.builderRollAbilities, gmToken, { method: "custom" })).status).toBe(409);
 

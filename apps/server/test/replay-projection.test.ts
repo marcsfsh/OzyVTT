@@ -181,7 +181,7 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     expect(revealed.actors.find((actor) => actor.name === "Shadow Stalker")!.hp).toMatchObject({ kind: "band" });
   });
 
-  it("drops every roll that is not public - from the document AND from each turn's log slice", () => {
+  it("drops every roll that is not public: from the document AND from each turn's log slice", () => {
     const replay = projectPlayerReplay(3, document());
     expect(replay.rolls.map((entry) => entry.id)).toEqual(["r-public"]);
     const logIds = replay.turns.flatMap((turn) => turn.log.map((entry) => entry.id));

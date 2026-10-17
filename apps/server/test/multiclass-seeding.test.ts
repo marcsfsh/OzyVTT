@@ -14,7 +14,7 @@ import { setSpellSlotRemaining } from "../src/spellcasting.js";
 import { projectPlayerView } from "../src/projections.js";
 
 // Multiclass seeding: hit dice come from class levels (the one-term `hitPoints.formula` cannot say
-// 3d10 + 2d6), and slots are derived from `spellcasting.classes[]`, not only the top-level list.
+// 3d10 + 2d6), and slots are derived from `spellcasting.classes[]` as well as the top-level list.
 
 const ACTOR = "10000000-0000-4000-8000-0000000000a1";
 const OWNER = "30000000-0000-4000-8000-0000000000b1";
@@ -145,7 +145,7 @@ describe("multiclass seeding", () => {
         { die: "d6", maximum: 2, remaining: 1 }
       ]
     });
-    // Spending past the whole pool is rejected on the total, not on one die size.
+    // Spending past the whole pool is rejected on the whole pool's total.
     expect(() => spendHitDice(game, ACTOR, [4, 4], { role: "gm" }, resolver(game))).toThrowError(/1 Hit Die left/);
     applyRest(game, ACTOR, "long", resolver(game));
     expect(actorOf(game).hitDice).toEqual({

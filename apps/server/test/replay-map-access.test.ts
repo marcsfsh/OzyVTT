@@ -65,7 +65,7 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
       (await fetch(`${base}/api/v1/map-assets/${assetId}/content`, { headers: { authorization: `Bearer ${token}` } }))
         .status;
 
-    // Two battlemaps, two recorded fights - one per map, so "shared" can be told from "archived".
+    // Two battlemaps, two recorded fights: one per map, so "shared" can be told from "archived".
     const shared = await server.mapAssets.import(png(900, 600), "shared.png");
     const secret = await server.mapAssets.import(png(901, 600), "secret.png");
     server.mapCatalog.register(shared.metadata.id, "The bridge", "battlemap");
@@ -138,7 +138,7 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
     expect(await image(secret.metadata.id, gmToken)).toBe(200);
     expect((await fetch(`${base}/api/v1/map-assets/${shared.metadata.id}/content`)).status).toBe(401);
 
-    // Un-sharing takes the image back: access follows the flag, not the archive.
+    // Un-sharing takes the image back: access follows the flag.
     expect(await setShared(sharedArchiveId, false)).toBe(200);
     expect(await image(shared.metadata.id, playerToken)).toBe(403);
   });

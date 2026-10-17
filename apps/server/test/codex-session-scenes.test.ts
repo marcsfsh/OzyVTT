@@ -52,7 +52,7 @@ describe("session scene attachments", () => {
     expect(store.createSession({ sceneIds: many }).sceneIds).toHaveLength(20);
   });
 
-  it("is GM-only in projections ALWAYS - even for a revealed session", () => {
+  it("is GM-only in projections ALWAYS, even for a revealed session", () => {
     const session = store.createSession({
       sessionNumber: 5,
       recapBody: "They crossed the bridge.",
@@ -69,7 +69,7 @@ describe("session scene attachments", () => {
     expect(JSON.stringify(player)).not.toContain(SCENE_A);
   });
 
-  it("keeps scene ids out of both search indexes - they are ids, not text", () => {
+  it("keeps scene ids out of both search indexes: they are ids, not text", () => {
     const session = store.createSession({
       sessionNumber: 6,
       prepBody: "Prep",

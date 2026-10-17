@@ -134,7 +134,7 @@ describe("Bless", () => {
   it("adds 1d4 to the blessed creature's saving throws", () => {
     const { state, resolve } = fight(wizard);
     resolve("spell-bless", { targetIds: [HERO] });
-    // Dexterity 14, not proficient: +2, and the d4.
+    // Dexterity 14, no proficiency: +2, and the d4.
     expect(save(state, HERO, "dex", [10, 3]).total).toBe(15);
     expect(state.rolls.at(-1)?.formula).toBe("1d20 + 2 + 1d4");
   });

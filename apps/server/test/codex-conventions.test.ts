@@ -79,7 +79,7 @@ describe("codex request correlation (X-Request-Id)", () => {
     const ok = await get(base, "/api/v1/codex/pages", { ...GM, "x-request-id": CALLER_ID });
     expect(ok.headers.get("x-request-id")).toBe(CALLER_ID);
 
-    // The error body must echo the caller's request id, not a freshly minted one.
+    // The error body must echo the caller's own request id.
     const failed = await post(base, "/api/v1/codex/pages", { ...GM, "x-request-id": CALLER_ID }, { title: "" });
     expect(failed.status).toBe(400);
     expect((await body(failed)).error.requestId).toBe(CALLER_ID);
@@ -117,7 +117,7 @@ describe("codex 401 vs 403", () => {
     }
   });
 
-  it("answers 403 to every valid credential that does not reach the route - a player, an underscoped credential", async () => {
+  it("answers 403 to every valid credential that does not reach the route: a player, an underscoped credential", async () => {
     const { base } = await fixture();
     const created = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Keep" }));
     const pageId = created.data.page.id as string;
@@ -136,7 +136,7 @@ describe("codex 401 vs 403", () => {
     expect((await body(await get(base, `/api/v1/codex/pages/${pageId}`, GM))).data.page.title).toBe("Keep");
   });
 
-  it("keeps 404-not-403 for a record a player may not see - a different axis, and it does not move", async () => {
+  it("keeps 404-not-403 for a record a player may not see: a different axis, and it does not move", async () => {
     const { base } = await fixture();
     const secret = await body(
       await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", gmBody: "Meets under the inn." })
@@ -294,9 +294,9 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     const gmTag = (await get(base, "/api/v1/codex/pages", GM)).headers.get("etag");
     const playerTag = (await get(base, "/api/v1/codex/pages", PLAYER)).headers.get("etag");
     expect(gmTag).not.toBe(playerTag);
-    // Presenting the GM's tag as a player is a cache miss, not a 304 - the bodies genuinely differ.
+    // Presenting the GM's tag as a player is a cache miss: the bodies genuinely differ.
     expect((await get(base, "/api/v1/codex/pages", { ...PLAYER, "if-none-match": gmTag as string })).status).toBe(200);
-    // A credential reads at GM grade, so it shares the GM tag rather than minting a third one.
+    // A credential reads at GM grade, so it shares the GM tag and mints no third one.
     expect((await get(base, "/api/v1/codex/pages", READ_CREDENTIAL)).headers.get("etag")).toBe(gmTag);
   });
 
@@ -310,7 +310,7 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     const pagesTag = (await get(base, "/api/v1/codex/pages", GM)).headers.get("etag") as string;
     const sessionsTag = (await get(base, "/api/v1/codex/sessions", GM)).headers.get("etag") as string;
     expect(sessionsTag, "two endpoints at one revision are two resources").not.toBe(pagesTag);
-    // The other endpoint's tag must be a cache miss, not an empty 304.
+    // The other endpoint's tag must be a cache miss with a body.
     expect((await get(base, "/api/v1/codex/sessions", { ...GM, "if-none-match": pagesTag })).status).toBe(200);
     expect((await get(base, "/api/v1/codex/pages", { ...GM, "if-none-match": sessionsTag })).status).toBe(200);
     // ...and each still 304s against its own.

@@ -75,7 +75,7 @@ describe("Lay on Hands", () => {
       limit: 25,
       per: "long-rest"
     });
-    // A pool one action spends goes by that action's name, not its key.
+    // A pool one action spends goes by that action's name.
     expect(pools.find((entry) => entry.id === "paladins-smite")?.name).toBe("Divine Smite (no slot)");
   });
 

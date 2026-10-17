@@ -306,7 +306,7 @@ describe("live authoritative encounter workflow", () => {
         slot: "action",
         used: true
       });
-      // Un-marking is a correction, not an event - it must stay silent.
+      // Un-marking is a correction and must stay silent.
       await emitCommand(gmSocket, "turn:use", {
         commandId: "30000000-0000-4000-8000-000000000062",
         slot: "action",

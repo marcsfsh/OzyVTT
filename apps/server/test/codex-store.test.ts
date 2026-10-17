@@ -51,7 +51,7 @@ afterEach(async () => {
 });
 
 // The session half of the context the player journal/chronicle projections take (`journalContext`). A
-// function, not a constant: reveal state changes mid-test and a captured context would go stale.
+// function: reveal state changes mid-test and a captured context would go stale.
 const playerSessionNumbers = (from: CodexStore = store) => ({
   unrevealedSessionIds: journalContext(from).unrevealedSessionIds
 });
@@ -68,7 +68,7 @@ const playerConnectionContext = (from: CodexStore = store) => ({
   revealedSourceIds: new Set<string>()
 });
 
-describe("CodexStore search — the SQL visibility layer, on its own", () => {
+describe("CodexStore search: the SQL visibility layer, on its own", () => {
   // Player search is gated in SQL (`PLAYER_SEARCH_VISIBLE_SQL`) and again by `projectPlayerSearchHit`; these call
   // `searchAll` directly so each kind's SQL gate is verified on its own.
   it("does not return an unrevealed MAP to a player", () => {
@@ -102,7 +102,7 @@ describe("CodexStore search — the SQL visibility layer, on its own", () => {
 
   it("does not return a REVEALED marker sitting on a SECRET map to a player (CD-6, at the SQL layer)", () => {
     // The pin is shown; the map is not. Players never receive the map, so they must not find the pin
-    // either, and that must hold in the query, not only in the projection.
+    // either, and that must hold in the query as well as in the projection.
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Hidden", kind: "regional" });
     const marker = store.createMarker(map.id, {
       x: 0.5,
@@ -220,7 +220,7 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
     }
   });
 
-  it("ranks across KINDS, not just within one - a map TITLED for the query beats a journal that mentions it", () => {
+  it("ranks across KINDS, not just within one: a map TITLED for the query beats a journal that mentions it", () => {
     // Ordering must hold between kinds under the shared 50-result cap. A journal entry has an empty title, so
     // only the title weight lifts the map (not titled exactly "Vallaki", so tier 2 alone) above it.
     const map = store.createMap({
@@ -238,7 +238,7 @@ describe("CodexStore search ranks the record NAMED for the query first", () => {
     }
   });
 
-  it("still finds a record whose ONLY match is a tag or a body - re-ranking never filters", () => {
+  it("still finds a record whose ONLY match is a tag or a body: re-ranking never filters", () => {
     // Re-ranking may move results down but never out, including behind the exact-title tier when another
     // record wins it.
     const named = store.createPage({ title: "Villain", playerBody: "the archetype", revealedToPlayers: true });
@@ -274,7 +274,7 @@ describe("CodexStore tags on every record type", () => {
     const entry = store.createEntry({ playerText: "The party arrived.", tags: ["session-1"] });
     expect(entry.tags).toEqual(["session-1"]);
 
-    // Updating replaces the whole set; an empty array genuinely clears rather than being ignored as absent.
+    // Updating replaces the whole set; an empty array genuinely clears it.
     expect(store.updateMap(map.id, { tags: ["act-two"] }).tags).toEqual(["act-two"]);
     expect(store.updateMarker(marker.id, { tags: [] }).tags).toEqual([]);
     expect(store.updateEntry(entry.id, { tags: ["session-2"] }).tags).toEqual(["session-2"]);
@@ -418,7 +418,7 @@ describe("CodexStore pages", () => {
   });
 
   it("leaves an auto-logged battle undated when the world has no current date", () => {
-    // With no calendar "now" there is nothing to date it by, so it stays undated rather than inventing a date.
+    // With no calendar "now" there is nothing to date it by, so it stays undated.
     const entry = store.appendCombatEntry({ sourceEncounterId: 9, playerText: "A battle was fought here." });
     expect(entry.calendarInstant).toBeNull();
     expect(entry.inWorldDate).toBeNull();
@@ -467,7 +467,7 @@ describe("CodexStore links + search", () => {
     store.createPage({ title: "Cult", gmBody: "meets near [[Bree]]" }); // gm-layer, unrevealed
     const incoming = store.connectionsForPage(bree.id).filter((row) => row.direction === "in");
     expect(incoming).toHaveLength(2);
-    // A mention is a connection with `origin: "mention"` and no id, not a separate kind of thing.
+    // A mention is a connection with `origin: "mention"` and no id, of the same kind as any other.
     expect(incoming.find((row) => row.otherTitle === "Road")).toMatchObject({
       layer: "player",
       otherRevealed: true,
@@ -980,8 +980,8 @@ describe("CodexStore calendar + timeline", () => {
       inWorldDate: { year: 1450, month: 0, day: 1 }
     });
     const late = store.createEntry({ playerText: "The war.", inWorldDate: { year: 1500, month: 0, day: 1 } });
-    // Created in chronological order here, so the assertion checks dates place records rather than a
-    // later-created record riding its insertion order.
+    // Created in chronological order here, so the assertion checks dates place records, and a
+    // later-created record can't pass by its insertion order.
     const undated = store.createEntry({ playerText: "Someday." });
 
     expect(store.listChronicle().map((record) => (record.kind === "entry" ? record.entry.id : record.page.id))).toEqual(
@@ -1083,7 +1083,7 @@ describe("CodexStore calendar + timeline", () => {
       inWorldDate: { year: 1, month: 1, day: 10 }
     });
     expect(eventNow.calendarInstant).toBe(entryOnTheSameDay.calendarInstant); // reflowed page == freshly dated entry
-    expect(eventNow.inWorldLabel).toBe("Fall 10, 1 AE"); // label recomputed, not stale
+    expect(eventNow.inWorldLabel).toBe("Fall 10, 1 AE"); // label recomputed from the new calendar
     // Both instants stated from the new calendar's arithmetic (year*200 + month offset + day-1), so this
     // fails if either kept a value from the old 12x30 year.
     expect(eventNow.calendarInstant).toBe(1 * 200 + 100 + 9);
@@ -1111,7 +1111,7 @@ describe("CodexStore calendar + timeline", () => {
 
 // `listChronicle()` is ungated and `projectPlayerChronicleRecord` is the only gate; a store-level filter
 // could mask a broken projection in HTTP tests, so these assert the store stays ungated.
-describe("CodexStore chronicle — deliberately ungated", () => {
+describe("CodexStore chronicle: deliberately ungated", () => {
   it("returns UNREVEALED entries and UNREVEALED event pages to the store's caller", () => {
     const entry = store.createEntry({ playerText: "secret", inWorldDate: { year: 1, month: 0, day: 1 } });
     const page = store.createPage({
@@ -1126,7 +1126,7 @@ describe("CodexStore chronicle — deliberately ungated", () => {
     expect(ids).toEqual([entry.id, page.id]);
   });
 
-  it("returns the GM half of both record types raw — the projection, not the store, is what strips it", () => {
+  it("returns the GM half of both record types raw: the projection strips it", () => {
     store.createEntry({ playerText: "seen", gmText: "unseen", inWorldDate: { year: 1, month: 0, day: 1 } });
     store.createPage({
       title: "Event",
@@ -1142,7 +1142,7 @@ describe("CodexStore chronicle — deliberately ungated", () => {
 });
 
 // The chronicle's projection layer on its own: the single gate, exercised directly, one property per test.
-describe("Codex chronicle — the projection layer, on its own", () => {
+describe("Codex chronicle: the projection layer, on its own", () => {
   const playerChronicle = () =>
     store
       .listChronicle()
@@ -1294,14 +1294,14 @@ describe("CodexStore media visibility (page images)", () => {
 
 // The page -> marker lookup is gated by the router (unrevealed page) and by `projectPlayerPageMarker` (each
 // pin); these call the store and projection directly.
-describe("Codex page→marker reverse lookup — the store and projection layers, on their own", () => {
+describe("Codex page→marker reverse lookup: the store and projection layers, on their own", () => {
   const context = (
     marker: ReturnType<CodexStore["getMarker"]>,
     mapRevealed: boolean,
     revealedPageIds: string[] = []
   ) => ({ marker: marker!, mapRevealed, revealedPageIds: new Set(revealedPageIds), subMapRevealed: false });
 
-  it("the store's reverse lookup is deliberately UNGATED — one gate, in the projection, or the layers can mask each other", () => {
+  it("the store's reverse lookup is deliberately UNGATED: one gate, in the projection, so the layers can't mask each other", () => {
     const map = store.createMap({ assetId: crypto.randomUUID(), name: "Amberhold", kind: "regional" }); // secret
     const page = store.createPage({ title: "The Amber Temple" }); // secret
     const marker = store.createMarker(map.id, {
@@ -1390,12 +1390,12 @@ describe("Codex page→marker reverse lookup — the store and projection layers
 
 // The whole-graph connections feed at the store and projection layers. `projectPlayerConnections` decides
 // visibility and the store feeding it is ungated, so each rule is proven at the projection.
-describe("Codex whole-graph connections — the store and projection layers, on their own", () => {
+describe("Codex whole-graph connections: the store and projection layers, on their own", () => {
   const context = () => playerConnectionContext();
   const mentions = () => store.listAllConnections().filter((edge) => edge.origin === "mention");
   const pair = (edge: { fromId: string; toPageId: string }) => ({ fromPageId: edge.fromId, toPageId: edge.toPageId });
 
-  it("the store's feed is deliberately UNGATED — both layers, every reveal state, both origins", () => {
+  it("the store's feed is deliberately UNGATED across layers, reveal states and origins", () => {
     const target = store.createPage({ title: "Vallaki" }); // secret
     const source = store.createPage({ title: "Barovia", gmBody: "Answers to [[Vallaki]]." }); // secret, GM-layer link
     expect(mentions()).toEqual([
@@ -1521,7 +1521,7 @@ describe("Codex whole-graph connections — the store and projection layers, on 
     expect(Object.keys(travelling[0]!).sort()).toEqual(["fromId", "fromKind", "label", "origin", "toPageId"]);
   });
 
-  it("scrubs a record's link rows when it is deleted — v22 dropped the foreign key, so nothing cascades", () => {
+  it("scrubs a record's link rows when it is deleted, since v22 dropped the foreign key and nothing cascades", () => {
     const shown = store.createPage({ title: "Vallaki" });
     const session = store.createSession({ recapBody: "[[Vallaki]]" });
     const quest = store.createQuest({ title: "Q", playerBody: "[[Vallaki]]" });
@@ -1540,7 +1540,7 @@ describe("Codex whole-graph connections — the store and projection layers, on 
 
 // Recency means "what have I been writing?": reveals and folder moves do not touch it, adding a
 // relationship does. The clock only moves when the test says so.
-describe("CodexStore recency semantics — what counts as an update", () => {
+describe("CodexStore recency semantics: what counts as an update", () => {
   let recencyDirectory: string;
   let clock: number;
   let recency: CodexStore;
@@ -1575,7 +1575,7 @@ describe("CodexStore recency semantics — what counts as an update", () => {
     expect(updatedAt(page.id) > afterBody).toBe(true);
   });
 
-  it("does NOT count a reveal toggle — but still bumps the codex revision, so clients refetch", () => {
+  it("does NOT count a reveal toggle, and still bumps the codex revision so clients refetch", () => {
     const page = recency.createPage({ title: "The Amber Temple", playerBody: "Ice and secrets." });
     const born = updatedAt(page.id);
     const revisionBefore = recency.revision;
@@ -1590,7 +1590,7 @@ describe("CodexStore recency semantics — what counts as an update", () => {
     expect(updatedAt(page.id)).toBe(born);
   });
 
-  it("does NOT count a folder move — but still bumps `rev`, because an open editor's copy really is stale", () => {
+  it("does NOT count a folder move, and still bumps `rev` because an open editor's copy really is stale", () => {
     const page = recency.createPage({ title: "Ireena", folder: "NPCs" });
     const born = updatedAt(page.id);
     const bornRev = rev(page.id);
@@ -1601,7 +1601,7 @@ describe("CodexStore recency semantics — what counts as an update", () => {
     expect(rev(page.id)).toBe(bornRev + 1); // conflict detection is a separate concern
   });
 
-  it("does NOT count a folder DELETE dropping pages to the top level — it is a folder move by another name", () => {
+  it("does NOT count a folder DELETE dropping pages to the top level, which is a folder move by another name", () => {
     const page = recency.createPage({ title: "Ireena", folder: "NPCs/Villagers" });
     const born = updatedAt(page.id);
     const bornRev = rev(page.id);
@@ -1621,7 +1621,7 @@ describe("CodexStore recency semantics — what counts as an update", () => {
     const edge = recency.createConnection(strahd.id, { toPageId: barovia.id, label: "rules" });
     expect(updatedAt(strahd.id) > bornStrahd).toBe(true);
     expect(updatedAt(barovia.id) > bornBarovia).toBe(true); // the other end gained a connection too
-    expect(rev(strahd.id)).toBe(strahd.rev); // `rev` is the conflict token, not recency
+    expect(rev(strahd.id)).toBe(strahd.rev); // `rev` is the conflict token and ignores recency
     expect(rev(barovia.id)).toBe(barovia.rev);
 
     // An idempotent re-add changes nothing, so it is not an edit.
@@ -1686,7 +1686,7 @@ describe("CodexStore sessions", () => {
       status: "planned",
       rev: 1
     });
-    expect(created.attendees).toEqual(["Ozy", "Mara"]); // trimmed and deduped, not slugged
+    expect(created.attendees).toEqual(["Ozy", "Mara"]); // trimmed and deduped, names kept as typed
     expect(created.createdAt).toBe(created.updatedAt); // born, so the two stamps agree
 
     tick();
@@ -1716,7 +1716,7 @@ describe("CodexStore sessions", () => {
     expect(sessions.updateSession(session.id, { prepBody: "v3" }, undefined).prepBody).toBe("v3");
   });
 
-  it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision", () => {
+  it("does NOT move recency or `rev` on a reveal, and still bumps the codex revision", () => {
     // The recap badge compares a session's `updatedAt` against a lastSeen stamp, so a reveal sweep that
     // re-stamped every session would light the badge for unchanged recaps.
     const session = sessions.createSession({ sessionNumber: 2, recapBody: "The wolves came at dusk." });
@@ -1764,7 +1764,7 @@ describe("CodexStore sessions", () => {
     sessions.setSessionRevealed(hidden.id, true);
     sessions.setSessionRevealed(unnumbered.id, true);
     expect([...journalContext(sessions).unrevealedSessionIds]).toEqual([]);
-    // ...and hiding 5 again puts a different id in, so this is a per-row read rather than a constant.
+    // ...and hiding 5 again puts a different id in, so this is a per-row read.
     sessions.setSessionRevealed(shown.id, false);
     expect([...journalContext(sessions).unrevealedSessionIds]).toEqual([shown.id]);
   });
@@ -1847,7 +1847,7 @@ describe("CodexStore sessions", () => {
     tick();
     expect(sessions.setActiveSession(session.id)).toBe(session.id);
     expect(sessions.activeSessionId).toBe(session.id);
-    // Activating is a statement about the table, not an edit of the record: no rev bump (an open console
+    // Activating is a statement about the table and leaves the record alone: no rev bump (an open console
     // would 409) and no recency move (the badge would light for unchanged prose).
     expect(sessions.getSession(session.id)).toEqual(born);
 
@@ -1871,7 +1871,7 @@ describe("CodexStore sessions", () => {
     expect(sessions.createEntry({ playerText: "Timeless lore.", sessionId: null }).sessionNumber).toBeNull();
   });
 
-  it("degrades to today's exact behaviour when there is no active session — and in every gap", () => {
+  it("degrades to today's exact behaviour when there is no active session and in every gap", () => {
     // A numbered session that is not active exists throughout; without it, "resolve the active session" and
     // "use any session lying around" produce the same nulls.
     const bystander = sessions.createSession({ sessionNumber: 9 });
@@ -1970,7 +1970,7 @@ describe("CodexStore quests", () => {
     expect(quests.updateQuest(quest.id, { gmBody: "v3" }, undefined).gmBody).toBe("v3");
   });
 
-  it("does NOT move recency or `rev` on a reveal — but still bumps the codex revision", () => {
+  it("does NOT move recency or `rev` on a reveal, and still bumps the codex revision", () => {
     const quest = quests.createQuest({ title: "The Vault", playerBody: "Open it." });
     const born = quest.updatedAt;
     const revisionBefore = quests.revision;
@@ -1997,7 +1997,7 @@ describe("CodexStore quests", () => {
     expect(quest.objectives).toEqual(written);
     expect(quests.getQuest(quest.id)!.objectives).toEqual(written); // ...and it survives the database round trip
 
-    // An edit replaces the list wholesale: the stored order is the new array, not a merge by position or text.
+    // An edit replaces the list wholesale: the stored order is the new array as sent.
     const edited = [
       { text: "Burn the counting house", done: false },
       { text: "A newly inserted step", done: false },
@@ -2079,7 +2079,7 @@ describe("CodexStore quests", () => {
     tick();
     const second = quests.createQuest({ title: "Second" });
     // A quest has no number or in-world date, so the order it was started in is the only intrinsic one.
-    // Completing one must not move it; that is a filter, not an ordering.
+    // Completing one must not move it; completion is a filter and plays no part in the order.
     quests.updateQuest(first.id, { status: "completed" }, first.rev);
     expect(quests.listQuests().map((quest) => quest.id)).toEqual([first.id, second.id]);
 
@@ -2130,7 +2130,7 @@ describe("CodexStore quests", () => {
 
 // The player search index text: a revealed quest passes the SQL and projection gates, so if `gmBody` reached
 // the player index a GM-only phrase would produce a hit. The quest is revealed so nothing else masks it.
-describe("CodexStore quest search index text — gate 1, with no second line of defence", () => {
+describe("CodexStore quest search index text: gate 1, with no second line of defence", () => {
   const GM_PHRASE = "the ledger is a forgery";
   const seedRevealed = () => {
     const quest = store.createQuest({
@@ -2184,7 +2184,7 @@ describe("CodexStore quest search index text — gate 1, with no second line of 
 
 // The quest search projection and record projection, called directly. An HTTP test cannot tell a working
 // projection from a SQL predicate that happened to compensate for a broken one.
-describe("Codex quest — the projection layer, on its own", () => {
+describe("Codex quest: the projection layer, on its own", () => {
   const GM_PHRASE = "The ledger is a forgery; the real one burned.";
   const seed = () =>
     store.createQuest({
@@ -2242,7 +2242,7 @@ describe("Codex quest — the projection layer, on its own", () => {
     expect(JSON.stringify(projected)).not.toContain(secret.id);
   });
 
-  it("refuses an UNREVEALED quest at the SEARCH projection too — gate 3, on its own", () => {
+  it("refuses an UNREVEALED quest at the SEARCH projection too: gate 3, on its own", () => {
     const quest = seed();
     // Called directly with no SQL in front; over HTTP `PLAYER_SEARCH_VISIBLE_SQL` would already have dropped this row.
     expect(projectPlayerSearchHit({ kind: "quest", quest }, playerSessionNumbers())).toBeNull();
@@ -2258,7 +2258,7 @@ describe("Codex quest — the projection layer, on its own", () => {
     const hit = projectPlayerSearchHit({ kind: "quest", quest: revealed }, playerSessionNumbers())!;
     // The same key set every other kind emits, so a row renderer never branches on kind.
     expect(Object.keys(hit).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
-    // Quests carry no tags, so this is `[]` rather than a missing key or null. `status`/`objectives` live on
+    // Quests carry no tags, so this is `[]`. `status`/`objectives` live on
     // the record; a result row exists to navigate.
     expect(hit.tags).toEqual([]);
     expect(hit.entityType).toBeNull();
@@ -2269,7 +2269,7 @@ describe("Codex quest — the projection layer, on its own", () => {
 });
 
 // The status CHECKs are asserted in SQL because a repair script could bypass `sessionStatus()` and
-// `questStatus()`, and the readers would coerce a bad value rather than fail.
+// `questStatus()`, and the readers would coerce a bad value and carry on.
 describe("CodexStore schema constraints", () => {
   const raw = () => new DatabaseSync(join(directory, "vtt.sqlite"));
 
@@ -2323,7 +2323,7 @@ describe("CodexStore schema constraints", () => {
 
 // Eras need no migration: a date's era is derived from its year, and `normalizeCalendar` reads
 // `input.eras ?? []`. The fixture deletes `eras` from the stored blob, as older campaigns have it on disk.
-describe("CodexStore eras — additive inside calendar_json, no stored date touched (5f)", () => {
+describe("CodexStore eras: additive inside calendar_json, no stored date touched (5f)", () => {
   /** Every dated row's derived and raw columns, read as raw SQL so a projection cannot hide a loss. */
   const datedRows = (path: string) => {
     const database = new DatabaseSync(path);
@@ -2442,7 +2442,7 @@ describe("CodexStore eras — additive inside calendar_json, no stored date touc
     }
   });
 
-  // Export/import round-trips with and without `eras`, and a pre-eras bundle imports to `[]` rather than
+  // Export/import round-trips with and without `eras`, and a pre-eras bundle imports to `[]` with no
   // undefined or a crash.
   it("round-trips eras through export/import, and imports a pre-eras bundle to an empty list", () => {
     const eras = [
@@ -2452,7 +2452,7 @@ describe("CodexStore eras — additive inside calendar_json, no stored date touc
     seedCampaign(store);
     store.setCalendar({ ...store.getCalendar(), eras });
     const withEras = store.exportBundle();
-    // Sorted on the way in, so the bundle carries the invariant rather than typing order.
+    // Sorted on the way in, so the bundle carries the invariant whatever order the GM typed.
     expect(withEras.calendar.eras).toEqual([
       { name: "Age of Ruin", startYear: 1000 },
       { name: "Third Age", startYear: 1400 }
@@ -2470,7 +2470,7 @@ describe("CodexStore eras — additive inside calendar_json, no stored date touc
       "Mol, Alturiak 20, Third Age 1492 DR"
     ]);
 
-    // A pre-eras bundle: the key is absent, not empty.
+    // A pre-eras bundle: the key is absent altogether.
     const legacy = JSON.parse(JSON.stringify(withEras)) as { calendar: Record<string, unknown> };
     delete legacy.calendar.eras;
     expect(legacy.calendar).not.toHaveProperty("eras");
@@ -2524,7 +2524,7 @@ describe("CodexStore eras — additive inside calendar_json, no stored date touc
 
 // The session projection, called directly. An HTTP test cannot tell a working projection from a router
 // that happened to compensate.
-describe("Codex session — the projection layer, on its own", () => {
+describe("Codex session: the projection layer, on its own", () => {
   const seed = () =>
     store.createSession({
       sessionNumber: 6,
@@ -2564,7 +2564,7 @@ describe("Codex session — the projection layer, on its own", () => {
 
 // A session's existence is GM information, but auto-linking stamps the active session onto entries. An
 // unrevealed record's number is blanked; a revealed record's, or a number with no record, is not.
-describe("Codex journal — the unrevealed-session number gate, on its own", () => {
+describe("Codex journal: the unrevealed-session number gate, on its own", () => {
   /** An entry a player may read, filed under a session by id, as auto-linking produces. */
   const revealedEntry = (sessionId: string | null) =>
     store.createEntry({ playerText: "We reached Vallaki.", sessionId, revealedToPlayers: true });
@@ -2590,7 +2590,7 @@ describe("Codex journal — the unrevealed-session number gate, on its own", () 
     });
   });
 
-  it("lets a bare LABEL with no session through - director ruling R2's stamp-back, and nothing else reaches this arm", () => {
+  it("lets a bare LABEL with no session through: director ruling R2's stamp-back, and nothing else reaches this arm", () => {
     // A bare label comes from `deleteSession` stamping a revealed session's number onto its entries. That
     // number was already player-visible and names no remaining record, so it travels.
     const revealed = store.createSession({ sessionNumber: 4 });
@@ -2620,7 +2620,7 @@ describe("Codex journal — the unrevealed-session number gate, on its own", () 
     });
   });
 
-  it("gates ONLY the link — the rest of a revealed entry travels exactly as it did", () => {
+  it("gates ONLY the link: the rest of a revealed entry travels exactly as it did", () => {
     const session = store.createSession({ sessionNumber: 4 });
     const entry = store.createEntry({
       playerText: "We reached Vallaki.",
@@ -2726,7 +2726,7 @@ describe("Codex journal — the unrevealed-session number gate, on its own", () 
 describe("CodexStore deadlines + downtime", () => {
   // The new kinds insert and read back as themselves; without a real `kind` parse a deadline would silently
   // read back as a note.
-  it("stores a deadline and a downtime as THEMSELVES — the widened CHECK, and a kind that is parsed rather than collapsed", () => {
+  it("stores a deadline and a downtime as THEMSELVES: the widened CHECK, and a kind parsed as it is", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
     const deadline = store.createDeadline({
       playerText: "The duke's ultimatum expires.",
@@ -2761,7 +2761,7 @@ describe("CodexStore deadlines + downtime", () => {
     expect(store.setEntryRevealed(deadline.id, true).revealedToPlayers).toBe(true);
 
     // `indexEntry` runs from `insertEntry`, so both kinds are findable on their own text exactly as a note
-    // is, and the unrevealed downtime is hidden from players by the reveal gate, not its kind.
+    // is, and the unrevealed downtime is hidden from players by the reveal gate; its kind plays no part.
     expect(
       store.searchAll("gm", "ultimatum").hits.some((hit) => hit.kind === "journal" && hit.id === deadline.id)
     ).toBe(true);
@@ -2798,7 +2798,7 @@ describe("CodexStore deadlines + downtime", () => {
     // 1. Creating proposes; the clock has not moved.
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 0, day: 10 });
     expect(downtimePayloadOf(downtime)!.applied).toBe(false);
-    // ...and the record is dated where the downtime happened (the GM's clock), not where it will end.
+    // ...and the record is dated where the downtime starts (the GM's clock).
     expect(downtime.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 });
     expect(store.proposedDateFor(downtime)).toEqual({ year: 1492, month: 1, day: 10 });
 
@@ -2817,7 +2817,7 @@ describe("CodexStore deadlines + downtime", () => {
     expect(applied.entry.inWorldDate).toEqual({ year: 1492, month: 0, day: 10 }); // the record did not re-date itself
     expect(store.proposedDateFor(applied.entry)).toBeNull(); // nothing left to propose
 
-    // 3. Applying again (a stale page or double-submit) throws rather than silently succeeding, and does
+    // 3. Applying again (a stale page or double-submit) throws and does
     //    not move the clock a second time.
     expect(() => store.applyDowntime(downtime.id)).toThrow(CodexRevisionConflictError);
     expect(store.getCalendar().currentDate).toEqual({ year: 1492, month: 1, day: 10 });
@@ -3096,7 +3096,7 @@ describe("CodexStore deadlines + downtime", () => {
     store.publishCampaignDate();
     expect(store.getPublishedDate()).toEqual(store.getCalendar().currentDate);
 
-    // Publishing with no GM clock clears the published date rather than leaving a stale one.
+    // Publishing with no GM clock clears the published date, so no stale one is left.
     store.setCalendar({ ...store.getCalendar(), currentDate: null });
     store.publishCampaignDate();
     expect(store.getPublishedDate()).toBeNull();
@@ -3193,7 +3193,7 @@ describe("CodexStore standing, party marker + milestones", () => {
     expect(store.setPartyMarker(village.id)!.isParty).toBe(true);
     expect(store.partyMarker()!.id).toBe(village.id);
 
-    // Flagging a second pin on the same map moves the party rather than erroring.
+    // Flagging a second pin on the same map moves the party there.
     store.setPartyMarker(castle.id);
     expect(store.partyMarker()!.id).toBe(castle.id);
     expect(store.getMarker(village.id)!.isParty).toBe(false);
@@ -3309,15 +3309,15 @@ describe("CodexStore standing, party marker + milestones", () => {
     expect(store.setStanding(harpers.id, -20, "Sold them out.").value).toBe(-20);
     expect(deltaFor("Sold them out.")).toEqual({ factionPageId: harpers.id, delta: -60, reason: "Sold them out." });
 
-    // Clamped, not rejected: the ends of the scale are meaningful. The delta uses the clamped value so the
-    // history adds up to the table (-20 -> 100 is +120, not +1020).
+    // Clamped: the ends of the scale are meaningful. The delta uses the clamped value so the
+    // history adds up to the table (-20 -> 100 is +120).
     expect(store.setStanding(harpers.id, 1000, "Saved the High Harper.").value).toBe(100);
     expect(deltaFor("Saved the High Harper.").delta).toBe(120);
     expect(store.setStanding(harpers.id, -9999, "Burned their safehouse.").value).toBe(-100);
     expect(deltaFor("Burned their safehouse.").delta).toBe(-200);
-    // Fractions truncate rather than writing a REAL into a STRICT INTEGER column.
+    // Fractions truncate, so no REAL lands in a STRICT INTEGER column.
     expect(store.setStanding(harpers.id, 12.9, "Made partial amends.").value).toBe(12);
-    // NaN/Infinity are an error, not a clamp.
+    // NaN/Infinity are an error.
     expect(() => store.setStanding(harpers.id, Number.NaN, "?")).toThrow(/number/);
     expect(() => store.setStanding(harpers.id, Number.POSITIVE_INFINITY, "?")).toThrow(/number/);
 
@@ -3413,7 +3413,7 @@ describe("CodexStore standing, party marker + milestones", () => {
       reason: "Saved the caravan."
     });
 
-    // A level is a stated fact, so it is rejected rather than clamped (unlike standing).
+    // A level is a stated fact, so an out-of-range one is rejected (standing is clamped).
     expect(() => store.createMilestone({ milestone: { level: 0, reason: "?" } })).toThrow(/1 to 20/);
     expect(() => store.createMilestone({ milestone: { level: 21, reason: "?" } })).toThrow(/1 to 20/);
     expect(() => store.createMilestone({ milestone: { level: 4.5, reason: "?" } })).toThrow(/1 to 20/);
@@ -3456,7 +3456,7 @@ describe("CodexStore standing, party marker + milestones", () => {
     store.setPartyMarker(village.id);
 
     const bundle = store.exportBundle();
-    // Keyed by faction rather than position: `listStanding` breaks a `created_at` tie on a random uuid. The
+    // Keyed by faction: `listStanding` breaks a `created_at` tie on a random uuid. The
     // bundle must carry every faction's signed value and its own reveal state.
     expect(
       Object.fromEntries(bundle.standing.map((row) => [row.factionPageId, [row.value, row.revealedToPlayers]]))
@@ -3497,7 +3497,7 @@ describe("CodexStore standing, party marker + milestones", () => {
 
 // Bundle keys whose facts exist nowhere else: the calendar (instants depend on it), empty folders (only in
 // `codex_folders`), and revision history. Store-level because `GET /codex/export` returns it verbatim.
-describe("CodexStore export bundle — the calendar, empty folders and revision history (2026-07-30)", () => {
+describe("CodexStore export bundle: the calendar, empty folders and revision history (2026-07-30)", () => {
   it("carries the CALENDAR, and keeps the GM's clock distinct from the published one", () => {
     // A non-default calendar (two 10-day months), so omitting it would move every dated record.
     store.setCalendar({
@@ -3556,7 +3556,7 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
     // Both pages' histories in one list, regroupable by `pageId`, unlike the per-page `listRevisions`.
     expect(new Set(bundle.revisions.map((row) => row.pageId))).toEqual(new Set([page.id, other.id]));
     const history = bundle.revisions.filter((row) => row.pageId === page.id);
-    // Ascending: a history, not a feed. One row per `rev`: the creation checkpoints the page and the first
+    // Ascending, as a history reads. One row per `rev`: the creation checkpoints the page and the first
     // edit's prior state is the same rev 1, so `revisionExistsAt` suppresses the byte-identical duplicate.
     expect(history.map((row) => row.rev)).toEqual([1, 2]);
     expect(history[0]).toMatchObject({ title: "Strahd", playerBody: "A count.", gmBody: "The darklord." });
@@ -3606,7 +3606,7 @@ describe("CodexStore export bundle — the calendar, empty folders and revision 
 
 // Revision history settings. By default a save within 90 minutes of the last checkpoint writes no revision.
 // Tests drive the injected clock (`new CodexStore(path, () => now)`); nothing here prunes revisions.
-describe("CodexStore revision history — the GM's two knobs (owner decision, 2026-07-30)", () => {
+describe("CodexStore revision history: the GM's two knobs (owner decision, 2026-07-30)", () => {
   const EPOCH = Date.parse("2026-07-30T09:00:00.000Z");
   let clockDirectory: string;
   let clock: CodexStore;
@@ -3647,13 +3647,13 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
     clock.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
     const revisions = clock.listRevisions(page.id);
     expect(revisions).toHaveLength(2);
-    // ...and it captured the state this save overwrote (v1, authored at t=89), not the v2 it wrote.
+    // ...and it captured the state this save overwrote (v1, authored at t=89).
     expect(revisions[0]).toMatchObject({ playerBody: "v1", authoredAt: new Date(EPOCH + 89 * 60_000).toISOString() });
   });
 
   // `windowMinutes: 0` means "keep every save"; `enabled: false` is "never". The clock does not move between
   // these saves, so nothing can pass by elapsed time.
-  it("checkpoints EVERY save at windowMinutes 0 — the OLD behaviour, not 'never'", () => {
+  it("checkpoints EVERY save at windowMinutes 0, the OLD behaviour", () => {
     clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 0 }, autosave: AUTOSAVE_DEFAULT });
     at(0);
     const page = clock.createPage({ title: "Vallaki", playerBody: "v0" });
@@ -3684,7 +3684,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
     at(2000);
     clock.updatePage(page.id, { playerBody: "fifth" }, undefined, "gm");
     // No new row, and no row destroyed: disabling must not delete the GM's only undo, so the same ids are
-    // asserted, not just a count.
+    // asserted along with the count.
     expect(clock.listRevisions(page.id).map((row) => row.id)).toEqual(before.map((row) => row.id));
 
     // ...and the history is still restorable with the switch off.
@@ -3695,7 +3695,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
     expect(clock.listRevisions(page.id).map((row) => row.id)).toEqual(before.map((row) => row.id));
   });
 
-  // With history disabled no checkpoint is written, not even on creation; the window never throttles a
+  // With history disabled no checkpoint is written, on creation included; the window never throttles a
   // creation, but the switch does.
   it("writes NO checkpoint at all with history disabled, not even a page's creation", () => {
     clock.setSettings({ revisionHistory: { enabled: false, windowMinutes: 90 }, autosave: AUTOSAVE_DEFAULT });
@@ -3740,7 +3740,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
     expect(clock.restoreRevision(page.id, draft!.id, "gm").playerBody).toBe("the good draft");
   });
 
-  it("never throttles createPage — even with a window nothing could fall outside", () => {
+  it("never throttles createPage, even with a window nothing could fall outside", () => {
     clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 10_080 }, autosave: AUTOSAVE_DEFAULT }); // a week
     at(0);
     const first = clock.createPage({ title: "One" });
@@ -3756,7 +3756,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
   });
 
   // The snapshot must capture the prior state. With new-state snapshots, the save at t=80 would be coalesced
-  // away and a ruinous save after a two-day gap would checkpoint the ruin, dropping the GM back to t=0.
+  // away and a ruinous save after a two-day gap would checkpoint the ruin and drop the GM back to t=0.
   it("checkpoints the GOOD prior state across an idle gap, so the ruinous save recovers the work", () => {
     at(0);
     const page = clock.createPage({ title: "Ravenloft", playerBody: "opening" });
@@ -3769,7 +3769,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
 
     const revisions = clock.listRevisions(page.id);
     expect(revisions).toHaveLength(2);
-    // The checkpoint that save took is the state it was about to overwrite, not the ruin it wrote.
+    // The checkpoint that save took is the state it was about to overwrite.
     expect(revisions[0].playerBody).toBe("the good work");
     expect(revisions.map((row) => row.playerBody)).not.toContain("");
     expect(clock.restoreRevision(page.id, revisions[0].id, "gm").playerBody).toBe("the good work");
@@ -3802,7 +3802,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
         .revisionHistory
     ).toMatchObject({ enabled: false, windowMinutes: 45 });
     expect(clock.getSettings().revisionHistory).toMatchObject({ enabled: false, windowMinutes: 45 });
-    // A non-finite window is an error, not a clamp: `Math.trunc(NaN)` is NaN, which a STRICT INTEGER column
+    // A non-finite window is an error: `Math.trunc(NaN)` is NaN, which a STRICT INTEGER column
     // would reject. Same rule as `standingValue`.
     expect(() =>
       clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: Number.NaN }, autosave: AUTOSAVE_DEFAULT })
@@ -3878,7 +3878,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
     expect(set({ enabled: true, intervalSeconds: -30 }).autosave.intervalSeconds).toBe(1);
     expect(set({ enabled: false, intervalSeconds: 10.9 }).autosave).toEqual({ enabled: false, intervalSeconds: 10 });
     expect(clock.getSettings().autosave).toEqual({ enabled: false, intervalSeconds: 10 });
-    // A non-finite interval is an error, not a clamp, as with `revisionWindowMinutes`.
+    // A non-finite interval is an error, as with `revisionWindowMinutes`.
     expect(() => set({ enabled: true, intervalSeconds: Number.NaN })).toThrow(/seconds/i);
     // ...and `enabled` must be stated, since a coerced missing field would land on `false` and stop autosave.
     expect(() => clock.setSettings({ revisionHistory: { enabled: true, windowMinutes: 90 } } as never)).toThrow(
@@ -3966,7 +3966,7 @@ describe("CodexStore revision history — the GM's two knobs (owner decision, 20
 
 // The revision usage figures and the delete, tested together because they are one loop in use (read the
 // cost, trim, read again), and only reading the figures could not tell a real count from a constant.
-describe("CodexStore revision history — usage figures and the delete (owner decision, 2026-07-30)", () => {
+describe("CodexStore revision history: usage figures and the delete (owner decision, 2026-07-30)", () => {
   const EPOCH = Date.parse("2026-07-30T09:00:00.000Z");
   let pruneDirectory: string;
   let pruner: CodexStore;
@@ -4012,7 +4012,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     );
   });
 
-  it("reports a smaller history after a delete — the read/trim/read loop the screen is for", () => {
+  it("reports a smaller history after a delete: the read/trim/read loop the screen is for", () => {
     pruner.createPage({ title: "Krezk", playerBody: "a long-ish body" });
     pruner.createPage({ title: "Berez", playerBody: "another body" });
     const before = pruner.getSettings().revisionHistory;
@@ -4025,7 +4025,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     expect(after).toMatchObject({ enabled: true, windowMinutes: 0 });
   });
 
-  // `olderThanDays: 0` deletes everything by ordinary arithmetic (nothing is younger than zero days), not a
+  // `olderThanDays: 0` deletes everything by ordinary arithmetic (nothing is younger than zero days) with no
   // special case, so the boundary is asserted on both sides.
   it("deletes EVERY revision at olderThanDays 0, by ordinary arithmetic", () => {
     const page = pruner.createPage({ title: "Argynvostholt", playerBody: "v0" });
@@ -4060,7 +4060,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     ]);
 
     // From day 3, "older than 3 days" cuts at day 0 inclusive: both day-0 checkpoints go and the survivors are
-    // asserted, not just the count.
+    // asserted along with the count.
     expect(pruner.deleteRevisionsOlderThan(3)).toBe(2);
     expect(pruner.listRevisions(page.id).map((row) => row.playerBody)).toEqual(["day-2", "day-1"]);
     expect(pruner.getSettings().revisionHistory.versionCount).toBe(2);
@@ -4074,7 +4074,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
   });
 
   /** Deleting revisions never touches `codex_pages`: bodies, typed fields and `rev` all survive. */
-  it("never touches codex_pages — bodies, fields and rev all survive a delete-everything", () => {
+  it("never touches codex_pages: bodies, fields and rev all survive a delete-everything", () => {
     // A `character`, because `goals` is one of its secret fields; a `location` would arrive with `gmFields`
     // already empty and prove nothing.
     const page = pruner.createPage({
@@ -4101,7 +4101,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     expect(pruner.updatePage(page.id, { playerBody: "wagons, horses and a bear" }, undefined, "gm").rev).toBe(3);
   });
 
-  it("deletes regardless of the enabled setting — the GM who turned history off is the one reclaiming space", () => {
+  it("deletes regardless of the enabled setting, since the GM who turned history off is the one who wants the space back", () => {
     const page = pruner.createPage({ title: "Berez", playerBody: "v0" });
     pruner.updatePage(page.id, { playerBody: "v1" }, undefined, "gm");
     pruner.updatePage(page.id, { playerBody: "v2" }, undefined, "gm");
@@ -4112,7 +4112,7 @@ describe("CodexStore revision history — usage figures and the delete (owner de
     expect(pruner.getSettings().revisionHistory.versionCount).toBe(0);
   });
 
-  // Rejected, not clamped, unlike `windowMinutes`: this is the one destructive route in the codex, and a
+  // Rejected (`windowMinutes` clamps): this is the one destructive route in the codex, and a
   // malformed destructive request must not be interpreted generously.
   it("rejects a negative, fractional or absurd age rather than clamping it, and deletes nothing when it does", () => {
     const page = pruner.createPage({ title: "Yester Hill", playerBody: "v0" });
@@ -4323,7 +4323,7 @@ describe("every codex write bumps the coarse revision (the ETag's invariant)", (
 
 // Sessions join the suite-wide search index, a three-gate viewer-safety change (see `CodexRecordKind`).
 // The index-text gate has no second line of defence, so each gate is asserted at its own layer.
-describe("CodexStore search — sessions join the one index (three gates)", () => {
+describe("CodexStore search: sessions join the one index (three gates)", () => {
   const seed = () =>
     store.createSession({
       sessionNumber: 4,
@@ -4334,7 +4334,7 @@ describe("CodexStore search — sessions join the one index (three gates)", () =
       attendees: ["Ozy", "Mara"]
     });
 
-  it("GATE 1 — prep and attendees never enter the PLAYER index, even for a revealed session", () => {
+  it("GATE 1: prep and attendees never enter the PLAYER index, even for a revealed session", () => {
     const session = store.setSessionRevealed(seed().id, true);
     expect(store.searchAll("gm", "ambush").hits.some((hit) => hit.id === session.id)).toBe(true);
     expect(store.searchAll("gm", "Mara").hits.some((hit) => hit.id === session.id)).toBe(true);
@@ -4351,7 +4351,7 @@ describe("CodexStore search — sessions join the one index (three gates)", () =
     }
   });
 
-  it("GATE 2 — the SQL predicate hides an UNREVEALED session from a player, below any projection", () => {
+  it("GATE 2: the SQL predicate hides an UNREVEALED session from a player, below any projection", () => {
     const session = seed();
     // Called directly with no projection in front: the layer an HTTP test cannot see.
     expect(store.searchAll("player", "crossed").hits).toEqual([]);
@@ -4361,7 +4361,7 @@ describe("CodexStore search — sessions join the one index (three gates)", () =
     expect(store.searchAll("player", "crossed").hits.some((hit) => hit.id === session.id)).toBe(true);
   });
 
-  it("GATE 3 — the projection arm refuses an unrevealed session even when the SQL layer passes it", () => {
+  it("GATE 3: the projection arm refuses an unrevealed session even when the SQL layer passes it", () => {
     const session = seed();
     // Constructed by hand, as the SQL layer would hand it over if its gate were weakened.
     expect(projectPlayerSearchHit({ kind: "session", session }, playerSessionNumbers())).toBeNull();
@@ -4462,7 +4462,7 @@ describe("CodexStore search — sessions join the one index (three gates)", () =
 
 // A player chronicle row carries the server's `calendarInstant` alongside `inWorldDate`, so the client never
 // re-derives it (and diverges on a day that overflows its month).
-describe("Codex chronicle — a player's machine-readable dates", () => {
+describe("Codex chronicle: a player's machine-readable dates", () => {
   it("carries both date forms on a revealed dated row, and the instant is the server's own clamped one", () => {
     // A 30-day month and a date on day 31 of it.
     store.setCalendar({
@@ -4509,8 +4509,8 @@ describe("Codex chronicle — a player's machine-readable dates", () => {
   });
 });
 
-/** Downtime linked to a character page, so the tracker totals a person rather than a spelling of a name. */
-describe("CodexStore downtime — the character link", () => {
+/** Downtime linked to a character page, so the tracker totals a person whatever the spelling of the name. */
+describe("CodexStore downtime: the character link", () => {
   it("round-trips the link, keeps it through applyDowntime, and refuses an id that names no page", () => {
     const character = store.createPage({ title: "Ireena", entityType: "character" });
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 1 } });
@@ -4536,7 +4536,7 @@ describe("CodexStore downtime — the character link", () => {
       characterPageId: character.id
     });
 
-    // An id naming no page is not-found, not a dangling link.
+    // An id naming no page is not-found, so no link dangles.
     expect(() =>
       store.createDowntime({
         playerText: "Nobody.",
@@ -4598,7 +4598,7 @@ describe("CodexStore downtime — the character link", () => {
 
     store.deletePage(character.id);
 
-    // The record survives its page, and the link is nulled rather than left dangling.
+    // The record survives its page, and the link is nulled.
     const after = downtimePayloadOf(store.getEntry(entry.id)!)!;
     expect(after.characterPageId).toBeNull();
     expect(after.who, "the free-text fallback is what the row shows now").toBe("Ireena");
@@ -4650,7 +4650,7 @@ describe("CodexStore downtime — the character link", () => {
 describe("CodexStore quest history", () => {
   const questRecords = () => store.listTimeline().filter((entry) => entry.kind === "quest");
 
-  it("records a quest's START on create, and every STATUS CHANGE after it — never a prose edit", () => {
+  it("records a quest's START on create and every STATUS CHANGE after it, and never a prose edit", () => {
     store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 1, day: 12 } });
     const session = store.createSession({ sessionNumber: 3 });
     store.setActiveSession(session.id);
@@ -4660,7 +4660,7 @@ describe("CodexStore quest history", () => {
     const start = questRecords()[0]!;
     // The status reached is the default `not-started`: writing a lead down is not the party taking it up.
     expect(questEventPayloadOf(start)).toEqual({ questId: quest.id, status: "not-started" });
-    // Hidden, with empty player text, which is why the projection hides the whole row rather than a field.
+    // Hidden, with empty player text, which is why the projection hides the whole row.
     expect(start.revealedToPlayers).toBe(false);
     expect(start.playerText).toBe("");
     // Dated at the GM's clock and filed under the active session, as every auto-written record is.
@@ -4672,7 +4672,7 @@ describe("CodexStore quest history", () => {
     store.updateQuest(quest.id, { title: "Find the Sunsword, urgently" }, undefined);
     expect(questRecords()).toHaveLength(1);
 
-    // A status change writes exactly one, carrying the status reached.
+    // A status change writes exactly one, with the status reached.
     store.updateQuest(quest.id, { status: "completed" }, undefined);
     expect(questRecords()).toHaveLength(2);
     expect(questEventPayloadOf(questRecords()[1]!)).toEqual({ questId: quest.id, status: "completed" });
@@ -4734,7 +4734,7 @@ describe("CodexStore quest history", () => {
       projectPlayerJournalEntry(store.getEntry(record.id)!, { unrevealedSessionIds: new Set<string>() })
     ).toBeNull();
 
-    // Reveal the quest and the row travels, carrying its status.
+    // Reveal the quest and the row travels with its status.
     store.setQuestRevealed(quest.id, true);
     const shown = projectPlayerChronicleRecord(
       { kind: "entry", entry: store.getEntry(record.id)! },
@@ -4793,7 +4793,7 @@ describe("CodexStore quest history", () => {
 
 // Backup and restore: a round trip is lossless, a bad bundle leaves the codex exactly as it was, and a
 // backup from before restore existed still restores.
-describe("CodexStore import — replace, all-or-nothing", () => {
+describe("CodexStore import: replace, all-or-nothing", () => {
   /** A codex with one of everything, so a round trip has something to lose. */
   const populate = () => {
     store.setCalendar({
@@ -4897,14 +4897,14 @@ describe("CodexStore import — replace, all-or-nothing", () => {
     const pageWithHistory = store.listPages().find((page) => page.title === "Vallaki")!;
     const revision = store.listRevisions(pageWithHistory.id).at(-1)!;
     expect(store.restoreRevision(pageWithHistory.id, revision.id, "gm").playerBody).toContain("A walled town");
-    // Derived link rows were rebuilt, not restored from a stale copy.
+    // Derived link rows were rebuilt fresh.
     expect(store.listAllConnections().some((edge) => edge.origin === "mention")).toBe(true);
     // The search index was rebuilt too, and prep stays GM-only.
     expect(store.searchAll("gm", "ambush").hits.some((hit) => hit.kind === "session")).toBe(true);
     expect(store.searchAll("player", "ambush").hits).toEqual([]);
   });
 
-  it("writes NOTHING when a bundle is bad — the codex is exactly as it was", () => {
+  it("writes NOTHING when a bundle is bad: the codex is exactly as it was", () => {
     populate();
     const before = JSON.stringify(store.exportBundle());
     const revisionBefore = store.revision;
@@ -4920,8 +4920,8 @@ describe("CodexStore import — replace, all-or-nothing", () => {
     expect(JSON.stringify(store.exportBundle()), "row for row, the codex is untouched").toBe(before);
     expect(store.revision, "...and nothing bumped the revision, so no client was told to refetch").toBe(revisionBefore);
 
-    // The cross-record invariants are refused up front with copy a GM can act on, not as a mid-transaction
-    // constraint failure.
+    // The cross-record invariants are refused up front with copy a GM can act on, before any mid-transaction
+    // constraint failure can fire.
     expect(() =>
       store.importBundle({
         ...bundle,
@@ -4970,7 +4970,7 @@ describe("CodexStore import — replace, all-or-nothing", () => {
     }
     // A mistyped section is named, so the GM can fix it.
     expect(() => store.importBundle({ pagez: [] })).toThrow(/"pagez"/);
-    // A recognised section that is not a list is refused by name too, rather than counting as zero records.
+    // A recognised section that is not a list is refused by name too, so it can't count as zero records.
     expect(() => store.importBundle({ pages: { id: "x" } })).toThrow(/"pages" section is not a list/);
     expect(JSON.stringify(store.exportBundle())).toBe(before);
 
@@ -5263,7 +5263,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "initialize",
     "close",
     "recallCommand",
-    // A receipt is bookkeeping about a response, not content; bumping here would invalidate every ETag a
+    // A receipt is bookkeeping about a response and carries no content; bumping here would invalidate every ETag a
     // second time for a write that already bumped.
     "recordCommand",
     "listFolders",

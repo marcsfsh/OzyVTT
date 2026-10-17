@@ -149,7 +149,7 @@ const fighterInput = (): MutableInput => ({
 });
 
 // One equipped row, copied from the real catalog record as the sheet's add flow copies it. The `armor`
-// block is what the AC math reads; a missing record throws by name rather than deriving a silent zero.
+// block is what the AC math reads; a missing record throws by name, so no silent zero comes out.
 function equippedFromCatalog(id: string): InventoryItem {
   const record = view.equipmentRecord(id);
   if (!record?.armor) throw new Error(`the SRD catalog has no armor record for "${id}"`);
@@ -270,7 +270,7 @@ describe("Unarmored Defense and a shield", () => {
       (id) => state.definitions.find((entry) => entry.id === id)?.definition,
       { catalog, role: "player" }
     );
-    // 15, not 12: the live rider wins over the stale flag, so Draconic Resilience survives the Shield (whose +2
+    // 15: the live rider wins over the stale flag, so Draconic Resilience survives the Shield (whose +2
     // needs training this Sorcerer lacks).
     expect(hero.armorClass, "a sheet saved before the content fix must keep its Charisma under the shield").toBe(15);
   });
@@ -302,7 +302,7 @@ describe("Unarmored Defense and a shield", () => {
   });
 
   // The reader fails open: a definition claiming no feature (monster, PDF import) derives an ordinary AC from
-  // armor rather than NaN, and no Unarmored Defense is inferred from a class name.
+  // armor with no NaN, and no Unarmored Defense is inferred from a class name.
   it("derives an ordinary armor AC for a definition that claims no feature at all", () => {
     const { definition } = onTheTable(barbarianInput());
     const { character: _dropped, ...stripped } = definition;
@@ -331,7 +331,7 @@ describe("Unarmored Defense and a shield", () => {
       (id) => state.definitions.find((entry) => entry.id === id)?.definition,
       { catalog, role: "player" }
     );
-    expect(actor.armorClass).toBe(18); // Chain Mail 16 + Shield 2 - no feature is claimed, so none is granted
+    expect(actor.armorClass).toBe(18); // Chain Mail 16 + Shield 2: no feature is claimed, so none is granted
   });
 
   // A sheet saved before the `unarmoredDefense` extension key existed (only that sub-key deleted, JSON round

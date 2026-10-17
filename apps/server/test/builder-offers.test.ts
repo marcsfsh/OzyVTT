@@ -60,7 +60,7 @@ const filled = (offer: BuilderOffer, picks: BuilderOffersReply["picks"]) =>
 /**
  * Answers the first open offer with the first options it still allows, as the wizard's path opens, until
  * nothing is open. Ability-score picks rotate so the 20 cap is not what is tested. Unanswerable offers are
- * collected, not thrown, so a failure names them.
+ * collected and reported together, so a failure names them.
  */
 function fillGreedily(classId: string, level: number) {
   const identity = { speciesId: "human", backgroundId: "soldier", classId, level };

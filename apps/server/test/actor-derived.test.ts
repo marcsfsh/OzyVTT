@@ -175,7 +175,7 @@ describe("the save chip and the rolled save are one number", () => {
     expect(bare.saveFromItems).toBe(0);
   });
 
-  it("EQUALS what the roll path computes - the assertion that makes drift impossible", () => {
+  it("EQUALS what the roll path computes: the assertion that makes drift impossible", () => {
     const state = stateWith(worn);
     const derivation = deriveEquipment(state.actors[0], definition, catalog);
     for (const row of sheetFor(state, definition, catalog).abilities) {
@@ -188,7 +188,7 @@ describe("the save chip and the rolled save are one number", () => {
   /** `saveModifierFor` must read `proficiencies.saves`, so a PC's forced save matches the sheet's chip. */
   it("reads save proficiency off the sheet, not just off a monster extension", () => {
     expect(saveModifierFor(definitionOf(), "dex")).toBe(6); // +3 Dex, +3 PB, proficient
-    expect(saveModifierFor(definitionOf(), "str")).toBe(3); // +3 Str, not proficient
+    expect(saveModifierFor(definitionOf(), "str")).toBe(3); // +3 Str, no proficiency
     // An explicit GM total still wins outright.
     const overridden = definitionOf({ proficiencies: { saves: ["dex"], skills: [], saveOverrides: { dex: 11 } } });
     expect(saveModifierFor(overridden, "dex")).toBe(11);
