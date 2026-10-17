@@ -695,15 +695,15 @@ describe("riders that parse and could never take effect", () => {
   it("refuses a damage rider gated on a moment the damage roll never collects", () => {
     // The damage roll collects the standing pass, `on-hit`, `on-critical-hit` and `on-damage-roll` only.
     const riders = [
-      { type: "extra-damage", formula: "1d6", damageType: "fire" },
-      { type: "damage-bonus", amount: 2 }
+      { named: "an extra-damage", rider: { type: "extra-damage", formula: "1d6", damageType: "fire" } },
+      { named: "a damage-bonus", rider: { type: "damage-bonus", amount: 2 } }
     ];
-    for (const { type, ...rest } of riders) {
-      const rider = { type, ...rest, when: [{ type: "on-attack-roll" }] };
+    for (const { named, rider: base } of riders) {
+      const rider = { ...base, when: [{ type: "on-attack-roll" }] };
       const refused = validateForPublish("feat", feat(rider), contextWith());
-      expect(refused.valid, type).toBe(false);
+      expect(refused.valid, base.type).toBe(false);
       expect(messages(refused)).toContain(
-        `gates a ${type} on "on-attack-roll", a moment the damage roll never collects`
+        `gates ${named} on "on-attack-roll", a moment the damage roll never collects`
       );
       expect(refused.issues[0].path).toEqual(["feature", "modifiers", 0]);
     }

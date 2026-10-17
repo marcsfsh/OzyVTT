@@ -55,7 +55,13 @@ describe("what a prepared caster may change", () => {
     const sheet = built("cleric", 3);
     const choices = spellChoicesOf({ spellbook: [] }, sheet, library, policy)!;
     const cleric = choices.swaps.find((entry) => entry.classId === "cleric")!;
-    expect(cleric.spellIds).toEqual(expect.arrayContaining(["shield-of-faith", "spiritual-weapon"]));
+    // Level 1 and 2 Cleric spells the build didn't prepare are offered; which ones the dice prepared varies.
+    const held = new Set(classSpells(sheet, "cleric").map((spell) => spell.id));
+    const unprepared = ["shield-of-faith", "spiritual-weapon", "guiding-bolt", "sanctuary", "command", "hold-person"]
+      .filter((id) => !held.has(id))
+      .slice(0, 2);
+    expect(unprepared).toHaveLength(2);
+    expect(cleric.spellIds).toEqual(expect.arrayContaining(unprepared));
     expect(cleric.spellIds).not.toContain("spirit-guardians");
     for (const spell of classSpells(sheet, "cleric")) expect(cleric.spellIds).not.toContain(spell.id);
     expect(choices.spellbook).toBeNull();

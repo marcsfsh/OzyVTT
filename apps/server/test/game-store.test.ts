@@ -61,7 +61,8 @@ describe("SQLite GameStore", () => {
       ).toBe(50);
       expect(database.prepare("SELECT store, version FROM migrations").all()).toEqual([
         { store: "game", version: 1 },
-        { store: "game", version: 2 }
+        { store: "game", version: 2 },
+        { store: "game", version: 3 }
       ]);
       database.close();
     } finally {

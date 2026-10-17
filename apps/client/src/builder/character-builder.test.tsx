@@ -1061,7 +1061,7 @@ describe("rolling a random character", () => {
       within(within(dialog).getByRole("group", { name: "Cleric levels" })).getByRole("button", { name: "Increase" })
     );
     expect(
-      within(dialog).getByText("Level 3 in all. The first class is the one taken at level 1.")
+      within(dialog).getByText("Level 3 in all. The character starts in the first class at level 1.")
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Roll it up" }));
     const generate = vi.mocked(socket.emit).mock.calls.find(([event]) => event === "character:generate");

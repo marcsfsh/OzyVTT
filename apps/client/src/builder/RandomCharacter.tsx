@@ -143,7 +143,7 @@ export function RandomCharacterModal({
         </>
       )}
       {multiclass && (
-        <p className="random-character-note">Level {total} in all. The first class is the one taken at level 1.</p>
+        <p className="random-character-note">Level {total} in all. The character starts in the first class at level 1.</p>
       )}
       {/* A multiclass character starts from a chosen class, so the dice's choice can't take a second one. */}
       {plan[0].classId && plan.length < MAX_CLASSES && room > 0 && unused.length > 0 ? (

@@ -5438,6 +5438,15 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
         s.createDowntime({ playerText: "Forging.", downtime: { who: "Ireena", activity: "Forging", days: 3 } }).id
       );
     },
+    advanceCampaignDate: (s) => {
+      s.setCalendar({
+        yearName: "DR",
+        months: [{ name: "Hammer", days: 30 }],
+        weekdays: ["First"],
+        currentDate: { year: 1492, month: 0, day: 1 }
+      });
+      s.advanceCampaignDate(1);
+    },
     updateEntry: (s) => {
       s.updateEntry(s.createEntry({ playerText: "A" }).id, { playerText: "B" });
     },
