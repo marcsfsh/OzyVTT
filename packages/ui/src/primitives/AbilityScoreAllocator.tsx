@@ -69,8 +69,8 @@ interface AbilityScoreAllocatorProps {
 }
 
 const signed = (value: number | null) =>
-  value == null ? "—" : value === 0 ? "±0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
-const plain = (value: number | null) => (value == null ? "—" : String(value));
+  value == null ? "None" : value === 0 ? "±0" : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
+const plain = (value: number | null) => (value == null ? "None" : String(value));
 
 /** The ability-score step for all four generation methods. Assignment is a per-ability `<Select>` rather than
     drag-and-drop, which fails on a phone. Numbers use `.tabular` so columns line up as they change. Pure
@@ -181,7 +181,7 @@ export function AbilityScoreAllocator({
                     value={assigned?.id ?? ""}
                     onChange={(event) => onAssign?.(row.id, event.target.value === "" ? null : event.target.value)}
                   >
-                    <option value="">—</option>
+                    <option value="">None</option>
                     {assigned && <option value={assigned.id}>{assigned.value}</option>}
                     {unassigned.map((entry) => (
                       <option key={entry.id} value={entry.id}>
@@ -206,7 +206,7 @@ export function AbilityScoreAllocator({
                 <span className="nh-abil-cell-label" aria-hidden="true">
                   Bonus
                 </span>
-                <span className="nh-abil-num tabular">{row.bonus ? signed(row.bonus) : "—"}</span>
+                <span className="nh-abil-num tabular">{row.bonus ? signed(row.bonus) : "None"}</span>
               </span>
 
               <span className="nh-abil-cell">

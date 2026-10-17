@@ -50,7 +50,7 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
 
   const remove = (index: number) => {
     // Removal has no native announcement; name the row so "Remove" isn't announced bare.
-    setAnnouncement(`${nameOf(items[index], index)} removed — ${items.length - 1} left.`);
+    setAnnouncement(`${nameOf(items[index], index)} removed, ${items.length - 1} left.`);
     onChange?.(items.filter((_, i) => i !== index));
   };
 
@@ -97,7 +97,7 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
                     {item.done && <IconCheck />}
                   </span>
                   <span className="nh-checklist-text">{item.text}</span>
-                  <span className="nh-sr-only">{item.done ? "— done" : "— not done"}</span>
+                  <span className="nh-sr-only">{item.done ? ", done" : ", not done"}</span>
                 </>
               )}
             </li>

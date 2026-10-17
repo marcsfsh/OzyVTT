@@ -80,7 +80,7 @@ export function RowEditor<T>({
     const row = onAdd();
     onChange([...rows, row]);
     setExpanded((prev) => [...prev, rowKey(row)]);
-    setAnnouncement(`${addLabel} — ${rows.length + 1} total.`);
+    setAnnouncement(`${addLabel}, ${rows.length + 1} total.`);
   };
 
   /* Pointer events, not HTML5 drag-and-drop, which never fires from touch. Pointer capture keeps moves coming

@@ -98,7 +98,7 @@ export function TagInput({
   return (
     <div className={cx("nh-taginput", className)}>
       {values.length > 0 && (
-        <ul className="nh-taginput-tags" role="list" aria-label={ariaLabel ? `${ariaLabel} — chosen` : "Chosen"}>
+        <ul className="nh-taginput-tags" role="list" aria-label={ariaLabel ? `${ariaLabel}, chosen` : "Chosen"}>
           {values.map((tag) => (
             <li key={tag}>
               <Chip onRemove={() => remove(tag)} removeLabel={`Remove ${tag}`}>
