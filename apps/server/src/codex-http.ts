@@ -282,11 +282,17 @@ export function createCodexRouter(options: CodexRouterOptions) {
   };
 
   /**
-   * Weak `ETag` of store revision (every write bumps it), grade and resource, with a 304 on match. Called only
+   * Weak `ETag` of a version, the grade and the resource, with a 304 on match. A GM's version is the store
+   * revision, which every write bumps. A player's is a hash of the body they receive: the revision moves on
+   * GM-only writes too, and a tag that moved with it would tell the table the GM had saved something. Called only
    * after every auth and existence gate, so a 304 never confirms that a hidden record exists.
    */
   const readEnvelope = (request: Request, response: Response, grade: CodexGrade, data: unknown) => {
-    const etag = `W/"codex-r${store.revision}-${grade}-${resourceKey(request)}"`;
+    const version =
+      grade === "gm"
+        ? `r${store.revision}`
+        : `c${createHash("sha1").update(JSON.stringify(data)).digest("hex").slice(0, 16)}`;
+    const etag = `W/"codex-${version}-${grade}-${resourceKey(request)}"`;
     response.setHeader("etag", etag);
     if (request.header("if-none-match") === etag) return response.status(304).end();
     return sendData(response, 200, data);
@@ -895,7 +901,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   }));
 
   // Settings are GM-only, reads included. Their writes ping nobody (no client shows them), though the store
-  // still bumps the revision for ETags.
+  // still bumps the revision for the GM's ETags.
   router.get(expressPath(CODEX_PATHS.settings), requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", { settings: store.getSettings() })
   );

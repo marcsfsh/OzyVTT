@@ -51,10 +51,10 @@ async function fixture() {
   return { base: `http://127.0.0.1:${port}/api/v1/codex`, store };
 }
 
-/** One read as a player receives it: the status and the exact bytes. */
+/** One read as a player receives it: the status, the ETag and the exact bytes. */
 async function read(base: string, path: string, token: string) {
   const response = await fetch(`${base}${path}`, { headers: { authorization: `Bearer ${token}` } });
-  return { path, status: response.status, body: await response.text() };
+  return { path, status: response.status, etag: response.headers.get("etag"), body: await response.text() };
 }
 
 /** The same reads for the player and for the preview session. */

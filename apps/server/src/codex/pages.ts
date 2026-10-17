@@ -418,7 +418,7 @@ export function moveFolder(db: CodexDb, fromPath: string, toPath: string): numbe
   // `folder()` re-validates the new path's depth and length, and turns "" (the top level) into null.
   const repath = (value: string): string | null =>
     folder(value === from ? (to ?? "") : to === null ? value.slice(from.length + 1) : to + value.slice(from.length));
-  // A move that finds nothing writes nothing, so it leaves the revision (and every ETag) alone.
+  // A move that finds nothing writes nothing, so it leaves the revision (and every GM ETag) alone.
   return transaction(db.database, () => {
     const now = stamp(db);
     const pages = db.database

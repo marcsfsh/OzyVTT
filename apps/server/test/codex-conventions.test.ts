@@ -288,6 +288,33 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     expect((await body(after)).data.pages).toHaveLength(1);
   });
 
+  // The store revision moves on every write, GM-only ones included, so a player tag built from it would tell the
+  // table that the GM had just saved something. A player's tag fingerprints what that player receives instead.
+  it("keeps a player's tag through a GM-only write, and moves it when the player's answer changes", async () => {
+    const { base } = await fixture();
+    const created = await body(
+      await post(base, "/api/v1/codex/pages", GM, { title: "Keep", playerBody: "Stone.", revealedToPlayers: true })
+    );
+    const id = created.data.page.id as string;
+    const paths = ["/api/v1/codex/pages", `/api/v1/codex/pages/${id}`];
+    const tags = await Promise.all(paths.map(async (path) => (await get(base, path, PLAYER)).headers.get("etag")!));
+
+    await patch(base, `/api/v1/codex/pages/${id}`, GM, { gmBody: "The vault is under it." });
+    await post(base, "/api/v1/codex/pages", GM, { title: "Hidden prep" });
+    for (const [index, path] of paths.entries()) {
+      const conditional = await get(base, path, { ...PLAYER, "if-none-match": tags[index] });
+      expect(conditional.status, `${path} after GM-only writes`).toBe(304);
+    }
+
+    await patch(base, `/api/v1/codex/pages/${id}`, GM, { title: "Keep tower" });
+    for (const [index, path] of paths.entries()) {
+      const conditional = await get(base, path, { ...PLAYER, "if-none-match": tags[index] });
+      expect(conditional.status, `${path} after a player-visible write`).toBe(200);
+      expect(conditional.headers.get("etag")).not.toBe(tags[index]);
+    }
+    for (const tag of tags) expect(tag).toMatch(/^W\/"codex-c[0-9a-f]{16}-player-[0-9a-f]{12}"$/);
+  });
+
   it("tags GM and player reads differently, so one cached answer can never be served to the other role", async () => {
     const { base } = await fixture();
     await post(base, "/api/v1/codex/pages", GM, { title: "Keep" });

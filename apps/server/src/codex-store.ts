@@ -29,8 +29,8 @@ import { openDatabase } from "./database.js";
 
 /**
  * The worldbuilding Codex's persistence, one module per aggregate under `codex/`. Every write bumps the coarse
- * `revision`, which pings clients and keys ETags. Rows hold both layers; only `codex-projections.ts` strips
- * GM data for players. Writes that reach across aggregates (deletes, mostly) are composed here.
+ * `revision`, which pings clients and keys the GM's ETags. Rows hold both layers; only `codex-projections.ts`
+ * strips GM data for players. Writes that reach across aggregates (deletes, mostly) are composed here.
  */
 export class CodexStore {
   #context: CodexDb | undefined;

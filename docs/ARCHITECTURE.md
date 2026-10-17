@@ -159,7 +159,8 @@ audience. There are four:
   a player's journal places an entry by the session number the player receives, a page's mentions
   keep a fixed order, a hidden page never takes a revealed page's title for `[[links]]`, and a
   GM-layer connection never folds away a player-layer mention. A hidden record is a 404, never a
-  403, and ETags are computed after every gate.
+  403, and ETags are computed after every gate. A GM's ETag carries the store revision; a player's
+  hashes the body they receive, so a GM-only write leaves it as it was.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
   list of shared replays carries the GM's name for one, never the name of the scene it was fought on.
