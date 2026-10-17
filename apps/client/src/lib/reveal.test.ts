@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { revealInRegion } from "./reveal";
 
-// What `revealInRegion` scrolls: the element's own scroll region, never a clipping box above it.
+// What `revealInRegion` scrolls: the element's own scroll region alone. A clipping box above it stays put.
 
 function layout(regionTop: number, regionBottom: number, top: number, bottom: number) {
   const clip = document.createElement("div");
