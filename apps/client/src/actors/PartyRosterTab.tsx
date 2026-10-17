@@ -342,7 +342,16 @@ export function PartyRosterTab({
         }
       />
       {sheetActor && (
-        <CharacterSheet actor={sheetActor} role="gm" state={state} onClose={() => setSheetActorId(null)} />
+        <CharacterSheet
+          actor={sheetActor}
+          role="gm"
+          state={state}
+          onClose={() => setSheetActorId(null)}
+          onLevel={() => {
+            setSheetActorId(null);
+            navigate(`/characters/${sheetActor.id}/level`);
+          }}
+        />
       )}
       {previewImport && (
         <Modal

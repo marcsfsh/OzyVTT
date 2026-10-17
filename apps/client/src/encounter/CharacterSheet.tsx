@@ -70,6 +70,7 @@ export function CharacterSheet({
   combat,
   onJumpToInitiative,
   standaloneActions,
+  onLevel,
   onClose
 }: Readonly<{
   actor: GmActor | PlayerActor;
@@ -86,6 +87,9 @@ export function CharacterSheet({
   };
   /** In "jump" sheet-attack mode, called after an attack chip starts targeting so the panel hops to the initiative view. */ onJumpToInitiative?: () => void;
   /** Page-level doors for the standalone presentation, shown as the frame's bottom row. Only the SPA's `/characters/:id` passes any; `sheet.html` has no router. */ standaloneActions?: React.ReactNode;
+  /** Opens the level page for this character; a sheet opened over another page passes it, so levelling is one tap
+   *  from wherever the sheet is. */
+  onLevel?: () => void;
   onClose: () => void;
 }>) {
   const [feedback, setFeedback] = useState("");
@@ -617,6 +621,11 @@ export function CharacterSheet({
           {actor.kind === "player-character" && definition && editMode !== "identity" && (
             <Button size="sm" variant="ghost" className="sheet-section-edit" onClick={() => setEditMode("identity")}>
               Edit
+            </Button>
+          )}
+          {onLevel && actor.kind === "player-character" && (
+            <Button size="sm" variant="ghost" className="sheet-section-edit" onClick={onLevel}>
+              Level up or down…
             </Button>
           )}
         </div>
