@@ -10,36 +10,90 @@ const RULE_FAMILIES = {
   "movement.exceeds-speed": "movement",
   "movement.no-movement-remaining": "movement",
   "movement.stand-up-cost": "movement",
+  // Standing spends movement, which a creature has only on its own turn.
+  "movement.stand-up-off-turn": "movement",
+  // Steady Aim is only for a creature that hasn't moved this turn.
+  "movement.already-moved": "movement",
+  // A player's move off their turn, and a player's teleport, are the GM's to allow.
+  "movement.off-turn": "movement",
+  "movement.teleport": "movement",
+  // "You can't willingly end a move in a space occupied by another creature."
+  "movement.occupied": "movement",
+  // Flying or burrowing without the speed, and a path that hostile creatures shut.
+  "movement.no-speed": "movement",
+  "movement.blocked-path": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
   "economy.not-your-turn": "economy",
+  // Only the GM gives back a spent action, Bonus Action or Reaction: un-marking it would let a creature act twice.
+  "economy.spent-slot": "economy",
+  // Wait mode: no one acts until every player has rolled initiative.
+  "initiative.gathering": "economy",
   // Being incapacitated or down means you have no actions: an economy block, not a targeting one.
   "condition.incapacitated": "economy",
   "condition.down": "economy",
+  // Ending a condition or effect someone else imposed skips the action (Escape) or the save its own rules ask for.
+  "condition.imposed": "economy",
+  // A raging Barbarian can't cast spells (SRD Rage).
+  "condition.raging": "economy",
+  // An effect that takes away Reactions (Slow).
+  "condition.no-reactions": "economy",
+  "condition.no-spells": "economy",
   // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",
+  // Reckless Attack is decided with the first attack roll on the Barbarian's turn.
+  "attack.after-first-roll": "economy",
+  // A Loading weapon fires once per action, however many attacks the action allows.
+  "attack.loading": "economy",
+  "attack.no-ammunition": "economy",
+  // A Two-Handed weapon can't swing while a Shield takes one hand.
+  "attack.two-handed": "economy",
+  // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot
+  // (the GM can stop policing slots, and this rule stays).
+  "spell.untrained-armor": "economy",
+  // A Spell Scroll in a spell the reader's lists don't have is unintelligible.
+  "spell.scroll-unreadable": "economy",
+  // What a spell offers "on your later turns" isn't taken on the turn it was cast (Spiritual Weapon, Heat Metal).
+  "spell.later-turn": "economy",
+  // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed, not taken alone.
+  "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
+  // "Can't take this action again until the start of its next turn": spent for the round, like the pool.
+  "legendary.once-per-round": "resources",
   "feature.no-uses-remaining": "resources",
   "feature.requires-effect": "resources",
-  "feature.no-spell-slot": "resources",
+  // "Once per turn" or "only once on a turn" (Action Surge with two uses, Stunning Strike): a per-turn limit.
+  "feature.once-per-turn": "resources",
   "range.out-of-range": "targeting",
   "range.out-of-reach": "targeting",
   "range.underwater": "targeting",
   "target.grappled-by-source": "targeting",
   "target.too-large-to-grapple": "targeting",
+  // Help distracts an enemy, so not the helper or one of its allies.
+  "target.not-an-enemy": "targeting",
+  // Hunter's Mark and Hex move only once the marked creature drops to 0 Hit Points.
+  "target.mark-still-standing": "targeting",
   "cover.total": "targeting",
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",
   "attack.cleave-too-far": "targeting",
+  // A spell aimed at more creatures than it can target (Hold Person at two Humanoids from a 2nd-level slot).
+  "target.too-many": "targeting",
+  // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
+  "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction, not an economy one.
   "condition.charmed-charmer": "targeting",
-  // Nothing raises it yet; the slots family is already part of the GM's exceptions.
-  "slots.none-remaining": "slots"
+  // Spellcasting is its own family, so "Don't police spell slots or prepared spells" relaxes these and nothing else.
+  "slots.none-remaining": "slots",
+  "slots.below-spell-level": "slots",
+  "slots.one-per-turn": "slots",
+  // Casting a spell the character hasn't prepared is spellcasting bookkeeping too.
+  "slots.not-prepared": "slots"
 } as const satisfies Record<string, RuleFamily>;
 
 export type RuleId = keyof typeof RULE_FAMILIES;

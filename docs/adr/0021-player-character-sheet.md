@@ -36,7 +36,11 @@ ability-only`. The builder later _fills the same fields_; no consumer changes. (
 3. **Immutable definition vs. live actor split**, mirroring `hitDice`/`actionUses`:
    identity, proficiency selections, and spell _capability_ live on `ActorDefinition`; live
    `spellSlots`/`pactSlots`/`preparedSpellIds`/`inventory`/`currency` live on `Actor`, seeded
-   in `instantiate()` and projected **owner-only**.
+   in `instantiate()` and projected **owner-only**. (Since 2026-10-16 a Long Rest keeps the
+   prepared list and opens a prepare step, `Actor.preparation`, in which a Cleric, Druid or
+   Wizard player changes it within the cap, a Paladin or Ranger one spell, and a Circle of the Land
+   Druid chooses its land; the GM may change either any time, and `character.finish-preparing` closes
+   the step.)
 
 4. **Players initiate their own rolls; the server still resolves and authorizes.** Damage to
    monsters stays a GM-applied step — players never reduce another creature's HP. All
@@ -49,6 +53,13 @@ ability-only`. The builder later _fills the same fields_; no consumer changes. (
    `ActorDefinitionSchema`. Shared bundle content is never editable this way. Guided creation
    stays deferred to the builder.
 
+   **Amendment (2026-10-16):** the identity hand-edit is narrowed. A player may rename (class, subclass,
+   species, background) but not change what the rules read: class rows, levels, species and background ids,
+   feats, features, the choice ledger and Martial Arts are the GM's. On a sheet the builder made (it carries
+   the choice ledger) those belong to the builder for everyone; the Level flow (`character.rebuild`) changes
+   them, re-validated, so a hand-added class or feat can no longer slip past the rules or vanish at the next
+   rebuild.
+
 **Amendment (v6, 2026-07-23): a slice of "rules auto-derivation" ships in the play sheet.**
 Originally this ADR parked all auto-derivation (incl. AC-from-armor) for the builder. In
 response to direct GM feedback, the play sheet now derives two things from equipped gear, using
@@ -60,6 +71,26 @@ is equipped (so imports and monsters are unaffected); **(b) weapon attack action
 weapons render as tap-to-roll to-hit/damage on the sheet (Str melee / Dex ranged; finesse,
 versatile, and per-weapon proficiency remain builder work as that data isn't vendored). The
 guided builder, point-buy, level-up, and full content/derivation are still deferred.
+
+**Amendment (2026-10-16): Armor Class follows what is worn now.** A built character's AC is no longer
+frozen at build: with no armor or Shield it is 10 + Dex (or its Unarmored Defense), and its features'
+`armor-class` riders are read live, so the Defense fighting style follows armor bought or removed later.
+A Shield adds its +2 only with Shield training. A printed total (a stat block, a PDF import) stands
+until body armor is equipped, since it may already count a Shield. The GM can set an AC by hand
+(`actor.set-armor-class`), shown to the party as set by the GM, until cleared.
+
+**Amendment (2026-10-17): the prepare step reaches the whole list, and a Wizard keeps a spellbook.** A
+built sheet lists the spells its class chose, so the prepare step also swaps one of them for another
+(`character.swap-spell`): a Cleric, Druid, Paladin or Ranger takes any spell of its class's list for which
+it has slots, a Wizard any spell in its spellbook. The swap re-makes that spell's row in the choices ledger
+and rebuilds the sheet, as a re-chosen land does, so the new spell gets its cast action and counts toward the
+cap; a Paladin's or Ranger's one change a rest covers it. A Wizard's book is the Wizard spells on its sheet
+plus `Actor.spellbook` (owner-only): the rest of the six spells at level 1 and two a level the SRD gives,
+added free, and spells copied in (`character.add-to-spellbook`), each 2 hours and 50 GP a spell level, from a
+Spell Scroll after an Intelligence (Arcana) check against DC 10 + the spell's level that destroys the scroll
+either way, or, by the GM, from another book. The copy doesn't move the clock; the table log says how long
+it took. What a character may swap in and add rides `actor:available-actions` (`spellChoices`). A sheet
+imported without its ledger keeps the old toggles only.
 
 ## Consequences
 

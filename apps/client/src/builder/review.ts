@@ -5,6 +5,7 @@ import { METHOD_LABELS } from "./AbilitiesStep";
 import {
   ABILITY_LABELS,
   ASI_SHORTHAND,
+  classLineOf,
   STEP_IDS,
   STEP_LABELS,
   titleize,
@@ -89,9 +90,15 @@ export function reviewSections(input: ReviewInput): ReviewSection[] {
       ...(context.originFeat ? [{ label: "Origin feat", value: context.originFeat.name }] : [])
     ]),
     sectionFor(input, "class", "class", [
-      { label: "Class", value: context.classRecord?.name ?? "—" },
+      { label: context.classes.length > 1 ? "Classes" : "Class", value: classLineOf(context) ?? "—" },
       { label: "Level", value: String(draft.level), numeric: true },
-      { label: "Hit die", value: context.hitDie ?? "—", numeric: true }
+      context.classes.length > 1
+        ? {
+            label: "Hit dice",
+            value: context.classes.map(({ record, levels }) => `${levels}${record.hitDie}`).join(" + "),
+            numeric: true
+          }
+        : { label: "Hit die", value: context.hitDie ?? "—", numeric: true }
     ]),
     /* No separate subclass item: the subclass is a feature offer, so `sectionFor` already emits it. */
     sectionFor(input, "features", "features", []),
@@ -103,9 +110,11 @@ export function reviewSections(input: ReviewInput): ReviewSection[] {
         value:
           draft.hpMode === "average"
             ? "Average each level"
-            : draft.hpEntries.length > 0
-              ? `Rolled ${draft.hpEntries.join(", ")}`
-              : "Rolled (none entered)"
+            : draft.hpMode === "roll"
+              ? "Rolled by the table"
+              : draft.hpEntries.length > 0
+                ? `Rolled ${draft.hpEntries.join(", ")}`
+                : "Rolled (none entered)"
       }
     ]),
     sectionFor(input, "equipment", "equipment", [])

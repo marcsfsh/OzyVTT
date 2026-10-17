@@ -4,7 +4,9 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { importActorDefinition } from "../src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
+import { effectiveActions } from "../src/effective-actions.js";
 import { startEncounter } from "../src/encounter.js";
+import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 
 // Cleric, Druid and Bard mechanics, asserted as numbers a player can act on, counters the engine
 // spends, or refusals the server issues; never "the rider survived derivation" on its own. Uses the
@@ -59,13 +61,15 @@ const HUMAN: Row[] = [
 const SAGE_FEAT: Row[] = [
   { level: 1, kind: "cantrip", id: "minor-illusion", payload: { featureId: "magic-initiate-wizard" } },
   { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
-  { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } }
+  { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+  { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } }
 ];
 /** The same for the Acolyte's Magic Initiate (Cleric), on the Charisma class. */
 const ACOLYTE_FEAT: Row[] = [
   { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
   { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
-  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } }
+  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+  { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } }
 ];
 
 // A Druid of any level. `sage` is the background because it can raise Wisdom; its origin feat's
@@ -172,18 +176,6 @@ const bard = (level: number, cha: 8 | 15, extra: Row[] = []): Mutable =>
             { level: 9, classId: "bard", kind: "expertise", id: "stealth", payload: { featureId: "expertise" } }
           ] as Row[])
         : []),
-      ...(level >= 10
-        ? ([
-            {
-              level: 10,
-              classId: "bard",
-              kind: "spell",
-              id: "hypnotic-pattern",
-              payload: { featureId: "magical-secrets" }
-            },
-            { level: 10, classId: "bard", kind: "spell", id: "fear", payload: { featureId: "magical-secrets" } }
-          ] as Row[])
-        : []),
       // Magical Discoveries: two spells from the Cleric, Druid or Wizard list (the union slug). Neither is
       // on the Bard list.
       ...(level >= 6
@@ -208,7 +200,7 @@ const actionOf = (definition: ReturnType<typeof build>, id: string) =>
 const spellOf = (definition: ReturnType<typeof build>, id: string) =>
   (definition.spellcasting?.spells ?? []).find((spell) => spell.id === id);
 
-/** An encounter where the foe holds the turn, so the action-economy slot never masks a use gate. */
+/** An encounter with the action economy off, so neither the turn nor the action slot masks a use gate. */
 function encounterWith(definition: ReturnType<typeof build>): GameState {
   const state = GameStateSchema.parse({ schemaVersion: 1 });
   importActorDefinition(state, definition, HERO, "public");
@@ -232,6 +224,7 @@ function encounterWith(definition: ReturnType<typeof build>): GameState {
     () => 1,
     { width: 900, height: 600, calibration: null }
   );
+  state.combat = { ...state.combat, ruleExceptions: { economy: "freeform" } };
   return state;
 }
 let commandSeq = 0;
@@ -292,7 +285,7 @@ describe("Druidic - a language and an always-prepared spell (audit row 35)", () 
         .filter((spell) => spell.level === 1 && !spell.alwaysPrepared)
         .map((spell) => spell.id)
         .sort()
-    ).toEqual(["cure-wounds", "entangle", "faerie-fire", "fog-cloud", "magic-missile"]); // 4 class + the Sage feat's own
+    ).toEqual(["cure-wounds", "entangle", "faerie-fire", "fog-cloud"]); // the Sage feat's own is always prepared
     expect(() =>
       build(druid(1, [primalOrder("magician"), ...four, { level: 1, kind: "spell", id: "thunderwave" } as Row]))
     ).toThrowError(/Druid prepares 4 spells at level 1; got 5/);
@@ -315,6 +308,18 @@ describe("Wild Shape - the pool, read off the printed column (audit row 54)", ()
     ).toEqual({ limit: 4, per: "long-rest" });
     // ...and it is a Bonus Action, as the SRD prints.
     expect(actionOf(build(druid(2, [primalOrder("warden")])), "wild-shape")?.activation).toBe("bonus-action");
+  });
+
+  it("gives Temporary Hit Points equal to the Druid level as the form is assumed", () => {
+    const definition = build(druid(6, [primalOrder("warden")]));
+    const state = encounterWith(definition);
+    resolveDefinitionAction(
+      state,
+      actionOf(definition, "wild-shape")!,
+      { actorId: HERO, targetIds: [], commandId: command() },
+      deps(definition)
+    );
+    expect(state.actors[0].hp.temporary).toBe(6);
   });
 
   it("really spends the counter, twice, and then refuses the third", () => {
@@ -422,6 +427,35 @@ describe("Elemental Fury - the twin of Blessed Strikes (audit row 5)", () => {
     expect(() => build(bogus)).toThrowError(/not an offered option/);
   });
 
+  it("adds the Wisdom modifier to a Druid cantrip's damage with Potent Spellcasting, and not with Primal Strike", () => {
+    // Wisdom 15 + 2 (Sage) = 17: +3. Produce Flame's hurl, 1d8 at level 7 is 2d8, both dice 3.
+    const flame = (option: "potent-spellcasting" | "primal-strike") => {
+      const definition = build(
+        druid(7, [
+          primalOrder("warden"),
+          elementalFury(option),
+          { level: 4, kind: "cantrip", id: "produce-flame" } as Row
+        ])
+      );
+      const state = encounterWith(definition);
+      const faces = [15, 3, 3];
+      // The catalog is where the chosen option's rider is read from.
+      const flameDeps = { ...deps(definition), catalog: equipmentCatalogOf(library), random: () => faces.shift() ?? 3 };
+      const act = (id: string, targetIds: string[]) =>
+        resolveDefinitionAction(
+          state,
+          effectiveActions(definition, state.actors[0]!, undefined).find((action) => action.id === id)!,
+          { actorId: HERO, targetIds, commandId: command() },
+          flameDeps
+        );
+      act("spell-produce-flame", []);
+      return act("spell-produce-flame-then-hurl", [FOE]);
+    };
+    const potent = flame("potent-spellcasting");
+    expect(potent.damage).toContainEqual({ formula: "3", type: "fire", total: 3 });
+    expect(flame("primal-strike").damage.map((part) => part.type)).toEqual(["fire"]);
+  });
+
   it("refuses the build outright when the level-7 pick is missing", () => {
     // An unanswered pick is a rejection, not a silent skip.
     expect(() => build(druid(7, [primalOrder("warden")]))).toThrowError(/Elemental Fury/);
@@ -463,7 +497,7 @@ describe("Nature's Ward - the half of audit row 65 that is authorable", () => {
 });
 
 describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)", () => {
-  it("makes a level-19 Druid pick one, and refuses a feat that is not an Epic Boon", () => {
+  it("makes a level-19 Druid pick one, or another feat it qualifies for", () => {
     const taken = build(
       druid(19, [
         primalOrder("warden"),
@@ -473,12 +507,17 @@ describe("Epic Boon - the level-19 feat nine classes lost outright (audit row 6)
     );
     expect((taken.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
     expect(() => build(druid(19, [primalOrder("warden"), elementalFury("primal-strike")]))).toThrowError(/Epic Boon/);
-    const wrongFeat = druid(19, [
+    // "or another feat of your choice for which you qualify": Grappler (DEX 14), but not Alert, already held.
+    const grappler = build(
+      druid(19, [primalOrder("warden"), elementalFury("primal-strike"), ...epicBoon("druid", "grappler", "dex")])
+    );
+    expect((grappler.character?.feats ?? []).map((feat) => feat.id)).toContain("grappler");
+    const held = druid(19, [
       primalOrder("warden"),
       elementalFury("primal-strike"),
-      { level: 19, classId: "druid", kind: "feat", id: "grappler", payload: { featureId: "epic-boon" } } as Row
+      { level: 19, classId: "druid", kind: "feat", id: "alert", payload: { featureId: "epic-boon" } } as Row
     ]);
-    expect(() => build(wrongFeat)).toThrowError(/not an offered option/);
+    expect(() => build(held)).toThrowError(/Alert is already on this character/);
   });
 
   it("does the same for the Bard", () => {
@@ -662,5 +701,71 @@ describe("Divine Intervention - a pool that now costs the action the SRD prints"
         deps(definition)
       )
     ).toThrowError(/no uses remaining \(1\/long rest\)/);
+  });
+});
+
+describe("Circle of the Land Spells - the chosen land's spells for the Druid's level and lower", () => {
+  const alwaysPrepared = (level: number) =>
+    (
+      build(druid(level, [primalOrder("warden"), ...(level >= 7 ? [elementalFury("primal-strike")] : [])])).spellcasting
+        ?.spells ?? []
+    )
+      .filter((spell) => spell.alwaysPrepared)
+      .map((spell) => spell.id);
+
+  it("gives a Polar Druid each row of the table as it reaches that level", () => {
+    expect(alwaysPrepared(3)).toEqual(expect.arrayContaining(["fog-cloud", "hold-person", "ray-of-frost"]));
+    expect(alwaysPrepared(3)).not.toContain("sleet-storm");
+    const five = alwaysPrepared(5);
+    expect(five).toContain("sleet-storm");
+    expect(five).not.toContain("ice-storm");
+    expect(alwaysPrepared(9)).toEqual(expect.arrayContaining(["sleet-storm", "ice-storm", "cone-of-cold"]));
+  });
+
+  it("describes each land with the spells the SRD table prints", () => {
+    const lands = new Map(
+      (
+        library
+          .subclassRecord("circle-of-the-land")!
+          .features.find((feature) => feature.id === "circle-of-the-land-spells")!.choice!.options ?? []
+      ).map((option) => [option.id, option.description])
+    );
+    expect(lands.get("arid")).toContain("Wall of Stone");
+    expect(lands.get("arid")).not.toContain("Wall of Fire");
+    expect(lands.get("polar")).toContain("Cone of Cold");
+    expect(lands.get("polar")).not.toContain("Slow");
+    expect(lands.get("temperate")).toContain("Tree Stride");
+    expect(lands.get("temperate")).not.toContain("Ice Storm");
+  });
+});
+
+describe("Magical Secrets - the Bard's own picks may come from three more lists", () => {
+  // Spirit Guardians is a Cleric spell, on no Bard list.
+  const guardians = { level: 10, kind: "spell", id: "spirit-guardians" } as Row;
+
+  it("lets a Bard 10 prepare a Cleric spell as a Bard spell, and a Bard 9 not", () => {
+    const skills = loreSkills("arcana", "history", "nature");
+    const built = build(bard(10, 15, [...skills, guardians]));
+    expect(spellOf(built, "spirit-guardians")).toMatchObject({ classId: "bard", alwaysPrepared: false });
+    expect(() => build(bard(9, 15, [...skills, { ...guardians, level: 9 }]))).toThrowError(/"spirit-guardians"/);
+  });
+
+  it("adds no picks of its own: the Bard 10 prepares the printed number", () => {
+    const built = build(bard(10, 15, loreSkills("arcana", "history", "nature")));
+    expect(built.spellcasting?.classes?.[0]).toMatchObject({ classId: "bard", prepared: 15 });
+  });
+});
+
+describe("Magical Discoveries - a spell the Bard has slots for", () => {
+  it("refuses Wish to a Bard 6, whose highest slot is level 3", () => {
+    const input = bard(6, 15);
+    input.choices = [
+      ...input.choices.filter((row) => row.payload?.featureId !== "magical-discoveries"),
+      { level: 6, kind: "spell", id: "spiritual-weapon", payload: { featureId: "magical-discoveries" } },
+      { level: 6, kind: "spell", id: "wish", payload: { featureId: "magical-discoveries" } }
+    ] as Row[];
+    expect(() => build(input)).toThrowError(
+      '"wish" is level 9, above the maximum spell level (3) for "Magical Discoveries".'
+    );
   });
 });

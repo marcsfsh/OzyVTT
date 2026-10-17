@@ -105,12 +105,13 @@ function tableWith(
 
 /**
  * The prompt's gesture end to end: the typed damage, through `SavePrompt`'s builder and the server's
- * `.strict()` schema, into the engine. `method: "manual"` with the rolled total is what Confirm sends.
+ * `.strict()` schema, into the engine. A number is the GM's ruled total (`method: "manual"`); `{ face }` is
+ * the d20 a player's physical die shows, to which the server adds the bonus (Borin's Dex save is +2).
  */
 function answerFromThePrompt(
   table: ReturnType<typeof tableWith>,
   typedDamage: string | null,
-  rolledTotal: number,
+  rolled: number | Readonly<{ face: number }>,
   who: Readonly<{ role: "gm" | "player"; sessionId: string }> = { role: "gm", sessionId: IDS.gm },
   commit = true
 ) {
@@ -118,9 +119,8 @@ function answerFromThePrompt(
     commandId: command,
     ...saveAnswerPayload({
       saveId: IDS.save,
-      method: "manual",
+      ...(typeof rolled === "number" ? { method: "manual", total: rolled } : { method: "roll", face: rolled.face }),
       commit,
-      total: rolledTotal,
       ...(saveDamageAmend(17, typedDamage) !== undefined ? { damageOverride: saveDamageAmend(17, typedDamage) } : {})
     })
   };
@@ -139,7 +139,8 @@ function answerFromThePrompt(
       table.deps(who.role, who.sessionId),
       request.legendaryResistance,
       request.rollMode,
-      request.damageOverride
+      request.damageOverride,
+      request.face !== undefined ? { face: request.face } : {}
     )
   };
 }
@@ -209,11 +210,12 @@ describe("the save prompt's damage field", () => {
     expect(40 - table.hp()).toBe(3);
   });
 
-  it("answers a TWO-TYPE save with 5 for an amended 12, which no halving of the total can produce", () => {
-    // 9 fire + 8 cold: `rescaleDamageParts` re-weights 12 as 7 + 5 and the success halving floors each
-    // part (3 + 2 = 5), while `floor(12 / 2)` is 6. `save-damage.test.tsx` renders this fixture.
+  it("answers a TWO-TYPE save with 4 for an amended 12 against fire resistance: halved once, then resisted", () => {
+    // 9 fire + 8 cold: `rescaleDamageParts` re-weights 12 as 7 + 5, the success halves the total once to 6
+    // (4 fire + 2 cold, SRD Half Damage), and the fire is resisted: 2 + 2 = 4. `save-damage.test.tsx` renders
+    // this fixture.
     const table = tableWith({
-      resistant: false,
+      resistant: true,
       halfOnSuccess: true,
       parts: [
         { amount: 9, type: "fire" },
@@ -221,15 +223,15 @@ describe("the save prompt's damage field", () => {
       ]
     });
     const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
-    expect(outcome.appliedDamage).toBe(5);
-    expect(Math.floor(12 / 2), "the fixture stopped distinguishing the server's halving").not.toBe(5);
-    // And the commit lands the same 5, per type.
+    expect(outcome.appliedDamage).toBe(4);
+    expect(Math.floor(12 / 2), "the fixture stopped distinguishing the server's number").not.toBe(4);
+    // And the commit lands the same 4, per type.
     const committed = answerFromThePrompt(table, "12", 18);
     expect(committed.outcome.parts).toEqual([
-      { amount: 3, type: "fire", adjusted: 3, adjustment: null, adjustmentSource: null },
+      { amount: 4, type: "fire", adjusted: 2, adjustment: "resistance", adjustmentSource: null },
       { amount: 2, type: "cold", adjusted: 2, adjustment: null, adjustmentSource: null }
     ]);
-    expect(40 - table.hp()).toBe(5);
+    expect(40 - table.hp()).toBe(4);
   });
 
   it("answers the recheck with ZERO on a success that does not halve - the case the old line got most wrong", () => {
@@ -261,11 +263,12 @@ describe("the save prompt's damage field", () => {
   it("lets the owner amend their own save and refuses the stranger who tries", () => {
     const mine = tableWith({ resistant: false, halfOnSuccess: false });
     const before = mine.hp();
-    answerFromThePrompt(mine, "3", 5, { role: "player", sessionId: IDS.borinSession });
+    // A d20 of 3 makes 5 against DC 15: a failure, so the amended 3 lands whole.
+    answerFromThePrompt(mine, "3", { face: 3 }, { role: "player", sessionId: IDS.borinSession });
     expect(before - mine.hp()).toBe(3);
 
     const theirs = tableWith({ resistant: false, halfOnSuccess: false });
-    expect(() => answerFromThePrompt(theirs, "3", 5, { role: "player", sessionId: IDS.strangerSession }))
+    expect(() => answerFromThePrompt(theirs, "3", { face: 3 }, { role: "player", sessionId: IDS.strangerSession }))
       // The ownership boundary: `adjustableActor` turns a player away from someone else's target before
       // the amend is considered.
       .toThrow(/only track your own character/);

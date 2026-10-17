@@ -91,14 +91,15 @@ export function parse<Schema extends z.ZodType>(
   throw new GameInputError(message, issues);
 }
 
-/** The reply a principal may receive. A player never gets a GM-only narration line, wherever an action
- *  resolution sits in the reply (an ack bypasses the state projection). */
+/** The reply a principal may receive. Wherever an action resolution sits in the reply (an ack bypasses the
+ *  state projection), a player never gets a GM-only narration line or a target's Armor Class: monster stats
+ *  are GM knowledge, and an attack's AC would hand one over per swing. */
 export function projectReply(principal: GamePrincipal, reply: GameReply): GameReply {
-  return isGmGrade(principal) ? reply : (withoutGmOnlyNarration(reply) as GameReply);
+  return isGmGrade(principal) ? reply : (forPlayer(reply) as GameReply);
 }
 
-function withoutGmOnlyNarration(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withoutGmOnlyNarration);
+function forPlayer(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(forPlayer);
   if (value === null || typeof value !== "object") return value;
   const projected: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
@@ -108,7 +109,11 @@ function withoutGmOnlyNarration(value: unknown): unknown {
       else if (readable.length > 0) projected[key] = readable;
       continue;
     }
-    projected[key] = withoutGmOnlyNarration(child);
+    if (key === "targetAc") {
+      projected[key] = null;
+      continue;
+    }
+    projected[key] = forPlayer(child);
   }
   return projected;
 }

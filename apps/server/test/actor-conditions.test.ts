@@ -84,7 +84,10 @@ describe("condition tracking", () => {
     expect(() => setCondition(game, IDS.monster, "prone", true, undefined, OWNER)).toThrow(/own character/);
     setCondition(game, IDS.monster, "restrained", true, undefined, GM);
     const view = projectPlayerView(game, IDS.session, () => null);
-    expect(view.actors.find((actor) => actor.id === IDS.pc)?.conditions).toEqual([{ id: "poisoned" }]);
+    // The player's own mark stays theirs to take off.
+    expect(view.actors.find((actor) => actor.id === IDS.pc)?.conditions).toEqual([
+      { id: "poisoned", selfApplied: true }
+    ]);
     expect(view.actors.find((actor) => actor.id === IDS.monster)?.conditions).toEqual([{ id: "restrained" }]);
   });
 });

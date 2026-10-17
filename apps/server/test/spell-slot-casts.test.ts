@@ -8,7 +8,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { startEncounter } from "../src/encounter.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { castSlotLevel } from "../src/resolution/economy.js";
-import { looseRollPlan, spendLooseUses } from "../src/tap-routing.js";
+import { looseRollPlan, slotsModeFor, spendLooseUses } from "../src/tap-routing.js";
 
 // A leveled spell cast from the sheet resolves on the server: the builder mints it as an action that spends a slot,
 // a higher slot rolls that slot's dice, and outside a fight the loose route spends the slot and rolls the healing.
@@ -49,6 +49,7 @@ const druid = (): CharacterCreateRequestInput =>
       { level: 1, kind: "cantrip", id: "minor-illusion", payload: { featureId: "magic-initiate-wizard" } },
       { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
       { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } },
       { level: 3, classId: "druid", kind: "subclass", id: "circle-of-the-land" },
       { level: 3, kind: "land", id: "polar", payload: { featureId: "circle-of-the-land-spells" } },
       { level: 1, kind: "equipment", id: "druid-a" },
@@ -168,5 +169,22 @@ describe("a leveled spell cast outside a fight", () => {
     const before = hero.spellSlots!.find((slot) => slot.level === 1)!.remaining;
     spendLooseUses(hero, cure, actions, 1);
     expect(hero.spellSlots!.find((slot) => slot.level === 1)!.remaining).toBe(before - 1);
+  });
+
+  it("refuses an empty slot only while the table polices spell slots; advised, it is a note", () => {
+    const state = GameStateSchema.parse({ schemaVersion: 1 });
+    importActorDefinition(state, definition, HERO, "public", catalog);
+    const hero = state.actors[0];
+    hero.spellSlots = hero.spellSlots!.map((slot) => ({ ...slot, remaining: 0 }));
+    const actions = effectiveActions(definition, hero, catalog);
+    const cure = actions.find((action) => action.id === "spell-cure-wounds")!;
+    expect(() => spendLooseUses(hero, cure, actions, 1, "strict")).toThrowError(/has none left/);
+    expect(spendLooseUses(hero, cure, actions, 1, "assisted")).toMatchObject({
+      spent: false,
+      warning: expect.stringMatching(/has none left/)
+    });
+    expect(spendLooseUses(hero, cure, actions, 1, "freeform")).toEqual({ usesLeft: null, spent: false });
+    // Slots follow the table's standing dial, which starts on Enforce.
+    expect(slotsModeFor(state)).toBe("strict");
   });
 });

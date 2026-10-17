@@ -38,7 +38,7 @@ describe("adding a catalog weapon to a sheet", () => {
     expect(refused, "the sheet's add-from-catalog payload was refused").toEqual([]);
   });
 
-  it("drops the browse-only mastery and keeps the properties the engine reads", () => {
+  it("drops the browse-only mastery and keeps the properties, band and Versatile die the engine reads", () => {
     const longsword = catalog.find((item) => item.id === "longsword")!;
     // The catalog record really carries both; this is not a synthetic fixture.
     expect(longsword.weapon).toMatchObject({ mastery: "sap", properties: ["versatile"] });
@@ -48,8 +48,10 @@ describe("adding a catalog weapon to a sheet", () => {
       "damageDice",
       "damageType",
       "longRangeFeet",
+      "melee",
       "properties",
-      "rangeFeet"
+      "rangeFeet",
+      "versatileDice"
     ]);
     expect("mastery" in posted).toBe(false);
 

@@ -1,0 +1,15 @@
+/* The aid buttons under a dying creature: one wrapping row, each a full tap target. */
+.stabilize-control {
+  /* Its own line under the pips when the tracker wraps. */
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.stabilize-helper {
+  flex: 1 1 9rem;
+  min-width: 0;
+  max-width: 14rem;
+}

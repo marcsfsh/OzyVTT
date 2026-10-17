@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { usePrompt } from "../components/feedback";
-import { armorClassInPlay, type ContentActionSummary, type GmActor, type GmView } from "@vtt/domain";
+import { armorClassInPlay, owedDamageParts, type ContentActionSummary, type GmActor, type GmView } from "@vtt/domain";
 import { ActionResultCard } from "./ActionResultCard";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { componentLabel } from "./action-summary";
@@ -19,7 +19,6 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
-import { useRollPreference } from "../dice/roll-preference";
 import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 import "./action-runner.css";
@@ -47,8 +46,6 @@ export function ActionRunner({
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { prompt, dialog } = usePrompt();
-  // Manual vs auto follows the shared per-browser dice-input preference.
-  const { rollMode } = useRollPreference();
   // A strict-mode rejection awaiting the GM's call. Store state, so a resolve from the map's confirm
   // bar shows the same override dialog here (ADR-0020).
   const blockedPrompt = useTargetingBlocked();
@@ -102,25 +99,32 @@ export function ActionRunner({
     if (!ok && message) onFeedback(message);
   };
 
-  const applyDamage = (targetId: string, targetName: string, key: string, overrideAmount?: number) => {
-    if (!result || (overrideAmount ?? result.damageTotal) <= 0) {
+  const applyDamage = (
+    targetId: string,
+    targetName: string,
+    key: string,
+    overrideAmount?: number,
+    owedParts?: ReadonlyArray<{ amount: number; type: string }>
+  ) => {
+    // A target of an action with no attack roll is owed its own parts (Magic Missile's darts); a hit owes the roll's.
+    const parts = owedParts ? owedParts.map((part) => ({ ...part })) : result ? owedDamageParts(result) : [];
+    const owed = parts.reduce((sum, part) => sum + part.amount, 0);
+    if (!result || (overrideAmount ?? owed) <= 0) {
       setApplied((current) => new Set([...current, key]));
       return;
     }
     setBusy(true);
     // The typed parts always travel with the apply, amended or not: an override is sent as
     // `damageOverride` and the server re-weights the same types to it, so resistances still apply.
-    const parts = [
-      ...result.damage.map((part) => ({ amount: part.total, type: part.type })),
-      ...(result.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-    ].filter((part) => part.amount > 0);
-    const useOverride = overrideAmount !== undefined && overrideAmount !== result.damageTotal;
+    const useOverride = overrideAmount !== undefined && overrideAmount !== owed;
     void command("actor:apply-damage", {
       actorId: targetId,
-      amount: overrideAmount ?? result.damageTotal,
+      amount: overrideAmount ?? owed,
       parts,
       ...(useOverride ? { damageOverride: overrideAmount } : {}),
       sourceActorId: actor.id,
+      // Names the action, so the server lands what its damage drains (a Life Drain's lower Hit Point maximum).
+      ...(result.actionId !== undefined && result.actionId.length <= 120 ? { sourceActionId: result.actionId } : {}),
       sourceName: `${actor.name}'s ${result.actionName}`,
       critical: result.crit
     }).then((response) => {
@@ -136,7 +140,7 @@ export function ActionRunner({
           `${targetName} took ${application.totalApplied} damage - ${damageAdjustments(application.parts, application.flatReduction)}.`
         );
       } else {
-        onFeedback(`${targetName} took ${application?.totalApplied ?? result.damageTotal} damage.`);
+        onFeedback(`${targetName} took ${application?.totalApplied ?? owed} damage.`);
       }
     });
   };
@@ -209,7 +213,10 @@ export function ActionRunner({
             }))}
           onMap
           busy={resolveBusy}
-          onRoll={() => resolveTargeting(state.revision, onOutcome)}
+          onInvalidFace={onFeedback}
+          onRoll={(face) =>
+            resolveTargeting(state.revision, onOutcome, face !== undefined ? { attackNatural: face } : {})
+          }
         />
       )}
       {result && (
@@ -220,7 +227,6 @@ export function ActionRunner({
           actions={actions}
           busy={busy}
           resolveBusy={resolveBusy}
-          rollMode={rollMode}
           onFeedback={onFeedback}
           resolve={(options) => resolveTargeting(state.revision, onOutcome, options)}
           onAgain={(action) => beginTargeting(action, actor.id)}

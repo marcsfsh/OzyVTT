@@ -1,17 +1,28 @@
 import type { BuilderPolicy } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
-import { ABILITIES, hitDieFaces, STANDARD_ARRAY, statPriorityFor, type Ability } from "@vtt/rules-5e";
-import type { ClassReference } from "@vtt/content-srd-5.2.1";
+import {
+  ABILITIES,
+  hitDieFaces,
+  meetsMulticlassMinimums,
+  STANDARD_ARRAY,
+  statPriorityFor,
+  type Ability
+} from "@vtt/rules-5e";
+import { featurePicks, type ClassReference } from "@vtt/content-srd-5.2.1";
 import type { CharacterCreateRequestInput } from "./character-build.js";
 import {
-  classSpellList,
+  classSpellOptions,
   computeServerOffers,
+  levelGatesFit,
   levelOfPick,
+  MAX_CLASSES,
+  SPELLCASTING_ABILITY_KIND,
   withinOfferSpellWindow,
   type ChoiceOffer,
   type ServerOfferSurvey
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
+import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
 /** Server-side random character generator: standard array by class priority, every other decision
@@ -25,16 +36,20 @@ export type GenerateCharacterInput = Readonly<{
   level: number;
   /** The class to build; omitted means "surprise me", drawn from the caller's own catalog. */
   classId?: string;
+  /** A multiclass character: each class with its levels, the starting class first; the levels add up to `level`. */
+  classes?: ReadonlyArray<Readonly<{ classId: string; level: number }>>;
   /** A name to use verbatim; omitted draws one from the species' own name bundle. */
   name?: string;
 }>;
 
+/** One hit-point die thrown for a level, at its class's die size. */
+export type HitPointRoll = Readonly<{ faces: number; roll: number }>;
+
 export type GeneratedCharacter = Readonly<{
   /** The build request: `buildCharacterDefinition`'s input and `character.create`'s payload shape. */
   request: CharacterCreateRequestInput;
-  /** The hit-point dice thrown (levels 2..level), for the table feed. */
-  hitPointRolls: readonly number[];
-  hitDieFaces: number;
+  /** The hit-point dice thrown (levels 2..level), each at its level's class die, for the table feed. */
+  hitPointRolls: readonly HitPointRoll[];
   /** One line naming what was rolled up, for the feed row. */
   summary: string;
 }>;
@@ -75,39 +90,101 @@ function drawPreferring<T>(preferred: readonly T[], all: readonly T[], count: nu
 
 // Ability scores: the one decision that is not random.
 
-/** The standard array by `statPriorityFor` (an unknown homebrew class falls back to sheet order). */
-function standardArrayFor(classId: string, library: ContentView): Record<Ability, number> {
-  const priority = statPriorityFor(classId, library.classProgressionTable());
-  const ordered = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
+/**
+ * The order the standard array is spent in: the starting class's `statPriorityFor` (an unknown homebrew class falls
+ * back to sheet order), with a multiclass character's needs first, since every class wants 13 in its primary ability
+ * (SRD Multiclassing). An "any" minimum (the Fighter's Strength or Dexterity) takes whichever ranks higher.
+ */
+function abilityOrderFor(records: readonly ClassReference[], library: ContentView): Ability[] {
+  const priority = statPriorityFor(records[0].id, library.classProgressionTable());
+  const ranked = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
+  const needed = new Set<Ability>();
+  if (records.length > 1) {
+    const minimums = records.flatMap((record) =>
+      record.multiclassPrerequisites ? [record.multiclassPrerequisites] : []
+    );
+    for (const minimum of minimums.filter((entry) => entry.mode === "all"))
+      for (const entry of minimum.minimums) needed.add(entry.ability);
+    for (const minimum of minimums.filter((entry) => entry.mode === "any")) {
+      const abilities = minimum.minimums.map((entry) => entry.ability);
+      if (!abilities.some((ability) => needed.has(ability)))
+        needed.add([...abilities].sort((left, right) => ranked.indexOf(left) - ranked.indexOf(right))[0]);
+    }
+  }
+  return [...ranked.filter((ability) => needed.has(ability)), ...ranked.filter((ability) => !needed.has(ability))];
+}
+
+/** `abilityOrderFor`, then the same order with each needed ability in turn moved to the last needed place: the one
+ *  the standard array gives least, which the background's increase may then have to lift. */
+function abilityOrdersFor(records: readonly ClassReference[], library: ContentView): Ability[][] {
+  const order = abilityOrderFor(records, library);
+  const needed = records.length > 1 ? neededAbilities(records, order) : 0;
+  const variants = order.slice(0, needed).map((ability) => {
+    const rest = order.slice(0, needed).filter((other) => other !== ability);
+    return [...rest, ability, ...order.slice(needed)];
+  });
+  return [order, ...variants.reverse()];
+}
+
+/** How many abilities at the front of a multiclass order are there for a class's minimum. */
+function neededAbilities(records: readonly ClassReference[], order: readonly Ability[]): number {
+  const needs = (ability: Ability) =>
+    records.some((record) =>
+      (record.multiclassPrerequisites?.minimums ?? []).some((minimum) => minimum.ability === ability)
+    );
+  const firstFree = order.findIndex((ability) => !needs(ability));
+  return firstFree === -1 ? order.length : firstFree;
+}
+
+/** The standard array spent in `order`, highest first. */
+function standardArrayFor(order: readonly Ability[]): Record<Ability, number> {
   const scores = {} as Record<Ability, number>;
   for (const ability of ABILITIES) scores[ability] = STANDARD_ARRAY[STANDARD_ARRAY.length - 1];
-  ordered.forEach((ability, index) => {
+  order.forEach((ability, index) => {
     scores[ability] = STANDARD_ARRAY[Math.min(index, STANDARD_ARRAY.length - 1)];
   });
   return scores;
 }
 
-/** The background's +2/+1, placed on the two highest-priority abilities the background may raise. */
+type Allocation = Array<{ ability: Ability; amount: number }>;
+
+/**
+ * The background's increase: +2/+1 on the two abilities it may raise that come first in `order` (a background that
+ * prints only +1/+1/+1 takes that). When that leaves a class short of its multiclass minimum, the first other legal
+ * spread that meets every one is taken instead; null when none does.
+ */
 function backgroundAllocationFor(
-  classId: string,
-  library: ContentView,
-  options: { from: readonly Ability[]; spreads: ReadonlyArray<readonly number[]> } | undefined
-): Array<{ ability: Ability; amount: number }> {
-  if (!options) return [];
-  const priority = statPriorityFor(classId, library.classProgressionTable());
-  const ranked = [...options.from].sort((left, right) => {
-    const rank = (ability: Ability) => {
-      const at = priority.indexOf(ability);
-      return at === -1 ? ABILITIES.length : at;
-    };
-    return rank(left) - rank(right);
-  });
+  order: readonly Ability[],
+  options: { from: readonly Ability[]; spreads: ReadonlyArray<readonly number[]> } | undefined,
+  meets: (allocation: Allocation) => boolean
+): Allocation | null {
+  if (!options) return meets([]) ? [] : null;
+  const rank = (ability: Ability) => {
+    const at = order.indexOf(ability);
+    return at === -1 ? ABILITIES.length : at;
+  };
+  const ranked = [...options.from].sort((left, right) => rank(left) - rank(right));
   // Prefer the +2/+1 spread; a background that only prints +1/+1/+1 takes that instead.
   const twoOne = options.spreads.find((spread) => [...spread].sort((a, b) => b - a).join("/") === "2/1");
-  const spread = [...(twoOne ?? options.spreads[0] ?? [])].sort((left, right) => right - left);
-  return spread
-    .map((amount, index) => ({ ability: ranked[index], amount }))
-    .filter((entry) => entry.ability !== undefined);
+  const spreadOf = (spread: readonly number[]) => [...spread].sort((left, right) => right - left);
+  const placed = (spread: readonly number[], abilities: readonly Ability[]): Allocation =>
+    spreadOf(spread)
+      .map((amount, index) => ({ ability: abilities[index], amount }))
+      .filter((entry) => entry.ability !== undefined);
+  const preferred = placed(twoOne ?? options.spreads[0] ?? [], ranked);
+  if (meets(preferred)) return preferred;
+  const orderings = (abilities: readonly Ability[]): Ability[][] =>
+    abilities.length <= 1
+      ? [[...abilities]]
+      : abilities.flatMap((first, index) =>
+          orderings(abilities.filter((_, at) => at !== index)).map((rest) => [first, ...rest])
+        );
+  for (const spread of options.spreads)
+    for (const abilities of orderings(ranked)) {
+      const allocation = placed(spread, abilities);
+      if (meets(allocation)) return allocation;
+    }
+  return null;
 }
 
 // Answering one offer.
@@ -141,6 +218,20 @@ function proficientSkills(survey: ServerOfferSurvey): Set<string> {
   return held;
 }
 
+/** Skills an unanswered expertise pick still needs proficiency in: every option of an expertise offer with fewer
+ *  proficient options than picks left (a Wizard's Scholar taken after a class whose skills share none of its six). */
+function expertiseShortfall(survey: ServerOfferSurvey): Set<string> {
+  const proficient = proficientSkills(survey);
+  const wanted = new Set<string>();
+  for (const offer of survey.offers) {
+    if (offer.kind !== "expertise") continue;
+    const open = [...offer.options].filter((id) => proficient.has(id) && !offer.taken.includes(id));
+    if (open.length >= offer.capacity - offer.taken.length) continue;
+    for (const id of offer.options) if (!proficient.has(id)) wanted.add(id);
+  }
+  return wanted;
+}
+
 /** Offer kinds whose answers the build refuses to repeat. */
 const PROFICIENCY_KINDS: ReadonlySet<string> = new Set(["skill", "tool", "language", "skill-or-tool"]);
 
@@ -149,8 +240,13 @@ const PROFICIENCY_KINDS: ReadonlySet<string> = new Set(["skill", "tool", "langua
 function heldOfKind(survey: ServerOfferSurvey, kind: string, choices: readonly CharacterChoice[]): Set<string> {
   const held = new Set<string>();
   if (kind === "skill") for (const skill of survey.background.skillProficiencies) held.add(skill);
+  // A later class trains only its multiclass tools (a Rogue's Thieves' Tools).
   if (kind === "tool")
-    for (const tool of [...survey.classRecord.toolProficiencies, ...survey.background.toolProficiencies])
+    for (const tool of [
+      ...survey.classRecord.toolProficiencies,
+      ...survey.classes.slice(1).flatMap(({ record }) => record.multiclassProficiencies?.tools ?? []),
+      ...survey.background.toolProficiencies
+    ])
       held.add(tool);
   if (kind === "language")
     for (const language of [...survey.species.languages, ...survey.background.languages]) held.add(language);
@@ -183,10 +279,17 @@ function carriedWeaponIds(survey: ServerOfferSurvey, choices: readonly Character
   return carried;
 }
 
-/** Scores as step 5 sees them for the ASI cap: pre-increase scores plus existing "asi" rows. */
-function projectedScores(survey: ServerOfferSurvey, choices: readonly CharacterChoice[]): Record<Ability, number> {
+/** Scores as step 5 sees them: pre-increase scores plus the "asi" rows and ability-score picks so far, only
+ *  those below `level` when one is given (what a feat taken at that level is checked against). */
+function projectedScores(
+  survey: ServerOfferSurvey,
+  choices: readonly CharacterChoice[],
+  level = Number.POSITIVE_INFINITY
+): Record<Ability, number> {
   const scores = { ...survey.scoresBeforeIncreases };
   for (const row of choices) {
+    if (row.level >= level) continue;
+    if (row.kind === "ability-score" && ABILITY_IDS.has(row.id)) scores[row.id as Ability] += 1;
     if (row.kind !== "asi-or-feat" || row.id !== "asi") continue;
     for (const increase of (row.payload?.increases ?? []) as ReadonlyArray<{ ability: Ability; amount: number }>) {
       scores[increase.ability] += increase.amount;
@@ -211,7 +314,8 @@ function asiIncreases(
   return byOne.length === 2 ? byOne.map((ability) => ({ ability, amount: 1 })) : null;
 }
 
-/** Whether a feat is legally takeable now. Held feats are never redrawn, which only narrows the draw. */
+/** Whether a feat is legally takeable at this pick's level, by the prerequisites the build checks. Held feats are
+ *  never redrawn, which only narrows the draw. */
 function featIsTakeable(
   id: string,
   survey: ServerOfferSurvey,
@@ -222,8 +326,7 @@ function featIsTakeable(
   if (survey.heldFeatIds.has(id)) return false;
   const feat = library.featRecord(id);
   if (!feat) return true; // an inline option rather than a catalog feat; the offer already vouched for it
-  if (feat.prerequisite?.level !== undefined && level < feat.prerequisite.level) return false;
-  return (feat.prerequisite?.abilityScores ?? []).every((minimum) => scores[minimum.ability] >= minimum.minimum);
+  return featPrerequisiteFailure(feat, { ...featHoldings(survey), level, scores }) === null;
 }
 
 const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
@@ -239,15 +342,18 @@ function answerOffer(
 ): CharacterChoice[] {
   const outstanding = offer.capacity - offer.taken.length;
   const scores = projectedScores(survey, choices);
+  // An improvement follows the priority of the class it belongs to.
+  const priorityClass = offer.classId ?? input.classId;
 
   // "Raise scores instead of taking a feat", decided per pick.
   if (offer.kind === "asi-or-feat" && random(2) === 1) {
-    const increases = asiIncreases(survey, choices, input.classId, library);
+    const increases = asiIncreases(survey, choices, priorityClass, library);
     if (increases) return [rowFor(offer, "asi", offer.taken.length, { increases })];
   }
 
+  // An option whose own prerequisite is unmet (an invocation needing a damaging cantrip) is refused by the build.
   const legal = sortedIds(offer.options).filter(
-    (id) => withinOfferSpellWindow(offer, id) && (offer.repeatable || !offer.taken.includes(id))
+    (id) => withinOfferSpellWindow(offer, id) && (offer.repeatable || !offer.taken.includes(id)) && !offer.unmet.has(id)
   );
 
   // Hard filters remove ids the validator would refuse; preferences only reorder legal ids, so running
@@ -255,7 +361,9 @@ function answerOffer(
   let candidates = legal;
   let preferred: readonly string[] = legal;
   if (FEAT_KINDS.has(offer.kind)) {
-    candidates = legal.filter((id) => featIsTakeable(id, survey, input.level, scores, library));
+    const level = levelOfPick(offer, offer.taken.length);
+    const before = projectedScores(survey, choices, level);
+    candidates = legal.filter((id) => featIsTakeable(id, survey, level, before, library));
     preferred = candidates;
   } else if (offer.kind === "expertise") {
     // SRD: expertise must be in skills you are proficient in; step 8 rejects otherwise.
@@ -266,80 +374,129 @@ function answerOffer(
       preferred = reachable;
     }
   } else if (offer.kind === "ability-score") {
+    // The build refuses a pick past the ceiling, so it is a hard filter.
     const ceiling = offer.maximum ?? 20;
-    preferred = legal.filter((id) => !ABILITY_IDS.has(id) || scores[id as Ability] < ceiling);
+    candidates = legal.filter((id) => !ABILITY_IDS.has(id) || scores[id as Ability] < ceiling);
+    preferred = candidates;
   } else if (
     offer.kind === "skill" ||
     offer.kind === "tool" ||
     offer.kind === "language" ||
     offer.kind === "skill-or-tool"
   ) {
-    // A repeat proficiency is refused by the build, so it is a hard filter.
-    const held = heldOfKind(survey, offer.kind === "skill-or-tool" ? "skill" : offer.kind, choices);
+    // A repeat proficiency is refused by the build, so it is a hard filter. Skilled's picks may be skills or tools.
+    const held =
+      offer.kind === "skill-or-tool"
+        ? new Set([...heldOfKind(survey, "skill", choices), ...heldOfKind(survey, "tool", choices)])
+        : heldOfKind(survey, offer.kind, choices);
     candidates = legal.filter((id) => !held.has(id));
     preferred = candidates;
+    // An expertise pick still to come may need one of these skills first.
+    if (offer.kind === "skill" || offer.kind === "skill-or-tool") {
+      const wanted = expertiseShortfall(survey);
+      const covering = candidates.filter((id) => wanted.has(id));
+      if (covering.length > 0) preferred = covering;
+    }
+  } else if (offer.kind === SPELLCASTING_ABILITY_KIND) {
+    // Cast with the best of the abilities offered.
+    const best = Math.max(...legal.map((id) => scores[id as Ability] ?? 0));
+    preferred = legal.filter((id) => (scores[id as Ability] ?? 0) === best);
   } else if (offer.kind === "weapon-mastery") {
     // Mastery in an uncarried weapon is legal but useless, so carried weapons come first.
     const carried = carriedWeaponIds(survey, choices);
     preferred = legal.filter((id) => carried.has(id));
   }
 
-  const drawn = drawPreferring(preferred, candidates, outstanding, random);
+  let drawn = drawPreferring(preferred, candidates, outstanding, random);
+  if (!fitsLevelGates(offer, survey, drawn)) drawn = drawWithinLevelGates(offer, survey, preferred, candidates, random);
   const rows = drawn.map((id, at) => rowFor(offer, id, offer.taken.length + at));
   // A feat-kinded offer with no legal feat still owes its pick, and "asi" always fits.
   if (rows.length === 0 && offer.kind === "asi-or-feat") {
-    const increases = asiIncreases(survey, choices, input.classId, library);
+    const increases = asiIncreases(survey, choices, priorityClass, library);
     if (increases) return [rowFor(offer, "asi", offer.taken.length, { increases })];
   }
   return rows;
+}
+
+/** An option's class-level gate ("Level 5+ Warlock"), or 1 for none. */
+const gateOf = (offer: ChoiceOffer, id: string) => offer.optionRecords?.find((option) => option.id === id)?.level ?? 1;
+
+/** Whether an offer's picks so far plus these could all be held at its class's level (see `levelGatesFit`). */
+function fitsLevelGates(offer: ChoiceOffer, survey: ServerOfferSurvey, drawn: readonly string[]): boolean {
+  const entry = survey.classes.find((candidate) => candidate.record.id === offer.classId);
+  if (!offer.slotLevels || !entry) return true;
+  const slots = [
+    ...offer.slotLevels,
+    ...Array.from({ length: Math.max(0, offer.capacity - offer.slotLevels.length) }, () => entry.level)
+  ];
+  const gates = [...offer.taken, ...drawn].map((id) => gateOf(offer, id)).filter((gate) => gate > 1);
+  return levelGatesFit(gates, slots, entry.level);
+}
+
+/** Draws an offer's picks one at a time, each only where the gates still fit with it. */
+function drawWithinLevelGates(
+  offer: ChoiceOffer,
+  survey: ServerOfferSurvey,
+  preferred: readonly string[],
+  candidates: readonly string[],
+  random: DiceRandom
+): string[] {
+  const drawn: string[] = [];
+  for (let pick = offer.taken.length; pick < offer.capacity; pick += 1) {
+    const fits = (id: string) => !drawn.includes(id) && fitsLevelGates(offer, survey, [...drawn, id]);
+    const next = drawPreferring(preferred.filter(fits), candidates.filter(fits), 1, random)[0];
+    if (next === undefined) break;
+    drawn.push(next);
+  }
+  return drawn;
 }
 
 // The class's own spell budgets are printed columns rather than offers, so they are filled here.
 
 type SpellOption = Readonly<{ id: string; name: string; level?: number }>;
 
-/** The class (or subclass) spell list this build casts from, or null when it casts nothing. */
-function spellListOf(survey: ServerOfferSurvey): { options: readonly SpellOption[]; maxSlotLevel: number } | null {
-  const list = classSpellList(survey.classRecord, survey.subclass, survey.levelRow, survey.catalogs);
-  if (list?.unresolvable)
-    reject(`The ${survey.classRecord.name} spell list could not be resolved: ${list.unresolvable}`);
-  return list;
-}
-
-/** Fills the class cantrip and prepared-spell budgets to step 9's caps (printed column plus `extraPicks`). */
+/** Fills each casting class's cantrip and prepared-spell budgets to step 9's caps (printed column plus `extraPicks`),
+ *  from its own list up to its own highest slot level. A spell sits on the sheet once, so no class repeats another's. */
 function fillSpellBudgets(
   survey: ServerOfferSurvey,
   choices: readonly CharacterChoice[],
   random: DiceRandom
 ): CharacterChoice[] {
-  const list = spellListOf(survey);
-  if (!list) return [];
   const claimed = new Set(choices.filter((row) => row.kind === "spell" || row.kind === "cantrip").map((row) => row.id));
-  const untagged = (kind: string) =>
-    choices.filter((row) => row.kind === kind && typeof row.payload?.featureId !== "string").length;
   const rows: CharacterChoice[] = [];
-  const top = (kind: "cantrip" | "spell", cap: number, eligible: readonly SpellOption[]) => {
-    const missing = cap - untagged(kind);
-    if (missing <= 0) return;
-    for (const option of drawSome(
-      eligible.filter((spell) => !claimed.has(spell.id)),
-      missing,
-      random
-    )) {
-      claimed.add(option.id);
-      rows.push({ level: 1, classId: survey.classRecord.id, kind, id: option.id });
-    }
-  };
-  top(
-    "cantrip",
-    survey.printedCantrips + (survey.extraPickBudgets.get("class-cantrips") ?? 0),
-    list.options.filter((spell) => (spell.level ?? 0) === 0)
-  );
-  top(
-    "spell",
-    survey.printedPrepared + (survey.extraPickBudgets.get("class-spells") ?? 0),
-    list.options.filter((spell) => (spell.level ?? 0) >= 1 && (spell.level ?? 0) <= list.maxSlotLevel)
-  );
+  for (const budget of survey.classSpells) {
+    const list = classSpellOptions(budget, survey.catalogs);
+    if (list.unresolvable) reject(`The ${budget.className} spell list could not be resolved: ${list.unresolvable}`);
+    const untagged = (kind: string) =>
+      choices.filter(
+        (row) =>
+          row.kind === kind &&
+          typeof row.payload?.featureId !== "string" &&
+          (row.classId ?? survey.classRecord.id) === budget.classId
+      ).length;
+    const top = (kind: "cantrip" | "spell", cap: number, eligible: readonly SpellOption[]) => {
+      const missing = cap - untagged(kind);
+      if (missing <= 0) return;
+      for (const option of drawSome(
+        eligible.filter((spell) => !claimed.has(spell.id)),
+        missing,
+        random
+      )) {
+        claimed.add(option.id);
+        rows.push({ level: budget.takenAt, classId: budget.classId, kind, id: option.id });
+      }
+    };
+    top(
+      "cantrip",
+      budget.cantrips,
+      list.options.filter((spell) => (spell.level ?? 0) === 0)
+    );
+    top(
+      "spell",
+      budget.prepared,
+      list.options.filter((spell) => (spell.level ?? 0) >= 1 && (spell.level ?? 0) <= budget.maxSlotLevel)
+    );
+  }
   return rows;
 }
 
@@ -371,31 +528,95 @@ export function generateCharacterRequest(
       "The generator sets ability scores with the standard array, which this table does not allow - enable it in Settings first."
     );
   }
-  const classId = input.classId ?? drawOne(sortedIds(library.classSummaries().map((entry) => entry.id)), random);
-  const classRecord = library.classRecord(classId) ?? reject(`No class "${classId}" is in the content catalog.`);
+  // A multiclass plan takes its classes' levels in turn, the starting class first.
+  const plan = input.classes ?? [
+    {
+      classId: input.classId ?? drawOne(sortedIds(library.classSummaries().map((entry) => entry.id)), random),
+      level: input.level
+    }
+  ];
+  if (plan.reduce((total, entry) => total + entry.level, 0) !== input.level)
+    reject(`The class levels add up to ${plan.reduce((total, entry) => total + entry.level, 0)}, not ${input.level}.`);
+  if (new Set(plan.map((entry) => entry.classId)).size !== plan.length) reject("Each class may be listed once.");
+  if (plan.length > MAX_CLASSES) reject(`A character can have at most ${MAX_CLASSES} classes.`);
+  if (input.classId && input.classId !== plan[0].classId)
+    reject(`The first class is the starting class, so it must be "${input.classId}".`);
+  const records = plan.map(
+    (entry) => library.classRecord(entry.classId) ?? reject(`No class "${entry.classId}" is in the content catalog.`)
+  );
+  const classRecord = records[0];
+  const classId = classRecord.id;
+  const sequence = plan.flatMap((entry) => Array.from({ length: entry.level }, () => entry.classId));
   const speciesId = drawOne(sortedIds(library.speciesSummaries().map((entry) => entry.id)), random);
   const species = library.speciesRecord(speciesId)!;
   const backgroundId = drawOne(sortedIds(library.backgroundSummaries().map((entry) => entry.id)), random);
   const background = library.backgroundRecord(backgroundId)!;
 
-  let subclassId: string | undefined;
-  if (input.level >= classRecord.subclassLevel) {
+  /** A subclass drawn for a class that has reached its subclass level. */
+  const drawSubclass = (record: ClassReference, level: number): string | undefined => {
+    if (level < record.subclassLevel) return undefined;
     const available = sortedIds(
       library
         .subclassSummaries()
-        .filter((entry) => entry.classId === classId)
+        .filter((entry) => entry.classId === record.id)
         .map((entry) => entry.id)
     );
     if (available.length === 0)
       reject(
-        `No ${classRecord.name} ${classRecord.subclassLabel ?? "subclass"} is in the content catalog, and a level-${input.level} ${classRecord.name} needs one.`
+        `No ${record.name} ${record.subclassLabel ?? "subclass"} is in the content catalog, and a level-${level} ${record.name} needs one.`
       );
-    subclassId = drawOne(available, random);
-  }
+    return drawOne(available, random);
+  };
+  const subclassId = drawSubclass(classRecord, plan[0].level);
+  // A later class names its subclass in a ledger row at the character level it reached its subclass level, as the
+  // wizard writes it.
+  const laterSubclassRows: CharacterChoice[] = records.slice(1).flatMap((record, index) => {
+    const id = drawSubclass(record, plan[index + 1].level);
+    if (!id) return [];
+    const takenAt = sequence.flatMap((entry, at) => (entry === record.id ? [at + 1] : []));
+    const featureId = record.features.find((feature) =>
+      featurePicks(feature).some((pick) => pick.kind === "subclass")
+    )?.id;
+    return [
+      {
+        level: takenAt[record.subclassLevel - 1],
+        classId: record.id,
+        kind: "subclass",
+        id,
+        ...(featureId ? { payload: { featureId } } : {})
+      }
+    ];
+  });
 
-  // Hit points are rolled through `random` and recorded by `hitPointRollRows`, so the character can be rebuilt.
-  const faces = hitDieFaces(classRecord.hitDie);
-  const hitPointRolls = Array.from({ length: Math.max(0, input.level - 1) }, () => random(faces));
+  // Hit points are rolled through `random` and recorded by `hitPointRollRows`, so the character can be rebuilt. Each
+  // level rolls its own class's die.
+  const hitPointRolls = sequence.slice(1).map((id) => {
+    const faces = hitDieFaces(records.find((record) => record.id === id)!.hitDie);
+    return { faces, roll: random(faces) };
+  });
+
+  // Scores: the standard array where every class's multiclass minimum needs it, then the background's increase. When
+  // the background can't lift the lowest of those, another needed ability takes the lowest place instead.
+  const scoresFor = (order: readonly Ability[]) => {
+    const baseScores = standardArrayFor(order);
+    const meetsEveryMinimum = (allocation: Allocation) => {
+      if (records.length === 1) return true;
+      const scores = { ...baseScores };
+      for (const entry of allocation) scores[entry.ability] += entry.amount;
+      for (const bonus of species.abilityBonuses) scores[bonus.ability] += bonus.amount;
+      return records.every((record) => meetsMulticlassMinimums(scores, record.multiclassPrerequisites));
+    };
+    const allocation = backgroundAllocationFor(order, background.abilityOptions, meetsEveryMinimum);
+    return allocation ? { baseScores, backgroundBonusAllocation: allocation } : null;
+  };
+  const { baseScores, backgroundBonusAllocation } =
+    abilityOrdersFor(records, library).reduce<ReturnType<typeof scoresFor>>(
+      (found, order) => found ?? scoresFor(order),
+      null
+    ) ??
+    reject(
+      `The standard array and ${background.name}'s increases can't give ${records.map((record) => record.name).join(" and ")} the 13s multiclassing needs; try again or choose other classes.`
+    );
 
   const identity = {
     // Drawn from the species' name bundle (the same one the wizard suggests from).
@@ -405,19 +626,20 @@ export function generateCharacterRequest(
     classId,
     level: input.level,
     ...(subclassId ? { subclassId } : {}),
+    ...(records.length > 1 ? { classLevels: sequence } : {}),
     abilityMethod: GENERATOR_ABILITY_METHOD,
-    baseScores: standardArrayFor(classId, library),
-    backgroundBonusAllocation: backgroundAllocationFor(classId, library, background.abilityOptions),
-    hp: { mode: "entries" as const, entries: hitPointRolls }
+    baseScores,
+    backgroundBonusAllocation,
+    hp: { mode: "entries" as const, entries: hitPointRolls.map((entry) => entry.roll) }
   };
 
-  const choices: CharacterChoice[] = [];
+  const choices: CharacterChoice[] = [...laterSubclassRows];
   // One opening survey for the two rows written before the loop; neither reads a pick.
   const opening = computeServerOffers({ ...identity, choices }, library, policy);
   // Written through `rowFor` like every other pick so it carries `payload.featureId` and the offer's own
   // level, which `level-ledger.ts` matches on for level-up prefill.
   if (subclassId) {
-    const offer = opening.offers.find((candidate) => candidate.kind === "subclass");
+    const offer = opening.offers.find((candidate) => candidate.kind === "subclass" && candidate.classId === classId);
     choices.push(
       offer
         ? rowFor(offer, subclassId, 0)
@@ -440,14 +662,15 @@ export function generateCharacterRequest(
     const pending = survey.offers.filter(
       (offer) => offer.unresolvable === null && offer.kind !== "subclass" && offer.taken.length < offer.capacity
     );
-    // The narrowest proficiency pick goes first (Keen Senses' three skills before a class's six), so a broad pick
+    // The narrowest proficiency or feat pick goes first (Keen Senses' three skills before a class's six, the
+    // Champion's Additional Fighting Style before an improvement that may take any feat), so a broad pick
     // cannot take the only options a narrow one has; repeats are refused.
     const narrowest = pending
-      .filter((offer) => PROFICIENCY_KINDS.has(offer.kind))
+      .filter((offer) => PROFICIENCY_KINDS.has(offer.kind) || FEAT_KINDS.has(offer.kind))
       .sort((left, right) => left.options.size - right.options.size)[0];
     const open = narrowest ?? pending[0];
     if (!open) {
-      return { request: { ...identity, choices }, hitPointRolls, hitDieFaces: faces, summary: summaryOf(survey) };
+      return { request: { ...identity, choices }, hitPointRolls, summary: summaryOf(survey) };
     }
     const rows = answerOffer(open, survey, choices, { ...input, classId }, library, random);
     if (rows.length === 0) {
@@ -462,8 +685,13 @@ export function generateCharacterRequest(
 
 function summaryOf(survey: ServerOfferSurvey): string {
   const lineage = survey.lineage ? ` (${survey.lineage.name})` : "";
-  const subclass = survey.subclass ? ` (${survey.subclass.name})` : "";
-  return `${survey.species.name}${lineage} ${survey.classRecord.name}${subclass} · ${survey.background.name}`;
+  const classes = survey.classes
+    .map(
+      (entry) =>
+        `${entry.record.name}${survey.classes.length > 1 ? ` ${entry.level}` : ""}${entry.subclass ? ` (${entry.subclass.name})` : ""}`
+    )
+    .join(" / ");
+  return `${survey.species.name}${lineage} ${classes} · ${survey.background.name}`;
 }
 
 /** A name from the species' name bundle, or null when the content has none. */

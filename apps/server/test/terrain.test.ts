@@ -139,43 +139,65 @@ describe("what players and the table screen see of the terrain", () => {
 describe("what a move costs", () => {
   it("is the straight count on open ground", () => {
     const state = game({ [HERO]: cell(4, 0) });
-    expect(movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0))).toEqual({ feet: 20, difficultFeet: 0 });
+    expect(movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0))).toEqual({
+      feet: 20,
+      difficultFeet: 0,
+      path: [cell(0, 0), cell(1, 0), cell(2, 0), cell(3, 0), cell(4, 0)]
+    });
   });
 
   it("charges double through difficult terrain it can't go round, and nothing extra when it can", () => {
     const state = game({ [HERO]: cell(4, 0) });
     // A band of rubble across the whole map.
     paintTerrain(state, undefined, GRID, { op: "difficult", rect: cells(2, 0, 2, 19) });
-    expect(movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0))).toEqual({ feet: 25, difficultFeet: 5 });
+    expect(movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0))).toMatchObject({ feet: 25, difficultFeet: 5 });
     // A small patch is cheaper to walk round.
     resetTerrain(state, undefined);
     paintTerrain(state, undefined, GRID, { op: "difficult", rect: cells(2, 0, 2, 0) });
-    expect(movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0))).toEqual({ feet: 20, difficultFeet: 0 });
+    expect(movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0))).toMatchObject({ feet: 20, difficultFeet: 0 });
   });
 
-  it("treats an enemy's space as difficult, but not an ally's, a Tiny creature's or a hidden one's", () => {
+  it("lets a mover through an ally's, a Tiny creature's or a hidden one's space as open ground", () => {
     // Squeezed in a corridor one row high: the only way past is through whoever stands in it.
     const corridor = (occupant: string) => {
       const state = game({ [HERO]: cell(4, 0), [occupant]: cell(2, 0) });
       paintTerrain(state, undefined, GRID, { op: "difficult", rect: cells(0, 1, 19, 19) });
       return movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0));
     };
-    expect(corridor(FRIEND)).toEqual({ feet: 20, difficultFeet: 0 });
-    expect(corridor(RAT)).toEqual({ feet: 20, difficultFeet: 0 });
+    expect(corridor(FRIEND)).toMatchObject({ feet: 20, difficultFeet: 0 });
+    expect(corridor(RAT)).toMatchObject({ feet: 20, difficultFeet: 0 });
     // A hidden creature never changes the cost, or a player's preview would disagree with the charge.
-    expect(corridor(LURKER)).toEqual({ feet: 20, difficultFeet: 0 });
-    // The Large ogre fills two rows against the map's top edge: walking round underneath costs one extra step,
-    // and once the ground below is difficult too, straight through its space is cheapest.
+    expect(corridor(LURKER)).toMatchObject({ feet: 20, difficultFeet: 0 });
+  });
+
+  it("bars an enemy's space within a size of the mover, and opens it as difficult terrain once it is Incapacitated", () => {
+    // SRD "Moving around Other Creatures": the Large ogre against the map's top edge can't be walked through by a
+    // Medium hero, so the way runs round underneath, through the rubble there.
     const ogre = game({ [HERO]: cell(4, 0), [OGRE]: { x: 150, y: 50 } });
     expect(movementCost(ogre, GRID, HERO, cell(0, 0), cell(4, 0))?.feet).toBe(25);
     paintTerrain(ogre, undefined, GRID, { op: "difficult", rect: cells(0, 2, 19, 19) });
-    expect(movementCost(ogre, GRID, HERO, cell(0, 0), cell(4, 0))).toEqual({ feet: 30, difficultFeet: 10 });
+    expect(movementCost(ogre, GRID, HERO, cell(0, 0), cell(4, 0))).toMatchObject({ feet: 35, difficultFeet: 10 });
+    // Stunned, it no longer bars the way: its space is Difficult Terrain, and straight through is cheapest.
+    ogre.actors.find((actor) => actor.id === OGRE)!.conditions = [{ id: "stunned" }];
+    expect(movementCost(ogre, GRID, HERO, cell(0, 0), cell(4, 0))).toMatchObject({ feet: 30, difficultFeet: 10 });
+    // With no way round at all, the way is shut.
+    const corridor = game({ [HERO]: cell(4, 0), [OGRE]: { x: 150, y: 50 } });
+    paintTerrain(corridor, undefined, GRID, { op: "difficult", rect: cells(0, 2, 19, 19) });
+    expect(movementCost(corridor, { ...GRID, height: 100 }, HERO, cell(0, 0), cell(4, 0))).toEqual({
+      feet: 0,
+      difficultFeet: 0,
+      path: [],
+      blocked: true
+    });
   });
 
   it("measures straight on a scaled gridless map, where there is no terrain", () => {
     const state = game({ [HERO]: { x: 100, y: 0 } });
     const scaled: TokenMapGeometry = { ...GRIDLESS, scale: { kind: "image-scale", distancePerPixel: 0.1, unit: "ft" } };
-    expect(movementCost(state, scaled, HERO, { x: 0, y: 0 }, { x: 100, y: 0 })).toEqual({ feet: 10, difficultFeet: 0 });
+    expect(movementCost(state, scaled, HERO, { x: 0, y: 0 }, { x: 100, y: 0 })).toMatchObject({
+      feet: 10,
+      difficultFeet: 0
+    });
     expect(movementCost(state, GRIDLESS, HERO, { x: 0, y: 0 }, { x: 100, y: 0 })).toBeNull();
   });
 });
@@ -212,7 +234,13 @@ describe("spending movement", () => {
       counted: true,
       speedFeet: 30,
       usedFeet: 0,
-      enforcement: "strict"
+      enforcement: "strict",
+      // No special speed: climbing and swimming spend Speed at an extra foot per foot.
+      modes: [
+        { mode: "walk", budgetFeet: 30, extraCost: false },
+        { mode: "swim", budgetFeet: 30, extraCost: true },
+        { mode: "climb", budgetFeet: 30, extraCost: true }
+      ]
     });
     // Off its turn a creature's moves are free.
     expect(movementStatus(state, FRIEND, { resolveDefinition: () => undefined })).toMatchObject({
@@ -263,7 +291,7 @@ describe("over HTTP", () => {
     const answer = await fetch(`${base}${path}`, { headers: headers(gmToken) });
     expect(answer.status).toBe(200);
     const body = (await answer.json()) as { data: unknown };
-    expect(body.data).toEqual({ counted: true, speedFeet: 30, usedFeet: 0, enforcement: "strict" });
+    expect(body.data).toMatchObject({ counted: true, speedFeet: 30, usedFeet: 0, enforcement: "strict" });
     const ajv = new Ajv2020({ strict: false });
     ajv.addSchema(openApiDocument as unknown as Record<string, unknown>, "openapi");
     const validate = ajv.compile({ $ref: "openapi#/components/schemas/ActorMovementResponse" });

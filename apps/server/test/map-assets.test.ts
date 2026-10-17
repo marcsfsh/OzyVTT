@@ -3,17 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { inspectMapImage, MapAssetStore } from "../src/map-assets.js";
-
-function png(width: number, height: number, animated = false) {
-  const buffer = Buffer.alloc(animated ? 40 : 24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  if (animated) buffer.write("acTL", 28, "ascii");
-  return buffer;
-}
+import { png } from "./image-fixtures.js";
 
 function jpeg(width: number, height: number) {
   const buffer = Buffer.alloc(23);
@@ -57,6 +47,23 @@ describe("map image inspection", () => {
     expect(() => inspectMapImage(png(4000, 4000), { maxDimensionPx: 2000 })).toThrow("dimensions");
     expect(() => inspectMapImage(png(1000, 1000), { maxPixels: 500_000 })).toThrow("pixel safety");
     expect(() => inspectMapImage(png(10, 10), { maxBytes: 10 })).toThrow("upload limit");
+  });
+
+  it("refuses a file cut short, as a half-finished download is", () => {
+    const whole = png(640, 480);
+    expect(() => inspectMapImage(whole.subarray(0, whole.length - 6))).toThrow("incomplete");
+    // Bytes after the end marker are ignored, as browsers ignore them.
+    expect(inspectMapImage(Buffer.concat([whole, Buffer.from("trailing")]))).toMatchObject({ width: 640 });
+
+    // A scan whose entropy data holds a stuffed 0xFF00 and a restart marker, then the end of image.
+    const scan = Buffer.from([0xff, 0xda, 0x00, 0x02, 0x12, 0xff, 0x00, 0x34, 0xff, 0xd0, 0x56]);
+    const head = jpeg(800, 600).subarray(0, 21);
+    expect(inspectMapImage(Buffer.concat([head, scan, Buffer.from([0xff, 0xd9])]))).toMatchObject({ width: 800 });
+    expect(() => inspectMapImage(Buffer.concat([head, scan]))).toThrow("incomplete");
+
+    const lossless = webp(1200, 900);
+    lossless.writeUInt32LE(4000, 4);
+    expect(() => inspectMapImage(lossless)).toThrow("incomplete");
   });
 });
 

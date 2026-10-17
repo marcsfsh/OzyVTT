@@ -1,4 +1,5 @@
 import type { EncounterTokenPosition, GameState } from "@vtt/domain";
+import type { MoveMode } from "@vtt/domain/commands";
 import { imageToGrid } from "./grid-calibration.js";
 import { measureGridPath } from "./map-measurement.js";
 import type { TokenMapGeometry } from "./token-placement.js";
@@ -17,6 +18,16 @@ import type { TokenMapGeometry } from "./token-placement.js";
 type Point = Readonly<{ x: number; y: number }>;
 
 export type MovementNarration = Readonly<{ publicText: string | null; gmText: string | null }>;
+
+const MODE_VERBS: Readonly<Record<MoveMode, string>> = {
+  walk: "moved",
+  fly: "flew",
+  swim: "swam",
+  climb: "climbed",
+  burrow: "burrowed",
+  teleport: "teleported",
+  forced: "was moved"
+};
 
 /** Tolerance (feet) for reach/range/opportunity-attack comparisons. Stored positions and grid round-trips
  *  can put an adjacent creature at 5.0001 ft; on a grid the smallest real gap beyond reach is a whole
@@ -110,6 +121,10 @@ export function narrateTokenMove(
     /** The mover's position before the mutation; null when it entered from the tray. */
     from: EncounterTokenPosition | null;
     geometry: TokenMapGeometry;
+    /** How it travelled, for the verb ("flew", "teleported"); walking when absent. */
+    mode?: MoveMode;
+    /** It crawled, being Prone. */
+    crawled?: boolean;
   }>
 ): MovementNarration | null {
   const { state, actorId, from, geometry } = input;
@@ -156,12 +171,13 @@ export function narrateTokenMove(
     ranges.push({ name: other.name, hidden: other.visibility === "gm-only", label });
   }
 
+  const how = input.crawled ? "crawled" : MODE_VERBS[input.mode ?? "walk"];
   const verb =
     from === null
       ? `${mover.name} entered the map`
       : moved === null
-        ? `${mover.name} moved`
-        : `${mover.name} moved ${formatDistance(moved)}`;
+        ? `${mover.name} ${how}`
+        : `${mover.name} ${how} ${formatDistance(moved)}`;
   const withRanges = (list: readonly Range[]) =>
     list.length > 0 ? `${verb} - ${list.map((range) => range.label).join(", ")}.` : `${verb}.`;
 

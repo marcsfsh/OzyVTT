@@ -8,6 +8,7 @@ import { GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 import { activateScene } from "../src/scenes.js";
+import { png } from "./image-fixtures.js";
 
 // A blocked player can turn the block into a question to the GM; the question belongs to one player,
 // and Allow re-runs the parked command. The parked payload's `expectedRevision` is from ask time, so
@@ -24,16 +25,6 @@ const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 // A live fight mid-turn: Hero is up, prone, with a 30 ft Speed already spent. Standing costs half
 // Speed, so `actor.set-condition` blocks with `movement.stand-up-cost`.

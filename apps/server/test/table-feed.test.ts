@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CombatLogStore, projectFeedRow } from "../src/combat-log.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../src/roll-history.js";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 // `GameState.rolls` is the live 200-roll hot window; the combat-log store is the durable feed every
 // roll reaches. Pinned: every roll reaches the log, is attributed, initiative leaves dice behind, and
@@ -193,16 +194,6 @@ describe("recordRoll: the one writer", () => {
 
 // End to end over the public HTTP surface.
 
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
-
 function initialState() {
   return GameStateSchema.parse({
     schemaVersion: 1,
@@ -358,6 +349,25 @@ describe("the feed over the API", () => {
     expect(playerRows.length).toBe(1);
     expect(playerRows[0].actorId).toBe(HERO);
     expect(JSON.stringify(playerRows)).not.toContain("Unrevealed Tyrant");
+  });
+
+  it("keeps a GM's public roll from a hidden creature's sheet away from players", async () => {
+    const { base, server, gmToken } = await boot();
+    const playerToken = server.auth.issuePlayerSession();
+    const rolled = await post(base, GAME_PATHS.rolls, gmToken, {
+      commandId: randomUUID(),
+      formula: "1d20+6",
+      purpose: "check",
+      visibility: "public",
+      label: "Stealth check",
+      actorId: SECRET
+    });
+    expect(rolled.status).toBe(200);
+    expect(server.store.snapshot.rolls.find((record) => record.actorId === SECRET)?.visibility).toBe("gm-only");
+
+    const snapshot = await fetch(base + GAME_PATHS.snapshot, { headers: bearer(playerToken) });
+    expect(JSON.stringify(await snapshot.json())).not.toContain(SECRET);
+    expect((await feed(base, playerToken)).filter((entry) => entry.kind === "roll")).toEqual([]);
   });
 
   it("does not write a second feed row when a command is safely retried", async () => {

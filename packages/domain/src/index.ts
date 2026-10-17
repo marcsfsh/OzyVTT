@@ -4,6 +4,12 @@ export * from "./pick-budget.js";
 export * from "./character-draft.js";
 /** The AC an attack meets, shared so the server's roll and the sheets agree. */
 export * from "./armor-class.js";
+/** The typed damage a resolution owes, shared so the card's total and every apply path agree. */
+export * from "./damage-parts.js";
+/** Who is dead, shared so healing, rests and the sheets agree. */
+export * from "./death.js";
+/** Game time for rests, shared so the 16-hour rule and the GM's rest panel agree. */
+export * from "./rest-clock.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
 export * from "./codex-entities.js";
@@ -30,6 +36,7 @@ export {
 } from "@vtt/schemas";
 /** Re-exported because the client cannot import `@vtt/schemas`; a hand-copied list would drift. */
 export {
+  catalogIdOf,
   ItemMagicMarkerSchema,
   ItemSlotSchema,
   RIDER_TRIGGER_KINDS,

@@ -1,6 +1,8 @@
 import type { Actor } from "@vtt/domain";
-import type { ActorAction, ActorDefinition } from "@vtt/schemas";
-import { collectRiders, sumRiders } from "@vtt/rules-5e";
+import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
+import { withTakenActions } from "./builtin-actions.js";
+import { atSpellUpLevel } from "./lasting-spells.js";
 import {
   deriveEquipment,
   sourceItemOf,
@@ -10,18 +12,44 @@ import {
 
 /** The action list every actor-scoped consumer must read instead of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
- *  reads. Nothing is written back. Moment-gated riders are collected on the roll path instead (the two sets
- *  are disjoint). */
+ *  reads, and the effects of a row that takes two generic actions at once (`withTakenActions`). Nothing is written
+ *  back. Moment-gated riders are collected on the roll path instead (the two sets are disjoint). */
 export function effectiveActions(
   definition: ActorDefinition | undefined,
   actor: Actor | undefined,
   catalog: EquipmentCatalog | undefined
 ): readonly ActorAction[] {
-  const base = definition?.actions ?? [];
+  const declared = definition?.actions ?? [];
+  // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a 3rd-level slot).
+  const taken = declared.map((action) =>
+    withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition)
+  );
+  // The definition's own list when nothing changed, so a caller holding it sees the same array.
+  const base = taken.every((action, index) => action === declared[index]) ? declared : taken;
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
   return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor));
+}
+
+/** SRD Eldritch Spear: the cantrip picked for it reaches 30 feet farther for each Warlock level. Applied to the spell
+ *  attack's range, where the engine measures it; a save cantrip's range stays the GM's. */
+function withEldritchSpear(action: ActorAction, definition: ActorDefinition | undefined): ActorAction {
+  const rangeFeet = action.attack?.rangeFeet;
+  if (rangeFeet === undefined || action.spellId === undefined) return action;
+  const character = definition?.character;
+  const picked = character?.choices?.find(
+    (choice) => choice.kind === "cantrip" && choice.payload?.featureId === "eldritch-spear"
+  )?.id;
+  const level = character?.classes.find((entry) => entry.id === "warlock")?.level ?? 0;
+  if (picked !== action.spellId || level === 0) return action;
+  return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 30 * level } };
+}
+
+/** A later action of a spell its caster has up at a higher level, rolled at that level; anything else unchanged. */
+function atLevelUp(action: ActorAction, actor: Actor | undefined, catalog: EquipmentCatalog | undefined): ActorAction {
+  const spell = actor && action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined;
+  return spell && actor ? atSpellUpLevel(action, spell, actor) : action;
 }
 
 /** Folds the standing riders that apply to one action into the numbers the resolver reads. */
@@ -30,7 +58,10 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
   const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
   if (riders.length === 0) return action;
 
-  const attackBonus = sumRiders(riders, "attack-bonus");
+  // A wand of the war mage's bonus to spell attack rolls lands on every spell attack its bearer makes.
+  const attackBonus =
+    sumRiders(riders, "attack-bonus") +
+    (action.spellId !== undefined && action.attack ? sumRiders(riders, "spell-attack-bonus") : 0);
   const damageBonus = sumRiders(riders, "damage-bonus");
   const critDice = riders.reduce(
     (total, rider) => (rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total),
@@ -66,7 +97,7 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
       ? { save: { ...action.save, dc: Math.max(1, Math.min(40, action.save.dc + saveDc)) } }
       : {}),
     ...(action.uses && poolBonus !== 0
-      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(20, action.uses.limit + poolBonus)) } }
+      ? { uses: { ...action.uses, limit: Math.max(1, Math.min(MAX_ACTION_USES, action.uses.limit + poolBonus)) } }
       : {}),
     // A standing `damage-bonus` (a +1 weapon) folds into the first damage part's formula, so sheet, roll
     // and resolver read one number; the constant is never crit-doubled. Moment-gated ones are added by
@@ -120,10 +151,20 @@ function usesBonus(action: ActorAction, riders: ReturnType<typeof collectRiders>
   );
 }
 
-/** The natural-d20 threshold at or above which an attack crits (SRD 20; a rider can widen it). */
-export function criticalThreshold(derivation: EquipmentDerivation, actor: Actor, action: ActorAction): number {
+/** The natural-d20 threshold at or above which an attack crits (SRD 20; a rider can widen it). Standing riders (a
+ *  keen weapon) and ones gated on the attack roll, which can name the kinds of attack they widen (Improved
+ *  Critical: weapons and Unarmed Strikes) when the roll's filters are passed. */
+export function criticalThreshold(
+  derivation: EquipmentDerivation,
+  actor: Actor,
+  action: ActorAction,
+  filters: Omit<Partial<RiderContext>, "moment"> = {}
+): number {
   const sourceItemId = sourceItemOf(action, derivation, actor.inventory);
-  const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
+  const riders = [
+    ...collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId }),
+    ...collectRiders(derivation.carriers, { ...derivation.context, ...filters, moment: "on-attack-roll", sourceItemId })
+  ];
   return riders.reduce(
     (lowest, rider) =>
       rider.modifier.type === "critical-range" && rider.modifier.threshold !== undefined
@@ -139,26 +180,23 @@ export function criticalThreshold(derivation: EquipmentDerivation, actor: Actor,
 export function actionPools(
   actions: readonly ActorAction[]
 ): Array<{ id: string; name: string; limit: number; per: string }> {
-  const pools = new Map<string, { id: string; name: string; limit: number; per: string }>();
+  const pools = new Map<string, { id: string; name: string; limit: number; per: string; named: boolean }>();
   for (const action of actions) {
     if (!action.uses) continue;
     const id = action.uses.pool ?? action.id;
     const existing = pools.get(id);
     if (!existing) {
-      pools.set(id, {
-        id,
-        name: action.id === id ? action.name : titleCase(id),
-        limit: action.uses.limit,
-        per: action.uses.per
-      });
+      // A pool one action spends reads as that action ("Divine Smite (no slot)") until a second shares it.
+      pools.set(id, { id, name: action.name, limit: action.uses.limit, per: action.uses.per, named: action.id === id });
       continue;
     }
     // Same rule as `useLimitFor`: only a sibling in the same rest scope raises the ceiling.
     if (existing.per === action.uses.per) existing.limit = Math.max(existing.limit, action.uses.limit);
-    // An action whose own id is the pool key names it better than the derived title.
-    if (action.id === id) existing.name = action.name;
+    // An action whose own id is the pool key names it; several others share the derived title.
+    if (action.id === id) Object.assign(existing, { name: action.name, named: true });
+    else if (!existing.named) existing.name = titleCase(id);
   }
-  return [...pools.values()];
+  return [...pools.values()].map(({ named: _named, ...pool }) => pool);
 }
 
 const titleCase = (slug: string): string =>

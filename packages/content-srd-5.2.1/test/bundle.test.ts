@@ -12,6 +12,7 @@ import {
   loadConditions,
   loadDamageTypes,
   loadEquipment,
+  loadGlossary,
   loadMagicItems,
   loadMonsterDefinitions,
   loadRules,
@@ -90,6 +91,30 @@ describe("SRD 5.2.1 monster bundle", () => {
     }
   });
 
+  it("carries what the bestiary and checks need: XP, skills, the printed size, clean text", () => {
+    const extension = (id: string) =>
+      monsters.find((monster) => monster.source.externalId === id)!.extensions["open5e.srd-2024"] as {
+        experiencePoints: number | null;
+        skills: Record<string, number>;
+        traits: Array<{ name: string; description: string }>;
+      };
+    // XP from the challenge rating; the SRD's own examples: CR 1/2 is 100, CR 9 is 5,000, CR 17 is 18,000.
+    expect(
+      monsters.every((monster) => typeof extension(monster.source.externalId!).experiencePoints === "number")
+    ).toBe(true);
+    expect(extension("goblin-warrior").experiencePoints).toBe(50);
+    expect(extension("adult-red-dragon").experiencePoints).toBe(18000);
+    expect(extension("goblin-warrior").skills).toEqual({ stealth: 6 });
+    // "Medium or Small" stat blocks take the first printed size; genuinely Small creatures stay Small.
+    const size = (id: string) => monsters.find((monster) => monster.source.externalId === id)!.size;
+    expect([size("knight"), size("vampire"), size("werewolf")]).toEqual(["medium", "medium", "medium"]);
+    expect(size("goblin-warrior")).toBe("small");
+    expect(JSON.stringify(monsters)).not.toContain("|XPHB|");
+    const pudding = monsters.find((monster) => monster.source.externalId === "black-pudding")!;
+    expect(pudding.actions.map((action) => action.name)).toContain("Split");
+    expect(extension("octopus").traits.map((trait) => trait.name)).toEqual(["Compression", "Water Breathing"]);
+  });
+
   it("adapts the aboleth stat block faithfully", () => {
     const aboleth = monsters.find((monster) => monster.source.externalId === "aboleth");
     expect(aboleth).toBeDefined();
@@ -119,6 +144,43 @@ describe("SRD 5.2.1 monster bundle", () => {
     const tail = crocodile.actions.find((action) => action.id === "tail")!;
     expect(tail.onHit).toEqual([{ conditions: [{ id: "prone" }], maxTargetSize: "large" }]);
     expect(tail.targetRules).toEqual(["not-grappled-by-source"]);
+  });
+
+  it("reads every Multiattack the SRD prints but the hydra's, with its replacements and other plans", () => {
+    const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
+    const multiattackOf = (id: string) => byId(id).actions.find((action) => action.id === "multiattack")!;
+    expect(multiattackOf("bone-devil").multiattack).toEqual([
+      { actionId: "claw", count: 2 },
+      { actionId: "infernal-sting", count: 1 }
+    ]);
+    expect(multiattackOf("lion").multiattackReplacements).toEqual([{ actionIds: ["roar"], attacks: 1 }]);
+    expect(multiattackOf("barbed-devil").multiattackAlternatives).toEqual([[{ actionId: "hurl-flame", count: 2 }]]);
+    expect(multiattackOf("goblin-boss").multiattack).toEqual([{ actionId: "scimitar", count: 2, or: ["shortbow"] }]);
+    const prose = monsters.flatMap((monster) =>
+      monster.actions
+        .filter((action) => /multiattack/i.test(action.name) && action.activation === "action" && !action.multiattack)
+        .map(() => monster.source.externalId)
+    );
+    expect(prose).toEqual(["hydra"]);
+  });
+
+  it("keeps the tyrannosaurus's Tail off the creature its Bite grapples, read from the Bite's text", () => {
+    const rex = monsters.find((monster) => monster.source.externalId === "tyrannosaurus-rex")!;
+    expect(rex.actions.find((action) => action.id === "tail")!.targetRules).toEqual(["not-grappled-by-source"]);
+  });
+
+  it("marks legendary actions taken once a round, and gives one that makes an attack that attack", () => {
+    const legendary = monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary);
+    expect(legendary.filter((action) => action.legendary!.oncePerRound).length).toBe(41);
+    const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
+    const pounce = dragon.actions.find((action) => action.id === "pounce")!;
+    const rend = dragon.actions.find((action) => action.id === "rend")!;
+    expect(pounce.attack).toEqual(rend.attack);
+    expect(pounce.damage).toEqual(rend.damage);
+    expect(dragon.actions.find((action) => action.id === "fiery-rays")!.legendary).toEqual({
+      cost: 1,
+      oncePerRound: true
+    });
   });
 
   it("carries structured limited-use pools (recharge and rest scopes)", () => {
@@ -191,10 +253,10 @@ describe("SRD 5.2.1 monster bundle", () => {
 
   it("recovers structured attacks from statblock prose when upstream has no attack row", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
-    // rat: flat "1 Piercing damage" - attack is structured, damage stays prose-only.
+    // rat: flat "1 Piercing damage" - a fixed amount, dealt as printed (no dice, so a crit leaves it at 1).
     const ratBite = byId("rat").actions.find((action) => action.id === "bite");
     expect(ratBite?.attack).toEqual({ bonus: 2, reachFeet: 5 });
-    expect(ratBite?.damage).toEqual([]);
+    expect(ratBite?.damage).toEqual([{ formula: "1", type: "piercing" }]);
     // ankheg: dice primary plus acid rider, parenthetical advantage clause skipped.
     const ankhegBite = byId("ankheg").actions.find((action) => action.id === "bite");
     expect(ankhegBite?.attack).toEqual({ bonus: 5, reachFeet: 5 });
@@ -261,6 +323,19 @@ describe("SRD 5.2.1 reference bundles", () => {
       "stunned",
       "unconscious"
     ]);
+  });
+
+  it("prints every condition's rules as clean bullets, with the upstream extraction glitches fixed", () => {
+    const text = (id: string) => loadConditions().find((condition) => condition.id === id)!.description;
+    for (const condition of loadConditions()) {
+      // Every bullet has a space after its star, and no word is split across a line ("move- ment").
+      expect(condition.description, condition.id).not.toMatch(/\n\*\S/);
+      expect(condition.description, condition.id).not.toMatch(/[a-z]- [a-z]/);
+    }
+    expect(text("prone")).toContain("amount of movement equal to half your Speed");
+    // Unaware is its own bullet, not the tail of Automatic Critical Hits.
+    expect(text("unconscious")).toMatch(/within 5 feet of you\. \n\* Unaware\. You’re unaware/);
+    expect(text("invisible")).toContain("\n* Attacks Affected.");
   });
 
   it("carries all 339 spells with faithful structured fields (fireball spot-check)", () => {
@@ -458,8 +533,10 @@ describe("SRD 5.2.1 reference bundles", () => {
     // Each of the four sources is counted from its own bundle: gear, non-improvised weapons, armor and
     // the generated magic items.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
-    expect(loadMagicItems().length).toBe(268);
-    expect(equipment.length).toBe(132 + nonImprovisedWeapons + loadArmor().length + 268);
+    expect(loadMagicItems().length).toBe(270);
+    // 141 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets, two gaming sets and
+    // the two Spell Scrolls the gear table sells (Cantrip and Level 1).
+    expect(equipment.length).toBe(141 + nonImprovisedWeapons + loadArmor().length + 270);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).
@@ -530,6 +607,44 @@ describe("SRD 5.2.1 reference bundles", () => {
  * Homebrew seam on the reference records. A plain `z.object` strips undeclared keys silently, so
  * `source` must be declared on every record or `source: "homebrew"` is lost.
  */
+describe("the gear text is the SRD 5.2.1's", () => {
+  const text = (id: string) => loadEquipment().find((item) => item.id === id)?.description ?? "";
+  it("throws Acid, Alchemist's Fire and Holy Water as a Dexterity save in the Attack action, not an attack roll", () => {
+    for (const id of ["acid", "alchemists-fire", "holy-water", "oil", "net"]) {
+      expect(text(id), id).toContain("replace one of your attacks");
+      expect(text(id), id).toContain(
+        "Dexterity saving throw (DC 8 plus your Dexterity modifier and Proficiency Bonus)"
+      );
+      expect(text(id), id).not.toMatch(/ranged attack|on a hit/i);
+    }
+    expect(text("holy-water")).toContain("2d8 Radiant damage");
+  });
+
+  it("prints the 2024 numbers for rope, manacles, chain and the tinderbox", () => {
+    expect(text("rope")).toContain("DC 20 Strength (Athletics)");
+    expect(text("manacles")).toContain("DC 25 Strength (Athletics)");
+    expect(text("chain")).toContain("DC 20 Strength (Athletics)");
+    expect(text("chain")).not.toContain("Hit Points");
+    expect(text("tinderbox")).toContain("takes a Bonus Action");
+    expect(text("hunting-trap")).toContain("DC 13 Dexterity saving throw");
+  });
+
+  it("packs the 2024 contents, with the pack's weight", () => {
+    const explorers = loadEquipment().find((item) => item.id === "explorers-pack")!;
+    expect(explorers.description).toBe(
+      "An Explorer's Pack contains the following items: Backpack, Bedroll, 2 flasks of Oil, 10 days of Rations, Rope, Tinderbox, 10 Torches, and Waterskin."
+    );
+    expect(explorers.weightLb).toBe(55);
+    expect(text("priests-pack")).not.toContain("Alms Box");
+  });
+
+  it("gives every tool its Ability and Utilize entries, and stocks the gear the catalog lacked", () => {
+    expect(text("thieves-tools")).toBe("Ability: Dexterity. Utilize: Pick a lock (DC 15), or disarm a trap (DC 15).");
+    for (const id of ["chest", "map", "net", "string", "firearm-bullets-10", "gaming-set-dragonchess"])
+      expect(text(id), id).not.toBe("");
+  });
+});
+
 describe("homebrew source discriminator and open item categories", () => {
   const spellBody = {
     id: "hb-grave-touch",
@@ -732,5 +847,25 @@ describe("attribution", () => {
     expect(attribution.license).toBe("CC-BY-4.0");
     expect(attribution.attribution).toContain("This work includes material from the System Reference Document 5.2.1");
     expect(attribution.attribution).toContain("https://creativecommons.org/licenses/by/4.0/legalcode");
+  });
+});
+
+describe("SRD 5.2.1 Rules Glossary bundle", () => {
+  const glossary = loadGlossary();
+
+  it("holds every term once, with its bracketed tag", () => {
+    expect(glossary.length).toBe(155);
+    expect(new Set(glossary.map((entry) => entry.id)).size).toBe(glossary.length);
+    const prone = glossary.find((entry) => entry.id === "prone");
+    expect(prone).toMatchObject({ name: "Prone", tag: "Condition" });
+    expect(prone!.description).toContain("Restricted Movement.");
+    expect(glossary.find((entry) => entry.id === "attack")?.tag).toBe("Action");
+    // No markdown left for a reader to see.
+    expect(glossary.some((entry) => /\*\*|<\/?t[dr]>/.test(entry.description))).toBe(false);
+  });
+
+  it("gives every rules section a distinct id", () => {
+    const rules = loadRules();
+    expect(new Set(rules.map((rule) => rule.id)).size).toBe(rules.length);
   });
 });

@@ -1,11 +1,11 @@
 /**
  * Sorcerer and Draconic Sorcery mechanics, merged over the ETL-generated prose.
  *
- * Uses count one per spend, so only options costing exactly 1 Sorcery Point ride the
- * `sorcery-points` pool. Heightened and Quickened Spell cost 2 and keep their price in prose.
+ * A Metamagic option is a pick, not an action, so it can't carry a price of its own: the 1-point options ride the
+ * `sorcery-points` pool, and Heightened and Quickened Spell's 2 points are spent from the sheet's Limited uses.
  */
 import type { DamageType } from "@vtt/schemas";
-import type { ClassMechanicsModule } from "./overlay.js";
+import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
 // One debit off the shared pool, which reads the printed Sorcery Points column.
 const ONE_SORCERY_POINT = {
@@ -77,26 +77,53 @@ export const sorcerer: ClassMechanicsModule = {
         "twinned-spell": ONE_SORCERY_POINT
       }
     },
-    // The once-per-Long-Rest permission only; the points it returns are refilled by hand.
+    // The once-per-Long-Rest permission only; the GM gives the points back from the sheet's Limited uses.
     "sorcerous-restoration": { uses: { limit: 1, per: "long-rest" } },
-    "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" } }
+    "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
     // Not modeled: Sorcery Incarnate (substitute cost, two Metamagic per spell), Arcane Apotheosis
     // (cost waiver) and the cantrip replacement clauses.
+  },
+  subclassStages: {
+    "draconic-sorcery": spellTableStages("draconic-spells", "Draconic Spells", "Sorcerer", [
+      [
+        5,
+        [
+          ["fear", "Fear", 3],
+          ["fly", "Fly", 3]
+        ]
+      ],
+      [
+        7,
+        [
+          ["arcane-eye", "Arcane Eye", 4],
+          ["charm-monster", "Charm Monster", 4]
+        ]
+      ],
+      [
+        9,
+        [
+          ["legend-lore", "Legend Lore", 5],
+          ["summon-dragon", "Summon Dragon", 5]
+        ]
+      ]
+    ])
   },
   subclasses: {
     "draconic-sorcery": {
       /**
        * 10 + Dexterity + Charisma while unarmored. `allowShield` is authored true: the printed sentence
        * restricts only wearing armor, and the SRD treats a Shield separately (the Monk's text names it,
-       * this one does not). The Hit Point half (+3 at level 3, +1 per level after) stays prose.
+       * this one does not). "+3, and +1 whenever you gain another Sorcerer level": +1 per level, taken at 3.
        */
       "draconic-resilience": {
-        modifiers: [{ type: "unarmored-defense", ability: "cha", allowShield: true }]
+        modifiers: [
+          { type: "unarmored-defense", ability: "cha", allowShield: true },
+          { type: "hit-points-per-level", amount: 1 }
+        ]
       },
       /**
-       * Only the level-3 tier is authored: `grants.spells` has no character-level gate, and the overlay
-       * cannot split the feature into staged records. Granted spells are always prepared and do not use
-       * prepared slots; Command is not otherwise on the Sorcerer list.
+       * The level-3 tier; the table's later rows are staged features (`subclassStages`). Granted spells are
+       * always prepared and do not use prepared slots; Command is not otherwise on the Sorcerer list.
        */
       "draconic-spells": {
         grants: {
@@ -143,7 +170,17 @@ export const sorcerer: ClassMechanicsModule = {
             activation: "bonus-action",
             description:
               "Draconic wings appear on your back for 1 hour or until you dismiss them (no action required). For the duration you have a Fly Speed of 60 feet. You regain the use on a Long Rest, or by spending 3 Sorcery Points.",
-            damage: []
+            damage: [],
+            grants: {
+              name: "Dragon Wings",
+              tags: ["dragon-wings"],
+              duration: { type: "manual" },
+              modifiers: [{ type: "special-speed", movement: "fly", feet: 60 }],
+              onEnd: [],
+              target: "self",
+              voidWhileIncapacitated: false,
+              concentration: false
+            }
           }
         ]
       },

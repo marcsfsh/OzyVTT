@@ -22,6 +22,7 @@ import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { gameCommands, gameReads, socketEventOf } from "../src/commands/index.js";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 // ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
 // credential, discovers capabilities, reads a safe snapshot, submits and safely retries idempotent
@@ -30,16 +31,6 @@ import { createServer } from "../src/server.js";
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const SECRET_ID = "10000000-0000-4000-8000-000000000002";
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 function initialState() {
   return GameStateSchema.parse({
@@ -114,6 +105,42 @@ async function issueCredential(base: string, gmToken: string, name: string, scop
   const body = await response.json();
   return { token: body.data.token as string, id: body.data.credential.id as string };
 }
+
+describe("death saves over the API", () => {
+  it("lets a player make one death save, on their dying character's own turn", async () => {
+    const { base, server, gmToken, mapAssetId } = await bootWithBattlemap();
+    const playerToken = server.auth.issuePlayerSession();
+    await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: HERO_ID });
+    await post(base, GAME_PATHS.encounterStart, gmToken, {
+      commandId: randomUUID(),
+      mapAssetId,
+      entries: [
+        { actorId: SECRET_ID, score: 20 },
+        { actorId: HERO_ID, score: 10 }
+      ]
+    });
+    await post(base, GAME_PATHS.actorHp.replace("{actorId}", HERO_ID), gmToken, {
+      commandId: randomUUID(),
+      actorId: HERO_ID,
+      current: 0
+    });
+    // A typed 12: a plain success, so a random natural 20 can't bring the hero back up mid-test.
+    const roll = (token: string) =>
+      post(base, GAME_PATHS.deathSaveRoll.replace("{actorId}", HERO_ID), token, {
+        commandId: randomUUID(),
+        actorId: HERO_ID,
+        naturalRoll: 12
+      });
+    // The Tyrant's turn: not yet.
+    expect((await roll(playerToken)).status).toBe(409);
+    await post(base, GAME_PATHS.initiativeNext, gmToken, { commandId: randomUUID() });
+    expect((await roll(playerToken)).status).toBe(200);
+    // One per turn.
+    expect((await roll(playerToken)).status).toBe(409);
+    // The GM can still roll one as a correction.
+    expect((await roll(gmToken)).status).toBe(200);
+  });
+});
 
 describe("public game API over /api/v1", () => {
   it("serves GM-full and player-safe snapshots by principal, with ETag polling and no hidden-actor leaks", async () => {
@@ -457,6 +484,28 @@ describe("public game API over /api/v1", () => {
       headers: bearer(reader.token)
     });
     expect(actions.status).toBe(200);
+    // The SRD's check actions offer the skills they are made with, the usual one first; Influence picks its target.
+    const rows = (await actions.json()).data.actions as ReadonlyArray<{
+      id: string;
+      targeting?: string;
+      checkSkills?: ReadonlyArray<{ id: string; ability: string }>;
+    }>;
+    const row = (id: string) => rows.find((entry) => entry.id === id);
+    expect(row("search")?.checkSkills?.[0]).toEqual({ id: "perception", ability: "wis" });
+    expect(row("study")?.checkSkills?.map((skill) => skill.id)).toEqual([
+      "investigation",
+      "arcana",
+      "history",
+      "nature",
+      "religion"
+    ]);
+    expect(row("influence")?.targeting).toBe("single");
+    expect(row("influence")?.checkSkills).toContainEqual({ id: "animal-handling", ability: "wis" });
+    expect(row("escape-grapple")?.checkSkills).toEqual([
+      { id: "athletics", ability: "str" },
+      { id: "acrobatics", ability: "dex" }
+    ]);
+    expect(row("dodge")?.checkSkills).toBeUndefined();
     const missing = await fetch(base + CONTENT_PATHS.monsterById.replace("{definitionId}", "no-such-monster"), {
       headers: bearer(reader.token)
     });
@@ -511,6 +560,13 @@ describe("public game API over /api/v1", () => {
     const conditionsBody = await conditions.json();
     expect(conditionsBody.data.conditions.length).toBeGreaterThan(5);
     expect(conditionsBody.data.attribution).toContain("System Reference Document 5.2.1");
+
+    // The Rules Glossary is reference text any joined player may read.
+    const glossary = await fetch(base + CONTENT_PATHS.glossary, { headers: bearer(playerToken) });
+    expect(glossary.status).toBe(200);
+    const glossaryBody = await glossary.json();
+    expect(glossaryBody.data.glossary.find((entry: { id: string }) => entry.id === "prone")?.tag).toBe("Condition");
+    expect(glossaryBody.data.attribution).toContain("System Reference Document 5.2.1");
 
     const equipment = await fetch(base + CONTENT_PATHS.equipment, { headers: bearer(playerToken) });
     expect(equipment.status).toBe(200);
@@ -610,7 +666,8 @@ describe("public game API over /api/v1", () => {
     const soldier = backgrounds.data.backgrounds.find((entry: { id: string }) => entry.id === "soldier");
     expect(soldier.toolChoices).toEqual({
       choose: 1,
-      from: ["gaming-set-dice", "gaming-set-playing-cards"],
+      // SRD: "Choose one kind of Gaming Set", all four variants.
+      from: ["gaming-set-dice", "gaming-set-dragonchess", "gaming-set-playing-cards", "gaming-set-three-dragon-ante"],
       fromCatalog: null
     });
     expect(soldier).toHaveProperty("skillChoices");
@@ -629,7 +686,10 @@ describe("public game API over /api/v1", () => {
       customFormula: null,
       maxLevel: 20,
       playerBuilder: "open",
-      playerRandom: "gm-only"
+      playerRandom: "gm-only",
+      // Players may type what their physical dice show until the GM closes it, and a rolled level counts as rolled.
+      typedRolls: "open",
+      hitPointRollFloor: "none"
     });
 
     // Player write refused; the policy is the GM's.
@@ -661,7 +721,9 @@ describe("public game API over /api/v1", () => {
       customFormula: "3d6",
       maxLevel: 20,
       playerBuilder: "open",
-      playerRandom: "gm-only"
+      playerRandom: "gm-only",
+      typedRolls: "open",
+      hitPointRollFloor: "none"
     });
   });
 
@@ -1211,6 +1273,18 @@ describe("public game API over /api/v1", () => {
       await (await post(base, GAME_PATHS.actors, gmToken, { commandId, definitionId: "giant-crocodile" })).json()
     );
     const crocId = added.data.actorId as string;
+    // Average hit points by default; rolled on request, from the stat block's Hit Dice.
+    expect(server.store.snapshot.actors.find((actor) => actor.id === crocId)?.hp.maximum).toBe(85);
+    const rolledId = randomUUID();
+    await post(base, GAME_PATHS.actors, gmToken, {
+      commandId: rolledId,
+      definitionId: "giant-crocodile",
+      hitPoints: "roll"
+    });
+    const rolled = server.store.snapshot.actors.find((actor) => actor.id === rolledId)!.hp;
+    expect(rolled.current).toBe(rolled.maximum);
+    expect(rolled.maximum).toBeGreaterThanOrEqual(9 + 27); // 9d12 + 27
+    expect(rolled.maximum).toBeLessThanOrEqual(108 + 27);
 
     const path = GAME_PATHS.actorAvailableActions.replace("{actorId}", crocId);
     expect((await fetch(base + path)).status).toBe(401);
@@ -1230,7 +1304,7 @@ describe("public game API over /api/v1", () => {
     const rows = body.data.actions as ReadonlyArray<{
       id: string;
       available: boolean;
-      violations: readonly unknown[];
+      violations: ReadonlyArray<{ rule: string }>;
       builtin?: boolean;
     }>;
     // Stat-block rows first, then the SRD builtin generic actions flagged builtin: true.
@@ -1243,8 +1317,14 @@ describe("public game API over /api/v1", () => {
     for (const id of ["dodge", "dash", "disengage", "help", "hide", "ready", "unarmed-grapple", "escape-grapple"]) {
       expect(rows.find((row) => row.id === id)?.builtin).toBe(true);
     }
-    // No encounter running: nothing is spent, so everything reports available with no violations.
-    expect(rows.every((row) => row.available && row.violations.length === 0)).toBe(true);
+    // No encounter running: nothing is spent, so everything reports available with no violations, but an action
+    // that needs an effect the crocodile doesn't have: putting out a fire needs it to be burning.
+    const putOut = rows.find((row) => row.id === "extinguish-fire");
+    expect(putOut?.available).toBe(false);
+    expect(putOut?.violations.map((violation) => violation.rule)).toEqual(["feature.requires-effect"]);
+    expect(rows.filter((row) => row !== putOut).every((row) => row.available && row.violations.length === 0)).toBe(
+      true
+    );
   });
 });
 

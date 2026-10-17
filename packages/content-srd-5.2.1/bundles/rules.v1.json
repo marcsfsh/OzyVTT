@@ -252,28 +252,28 @@
   "description": "Adventurers and monsters often hide, whether to spy on one another, sneak past a guardian, or set an ambush. The Game Master decides when circumstances are appropriate for hiding. When you try to hide, you take the Hide action."
  },
  {
-  "id": "exploration-3",
+  "id": "exploration-4",
   "name": "Interacting with Objects",
   "ruleset": "Exploration",
   "order": 3,
   "description": "Interacting with objects is often simple to resolve. The player tells the GM that their character is doing something, such as moving a lever or opening a door, and the GM describes what happens. Sometimes, however, rules govern what you can do with an object, as detailed in the following sections.\n\n## What Is an Object?\n\nFor the purpose of the rules, an object is a discrete, inanimate item like a window, door, sword, book, table, chair, or stone. It isn’t a building or a vehicle, which are composed of many objects.\n\n## Time-Limited Object Interactions\n\nWhen time is short, such as in combat, interactions with objects are limited: one free interaction per turn. That interaction must occur during a creature’s movement or action. Any additional interactions require the Utilize action, as explained in “Combat” later in “Playing the Game.”\n\n## Finding Hidden Objects\n\nWhen your character searches for hidden things, such as a secret door or a trap, the GM typically asks you to make a Wisdom (Perception) check, provided you describe the character searching in the hidden object’s vicinity. On a success, you find the object, other important details, or both.\n\nIf you describe your character searching nowhere near a hidden object, a Wisdom (Perception) check won’t reveal the object, no matter the check’s total.\n\n## Carrying Objects\n\nYou can usually carry your gear and treasure without worrying about the weight of those objects. If you try to haul an unusually heavy object or a massive number of lighter objects, the GM might require you to abide by the rules for carrying capacity in “Rules Glossary.”\n\n## Breaking Objects\n\nAs an action, you can automatically break or otherwise destroy a fragile, nonmagical object, such as a glass container or a piece of paper. If you try to damage something more resilient, the GM might use the rules on breaking objects in “Rules Glossary.”"
  },
  {
-  "id": "exploration-4",
+  "id": "exploration-5",
   "name": "Marching Order",
   "ruleset": "Exploration",
   "order": 4,
   "description": "The adventurers should establish a marching order while they travel, whether indoors or outdoors. A marching order makes it easier to determine which characters are affected by traps, which ones can spot hidden enemies, and which ones are the closest to those enemies if a fight breaks out. You can change your marching order outside combat and record the order any way you like: write it down, for example, or arrange miniatures to show it."
  },
  {
-  "id": "exploration-5",
+  "id": "exploration-6",
   "name": "Hazards",
   "ruleset": "Exploration",
   "order": 5,
   "description": "Monsters are the main perils characters face, but other dangers await. “Rules Glossary” defines the following hazards:\n\n* Burning\n* Dehydration\n* Falling\n* Malnutrition\n* Suffocation"
  },
  {
-  "id": "exploration-6",
+  "id": "exploration-7",
   "name": "Travel",
   "ruleset": "Exploration",
   "order": 6,

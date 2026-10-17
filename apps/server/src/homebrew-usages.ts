@@ -1,6 +1,6 @@
 import type { HomebrewContentType } from "@vtt/api-contract";
 import type { GameState } from "@vtt/domain";
-import { characterChoices, type ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, characterChoices, type ActorDefinition } from "@vtt/schemas";
 
 /**
  * What refers to a homebrew record, computed on demand. Character usages are informational (built definitions are
@@ -54,13 +54,14 @@ export function buildHomebrewUsageIndex(state: GameState): HomebrewUsageIndex {
       );
 
     for (const item of actor.inventory) {
-      record("equipment", item.id, at("inventory", `carried by ${actor.name}`));
+      record("equipment", catalogIdOf(item), at("inventory", `carried by ${actor.name}`));
       // A bound template also references its base; deleting the base strands the bind.
       if (item.baseId !== undefined)
         record("equipment", item.baseId, at("inventory", `bound base of ${item.name}, carried by ${actor.name}`));
     }
     for (const spellId of actor.preparedSpellIds)
       record("spell", spellId, at("prepared-spell", `prepared by ${actor.name}`));
+    for (const entry of actor.spellbook) record("spell", entry.id, at("spellbook", `in ${actor.name}'s spellbook`));
 
     const definition = actor.definitionId ? definitionsById.get(actor.definitionId) : undefined;
     if (definition) recordDefinitionUsages(definition, record, at);

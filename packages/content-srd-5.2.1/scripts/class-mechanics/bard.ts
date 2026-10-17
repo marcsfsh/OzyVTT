@@ -6,8 +6,7 @@ export const bard: ClassMechanicsModule = {
     /**
      * Uses scale off the Charisma modifier, not the printed Bardic Die column (that is the die size, so
      * it stays display-only and is not in `liveResources`). Cutting Words and Peerless Skill spend the
-     * same pool. The die granted to another creature, Font of Inspiration and Superior Inspiration stay
-     * prose.
+     * same pool. The die granted to another creature and Superior Inspiration stay prose.
      */
     "bardic-inspiration": {
       tags: ["bardic-inspiration"],
@@ -25,7 +24,12 @@ export const bard: ClassMechanicsModule = {
     },
 
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
+    },
+
+    // "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest."
+    "font-of-inspiration": {
+      modifiers: [{ type: "short-rest-regain", poolId: "bardic-inspiration" }]
     },
 
     /**
@@ -39,11 +43,16 @@ export const bard: ClassMechanicsModule = {
           { id: "power-word-kill", level: 9, alwaysPrepared: true }
         ]
       }
-    }
+    },
 
-    // Not modeled: Magical Secrets (its generated `choice` is wrong, and nothing widens an existing
-    // budget's spell list), Jack of All Trades (half proficiency), Font of Inspiration, Superior
-    // Inspiration and Countercharm.
+    /**
+     * Not a pick of its own: the Bard's prepared spells and later replacements may come from these lists too,
+     * and count as Bard spells.
+     */
+    "magical-secrets": { extraSpellLists: ["cleric", "druid", "wizard"] }
+
+    // Jack of All Trades is applied by the server's check plan (`ability-checks.ts`), by its feature id.
+    // Not modeled: Superior Inspiration and Countercharm.
   },
 
   subclasses: {

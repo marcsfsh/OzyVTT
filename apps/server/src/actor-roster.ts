@@ -1,18 +1,24 @@
 import { makeHitDicePool, type Actor, type ActorDefinition, type GameState, type HitDiceEntry } from "@vtt/domain";
+import type { ActorAction } from "@vtt/schemas";
 import {
   ABILITIES,
   abilityModifier,
   armorClassFromEquipment,
+  casterProgressionFor,
   hitDicePool,
   multiclassCasterLevel,
   multiclassPactSlots,
   multiclassSpellSlots,
+  wornBodyArmor,
   type Ability,
   type ClassLevelEntry,
+  type ClassProgressionTable,
   type UnarmoredDefense
 } from "@vtt/rules-5e";
 import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
+import { storedClassSequence } from "./character-offers.js";
 import { endEffectsSustainedBy } from "./effects.js";
+import { actionPools, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -81,13 +87,48 @@ export function spellSlotMaxima(
 function baseSpellSlotMaxima(definition: ActorDefinition | undefined): ReadonlyArray<{ level: number; max: number }> {
   const spellcasting = definition?.spellcasting;
   if (!spellcasting) return [];
-  if (spellcasting.slots.length > 0) return spellcasting.slots;
   const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  // A Warlock built before Pact Magic had a pool of its own carried the pact row as its `slots`; those are its pact
+  // slots, which `pactSlotMaximum` derives, so counting them here would seed them twice.
+  const pactOnly =
+    !spellcasting.pact &&
+    casterIds.size > 0 &&
+    [...casterIds].every((classId) => casterProgressionFor(classId) === "pact");
+  if (pactOnly) return [];
+  if (spellcasting.slots.length > 0) return spellcasting.slots;
   if (casterIds.size === 0) return [];
   const casterLevels = classLevelsOf(definition!).filter((entry) => casterIds.has(entry.classId));
   return multiclassSpellSlots(multiclassCasterLevel(casterLevels))
     .map((count, index) => ({ level: index + 1, max: count }))
     .filter((slot) => slot.max > 0);
+}
+
+/**
+ * An imported sheet that lists its casting classes but states no slots, with the slots written in from the
+ * table's own class rows. The live reads above fall back to the SRD rows, which know no homebrew class, so a
+ * homebrew half caster's levels would otherwise add nothing to the shared table.
+ */
+export function withDerivedSlots(definition: ActorDefinition, table: ClassProgressionTable): ActorDefinition {
+  const spellcasting = definition.spellcasting;
+  if (!spellcasting || (spellcasting.slots.length > 0 && spellcasting.pact)) return definition;
+  const casterIds = new Set((spellcasting.classes ?? []).map((entry) => entry.classId));
+  if (casterIds.size === 0) return definition;
+  const casterLevels = classLevelsOf(definition).filter((entry) => casterIds.has(entry.classId));
+  const slots =
+    spellcasting.slots.length > 0
+      ? spellcasting.slots
+      : multiclassSpellSlots(multiclassCasterLevel(casterLevels, table))
+          .map((count, index) => ({ level: index + 1, max: count }))
+          .filter((slot) => slot.max > 0);
+  const pact = spellcasting.pact ?? multiclassPactSlots(casterLevels, table);
+  return {
+    ...definition,
+    spellcasting: {
+      ...spellcasting,
+      slots,
+      ...(pact ? { pact: "max" in pact ? pact : { level: pact.level, max: pact.slots } } : {})
+    }
+  };
 }
 
 /** Warlock Pact Magic maximum, derived from the Warlock levels when the sheet did not state one. */
@@ -123,8 +164,18 @@ export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
     : [];
 }
 
-/** Flat non-equipment AC (Defense, a ring of protection), kept in the `open5e.srd-2024` extension bag so
- *  re-deriving AC from the loadout doesn't drop it. Absent reads 0. */
+/** The `source.name` the character builder stamps on what it builds. */
+export const BUILDER_SOURCE_NAME = "OzyVTT Character Builder";
+
+/** Whether a sheet's Armor Class is worked out from what the character wears (a built character), rather than a
+ *  printed total that already counts its armor (a stat block, an imported sheet). */
+export function armorClassFromLoadout(definition: ActorDefinition): boolean {
+  // `source` is required by the schema, but hand-built definitions (tests, old fixtures) can lack it.
+  return definition.source?.name === BUILDER_SOURCE_NAME;
+}
+
+/** Flat non-equipment AC an older build kept in the `open5e.srd-2024` extension bag. Read only for a printed
+ *  total; a built character's riders are collected live from its features. Absent reads 0. */
 export function armorClassRiderOf(definition: ActorDefinition): number {
   // `extensions` is schema-defaulted, but hand-built definitions can lack it; missing means no rider.
   const extension = definition.extensions?.["open5e.srd-2024"];
@@ -135,44 +186,54 @@ export function armorClassRiderOf(definition: ActorDefinition): number {
   return 0;
 }
 
-/** This sheet's Unarmored Defense for the AC math, or null. Resolved from the authored rider via the
- *  catalog, else the builder's `open5e.srd-2024` bag (ability validated against `ABILITIES` so a bad
+/** This sheet's Unarmored Defenses for the AC math (a Monk/Barbarian has two). Resolved from the authored riders
+ *  via the catalog, else the builder's `open5e.srd-2024` bag (ability validated against `ABILITIES` so a bad
  *  string can't make AC NaN). Never inferred from a class name. */
-export function unarmoredDefenseOf(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense | null {
+export function unarmoredDefensesOf(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense[] {
   // Live content wins over the bag, which is a build-time snapshot and goes stale when content is
   // corrected (e.g. `allowShield`). The bag is the fallback when the feature can't be resolved (no
   // catalog, deleted homebrew class).
-  const fromContent = unarmoredDefenseFromContent(definition, catalog);
-  if (fromContent) return fromContent;
+  const fromContent = unarmoredDefensesFromContent(definition, catalog);
+  if (fromContent.length > 0) return fromContent;
   const extension = definition.extensions?.["open5e.srd-2024"];
-  if (extension && typeof extension === "object") {
-    const value = (extension as { unarmoredDefense?: unknown }).unarmoredDefense;
-    if (value && typeof value === "object") {
-      const { ability, allowShield } = value as { ability?: unknown; allowShield?: unknown };
-      if (typeof ability === "string" && (ABILITIES as readonly string[]).includes(ability)) {
-        return {
-          bonus: abilityModifier(definition.abilityScores[ability as Ability]),
-          allowShield: allowShield === true
-        };
-      }
-    }
-  }
-  return null;
+  if (!extension || typeof extension !== "object") return [];
+  const { unarmoredDefense, unarmoredDefenses } = extension as {
+    unarmoredDefense?: unknown;
+    unarmoredDefenses?: unknown;
+  };
+  return (Array.isArray(unarmoredDefenses) ? unarmoredDefenses : [unarmoredDefense]).flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const { ability, allowShield } = value as { ability?: unknown; allowShield?: unknown };
+    return typeof ability === "string" && (ABILITIES as readonly string[]).includes(ability)
+      ? [{ bonus: abilityModifier(definition.abilityScores[ability as Ability]), allowShield: allowShield === true }]
+      : [];
+  });
 }
 
-/** The AC an actor stores, which attacks read: equipped armor and shields when there are any, else the sheet's
- *  own (natural armor, monsters); plus the flat rider, so a built definition and its actor agree, and standing
- *  item riders. */
+/**
+ * The AC an actor stores, which attacks read. A GM-set AC wins outright. A built character's AC is what it wears now
+ * (SRD: with no armor or Shield, 10 + Dex, or its Unarmored Defense), plus the standing `armor-class` riders of its
+ * items and features (Defense applies only while armor is worn). A printed total (a stat block, an imported sheet)
+ * already counts the armor it was printed with, so it stands until body armor is equipped; a Shield alone can't be
+ * told apart from one it already counts. With several ways to calculate AC (a Monk/Barbarian's two Unarmored
+ * Defenses) only one applies at a time (SRD Multiclassing): the best.
+ */
 export function storedArmorClass(actor: Actor, definition: ActorDefinition, catalog?: EquipmentCatalog): number {
-  const equipmentAc = armorClassFromEquipment(
-    abilityModifier(definition.abilityScores.dex),
-    withResolvedSlots(actor.inventory, catalog),
-    unarmoredDefenseOf(definition, catalog)
-  );
-  return (
-    (equipmentAc === null ? definition.armorClass : equipmentAc + armorClassRiderOf(definition)) +
-    deriveEquipment(actor, definition, catalog).armorClass
-  );
+  if (actor.armorClassOverride !== undefined) return actor.armorClassOverride;
+  const derivation = deriveEquipment(actor, definition, catalog);
+  const dex = abilityModifier(definition.abilityScores.dex);
+  const items = withResolvedSlots(actor.inventory, catalog);
+  const unarmored = unarmoredDefensesOf(definition, catalog);
+  const training = { shield: derivation.untrainedShield === null };
+  const worn = [null, ...unarmored]
+    .map((option) => armorClassFromEquipment(dex, items, option, training))
+    .filter((value): value is number => value !== null);
+  const equipmentAc = worn.length > 0 ? Math.max(...worn) : null;
+  if (armorClassFromLoadout(definition))
+    return (equipmentAc ?? 10 + dex + Math.max(0, ...unarmored.map((option) => option.bonus))) + derivation.armorClass;
+  const base =
+    equipmentAc !== null && wornBodyArmor(items) ? equipmentAc + armorClassRiderOf(definition) : definition.armorClass;
+  return base + derivation.armorClass;
 }
 
 /** Re-derives every stored AC from current content. Inventory writes reconcile AC, but a homebrew publish or a
@@ -213,24 +274,25 @@ export function fillMissingSpeeds(
   return changed;
 }
 
-/** Unarmored Defense from the sheet's features then feats (last wins, like `interpretFeature`); fails open to null. */
-function unarmoredDefenseFromContent(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense | null {
-  if (!catalog) return null;
+/** Every Unarmored Defense the sheet's features and feats carry; fails open to none. */
+function unarmoredDefensesFromContent(definition: ActorDefinition, catalog?: EquipmentCatalog): UnarmoredDefense[] {
+  if (!catalog) return [];
   const blocks = [
     ...(definition.character?.features ?? []).map((held) => catalog.featureRecord?.(held)),
     ...(definition.character?.feats ?? []).map((held) => catalog.featRecord?.(held.id)?.feature)
   ];
-  let found: UnarmoredDefense | null = null;
-  for (const block of blocks) {
-    for (const modifier of block?.modifiers ?? []) {
-      if (modifier.type !== "unarmored-defense" || modifier.ability === undefined) continue;
-      found = {
-        bonus: abilityModifier(definition.abilityScores[modifier.ability]),
-        allowShield: modifier.allowShield === true
-      };
-    }
-  }
-  return found;
+  return blocks.flatMap((block) =>
+    (block?.modifiers ?? []).flatMap((modifier) =>
+      modifier.type === "unarmored-defense" && modifier.ability !== undefined
+        ? [
+            {
+              bonus: abilityModifier(definition.abilityScores[modifier.ability]),
+              allowShield: modifier.allowShield === true
+            }
+          ]
+        : []
+    )
+  );
 }
 
 function instantiate(
@@ -267,14 +329,18 @@ function instantiate(
     effects: [],
     deathSaves: null,
     actionUses: {},
+    heroicInspiration: false,
     choiceOverrides: {},
     conditionImmunities: definition.conditionImmunities ? [...definition.conditionImmunities] : [],
     speedFeet: definition.speedFeet,
     ...(definition.legendary ? { legendary: { ...definition.legendary } } : {}),
     hitDice: seedHitDice(definition),
+    lastLongRestAt: null,
     spellSlots: seedSpellSlots(definition, derivation.spellSlots),
     pactSlots: seedPactSlots(definition),
     preparedSpellIds: seedPreparedSpellIds(definition),
+    spellbook: [],
+    preparation: null,
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,
@@ -347,12 +413,19 @@ export function submitPendingImport(state: GameState, definition: ActorDefinitio
   ];
 }
 
-/** GM decision on a queued import: approving instantiates a claimable actor; either way it leaves the queue. */
-export function resolvePendingImport(state: GameState, importId: string, approve: boolean, newActorId: string) {
+/** GM decision on a queued import: approving instantiates a claimable actor; either way it leaves the queue. The
+ *  catalog gives its carried magic items their riders from the start, as the GM's own import does. */
+export function resolvePendingImport(
+  state: GameState,
+  importId: string,
+  approve: boolean,
+  newActorId: string,
+  catalog?: EquipmentCatalog
+) {
   const pending = state.pendingImports.find((entry) => entry.id === importId);
   if (!pending) throw new CommandRejectedError("That pending import is no longer in the queue.");
   state.pendingImports = state.pendingImports.filter((entry) => entry.id !== importId);
-  if (approve) importActorDefinition(state, pending.definition, newActorId, "public");
+  if (approve) importActorDefinition(state, pending.definition, newActorId, "public", catalog);
 }
 
 /** Archived characters are out of play; rejected (not filtered) so the GM's selection never silently changes. */
@@ -364,8 +437,11 @@ export function assertNotArchived(state: GameState, actorId: string) {
 /**
  * Rebuilds one character in place (level up/down, respec) from a definition built by
  * `buildCharacterDefinition`. Keeps table identity and campaign state (conditions, effects, notes,
- * currency, re-reconciled inventory); resets sheet-owned resources and derived stats. HP:
- * `current += newMaximum - oldMaximum`, clamped, so 5 -> 3 -> 5 lands where it started.
+ * currency, re-reconciled inventory) and what has been spent: a level is not a rest (SRD: "Each time you gain
+ * a level, you gain an additional Hit Die"; uses come back only on the rest a feature names), so spent uses,
+ * Hit Dice and slots carry over against the new maxima. Derived stats are recomputed. HP:
+ * `current += newMaximum - oldMaximum`, clamped, so 5 -> 3 -> 5 lands where it started; a character at 0 stays
+ * at 0, since gaining a level neither wakes nor revives anyone.
  */
 export function rebuildActorDefinition(
   state: GameState,
@@ -400,6 +476,11 @@ export function rebuildActorDefinition(
   // Carry over the old sheet's `hp-roll` rows for levels the new build doesn't cover, so levelling back
   // up restores the original rolls.
   const previous = state.definitions.find((entry) => entry.id === definitionId)?.definition;
+  // A build carrying fewer classes would silently drop one, unless it levels below where that class was taken.
+  if (dropsAClass(previous, definition))
+    throw new CommandRejectedError(
+      `${actor.name} has more classes than this build carries, and rebuilding would drop them.`
+    );
   const rebuilt = rememberHitPointRolls(previous, definition);
 
   const inventory = actor.inventory.map((item) => ({ ...item }));
@@ -409,7 +490,7 @@ export function rebuildActorDefinition(
   const maximum = definition.hitPoints.maximum;
 
   actor.hp = {
-    current: Math.max(0, Math.min(maximum, actor.hp.current + (maximum - previousMaximum))),
+    current: actor.hp.current <= 0 ? 0 : Math.max(0, Math.min(maximum, actor.hp.current + (maximum - previousMaximum))),
     maximum,
     temporary: actor.hp.temporary
   };
@@ -417,17 +498,99 @@ export function rebuildActorDefinition(
   actor.initiative = definition.initiativeBonus + derivation.initiative;
   actor.speedFeet = definition.speedFeet;
   actor.conditionImmunities = definition.conditionImmunities ? [...definition.conditionImmunities] : [];
-  actor.hitDice = seedHitDice(definition);
-  actor.spellSlots = seedSpellSlots(definition, derivation.spellSlots);
-  actor.pactSlots = seedPactSlots(definition);
-  actor.preparedSpellIds = seedPreparedSpellIds(definition);
-  actor.actionUses = {};
+  actor.hitDice = carriedHitDice(actor.hitDice, seedHitDice(definition));
+  actor.spellSlots = carriedSlots(
+    actor.spellSlots,
+    previous ? spellSlotMaxima(previous, deriveEquipment(actor, previous, catalog).spellSlots) : [],
+    seedSpellSlots(definition, derivation.spellSlots)
+  );
+  actor.pactSlots = carriedPactSlots(actor.pactSlots, pactSlotMaximum(previous), seedPactSlots(definition));
+  actor.preparedSpellIds = carriedPreparedSpells(actor.preparedSpellIds, previous, definition);
+  actor.actionUses = carriedUses(actor.actionUses, effectiveActions(definition, { ...actor, inventory }, catalog));
   actor.size = definition.size;
   actor.sizeCells = Math.max(definition.token.footprint.width, definition.token.footprint.height);
   state.definitions = state.definitions.map((entry) =>
     entry.id === definitionId ? { id: definitionId, definition: rebuilt } : entry
   );
   return actor;
+}
+
+/**
+ * Whether a rebuild leaves out a class the stored sheet has. Levelling below the level a class was first taken
+ * undoes that class, which is the Level flow's level-down; any other loss (a hand-added class, a single-class build
+ * sent for a multiclass sheet) is refused.
+ */
+function dropsAClass(previous: ActorDefinition | undefined, next: ActorDefinition): boolean {
+  const before = previous?.character?.classes ?? [];
+  const after = next.character?.classes ?? [];
+  if (before.length <= after.length) return false;
+  const level = after.reduce((total, entry) => total + entry.level, 0);
+  const sequence = storedClassSequence(previous?.character?.choices ?? []);
+  const kept = new Set(after.map((entry) => entry.id));
+  return before.some((entry) => !kept.has(entry.id) && !(sequence !== null && sequence.indexOf(entry.id) + 1 > level));
+}
+
+/** Spent counts kept against the new limits; a pool the new sheet no longer has is dropped. */
+function carriedUses(spent: Actor["actionUses"], actions: readonly ActorAction[]): Actor["actionUses"] {
+  const limits = new Map(actionPools(actions).map((pool) => [pool.id, pool.limit]));
+  const carried: Record<string, number> = {};
+  for (const [key, used] of Object.entries(spent)) {
+    const limit = limits.get(key);
+    if (limit !== undefined && used > 0) carried[key] = Math.min(used, limit);
+  }
+  return carried;
+}
+
+/** The new Hit Dice pool with each die size's spent dice still spent: a level adds a die, it restores none. */
+function carriedHitDice(previous: Actor["hitDice"], next: Actor["hitDice"]): Actor["hitDice"] {
+  if (!previous || !next) return next;
+  return makeHitDicePool(
+    next.entries.map((entry) => {
+      const before = previous.entries.find((candidate) => candidate.die === entry.die);
+      const spent = before ? Math.max(0, before.maximum - before.remaining) : 0;
+      return { ...entry, remaining: Math.max(0, entry.maximum - spent) };
+    })
+  );
+}
+
+/** The new slot maxima with each level's spent slots still spent. */
+function carriedSlots(
+  previous: Actor["spellSlots"],
+  previousMaxima: ReadonlyArray<{ level: number; max: number }>,
+  next: Actor["spellSlots"]
+): Actor["spellSlots"] {
+  if (!previous || !next) return next;
+  return next.map((slot) => {
+    const before = previous.find((candidate) => candidate.level === slot.level);
+    const max = previousMaxima.find((candidate) => candidate.level === slot.level)?.max ?? before?.remaining ?? 0;
+    const spent = before ? Math.max(0, max - before.remaining) : 0;
+    return { ...slot, remaining: Math.max(0, slot.remaining - spent) };
+  });
+}
+
+function carriedPactSlots(
+  previous: Actor["pactSlots"],
+  previousMaximum: { level: number; max: number } | null,
+  next: Actor["pactSlots"]
+): Actor["pactSlots"] {
+  if (!previous || !next || !previousMaximum) return next;
+  const spent = Math.max(0, previousMaximum.max - previous.remaining);
+  return { ...next, remaining: Math.max(0, next.remaining - spent) };
+}
+
+/** What the player had prepared, where the new sheet still knows it, plus what the new sheet adds prepared. */
+function carriedPreparedSpells(
+  prepared: readonly string[],
+  previous: ActorDefinition | undefined,
+  next: ActorDefinition
+): string[] {
+  const defaults = seedPreparedSpellIds(next);
+  if (!previous?.spellcasting || !next.spellcasting) return defaults;
+  const known = new Set(previous.spellcasting.spells.map((spell) => spell.id));
+  const always = new Set(next.spellcasting.spells.filter((spell) => spell.alwaysPrepared).map((spell) => spell.id));
+  return next.spellcasting.spells
+    .map((spell) => spell.id)
+    .filter((id) => always.has(id) || (known.has(id) ? prepared.includes(id) : defaults.includes(id)));
 }
 
 /** The new sheet, plus any `hp-roll` row the old one recorded for a level this build does not cover. */
@@ -515,6 +678,17 @@ export function removeActor(state: GameState, actorId: string) {
       tokens: state.combat.tokens.filter((token) => token.actorId !== actorId)
     };
   }
+  // Nor does a removed character wait for a rest.
+  const shortRest = state.rest.shortRest;
+  const members = shortRest?.actorIds.filter((id) => id !== actorId) ?? [];
+  state.rest = {
+    ...state.rest,
+    requests: state.rest.requests.filter((id) => id !== actorId),
+    shortRest:
+      shortRest && members.length > 0
+        ? { actorIds: members, done: shortRest.done.filter((id) => id !== actorId) }
+        : null
+  };
 }
 
 /** Definition lookup for sheets/actions: imported stat blocks first, then the bundled content. */

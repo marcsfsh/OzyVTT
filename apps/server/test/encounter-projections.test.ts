@@ -86,7 +86,7 @@ describe("recipient-safe encounter projections", () => {
         movementUsedFeet: 0
       },
       rulesMode: "strict",
-      ruleExceptions: { slots: "assisted" },
+      ruleExceptions: {},
       playerDamageMode: "proposal",
       pendingInitiative: [],
       playerInitiativeMode: "immediate",

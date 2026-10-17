@@ -3,6 +3,7 @@ import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domai
 import { Button, Input, SegmentedControl, Select, Stepper, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "./roll-preference";
+import { RollCallPanel } from "./RollCallPanel";
 import "./dice-panel.css";
 
 const PURPOSE_LABELS: Record<RollPurpose, string> = {
@@ -31,7 +32,7 @@ export const ROLL_VISIBILITY_WORD: Readonly<Record<RollVisibility, string>> = {
  * Who may choose what. The GM gets two: for a GM roller `self-only` and `gm-only` reach the same
  * eyes (`apps/server/src/combat-log.ts`), so a third option would be a second name for one audience.
  */
-const VISIBILITY_OPTIONS: Readonly<Record<"gm" | "player", readonly RollVisibility[]>> = {
+export const VISIBILITY_OPTIONS: Readonly<Record<"gm" | "player", readonly RollVisibility[]>> = {
   gm: ["public", "gm-only"],
   player: ["public", "self-only", "blind"]
 };
@@ -43,8 +44,15 @@ function modifierLabel(modifier: number) {
   return modifier === 0 ? "±0" : modifier > 0 ? `+${modifier}` : `−${Math.abs(modifier)}`;
 }
 
-function isBareD20(formula: string) {
-  return /^\s*1?d20\s*$/i.test(formula);
+/**
+ * A formula with its first single d20 rolled with Advantage (`2d20kh1`) or Disadvantage (`2d20kl1`), so "1d20 + 5"
+ * keeps its bonus; null when the formula has no single d20 to give it to.
+ */
+export function withD20Mode(formula: string, keep: "kh1" | "kl1"): string | null {
+  const match = /(^|[^0-9a-z])(1?d20)(?![0-9a-z])/i.exec(formula);
+  if (!match) return null;
+  const start = match.index + match[1].length;
+  return `${formula.slice(0, start)}2d20${keep}${formula.slice(start + match[2].length)}`;
 }
 
 export function DicePanel({
@@ -65,8 +73,8 @@ export function DicePanel({
   const [disadvantage, setDisadvantage] = useState(false);
   const [fallFeet, setFallFeet] = useState("");
   const { toast } = useToast();
-  // The shared per-browser dice-input preference.
-  const { rollInput, bonusMode, setRollInput, setBonusMode } = useRollPreference();
+  // The shared per-browser dice-input preference; no choice at a table that keeps players' dice on the server.
+  const { rollInput, mayType, setRollInput } = useRollPreference();
   // A player's "self-only" roll is seen by the roller and the GM but no other player. "blind" hides
   // the result from the roller too.
   const visibilityOptions = VISIBILITY_OPTIONS[role];
@@ -108,14 +116,16 @@ export function DicePanel({
     }
     void submit(`1d${sides}${modifierSuffix(modifier)}`, "manual");
   };
+  // An armed Advantage or Disadvantage goes to the formula's d20 and is spent; a formula with no d20 leaves it armed
+  // for the next roll that has one.
   const customRoll = () => {
-    if (isBareD20(formula) && (advantage || disadvantage)) {
-      const kind = advantage ? "kh1" : "kl1";
+    const armed = advantage ? "kh1" : disadvantage ? "kl1" : null;
+    const moded = armed ? withD20Mode(formula, armed) : null;
+    if (moded !== null) {
       setAdvantage(false);
       setDisadvantage(false);
-      return void submit(`2d20${kind}`, purpose);
     }
-    void submit(formula, purpose);
+    void submit(moded ?? formula, purpose);
   };
   // SRD Falling: 1d6 bludgeoning per 10 feet fallen, max 20d6, and the faller lands Prone. The server
   // rolls; this builds the formula and reminds about applying damage and Prone.
@@ -148,30 +158,20 @@ export function DicePanel({
         </label>
       </div>
       {/* The per-browser roll-input preference, shared with the character sheet's toggle. */}
-      <div className="dice-roll-pref" role="group" aria-label="How you roll">
-        <SegmentedControl
-          size="sm"
-          ariaLabel="Roll input mode"
-          value={rollInput}
-          onChange={(mode) => setRollInput(mode as "digital" | "manual")}
-          options={[
-            { value: "digital", label: "Digital" },
-            { value: "manual", label: "Manual" }
-          ]}
-        />
-        {rollInput === "manual" && (
+      {mayType && (
+        <div className="dice-roll-pref" role="group" aria-label="How you roll">
           <SegmentedControl
             size="sm"
-            ariaLabel="Typed bonus handling"
-            value={bonusMode}
-            onChange={(mode) => setBonusMode(mode as "auto" | "total")}
+            ariaLabel="Roll input mode"
+            value={rollInput}
+            onChange={(mode) => setRollInput(mode as "digital" | "manual")}
             options={[
-              { value: "auto", label: "Auto-add bonus" },
-              { value: "total", label: "Final total" }
+              { value: "digital", label: "Digital" },
+              { value: "manual", label: "Manual" }
             ]}
           />
-        )}
-      </div>
+        </div>
+      )}
       <div className="dice-quick" role="group" aria-label="Quick rolls">
         {QUICK_DICE.map((sides) => (
           <button key={sides} onClick={() => quickRoll(sides)}>
@@ -241,6 +241,8 @@ export function DicePanel({
         </div>
         <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
       </details>
+      {/* The GM's own panel calls for rolls; a character's dice pane does not. */}
+      {role === "gm" && !mineActorId && "definitions" in state && <RollCallPanel state={state} />}
       {(() => {
         const rolls =
           mineActorId && rollFilter === "mine"

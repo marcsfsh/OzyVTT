@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
-import { loadEquipment, loadMagicItems } from "@vtt/content-srd-5.2.1";
+import { loadEquipment, loadMagicItems, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import type { EquipmentReference } from "@vtt/content-srd-5.2.1";
@@ -47,7 +47,14 @@ function definitionOf(): ActorDefinition {
     actions: [],
     extensions: {},
     character: { classes: [{ id: "paladin", name: "Paladin", level: 5 }], feats: [] },
-    proficiencies: { saves: [], skills: [], weapons: ["martial"], armor: [], tools: [] }
+    // A Paladin's armor training: a Shield's +2 lands only with it (SRD Armor Training).
+    proficiencies: {
+      saves: [],
+      skills: [],
+      weapons: ["martial"],
+      armor: ["light", "medium", "heavy", "shields"],
+      tools: []
+    }
   } as unknown as ActorDefinition;
 }
 
@@ -225,7 +232,7 @@ describe("the armour and shield rows move a real Armor Class", () => {
   it("raises actor.armorClass on equip and gives it back on unequip", () => {
     // `armor-class` is not in `THIS_ITEM_BY_DEFAULT`, so it is a standing bearer rider and needs no
     // `armor` block. A shield adds the plain shield's +2 from its block on top of its own bonus: Dex 14
-    // and no body armor make 10 + 2 + 2 = 14 before the rider.
+    // and no body armor make 10 + 2 + 2 = 14 before the rider. Built, so a Shield alone derives the AC.
     for (const [id, amount] of [
       ["armor-1", 1],
       ["shield-2", 2 + 2],
@@ -233,7 +240,7 @@ describe("the armour and shield rows move a real Armor Class", () => {
       ["dwarven-plate", 2]
     ] as const) {
       const catalog = catalogOf([shipped(id)]);
-      const definition = definitionOf();
+      const definition = { ...definitionOf(), source: { name: "OzyVTT Character Builder", version: "1" } };
       const state = stateWith([]);
       setInventoryItem(state, IDS.hero, asPicked(id), () => definition, { catalog });
       expect(state.actors[0].armorClass, `${id}: +${amount} did not reach the sheet's AC`).toBe(12 + amount);
@@ -336,6 +343,34 @@ describe("the shipped on-hit dice on a bound melee block", () => {
     expect(resolution.damageTotal).toBe(16);
   });
 
+  it("dragon-slayer adds 3d6 of the weapon's type against a Dragon, and nothing against another creature", () => {
+    const definition = definitionOf();
+    const catalog = catalogOf([shipped("dragon-slayer")]);
+    const dragon = loadMonsterDefinitions().find((entry) => entry.source.externalId === "adult-black-dragon")!;
+    const swing = (foeDefinitionId: string | undefined) => {
+      const state = fight(stateWith([boundTo("dragon-slayer", "longsword")]));
+      state.actors[1]!.definitionId = foeDefinitionId;
+      const action = effectiveActions(definition, state.actors[0], catalog).find(
+        (entry) => entry.id === "item-dragon-slayer"
+      )!;
+      // d20 = 10 (hit); longsword 1d8 = 5, +3 Strength and +1; the rider's 3d6 = 1 + 2 + 3.
+      return resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000205" },
+        {
+          ...deps([10, 5, 1, 2, 3], catalog, definition),
+          resolveDefinition: (id) => (id === "dragon" ? dragon : undefined)
+        }
+      );
+    };
+    expect(swing("dragon").damage).toEqual([
+      { formula: "1d8 + 4", type: "slashing", total: 9 },
+      { formula: "3d6", type: "slashing", total: 6 }
+    ]);
+    expect(swing(undefined).damage).toEqual([{ formula: "1d8 + 4", type: "slashing", total: 9 }]);
+  });
+
   it("frost-brand and sword-of-wounding land their dice the same way, each from its shipped record", () => {
     const definition = definitionOf();
     for (const [id, formula, faces, type, total] of [
@@ -397,13 +432,13 @@ describe("the authored riders are present in the shipped bundle", () => {
     expect(shipped("sentinel-shield").modifiers).toContainEqual(
       expect.objectContaining({ type: "roll-mode", roll: "initiative", mode: "advantage" })
     );
-    // Gated on the ability because `BUILTIN_CHECKS.search` passes no skill and `skill-is` fails closed
-    // without one. Driven to the die in `item-mechanics-shared.test.ts`.
+    // Perception only: Search rolls the skill the searcher picks, so an Insight or Survival search gets no
+    // Advantage. Driven to the die in `item-mechanics-shared.test.ts`.
     expect(shipped("sentinel-shield").modifiers).toContainEqual({
       type: "roll-mode",
       roll: "check",
       mode: "advantage",
-      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+      when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
     });
     expect(shipped("plate-armor-of-etherealness").casts).toContainEqual(
       expect.objectContaining({ spellId: "etherealness" })
@@ -434,14 +469,23 @@ describe("the authored riders are present in the shipped bundle", () => {
       "dwarven-thrower": ["attack-bonus +3", "damage-bonus +3"],
       defender: ["attack-bonus +3", "damage-bonus +3"],
       "vorpal-sword": ["attack-bonus +3", "damage-bonus +3"],
-      "holy-avenger": ["attack-bonus +3", "damage-bonus +3"],
+      "holy-avenger": ["attack-bonus +3", "damage-bonus +3", "extra-damage 2d10 radiant vs fiend, undead"],
       "scimitar-of-speed": ["attack-bonus +2", "damage-bonus +2"],
       "nine-lives-stealer": ["attack-bonus +2", "damage-bonus +2"],
       "quarterstaff-of-the-acrobat": ["attack-bonus +2", "damage-bonus +2"],
       "dagger-of-venom": ["attack-bonus +1", "damage-bonus +1"],
-      "giant-slayer": ["attack-bonus +1", "damage-bonus +1"],
-      "dragon-slayer": ["attack-bonus +1", "damage-bonus +1"],
-      "mace-of-smiting": ["attack-bonus +1", "damage-bonus +1"],
+      "giant-slayer": ["attack-bonus +1", "damage-bonus +1", "extra-damage 2d6 of the weapon's type vs giant"],
+      "dragon-slayer": ["attack-bonus +1", "damage-bonus +1", "extra-damage 3d6 of the weapon's type vs dragon"],
+      "mace-of-smiting": [
+        "attack-bonus +1",
+        "damage-bonus +1",
+        "attack-bonus +2 vs construct",
+        "damage-bonus +2 vs construct",
+        "damage-bonus +7 on a critical hit",
+        "damage-bonus +7 on a critical hit vs construct"
+      ],
+      "mace-of-disruption": ["extra-damage 2d6 radiant vs fiend, undead"],
+      "vicious-weapon": ["extra-damage 2d6 of the weapon's type"],
       "hammer-of-thunderbolts": ["attack-bonus +1", "damage-bonus +1"],
       "berserker-axe": ["attack-bonus +1", "damage-bonus +1"],
       "luck-blade": ["attack-bonus +1", "damage-bonus +1"],
@@ -450,10 +494,23 @@ describe("the authored riders are present in the shipped bundle", () => {
       "sword-of-wounding": ["extra-damage 2d6 necrotic"]
     };
     const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"];
-    const nameOf = (modifier: { type: string; amount?: number; formula?: string; damageType?: string }): string =>
-      modifier.type === "extra-damage"
-        ? `extra-damage ${modifier.formula} ${modifier.damageType}`
-        : `${modifier.type} ${(modifier.amount ?? 0) >= 0 ? "+" : ""}${modifier.amount}`;
+    type Named = {
+      type: string;
+      amount?: number;
+      formula?: string;
+      damageType?: string;
+      when?: ReadonlyArray<{ type: string; creatureTypes?: readonly string[] }>;
+    };
+    // A gate names when the rider fires: on a critical hit, or against the creature types it names.
+    const gateOf = (modifier: Named): string => {
+      const crit = modifier.when?.some((trigger) => trigger.type === "on-critical-hit") ? " on a critical hit" : "";
+      const versus = modifier.when?.find((trigger) => trigger.type === "versus-creature-type")?.creatureTypes;
+      return `${crit}${versus ? ` vs ${versus.join(", ")}` : ""}`;
+    };
+    const nameOf = (modifier: Named): string =>
+      (modifier.type === "extra-damage"
+        ? `extra-damage ${modifier.formula} ${modifier.damageType ?? "of the weapon's type"}`
+        : `${modifier.type} ${(modifier.amount ?? 0) >= 0 ? "+" : ""}${modifier.amount}`) + gateOf(modifier);
     const actual = Object.fromEntries(
       weapons
         .map(
@@ -462,9 +519,7 @@ describe("the authored riders are present in the shipped bundle", () => {
               row.id,
               (row.modifiers ?? [])
                 .filter((modifier) => WEAPON_SCOPED.includes(modifier.type))
-                .map((modifier) =>
-                  nameOf(modifier as { type: string; amount?: number; formula?: string; damageType?: string })
-                )
+                .map((modifier) => nameOf(modifier as Named))
             ] as const
         )
         .filter(([, riders]) => riders.length > 0)
@@ -475,11 +530,15 @@ describe("the authored riders are present in the shipped bundle", () => {
     ).toEqual(AUTHORED);
 
     // Every +N pair has no explicit gate or scope: `THIS_ITEM_BY_DEFAULT` means "made with this magic
-    // weapon", and `scope: "bearer"` would let two magic weapons in a pack stack.
+    // weapon", and `scope: "bearer"` would let two magic weapons in a pack stack. A rider gated on the hit, a
+    // critical hit or the target's creature type is the item's own printed condition.
+    const printedGate = (trigger: { type: string }) =>
+      ["on-hit", "on-attack-roll", "on-critical-hit", "versus-creature-type"].includes(trigger.type);
     for (const row of weapons) {
       for (const modifier of row.modifiers ?? []) {
         if (!WEAPON_SCOPED.includes(modifier.type)) continue;
-        expect(modifier.when, `${row.id}/${modifier.type} must stay ungated`).toBeUndefined();
+        const printed = modifier.when !== undefined && modifier.when.every(printedGate);
+        if (!printed) expect(modifier.when, `${row.id}/${modifier.type} must stay ungated`).toBeUndefined();
         expect(
           (modifier as { scope?: string }).scope,
           `${row.id}/${modifier.type} must not set an explicit scope`
@@ -490,7 +549,7 @@ describe("the authored riders are present in the shipped bundle", () => {
 
   it("leaves every RESERVED item bare, so a later unit finds an unauthored carrier", () => {
     // Rows whose printed effects need mechanics the engine does not model yet.
-    for (const id of ["sun-blade", "energy-bow", "vicious-weapon", "spellguard-shield", "thunderous-greatclub"]) {
+    for (const id of ["sun-blade", "energy-bow", "thunderous-greatclub"]) {
       const row = shipped(id) as unknown as { modifiers: unknown[]; casts: unknown[]; cursed: boolean };
       expect(row.modifiers, `${id} is reserved and must carry no modifiers`).toEqual([]);
       expect(row.casts, `${id} is reserved and must carry no casts`).toEqual([]);
@@ -498,23 +557,39 @@ describe("the authored riders are present in the shipped bundle", () => {
     }
   });
 
+  it("gives Spellguard Shield its Disadvantage on spell attacks alone", () => {
+    expect(shipped("spellguard-shield").modifiers).toEqual([
+      {
+        type: "roll-mode",
+        roll: "incoming-attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
+      }
+    ]);
+  });
+
   it("holds the two riders this salvage REMOVED to their named absences", () => {
     // Two authoring mistakes pinned so they do not return:
     // 1. `demon-armor`'s "you know Abyssal": an item's `grants.languages` lands in
     //    `derivation.languages`, which nothing reads; sheet languages are built at character-build time.
-    // 2. `armor-of-vulnerability`: `FeatureGrantsSchema` has no `damageVulnerabilities`, so authoring
-    //    the resistance half alone would make the cursed armor strictly better than plain.
+    // 2. `armor-of-vulnerability`: both halves hang on the type the GM picks per copy, so the resistance is
+    //    the chosen one and the curse's vulnerabilities are the other two, never a fixed modifier. The curse's
+    //    attunement lock holds too (SRD: attunement to a cursed item can't be ended voluntarily).
     expect(
       shipped("demon-armor").grants?.languages ?? [],
       "demon-armor's Abyssal has no reader; it is a named absence, not a grant"
     ).toEqual([]);
     const vulnerable = shipped("armor-of-vulnerability") as unknown as {
       modifiers: unknown[];
-      grants: unknown;
+      grants: { damageResistances?: string[] } | undefined;
       cursed: boolean;
+      damageTypeChoice: string[];
+      vulnerableToOtherChoices: boolean;
     };
-    expect(vulnerable.modifiers, "armor-of-vulnerability must author nothing until both halves can land").toEqual([]);
-    expect(vulnerable.cursed, "a curse with no downside is an inverted item").toBe(false);
-    expect((vulnerable.grants as { damageResistances?: string[] } | undefined)?.damageResistances ?? []).toEqual([]);
+    expect(vulnerable.modifiers, "a fixed vulnerability would ignore the GM's pick").toEqual([]);
+    expect(vulnerable.cursed, "attuning locks the cursed armor on").toBe(true);
+    expect(vulnerable.grants?.damageResistances).toEqual(["bludgeoning"]);
+    expect(vulnerable.damageTypeChoice).toEqual(["bludgeoning", "piercing", "slashing"]);
+    expect(vulnerable.vulnerableToOtherChoices).toBe(true);
   });
 });

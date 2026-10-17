@@ -250,16 +250,17 @@ describe("Rage's effect reaches the rolls the server makes", () => {
       );
     const calm = barbarian();
     grappled(calm);
-    // Str +3 beats Dex +2, so Athletics (a Strength check) is the branch that rolls: one die, the 4 stands.
+    // Str +3 and Athletics proficiency (+2) beat Dex +2, so Athletics (a Strength check) is the branch that rolls: one
+    // die, the 4 stands.
     const before = use(calm, builtinAction("escape-grapple")!, [4, 18], [], true);
-    expect(before.check).toMatchObject({ naturalRoll: 4, total: 7 });
+    expect(before.check).toMatchObject({ naturalRoll: 4, total: 9 });
     expect(before.rollMode).toBeUndefined();
 
     const raging = barbarian();
     enterRage(raging);
     grappled(raging);
     const during = use(raging, builtinAction("escape-grapple")!, [4, 18], [], true);
-    expect(during.check).toMatchObject({ naturalRoll: 18, total: 21 });
+    expect(during.check).toMatchObject({ naturalRoll: 18, total: 23 });
     expect(during.rollMode).toMatchObject({ mode: "advantage", advantage: ["Raging"] });
   });
 

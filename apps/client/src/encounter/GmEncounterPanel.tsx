@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
-import { Button, Switch, IconArrow, Eyebrow } from "@vtt/ui";
+import { Button, Chip, Switch, IconArrow, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
 import { PendingAsksForGm } from "./RuleAsk";
 import { useRollPreference } from "../dice/roll-preference";
@@ -15,6 +15,10 @@ import { ConfirmRow } from "./ConfirmRow";
 import { FightMenu } from "./FightMenu";
 import { ActingConsole } from "./ActingConsole";
 import { GmInitiativeRow } from "./GmInitiativeRow";
+import { SpellAreas } from "./SpellAreas";
+
+/** How long a turn button ignores taps after a turn command settles: longer than a double tap. */
+const TURN_SETTLE_MS = 500;
 
 export function GmEncounterPanel({
   state,
@@ -40,11 +44,17 @@ export function GmEncounterPanel({
   );
   const liveMapRef = useRef(state.combat.mapAssetId);
   const [busy, setBusy] = useState(false);
+  // On a LAN the turn changes before a double tap's second tap lands, so a turn button ignores taps
+  // until shortly after the last turn command settled; otherwise one double tap skips a combatant.
+  const turnSettlesAt = useRef(0);
   const [message, setMessage] = useState("");
   // The GM's rolls follow the shared per-browser dice-input preference.
   const { rollMode } = useRollPreference();
   // Encounter-setup opt-in: claimed players roll their own initiative (per encounter, not persisted).
   const [playersRollInitiative, setPlayersRollInitiative] = useState(false);
+  // SRD Surprise and group rolls, per fight: who rolls initiative at Disadvantage, and one roll per stat block.
+  const [surprised, setSurprised] = useState<ReadonlySet<string>>(() => new Set());
+  const [groupMonsters, setGroupMonsters] = useState(true);
   // A pending history rewrite/discard the GM must confirm (see the Previous/Next flow).
   const [confirm, setConfirm] = useState<{
     message: string;
@@ -119,12 +129,13 @@ export function GmEncounterPanel({
       // No scores: the server rolls every staged combatant, so a previous fight's order never carries over.
       const entries = rosterActors(state.actors)
         .filter((actor) => selectedActors.has(actor.id))
-        .map((actor) => ({ actorId: actor.id }));
+        .map((actor) => (surprised.has(actor.id) ? { actorId: actor.id, surprised: true } : { actorId: actor.id }));
       if (entries.length === 0) throw new Error("Stage at least one character or monster.");
       return command("encounter:start", {
         mapAssetId: startMapId,
         entries,
         playersRollInitiative,
+        groupMonsters,
         expectedRevision: state.revision
       });
     }, "The fight has started. Initiative was rolled, and every token is ready in the tray above.");
@@ -152,6 +163,8 @@ export function GmEncounterPanel({
     success: string,
     onConfirm?: () => Promise<MutationResult>
   ) => {
+    if (performance.now() < turnSettlesAt.current) return;
+    turnSettlesAt.current = Number.POSITIVE_INFINITY;
     setBusy(true);
     setMessage("");
     setConfirm(null);
@@ -162,10 +175,12 @@ export function GmEncounterPanel({
         return;
       }
       if (!result.ok) throw new Error(result.message ?? "The turn command was rejected.");
+      turnSettlesAt.current = performance.now() + TURN_SETTLE_MS;
       setMessage(success);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
+      if (turnSettlesAt.current === Number.POSITIVE_INFINITY) turnSettlesAt.current = 0;
       setBusy(false);
     }
   };
@@ -305,6 +320,35 @@ export function GmEncounterPanel({
                   disabled={busy}
                   onChange={setPlayersRollInitiative}
                 />
+                <Switch
+                  label="One roll for each group of identical monsters"
+                  checked={groupMonsters}
+                  disabled={busy}
+                  onChange={setGroupMonsters}
+                />
+                {stagedIds.length > 0 && (
+                  <fieldset className="encounter-surprise">
+                    <legend>Surprised? They roll initiative at Disadvantage.</legend>
+                    <div className="encounter-surprise-chips">
+                      {stagedIds.map((actorId) => (
+                        <Chip
+                          key={actorId}
+                          pressed={surprised.has(actorId)}
+                          disabled={busy}
+                          onClick={() =>
+                            setSurprised((current) => {
+                              const next = new Set(current);
+                              if (!next.delete(actorId)) next.add(actorId);
+                              return next;
+                            })
+                          }
+                        >
+                          {state.actors.find((actor) => actor.id === actorId)?.name ?? "Unknown"}
+                        </Chip>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
                 {!readyToStart && (
                   <p className="encounter-start-blocked" role="status">
                     {stagedIds.length === 0 ? "Stage at least one character or monster." : "Pick a battle map first."}
@@ -400,6 +444,8 @@ export function GmEncounterPanel({
           {/* Players' questions, pinned above the turn order. Allow replays the parked command with GM
           authority; it can fail against current state, in which case the question stays and says so. */}
           <PendingAsksForGm state={state} onFeedback={setMessage} />
+          {/* The spell areas the server runs on the map; one a player cast waits here to be placed. */}
+          <SpellAreas state={state} busy={busy} run={run} />
           {(state.combat.pendingInitiative ?? []).length > 0 && (
             <div className="initiative-gathering" role="status">
               <span>

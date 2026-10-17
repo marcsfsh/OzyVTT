@@ -1,8 +1,9 @@
 import { IconRepeat, IconWarning } from "@vtt/ui";
 import type { ActionResolution, ContentActionSummary, GmActor, GmView } from "@vtt/domain";
-import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
+import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { componentLabel } from "./action-summary";
+import { damageBreakdown } from "./format";
 import type { ResolveOptions } from "./targeting";
 
 /**
@@ -17,7 +18,6 @@ export function ActionResultCard({
   actions,
   busy,
   resolveBusy,
-  rollMode,
   onFeedback,
   resolve,
   onAgain,
@@ -32,7 +32,6 @@ export function ActionResultCard({
   actions: readonly ContentActionSummary[] | null;
   busy: boolean;
   resolveBusy: boolean;
-  rollMode: "auto" | "manual";
   onFeedback: (text: string) => void;
   resolve: (options: ResolveOptions) => void;
   onAgain: (action: ContentActionSummary) => void;
@@ -41,7 +40,13 @@ export function ActionResultCard({
   /** A typed damage override (manual roll mode, or a GM adjustment). */
   damageEdit: string | null;
   onDamageEditChange: (value: string) => void;
-  applyDamage: (targetId: string, targetName: string, key: string, overrideAmount?: number) => void;
+  applyDamage: (
+    targetId: string,
+    targetName: string,
+    key: string,
+    overrideAmount?: number,
+    parts?: ReadonlyArray<{ amount: number; type: string }>
+  ) => void;
 }>) {
   const again = !result.preview ? actions?.find((candidate) => candidate.name === result.actionName) : undefined;
   return (
@@ -77,6 +82,7 @@ export function ActionResultCard({
         </p>
       )}
       {result.attack && <AttackOutcome attack={result.attack} audience="gm" />}
+      {result.check && <CheckOutcome check={result.check} />}
       {result.waitingOnReaction &&
         result.attack &&
         (() => {
@@ -103,12 +109,11 @@ export function ActionResultCard({
       {result.preview && result.attack && (
         <AttackPreview
           attack={result.attack}
-          mode={result.rollMode?.mode}
           busy={resolveBusy}
-          rollMode={rollMode}
-          bonusMode="auto"
+          viewer="gm"
           onFeedback={onFeedback}
           push={result.push}
+          {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
           resolve={resolve}
         />
       )}
@@ -133,10 +138,7 @@ export function ActionResultCard({
           // for reference.
           const typed = damageEdit !== null && damageEdit.trim() !== "" ? Number(damageEdit) : null;
           const overriding = typed !== null && Number.isFinite(typed) && typed >= 0 && typed !== result.damageTotal;
-          const breakdown = [
-            ...result.damage.map((part) => `${part.formula} ${part.type} = ${part.total}`),
-            ...(result.bonusDamage ?? []).map((part) => `+${part.amount} ${part.source}`)
-          ].join(" + ");
+          const breakdown = damageBreakdown(result);
           return (
             <p className="action-damage">
               Damage: <strong>{overriding ? typed : result.damageTotal}</strong>
@@ -198,6 +200,27 @@ export function ActionResultCard({
             </span>
           );
         })()}
+      {/* No attack roll and no save (Magic Missile): each target is owed its damage, applied like a hit's. */}
+      {!result.attack &&
+        !result.preview &&
+        result.damageTargets?.map((owed) =>
+          applied.has(owed.targetId) ? (
+            <p key={owed.targetId} className="action-applied">
+              Applied to {owed.targetName}.
+            </p>
+          ) : (
+            <span key={owed.targetId} className="action-apply-group">
+              <button
+                type="button"
+                className="action-apply"
+                disabled={busy}
+                onClick={() => applyDamage(owed.targetId, owed.targetName, owed.targetId, undefined, owed.parts)}
+              >
+                Apply {owed.total} to {owed.targetName}
+              </button>
+            </span>
+          )
+        )}
       {result.warnings?.map((warning) => (
         <p key={warning} className="action-warning">
           <IconWarning /> {warning}

@@ -2,26 +2,22 @@ import { useState } from "react";
 import { Button, Input } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "../dice/roll-preference";
-import { DieModeButtons, type DieMode } from "./RollControls";
 import "./prompts.css";
 
 /**
- * A player's "roll for initiative" prompt while their id is in `combat.pendingInitiative`. Digital
- * rolls on the server (with Adv/Disadv); manual takes a typed d20. The server adds the initiative
- * modifier and, in wait mode, starts turns once everyone has rolled.
+ * A player's "roll for initiative" prompt while their id is in `combat.pendingInitiative`. Digital rolls on
+ * the server, which applies Advantage or Disadvantage from the rules (Surprise, conditions, features); manual
+ * takes a typed d20. The server adds the initiative modifier and, in wait mode, starts turns once everyone
+ * has rolled.
  */
 export function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
   const { rollInput } = useRollPreference();
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState("");
   const [feedback, setFeedback] = useState("");
-  const roll = (payload: { natural?: number; rollMode?: DieMode }) => {
+  const roll = (natural?: number) => {
     setBusy(true);
-    void command("initiative:roll-self", {
-      actorId,
-      ...(payload.natural !== undefined ? { natural: payload.natural } : {}),
-      ...(payload.rollMode ? { rollMode: payload.rollMode } : {})
-    }).then((result) => {
+    void command("initiative:roll-self", { actorId, ...(natural !== undefined ? { natural } : {}) }).then((result) => {
       setBusy(false);
       if (!result.ok) setFeedback(result.message ?? "Initiative could not be rolled.");
     });
@@ -32,12 +28,13 @@ export function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
       setFeedback("Enter your d20 (1-20).");
       return;
     }
-    roll({ natural: value });
+    roll(value);
   };
   return (
     <div className="save-prompt initiative-prompt" role="group" aria-label="Roll your initiative">
       <p className="save-prompt-label">
         <strong>Roll for initiative</strong>
+        {rollInput === "manual" && " - with Advantage or Disadvantage, roll two d20s and type the one that counts."}
       </p>
       {rollInput === "manual" ? (
         <span className="save-prompt-actions">
@@ -62,8 +59,7 @@ export function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
         </span>
       ) : (
         <span className="save-prompt-confirm">
-          <DieModeButtons disabled={busy} onPick={(mode) => roll({ rollMode: mode })} />
-          <button type="button" className="encounter-primary" disabled={busy} onClick={() => roll({})}>
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => roll()}>
             Roll initiative
           </button>
         </span>

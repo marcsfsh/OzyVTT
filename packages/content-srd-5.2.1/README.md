@@ -51,17 +51,26 @@ scratch directory and requires every committed bundle back byte for byte, so edi
   damage on a success, the condition a failure imposes) is read from the text once here by
   `scripts/save-outcomes.ts`, with reviewed overrides, so the engine never reads prose; authored
   mechanics (classes, species, items) state it explicitly. The same goes for an action's or spell's
-  area of effect and for a Multiattack whose attacks the build cannot structure, read here by
-  `src/action-prose.ts` (homebrew and imported stat blocks go through it as they enter the
-  campaign). Each spell's cast model (the spell attacks one cast makes, its damage and its healing)
-  is read here too, by `scripts/spell-effects.ts` with a reviewed table, because the source's damage
+  area of effect and for a Multiattack's plan (the other plan it can be, and the actions that can
+  replace one of its attacks), read here by `src/action-prose.ts`; homebrew and imported stat
+  blocks get the area, and the mark of a Multiattack nothing structured names, from it as they
+  enter the campaign. What a stat block's traits do (Regeneration, Undead Fortitude, auras, Death Burst) is
+  read the same way by `scripts/trait-mechanics.ts`, and the spells its actions cast (a Spellcasting
+  list's At Will and N/Day spells, a Misty Step) by `scripts/monster-spells.ts`. Each spell's cast model (the spell attacks one cast makes and how far they reach, its
+  damage and its healing, whether its save waits for a later trigger, what it lets the caster do
+  on later turns, and the effect it leaves on its targets or on a creature that fails its save) is read
+  here too, by `scripts/spell-effects.ts` with a reviewed table, because the source's damage
   and attack columns describe the prose rather than a cast. Upstream data bugs are fixed via reviewed
   `CORRECTIONS` tables (never by editing sources); fixtures open5e mislabels as SRD are dropped via
   `EXCLUSIONS`.
 - `scripts/build-class-bundle.ts`: generates the other nine classes and their subclasses from
   `classes.md`. The markdown carries no riders, so mechanics are authored per class in
   `scripts/class-mechanics/` and merged into every class record, generated or hand-authored. A
-  rider may live in only one place: the merge refuses one the record already carries.
+  rider may live in only one place: the merge refuses one the record already carries. A feature
+  the text prints once but the rules grant in steps (a subclass spells table's later rows,
+  Unarmored Movement's column) is a staged feature (`stages`, `subclassStages`), a whole record
+  with its own level added beside the printed ones. An option's printed "Prerequisite: Level N+"
+  becomes its `level`, and a prerequisite naming another option of the same pick its `requires`.
 - `scripts/build-magic-items.ts`: parses `magic-items.md` into one row per item (the five
   "+1, +2, or +3" ladders expand to one row per tier), with slot, rarity, attunement, prose and the
   `appliesTo` base-item column. Mechanics are authored in `scripts/item-mechanics/items.ts`, a map
@@ -79,7 +88,8 @@ scratch directory and requires every committed bundle back byte for byte, so edi
   - `attribution.json`: the required CC BY 4.0 attribution (wording verified against the SRD's
     own Legal Information page); any surface that displays this content must show it.
   - `classes.v1.json` (all twelve classes, each a complete 20-row table) and `subclasses.v1.json`
-    (the one SRD subclass per class). Domain and patron spells are staged always-prepared grants;
+    (the one SRD subclass per class). Domain, oath, patron, draconic and land spells are staged
+    always-prepared grants, one record per table row;
     shared resources (e.g. `channel-divinity`) draw on one uses pool.
   - `magic-items.v1.json`: every SRD magic item, folded into `loadEquipment()`. A magic shield
     carries the base shield's armor block, so its own bonus stacks on the shield's +2.

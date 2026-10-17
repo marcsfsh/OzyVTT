@@ -6,6 +6,7 @@ import { GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { TokenCatalogStore } from "../src/token-catalog.js";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 // The three gates a player needs to choose their own character's token: the command, the library
 // listing, and the upload. Each opens only for the player's own claimed character. The GM keeps
@@ -21,16 +22,6 @@ const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
 const post = (base: string, path: string, token: string, body: unknown = {}) =>

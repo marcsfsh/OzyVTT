@@ -140,20 +140,14 @@ describe("the item mechanics overlay", () => {
     }
   });
 
-  it("refuses a rider type no consumer reads yet, pointing at the disposition table", () => {
-    // The map may only author riders that a consumer reads today (`CARRIER_RIDER_DISPOSITION`).
-    expect(CARRIER_RIDER_DISPOSITION_MIRROR["spell-attack-bonus"]).toBe("unread");
+  it("lets a spell attack bonus through now that spell attacks read it, leaving no rider type unread", () => {
+    // The map may only author riders that a consumer reads today (`CARRIER_RIDER_DISPOSITION`); the refusal stays
+    // for a rider type added before its reader.
+    expect(CARRIER_RIDER_DISPOSITION_MIRROR["spell-attack-bonus"]).toBe("standing");
+    expect(Object.values(CARRIER_RIDER_DISPOSITION_MIRROR)).not.toContain("unread");
     expect(() =>
       applyItemMechanics(rows, {
         "cloak-of-protection": { modifiers: [{ type: "spell-attack-bonus", amount: 1 }] }
-      })
-    ).toThrow(
-      'cloak-of-protection - modifiers.0 is "spell-attack-bonus", which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Leave the item prose until a consumer reads it'
-    );
-    // Its readable sibling is not refused, so the check is about the disposition and not the family.
-    expect(() =>
-      applyItemMechanics(rows, {
-        "cloak-of-protection": { modifiers: [{ type: "spell-save-dc", amount: 1 }] }
       })
     ).not.toThrow();
   });
@@ -301,5 +295,17 @@ describe("the item mechanics overlay", () => {
         "cloak-of-protection": { modifiers: [{ type: "armor-class", amount: 99 }] }
       })
     ).toThrow(/cloak-of-protection - the schema refuses the merged row\. modifiers\.0\.amount:/);
+
+    // A GM-chosen type replaces one printed resistance, so the record must grant exactly one of its choices.
+    expect(() => applyItemMechanics(rows, { "cloak-of-protection": { damageTypeChoice: ["acid", "cold"] } })).toThrow(
+      "cloak-of-protection - the schema refuses the merged row. damageTypeChoice: A chosen damage type replaces one granted resistance: grant exactly one, from the choices."
+    );
+  });
+
+  it("lets the GM choose the resistance of the items whose text says so", () => {
+    const choiceOf = (id: string) => rows.find((row) => row.id === id)!.damageTypeChoice;
+    expect(choiceOf("ring-of-resistance")).toHaveLength(10);
+    expect(choiceOf("armor-of-resistance")).toEqual(choiceOf("ring-of-resistance"));
+    expect(choiceOf("dragon-scale-mail")).toEqual(["acid", "cold", "fire", "lightning", "poison"]);
   });
 });

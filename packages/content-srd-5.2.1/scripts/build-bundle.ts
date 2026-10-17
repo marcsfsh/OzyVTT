@@ -10,7 +10,18 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { ActorDefinitionSchema, type ActorAction, type ActorDefinition } from "@vtt/schemas";
+import {
+  ActorDefinitionSchema,
+  AmmunitionKindSchema,
+  DamageTypeSchema,
+  SaveConditionSchema,
+  type ActorAction,
+  type ActorDefinition,
+  type AmmunitionKind,
+  type OngoingDamage,
+  type SaveFailureDuration
+} from "@vtt/schemas";
+import { experienceForChallenge } from "@vtt/rules-5e";
 import {
   ArmorReferenceSchema,
   ConditionReferenceSchema,
@@ -21,9 +32,20 @@ import {
   WeaponReferenceSchema
 } from "../src/index.js";
 import { outDir, sourcePath } from "./paths.js";
-import { SPELL_SAVE_OVERRIDE_IDS, spellSaveOutcomeFor, statBlockSaveOutcome } from "./save-outcomes.js";
-import { areaOfProse, withProseFacts } from "../src/action-prose.js";
-import { spellEffectFor } from "./spell-effects.js";
+import {
+  failureDurationOf,
+  hitPointLossOf,
+  SPELL_SAVE_OVERRIDE_IDS,
+  spellSaveOutcomeFor,
+  statBlockSaveOutcome,
+  withoutOngoingDamage
+} from "./save-outcomes.js";
+import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
+import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
+import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
+import { traitMechanicsOf } from "./trait-mechanics.js";
+import { withSpellcasting } from "./monster-spells.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -284,63 +306,100 @@ const primaryDamageType = (attack: AttackFields, desc: string): string => {
  * ADR-0020 structured mechanics, extracted only from the SRD 2024 statblock house style -
  * confident patterns only, everything else stays prose (fail-open per ADR-0008).
  */
-const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 };
-
-/**
- * Multiattack composition. Two stock phrasings: "The X makes one Bite attack and one Tail attack."
- * and "The X makes three Rend attacks." (a trailing "It can replace…" sentence leaves the main plan
- * structured; the replacement option stays prose). Names must resolve to sibling action ids.
- */
-const parseMultiattack = (
-  desc: string,
-  siblingIdByName: ReadonlyMap<string, string>
-): Array<{ actionId: string; count: number }> | null => {
-  const resolve = (name: string) => siblingIdByName.get(name.trim().toLowerCase());
-  const pair = desc.match(/makes one ([A-Za-z' -]+?) attack and one ([A-Za-z' -]+?) attack/i);
-  if (pair) {
-    const first = resolve(pair[1]);
-    const second = resolve(pair[2]);
-    if (first && second)
-      return first === second
-        ? [{ actionId: first, count: 2 }]
-        : [
-            { actionId: first, count: 1 },
-            { actionId: second, count: 1 }
-          ];
-    return null;
-  }
-  const repeated = desc.match(/makes (one|two|three|four|\d) ([A-Za-z' -]+?) attacks\b/i);
-  if (repeated) {
-    const count = NUMBER_WORDS[repeated[1].toLowerCase()] ?? Number.parseInt(repeated[1], 10);
-    const actionId = resolve(repeated[2]);
-    if (actionId && Number.isInteger(count) && count >= 1 && count <= 4) return [{ actionId, count }];
-  }
-  return null;
-};
-
 /**
  * On-hit condition riders from the stock phrasing: "If the target is a Large or smaller creature,
  * it has the Grappled condition (escape DC 15). While Grappled, the target has the Restrained
- * condition." and "…it has the Prone condition." Only attack actions get riders (a save action's
- * conditions flow through the pending-save pipeline instead).
+ * condition." (or "...and it has the Restrained condition until the grapple ends"), "…it has the Prone
+ * condition.", and an unconditional timed one: "...and the target has the Poisoned condition until the start of
+ * the assassin's next turn." Only attack actions get riders (a save action's conditions flow through the
+ * pending-save pipeline instead); a rider that depends on a charge or a drop to 0 HP stays prose.
  */
 type OnHitRider = {
   conditions: Array<{ id: string }>;
+  name?: string;
   escapeDc?: number;
   maxTargetSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  duration?: SaveFailureDuration;
+  ongoingDamage?: OngoingDamage;
+  insteadOfDamage?: true;
 };
+/** "takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns" (the source's) or "... of its turns". */
+function riderOngoingDamage(text: string): OngoingDamage | undefined {
+  const match =
+    /\btakes \d+ \((\d+d\d+(?: [+-] \d+)?)\) ([A-Z][a-z]+) damage at the start of each of (its|the [A-Za-z' -]+?(?:'s|s')) turns\b/.exec(
+      text
+    );
+  const type = match ? DamageTypeSchema.safeParse(match[2]!.toLowerCase()) : null;
+  if (!match || !type?.success) return undefined;
+  return {
+    damage: [{ formula: match[1]!, type: type.data }],
+    at: match[3] === "its" ? "bearer-turn-start" : "source-turn-start"
+  };
+}
+const RIDER_CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
+const riderConditionIds = (names: string): string[] =>
+  names
+    .split(/ and /)
+    .map((name) => name.toLowerCase())
+    .filter((id) => RIDER_CONDITIONS.has(id) && id !== "grappled");
 const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
   const size = desc.match(/If the target is a (Tiny|Small|Medium|Large|Huge) or smaller creature/i);
   const maxTargetSize = size ? (size[1].toLowerCase() as NonNullable<OnHitRider["maxTargetSize"]>) : undefined;
   const riders: OnHitRider[] = [];
-  const grapple = desc.match(/has the Grappled condition \(escape DC (\d+)\)/i);
+  // "It has the Grappled condition (escape DC 15)", or a rug's "can give it the Grappled condition (escape DC 13) instead
+  // of dealing damage", with what the grapple deals each turn while it lasts.
+  const grapple = desc.match(/(?:has|give it) the Grappled condition \(escape DC (\d+)\)/i);
   if (grapple) {
-    const conditions = [{ id: "grappled" }];
-    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc))
-      conditions.push({ id: "restrained" });
-    riders.push({ conditions, escapeDc: Number.parseInt(grapple[1], 10), ...(maxTargetSize ? { maxTargetSize } : {}) });
+    // What lasts exactly as long as the grapple rides the same effect, so escaping ends it too.
+    const held = new Set<string>();
+    if (/While Grappled, the target (?:also )?has the Restrained condition/i.test(desc)) held.add("restrained");
+    for (const match of desc.matchAll(
+      /\b(?:it|the target) has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? until the grapple ends|\bUntil the grapple ends, the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?/g
+    ))
+      for (const id of riderConditionIds(match[1] ?? match[2]!)) held.add(id);
+    const conditions = [{ id: "grappled" }, ...[...held].slice(0, 2).map((id) => ({ id }))];
+    const ongoingDamage = riderOngoingDamage(desc.slice(grapple.index ?? 0));
+    riders.push({
+      conditions,
+      escapeDc: Number.parseInt(grapple[1], 10),
+      ...(maxTargetSize ? { maxTargetSize } : {}),
+      ...(ongoingDamage ? { ongoingDamage } : {}),
+      ...(/\bGrappled condition \(escape DC \d+\) instead of dealing damage\b/.test(desc)
+        ? { insteadOfDamage: true as const }
+        : {})
+    });
   } else if (/it has the Prone condition/i.test(desc)) {
     riders.push({ conditions: [{ id: "prone" }], ...(maxTargetSize ? { maxTargetSize } : {}) });
+  } else if (/\battaches to (?:the target|it)\b/.test(desc)) {
+    // "The stirge attaches to the target. While attached, ... the target takes 5 (2d4) Necrotic damage at the start of
+    // each of the stirge's turns"; "While the cloaker is attached, the target has the Blinded condition". An attachment
+    // with nothing the engine runs (the darkmantle's) stays prose.
+    const blinded = /\bWhile (?:the [\w -]+? is )?attached, the target has the ([A-Z][a-z]+) condition\b/.exec(desc);
+    const conditions = blinded ? riderConditionIds(blinded[1]!).map((id) => ({ id })) : [];
+    const ongoingDamage = riderOngoingDamage(desc);
+    if (conditions.length > 0 || ongoingDamage)
+      riders.push({
+        conditions,
+        name: "Attached",
+        ...(maxTargetSize ? { maxTargetSize } : {}),
+        ...(ongoingDamage ? { ongoingDamage } : {})
+      });
+  }
+  // An unconditional rider in the hit's own sentence (not one opening with "If"): timed, or with no end printed there
+  // (an otyugh's Poisoned, which a later save ends), which lasts until ended.
+  const hit = desc.slice(Math.max(0, desc.search(/\bHit:|Attack Roll:/)));
+  for (const sentence of hit.split(/(?<=\.)\s+/)) {
+    if (/^If\b/.test(sentence) || /Grappled/.test(sentence)) continue;
+    const timed = sentence.match(
+      /\bthe target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions? (until the (?:start|end) of (?:its|the [A-Za-z' -]+?(?:'s|s')) next turn)/
+    );
+    const untimed = timed
+      ? null
+      : sentence.match(/\bdamage, and the target has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?\.$/);
+    const ids = riderConditionIds((timed ?? untimed)?.[1] ?? "");
+    const duration = timed ? failureDurationOf(timed[2]) : undefined;
+    if (ids.length > 0 && (duration || untimed) && riders.length < 2)
+      riders.push({ conditions: ids.map((id) => ({ id })), ...(duration ? { duration } : {}) });
   }
   return riders.length > 0 ? riders : null;
 };
@@ -365,11 +424,57 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * - protective-magic: its Shield, offered when an attack would hit.
  */
 const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction">> = {
-  "giant-crocodile/tail": { targetRules: ["not-grappled-by-source"] },
   "archmage/protective-magic": PROTECTIVE_MAGIC,
   "lich/protective-magic": PROTECTIVE_MAGIC,
   "mage/protective-magic": PROTECTIVE_MAGIC
 };
+
+const PRINTED_NAME = "[A-Z][A-Za-z'’-]*(?: [A-Z][A-Za-z'’-]*)*";
+
+/**
+ * What one action says about another, read across the stat block: a grapple that keeps an attack off its target
+ * ("While Grappled, ... can't be targeted by the tyrannosaurus's Tail"), and a legendary action that makes one attack
+ * or uses another action ("it makes one Rend attack", "The kraken uses Lightning Strike"), which resolves as that
+ * action, so the swing spends the pool. "One Claw or Tail attack" stays the GM's pick.
+ */
+function linkedActions(actions: ActorAction[], idOf: (name: string) => string | undefined): ActorAction[] {
+  const byId = new Map(actions.map((action) => [action.id, action]));
+  const keptOffGrappled = new Set<string>();
+  for (const action of actions) {
+    const match = new RegExp(
+      `While Grappled\\b[^.]*can[’']t be targeted by the [^.]*?[’']s? (${PRINTED_NAME})\\.`
+    ).exec(action.description);
+    const id = match ? idOf(match[1]) : undefined;
+    if (id) keptOffGrappled.add(id);
+  }
+  return actions.map((action) => {
+    let next = action;
+    if (keptOffGrappled.has(next.id) && !next.targetRules?.includes("not-grappled-by-source"))
+      next = { ...next, targetRules: [...(next.targetRules ?? []), "not-grappled-by-source"] };
+    if (next.legendary && !next.attack && !next.save && next.damage.length === 0) {
+      const body = next.description.replace(/^Legendary Action[^.]*\.\s*/, "");
+      const named =
+        new RegExp(`\\bmakes one (${PRINTED_NAME}) attack\\b`).exec(body) ??
+        new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body);
+      const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
+      if (source && (source.attack || source.save || source.damage.length > 0)) {
+        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules } = source;
+        next = {
+          ...next,
+          ...(attack ? { attack } : {}),
+          ...(save ? { save } : {}),
+          damage,
+          ...(onHit ? { onHit } : {}),
+          ...(conditionalDamage ? { conditionalDamage } : {}),
+          ...(reminder ? { reminder } : {}),
+          ...(area && !next.area ? { area } : {}),
+          ...(targetRules ? { targetRules } : {})
+        };
+      }
+    }
+    return next;
+  });
+}
 
 const usesSuffix = (action: ActionFields): string => {
   if (/\(Recharge /i.test(action.name)) return ""; // upstream already printed the recharge note in the name (basilisk, blink dog, cloaker)
@@ -398,7 +503,7 @@ const usesOf = (
 /**
  * Fallback for attack actions with no CreatureActionAttack row upstream (mostly animals): parses the
  * 2024 statblock prose ("Melee Attack Roll: +2, reach 5 ft. 10 (2d6 + 3) Slashing damage..."). A flat
- * primary ("1 Piercing damage") keeps an empty damage list; "or ... Bloodied" variants stay prose.
+ * primary ("1 Piercing damage") keeps an empty list here; `printedHitDamage` reads the damage, fixed amounts and conditional variants included.
  */
 type ProseAttack = {
   bonus: number;
@@ -439,20 +544,45 @@ const parseProseAttack = (desc: string): ProseAttack | null => {
 };
 
 /**
- * Damage a save action deals on a failed save, from the "Failure:" clause ("Failure: 45 (10d8) Fire
- * damage."). What a success does and the condition a failure imposes come from `statBlockSaveOutcome`; a
- * flat-only failure with no dice stays prose (ADR-0008).
+ * Reviewed save actions the "Failure:" reader gets wrong, keyed `<creature>/<action>`; each says why. The engine
+ * runs what is left of them and the GM the rest, from the reminder.
  */
-const parseSaveDamage = (desc: string): { formula: string; type: string }[] => {
-  const failure = desc.match(/Failure:\s*(.+?)(?:\s*Success:|$)/s);
-  const segment = failure ? failure[1] : desc;
-  const damage: { formula: string; type: string }[] = [];
-  for (const match of segment.matchAll(/\d+\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)\s+([A-Za-z]+) damage/g)) {
-    const type = match[2].toLowerCase();
-    if ((DAMAGE_TYPES as readonly string[]).includes(type))
-      damage.push({ formula: match[1].replace(/\s*([+-])\s*/, " $1 "), type });
+const SAVE_ACTION_FIXES: Readonly<
+  Record<string, Readonly<{ why: string; drop: "save" | "damage" | "outcome"; reminder: string }>>
+> = {
+  // Three roars in one action: only the first one's save is structured.
+  "sphinx-of-valor/roar": {
+    why: "the Second and Third Roars are later uses with their own saves",
+    drop: "damage",
+    reminder:
+      "Roar runs its First Roar (Frightened for 1 minute). The Second Roar (Paralyzed) and Third Roar (Con save, 44 (8d10) Thunder damage and Prone, half on a success) are applied by hand."
+  },
+  // The save happens when the target finishes a Long Rest, not on the hit.
+  "otyugh/bite": {
+    why: "the Constitution save is made after a Long Rest",
+    drop: "save",
+    reminder:
+      "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends."
+  },
+  // "If the target has 20 Hit Points or fewer..." is a branch the save prompt cannot take per target.
+  "incubus/nightmare-recharge-6": {
+    why: "the failure depends on the target's Hit Points",
+    drop: "outcome",
+    reminder:
+      "On a failed save: a target with 20 Hit Points or fewer has the Unconscious condition for 1 hour (until it takes damage or is woken); any other target takes 18 (4d8) Psychic damage."
+  },
+  "sea-hag/death-glare": {
+    why: "the failure depends on the target's Hit Points",
+    drop: "outcome",
+    reminder:
+      "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage."
+  },
+  "solar/slaying-bow": {
+    why: "the failure depends on the target's Hit Points",
+    drop: "outcome",
+    reminder:
+      "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage."
   }
-  return damage;
 };
 
 /**
@@ -495,9 +625,93 @@ const TINY_PER_SRD = [
 ];
 
 /**
+ * Stat blocks the SRD prints as "Medium or Small" (the NPCs, vampires, mummies, lycanthropes, the wraith).
+ * open5e keeps only "small", which made a Knight too small to grapple an Ogre; Medium is the printed
+ * default, and the GM can still set Small per creature.
+ */
+const MEDIUM_OR_SMALL_PER_SRD = [
+  "archmage",
+  "assassin",
+  "bandit",
+  "bandit-captain",
+  "berserker",
+  "commoner",
+  "cultist",
+  "cultist-fanatic",
+  "druid",
+  "gladiator",
+  "guard",
+  "guard-captain",
+  "knight",
+  "mage",
+  "mummy",
+  "mummy-lord",
+  "noble",
+  "pirate",
+  "pirate-captain",
+  "priest",
+  "priest-acolyte",
+  "scout",
+  "spy",
+  "tough",
+  "tough-boss",
+  "vampire",
+  "vampire-familiar",
+  "vampire-spawn",
+  "warrior-infantry",
+  "warrior-veteran",
+  "werebear",
+  "wereboar",
+  "wererat",
+  "weretiger",
+  "werewolf",
+  "wraith"
+];
+
+/** Action names open5e got wrong. The Black Pudding's Split reaction is stored as "Parry". */
+const ACTION_NAME_CORRECTIONS: Record<string, string> = { "srd-2024_black-pudding-split": "Split" };
+
+/** The 18 skills as the app names them, keyed by open5e's `skill_bonus_*` suffix. */
+const SKILL_FIELDS = [
+  "acrobatics",
+  "animal_handling",
+  "arcana",
+  "athletics",
+  "deception",
+  "history",
+  "insight",
+  "intimidation",
+  "investigation",
+  "medicine",
+  "nature",
+  "perception",
+  "performance",
+  "persuasion",
+  "religion",
+  "sleight_of_hand",
+  "stealth",
+  "survival"
+] as const;
+
+/** A creature's printed skill bonuses, keyed by the app's skill ids ("sleight-of-hand"). */
+function skillBonuses(fields: CreatureFields): Record<string, number> {
+  const skills: Record<string, number> = {};
+  for (const skill of SKILL_FIELDS) {
+    const bonus = (fields as unknown as Record<string, unknown>)[`skill_bonus_${skill}`];
+    if (typeof bonus === "number") skills[skill.replace(/_/g, "-")] = bonus;
+  }
+  return skills;
+}
+
+/** 5etools cross-reference tags that leaked into open5e's text ("[Area of Effect]|XPHB|Sphere",
+ *  "Cover|XPHB|Total Cover"): the readable word is the last part. */
+function withoutSourceTags(text: string): string {
+  return text.replace(/\[[^\]]*\]\|XPHB\|/g, "").replace(/[\w ]+\|XPHB\|/g, "");
+}
+
+/**
  * Corrections for upstream fixture bugs, applied before adaptation so the vendored sources stay
- * byte-identical to open5e. Values are the printed SRD 5.2.1 ones. The SRD's "Medium or Small" NPC
- * statblocks keep open5e's "small".
+ * byte-identical to open5e. Values are the printed SRD 5.2.1 ones.
  */
 const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   // octopus: CON/CHA modifiers stored as scores; a garbage 30 in the CON save column
@@ -506,16 +720,12 @@ const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   // mastiff / swarm-of-rats: the save *modifier* stored where the SRD-printed save bonus belongs.
   "srd-2024_mastiff": { saving_throw_wisdom: 3 },
   "srd-2024_swarm-of-rats": { saving_throw_dexterity: 2 },
-  ...Object.fromEntries(TINY_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "tiny" }]))
+  ...Object.fromEntries(TINY_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "tiny" }])),
+  ...Object.fromEntries(MEDIUM_OR_SMALL_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "medium" }]))
 };
 
-/**
- * Same idea for spells. greater-invisibility ships with an empty `desc` upstream; the text is
- * the printed SRD 5.2.1 sentence.
- */
-const SPELL_CORRECTIONS: Record<string, Partial<SpellFields>> = {
-  "srd-2024_greater-invisibility": { desc: "A creature you touch has the Invisible condition until the spell ends." }
-};
+/** Same idea for spells: reviewed against the SRD 5.2.1 spells chapter (`spell-corrections.ts`). */
+const SPELL_CORRECTIONS: Readonly<Record<string, Partial<SpellFields>>> = SPELL_FIELD_CORRECTIONS;
 
 for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
   if (!creatures.some((creature) => creature.pk === pk))
@@ -539,12 +749,16 @@ const report = {
   proseAttacks: 0,
   structuredSaves: 0,
   saveDamage: 0,
+  printedAttackDamage: 0,
+  saveActionFixes: [] as string[],
   structuredMultiattacks: 0,
   proseMultiattacks: 0,
   onHitRiders: 0,
   rechargeUses: 0,
   restUses: 0,
   legendaryCreatures: 0,
+  traitMechanics: 0,
+  castingActions: 0,
   typedDefenses: 0,
   corrections: [] as string[],
   untypedDamage: [] as string[],
@@ -557,6 +771,10 @@ const KNOWN_CONDITION_IDS = new Set(
     .map((condition) => condition.fields.describes)
 );
 const KNOWN_DAMAGE_TYPES = new Set<string>(DAMAGE_TYPES);
+/** The SRD spells a stat block can cast, by the id the spell bundle gives them. */
+const SRD_SPELL_IDS: ReadonlySet<string> = new Set(
+  spells.filter((spell) => spell.fields.document === "srd-2024").map((spell) => slugOf(spell.pk))
+);
 
 const monsters: ActorDefinition[] = creatures
   .filter((creature) => creature.fields.document === "srd-2024" && !EXCLUSIONS.has(creature.pk))
@@ -571,8 +789,9 @@ const monsters: ActorDefinition[] = creatures
     const footprint = FOOTPRINT_BY_SIZE[fields.size];
     const sortedActions = (actionsByCreature.get(creature.pk) ?? []).sort(
       (left, right) =>
-        (left.fields.order_in_statblock ?? 0) - (right.fields.order_in_statblock ?? 0) ||
-        left.pk.localeCompare(right.pk)
+        // An unnumbered action (some legendary ones) goes after the numbered stat block, not before Multiattack.
+        (left.fields.order_in_statblock ?? Number.MAX_SAFE_INTEGER) -
+          (right.fields.order_in_statblock ?? Number.MAX_SAFE_INTEGER) || left.pk.localeCompare(right.pk)
     );
     // Sibling action names -> ids (raw upstream names, before any uses suffix) for Multiattack composition.
     const siblingIdByName = new Map(
@@ -581,17 +800,47 @@ const monsters: ActorDefinition[] = creatures
         idSafe(slugOf(sibling.pk).replace(`${slug}_`, ""))
       ])
     );
+    // A printed name, matched with or without a parenthesised suffix ("Bite (Bat or Vampire Form Only)").
+    const siblingIdOf = (name: string) => {
+      const key = name.trim().toLowerCase();
+      if (siblingIdByName.has(key)) return siblingIdByName.get(key);
+      for (const [full, id] of siblingIdByName) if (full.replace(/\s*\([^)]*\)\s*$/, "") === key) return id;
+      return undefined;
+    };
     const creatureActions = sortedActions.map((action) => {
       const row = attackByAction.get(action.pk)?.fields;
       const prose = row ? null : parseProseAttack(action.fields.desc);
-      const save = action.fields.desc.match(SAVE_PATTERN);
+      const fix = SAVE_ACTION_FIXES[`${slug}/${idSafe(slugOf(action.pk).replace(`${slug}_`, ""))}`];
+      if (fix) report.saveActionFixes.push(`${slug}: ${fix.why}`);
+      const save = fix?.drop === "save" ? null : action.fields.desc.match(SAVE_PATTERN);
       const legendary = action.fields.action_type === "LEGENDARY_ACTION";
       const legendaryPrefix = legendary
         ? `Legendary Action${(action.fields.legendary_action_cost ?? 1) > 1 ? ` (costs ${action.fields.legendary_action_cost} actions)` : ""}. `
         : "";
-      // Flat damage (e.g. the octopus's "1 Bludgeoning") has no dice; it stays in the
-      // description text per ADR-0008 rather than forcing a fake formula.
-      const damage = row
+      // The printed hit clause is the authority for an attack's damage, a fixed "1 Piercing damage" included; the
+      // upstream row and the prose reader are the fallback when the text prints nothing typed.
+      const printed = row || prose ? printedHitDamage(action.fields.desc) : null;
+      if (printed) report.printedAttackDamage += 1;
+      // A save rider on an attack deals its damage through the hit, but may still deal more on later turns.
+      const saveDamage = save ? printedSaveDamage(action.fields.desc) : null;
+      // A reviewed failure the engine can't apply keeps only what a success does.
+      const saveOutcome = save
+        ? fix?.drop === "outcome"
+          ? { successDamage: statBlockSaveOutcome(action.fields.desc).successDamage, failureConditions: [] }
+          : statBlockSaveOutcome(action.fields.desc)
+        : null;
+      // Hit points a failure takes each turn (an infernal wound) are the failure's own effect; stanching it is the GM's.
+      const loss = save && fix?.drop !== "outcome" ? hitPointLossOf(action.fields.desc) : null;
+      // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
+      const laterDamage = saveDamage?.laterDamage ?? null;
+      const reminder =
+        fix?.reminder ??
+        loss?.reminder ??
+        (laterDamage !== null && saveOutcome && "ongoingDamage" in saveOutcome
+          ? withoutOngoingDamage(laterDamage)
+          : laterDamage) ??
+        undefined;
+      const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
               ? [
@@ -612,7 +861,8 @@ const monsters: ActorDefinition[] = creatures
           ]
         : // A save-for-damage action (Fire Breath) has no attack row; pull its damage from the
           // "Failure:" clause so answering a failed save actually applies it.
-          (prose?.damage ?? (save ? parseSaveDamage(action.fields.desc) : []));
+          (prose?.damage ?? (save ? (saveDamage?.damage ?? []) : []));
+      const damage = fix?.drop === "outcome" || fix?.drop === "damage" ? [] : (printed?.damage ?? fromRows);
       // rangeFeet is the maximum attackable range; rangeNormalFeet the normal band when the
       // weapon has two ranges (disadvantage between them - SRD Range).
       const attack = row
@@ -632,9 +882,11 @@ const monsters: ActorDefinition[] = creatures
           : null;
       const actionId = idSafe(slugOf(action.pk).replace(`${slug}_`, ""));
       // ADR-0020 structured mechanics, all confident-pattern-only with prose fallback.
+      // A Multiattack's plan, the plans it can be instead and what can replace its attacks, read from its text against
+      // the stat block's other actions.
       const multiattack =
         !legendary && action.fields.action_type === "ACTION" && /multiattack/i.test(action.fields.name)
-          ? parseMultiattack(action.fields.desc, siblingIdByName)
+          ? multiattackOfProse(action.fields.desc, siblingIdOf)
           : null;
       const onHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
       const uses = usesOf(action.fields);
@@ -652,7 +904,7 @@ const monsters: ActorDefinition[] = creatures
       for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
       return withProseFacts({
         id: actionId,
-        name: `${action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
+        name: `${ACTION_NAME_CORRECTIONS[action.pk] ?? action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
         activation:
           action.fields.action_type === "ACTION"
             ? ("action" as const)
@@ -661,25 +913,61 @@ const monsters: ActorDefinition[] = creatures
               : action.fields.action_type === "REACTION"
                 ? ("reaction" as const)
                 : ("other" as const),
-        description: `${legendaryPrefix}${action.fields.desc}`.slice(0, 12000),
+        description: withoutSourceTags(`${legendaryPrefix}${action.fields.desc}`).slice(0, 12000),
         ...(attack ? { attack } : {}),
         ...(save
           ? {
               save: {
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
-                ...statBlockSaveOutcome(action.fields.desc)
+                ...saveOutcome!,
+                ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {})
               }
             }
           : {}),
         damage,
-        ...(multiattack ? { multiattack } : {}),
+        ...(printed && printed.conditionalDamage.length > 0 ? { conditionalDamage: printed.conditionalDamage } : {}),
+        ...(reminder ? { reminder: reminder.slice(0, 600) } : {}),
+        ...(multiattack ? { multiattack: multiattack.plan } : {}),
+        ...(multiattack && multiattack.alternatives.length > 0
+          ? { multiattackAlternatives: multiattack.alternatives }
+          : {}),
+        ...(multiattack && multiattack.replacements.length > 0
+          ? { multiattackReplacements: multiattack.replacements }
+          : {}),
         ...(onHit ? { onHit } : {}),
         ...(uses ? { uses } : {}),
-        ...(legendary ? { legendary: { cost: action.fields.legendary_action_cost ?? 1 } } : {}),
+        ...(legendary
+          ? {
+              legendary: {
+                cost: action.fields.legendary_action_cost ?? 1,
+                // "The dragon can't take this action again until the start of its next turn."
+                ...(/can[’']t take this action again until the start of its next turn/i.test(action.fields.desc)
+                  ? { oncePerRound: true as const }
+                  : {})
+              }
+            }
+          : {}),
         ...(enrichment ?? {})
       });
     });
+    // The spells its actions cast, each a cast action in play; only spells the SRD spell list holds.
+    const actions = withSpellcasting(
+      linkedActions(creatureActions, siblingIdOf),
+      {
+        abilityScores: {
+          str: fields.ability_score_strength,
+          dex: fields.ability_score_dexterity,
+          con: fields.ability_score_constitution,
+          int: fields.ability_score_intelligence,
+          wis: fields.ability_score_wisdom,
+          cha: fields.ability_score_charisma
+        },
+        proficiencyBonus: fields.proficiency_bonus ?? proficiencyFromChallenge(challenge)
+      },
+      (spellId) => SRD_SPELL_IDS.has(spellId)
+    );
+    report.castingActions += actions.filter((action) => action.castsSpells).length;
     const senses = [
       fields.darkvision_range ? `darkvision ${fields.darkvision_range} ft.` : null,
       fields.blindsight_range ? `blindsight ${fields.blindsight_range} ft.` : null,
@@ -710,6 +998,13 @@ const monsters: ActorDefinition[] = creatures
           }
         : null;
     if (legendaryResource) report.legendaryCreatures += 1;
+    // Upstream order is the stat block's own.
+    const traitTexts = (traitsByCreature.get(creature.pk) ?? []).map((trait) => ({
+      name: trait.fields.name,
+      description: withoutSourceTags(trait.fields.desc)
+    }));
+    const traitMechanics = traitMechanicsOf(traitTexts);
+    report.traitMechanics += traitMechanics.length;
     return {
       schemaId: "vtt.actor-monster" as const,
       schemaVersion: 1 as const,
@@ -737,17 +1032,20 @@ const monsters: ActorDefinition[] = creatures
       },
       initiativeBonus: fields.initiative_bonus,
       speedFeet: fields.walk ?? 0,
-      actions: creatureActions,
+      actions,
       token: { disposition: "hostile" as const, footprint: { width: footprint, height: footprint } },
       ...(damageResistances.length > 0 ? { damageResistances } : {}),
       ...(damageImmunities.length > 0 ? { damageImmunities } : {}),
       ...(damageVulnerabilities.length > 0 ? { damageVulnerabilities } : {}),
       ...(conditionImmunities.length > 0 ? { conditionImmunities } : {}),
       ...(legendaryResource ? { legendary: legendaryResource } : {}),
+      ...(traitMechanics.length > 0 ? { traitMechanics } : {}),
       extensions: {
         "open5e.srd-2024": {
           challengeRating: challenge,
-          experiencePoints: fields.experience_points_integer,
+          // Upstream carries XP for one creature only; the rest follow from the challenge rating.
+          experiencePoints: fields.experience_points_integer ?? experienceForChallenge(challenge),
+          skills: skillBonuses(fields),
           type: fields.type,
           alignment: fields.alignment,
           armorDetail: fields.armor_detail || null,
@@ -776,9 +1074,7 @@ const monsters: ActorDefinition[] = creatures
           conditionImmunities: fields.condition_immunities_display || null,
           nonmagicalAttackImmunity: fields.nonmagical_attack_immunity,
           nonmagicalAttackResistance: fields.nonmagical_attack_resistance,
-          traits: (traitsByCreature.get(creature.pk) ?? [])
-            .sort((left, right) => left.fields.name.localeCompare(right.fields.name))
-            .map((trait) => ({ name: trait.fields.name, description: trait.fields.desc }))
+          traits: traitTexts
         }
       }
     };
@@ -798,6 +1094,27 @@ if (report.skipped.length > 0) {
   process.exit(1);
 }
 
+/**
+ * The upstream condition texts carry PDF-extraction glitches, fixed here so the vendored source stays
+ * byte-identical: a bullet with no space after its star, a word hyphenated across a line ("move- ment"), and
+ * Unconscious's last bullet run into the one before it.
+ */
+const CONDITION_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  unconscious: [[" of you. Unaware. ", " of you. \n* Unaware. "]]
+};
+for (const id of Object.keys(CONDITION_TEXT_FIXES)) {
+  if (!conditions.some((condition) => condition.fields.document === "srd-2024" && condition.fields.describes === id))
+    throw new Error(`Condition text fix targets unknown condition ${id} - check for a typo or an upstream rename.`);
+}
+const conditionText = (id: string, text: string): string => {
+  let fixed = text.replace(/\n\*(?=\S)/g, "\n* ").replace(/([a-z])- ([a-z])/g, "$1$2");
+  for (const [from, to] of CONDITION_TEXT_FIXES[id] ?? []) {
+    if (!fixed.includes(from)) throw new Error(`Condition text fix for ${id} no longer matches - review it.`);
+    fixed = fixed.replace(from, to);
+  }
+  return fixed;
+};
+
 const conditionRecords = conditions
   .filter((condition) => condition.fields.document === "srd-2024")
   .sort((left, right) => left.pk.localeCompare(right.pk))
@@ -807,7 +1124,7 @@ const conditionRecords = conditions
       .split("-")
       .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
       .join(" "),
-    description: condition.fields.desc
+    description: conditionText(condition.fields.describes, condition.fields.desc)
   }));
 
 /** Printed English title case: interior particles stay lowercase ("sleight-of-hand" -> "Sleight of Hand"). */
@@ -843,12 +1160,17 @@ const spellRecords = onlySrd(spells).map((spell) => {
   const fields = { ...spell.fields, ...correction };
   if (fields.saving_throw_ability && !abilityShort[fields.saving_throw_ability])
     throw new Error(`${spell.pk}: unexpected save ability ${fields.saving_throw_ability}`);
+  const effect = spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
+    distance: fields.range,
+    unit: fields.range_unit,
+    text: fields.range_text || null
+  });
   return {
     id: slugOf(spell.pk),
     name: fields.name,
     level: fields.level,
     school: fields.school,
-    castingTime: fields.casting_time,
+    castingTime: castingTimeText(fields.casting_time),
     reactionCondition: fields.reaction_condition || null,
     range: { distance: fields.range, unit: fields.range_unit, text: fields.range_text || null },
     components: {
@@ -861,7 +1183,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     duration: fields.duration,
     concentration: fields.concentration,
     ritual: fields.ritual,
-    attackRoll: fields.attack_roll,
+    attackRoll: makesSpellAttack(fields.desc, effect),
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
     save: fields.saving_throw_ability
       ? { ability: abilityShort[fields.saving_throw_ability], ...spellSaveOutcomeFor(slugOf(spell.pk), fields.desc) }
@@ -870,19 +1192,20 @@ const spellRecords = onlySrd(spells).map((spell) => {
     shape: fields.shape_type
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
-    area: areaOfProse(fields.desc),
-    effect: spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types),
+    area: spellAreaFor(slugOf(spell.pk), fields.desc),
+    effect,
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,
-    castingOptions: (spellOptionsBySpell.get(spell.pk) ?? [])
-      .sort((left, right) => left.fields.type.localeCompare(right.fields.type))
-      .map((option) => ({
+    castingOptions: castingOptionsFor(
+      slugOf(spell.pk),
+      (spellOptionsBySpell.get(spell.pk) ?? []).map((option) => ({
         type: option.fields.type,
         damageRoll: option.fields.damage_roll || null,
         targetCount: option.fields.target_count,
         description: option.fields.desc || null
       }))
+    )
   };
 });
 
@@ -898,8 +1221,8 @@ const weaponPropertyRecords = onlySrd(weaponProperties).map((property) => ({
  * fixtures do not link weapons to properties. Both are optional on the schema, so the join fails
  * the build rather than dropping them silently.
  *
- * A property cell's parenthetical is dropped (`Versatile (1d10)` -> `versatile`): riders match the
- * bare slug, and `EquipmentWeaponStatsSchema` has nowhere to put a second damage die.
+ * A property cell's parenthetical is dropped from the slug (`Versatile (1d10)` -> `versatile`), since riders
+ * match the bare word; the Versatile die is kept as `versatileDice`.
  */
 const weaponTableSource = readFileSync(sourcePath("dnd-5e-srd-markdown", "equipment.md"), "utf8");
 const stripTags = (value: string) =>
@@ -915,10 +1238,30 @@ const tableSlug = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/** `Ammunition (Range 150/600; Arrow)` -> "arrow". The table prints "Bullet" for both a Sling's and a firearm's,
+ *  which the Ammunition table sells as two items, so the Sling's is told apart by name. */
+function ammunitionKindOf(weaponId: string, properties: string): AmmunitionKind | null {
+  const printed = /Ammunition \([^;)]*;\s*([A-Za-z]+)\)/.exec(properties)?.[1]?.toLowerCase();
+  if (printed === undefined) return null;
+  if (printed === "bullet") return weaponId === "sling" ? "sling-bullet" : "firearm-bullet";
+  const kind = AmmunitionKindSchema.safeParse(printed);
+  if (!kind.success) throw new Error(`Weapons table: "${weaponId}" fires "${printed}", which no ammunition sells.`);
+  return kind.data;
+}
+
 const weaponTable = (() => {
   const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
-  const rows = new Map<string, { properties: readonly string[]; mastery: string; melee: boolean }>();
+  const rows = new Map<
+    string,
+    {
+      properties: readonly string[];
+      mastery: string;
+      melee: boolean;
+      versatileDice: string | null;
+      ammunition: AmmunitionKind | null;
+    }
+  >();
   // The `<th colspan="6">` band rows ("Simple Melee Weapons", ...) are the only source of melee vs
   // ranged: a thrown Dagger has a range and is melee, a Dart is not. Unknown bands, or data rows before
   // any band, fail the build.
@@ -947,7 +1290,9 @@ const weaponTable = (() => {
               .map((entry) => tableSlug(entry.replace(/\(.*/, "")))
               .filter((entry) => entry !== ""),
       mastery: tableSlug(cells[3]),
-      melee: band.melee
+      melee: band.melee,
+      versatileDice: /Versatile \((\d+d\d+)\)/.exec(properties)?.[1] ?? null,
+      ammunition: ammunitionKindOf(tableSlug(cells[0]), properties)
     });
   }
   // Both vocabularies come from the fixtures' `WeaponProperty` rows, as bare ids (riders match the bare word).
@@ -986,8 +1331,10 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     id,
     name: weapon.fields.name,
     category: weapon.fields.is_simple ? ("simple" as const) : ("martial" as const),
-    // Needed to resolve "Weapon (Any Melee Weapon)" eligibility.
+    // Needed to resolve "Weapon (Any Melee Weapon)" eligibility, and whether a thrown weapon has a melee reach.
     melee: row.melee,
+    ...(row.versatileDice !== null ? { versatileDice: row.versatileDice } : {}),
+    ...(row.ammunition !== null ? { ammunition: row.ammunition } : {}),
     improvised: weapon.fields.is_improvised,
     mastery: row.mastery,
     // `[]` when the table prints "—": a Mace has no properties, which differs from "not recorded".
@@ -1088,12 +1435,15 @@ const skillRecords = describesRecords(skills).map(({ id, name, description }) =>
 const damageTypeRecords = describesRecords(damageTypes);
 
 const ruleSetNames = new Map(onlySrd(ruleSets).map((set) => [set.pk, set.fields.name]));
+// Ids count within each ruleset: upstream repeats an index ("exploration-3" was both Hiding and
+// Interacting with Objects).
+const ruleCounts = new Map<string, number>();
 const ruleRecords = onlySrd(rules)
   .sort(
     (left, right) => left.fields.ruleset.localeCompare(right.fields.ruleset) || left.fields.index - right.fields.index
   )
   .map((rule) => ({
-    id: `${slugOf(rule.fields.ruleset)}-${rule.fields.index}`,
+    id: `${slugOf(rule.fields.ruleset)}-${ruleCounts.set(rule.fields.ruleset, (ruleCounts.get(rule.fields.ruleset) ?? 0) + 1).get(rule.fields.ruleset)}`,
     name: rule.fields.name,
     ruleset: ruleSetNames.get(rule.fields.ruleset) ?? slugOf(rule.fields.ruleset),
     order: rule.fields.index,
@@ -1165,7 +1515,7 @@ console.log(
   `rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, save-for-damage actions ${report.saveDamage}, monsters with typed defenses ${report.typedDefenses}`
 );
 console.log(
-  `limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures}`
+  `limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures} | traits the engine runs: ${report.traitMechanics} | actions that cast spells: ${report.castingActions}`
 );
 console.log(
   `conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`
@@ -1177,5 +1527,8 @@ if (report.corrections.length > 0)
   console.log(
     `upstream corrections applied (${report.corrections.length}): ${report.corrections.map(slugOf).join(", ")}`
   );
+console.log(`attack damage read from the printed hit clause: ${report.printedAttackDamage}`);
+if (report.saveActionFixes.length > 0)
+  console.log(`reviewed save actions (${report.saveActionFixes.length}): ${report.saveActionFixes.join("; ")}`);
 if (report.untypedDamage.length > 0)
   console.log(`untyped damage fallbacks (${report.untypedDamage.length}): ${report.untypedDamage.join(", ")}`);

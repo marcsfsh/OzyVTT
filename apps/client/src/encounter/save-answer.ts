@@ -12,10 +12,14 @@ export function saveAnswerPayload(
     saveId: string;
     method: "roll" | "manual";
     commit: boolean;
-    /** The rolled save total: required by the server for `method: "manual"`, absent for a fresh roll. */
+    /** The GM's ruled save total: required by the server for `method: "manual"`, absent for a roll. */
     total?: number;
-    /** The answerer's explicit Adv/Disadv choice; wins over the engine's aggregated sources. */
+    /** The face a physical d20 shows, for `method: "roll"`; the server adds the bonus. */
+    face?: number;
+    /** The GM's forced Adv/Disadv, which wins over the engine's count; the server ignores a player's. */
     dieMode?: "advantage" | "disadvantage" | "normal";
+    /** Throw the held die again: Heroic Inspiration for a player, free for the GM. */
+    reroll?: boolean;
     legendaryResistance?: boolean;
     damageOverride?: number;
   }>
@@ -26,7 +30,9 @@ export function saveAnswerPayload(
     commit: input.commit,
     ...(input.legendaryResistance ? { legendaryResistance: true } : {}),
     ...(input.total !== undefined ? { total: input.total } : {}),
+    ...(input.face !== undefined ? { face: input.face } : {}),
     ...(input.dieMode ? { rollMode: input.dieMode } : {}),
+    ...(input.reroll ? { reroll: true } : {}),
     ...(input.damageOverride !== undefined ? { damageOverride: input.damageOverride } : {})
   };
 }

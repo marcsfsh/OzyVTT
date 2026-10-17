@@ -10,14 +10,24 @@ import { setCondition } from "../src/actor-conditions.js";
 import { answerSave, saveRollSources } from "../src/saving-throws.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { rollDeathSave } from "../src/death-saves.js";
-import { builtinAction } from "../src/builtin-actions.js";
-import { addEffect, endEffect, endEncounterEffects, expireEffectsAtTurnStart, hasEffectTag } from "../src/effects.js";
+import { builtinAction, builtinActionFor, builtinActionsFor } from "../src/builtin-actions.js";
+import { actionSummaryOf } from "../src/content-library.js";
+import { effectiveActions } from "../src/effective-actions.js";
+import {
+  addEffect,
+  endEffect,
+  endEncounterEffects,
+  expireEffectsAtTurnStart,
+  hasEffectTag,
+  makeEffect
+} from "../src/effects.js";
 import { applyRest, spendHitDice } from "../src/rests.js";
 import { hitDiceFromDefinition } from "../src/actor-roster.js";
 import { applyTimelineRestore, timelineDirtied } from "../src/combat-history.js";
 import { projectPlayerCombat, projectPlayerView } from "../src/projections.js";
 import { setLegendaryUsed } from "../src/turn-economy.js";
 import { applyMovementRules } from "../src/movement-rules.js";
+import { effectiveSpeedFeet } from "../src/speed.js";
 import { creatureDistance, mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
 import { gridToImage } from "../src/grid-calibration.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
@@ -257,6 +267,34 @@ describe("report test 2 - Extra Attack", () => {
     expect(() =>
       resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])
     ).toThrow(/no attacks remaining in this action/);
+  });
+
+  // SRD Attack action: "you can make one attack roll with a weapon or an Unarmed Strike"; Grapple and Shove are
+  // Unarmed Strike options, so each takes the place of one of Extra Attack's attacks.
+  const unarmed = (game: GameState, actionId: string, targetId: string, faces: number[]) =>
+    resolveDefinitionAction(
+      game,
+      builtinAction(actionId)!,
+      { actorId: IDS.torva, targetIds: [targetId], commandId: nextCommandId(), builtin: true },
+      deps(faces, torvaDefinition)
+    );
+
+  it("lets an Unarmed Strike open the Attack action and a weapon finish it", () => {
+    const game = buildGame();
+    const strike = unarmed(game, "unarmed-strike", IDS.croc1, [15]);
+    expect(strike.componentsRemaining).toEqual({ attack: 1 });
+    const swing = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    expect(swing.componentsRemaining).toBeNull();
+    expect(() => unarmed(game, "unarmed-strike", IDS.croc1, [15])).toThrow(/no attacks remaining in this action/);
+  });
+
+  it("lets a Grapple or a Shove be the second attack after a weapon swing", () => {
+    const game = buildGame();
+    resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    const grapple = unarmed(game, "unarmed-grapple", IDS.pip, []);
+    expect(grapple.save).toMatchObject({ dc: 15 });
+    expect(game.combat.pendingSaves).toHaveLength(1);
+    expect(() => unarmed(game, "unarmed-shove-prone", IDS.pip, [])).toThrow(/no attacks remaining in this action/);
   });
 });
 
@@ -598,6 +636,36 @@ describe("report test 9 - zero HP, dying, and healing", () => {
       expect(result).toMatchObject({ committed: true, face: 7 });
       expect(pip.deathSaves).toEqual({ successes: 0, failures: 1, stable: false });
       expect(game.rolls.length).toBe(recorded); // a confirmed/typed roll records nothing new
+    });
+
+    it("adds what a saving throw adds (Exhaustion, save bonuses), while the die alone decides a 1 or a 20", () => {
+      const { game, pip } = dying();
+      // A 12 is a success on its own, but Exhaustion 3 takes 6 off the total.
+      const tired = rollDeathSave(
+        game,
+        pip,
+        { commit: false, modifier: -6 },
+        deps(() => 12)
+      );
+      expect(tired.outcome.outcome).toBe("failure");
+      // A 9 with a +1 Ring of Protection reaches 10.
+      expect(
+        rollDeathSave(
+          game,
+          pip,
+          { commit: false, modifier: 1 },
+          deps(() => 9)
+        ).outcome.outcome
+      ).toBe("success");
+      // A natural 20 is still a 20, whatever the penalty.
+      expect(
+        rollDeathSave(
+          game,
+          pip,
+          { commit: false, modifier: -6 },
+          deps(() => 20)
+        ).outcome.regainsOneHitPoint
+      ).toBe(true);
     });
 
     it("a natural 20 signals the regain-1-HP heal and resets the pips", () => {
@@ -945,6 +1013,15 @@ describe("report test 2/3 supplement - Eldritch Blast beams", () => {
 });
 
 describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
+  // The crocodile bites on its own turn: an action off it is a rules block of its own.
+  const crocTurn = () =>
+    buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.torva, score: 16 },
+      { actorId: IDS.pip, score: 12 },
+      { actorId: IDS.croc2, score: 12 },
+      { actorId: IDS.sable, score: 5 }
+    ]);
   // Prompt creation needs the target's definition, so these resolves carry the game's own resolver.
   const gameResolver = (game: GameState) => (definitionId: string) =>
     game.definitions.find((entry) => entry.id === definitionId)?.definition;
@@ -974,7 +1051,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     );
 
   it("parks a hit's damage on a pending prompt instead of the apply button", () => {
-    const game = buildGame();
+    const game = crocTurn();
     // Croc 1 bites Pip: 15 + 8 = 23 vs AC 16 hits; 6+6+6+5 = 23 piercing.
     const bite = resolveLive(
       game,
@@ -1004,7 +1081,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("answering use spends the reaction and applies half; the prompt clears", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     const outcome = answerReaction(
       game,
@@ -1028,7 +1105,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("declining applies the full parked damage and keeps the reaction", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     const outcome = answerReaction(
       game,
@@ -1112,8 +1189,62 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     expect(game.actors.find((actor) => actor.id === IDS.torva)!.hp.current).toBeLessThan(torvaHp);
   });
 
+  it("holds an opportunity attack's previewed die, so looking again or confirming uses it (ADR-0012)", () => {
+    const game = buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.torva, score: 8 }
+    ]);
+    const promptId = "40000000-0000-4000-8000-0000000000ab";
+    game.combat = {
+      ...game.combat,
+      pendingReactions: [
+        {
+          id: promptId,
+          kind: "leaves-reach",
+          actorId: IDS.croc1,
+          actionId: "opportunity-attack",
+          actionName: "Opportunity Attack",
+          sourceActorId: IDS.torva,
+          sourceName: "Torva Grimtusk",
+          targetActorId: IDS.torva,
+          triggerCommandId: nextCommandId(),
+          proposedDamage: 0,
+          proposedDamageParts: [],
+          critical: false,
+          weighed: null,
+          acBonus: null,
+          rollsAttack: true,
+          parkedAttack: null,
+          createdAt: 0
+        }
+      ]
+    };
+    const look = (faces: number[], options: Record<string, unknown> = {}) =>
+      answerReaction(game, nextCommandId(), promptId, true, undefined, { role: "gm" }, reactionDeps(game, faces), {
+        commit: false,
+        ...options
+      });
+    expect(look([4]).resolution?.attack).toMatchObject({ naturalRoll: 4 });
+    // An empty queue: a second look throws no die.
+    expect(look([]).resolution?.attack).toMatchObject({ naturalRoll: 4 });
+    // The GM's reroll throws again; the confirm then uses that die and rolls only the damage.
+    expect(look([18], { reroll: true }).resolution?.attack).toMatchObject({ naturalRoll: 18, outcome: "hit" });
+    const committed = answerReaction(
+      game,
+      nextCommandId(),
+      promptId,
+      true,
+      undefined,
+      { role: "gm" },
+      reactionDeps(game, [6, 6, 6]),
+      { commit: true }
+    );
+    expect(committed.resolution?.attack).toMatchObject({ naturalRoll: 18 });
+    expect(game.heldRolls).toEqual([]);
+  });
+
   it("offers no prompt when the reaction is already spent, the reactor is incapacitated, or the mode is freeform", () => {
-    const spent = buildGame();
+    const spent = crocTurn();
     spent.combat = { ...spent.combat, reactionsUsed: [IDS.pip] };
     expect(
       resolveLive(spent, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6])
@@ -1121,7 +1252,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     ).toBeUndefined();
     expect(spent.combat.pendingReactions).toHaveLength(0);
 
-    const stunned = buildGame();
+    const stunned = crocTurn();
     stunned.actors.find((actor) => actor.id === IDS.pip)!.conditions = [{ id: "stunned" }];
     // A stunned target gives the attack advantage, so the roll consumes two d20 faces.
     expect(
@@ -1129,7 +1260,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
         .reactionPrompts
     ).toBeUndefined();
 
-    const freeform = buildGame();
+    const freeform = crocTurn();
     freeform.combat = { ...freeform.combat, rulesMode: "freeform" };
     expect(
       resolveLive(freeform, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6])
@@ -1138,7 +1269,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("a spent reaction rejects use (decline stays open) and the GM dismiss drops the prompt without damage", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     game.combat = { ...game.combat, reactionsUsed: [IDS.pip] }; // spent between the hit and the answer
     const promptId = game.combat.pendingReactions[0].id;
@@ -1153,7 +1284,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("a player may answer only their own claimed character's prompt", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     const promptId = game.combat.pendingReactions[0].id;
     expect(() =>
@@ -1181,7 +1312,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
   });
 
   it("prompts persist across a turn advance so parked damage is never silently lost", () => {
-    const game = buildGame();
+    const game = crocTurn();
     resolveLive(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.pip] }, [15, 6, 6, 6]);
     nextInitiativeTurn(game);
     expect(game.combat.pendingReactions).toHaveLength(1);
@@ -1202,6 +1333,92 @@ describe("incapacitation gates the action economy (SRD 2024 Incapacitated)", () 
     expect(() => resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, [])).toThrow(
       /Unconscious and can't take actions, bonus actions, or reactions/
     );
+  });
+});
+
+describe("actions and Bonus Actions belong to your own turn (SRD Actions, Ready)", () => {
+  const builtin = (
+    game: GameState,
+    actionId: string,
+    input: { actorId: string; note?: string },
+    definition: ActorDefinition
+  ) =>
+    resolveDefinitionAction(
+      game,
+      builtinAction(actionId)!,
+      { actorId: input.actorId, targetIds: [], commandId: nextCommandId(), builtin: true, note: input.note ?? null },
+      deps([], definition)
+    );
+  const blockedRule = (attempt: () => unknown) => {
+    try {
+      attempt();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RulesBlockedError);
+      return (error as RulesBlockedError).rule;
+    }
+    return null;
+  };
+
+  it("refuses an action or a Bonus Action off the creature's turn, whoever sends it, until the GM overrides", () => {
+    const game = buildGame(); // Torva is up.
+    expect(blockedRule(() => builtin(game, "dodge", { actorId: IDS.sable }, sableDefinition))).toBe(
+      "economy.not-your-turn"
+    );
+    expect(
+      blockedRule(() =>
+        resolve(game, sableDefinition, "eldritch-blast", { actorId: IDS.sable, targetIds: [IDS.croc1] }, [15, 7])
+      )
+    ).toBe("economy.not-your-turn");
+    // A Bonus Action too: Torva's Rage while Sable is up.
+    const sableUp = buildGame([
+      { actorId: IDS.sable, score: 20 },
+      { actorId: IDS.torva, score: 10 },
+      { actorId: IDS.croc1, score: 5 }
+    ]);
+    expect(blockedRule(() => resolve(sableUp, torvaDefinition, "rage", { actorId: IDS.torva }, []))).toBe(
+      "economy.not-your-turn"
+    );
+    // Nothing happened: no effect, no roll, and no reaction spent in its place.
+    const sable = game.actors.find((actor) => actor.id === IDS.sable)!;
+    expect(sable.effects).toEqual([]);
+    expect(game.rolls).toEqual([]);
+    expect(game.combat.reactionsUsed).toEqual([]);
+    // The GM's ruling lets it through, reported for the audit line.
+    const forced = resolve(
+      game,
+      sableDefinition,
+      "eldritch-blast",
+      { actorId: IDS.sable, targetIds: [IDS.croc1], override: { reason: "Haste" } },
+      [15, 7]
+    );
+    expect(forced.overridden).toEqual({ rule: "economy.not-your-turn", reason: "Haste" });
+  });
+
+  it("lets the creature whose turn it is act", () => {
+    const game = buildGame();
+    expect(blockedRule(() => resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []))).toBeNull();
+  });
+
+  it("takes a readied response with the Reaction, and refuses it with no Reaction left (SRD Ready)", () => {
+    const game = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    builtin(game, "ready", { actorId: IDS.pip, note: "shoot the crocodile" }, pipDefinition);
+    nextInitiativeTurn(game);
+    // Spent before the trigger came: the ready can't be taken, rather than releasing for free.
+    game.combat = { ...game.combat, reactionsUsed: [IDS.pip] };
+    try {
+      resolve(game, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [15, 4]);
+      expect.unreachable();
+    } catch (error) {
+      expect((error as RulesBlockedError).rule).toBe("economy.reaction-used");
+      expect((error as RulesBlockedError).message).toBe(
+        "Pip Underbough has no reaction left to take the readied action with."
+      );
+    }
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.effects.map((effect) => effect.name)).toEqual(["Readied: shoot the crocodile"]);
   });
 });
 
@@ -1352,7 +1569,9 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
     expect(game.actors.find((actor) => actor.id === IDS.croc1)!.hp.current).toBe(0);
   });
 
-  it("petrified grants resistance to all damage and poison immunity (SRD Petrified)", () => {
+  // SRD 5.2.1 Petrified: resistance to all damage, poison included; its immunity is to the Poisoned condition
+  // (the 2014 poison damage immunity is gone).
+  it("petrified resists all damage and is immune to the Poisoned condition, not poison damage (SRD Petrified)", () => {
     const game = buildGame();
     game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "petrified" }];
     const outcome = applyDamageDetailed(
@@ -1370,9 +1589,13 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
     );
     expect(outcome.application.parts).toEqual([
       { type: "bludgeoning", amount: 17, adjusted: 8, adjustment: "resistance", adjustmentSource: "Petrified" },
-      { type: "poison", amount: 10, adjusted: 0, adjustment: "immunity", adjustmentSource: "Petrified" }
+      { type: "poison", amount: 10, adjusted: 5, adjustment: "resistance", adjustmentSource: "Petrified" }
     ]);
-    expect(outcome.application.totalApplied).toBe(8);
+    expect(outcome.application.totalApplied).toBe(13);
+    const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
+    const events = setCondition(game, IDS.torva, "poisoned", true, undefined, { role: "gm" });
+    expect(torva.conditions.map((condition) => condition.id)).toEqual(["petrified"]);
+    expect(events.some((event) => /immune to Poisoned/.test(event.text))).toBe(true);
   });
 
   it("condition immunity skips with narration instead of applying (SRD Immunity)", () => {
@@ -1458,7 +1681,8 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     expect(game.combat.turn.actionUsed).toBe(true);
     const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
 
-    // Incoming attack rolls at disadvantage, labeled.
+    // Incoming attack rolls at disadvantage, labeled. The crocodile bites on its own turn.
+    nextInitiativeTurn(game);
     const bite = resolve(
       game,
       crocodileDefinition,
@@ -1495,32 +1719,78 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     );
   });
 
-  it("Help grants the chosen ally attack advantage that expires at the helper's next turn", () => {
+  it("Help distracts an enemy: one ally's next attack roll against it has Advantage, then it is spent (SRD Help)", () => {
     const game = buildGame([
       { actorId: IDS.pip, score: 20 },
       { actorId: IDS.torva, score: 12 },
       { actorId: IDS.croc1, score: 8 }
     ]);
-    const help = resolveBuiltin(game, "help", { actorId: IDS.pip, targetIds: [IDS.torva] }, [], pipDefinition);
+    const help = resolveBuiltin(game, "help", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [], pipDefinition);
     expect(help.effectsApplied).toEqual([
-      { targetId: IDS.torva, targetName: "Torva Grimtusk", name: "Helped", conditionIds: [] }
+      { targetId: IDS.croc1, targetName: "Giant Crocodile", name: "Distracted by Pip Underbough", conditionIds: [] }
     ]);
 
-    nextInitiativeTurn(game); // Torva's turn - the bearer attacks with advantage.
-    const swing = resolve(
+    nextInitiativeTurn(game); // Torva's turn: her first swing at the crocodile has Advantage...
+    const first = resolve(
       game,
       torvaDefinition,
       "greataxe",
       { actorId: IDS.torva, targetIds: [IDS.croc1] },
       [3, 15, 6]
     );
-    expect(swing.rollMode?.advantage).toContain("Helped");
+    expect(first.rollMode?.advantage).toEqual(["Help (Pip Underbough)"]);
+    // ...and the second, Extra Attack's, has none: Help gives Advantage to one attack roll.
+    const second = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [12, 6]);
+    expect(second.rollMode).toBeUndefined();
+    expect(game.actors.find((actor) => actor.id === IDS.croc1)!.effects).toEqual([]);
+  });
 
-    nextInitiativeTurn(game); // croc
-    nextInitiativeTurn(game); // Pip's next turn: the help (sustained by Pip) expires.
-    expect(
-      game.actors.find((actor) => actor.id === IDS.torva)!.effects.some((effect) => effect.name === "Helped")
-    ).toBe(false);
+  it("Help gives nothing against another creature, and expires at the helper's next turn", () => {
+    const game = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.torva, score: 12 },
+      { actorId: IDS.croc1, score: 8 },
+      { actorId: IDS.croc2, score: 6 }
+    ]);
+    resolveBuiltin(game, "help", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [], pipDefinition);
+    nextInitiativeTurn(game);
+    const elsewhere = resolve(
+      game,
+      torvaDefinition,
+      "greataxe",
+      { actorId: IDS.torva, targetIds: [IDS.croc2] },
+      [12, 6]
+    );
+    expect(elsewhere.rollMode).toBeUndefined();
+    nextInitiativeTurn(game); // croc1
+    nextInitiativeTurn(game); // croc2
+    nextInitiativeTurn(game); // Pip's next turn: the distraction is gone.
+    expect(game.actors.find((actor) => actor.id === IDS.croc1)!.effects).toEqual([]);
+  });
+
+  it("Help refuses the helper itself, an ally, and an enemy beyond 5 feet", () => {
+    const game = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.torva, score: 12 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    const rule = (targetId: string, distanceFeet?: (a: string, b: string) => number | null) => {
+      try {
+        resolveDefinitionAction(
+          game,
+          builtinAction("help")!,
+          { actorId: IDS.pip, targetIds: [targetId], commandId: nextCommandId(), builtin: true },
+          { ...deps([], pipDefinition, distanceFeet) }
+        );
+      } catch (error) {
+        return (error as RulesBlockedError).rule;
+      }
+      return null;
+    };
+    expect(rule(IDS.pip)).toBe("target.not-an-enemy");
+    expect(rule(IDS.torva)).toBe("target.not-an-enemy");
+    expect(rule(IDS.croc1, () => 10)).toBe("range.out-of-reach");
+    expect(rule(IDS.croc1, () => 5)).toBeNull();
   });
 
   it("Hide rolls Dex (Stealth) vs DC 15, grants Invisible on success, and attacking reveals", () => {
@@ -1538,7 +1808,10 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
     const strike = resolve(game, pipDefinition, "rapier", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [2, 18, 5]);
     expect(strike.rollMode?.advantage).toContain("Attacker is Invisible");
-    expect(strike.effectsEnded).toEqual([{ actorId: IDS.pip, actorName: "Pip Underbough", name: "Hiding" }]);
+    // The effect names the total, the DC to find Pip (SRD Hide).
+    expect(strike.effectsEnded).toEqual([
+      { actorId: IDS.pip, actorName: "Pip Underbough", name: "Hiding (DC 16 to find)" }
+    ]);
     expect(pip.conditions.some((condition) => condition.id === "invisible")).toBe(false);
   });
 
@@ -1569,7 +1842,11 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
   });
 
   it("Unarmed grapple: target saves vs 8 + Str + PB; failure applies the escapable Grappled effect; escape frees; a stunned grappler releases", () => {
-    const game = buildGame();
+    const game = buildGame([
+      { actorId: IDS.torva, score: 16 },
+      { actorId: IDS.pip, score: 12 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
     // Torva grapples Pip (small - within one size): DC 8 + 4 + 3 = 15; Pip's better save is Dex (+7).
     const grapple = resolveBuiltin(
       game,
@@ -1620,8 +1897,12 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     expect(escape.check).toMatchObject({ dc: 15, success: true });
     expect(pip.conditions.some((condition) => condition.id === "grappled")).toBe(false);
 
-    // Re-grapple, then stun the grappler: SRD Grappling - an incapacitated grappler releases.
-    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
+    // Re-grapple on Torva's turn, then stun the grappler: SRD Grappling - an incapacitated grappler releases.
+    game.combat = {
+      ...game.combat,
+      turnActorId: IDS.torva,
+      turn: { ...game.combat.turn, actionUsed: false, actionInstance: null }
+    };
     resolveBuiltin(game, "unarmed-grapple", { actorId: IDS.torva, targetIds: [IDS.pip] }, [], torvaDefinition);
     answerSave(
       game,
@@ -1699,7 +1980,8 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     );
     game.combat = {
       ...game.combat,
-      initiative: [...game.combat.initiative, { actorId: extraId, score: 1, tieBreaker: 0 }]
+      initiative: [...game.combat.initiative, { actorId: extraId, score: 1, tieBreaker: 0 }],
+      turnActorId: extraId
     };
     const dodge = resolveBuiltin(game, "dodge", { actorId: extraId }, []);
     expect(dodge.effectGranted?.name).toBe("Dodging");
@@ -1850,6 +2132,31 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     place(stunned, IDS.croc1, 0, 0);
     stunned.actors.find((actor) => actor.id === IDS.croc1)!.conditions = [{ id: "stunned" }];
     expect(moveRules(stunned, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+  });
+
+  // SRD Opportunity Attacks: "a creature that you can see leaves your reach".
+  it("no prompt when the enemy can't see the mover: an Invisible mover, or a Blinded enemy without Blindsight", () => {
+    const unseen = buildGame();
+    place(unseen, IDS.croc1, 0, 0);
+    unseen.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "invisible" }];
+    expect(moveRules(unseen, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+
+    const blinded = buildGame();
+    place(blinded, IDS.croc1, 0, 0);
+    blinded.actors.find((actor) => actor.id === IDS.croc1)!.conditions = [{ id: "blinded" }];
+    expect(moveRules(blinded, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(0);
+
+    // Blindsight reaching the mover's starting space sees it either way.
+    const sensing = buildGame();
+    place(sensing, IDS.croc1, 0, 0);
+    const croc = sensing.actors.find((actor) => actor.id === IDS.croc1)!;
+    croc.conditions = [{ id: "blinded" }];
+    const stored = sensing.definitions.find((entry) => entry.id === croc.definitionId)!;
+    stored.definition = {
+      ...stored.definition,
+      extensions: { ...stored.definition.extensions, "open5e.srd-2024": { senses: ["blindsight 10 ft."] } }
+    };
+    expect(moveRules(sensing, IDS.torva, { x: 5, y: 0 }, { x: 30, y: 0 }).prompts).toHaveLength(1);
   });
 
   it("answering the opportunity prompt swings a real melee attack and auto-applies the damage", () => {
@@ -2095,6 +2402,25 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
       game.actors.find((actor) => actor.id === IDS.sable)!.effects.find((effect) => effect.tags.includes("dashing"))!
         .movementGrantFeet
     ).toBe(30);
+  });
+
+  it("a second Dash in one turn adds its movement to the first (Action Surge: 90 ft at Speed 30)", () => {
+    const game = buildGame([
+      { actorId: IDS.sable, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    dashFor(game, IDS.sable, sableDefinition);
+    // A second action this turn, as Action Surge gives.
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false } };
+    dashFor(game, IDS.sable, sableDefinition);
+    const sable = game.actors.find((actor) => actor.id === IDS.sable)!;
+    expect(sable.effects.filter((effect) => effect.tags.includes("dashing")).map((e) => e.movementGrantFeet)).toEqual([
+      30, 30
+    ]);
+    expect(() => moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 95, y: 0 })).toThrow(
+      "Sable Vex has 90 ft of movement left (this move needs 95 ft)."
+    );
+    expect(moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 90, y: 0 }).warning).toBeNull();
   });
 
   it("a Dash taken while ALREADY slowed grants the reduced Speed, and the total is the same 40", () => {
@@ -2355,6 +2681,63 @@ describe("range and reach validation (SRD Making an Attack / Range)", () => {
       (_a, b) => distances[b] ?? null
     );
     expect(jostled.rollMode?.disadvantage).toContain("Enemy within 5 feet (Giant Crocodile 2)");
+
+    // A crocodile the players can't see neither spoils the shot nor gets named in the reply.
+    const lurking = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 12 },
+      { actorId: IDS.croc2, score: 8 }
+    ]);
+    lurking.actors.find((actor) => actor.id === IDS.croc2)!.visibility = "gm-only";
+    const unseen = resolve(
+      lurking,
+      pipDefinition,
+      "shortbow",
+      { actorId: IDS.pip, targetIds: [IDS.croc1] },
+      [18, 3],
+      (_a, b) => distances[b] ?? null
+    );
+    expect(JSON.stringify(unseen)).not.toContain("Giant Crocodile 2");
+    expect(unseen.rollMode?.disadvantage ?? []).toEqual([]);
+  });
+
+  it("an adjacent creature spoils the shot only while it is an able, living enemy", () => {
+    const shoot = (game: GameState) =>
+      resolveDefinitionAction(
+        game,
+        actionOf(pipDefinition, "shortbow"),
+        { actorId: IDS.pip, targetIds: [IDS.croc1], commandId: nextCommandId() },
+        {
+          ...deps([18, 3], pipDefinition, (_a, b) => (b === IDS.croc2 ? 5 : 40)),
+          resolveDefinition: (id) => game.definitions.find((entry) => entry.id === id)?.definition
+        }
+      );
+    const crowded = () =>
+      buildGame([
+        { actorId: IDS.pip, score: 20 },
+        { actorId: IDS.croc1, score: 12 },
+        { actorId: IDS.croc2, score: 8 }
+      ]);
+    const neighbour = (game: GameState) => game.actors.find((actor) => actor.id === IDS.croc2)!;
+
+    // A monster at 0 HP is dead (SRD Monster Death), even with its token still on the map.
+    const dead = crowded();
+    neighbour(dead).hp.current = 0;
+    expect(shoot(dead).rollMode?.disadvantage ?? []).toEqual([]);
+
+    // A hostile NPC is an enemy like a monster.
+    const bandit = crowded();
+    neighbour(bandit).kind = "npc";
+    expect(shoot(bandit).rollMode?.disadvantage).toContain("Enemy within 5 feet (Giant Crocodile 2)");
+
+    // A creature whose stat block is friendly stands with the party (a summoned ally), whatever its kind.
+    const ally = crowded();
+    ally.definitions.push({
+      id: "friendly-croc",
+      definition: { ...crocodileDefinition, token: { ...crocodileDefinition.token, disposition: "friendly" } }
+    });
+    neighbour(ally).definitionId = "friendly-croc";
+    expect(shoot(ally).rollMode?.disadvantage ?? []).toEqual([]);
   });
 });
 
@@ -2712,6 +3095,38 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
     expect(rapier.rollMode?.disadvantage ?? []).not.toContain("Underwater (non-piercing melee)");
   });
 
+  it("a creature with a Swim Speed is not impeded, and ranged weapons have Disadvantage within normal range", () => {
+    // The Giant Crocodile swims 50 ft, so its bludgeoning Tail is not impeded.
+    const game = buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.torva, score: 8 }
+    ]);
+    game.combat = { ...game.combat, underwater: true };
+    const tail = resolve(
+      game,
+      crocodileDefinition,
+      "tail",
+      { actorId: IDS.croc1, targetIds: [IDS.torva] },
+      [15, 3, 3, 3]
+    );
+    expect(tail.rollMode?.disadvantage ?? []).not.toContain("Underwater (non-piercing melee)");
+
+    const archer = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    archer.combat = { ...archer.combat, underwater: true };
+    const shot = resolve(
+      archer,
+      pipDefinition,
+      "shortbow",
+      { actorId: IDS.pip, targetIds: [IDS.croc1] },
+      [18, 3, 3],
+      () => 30
+    );
+    expect(shot.rollMode?.disadvantage).toContain("Underwater (ranged weapon)");
+  });
+
   it("ranged attacks automatically miss beyond normal range (strict violation range.underwater)", () => {
     const game = buildGame([
       { actorId: IDS.pip, score: 20 },
@@ -2726,15 +3141,17 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
       expect(error).toBeInstanceOf(RulesBlockedError);
       expect((error as RulesBlockedError).rule).toBe("range.underwater");
     }
+    // Within normal range it can hit, at Disadvantage (two d20s, the lower kept).
     const close = resolve(
       game,
       pipDefinition,
       "shortbow",
       { actorId: IDS.pip, targetIds: [IDS.croc1] },
-      [18, 3],
+      [18, 17, 3],
       () => 60
     );
     expect(close.attack?.outcome).toBe("hit");
+    expect(close.rollMode?.disadvantage).toContain("Underwater (ranged weapon)");
   });
 
   it("everyone underwater resists fire damage, attributed to the environment", () => {
@@ -2758,8 +3175,10 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
   });
 });
 
+// SRD 5.2.1 Knocking Out a Creature: the drop to 0 becomes 1 HP and Unconscious (and so Prone) until it regains
+// any hit points; no dying, no defeat. The 2014-style "0 HP and stable" is gone.
 describe("knocking out a creature (SRD) - nonlethal damage", () => {
-  it("a nonlethal drop to 0 leaves a character Unconscious and stable instead of dying", () => {
+  it("a nonlethal drop to 0 leaves a character at 1 HP and Unconscious instead of dying", () => {
     const game = buildGame();
     const outcome = applyDamageDetailed(
       game,
@@ -2769,14 +3188,19 @@ describe("knocking out a creature (SRD) - nonlethal damage", () => {
       { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition }
     );
     const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
-    expect(pip.hp.current).toBe(0);
-    expect(pip.deathSaves).toEqual({ successes: 0, failures: 0, stable: true });
-    expect(pip.conditions.some((condition) => condition.id === "unconscious")).toBe(true);
+    expect(pip.hp.current).toBe(1);
+    expect(pip.deathSaves).toBeNull();
+    expect(pip.conditions.map((condition) => condition.id)).toEqual(["prone", "unconscious"]);
     expect(outcome.application.instantDeath).toBe(false);
+    expect(outcome.application.droppedToZero).toBe(false);
     expect(outcome.events.some((event) => /knocked out/.test(event.text))).toBe(true);
+    // Regaining any hit point wakes it; it stays Prone (SRD Unconscious).
+    healActor(game, IDS.pip, 1, { role: "gm" });
+    expect(pip.conditions.map((condition) => condition.id)).toEqual(["prone"]);
+    expect(pip.effects).toEqual([]);
   });
 
-  it("a nonlethal drop to 0 leaves a monster Unconscious, not defeated", () => {
+  it("a nonlethal drop to 0 leaves a monster at 1 HP and Unconscious, not defeated, and healing wakes it", () => {
     const game = buildGame();
     const outcome = applyDamageDetailed(
       game,
@@ -2786,11 +3210,11 @@ describe("knocking out a creature (SRD) - nonlethal damage", () => {
       { resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition }
     );
     expect(outcome.application.defeated).toBe(false);
-    expect(
-      game.actors
-        .find((actor) => actor.id === IDS.croc1)!
-        .conditions.some((condition) => condition.id === "unconscious")
-    ).toBe(true);
+    const croc = game.actors.find((actor) => actor.id === IDS.croc1)!;
+    expect(croc.hp.current).toBe(1);
+    expect(croc.conditions.some((condition) => condition.id === "unconscious")).toBe(true);
+    healActor(game, IDS.croc1, 4, { role: "gm" });
+    expect(croc.conditions.some((condition) => condition.id === "unconscious")).toBe(false);
   });
 });
 
@@ -2803,7 +3227,11 @@ describe("multiattack ergonomics - no pre-selection needed (report bug 5)", () =
     // Bite straight away (no Multiattack tap first): the plan opens with the Tail still owed.
     // (Face 2 misses AC 15 so the grapple rider doesn't block the Tail's later targeting.)
     resolve(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.torva] }, [2, 6, 6, 6]);
-    expect(game.combat.turn.actionInstance).toEqual({ actorId: IDS.croc1, components: { bite: 0, tail: 1 } });
+    expect(game.combat.turn.actionInstance).toEqual({
+      actorId: IDS.croc1,
+      components: { bite: 0, tail: 1 },
+      parentId: "multiattack"
+    });
     // Tapping the Multiattack row now is a continue (reports the remaining plan), not an override dialog.
     const plan = resolve(game, crocodileDefinition, "multiattack", { actorId: IDS.croc1 }, []);
     expect(plan.componentsRemaining).toEqual({ bite: 0, tail: 1 });
@@ -3126,14 +3554,16 @@ describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () =>
     nextInitiativeTurn(game); // the dragon's turn
     resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, Array(5).fill(1)); // 5d8 cold
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
-    // Round 2, low roll (2 < 5): the pool stays spent and the table sees why.
-    const lowEvents: { text: string; actorId: string }[] = [];
+    // Round 2, low roll (2 < 5): the pool stays spent, narrated to the GM alone (a monster's resources are
+    // GM knowledge; the table sees the breath when it is used).
+    const lowEvents: { text: string; actorId: string; gmOnly?: true }[] = [];
     nextInitiativeTurn(game, lowEvents as never, dragonDeps(game, 2)); // Torva (no dragon pools roll)
     nextInitiativeTurn(game, lowEvents as never, dragonDeps(game, 2)); // dragon's turn start: d6 = 2
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBe(1);
-    expect(
-      lowEvents.some((event) => event.actorId === DRAGON && /stays spent \(rolled 2, needs 5\+\)/.test(event.text))
-    ).toBe(true);
+    const stillSpent = lowEvents.find(
+      (event) => event.actorId === DRAGON && /stays spent \(rolled 2, needs 5\+\)/.test(event.text)
+    );
+    expect(stillSpent?.gmOnly).toBe(true);
     expect(() =>
       resolve(game, wyrmlingDefinition, "cold-breath", { actorId: DRAGON, targetIds: [IDS.torva] }, [])
     ).toThrowError(/recharges on 5\+ at the start of its turn/);
@@ -3518,7 +3948,11 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     const monsters = loadMonsterDefinitions();
     const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
     expect(dragon.legendary).toEqual({ actionsPerRound: 3, resistancesPerDay: 3 });
-    expect(dragon.actions.find((action) => action.id === "commanding-presence")!.legendary).toEqual({ cost: 1 });
+    // "The dragon can't take this action again until the start of its next turn."
+    expect(dragon.actions.find((action) => action.id === "commanding-presence")!.legendary).toEqual({
+      cost: 1,
+      oncePerRound: true
+    });
     // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (the lair bump stays
     // prose); 32 creatures carry Legendary Resistance; every legendary action row costs 1.
     expect(monsters.filter((monster) => monster.legendary?.actionsPerRound === 3).length).toBe(30);
@@ -3664,5 +4098,426 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
       ]
     });
     expect(legacy.actors[0].hitDice).toBeNull();
+  });
+});
+
+describe("Bonus Action forms of the generic actions (SRD Cunning Action, Nimble Escape)", () => {
+  const goblinDefinition = loadMonsterDefinitions().find((monster) => monster.source.externalId === "goblin-warrior")!;
+  const clayGolemDefinition = loadMonsterDefinitions().find((monster) => monster.source.externalId === "clay-golem")!;
+  const GOBLIN = "10000000-0000-4000-8000-000000000006";
+
+  /** Resolves the generic action this combatant can take by id, the Bonus Action forms its features give included. */
+  const take = (
+    game: GameState,
+    definition: ActorDefinition,
+    actorId: string,
+    actionId: string,
+    targetIds: readonly string[] = [],
+    faces: number[] = []
+  ) =>
+    resolveDefinitionAction(
+      game,
+      builtinActionFor(definition, actionId)!,
+      { actorId, targetIds, commandId: nextCommandId(), builtin: true, rollMode: null, override: null },
+      {
+        ...deps(faces, definition),
+        resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+      }
+    );
+
+  it("lists a Rogue's Cunning Action forms and none for a creature without the feature", () => {
+    const ids = (definition: ActorDefinition) =>
+      builtinActionsFor(definition)
+        .filter((action) => action.activation === "bonus-action")
+        .map((action) => `${action.id}:${action.name}`);
+    expect(ids(pipDefinition)).toEqual([
+      "dash-bonus:Cunning Action: Dash",
+      "disengage-bonus:Cunning Action: Disengage",
+      "hide-bonus:Cunning Action: Hide"
+    ]);
+    expect(ids(goblinDefinition)).toEqual([
+      "disengage-bonus:Nimble Escape: Disengage",
+      "hide-bonus:Nimble Escape: Hide"
+    ]);
+    expect(ids(torvaDefinition)).toEqual([]);
+  });
+
+  it("lets a Rogue attack and then Dash with the Bonus Action, which grants extra movement", () => {
+    const game = buildGame([
+      { actorId: IDS.pip, score: 20 },
+      { actorId: IDS.croc1, score: 8 }
+    ]);
+    resolve(game, pipDefinition, "rapier", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [15, 4]);
+    expect(game.combat.turn.actionUsed).toBe(true);
+    // The generic Dash is the action, already spent; Cunning Action's form is the Bonus Action.
+    expect(() => take(game, pipDefinition, IDS.pip, "dash")).toThrow(/already used an action/);
+    const dash = take(game, pipDefinition, IDS.pip, "dash-bonus");
+    expect(dash.effectGranted).toEqual({ name: "Dashing", tags: ["dashing"] });
+    expect(game.combat.turn.bonusActionUsed).toBe(true);
+    const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
+    expect(pip.effects.find((effect) => effect.tags.includes("dashing"))?.movementGrantFeet).toBe(25);
+    // One Bonus Action a turn.
+    expect(() => take(game, pipDefinition, IDS.pip, "disengage-bonus")).toThrow(/already used a bonus action/);
+  });
+
+  it("lets a goblin hit and then Disengage with Nimble Escape, so leaving reach provokes nothing", () => {
+    const game = buildGame([
+      { actorId: IDS.sable, score: 5 },
+      { actorId: IDS.torva, score: 3 }
+    ]);
+    game.actors.push(
+      ActorSchema.parse({
+        id: GOBLIN,
+        name: "Goblin Warrior",
+        kind: "monster",
+        visibility: "public",
+        hp: { current: 10, maximum: 10 },
+        armorClass: 15,
+        definitionId: "goblin-warrior",
+        size: "small",
+        speedFeet: 30
+      })
+    );
+    game.definitions.push({ id: "goblin-warrior", definition: goblinDefinition });
+    game.combat = {
+      ...game.combat,
+      turnActorId: GOBLIN,
+      initiative: [{ actorId: GOBLIN, score: 30, tieBreaker: 0 }, ...game.combat.initiative],
+      tokens: [
+        {
+          actorId: GOBLIN,
+          position: { x: 5, y: 0 },
+          sizeCells: 1,
+          sizePx: 50,
+          gridSizePx: null,
+          gridRotationRadians: null
+        },
+        ...game.combat.tokens.map((token) =>
+          token.actorId === IDS.sable ? { ...token, position: { x: 0, y: 0 } } : token
+        )
+      ]
+    };
+    const scimitar = goblinDefinition.actions.find((action) => action.id === "scimitar")!;
+    resolveDefinitionAction(
+      game,
+      scimitar,
+      { actorId: GOBLIN, targetIds: [IDS.sable], commandId: nextCommandId(), rollMode: null, override: null },
+      deps([15, 3], goblinDefinition)
+    );
+    const disengage = take(game, goblinDefinition, GOBLIN, "disengage-bonus");
+    expect(disengage.effectGranted).toEqual({ name: "Disengaged", tags: ["disengaged"] });
+    expect(game.combat.turn.bonusActionUsed).toBe(true);
+    const away = applyMovementRules(game, {
+      actorId: GOBLIN,
+      from: { x: 5, y: 0 },
+      to: { x: 30, y: 0 },
+      distance: (a, b) => Math.hypot(b.x - a.x, b.y - a.y),
+      override: null,
+      resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+      newPromptId: () => "70000000-0000-4000-8000-0000000000aa",
+      now: () => 0,
+      commandId: nextCommandId()
+    });
+    expect(away.prompts).toEqual([]);
+  });
+
+  it("gives a row that takes the Dash and Disengage actions both effects (the clay golem's Hasten)", () => {
+    const hasten = effectiveActions(clayGolemDefinition, undefined, undefined).find((action) =>
+      /takes the Dash and Disengage actions/.test(action.description)
+    )!;
+    expect(hasten.grants).toMatchObject({ tags: ["dashing", "disengaged"], target: "self" });
+    expect(actionSummaryOf(clayGolemDefinition.actions.find((action) => action.id === hasten.id)!).grants).toBe(true);
+  });
+});
+
+describe("Haste: one more action from a short list, and lethargy when it ends (SRD Haste)", () => {
+  const hasten = (game: GameState) =>
+    addEffect(
+      game,
+      IDS.torva,
+      makeEffect({
+        id: "haste-on-torva",
+        name: "Haste",
+        tags: ["hasted"],
+        sourceActorId: IDS.pip,
+        sourceName: "Pip Underbough",
+        startedRound: 1,
+        duration: { type: "rounds", remaining: 10 }
+      })
+    );
+  const generic = (game: GameState, actionId: string) =>
+    resolveDefinitionAction(
+      game,
+      builtinAction(actionId)!,
+      { actorId: IDS.torva, targetIds: [], commandId: nextCommandId(), builtin: true, rollMode: null, override: null },
+      deps([], torvaDefinition)
+    );
+
+  it("adds one attack, not a second Attack action's worth, after the creature's own action", () => {
+    const game = buildGame();
+    hasten(game);
+    resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    // The table sees another action is ready.
+    expect(projectPlayerCombat(game).turn.extraActionReady).toBe(true);
+    // Haste's action: "the Attack (one attack only)".
+    const third = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
+    expect(third.componentsRemaining).toBeNull();
+    expect(projectPlayerCombat(game).turn.extraActionReady).toBeUndefined();
+    expect(() =>
+      resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6])
+    ).toThrow(/no attacks remaining in this action/);
+  });
+
+  it("takes only Attack, Dash, Disengage, Hide or Utilize", () => {
+    const game = buildGame();
+    hasten(game);
+    generic(game, "dodge");
+    expect(() => generic(game, "magic")).toThrow(
+      /Haste's additional action takes only the Attack \(one attack only\), Dash, Disengage, Hide or Utilize action/
+    );
+    generic(game, "dash");
+    expect(() => generic(game, "disengage")).toThrow(/already used an action/);
+  });
+
+  it("leaves the target Incapacitated with Speed 0 until the end of its next turn when it ends", () => {
+    const game = buildGame(); // Torva, Pip, croc2, croc1, Sable
+    hasten(game);
+    nextInitiativeTurn(game); // Pip's turn: the caster's Concentration breaks.
+    endEffect(game, IDS.torva, "haste-on-torva");
+    const torva = () => game.actors.find((actor) => actor.id === IDS.torva)!;
+    expect(torva().effects.map((effect) => effect.name)).toEqual(["Lethargy"]);
+    expect(torva().conditions.map((condition) => condition.id)).toContain("incapacitated");
+    nextInitiativeTurn(game);
+    nextInitiativeTurn(game);
+    nextInitiativeTurn(game);
+    nextInitiativeTurn(game); // Torva's next turn: it can't act or move.
+    expect(() => generic(game, "dash")).toThrow(/Incapacitated/);
+    const derivation = deriveEquipment(torva(), torvaDefinition, undefined);
+    expect(effectiveSpeedFeet(torva(), derivation)).toBe(0);
+    nextInitiativeTurn(game); // ...and the end of that turn ends it.
+    expect(torva().effects).toEqual([]);
+    expect(torva().conditions.some((condition) => condition.id === "incapacitated")).toBe(false);
+  });
+
+  it("starts no lethargy when the fight's end sweeps Haste away", () => {
+    const game = buildGame();
+    hasten(game);
+    endEncounterEffects(
+      game,
+      game.combat.initiative.map((entry) => entry.actorId)
+    );
+    expect(game.actors.find((actor) => actor.id === IDS.torva)!.effects).toEqual([]);
+  });
+});
+
+describe("Opportunity attacks: one melee attack with a weapon or an Unarmed Strike (SRD Opportunity Attacks)", () => {
+  const PROMPT = "40000000-0000-4000-8000-0000000000ab";
+  /** The crocodile's turn: it leaves Pip's reach and Pip may strike. */
+  const leaving = () => {
+    const game = buildGame([
+      { actorId: IDS.croc1, score: 20 },
+      { actorId: IDS.pip, score: 8 }
+    ]);
+    game.combat = {
+      ...game.combat,
+      pendingReactions: [
+        {
+          id: PROMPT,
+          kind: "leaves-reach",
+          actorId: IDS.pip,
+          actionId: "opportunity-attack",
+          actionName: "Opportunity Attack",
+          sourceActorId: IDS.croc1,
+          sourceName: "Giant Crocodile",
+          targetActorId: IDS.croc1,
+          triggerCommandId: nextCommandId(),
+          proposedDamage: 0,
+          proposedDamageParts: [],
+          critical: false,
+          weighed: null,
+          acBonus: null,
+          rollsAttack: true,
+          parkedAttack: null,
+          createdAt: 0
+        }
+      ]
+    };
+    return game;
+  };
+  const strike = (
+    game: GameState,
+    actionId: string | undefined,
+    faces: number[],
+    options: Parameters<typeof answerReaction>[7] = {}
+  ) =>
+    answerReaction(
+      game,
+      nextCommandId(),
+      PROMPT,
+      true,
+      actionId,
+      { role: "gm" },
+      {
+        resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition,
+        random: () => {
+          const face = faces.shift();
+          if (face === undefined) throw new Error("dice queue empty");
+          return face;
+        },
+        newRollId: nextCommandId,
+        gmSessionId: IDS.gmSession,
+        now: () => "2026-07-18T00:00:00.000Z"
+      },
+      options
+    );
+
+  it("refuses a ranged weapon or a spell, and keeps the reaction", () => {
+    const game = leaving();
+    expect(() => strike(game, "shortbow", [18, 4])).toThrow(
+      /An opportunity attack is one melee attack with a weapon or an Unarmed Strike - Shortbow isn't one/
+    );
+    expect(game.combat.reactionsUsed).not.toContain(IDS.pip);
+    expect(game.combat.pendingReactions).toHaveLength(1);
+  });
+
+  it("takes an Unarmed Strike, and keeps the size rule on its Grapple option", () => {
+    const game = leaving();
+    // A Small halfling can't grapple a Huge crocodile: the option's own rule, not the reaction's.
+    expect(() => strike(game, "unarmed-grapple", [])).toThrow(/more than one size larger/);
+    const punch = strike(game, "unarmed-strike", [18, 2]);
+    expect(punch.used).toBe(true);
+    expect(punch.resolution?.attack).toMatchObject({ naturalRoll: 18 });
+    expect(game.combat.reactionsUsed).toContain(IDS.pip);
+  });
+});
+
+describe("Monster actions as the stat block prints them (Multiattack, legendary actions)", () => {
+  const MONSTER = "10000000-0000-4000-8000-000000000007";
+  /** A bundled monster and Torva in a fight; `heroFirst` puts Torva's turn first, for legendary actions. */
+  const fight = (externalId: string, heroFirst = false) => {
+    const definition = loadMonsterDefinitions().find((monster) => monster.source.externalId === externalId)!;
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: MONSTER,
+          name: definition.name,
+          kind: "monster",
+          visibility: "public",
+          hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum },
+          armorClass: definition.armorClass,
+          definitionId: externalId,
+          size: definition.size,
+          speedFeet: definition.speedFeet
+        },
+        {
+          id: IDS.torva,
+          name: "Torva Grimtusk",
+          kind: "player-character",
+          visibility: "public",
+          hp: { current: 75, maximum: 75 },
+          armorClass: 15,
+          definitionId: "import-torva",
+          size: "medium",
+          speedFeet: 40
+        }
+      ],
+      definitions: [
+        { id: externalId, definition },
+        { id: "import-torva", definition: torvaDefinition }
+      ]
+    });
+    startEncounter(
+      game,
+      {
+        mapAssetId: IDS.map,
+        entries: heroFirst
+          ? [
+              { actorId: IDS.torva, score: 20 },
+              { actorId: MONSTER, score: 10 }
+            ]
+          : [
+              { actorId: MONSTER, score: 20 },
+              { actorId: IDS.torva, score: 10 }
+            ]
+      },
+      () => 1,
+      GEOMETRY,
+      (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+    );
+    /** Resolves one of the monster's actions against Torva (or none): a 15 on the d20, every damage die its top face. */
+    const act = (actionId: string, targetIds: readonly string[] = [IDS.torva]) =>
+      resolveDefinitionAction(
+        game,
+        definition.actions.find((action) => action.id === actionId)!,
+        { actorId: MONSTER, targetIds, commandId: nextCommandId(), rollMode: null, override: null },
+        {
+          ...deps([], definition),
+          random: (sides) => Math.min(sides, 15),
+          resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+        }
+      );
+    return { game, definition, act };
+  };
+
+  it("lets the bone devil make both Claws and its Infernal Sting, in either order", () => {
+    const inOrder = fight("bone-devil");
+    inOrder.act("claw");
+    inOrder.act("claw");
+    expect(inOrder.act("infernal-sting").componentsRemaining).toBeNull();
+    expect(() => inOrder.act("claw")).toThrow(/no attacks remaining|no Claw left/);
+    const stingFirst = fight("bone-devil");
+    stingFirst.act("infernal-sting");
+    stingFirst.act("claw");
+    stingFirst.act("claw");
+    expect(() => stingFirst.act("infernal-sting")).toThrow(RulesBlockedError);
+  });
+
+  it("lets the lion replace one Rend with Roar, once", () => {
+    const { act } = fight("lion");
+    act("rend");
+    expect(act("roar").componentsRemaining).toBeNull();
+    expect(() => act("rend")).toThrow(/no attacks remaining|no Rend left/);
+    const roarFirst = fight("lion");
+    roarFirst.act("roar");
+    expect(roarFirst.act("rend").componentsRemaining).toBeNull();
+  });
+
+  it("lets the barbed devil's first Hurl Flame make it the other plan: two Hurl Flames, no Claws", () => {
+    const { act } = fight("barbed-devil");
+    act("hurl-flame");
+    act("hurl-flame");
+    expect(() => act("claws")).toThrow(/no attacks remaining|no Claws left/);
+  });
+
+  it("lets the goblin boss make two attacks with Scimitar or Shortbow in any combination", () => {
+    const { act } = fight("goblin-boss");
+    act("scimitar");
+    act("shortbow");
+    expect(() => act("scimitar")).toThrow(/no attacks remaining|no Scimitar left/);
+  });
+
+  it("keeps the tyrannosaurus's Tail off the creature its Bite grapples", () => {
+    const { act } = fight("tyrannosaurus-rex");
+    act("bite");
+    expect(() => act("tail")).toThrow(/grappled by Tyrannosaurus Rex and can't be targeted by Tail/);
+  });
+
+  it("spends a prose legendary action's cost, refuses one taken again before the creature's turn, and swings Pounce", () => {
+    const { game, act } = fight("adult-red-dragon", true); // Torva's turn
+    act("commanding-presence", []);
+    expect(game.combat.legendaryUsed[MONSTER]).toBe(1);
+    expect(() => act("commanding-presence", [])).toThrow(
+      /can't take Commanding Presence again until the start of its next turn/
+    );
+    const pounce = act("pounce");
+    expect(pounce.attack).toMatchObject({ outcome: "hit" });
+    expect(game.combat.legendaryUsed[MONSTER]).toBe(2);
+    nextInitiativeTurn(game); // the dragon's own turn: the pool and the once-a-round marks refill
+    expect(game.combat.legendaryUsed).toEqual({});
+    nextInitiativeTurn(game);
+    act("commanding-presence", []);
+    expect(game.combat.legendaryUsed[MONSTER]).toBe(1);
   });
 });

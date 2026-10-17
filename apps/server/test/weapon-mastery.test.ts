@@ -34,6 +34,7 @@ import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js
 import { pushTokenAway } from "../src/forced-movement.js";
 import { mapDistance, tokenCreatureDistance } from "../src/movement-narration.js";
 import { moveEncounterToken, setActorSize, type TokenMapGeometry } from "../src/token-placement.js";
+import { png } from "./image-fixtures.js";
 
 // Weapon Mastery, proved where a player sees it: damage on a miss, a foe's die rolled twice keeping the
 // worse, a condition from the foe's own save, a pushed token, a smaller Speed on the foe's turn, the attacker's
@@ -216,8 +217,21 @@ const swing = (built: Built, actionId: string, faces: number[]) =>
   );
 
 /** The foe swings back at the hero, which is where Sap has to show up. */
-const swingBack = (built: Built, faces: number[]) =>
-  resolveDefinitionAction(
+/** The foe swings back on its own turn, with a fresh action. */
+const swingBack = (built: Built, faces: number[]) => {
+  built.state.combat = {
+    ...built.state.combat,
+    turnActorId: IDS.foe,
+    turn: {
+      actionUsed: false,
+      bonusActionUsed: false,
+      actionInstance: null,
+      bonusActionInstance: null,
+      turnUses: {},
+      movementUsedFeet: 0
+    }
+  };
+  return resolveDefinitionAction(
     built.state,
     FOE_DEFINITION.actions.find((action) => action.id === "claw")!,
     {
@@ -227,6 +241,7 @@ const swingBack = (built: Built, faces: number[]) =>
     },
     deps(built, FOE_DEFINITION, faces)
   );
+};
 
 describe("every SRD weapon names its mastery", () => {
   it("covers all 38 rows with the eight printed properties, and spot-checks the table", () => {
@@ -589,6 +604,11 @@ describe("Push moves the target's token 10 feet straight away", () => {
     // A heavy crossbow three cells across and one down: two cells of push lands off a cell centre, so the snap
     // does visible work. Dex 13 (+1) + proficiency 2 = +3 to hit; a natural 15 is 18 vs AC 13.
     const built = battlefield(["heavy-crossbow", "longbow", "rapier"], ["heavy-crossbow"], cell(2, 2), cell(5, 3));
+    // A crossbow fires only with bolts to fire (SRD Ammunition).
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      InventoryItemSchema.parse({ id: "crossbow-bolts-20", name: "Crossbow Bolts (20)", category: "ammunition" })
+    ];
     const before = positionOf(built, IDS.foe)!;
     const hit = pushSwing(built, "item-heavy-crossbow", [15, 4]);
     expect(hit.attack?.outcome).toBe("hit");
@@ -1185,15 +1205,6 @@ describe("a mastery that cannot act off-turn says so where the GM reads it", () 
 const LURKER = "10000000-0000-4000-8000-000000000003";
 
 /** A 900x600 PNG header, which is all `inspectMapImage` reads. */
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 async function joinSocket(base: string, token: string) {
   const socket = connect(base, { auth: { token }, transports: ["websocket"], reconnection: false, forceNew: true });

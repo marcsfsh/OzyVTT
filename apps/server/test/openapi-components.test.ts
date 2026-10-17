@@ -303,7 +303,8 @@ describe("generated OpenAPI components", () => {
       "spell-id-is": { spellIds: ["eldritch-blast"] },
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large", "huge"] },
-      "versus-condition": { conditionIds: ["prone"] }
+      "versus-condition": { conditionIds: ["prone"] },
+      "by-effect-source": {}
     };
 
     /** One payload per modifier. */
@@ -334,6 +335,8 @@ describe("generated OpenAPI components", () => {
       "spell-attack-bonus": { amount: 2 },
       "spell-slot": { level: 3, amount: 1 },
       "resource-bonus": { poolId: "channel-divinity", amount: 1 },
+      "short-rest-regain": { poolId: "rage", amount: 1 },
+      "attunement-slots": { amount: 1 },
       "critical-range": { threshold: 19 },
       "critical-bonus-dice": { count: 1 },
       "damage-reduction": {
@@ -342,7 +345,8 @@ describe("generated OpenAPI components", () => {
       },
       "damage-resistance": { damageTypes: ["fire"], when: [{ type: "while-effect-tag", tags: ["raging"] }] },
       "damage-vulnerability": { damageTypes: ["cold"] },
-      sense: { sense: "tremorsense", feet: 30 }
+      sense: { sense: "tremorsense", feet: 30 },
+      "special-speed": { movement: "fly", feet: 60, hover: true }
     };
 
     it("validates every trigger against the branch its discriminator routes it to", () => {

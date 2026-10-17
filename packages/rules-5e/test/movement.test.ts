@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { footprintCenter, footprintOrigin, movementPath, pointInRects, spaceIsDifficultFor } from "../src/movement.js";
+import { footprintCenter, footprintOrigin, movementPath, pointInRects, spacePassage } from "../src/movement.js";
 
 const open = () => false;
 const cellSet = (cells: ReadonlyArray<readonly [number, number]>) => {
@@ -33,6 +33,20 @@ describe("movement over a square grid", () => {
     });
     expect(path?.costCells).toBe(7);
     expect(path?.difficultSteps).toBe(3);
+  });
+
+  it("charges twice a step's cost where the mover's Speed is halved, difficult terrain included", () => {
+    // Halved from column 3 on (Spirit Guardians' Emanation); column 4 is also rubble.
+    const path = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: (column) => column === 4,
+      isHalved: (column) => column >= 3
+    });
+    // Two open steps, one halved step (2) and one halved step into rubble (4).
+    expect(path?.costCells).toBe(8);
+    expect(path?.difficultSteps).toBe(1);
   });
 
   it("walks round a patch of difficult terrain when that is cheaper", () => {
@@ -123,15 +137,54 @@ describe("movement over a square grid", () => {
     expect(footprintCenter({ column: 3, row: 2 }, 1)).toEqual({ column: 3.5, row: 2.5 });
   });
 
-  it("treats a creature's space as difficult only for its enemies, and never a Tiny one", () => {
-    const fighter = { kind: "player-character" };
-    expect(spaceIsDifficultFor(fighter, { kind: "monster", size: "medium" })).toBe(true);
-    expect(spaceIsDifficultFor(fighter, { kind: "monster", size: "tiny" })).toBe(false);
-    expect(spaceIsDifficultFor(fighter, { kind: "player-character", size: "medium" })).toBe(false);
-    expect(spaceIsDifficultFor({ kind: "monster" }, { kind: "player-character" })).toBe(true);
-    // An NPC's side is the GM's call, so its space and its own movement are left alone.
-    expect(spaceIsDifficultFor(fighter, { kind: "npc", size: "medium" })).toBe(false);
-    expect(spaceIsDifficultFor({ kind: "npc" }, { kind: "monster", size: "large" })).toBe(false);
+  it("opens an ally's or a Tiny creature's space, and lets a mover through anyone else's only as the SRD says", () => {
+    const enemy = { ally: false, incapacitated: false, moverSize: "medium" };
+    expect(spacePassage({ ...enemy, ally: true, occupantSize: "medium" })).toBe("open");
+    expect(spacePassage({ ...enemy, occupantSize: "tiny" })).toBe("open");
+    // A hostile creature within one size bars the way...
+    expect(spacePassage({ ...enemy, occupantSize: "medium" })).toBe("blocked");
+    expect(spacePassage({ ...enemy, occupantSize: "large" })).toBe("blocked");
+    // ...unless it is Incapacitated or two sizes apart, and then its space is Difficult Terrain.
+    expect(spacePassage({ ...enemy, incapacitated: true, occupantSize: "medium" })).toBe("difficult");
+    expect(spacePassage({ ...enemy, occupantSize: "huge" })).toBe("difficult");
+    expect(spacePassage({ ...enemy, moverSize: "huge", occupantSize: "medium" })).toBe("difficult");
+  });
+
+  it("goes round a creature it can't pass, and says when there is no way through", () => {
+    const orc = cellSet([[2, 0]]);
+    const round = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: open,
+      isOpen: (column, row) => !orc(column, row)
+    });
+    expect(round?.costCells).toBe(4);
+    expect(round?.steps.some((step) => step.column === 2 && step.row === 0)).toBe(false);
+    // A corridor one cell wide, held by the orc.
+    const shut = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: open,
+      isOpen: (column, row) => row === 0 && !orc(column, row)
+    });
+    expect(shut).toEqual({ steps: [], costCells: 0, difficultSteps: 0, blocked: true });
+  });
+
+  it("adds a cell to every step while crawling, and two in difficult terrain", () => {
+    const rubble = cellSet([[2, 0]]);
+    const crawl = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 3, row: 0 },
+      sizeCells: 1,
+      isDifficult: rubble,
+      isOpen: (_column, row) => row === 0,
+      extraPerStep: 1
+    });
+    // Three steps at 2 each, one of them into rubble (3): 2 + 3 + 2.
+    expect(crawl?.costCells).toBe(7);
+    expect(crawl?.difficultSteps).toBe(1);
   });
 
   it("tests points against rects, edges included", () => {

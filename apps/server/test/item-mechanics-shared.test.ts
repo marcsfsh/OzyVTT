@@ -157,10 +157,10 @@ const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
   ["web", "{roll: '2d4', types: ['fire']} is the damage of BURNING webs, and the cast rolls it on every press"],
   [
     "ray-of-enfeeblement",
-    "attackRoll true + {roll: '1d8', types: []} -> a 1d8 Force SPELL ATTACK; the SRD prints neither, and the 1d8 is what the TARGET subtracts from its own damage rolls"
+    "{roll: '1d8', types: []} -> a 1d8 Force damage action; the 1d8 is what the TARGET subtracts from its own damage rolls"
   ],
-  ["protection-from-evil-and-good", "attackRoll true on a ward that rolls nothing at anybody"],
-  ["faerie-fire", "attackRoll true on a spell whose only roll is the target's Dexterity save"]
+  ["protection-from-evil-and-good", "a ward that rolls nothing at anybody"],
+  ["faerie-fire", "a spell whose only roll is the target's Dexterity save"]
 ];
 
 describe("the cast rules apply to every authored cast", () => {
@@ -190,8 +190,7 @@ describe("the cast rules apply to every authored cast", () => {
   });
 
   it("names no spell the record marks as an attack roll", () => {
-    // The `attackRoll` column is set by any mention of an attack roll in the text, including other
-    // creatures' attacks, so no authored cast may rely on it.
+    // An item's cast takes its attack from the spell's cast model, so none of them relies on this column.
     for (const cast of AUTHORED_CASTS) {
       const spell = view.spellRecord!(cast.spellId)!;
       expect(
@@ -205,7 +204,7 @@ describe("the cast rules apply to every authored cast", () => {
 // Rider families the per-category files only check survive into the bundle (`ammunition-3`,
 // `sentinel-shield`, `demon-armor`), driven here to an engine outcome.
 describe("the rider families held only by a bundle assertion, driven", () => {
-  it("ammunition's attack-bonus lands on a RANGED to-hit and stays off a MELEE one", () => {
+  it("ammunition's bonuses land on a shot from a launcher and stay off a melee swing or a thrown weapon", () => {
     const definition = definitionOf();
     const shot = (inventory: InventoryItem[], actionId: string) => {
       const state = fight(stateWith(inventory));
@@ -217,14 +216,29 @@ describe("the rider families held only by a bundle assertion, driven", () => {
         deps([9, 4], definition)
       ).attack!.total;
     };
-    // The bow and the mace come from the shipped catalog; the ammunition is picker-minted. d20 = 9.
-    expect(
-      shot([fromCatalog("longbow"), picked("ammunition-3")], "item-longbow"),
-      "the +3 did not reach the shot"
-    ).toBe(14);
-    expect(shot([fromCatalog("longbow")], "item-longbow"), "the control: Dex +2 alone").toBe(11);
-    // `attack-kind-is: ["ranged"]` keeps this from being a blanket +3.
-    expect(shot([fromCatalog("mace"), picked("ammunition-3")], "item-mace"), "the arrow reached a melee swing").toBe(9);
+    // The bow and the mace come from the shipped catalog; the ammunition is picker-minted, picked as arrows (a +3
+    // still waiting for its kind fits no launcher). d20 = 9.
+    const arrows3 = picked("ammunition-3", { baseId: "arrows-20" });
+    expect(shot([fromCatalog("longbow"), arrows3], "item-longbow"), "the +3 did not reach the shot").toBe(14);
+    expect(shot([fromCatalog("longbow"), picked("arrows-20")], "item-longbow"), "the control: Dex +2 alone").toBe(11);
+    // `weapon-property-is: ["ammunition"]` keeps this from being a blanket +3.
+    expect(shot([fromCatalog("mace"), arrows3], "item-mace"), "the arrow reached a melee swing").toBe(9);
+    // A thrown dagger is a ranged attack that fires no ammunition: d20 9 + Dex 2 + PB 3.
+    expect(shot([fromCatalog("dagger"), arrows3], "item-dagger"), "the arrow reached a thrown dagger").toBe(11);
+  });
+
+  it("ammunition's damage half lands on the launcher's hit", () => {
+    const definition = definitionOf();
+    const state = fight(stateWith([fromCatalog("longbow"), picked("ammunition-2", { baseId: "arrows-20" })]));
+    const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === "item-longbow")!;
+    const resolution = resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000001" },
+      deps([19, 4], definition)
+    );
+    expect(resolution.attack!.outcome).toBe("hit");
+    expect(resolution.bonusDamage).toEqual([{ amount: 2, type: "piercing", source: "Ammunition, +2" }]);
   });
 
   it("a roll-mode rider really reaches the initiative die, on all three of its carriers", () => {
@@ -241,10 +255,10 @@ describe("the rider families held only by a bundle assertion, driven", () => {
     }
   });
 
-  // "Advantage on ... Wisdom (Perception) checks" is authored to the ability, because `BUILTIN_CHECKS.search`
-  // has no `skill` key and `skill-is` fails closed. The same rider must leave Hide and Study alone.
+  // "Advantage on ... Wisdom (Perception) checks" is gated on the Perception skill, which a Search made with it carries.
+  // The same rider must leave a Search made with Insight, Hide and Study alone.
   it("Wisdom (Perception) advantage reaches the SEARCH die on both its carriers, and no other check", () => {
-    const searchWith = (id: string, n: number, over: Record<string, unknown> = {}) => {
+    const searchWith = (id: string, n: number, over: Record<string, unknown> = {}, skill = "perception") => {
       const definition = definitionOf();
       const state = fight(stateWith([picked(id, over)]));
       const resolution = resolveDefinitionAction(
@@ -254,7 +268,8 @@ describe("the rider families held only by a bundle assertion, driven", () => {
           actorId: IDS.hero,
           targetIds: [],
           commandId: `50000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
-          builtin: true
+          builtin: true,
+          skill
         },
         deps([6, 19], definition)
       );
@@ -268,10 +283,12 @@ describe("the rider families held only by a bundle assertion, driven", () => {
     ] as const) {
       const worn = searchWith(id, n);
       expect(worn.resolution.check, `${id}: Search did not keep the higher die`).toMatchObject({
-        skill: "Wisdom (Search)",
+        skill: "Wisdom (Perception)",
         naturalRoll: 19,
         total: 19
       });
+      // A Search made with Insight is no Perception check.
+      expect(searchWith(id, n + 20, {}, "insight").resolution.rollMode).toBeUndefined();
       expect(worn.formula).toBe("2d20kh1+0");
       expect(worn.resolution.rollMode).toEqual({ mode: "advantage", advantage: [name], disadvantage: [] });
 
@@ -313,7 +330,9 @@ describe("the rider families held only by a bundle assertion, driven", () => {
     const definition = definitionOf();
     for (const [id, name] of [
       ["demon-armor", "Demon Armor"],
-      ["shield-of-missile-attraction", "Shield of Missile Attraction"]
+      ["shield-of-missile-attraction", "Shield of Missile Attraction"],
+      ["berserker-axe", "Berserker Axe"],
+      ["armor-of-vulnerability", "Armor of Vulnerability"]
     ] as const) {
       const worn = stateWith([picked(id)]);
       // Captured rather than asserted with `.toThrow`, so a failure shows the item's id in the diff.
@@ -333,10 +352,11 @@ describe("the rider families held only by a bundle assertion, driven", () => {
       setInventoryItem(gm, IDS.hero, picked(id, { equipped: false }), () => definition, { catalog, role: "gm" });
       expect(gm.actors[0].inventory[0].equipped, `${id}: the GM must be able to take it off`).toBe(false);
     }
-    // These two are the whole population, so a third cursed carrier has to be looked at.
-    expect(ROWS.filter((row) => row.cursed === true).map((row) => row.id)).toEqual([
-      "demon-armor",
-      "shield-of-missile-attraction"
-    ]);
+    // The SRD prints a Curse on exactly these four, so a fifth cursed carrier has to be looked at.
+    expect(
+      ROWS.filter((row) => row.cursed === true)
+        .map((row) => row.id)
+        .sort()
+    ).toEqual(["armor-of-vulnerability", "berserker-axe", "demon-armor", "shield-of-missile-attraction"]);
   });
 });

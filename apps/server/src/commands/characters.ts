@@ -5,9 +5,12 @@ import {
   importActorDefinition,
   rebuildActorDefinition,
   resolvePendingImport,
-  submitPendingImport
+  storedDefinition,
+  submitPendingImport,
+  withDerivedSlots
 } from "../actor-roster.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { ABILITY_ROLL_LABEL, recordHitPointRoll, settleBuilderDice } from "../builder-dice.js";
 import { buildCharacterDefinition } from "../character-build.js";
 import { draftOwnerOf } from "../character-drafts.js";
 import { generateCharacterRequest } from "../character-generate.js";
@@ -22,8 +25,11 @@ import {
   CharacterResolveImportSchema,
   CharacterSubmitImportSchema
 } from "@vtt/domain/commands";
+import type { ContentView } from "../content-library.js";
 import { CommandRejectedError } from "../game-store.js";
 import { recordRoll } from "../roll-history.js";
+import { sendsSheetScores, sheetAbilityScores, sheetSourceOf } from "../sheet-abilities.js";
+import type { HitDie } from "@vtt/rules-5e";
 import { GameInputError } from "./failures.js";
 import { initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -57,6 +63,12 @@ function requireBuildRoom(state: GameState, level: number) {
   if (level > state.builderPolicy.maxLevel)
     throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
 }
+
+/** Each class's hit die in the caller's catalog, or null for a class it does not hold (the build refuses that). */
+const hitDieIn =
+  (catalog: ContentView) =>
+  (classId: string): HitDie | null =>
+    (catalog.classRecord(classId)?.hitDie as HitDie | undefined) ?? null;
 
 /** Auto-claim a player's new character so no window exists in which someone else can take it. */
 function claimForCreator(state: GameState, actorId: string, principal: GamePrincipal) {
@@ -109,7 +121,7 @@ export const characterCommands = [
     type: "character.create",
     operationId: "createCharacter",
     description:
-      "Creates a character from CHOICES rather than a finished sheet - the GM always, and a player when the table's builderPolicy.playerBuilder is open, in which case the new character is auto-claimed by its creator and a per-session daily cap applies: identity ids (species/background/class/subclass), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries (or the fixed average), and the choice-provenance ledger as the literal build input. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.",
+      "Creates a character from CHOICES rather than a finished sheet - the GM always, and a player when the table's builderPolicy.playerBuilder is open, in which case the new character is auto-claimed by its creator and a per-session daily cap applies: identity ids (species/background/class/subclass; a multiclass character adds `classLevels`, the class each level went to, and names each later class's subclass in its own `subclass` ledger row), base ability scores plus the background's +2/+1 or +1/+1/+1 allocation, per-level hit-point entries, the fixed average, or `hp.mode` roll for the server to throw them (recorded in the table feed), and the choice-provenance ledger as the literal build input. While builderPolicy.typedRolls is gm-only, a player's rolled ability scores must be the six totals of their own `builder.roll-abilities` roll (`abilityRollId`) and a player may not type hit-point rolls. The server validates every id against the content catalogs, resolves every catalog-driven choice through the same resolver the wizard uses, interprets the content features' structured riders into sheet actions, assembles the canonical ActorDefinition, and lands it through the import path - the new claimable actor's id equals this call's commandId and its editable sheet is keyed import-<actorId>.",
     summary:
       "Create a character from choices (ids, scores, HP entries, the choices ledger); the server assembles and imports the sheet (GM). The actor's id equals the commandId.",
     schema: CharacterCreateSchema,
@@ -129,9 +141,26 @@ export const characterCommands = [
           requireBuildRoom(state, request.level);
           // Validated inside the command against the stored policy; the caller's catalog keeps GM-only
           // homebrew out of a player's build.
-          const definition = buildCharacterDefinition(request, kit.catalogFor(principal), state.builderPolicy);
+          const catalog = kit.catalogFor(principal);
+          const { input, thrown } = settleBuilderDice(state, request, {
+            gm: isGmGrade(principal),
+            sessionId: sessionIdOf(principal),
+            previous: undefined,
+            hitDieOf: hitDieIn(catalog),
+            random: (sides) => kit.context.random(sides)
+          });
+          const definition = buildCharacterDefinition(input, catalog, state.builderPolicy);
           importActorDefinition(state, definition, actorId, "public", kit.equipmentCatalog());
           claimForCreator(state, actorId, principal);
+          recordHitPointRoll(state, {
+            id: kit.context.newId(),
+            commandId: request.commandId,
+            sessionId: sessionIdOf(principal),
+            gm: isGmGrade(principal),
+            actorId,
+            label: `Hit points, ${state.actors.find((actor) => actor.id === actorId)?.name ?? request.name}`,
+            dice: thrown
+          });
         },
         { actorId }
       );
@@ -149,9 +178,9 @@ export const characterCommands = [
     type: "character.generate",
     operationId: "generateCharacter",
     description:
-      "Rolls a complete, playable, single-class character at a level and lands it on the roster - the GM always, and a player when the table's builderPolicy.playerRandom is open, which unlike playerBuilder is CLOSED by default. The request carries only the level, an optional class (omitted means one is drawn) and an optional name; every other decision is made server-side from the same dice authority as every other roll: the standard array distributed by the class's own stat priority, the background's printed spread aimed the same way, and species, lineage, background, subclass, size, skills, tools, languages, feats, fighting styles, spells and starting equipment drawn at random from the offers the character builder itself computes. The result is assembled, validated and imported exactly as `POST /game/characters` is - same ActorDefinition, same choice ledger, so it levels up and respecs like a hand-built character - and the hit-point dice are recorded in the table feed. Auto-claimed by a player caller, with the same per-session daily cap.",
+      "Rolls a complete, playable character at a level and lands it on the roster - the GM always, and a player when the table's builderPolicy.playerRandom is open, which unlike playerBuilder is CLOSED by default. The request carries only the level, an optional class (omitted means one is drawn) or a multiclass `classes` list (each class with its levels, the starting class first), and an optional name; every other decision is made server-side from the same dice authority as every other roll: the standard array distributed by the starting class's stat priority (a multiclass character's 13s placed first), the background's printed spread aimed the same way, and species, lineage, background, subclass, size, skills, tools, languages, feats, fighting styles, spells and starting equipment drawn at random from the offers the character builder itself computes. The result is assembled, validated and imported exactly as `POST /game/characters` is - same ActorDefinition, same choice ledger, so it levels up and respecs like a hand-built character - and the hit-point dice are recorded in the table feed. Auto-claimed by a player caller, with the same per-session daily cap.",
     summary:
-      "Roll a complete, playable, single-class character at a level: the standard array by the class's stat priority and every other pick drawn server-side - the GM always, a player when builderPolicy.playerRandom is open (deny by default). The actor's id equals the commandId.",
+      "Roll a complete, playable character at a level, one class or several: the standard array by the class's stat priority and every other pick drawn server-side - the GM always, a player when builderPolicy.playerRandom is open (deny by default). The actor's id equals the commandId.",
     schema: CharacterGenerateSchema,
     malformed: "The character-generate command is malformed.",
     // Rolled with `context.random` inside the command, so a caller can't pre-roll; lands like `character.create`.
@@ -173,8 +202,6 @@ export const characterCommands = [
             kit.context.random(sides)
           );
           summary = generated.summary;
-          const rolls = generated.hitPointRolls;
-          const faces = generated.hitDieFaces;
           const definition = buildCharacterDefinition(
             generated.request,
             kit.catalogFor(principal),
@@ -183,24 +210,15 @@ export const characterCommands = [
           importActorDefinition(state, definition, actorId, "public", kit.equipmentCatalog());
           claimForCreator(state, actorId, principal);
           // Hit-point dice land in the table feed like any roll. Level 1 throws none.
-          if (rolls.length > 0)
-            recordRoll(state, {
-              id: kit.context.newId(),
-              commandId: request.commandId,
-              initiatorSessionId: sessionIdOf(principal),
-              initiatorRole: isGmGrade(principal) ? "gm" : "player",
-              initiatorLabel: isGmGrade(principal) ? "GM" : "A player",
-              label: `Hit points, ${state.actors.find((actor) => actor.id === actorId)?.name ?? "a new character"}`,
-              actorId,
-              purpose: "manual",
-              visibility: "public",
-              formula: `${rolls.length}d${faces}`,
-              normalizedFormula: `${rolls.length}d${faces}`,
-              dice: rolls.map((face) => ({ group: 0, sides: faces, face, kept: true, sign: 1 as const })),
-              modifiers: [],
-              total: rolls.reduce((sum, face) => sum + face, 0),
-              createdAt: new Date().toISOString()
-            });
+          recordHitPointRoll(state, {
+            id: kit.context.newId(),
+            commandId: request.commandId,
+            sessionId: sessionIdOf(principal),
+            gm: isGmGrade(principal),
+            actorId,
+            label: `Hit points, ${state.actors.find((actor) => actor.id === actorId)?.name ?? "a new character"}`,
+            dice: generated.hitPointRolls
+          });
         },
         { actorId }
       );
@@ -218,7 +236,7 @@ export const characterCommands = [
     type: "character.rebuild",
     operationId: "rebuildCharacter",
     description:
-      "Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused, so a level-down/level-up round trip restores the same maximum; a sheet with no recorded rolls rebuilds on the average. Refused while the character is in a live (or paused) fight.",
+      "Rebuilds one character at a new level - up OR down - or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused where the level still goes to the class they were rolled for, so a level-down/level-up round trip restores the same maximum; with `hp.mode` roll the server throws only the levels with no recorded roll. A level in a new class (`classLevels`) needs 13 in the primary ability of that class and of every current one, with the scores as they stand when it is taken; a build may leave out a class only by levelling below the level it was taken at. Spent uses, Hit Dice and spell slots stay spent against the new maxima, and a character at 0 hit points stays at 0. Refused while the character is in a live (or paused) fight.",
     summary:
       "Rebuild one character at a new level (up or down) or respec it, re-running the whole build from the choice ledger - the GM for anyone, a player for their own claimed character when the table's builder is open.",
     schema: CharacterRebuildSchema,
@@ -235,13 +253,37 @@ export const characterCommands = [
           throw new CommandRejectedError(`This table builds characters up to level ${state.builderPolicy.maxLevel}.`);
         const actor = state.actors.find((entry) => entry.id === actorId);
         if (!actor) throw new CommandRejectedError("That character no longer exists.");
+        const catalog = kit.catalogFor(principal);
+        const { actorId: _actorId, ...build } = request;
+        const previous = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
         // The name stays the live actor's: a rebuild changes what a character can do, not who they are.
-        const definition = buildCharacterDefinition(
-          { ...request, name: actor.name },
-          kit.catalogFor(principal),
-          state.builderPolicy
+        const { input, thrown } = settleBuilderDice(
+          state,
+          { ...build, name: actor.name },
+          {
+            gm: isGmGrade(principal),
+            sessionId: sessionIdOf(principal),
+            previous,
+            hitDieOf: hitDieIn(catalog),
+            // A sheet built before the ledger kept its scores may re-send the base scores its totals imply.
+            derivedScoresMatch: (sent) => {
+              const source = sheetSourceOf(previous);
+              return source !== null && sendsSheetScores(sent, sheetAbilityScores(source, catalog));
+            },
+            random: (sides) => kit.context.random(sides)
+          }
         );
+        const definition = buildCharacterDefinition(input, catalog, state.builderPolicy);
         rebuildActorDefinition(state, actorId, definition, kit.equipmentCatalog());
+        recordHitPointRoll(state, {
+          id: kit.context.newId(),
+          commandId: request.commandId,
+          sessionId: sessionIdOf(principal),
+          gm: isGmGrade(principal),
+          actorId,
+          label: `Hit points, ${actor.name}`,
+          dice: thrown
+        });
       });
       if (!duplicate)
         kit.context.appendLog({
@@ -257,11 +299,11 @@ export const characterCommands = [
     type: "builder.roll-abilities",
     operationId: "rollBuilderAbilities",
     description:
-      "Rolls six ability scores SERVER-SIDE for the character builder, through the table's allowed method and the GM's formula. The set is recorded as one public roll in the table feed. Character creation still bound-checks submitted scores rather than binding them to this roll: physical dice at the table stay a supported path.",
+      "Rolls six ability scores SERVER-SIDE for the character builder, through the table's allowed method and the GM's formula. The set is recorded as one public roll in the table feed, and its `rollId` is what a player's create or rebuild names as `abilityRollId` while the table keeps players' dice on the server (builderPolicy.typedRolls gm-only). The GM, and players at a table that lets them type their dice (open, the default), may instead submit scores from physical dice, which are bound-checked against the formula.",
     summary: "Roll six ability scores server-side for the character builder, recorded in the table feed.",
     schema: BuilderRollAbilitiesSchema,
     malformed: "The ability-roll command is malformed.",
-    // `character.create` still only bound-checks scores, since physical dice are supported.
+    // A player's create binds rolled scores to this roll unless the table opens typed rolls (`builder-dice.ts`).
     async run({ principal, request, execute }, kit) {
       const policy = kit.read().builderPolicy;
       if (!isGmGrade(principal) && policy.playerBuilder !== "open")
@@ -297,7 +339,7 @@ export const characterCommands = [
           initiatorSessionId: sessionIdOf(principal),
           initiatorRole: isGmGrade(principal) ? "gm" : "player",
           initiatorLabel: isGmGrade(principal) ? "GM" : "A player",
-          label: "Ability scores",
+          label: ABILITY_ROLL_LABEL,
           actorId: null,
           purpose: "manual",
           visibility: "public",
@@ -317,7 +359,7 @@ export const characterCommands = [
     type: "builder.set-policy",
     operationId: "setBuilderPolicy",
     description:
-      "Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing \"custom\" is only actionable while a formula is set. The stored policy is projected to every player verbatim.",
+      "Sets the character-builder table policy (GM-grade only; task-packet decision 10): which ability-score generation methods the wizard offers players (standard-array, point-buy, roll, custom - all four by default) and the GM's custom roll formula. A supplied formula is validated through the server's own dice grammar and bounds (a formula that can roll outside 1-30 is rejected); allowing \"custom\" is only actionable while a formula is set. `typedRolls` decides whether players may type what their dice show, for every roll: checks, saves, attacks, damage, death saves, initiative, and rolled scores and hit points (open by default; gm-only has the server throw them), and `hitPointRollFloor` whether a rolled hit-point level is raised to the class average (none by default, the SRD rule). The stored policy is projected to every player verbatim.",
     summary: "Set the character-builder policy: allowed ability-score methods and the GM's custom roll formula (GM).",
     schema: BuilderSetPolicySchema,
     malformed: "The builder-policy command is malformed.",
@@ -338,7 +380,9 @@ export const characterCommands = [
           // Omitted keeps what is stored.
           maxLevel: request.maxLevel ?? state.builderPolicy.maxLevel,
           playerBuilder: request.playerBuilder ?? state.builderPolicy.playerBuilder,
-          playerRandom: request.playerRandom ?? state.builderPolicy.playerRandom
+          playerRandom: request.playerRandom ?? state.builderPolicy.playerRandom,
+          typedRolls: request.typedRolls ?? state.builderPolicy.typedRolls,
+          hitPointRollFloor: request.hitPointRollFloor ?? state.builderPolicy.hitPointRollFloor
         };
       });
       if (!duplicate)
@@ -360,8 +404,11 @@ export const characterCommands = [
     schema: CharacterSubmitImportSchema,
     malformed: "The import submission is malformed.",
     // Any joined session may submit; the GM's approval is the gate.
-    async run({ principal, request, execute }) {
-      const definition = importedDefinition(request.definition, "character");
+    async run({ principal, request, execute }, kit) {
+      const definition = withDerivedSlots(
+        importedDefinition(request.definition, "character"),
+        kit.contentLibrary.forAudience("gm").classProgressionTable()
+      );
       await execute((state) => submitPendingImport(state, definition, request.commandId, sessionIdOf(principal)));
     }
   }),
@@ -376,9 +423,12 @@ export const characterCommands = [
     schema: CharacterResolveImportSchema,
     malformed: "The import decision is malformed.",
     gmOnly: "Only the GM can approve imported sheets.",
-    async run({ request, execute }) {
+    async run({ request, execute }, kit) {
       const actorId = request.commandId;
-      await execute((state) => resolvePendingImport(state, request.importId, request.approve, actorId), { actorId });
+      await execute(
+        (state) => resolvePendingImport(state, request.importId, request.approve, actorId, kit.equipmentCatalog()),
+        { actorId }
+      );
       return { actorId };
     }
   })

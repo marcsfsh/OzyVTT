@@ -13,6 +13,8 @@ import { ReplayShelf } from "../replay/ReplayShelf";
 import { EncounterMap } from "../scene/EncounterMap";
 import { SceneBuilder } from "../scenes/SceneBuilder";
 import { navigate, pathForGmTab } from "../router";
+import { PartyRest } from "../rest/PartyRest";
+import { ShortRestPrompt } from "../rest/ShortRestPrompt";
 import "./table-view.css";
 
 type StagedScene = GmView["combat"]["scenes"][number];
@@ -137,11 +139,17 @@ export function TableView(props: TableViewProps) {
           {!staged &&
             !state.combat.active &&
             (props.role === "gm" ? (
-              <PartyStrip role="gm" state={props.state} onOpenRoster={() => navigate(pathForGmTab("roster"))} />
+              /* The GM's rests sit beside the party they rest. */
+              <div className="table-party-row">
+                <PartyStrip role="gm" state={props.state} onOpenRoster={() => navigate(pathForGmTab("roster"))} />
+                <PartyRest state={props.state} />
+              </div>
             ) : playerHasClaimed && partyVisibilityOf(props.state) !== "off" ? (
               <PartyStrip role="player" state={props.state} />
             ) : null)}
         </div>
+        {/* The party's Short Rest on this player's own device: their Hit Dice to spend, and Done. */}
+        {props.role === "player" && <ShortRestPrompt state={props.state} />}
         {/* A player who has claimed nobody gets the picker. On a phone it renders as the sheet's body
           (below), so the map band stays live in a running fight. */}
         {props.role === "player" && !playerHasClaimed && !phoneTable && <ClaimCharacter state={props.state} />}

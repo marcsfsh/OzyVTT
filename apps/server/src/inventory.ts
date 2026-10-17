@@ -1,21 +1,27 @@
 import type { Actor, GameState } from "@vtt/domain";
-import type { ActorDefinition, Currency, InventoryItem } from "@vtt/schemas";
-import { effectiveSlot } from "@vtt/rules-5e";
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
+import { effectiveSlot, wornBodyArmor } from "@vtt/rules-5e";
 import { spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
+import { castAction, itemAction } from "./item-actions.js";
+import { keepAmmunitionCount } from "./ammunition.js";
+import { endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
+import { scrollSpellProblem } from "./scrolls.js";
 
 const MAX_ITEMS = 200;
+/** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
 const MAX_ATTUNED = 3;
 
-/** How many of a slot may be equipped at once. Anything unlisted is unlimited (weapons, gear, consumables). */
+/** How many of a slot may be worn at once, as the SRD lists them: "one pair of footwear, one pair of gloves or
+ *  gauntlets, one pair of bracers, one suit of armor, one item of headwear, or one cloak", and one Shield. Anything
+ *  unlisted is unlimited (rings, amulets, belts, robes, lenses, weapons, gear). */
 const SLOT_CAPACITY: Readonly<Record<string, number>> = {
-  ring: 2,
   head: 1,
-  neck: 1,
   shoulders: 1,
   hands: 1,
-  belt: 1,
+  bracers: 1,
   feet: 1,
   armor: 1,
   shield: 1
@@ -27,6 +33,9 @@ export type InventoryDeps = Readonly<{
   catalog?: EquipmentCatalog;
   /** Who is writing. A GM write bypasses the attunement cap and slot capacity (the audited override). */
   role?: "gm" | "player";
+  /** The spells this writer may put on a scroll: a player's own catalog, so a GM-only spell can't be probed for.
+   *  Absent: the catalog's. */
+  pickableSpell?: (id: string) => SpellReference | undefined;
 }>;
 
 /** Reconciles equipment onto the actor after an inventory write, recomputed whole so unequipping needs no
@@ -65,17 +74,35 @@ export function reconcileEquipment(
 const maxOf = (definition: ActorDefinition, level: number) =>
   spellSlotMaxima(definition).find((entry) => entry.level === level)?.max ?? 0;
 
-/** SRD attunement cap (3) and slot capacity; a GM write bypasses both. Items with no record may still
- *  attune (counted) but get no slot. */
-function enforceEquipRules(actor: Actor, incoming: InventoryItem, deps: InventoryDeps): void {
+/** Whether an attuned row takes one of the bearer's attunement slots: a catalog item only when it needs attunement (a
+ *  mundane dagger marked attuned takes none); a row the catalog doesn't know always does. */
+function needsAttunement(item: InventoryItem, deps: InventoryDeps): boolean {
+  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
+  return record ? record.attunement?.required === true : true;
+}
+
+/** How many magic items the bearer may attune at once: three, plus any `attunement-slots` rider (Use Magic Device). */
+export function attunementLimit(actor: Actor, definition: ActorDefinition | undefined, deps: InventoryDeps): number {
+  return MAX_ATTUNED + deriveEquipment(actor, definition, deps.catalog).attunementSlots;
+}
+
+/** SRD attunement limit and slot capacity; a GM write bypasses both. Items with no record may still attune
+ *  (counted when their marker needs it) but get no slot. */
+function enforceEquipRules(
+  actor: Actor,
+  incoming: InventoryItem,
+  definition: ActorDefinition | undefined,
+  deps: InventoryDeps
+): void {
   if (deps.role === "gm") return;
   const others = actor.inventory.filter((entry) => entry.id !== incoming.id);
-  if (incoming.attuned && incoming.quantity > 0) {
-    const attuned = others.filter((entry) => entry.attuned);
-    if (attuned.length >= MAX_ATTUNED) {
+  if (incoming.attuned && incoming.quantity > 0 && needsAttunement(incoming, deps)) {
+    const attuned = others.filter((entry) => entry.attuned && needsAttunement(entry, deps));
+    const limit = attunementLimit(actor, definition, deps);
+    if (attuned.length >= limit) {
       throw new CommandRejectedError(
-        `Already attuned to ${MAX_ATTUNED} items (${attuned
-          .slice(0, MAX_ATTUNED)
+        `Already attuned to ${limit} items (${attuned
+          .slice(0, limit)
           .map((entry) => entry.name)
           .join(", ")}) - break one first.`
       );
@@ -83,7 +110,7 @@ function enforceEquipRules(actor: Actor, incoming: InventoryItem, deps: Inventor
   }
   if (!incoming.equipped || incoming.quantity <= 0 || !deps.catalog) return;
   const slot = effectiveSlot({
-    slot: deps.catalog.equipmentRecord(incoming.id)?.slot ?? incoming.magic?.slot,
+    slot: deps.catalog.equipmentRecord(catalogIdOf(incoming))?.slot ?? incoming.magic?.slot,
     category: incoming.category
   });
   const capacity = SLOT_CAPACITY[slot];
@@ -93,7 +120,7 @@ function enforceEquipRules(actor: Actor, incoming: InventoryItem, deps: Inventor
       entry.equipped &&
       entry.quantity > 0 &&
       effectiveSlot({
-        slot: deps.catalog!.equipmentRecord(entry.id)?.slot ?? entry.magic?.slot,
+        slot: deps.catalog!.equipmentRecord(catalogIdOf(entry))?.slot ?? entry.magic?.slot,
         category: entry.category
       }) === slot
   );
@@ -106,11 +133,52 @@ function enforceEquipRules(actor: Actor, incoming: InventoryItem, deps: Inventor
   }
 }
 
+/**
+ * "The GM chooses the type" (Ring of Resistance): only the GM picks, and only from the record's choices. Any other
+ * write keeps the stored pick, so a sheet that never saw it cannot clear or change it.
+ */
+function withDamageTypeChoice(actor: Actor, item: InventoryItem, deps: InventoryDeps): InventoryItem {
+  if (deps.role !== "gm") {
+    const stored = actor.inventory.find((entry) => entry.id === item.id)?.chosenDamageType;
+    const { chosenDamageType: _sent, ...rest } = item;
+    return stored ? { ...rest, chosenDamageType: stored } : rest;
+  }
+  if (item.chosenDamageType === undefined) return item;
+  const choices = deps.catalog?.equipmentRecord(catalogIdOf(item))?.damageTypeChoice;
+  if (!choices) throw new CommandRejectedError(`${item.name} has no damage type to choose.`);
+  if (!choices.includes(item.chosenDamageType))
+    throw new CommandRejectedError(`${item.name} can resist ${choices.join(", ")}.`);
+  return item;
+}
+
+/**
+ * A Spell Scroll bears one spell (`spellId`), checked against the catalog and the levels the scroll holds. An omitted
+ * pick keeps the stored one, only the GM may change a pick once made, a row the bearer's catalog no longer knows
+ * keeps its stored pick, and a row of anything else carries none. Unpicked, a scroll stays legal and casts nothing.
+ */
+function withScrollSpell(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
+  if (!deps.catalog) return item;
+  const record = deps.catalog.equipmentRecord(catalogIdOf(item));
+  const { spellId: sent, ...rest } = item;
+  if (!record?.spellScroll) return rest;
+  const spellId = sent ?? stored?.spellId;
+  if (spellId === undefined) return rest;
+  if (spellId === stored?.spellId) return { ...rest, spellId };
+  if (deps.role !== "gm" && stored?.spellId !== undefined)
+    throw new CommandRejectedError(`${item.name} already bears a spell - only the GM can change it.`);
+  const lookup = deps.role !== "gm" && deps.pickableSpell ? deps.pickableSpell : deps.catalog.spellRecord;
+  const spell = lookup?.(spellId);
+  if (!spell) throw new CommandRejectedError(`There is no spell "${spellId}" to put on ${item.name}.`);
+  const problem = scrollSpellProblem(record, spell, item.name);
+  if (problem) throw new CommandRejectedError(problem);
+  return { ...rest, spellId };
+}
+
 /** Once attuned, a cursed item can't be unattuned, unequipped or deleted by a player; a GM can ("remove curse"). */
 function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps): void {
   if (deps.role === "gm" || !deps.catalog) return;
   const existing = actor.inventory.find((entry) => entry.id === incoming.id);
-  if (!existing?.attuned || deps.catalog.equipmentRecord(incoming.id)?.cursed !== true) return;
+  if (!existing?.attuned || deps.catalog.equipmentRecord(catalogIdOf(incoming))?.cursed !== true) return;
   const releasing = incoming.quantity <= 0 || !incoming.attuned || !incoming.equipped;
   if (releasing) throw new CommandRejectedError(`${existing.name} will not come off. Ask the GM.`);
 }
@@ -126,7 +194,47 @@ function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps
  *   - a stale pick on an already-bound row fails open, keeping its stored stats.
  */
 export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
-  const record = deps.catalog?.equipmentRecord(item.id);
+  return withMagicMarker(bindTemplateStats(item, deps, stored), deps);
+}
+
+/** The sheet's Attune control reads the row's marker, so a catalog magic item gets one from its record; a mundane
+ *  record clears any marker. Only what the item's printed type line already says (magic, needs attunement, where it
+ *  is worn), never a rider. A row the catalog doesn't know keeps what it was sent. */
+/** Stamps the catalog's magic marker on every carried row, for rows stored before the marker existed or whose
+ *  record changed since, so the sheet's Attune control reads the record. True when any row changed. */
+export function reconcileMagicMarkers(state: GameState, catalog: EquipmentCatalog): boolean {
+  let changed = false;
+  for (const actor of state.actors) {
+    const rows = actor.inventory.map((item) => {
+      const next = withMagicMarker(item, { catalog });
+      const same =
+        next.magic?.isMagic === item.magic?.isMagic &&
+        next.magic?.attunementRequired === item.magic?.attunementRequired &&
+        next.magic?.slot === item.magic?.slot;
+      return same ? item : next;
+    });
+    if (rows.some((row, index) => row !== actor.inventory[index])) {
+      actor.inventory = rows;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function withMagicMarker(item: InventoryItem, deps: InventoryDeps): InventoryItem {
+  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
+  if (!record) return item;
+  const { magic: _sent, ...rest } = item;
+  const attunementRequired = record.attunement?.required === true;
+  if (!record.isMagic && !attunementRequired) return rest;
+  return {
+    ...rest,
+    magic: { isMagic: record.isMagic, attunementRequired, ...(record.slot ? { slot: record.slot } : {}) }
+  };
+}
+
+function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
+  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
   const appliesTo = record?.appliesTo;
   if (!record || !appliesTo) {
     // A non-template row never carries a baseId (it would self-grant proficiency and mastery). Its stats
@@ -153,6 +261,16 @@ export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, store
     throw new CommandRejectedError(`${item.name} is already bound - remove it and add it again to change what it is.`);
   }
   const base = deps.catalog?.equipmentRecord(baseId);
+  // Magic ammunition is a piece of one kind (an arrow, a bolt): the pick says which launchers fire it, and it has no
+  // weapon stats to copy.
+  if (record.category === "ammunition") {
+    const { weapon: _weapon, armor: _armor, ...bare } = item;
+    if (appliesTo.baseIds.includes(baseId) && base?.ammunition !== undefined) return { ...bare, baseId };
+    if (stored?.baseId === baseId) return { ...bare, baseId };
+    throw new CommandRejectedError(
+      `${item.name} applies to ${appliesTo.label} - "${baseId}" is not one of the kinds it can be.`
+    );
+  }
   const stats = record.category === "weapon" ? base?.weapon : base?.armor;
   const shieldBase = record.category !== "weapon" && base?.category === "shield";
   const invalid =
@@ -187,7 +305,7 @@ export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, store
   const { weapon: _clientWeapon, armor: _clientArmor, ...bare } = item;
   return record.category === "weapon"
     ? { ...bare, baseId, weapon: weaponStatsFrom(base!.weapon)! }
-    : { ...bare, baseId, armor: armorStatsFrom(base!.armor)! };
+    : { ...bare, baseId, armor: withoutDrawbacks(armorStatsFrom(base!.armor)!, record) };
 }
 
 type CatalogRecord = NonNullable<ReturnType<NonNullable<InventoryDeps["catalog"]>["equipmentRecord"]>>;
@@ -201,8 +319,15 @@ function weaponStatsFrom(stats: CatalogRecord["weapon"]): InventoryItem["weapon"
     damageType: stats.damageType,
     rangeFeet: stats.rangeFeet ?? null,
     longRangeFeet: stats.longRangeFeet ?? null,
+    ...(stats.melee !== undefined ? { melee: stats.melee } : {}),
+    ...(stats.versatileDice !== undefined ? { versatileDice: stats.versatileDice } : {}),
     ...(stats.properties !== undefined ? { properties: [...stats.properties] } : {})
   };
+}
+
+/** Mithral armor has no Stealth Disadvantage and no Strength requirement, whatever its base prints. */
+function withoutDrawbacks(armor: NonNullable<InventoryItem["armor"]>, record: CatalogRecord): InventoryItem["armor"] {
+  return record.removesArmorDrawbacks ? { ...armor, stealthDisadvantage: false, strengthRequired: null } : armor;
 }
 
 function armorStatsFrom(stats: CatalogRecord["armor"]): InventoryItem["armor"] {
@@ -224,9 +349,14 @@ export function setInventoryItem(
   item: InventoryItem,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   deps: InventoryDeps = {}
-): void {
+): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  // A row naming itself as its own record is the plain form.
+  if (item.recordId === item.id) {
+    const { recordId: _same, ...plain } = item;
+    item = plain;
+  }
   // A removal never binds, so a row whose base left the catalog can still be removed.
   if (item.quantity > 0)
     item = bindTemplateItem(
@@ -234,10 +364,31 @@ export function setInventoryItem(
       deps,
       actor.inventory.find((entry) => entry.id === item.id)
     );
+  item = withDamageTypeChoice(actor, item, deps);
+  if (item.quantity > 0)
+    item = withScrollSpell(
+      item,
+      deps,
+      actor.inventory.find((entry) => entry.id === item.id)
+    );
+  item = keepAmmunitionCount(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    deps.catalog
+  );
+  const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);
-  enforceEquipRules(actor, item, deps);
-  if (item.quantity <= 0) actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);
-  else {
+  enforceEquipRules(actor, item, definition, deps);
+  if (item.quantity <= 0) {
+    // The charges a row spent leave with it, so a new copy under the same id starts full.
+    const removed = actor.inventory.find((entry) => entry.id === item.id);
+    const spentKeys = removed ? chargeKeysOf(removed, definition, deps) : [];
+    if (spentKeys.length > 0)
+      actor.actionUses = Object.fromEntries(
+        Object.entries(actor.actionUses).filter(([key]) => !spentKeys.includes(key))
+      );
+    actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);
+  } else {
     const index = actor.inventory.findIndex((entry) => entry.id === item.id);
     if (index >= 0)
       actor.inventory = actor.inventory.map((entry, position) => (position === index ? { ...item } : entry));
@@ -247,7 +398,83 @@ export function setInventoryItem(
       actor.inventory = [...actor.inventory, { ...item }];
     }
   }
-  reconcileEquipment(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined, deps);
+  reconcileEquipment(actor, definition, deps);
+  return donningEndsMageArmor(state, actor);
+}
+
+/** SRD Mage Armor: "The spell ends early if the target dons armor." A Shield is no armor here: it still adds to it. */
+function donningEndsMageArmor(state: GameState, actor: Actor): EffectNarration[] {
+  if (!wornBodyArmor(actor.inventory)) return [];
+  return actor.effects
+    .filter((effect) => effect.tags.includes(MAGE_ARMOR_TAG))
+    .flatMap((effect) => endEffect(state, actor.id, effect.id));
+}
+
+/** The charge pools a row's own actions and casts count in, in the record's order, whether or not the row is worn. */
+function chargeKeysOf(item: InventoryItem, definition: ActorDefinition | undefined, deps: InventoryDeps): string[] {
+  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
+  if (!record) return [];
+  const actions = [
+    ...record.actions.map((declared) => itemAction(item, declared, definition)),
+    ...record.casts.map((cast) => castAction(item, cast, item.name, definition, undefined))
+  ];
+  const keys = actions.flatMap((action) =>
+    action.uses && action.uses.per !== "turn" ? [action.uses.pool ?? action.id] : []
+  );
+  return keys.filter((key, index) => keys.indexOf(key) === index);
+}
+
+/**
+ * Hands one carried row, whole, from one character to another (the GM's "pass me the wand"): it arrives
+ * unequipped and unattuned, under a free row id, and the charges it has spent go with it, since they belong to the
+ * item and not to whoever held it.
+ */
+export function giveItem(
+  state: GameState,
+  fromActorId: string,
+  toActorId: string,
+  itemId: string,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
+  deps: InventoryDeps = {}
+): Readonly<{ name: string }> {
+  const from = state.actors.find((candidate) => candidate.id === fromActorId);
+  const to = state.actors.find((candidate) => candidate.id === toActorId);
+  if (!from || !to) throw new CommandRejectedError("That combatant no longer exists.");
+  if (from.id === to.id) throw new CommandRejectedError("Choose another character to give it to.");
+  const row = from.inventory.find((entry) => entry.id === itemId);
+  if (!row) throw new CommandRejectedError("That item is no longer in the pack.");
+  if (to.inventory.length >= MAX_ITEMS)
+    throw new CommandRejectedError(`${to.name}'s pack is full - remove something first.`);
+  const catalogId = catalogIdOf(row);
+  const taken = new Set(to.inventory.map((entry) => entry.id));
+  let id = catalogId;
+  for (let copy = 2; taken.has(id); copy += 1) id = `${catalogId.slice(0, 76)}-${copy}`;
+  const { recordId: _recordId, ...plain } = row;
+  const moved: InventoryItem = {
+    ...plain,
+    id,
+    ...(id !== catalogId ? { recordId: catalogId } : {}),
+    equipped: false,
+    attuned: false
+  };
+  const fromDefinition = from.definitionId ? resolveDefinition(from.definitionId) : undefined;
+  const toDefinition = to.definitionId ? resolveDefinition(to.definitionId) : undefined;
+  const oldKeys = chargeKeysOf(row, fromDefinition, deps);
+  const newKeys = chargeKeysOf(moved, toDefinition, deps);
+  const fromUses = { ...from.actionUses };
+  const toUses = { ...to.actionUses };
+  oldKeys.forEach((key, index) => {
+    const spent = fromUses[key];
+    delete fromUses[key];
+    if (spent !== undefined && newKeys[index] !== undefined) toUses[newKeys[index]] = spent;
+  });
+  from.actionUses = fromUses;
+  to.actionUses = toUses;
+  from.inventory = from.inventory.filter((entry) => entry.id !== itemId);
+  to.inventory = [...to.inventory, moved];
+  reconcileEquipment(from, fromDefinition, deps);
+  reconcileEquipment(to, toDefinition, deps);
+  return { name: row.name };
 }
 
 /** Set the whole coin purse. Owner-scoped by the caller. */

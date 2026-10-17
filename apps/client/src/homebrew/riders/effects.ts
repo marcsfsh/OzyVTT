@@ -2,7 +2,7 @@ import { type Modifier } from "@vtt/content-srd-5.2.1/schemas";
 import { newId } from "../../lib/ids";
 import { type Draft, type FieldDef, type SelectOption, grouped, opt } from "../schema";
 import { DAMAGE_TYPES, type RiderScope } from "../vocabulary";
-import { ROLL_MODE_ROLLS, ROLL_MODE_WAYS, signed } from "./modifiers";
+import { ROLL_MODE_ROLLS, ROLL_MODE_WAYS, signed, specialSpeedFields, specialSpeedLabel } from "./modifiers";
 import { hasType, whenField } from "./triggers";
 
 /**
@@ -13,12 +13,14 @@ import { hasType, whenField } from "./triggers";
  *   with an "Only for…" ability line).
  * - `damage-resistance` and `damage-vulnerability`.
  * - `speed`, summed live and given back when the effect ends.
+ * - `special-speed`, a Fly, Swim, Climb or Burrow Speed while the effect lasts (Fly, Spider Climb).
  */
 export const EFFECT_MODIFIER_LABELS = {
   "roll-mode": ["Rolls", "Advantage or disadvantage"],
   "damage-resistance": ["Damage and defence", "Resistance to damage"],
   "damage-vulnerability": ["Damage and defence", "Vulnerability to damage"],
-  speed: ["The character", "Speed"]
+  speed: ["The character", "Speed"],
+  "special-speed": ["The character", "Fly, swim, climb or burrow speed"]
 } as const satisfies Partial<Record<Modifier["type"], readonly [group: string, label: string]>>;
 const EFFECT_MODIFIER_TYPES: readonly SelectOption[] = Object.entries(EFFECT_MODIFIER_LABELS).map(
   ([type, [group, label]]) => grouped(group)(type, label)
@@ -34,6 +36,8 @@ function blankEffectModifier(type: string): Draft {
       return { type, damageTypes: [] };
     case "speed":
       return { type, amount: 10 };
+    case "special-speed":
+      return { type, movement: "fly", feet: 30 };
     default:
       return { type };
   }
@@ -59,6 +63,7 @@ const effectModifiersField = (): FieldDef => ({
     // Feet only for `speed`; a stored `damage-bonus`/`attack-bonus` must not read as "+2 ft".
     if (modifier.type === "speed" && typeof modifier.amount === "number")
       return `${name} ${signed(modifier.amount)} ft`;
+    if (modifier.type === "special-speed") return specialSpeedLabel(modifier);
     const types = Array.isArray(modifier.damageTypes) ? modifier.damageTypes.map(String) : [];
     return types.length > 0 ? `${name} — ${types.slice(0, 3).join(", ")}${types.length > 3 ? "…" : ""}` : name;
   },
@@ -100,6 +105,7 @@ const effectModifiersField = (): FieldDef => ({
       visibleWhen: hasType("speed"),
       help: "Negative for a curse. The bearer's Speed while this effect lasts, given back when it ends."
     },
+    ...specialSpeedFields(),
     {
       key: "damageTypes",
       label: "Damage types",
@@ -153,6 +159,7 @@ export const effectsField = (scope: RiderScope): FieldDef => ({
       options: [
         opt("rounds", "A number of rounds"),
         opt("until-source-next-turn", "Until your next turn"),
+        opt("until-source-turn-end", "Until the end of your next turn"),
         opt("encounter", "The whole encounter"),
         opt("manual", "Until removed by hand")
       ]

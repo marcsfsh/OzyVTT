@@ -106,8 +106,13 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await expect(gm.getByText("Round 1")).toBeVisible();
   await expectPageFits(gm);
 
-  // The player places their own token from the tray, then drags it across the map.
+  // A move off the mover's turn goes to the GM, so if the goblin won initiative the GM ends its turn first.
   await expect(player.getByText("Round 1")).toBeVisible();
+  const yourTurn = player.getByText("Your turn - act, then end it below");
+  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
+  await expect(yourTurn).toBeVisible();
+
+  // The player places their own token from the tray, then drags it across the map.
   await press(player.getByLabel("Staging tray").getByRole("button", { name: hero }));
   const token = player.getByRole("button", { name: new RegExp(`^${hero}.*Drag to move`) });
   await expect(token).toBeVisible();
@@ -145,6 +150,57 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
     await expect.poll(async () => (await positionOf(token)).x).toBeGreaterThan(start.x);
     expect((await positionOf(token)).y).toBe(start.y);
   }
+});
+
+test("a player answers the GM's call with a physical die, then rerolls it with Heroic Inspiration", async ({
+  open
+}) => {
+  const hero = PARTY[2];
+  const player = await open("/");
+  await joinAndClaim(player, hero);
+  // The GM's side is the API: this journey is about the player's card.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
+  const actorId = game.actors.find((actor: { name: string }) => actor.name === hero).id;
+  const gm = (path: string, data: Record<string, unknown>) =>
+    player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  expect((await gm(`/api/v1/game/actors/${actorId}/heroic-inspiration`, { actorId, has: true })).ok()).toBe(true);
+  const call = { kind: "check", ability: "wis", skill: "perception", dc: 10, actorIds: [actorId] };
+  expect((await gm("/api/v1/game/roll-calls", call)).ok()).toBe(true);
+
+  const card = player.getByRole("article", { name: `Wisdom (Perception) check for ${hero}` });
+  const face = card.getByLabel("Your d20 for the Wisdom (Perception) check");
+  await expect(player.getByText("The GM calls for a Wisdom (Perception) check (DC 10).")).toBeVisible();
+  // The toast announcing the call never covers the field the die is typed into.
+  expect(
+    await face.evaluate((field) => {
+      const box = field.getBoundingClientRect();
+      return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) === field;
+    })
+  ).toBe(true);
+  await expectPageFits(player);
+  await fillIn(face, "18");
+  await press(card.getByRole("button", { name: "Use" }));
+  await expect(card).toContainText("(d20 18) · success");
+
+  // The reroll is typed too, and its button keeps its whole label on a phone.
+  const reroll = card.getByRole("button", { name: "Reroll · Heroic Inspiration" });
+  const fits = await reroll.evaluate((button) => {
+    const outer = button.closest("article")!.getBoundingClientRect();
+    const box = button.getBoundingClientRect();
+    // A pixel of rounding between the two widths is not a cut-off label.
+    return button.scrollWidth <= button.clientWidth + 2 && box.right <= outer.right + 1;
+  });
+  expect(fits, "the reroll button fits its label inside the card").toBe(true);
+  await fillIn(card.getByLabel("The rerolled d20"), "2");
+  await press(reroll);
+  await expect(card).toContainText("(d20 2)");
+  await expectPageFits(player);
+  await press(card.getByRole("button", { name: "Done" }));
+  await expect(card).toBeHidden();
 });
 
 test("the GM pairs the table viewer and presents the map", async ({ open, request }) => {

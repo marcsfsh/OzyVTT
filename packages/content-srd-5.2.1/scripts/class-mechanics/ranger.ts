@@ -23,15 +23,18 @@ export const ranger: ClassMechanicsModule = {
     },
 
     /**
-     * "Speed increases by 10 feet while you aren't wearing Heavy armor", authored flat: "not Heavy" needs
-     * an OR, which the rider gate does not have, and `speed` is baked without consulting `when`. Rangers are not
-     * proficient with Heavy armor anyway. Climb and Swim Speeds stay prose.
+     * "Speed increases by 10 feet while you aren't wearing Heavy armor": the +10 is in the sheet's Speed, and a live
+     * -10 takes it back while Heavy armor is worn, so sheets built with the +10 stay right. The Climb and Swim
+     * Speeds equal to Speed are read from this feature by the movement rules (`specialSpeedsOf`).
      */
     roving: {
-      modifiers: [{ type: "speed", amount: 10 }]
+      modifiers: [
+        { type: "speed", amount: 10 },
+        { type: "speed", amount: -10, when: [{ type: "while-armored", weights: ["heavy"] }] }
+      ]
     },
 
-    // Uses equal the Wisdom modifier (minimum 1). The temporary HP and the Exhaustion decrease stay prose.
+    // Uses equal the Wisdom modifier (minimum 1). The Exhaustion decrease on a Short Rest is the rest's (rests.ts).
     tireless: {
       uses: { scaling: { type: "ability-modifier", ability: "wis", minimum: 1 }, per: "long-rest" },
       actions: [
@@ -41,12 +44,14 @@ export const ranger: ClassMechanicsModule = {
           activation: "action",
           description:
             "As a Magic action, you give yourself Temporary Hit Points equal to 1d8 plus your Wisdom modifier (minimum of 1). Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1.",
-          damage: []
+          damage: [],
+          healing: { formula: "1d8", self: true, temporary: true },
+          adds: { abilityModifier: "wis" }
         }
       ]
     },
 
-    // The activation and counter only; effects cannot apply the Invisible condition.
+    // "Giving yourself the Invisible condition until the end of your next turn."
     "natures-veil": {
       uses: { scaling: { type: "ability-modifier", ability: "wis", minimum: 1 }, per: "long-rest" },
       actions: [
@@ -56,7 +61,18 @@ export const ranger: ClassMechanicsModule = {
           activation: "bonus-action",
           description:
             "You invoke spirits of nature to magically hide yourself, giving yourself the Invisible condition until the end of your next turn.",
-          damage: []
+          damage: [],
+          grants: {
+            name: "Nature's Veil",
+            tags: ["natures-veil"],
+            duration: { type: "until-source-turn-end" },
+            modifiers: [],
+            onEnd: [],
+            target: "self",
+            voidWhileIncapacitated: false,
+            concentration: false,
+            conditions: ["invisible"]
+          }
         }
       ]
     },
@@ -67,7 +83,7 @@ export const ranger: ClassMechanicsModule = {
     },
 
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
 
     /**
@@ -119,8 +135,8 @@ export const ranger: ClassMechanicsModule = {
         }
       },
 
-      // A pick with prose-only options: both act on the attacker's rolls, and opportunity-attack triggers
-      // are never announced by the resolver.
+      // Escape the Horde's Disadvantage is read on every Opportunity Attack against the Ranger. Multiattack
+      // Defense is marked on the Ranger by the engine after a hit (`resolution/struck.ts`).
       "defensive-tactics": {
         choice: {
           kind: "defensive-tactics",
@@ -129,7 +145,15 @@ export const ranger: ClassMechanicsModule = {
             {
               id: "escape-the-horde",
               name: "Escape the Horde",
-              description: "Opportunity Attacks have Disadvantage against you."
+              description: "Opportunity Attacks have Disadvantage against you.",
+              modifiers: [
+                {
+                  type: "roll-mode",
+                  roll: "incoming-attack",
+                  mode: "disadvantage",
+                  when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["opportunity"] }]
+                }
+              ]
             },
             {
               id: "multiattack-defense",

@@ -1,8 +1,8 @@
 /**
  * Monk and Warrior of the Open Hand mechanics, merged over the ETL-generated prose.
  *
- * Uses count one per spend, so only features costing exactly 1 Focus Point ride the `focus-points`
- * pool; features costing 3 or 4 keep their price in prose rather than debiting the wrong amount.
+ * Every Focus Point spender rides the shared `focus-points` pool; one costing more than a point says so with
+ * `useCost` (Superior Defense 3, Quivering Palm 4).
  */
 import type { ClassMechanicsModule } from "./overlay.js";
 
@@ -64,18 +64,24 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
-    // The once-per-Long-Rest permission only; refilling Focus Points is done by hand.
+    // The once-per-Long-Rest permission only; the GM gives the Focus Points back from the sheet's Limited uses.
     "uncanny-metabolism": {
       uses: { limit: 1, per: "long-rest" }
     },
-    // Same caveat as the Barbarian's: it reaches feature actions only, not inventory-derived swings.
+    // "+10 feet while you aren't wearing armor or wielding a Shield", read with the live loadout. The column's
+    // later steps are staged features below.
+    "unarmored-movement": {
+      modifiers: [{ type: "speed", amount: 10, when: [{ type: "while-unarmored" }] }]
+    },
+    // `effective-actions` folds it onto every weapon swing and the Martial Arts strike.
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
     /**
      * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. A failed save is
-     * Stunned; the success rider (halved Speed, Advantage) stays prose. "Once per turn" is not expressible
-     * alongside the pool, so the scarcer Focus Point is what is tracked.
+     * Stunned until the start of the Monk's next turn; a success halves the target's Speed for as long, and the next
+     * attack roll against it spends the Advantage. The engine holds "once per turn" beside the Focus Point, keyed by
+     * the action's id.
      */
     "stunning-strike": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -91,7 +97,16 @@ export const monk: ClassMechanicsModule = {
             ability: "con",
             dc: { base: 8, ability: "wis", proficiencyBonus: true },
             successDamage: "none",
-            failureConditions: ["stunned"]
+            failureConditions: ["stunned"],
+            failureDuration: { type: "until-source-next-turn" },
+            successEffect: {
+              name: "Stunning Strike",
+              tags: ["speed-halved", "until-attacked"],
+              duration: { type: "until-source-next-turn" },
+              modifiers: [
+                { type: "roll-mode", roll: "incoming-attack", mode: "advantage", when: [{ type: "on-attack-roll" }] }
+              ]
+            }
           }
         }
       ]
@@ -100,20 +115,29 @@ export const monk: ClassMechanicsModule = {
     "disciplined-survivor": {
       grants: { saves: ["str", "dex", "con", "int", "wis", "cha"] }
     },
-    // Authored as `effects` so an activation is synthesised. The 3-point price and the Incapacitated
-    // end condition stay prose.
+    // "At the start of your turn, you can expend 3 Focus Points"; the Incapacitated end condition stays prose.
     "superior-defense": {
-      effects: [
+      uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
+      actions: [
         {
+          id: "superior-defense",
           name: "Superior Defense",
-          tags: ["superior-defense"],
-          duration: { type: "rounds", rounds: 10 },
-          modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
+          activation: "other",
+          description:
+            "At the start of your turn, expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to every damage type except Force.",
+          damage: [],
+          useCost: 3,
+          grants: {
+            name: "Superior Defense",
+            tags: ["superior-defense"],
+            duration: { type: "rounds", rounds: 10 },
+            modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
+          }
         }
       ]
     },
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
     /** "Your Dexterity and Wisdom scores increase by 4, to a maximum of 25." */
     "body-and-mind": {
@@ -124,12 +148,22 @@ export const monk: ClassMechanicsModule = {
     }
     // Not modeled here: Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`),
     // but its die and Dexterity do not reach inventory Monk weapons. Martial-Arts-die features (Deflect
-    // Attacks/Energy, heal and temp HP amounts), Unarmored Movement's scaling speed, and Slow Fall,
-    // Acrobatic Movement, Empowered Strikes, Evasion, Self-Restoration and Perfect Focus stay prose.
+    // Attacks/Energy, temp HP amounts), and Slow Fall, Acrobatic Movement, Empowered Strikes, Self-Restoration
+    // and Perfect Focus stay prose. Evasion is read by the save outcome (`hasEvasion` in the server) from the
+    // held feature.
   },
+  // The Unarmored Movement column's steps (+15 at 6, +20 at 10, +25 at 14, +30 at 18), each replacing the last.
+  stages: [6, 10, 14, 18].map((level, index, levels) => ({
+    id: `unarmored-movement-${level}`,
+    name: "Unarmored Movement",
+    level,
+    description: `Your speed increases by ${15 + 5 * index} feet while you aren't wearing armor or wielding a Shield.`,
+    replacesFeatureId: index === 0 ? "unarmored-movement" : `unarmored-movement-${levels[index - 1]}`,
+    modifiers: [{ type: "speed" as const, amount: 15 + 5 * index, when: [{ type: "while-unarmored" as const }] }]
+  })),
   subclasses: {
     "warrior-of-the-open-hand": {
-      // Uses equal the Wisdom modifier (minimum 1); the Martial Arts die heal stays prose.
+      // Uses equal the Wisdom modifier (minimum 1); the heal is the Martial Arts die plus the Wisdom modifier.
       "wholeness-of-body": {
         uses: { scaling: { type: "ability-modifier", ability: "wis", minimum: 1 }, per: "long-rest" },
         actions: [
@@ -139,12 +173,22 @@ export const monk: ClassMechanicsModule = {
             activation: "bonus-action",
             description:
               "Roll your Martial Arts die and regain a number of Hit Points equal to the number rolled plus your Wisdom modifier (minimum of 1 Hit Point regained).",
-            damage: []
+            damage: [],
+            // The Martial Arts die at the Warrior of the Open Hand's levels: d8 from 6, d10 from 11, d12 from 17.
+            healing: { formula: "1d8", self: true },
+            healingByLevel: [
+              { level: 6, formula: "1d8" },
+              { level: 11, formula: "1d10" },
+              { level: 17, formula: "1d12" }
+            ],
+            adds: { abilityModifier: "wis" }
           }
         ]
       },
-      // Flat 10d12 against the Monk's derived DC. The 4-point price, duration and one-target rule stay prose.
+      // Flat 10d12 against the Monk's derived DC, for the 4 Focus Points the vibrations cost. Their duration and the
+      // one-target rule stay prose.
       "quivering-palm": {
+        uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
         actions: [
           {
             id: "quivering-palm",
@@ -153,6 +197,7 @@ export const monk: ClassMechanicsModule = {
             description:
               "End the vibrations you set in a creature. The target makes a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one.",
             damage: [{ formula: "10d12", type: "force" }],
+            useCost: 4,
             save: {
               ability: "con",
               dc: { base: 8, ability: "wis", proficiencyBonus: true },

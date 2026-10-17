@@ -7,9 +7,12 @@ import { loadActorFixture } from "@vtt/test-fixtures";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import { RulesBlockedError } from "../src/game-store.js";
-import { looseRollPlan, offTurnVerdict, routeForTap, NOT_YOUR_TURN } from "../src/tap-routing.js";
+import { looseRollPlan, routeForTap, NOT_YOUR_TURN } from "../src/tap-routing.js";
+import { planEconomy } from "../src/resolution/economy.js";
+import { makeEffect } from "../src/effects.js";
 import { familyOf } from "../src/rules-families.js";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 // Tapping an action is a server routing decision with three named outcomes. Also pinned: a monster
 // sheet outside the fight rolls loose for the GM, and an off-turn tap is a rules block with an
@@ -56,6 +59,26 @@ const FLARE = {
 /** A real fixture sheet with the test actions grafted on, so the definition stays schema-valid. */
 function heroDefinition(id: string, name: string, actions: readonly object[] = [SWING, PARRY]) {
   return { ...(loadActorFixture("player-character") as Record<string, unknown>), id, name, actions };
+}
+
+/** The economy's plan for Second Hero acting while Hero is up; throws a strict block, returns the warnings. */
+function offTurnPlan(state: GameState, action: Parameters<typeof planEconomy>[2] = SWING, warnings: string[] = []) {
+  const attacker = state.actors.find((actor) => actor.id === OTHER)!;
+  return planEconomy(
+    state,
+    attacker,
+    action,
+    { actorId: OTHER, targetIds: [GOBLIN], commandId: randomUUID() },
+    undefined,
+    warnings,
+    undefined,
+    [action]
+  ).plan;
+}
+function offTurn(state: GameState, action: Parameters<typeof planEconomy>[2] = SWING): string[] {
+  const warnings: string[] = [];
+  offTurnPlan(state, action, warnings);
+  return warnings;
 }
 
 /** A live fight: Hero is up, Second Hero and the Goblin are waiting. */
@@ -106,9 +129,9 @@ describe("tap routing (the seam)", () => {
 
   it("refuses an off-turn action under a strict economy, warns under advise, and stays silent under off", () => {
     const strict = fightState();
-    expect(() => offTurnVerdict(strict, SWING, "Hero")).toThrow(RulesBlockedError);
+    expect(() => offTurn(strict)).toThrow(RulesBlockedError);
     try {
-      offTurnVerdict(strict, SWING, "Hero");
+      offTurn(strict);
     } catch (error) {
       const blocked = error as RulesBlockedError;
       expect(blocked.rule).toBe(NOT_YOUR_TURN);
@@ -120,17 +143,59 @@ describe("tap routing (the seam)", () => {
 
     const advise = fightState();
     advise.combat = { ...advise.combat, ruleExceptions: { economy: "assisted" } };
-    expect(offTurnVerdict(advise, SWING, "Hero").warning).toBe("Not your turn yet - Hero is up.");
+    expect(offTurn(advise)).toEqual(["Not your turn yet - Hero is up."]);
 
     const off = fightState();
     off.combat = { ...off.combat, ruleExceptions: { economy: "freeform" } };
-    expect(offTurnVerdict(off, SWING, "Hero").warning).toBeNull();
+    expect(offTurn(off)).toEqual([]);
+  });
+
+  it("refuses a Bonus Action off turn as well, and never names a hidden creature whose turn it is", () => {
+    const fight = fightState();
+    expect(() => offTurn(fight, { ...SWING, activation: "bonus-action" })).toThrow(RulesBlockedError);
+    fight.actors = fight.actors.map((actor) => (actor.id === HERO ? { ...actor, visibility: "gm-only" } : actor));
+    try {
+      offTurn(fight);
+      expect.unreachable();
+    } catch (error) {
+      expect((error as RulesBlockedError).message).toBe("Not your turn yet - wait for your turn.");
+    }
   });
 
   it("exempts reactions and legendary actions - taking those off turn is the point", () => {
     const fight = fightState();
-    expect(offTurnVerdict(fight, PARRY, "Hero").warning).toBeNull();
-    expect(offTurnVerdict(fight, { activation: "other", legendary: { cost: 1 } }, "Hero").warning).toBeNull();
+    expect(offTurn(fight, PARRY)).toEqual([]);
+    expect(offTurn(fight, { ...SWING, activation: "other", legendary: { cost: 1 } })).toEqual([]);
+  });
+
+  it("takes a Readied creature's response with its Reaction, and refuses it with none left (SRD Ready)", () => {
+    const fight = fightState();
+    fight.actors = fight.actors.map((actor) =>
+      actor.id === OTHER
+        ? {
+            ...actor,
+            effects: [
+              makeEffect({
+                id: "ready",
+                name: "Readied",
+                tags: ["readied"],
+                duration: { type: "until-source-next-turn" }
+              })
+            ]
+          }
+        : actor
+    );
+    expect(offTurnPlan(fight).markReaction).toBe(true);
+    fight.combat = { ...fight.combat, reactionsUsed: [OTHER] };
+    try {
+      offTurn(fight);
+      expect.unreachable();
+    } catch (error) {
+      expect((error as RulesBlockedError).rule).toBe("economy.reaction-used");
+      expect((error as RulesBlockedError).message).toBe(
+        "Second Hero has no reaction left to take the readied action with."
+      );
+    }
   });
 
   it("stops re-prompting once the GM has waved the economy through this turn", () => {
@@ -139,7 +204,7 @@ describe("tap routing (the seam)", () => {
       ...fight.combat,
       turn: { ...fight.combat.turn, rulesOverriddenFamilies: ["economy"] }
     };
-    expect(offTurnVerdict(fight, SWING, "Hero").warning).toBeNull();
+    expect(offTurn(fight)).toEqual([]);
   });
 
   it("plans the loose route's dice, with damage strictly opt-in", () => {
@@ -156,16 +221,6 @@ describe("tap routing (the seam)", () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 async function boot(state: GameState) {
   const directory = await mkdtemp(join(tmpdir(), "vtt-tap-"));
@@ -215,6 +270,36 @@ function withDefinitions(state: GameState): GameState {
     )
   });
 }
+
+describe("action.resolve over the API", () => {
+  it("refuses a player's off-turn action, and keeps a player's Ready trigger for the table", async () => {
+    const { base, server } = await boot(withDefinitions(fightState()));
+    const heroSession = server.auth.issuePlayerSession();
+    const otherSession = server.auth.issuePlayerSession();
+    await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO });
+    await post(base, GAME_PATHS.claims, otherSession, { actorId: OTHER });
+
+    // The map's targeting flow sends action.resolve directly; it meets the same turn rule as action.use.
+    const offTurn = await post(base, GAME_PATHS.actionResolve, otherSession, {
+      commandId: randomUUID(),
+      actorId: OTHER,
+      actionId: "swing",
+      targetIds: [GOBLIN]
+    });
+    expect(offTurn.status).toBe(409);
+    expect((await offTurn.json()).error.details.blocked.rule).toBe(NOT_YOUR_TURN);
+
+    const ready = await post(base, GAME_PATHS.actionResolve, heroSession, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      actionId: "ready",
+      note: "the goblin steps into reach"
+    });
+    expect(ready.status).toBe(200);
+    const hero = server.store.snapshot.actors.find((actor) => actor.id === HERO)!;
+    expect(hero.effects.map((effect) => effect.name)).toEqual(["Readied: the goblin steps into reach"]);
+  });
+});
 
 describe("action.use over the API", () => {
   it("resolves on turn and refuses off turn with an overridable, askable block", async () => {
@@ -439,11 +524,19 @@ describe("save.roll over the API", () => {
     const heroSession = server.auth.issuePlayerSession();
     await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO });
 
-    const answered = await post(base, GAME_PATHS.saveRoll, heroSession, {
+    // A player types the face their die shows, never a total.
+    const typedTotal = await post(base, GAME_PATHS.saveRoll, heroSession, {
       commandId: randomUUID(),
       actorId: HERO,
       ability: "dex",
       total: 20
+    });
+    expect(typedTotal.status).toBe(403);
+    const answered = await post(base, GAME_PATHS.saveRoll, heroSession, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      ability: "dex",
+      face: 18
     });
     expect(answered.status).toBe(200);
     const body = (await answered.json()).data;

@@ -7,10 +7,12 @@ import {
   addCombatant,
   endEncounter,
   nextInitiativeTurn,
+  removeCombatant,
   rollRemainingInitiative,
   rollSelfInitiative,
   setInitiativeScore,
-  startEncounter
+  startEncounter,
+  swapInitiative
 } from "../encounter.js";
 import {
   AddCombatantSchema,
@@ -21,16 +23,28 @@ import {
   InitiativeRollRemainingSchema,
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
+  InitiativeSwapSchema,
+  RemoveCombatantSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError, type JournalEntry } from "../game-store.js";
+import { requireTypedDie } from "../held-rolls.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
-import { initiatorOf, principalTag } from "./kit.js";
+import { initiatorOf, isGmGrade, principalTag, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { recoverAmmunition } from "../ammunition.js";
 
 // The encounter lifecycle, initiative and the turn economy.
+
+/** Where creatures stand on the fight's map; a map that can't be read leaves every distance unknown, so a turn still
+ *  moves on. */
+async function mappedDistance(
+  kit: Kit
+): Promise<(state: GameState, actorIdA: string, actorIdB: string) => number | null> {
+  return kit.creatureDistance().catch(() => () => null);
+}
 
 export const encounterCommands = [
   defineCommand({
@@ -46,7 +60,7 @@ export const encounterCommands = [
       const encounterMap = kit.context.mapCatalog.get(request.mapAssetId);
       if (!encounterMap || encounterMap.kind !== "battlemap")
         throw new CommandRejectedError("Select an uploaded battlemap before starting the encounter.");
-      const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative } = request;
+      const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative, groupMonsters } = request;
       const tokenGeometry = await kit.context.tokenGeometryFor(mapAssetId);
       // Omitted `entries` means "start the fight staged here", derived from live state rather than the client.
       // No refusal here, so `startEncounter`'s own guards keep their order and wording.
@@ -68,7 +82,8 @@ export const encounterCommands = [
             entries,
             rulesMode: rulesMode ?? draft.rulesPolicy.dial,
             ruleExceptions: ruleExceptions ?? { ...draft.rulesPolicy.exceptions },
-            playersRollInitiative
+            playersRollInitiative,
+            groupMonsters
           },
           () => kit.context.random(20),
           tokenGeometry,
@@ -90,7 +105,7 @@ export const encounterCommands = [
         if (entry.surprised === true)
           kit.context.appendLog({
             kind: "encounter",
-            text: `${kit.actorName(entry.actorId)} is surprised - initiative rolled at disadvantage.`,
+            text: `${kit.actorName(entry.actorId)} is surprised.`,
             actorIds: [entry.actorId],
             gmOnly: kit.actorHidden(entry.actorId)
           });
@@ -115,17 +130,18 @@ export const encounterCommands = [
       let endedSceneId: string | null = null;
       let endedMapAssetId: string | null = null;
       let endedTurnCount = 0;
+      let recovered: ReturnType<typeof recoverAmmunition> = [];
       const { duplicate } = await executeTimeline((state, timeline) => {
         // The last live picture of the fight, captured before endEncounter clears the combat.
         const finalState = structuredClone(state);
         endedSceneId = finalState.combat.activeSceneId;
         endedMapAssetId = finalState.combat.mapAssetId;
         // The fight's effects end with it (onEnd fires), scoped to its combatants so parked scenes' effects survive.
-        effectEvents = endEncounterEffects(
-          state,
-          state.combat.initiative.map((entry) => entry.actorId)
-        );
+        const combatantIds = state.combat.initiative.map((entry) => entry.actorId);
+        effectEvents = endEncounterEffects(state, combatantIds);
         endEncounter(state); // rejects while rewound
+        // SRD Ammunition: after a fight, half the pieces each combatant fired are picked up again.
+        recovered = recoverAmmunition(state, combatantIds, kit.equipmentCatalog());
         // Archive the fight in the same transaction, before wiping live buffers, so it can never be lost.
         // A fight that captured no boundaries is skipped.
         const entries = timeline.entries();
@@ -171,6 +187,13 @@ export const encounterCommands = [
       });
       if (duplicate) return;
       kit.context.appendLog({ kind: "encounter", text: "The encounter ended.", gmOnly: false });
+      for (const line of recovered)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: line.text,
+          actorIds: [line.actorId],
+          gmOnly: kit.actorHidden(line.actorId)
+        });
       kit.publishNarrations(effectEvents);
       kit.context.onEncounterArchived?.({
         mapAssetId: endedMapAssetId,
@@ -202,7 +225,8 @@ export const encounterCommands = [
           () => kit.context.random(20),
           geometry,
           Date.now(),
-          kit.initiativeRollSink(draft, commandId, principal)
+          kit.initiativeRollSink(draft, commandId, principal),
+          kit.initiativeRollDeps(draft)
         )
       );
       if (!duplicate) kit.publishRolls(state, commandId);
@@ -210,15 +234,83 @@ export const encounterCommands = [
   }),
 
   defineCommand({
+    type: "encounter.remove-combatant",
+    operationId: "removeEncounterCombatant",
+    description:
+      "Takes a combatant out of the running fight (GM-grade only): its initiative entry, token and prompts go, the turn moves on first when it was its turn, and what it sustains ends - its grapples and Concentration, what lasts until its next turn, and a creature it swallowed climbs out of the corpse with the movement the stat block names, landing Prone. It stays on the roster.",
+    summary: "Take a combatant out of the running fight, ending what it holds (GM).",
+    schema: RemoveCombatantSchema,
+    malformed: "The remove-combatant command is malformed.",
+    gmOnly: "Only the GM can take a combatant out of the fight.",
+    async run({ request, executeTimeline }, kit) {
+      const { actorId } = request;
+      let outcome: TimelineOutcome | undefined;
+      const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
+      const distance = await mappedDistance(kit);
+      const { state, duplicate } = await executeTimeline((draft, timeline) => {
+        if (draft.combat.historyCursor !== null)
+          throw new CommandRejectedError(
+            "Finish reviewing the combat history before taking a combatant out of the fight."
+          );
+        const gathering = draft.combat.playerInitiativeMode === "wait" && draft.combat.pendingInitiative.length > 0;
+        // Its turn ends first, recorded like any other, so Previous can bring it back.
+        if (draft.combat.turnActorId === actorId && draft.combat.initiative.length > 1 && !gathering)
+          outcome = planNextTurn(draft, timeline, false, (advancing) =>
+            nextInitiativeTurn(advancing, effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
+          );
+        else if (draft.combat.turnActorId === actorId && gathering) {
+          const order = draft.combat.initiative.filter((entry) => entry.actorId !== actorId);
+          if (order[0]) draft.combat = { ...draft.combat, turnActorId: order[0].actorId };
+        }
+        effectEvents.push(
+          ...removeCombatant(draft, actorId, (definitionId) => kit.resolveDefinitionIn(draft, definitionId))
+        );
+      });
+      if (duplicate) return;
+      if (outcome) kit.context.logTimelineOutcome(outcome, state);
+      kit.publishNarrations(effectEvents);
+      kit.context.appendLog({
+        kind: "encounter",
+        text: `${kit.actorName(actorId)} left the fight.`,
+        actorIds: [actorId],
+        gmOnly: kit.actorHidden(actorId)
+      });
+    }
+  }),
+
+  defineCommand({
     type: "initiative.set",
     operationId: "setInitiativeScore",
-    description: "Sets a combatant's initiative score (GM-grade only).",
+    description:
+      "Sets a combatant's initiative score (GM-grade only); `tieBreaker` orders combatants tied on the same score, higher first.",
     summary: "Set a combatant's initiative score (GM).",
     schema: InitiativeScoreSchema,
     malformed: "The Initiative update is malformed.",
     gmOnly: "Only the GM can change Initiative.",
     async run({ request, execute }) {
-      await execute((state) => setInitiativeScore(state, request.actorId, request.score));
+      await execute((state) => setInitiativeScore(state, request.actorId, request.score, request.tieBreaker));
+    }
+  }),
+
+  defineCommand({
+    type: "initiative.swap",
+    operationId: "swapInitiative",
+    description:
+      "Swaps two combatants' initiative (GM-grade only): the Alert feat's Initiative Swap, made right after initiative is rolled and before either has acted. Refused while either is Incapacitated.",
+    summary: "Swap two combatants' initiative, as Alert's Initiative Swap (GM).",
+    schema: InitiativeSwapSchema,
+    malformed: "The Initiative swap is malformed.",
+    gmOnly: "Only the GM can swap Initiative.",
+    async run({ request, execute }, kit) {
+      const { duplicate } = await execute((state) => swapInitiative(state, request.actorId, request.withActorId));
+      if (duplicate) return;
+      kit.context.appendLog({
+        kind: "encounter",
+        text: `${kit.actorName(request.actorId)} and ${kit.actorName(request.withActorId)} swapped initiative.`,
+        actorIds: [request.actorId, request.withActorId],
+        gmOnly: kit.actorHidden(request.actorId) || kit.actorHidden(request.withActorId)
+      });
     }
   }),
 
@@ -226,7 +318,7 @@ export const encounterCommands = [
     type: "initiative.roll-self",
     operationId: "rollOwnInitiative",
     description:
-      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; `rollMode` gives advantage/disadvantage), adds its initiative modifier, sets its score, and clears its pending flag. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
+      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; a player may type one only while the table's typedRolls is open), adds its initiative modifier, sets its score, and clears its pending flag. The rules set the roll mode (Surprise, conditions such as Poisoned, features, Dexterity check riders) and Exhaustion's penalty; `rollMode` is honoured only from a GM-grade session. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
     summary: "Roll your own claimed character's initiative (GM anyone); the server rolls unless a manual d20 is given.",
     schema: InitiativeRollSelfSchema,
     malformed: "The initiative roll is malformed.",
@@ -236,12 +328,15 @@ export const encounterCommands = [
       const { state, duplicate } = await execute((draft) => {
         // A player rolls only their own claimed character's initiative; the GM (integration) anyone's.
         requireActorAccess(initiatorOf(principal), draft, actorId, "check");
+        // A typed d20 only while the table lets players type their dice.
+        if (natural !== undefined) requireTypedDie(draft, initiatorOf(principal), undefined, natural);
         score = rollSelfInitiative(
           draft,
           actorId,
-          { natural, rollMode },
+          { natural, rollMode: isGmGrade(principal) ? rollMode : undefined },
           () => kit.context.random(20),
-          kit.initiativeRollSink(draft, commandId, principal)
+          kit.initiativeRollSink(draft, commandId, principal),
+          kit.initiativeRollDeps(draft)
         );
       });
       if (duplicate) return;
@@ -261,21 +356,14 @@ export const encounterCommands = [
     type: "initiative.roll-remaining",
     operationId: "rollRemainingInitiative",
     description:
-      "Rolls initiative for every combatant still pending a player roll (GM-grade only), beginning a `wait`-mode fight.",
-    summary: "Roll initiative for every player still pending, beginning a wait-mode fight (GM).",
+      "Settles initiative for every combatant still pending a player roll with the provisional roll made at the start (GM-grade only), beginning a `wait`-mode fight.",
+    summary: "Use the start's rolls for every player still pending, beginning a wait-mode fight (GM).",
     schema: InitiativeRollRemainingSchema,
     malformed: "The initiative command is malformed.",
     gmOnly: "Only the GM can roll initiative for the rest of the table.",
-    async run({ principal, request, execute }, kit) {
-      const { state, duplicate } = await execute((draft) =>
-        rollRemainingInitiative(
-          draft,
-          () => kit.context.random(20),
-          kit.initiativeRollSink(draft, request.commandId, principal)
-        )
-      );
+    async run({ execute }, kit) {
+      const { duplicate } = await execute((draft) => rollRemainingInitiative(draft));
       if (duplicate) return;
-      kit.publishRolls(state, request.commandId);
       kit.context.appendLog({
         kind: "action",
         text: "The GM rolled initiative for the remaining players.",
@@ -298,13 +386,11 @@ export const encounterCommands = [
       // Rewound and changed: rewrite history only after GM confirmation (TimelineConfirmationRequired).
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
+      const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         outcome = planNextTurn(draft, timeline, request.confirmRewrite === true, (advancing) =>
-          nextInitiativeTurn(advancing, effectEvents, {
-            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
-            catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides)
-          })
+          nextInitiativeTurn(advancing, effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
         );
       });
       if (duplicate) return;
@@ -344,6 +430,8 @@ export const encounterCommands = [
     async run({ principal, executeTimeline }, kit) {
       // End Turn is a live forward step like the GM's Next. Players cannot advance while the table is rewound.
       const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
+      const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
           throw new CommandRejectedError(
@@ -351,11 +439,7 @@ export const encounterCommands = [
             "history_review"
           );
         planNextTurn(draft, timeline, false, (advancing) =>
-          endTurn(advancing, initiatorOf(principal), effectEvents, {
-            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
-            catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides)
-          })
+          endTurn(advancing, initiatorOf(principal), effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
         );
       });
       if (duplicate) return;
@@ -368,14 +452,18 @@ export const encounterCommands = [
     type: "turn.use",
     operationId: "useTurnSlot",
     description:
-      "Marks the current turn's action or bonus action used/unused. A free manual toggle (never blocks); structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance.",
+      "Marks the current turn's action or bonus action used/unused. A manual toggle: structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance. Only the GM gives back a spent slot: a player's un-marking is the `economy.spent-slot` rules block (a GM note under advise).",
     summary: "Mark the current turn's action or bonus action used/unused.",
     schema: TurnUseSchema,
     malformed: "The turn command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { slot, used } = request;
-      const { state, duplicate } = await execute((draft) => setTurnSlot(draft, slot, used, initiatorOf(principal)));
+      const notes: string[] = [];
+      const { state, duplicate } = await execute((draft) =>
+        setTurnSlot(draft, slot, used, initiatorOf(principal), notes)
+      );
       if (duplicate) return;
+      kit.logRulesNotes(notes, state.combat.turnActorId);
       // Marking a slot spent is narrated like reactions; un-marking (a correction) stays silent.
       const turnActorId = state.combat.turnActorId;
       if (used && turnActorId)
@@ -391,13 +479,18 @@ export const encounterCommands = [
   defineCommand({
     type: "turn.use-reaction",
     operationId: "useReaction",
-    description: "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn.",
+    description:
+      "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn. Only the GM gives back a spent reaction: a player's un-marking is the `economy.spent-slot` rules block (a GM note under advise).",
     summary: "Mark a combatant's reaction used/unused.",
     schema: TurnReactionSchema,
     malformed: "The reaction command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, used } = request;
-      const { duplicate } = await execute((state) => setReactionUsed(state, actorId, used, initiatorOf(principal)));
+      const notes: string[] = [];
+      const { duplicate } = await execute((state) =>
+        setReactionUsed(state, actorId, used, initiatorOf(principal), notes)
+      );
+      if (!duplicate) kit.logRulesNotes(notes, actorId);
       if (!duplicate && used)
         kit.context.broadcastTableEvent({
           kind: "reaction",

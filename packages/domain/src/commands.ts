@@ -19,6 +19,7 @@ import {
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
+  DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
   ProficienciesSchema
@@ -82,6 +83,8 @@ export const EncounterStartSchema = z
     ruleExceptions: WireRuleExceptionsSchema.optional(),
     /** When true, claimed player-characters roll their own initiative (a provisional auto-roll parks them until they do). */
     playersRollInitiative: z.boolean().optional(),
+    /** SRD: one initiative roll for each group of identical monsters, so they act together. */
+    groupMonsters: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -90,10 +93,13 @@ export const InitiativeScoreSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     score: z.number().int().min(-1000).max(1000),
+    /** Orders combatants tied on `score` (higher acts first); the GM settles ties the dice don't. */
+    tieBreaker: z.number().int().min(-1000).max(1000).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** A player rolls their own initiative (server rolls unless a manual d20 `natural` is given; adv/disadv supported). */
+/** A player rolls their own initiative: the server rolls unless a manual d20 `natural` is given, under the roll mode
+ *  the rules give (Surprise, conditions, features). `rollMode` is a GM override and is ignored from a player. */
 export const InitiativeRollSelfSchema = z
   .object({
     commandId: z.uuid(),
@@ -115,11 +121,28 @@ export const SetPlayerInitiativeModeSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Alert's Initiative Swap, made by the GM for the table: two combatants trade initiative scores. */
+export const InitiativeSwapSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    withActorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const AddCombatantSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     score: z.number().int().min(-1000).max(1000).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Takes a combatant out of the running fight (GM): its initiative entry and token go, and what it sustains ends. */
+export const RemoveCombatantSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -133,6 +156,8 @@ export const ActorAddFromDefinitionSchema = z
       .max(200),
     visibility: z.enum(["public", "gm-only"]).default("public"),
     joinEncounter: z.boolean().optional(),
+    /** The stat block's average hit points (the default), or its Hit Dice rolled on the server. */
+    hitPoints: z.enum(["average", "roll"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -256,7 +281,10 @@ export const SetHpSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
-    current: z.number().int().min(0).max(10000),
+    /** Omitted with `maximum`: current hit points stay, up to the new maximum. */
+    current: z.number().int().min(0).max(10000).optional(),
+    /** A new hit point maximum, set before `current` (a tougher ogre, a Life Drain). */
+    maximum: z.number().int().min(1).max(10000).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -270,8 +298,8 @@ export const SetConditionSchema = z
       .max(60),
     active: z.boolean(),
     level: z.number().int().min(1).max(6).optional(),
-    /** Bypass a movement-rule rejection (standing from Prone costs half Speed); audited. */ override:
-      RulesOverrideSchema.optional(),
+    /** Bypass a rules rejection (standing from Prone costs half Speed, on your own turn; a condition someone else
+     *  imposed is theirs to end); audited. */ override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -281,6 +309,21 @@ export const TurnUseSchema = z
     slot: z.enum(["action", "bonus-action"]),
     used: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** One extra chosen for a hit: the offer's id, and a damage type or slot where the offer asks for one. */
+export const HitOptionChoiceSchema = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    damageType: z
+      .string()
+      .regex(/^[a-z]+$/)
+      .max(40)
+      .optional(),
+    slotLevel: z.number().int().min(1).max(9).optional()
   })
   .strict();
 export const ActionResolveSchema = z
@@ -301,7 +344,8 @@ export const ActionResolveSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(60)
       .optional(),
-    /** Explicit GM roll-mode choice; wins over the engine's advantage/disadvantage aggregation. */
+    /** The GM's choice of roll mode, which wins over the engine's count of Advantage and Disadvantage. Ignored from a
+     *  player: the rules decide. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** Bypass a rules-mode rejection; the reason is audited in the combat log and journal (ADR-0020). */
     override: RulesOverrideSchema.optional(),
@@ -311,19 +355,48 @@ export const ActionResolveSchema = z
     cover: z.enum(["half", "three-quarters", "total"]).optional(),
     /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
     note: z.string().trim().min(1).max(100).optional(),
-    /** false previews the attack roll only (no damage/riders/economy) for re-roll or confirm; the confirm passes `attackNatural`. Non-attack actions ignore it. */
+    /** Ready this spell rather than cast it now (SRD Ready): its slot is spent and it is held with Concentration until
+     *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
+    ready: z.boolean().optional(),
+    /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
+     *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
+     *  ignore it. */
     commit: z.boolean().default(true),
-    /** Apply this exact d20 face for the attack instead of rolling - confirming a preview, or a hand-rolled die. */
+    /** A typed d20: the face a physical die shows (the one that counts, under Advantage or Disadvantage). A player may
+     *  type one only while the table lets players type their dice, and not for an attack whose die the server threw. */
     attackNatural: z.number().int().min(1).max(20).optional(),
-    /** Hand-entered final attack total, used verbatim vs AC; pair with `critical` for a nat 20. */
+    /** GM only: a hand-entered final attack total, used verbatim vs AC; pair with `critical` for a nat 20 or `fumble`
+     *  for a nat 1. */
     attackTotal: z.number().int().min(-50).max(100).optional(),
-    /** Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred. */
+    /** GM only: declares a natural 20 (critical hit) for the hand-entered-total path. */
     critical: z.boolean().optional(),
+    /** GM only: declares a natural 1 (a miss whatever the total) for the hand-entered-total path. */
+    fumble: z.boolean().optional(),
+    /** With `commit: false`, throw the held attack d20 again: a player spends Heroic Inspiration to reroll one die (the
+     *  lowest); the GM rerolls freely. */
+    reroll: z.boolean().optional(),
+    /** The skill a check action is made with: Influence (Deception, Intimidation, Performance, Persuasion or Animal
+     *  Handling), Search (Insight, Medicine, Perception or Survival) or Study (Arcana, History, Investigation, Nature or
+     *  Religion). */
+    skill: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(60)
+      .optional(),
+    /** The ability a cast chooses: Hex's target has Disadvantage on ability checks made with it. */
+    ability: AbilitySchema.optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
      *  above it with a slot left. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The damage type picked for an action that lets its caster choose (Chromatic Orb); absent, its first. */
+    damageType: DamageTypeSchema.optional(),
+    /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
+     *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
+    hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
+    /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. */
+    spend: z.number().int().min(1).max(100).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -332,6 +405,9 @@ export const ActionResolveSchema = z
   })
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, {
     error: "Supply either a natural d20 or a final total, not both."
+  })
+  .refine((payload) => !(payload.critical === true && payload.fumble === true), {
+    error: "A roll is a natural 20 or a natural 1, not both."
   });
 // The message `save.answer` surfaces for out-of-bounds hand-entered damage (it reports the zod issue's own text).
 const SAVE_DAMAGE_BOUND = "Enter the damage as a whole number from 0 to 1000.";
@@ -339,9 +415,20 @@ export const SaveAnswerSchema = z
   .object({
     commandId: z.uuid(),
     saveId: z.uuid(),
+    /** "roll": the server throws the d20 (or takes `face`) and adds the save's modifier. "manual": GM only, `total` is
+     *  the final total as the GM rules it. */
     method: z.enum(["roll", "manual"]),
+    /** GM only, with `method: "manual"`: the final total, used as given. */
     total: z.number().int().min(-20).max(60).optional(),
+    /** A typed d20 for `method: "roll"`: the face a physical die shows (the one that counts). A player may type one only
+     *  while the table lets players type their dice, and not once the server has thrown this save's die. */
+    face: z.number().int().min(1).max(20).optional(),
+    /** The GM's choice of roll mode, which wins over the engine's count. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** With `commit: false`, throw the held d20 again: a player spends Heroic Inspiration to reroll one die (the
+     *  lowest); the GM rerolls freely. */
+    reroll: z.boolean().optional(),
+    /** false previews: the d20 is thrown and held, so a later preview or the confirm uses the same die. */
     commit: z.boolean().default(true),
     legendaryResistance: z.boolean().default(false),
     /** Hand-entered damage, applied before success halving with the proposal's types kept; a player may amend only their own character's save. */ damageOverride:
@@ -375,12 +462,18 @@ export const ReactionAnswerSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(120)
       .optional(),
-    /** Opportunity attacks (leaves-reach): false previews the swing (roll only, nothing applied) so the answerer can re-roll adv/disadv or confirm; the confirm passes attackNatural. */ commit:
-      z.boolean().default(true),
+    /** A strike (an opportunity attack, Retaliation): false previews the swing (roll only, nothing applied). The server
+     *  holds the previewed d20, so the confirm uses it. */ commit: z.boolean().default(true),
+    /** The GM's choice of roll mode for the strike. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** A typed d20 for the strike (see `action.resolve`). */
     attackNatural: z.number().int().min(1).max(20).optional(),
+    /** With `commit: false`, throw the held strike d20 again: Heroic Inspiration for a player, free for the GM. */
+    reroll: z.boolean().optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
+    /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
+    hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -447,6 +540,9 @@ export const EffectAddSchema = z
     modifiers: EffectModifiersSchema.optional(),
     /** The granter concentrates to sustain this effect (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().optional(),
+    /** The creature the effect comes from: with `concentration`, the one concentrating on it (the Cleric who cast
+     *  the Bless on the Fighter). Absent, a concentration effect is sustained by its bearer. */
+    sourceActorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -455,21 +551,44 @@ export const EffectEndSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     effectId: z.string().min(1).max(120),
+    /** Bypass the rules block on ending an effect someone else imposed (an Allow from the GM); audited. */
+    override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Death save. `commit: false` previews without touching pips; `commit: true` with the shown (or a
- *  physical) `naturalRoll` applies it; `commit: true` alone rolls and applies. */
+/** Death save. `commit: false` previews without touching pips, and the server holds the die; `commit: true` applies
+ *  the held die, or rolls and applies when none is held. */
 export const DeathSaveRollSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     commit: z.boolean().default(true),
+    /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** A typed d20: the face a physical die shows. A player may type one only while the table lets players type their
+     *  dice, and not once the server has thrown this death save's die. */
     naturalRoll: z.number().int().min(1).max(20).optional(),
+    /** With `commit: false`, throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
+    reroll: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Stabilize a creature at 0 hit points (`actorId`), or wake one knocked out, by the aid `helperId` gives: first aid
+ *  (a DC 10 Wisdom (Medicine) check), a Healer's Kit use, Spare the Dying, or the GM's own ruling (no helper). */
+export const ActorStabilizeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    method: z.enum(["medicine", "healers-kit", "spare-the-dying", "gm"]),
+    helperId: z.uuid().optional(),
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.method !== "gm" && value.helperId === undefined)
+      context.addIssue({ code: "custom", path: ["helperId"], message: "Choose who gives the aid." });
+  });
 /** Change the live fight's rules mode and optionally its per-family exceptions. Omitted `exceptions` leaves the stored ones. */
 export const SetRulesModeSchema = z
   .object({
@@ -497,6 +616,10 @@ export const ActionUseSchema = z
     override: RulesOverrideSchema.optional(),
     /** The spell slot to cast with; see `action.resolve`. */
     slotLevel: z.number().int().min(1).max(9).optional(),
+    /** How much of its pool an action that lets its user choose spends; see `action.resolve`. */
+    spend: z.number().int().min(1).max(100).optional(),
+    /** The damage type picked; see `action.resolve`. */
+    damageType: DamageTypeSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -507,9 +630,119 @@ export const SaveRollSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     ability: AbilitySchema,
+    /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
-    /** A hand-entered final total (the off-screen die), used verbatim instead of rolling. */
+    /** A typed d20: the face a physical die shows (see `save.answer`). */
+    face: z.number().int().min(1).max(20).optional(),
+    /** GM only: a hand-entered final total, used as given. */
     total: z.number().int().min(-50).max(100).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((payload) => payload.face === undefined || payload.total === undefined, {
+    error: "Supply either a typed d20 or a final total, not both."
+  });
+
+const SkillOrToolIdSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(80);
+
+/**
+ * An ability check rolled on the server: an ability, a skill or a tool (or a tool with the skill it uses). The server
+ * works out the bonus and the Advantage or Disadvantage from the rules, and records the roll.
+ */
+export const CheckRollSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    ability: AbilitySchema,
+    skill: SkillOrToolIdSchema.optional(),
+    tool: SkillOrToolIdSchema.optional(),
+    /** The DC to beat; absent, the GM adjudicates. */
+    dc: z.number().int().min(1).max(40).optional(),
+    /** Who sees the roll. A player can't roll GM-only; a hidden creature's roll is always the GM's. */
+    visibility: RollVisibilitySchema.default("public"),
+    /** A typed d20: the face a physical die shows (the one that counts). Players only while the table lets them. */
+    face: z.number().int().min(1).max(20).optional(),
+    /** The GM's choice of roll mode. Ignored from a player. */
+    rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** The creature a Wisdom (Perception or Survival) check is made to find: the roller's Hunter's Mark on it gives
+     *  Advantage. */
+    findActorId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** Reroll one die of a character's latest check (the lowest), while it is still their latest roll: a player spends
+ *  Heroic Inspiration; the GM rerolls freely. */
+export const CheckRerollSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    /** The face the rerolled physical die shows, for a check that was typed. */
+    face: z.number().int().min(1).max(20).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** The GM calls for a check or a save from one or several characters, with an optional DC. */
+export const RollCallStartSchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["check", "save"]),
+    ability: AbilitySchema,
+    /** A check's skill or tool; a save takes neither. */
+    skill: SkillOrToolIdSchema.optional(),
+    tool: SkillOrToolIdSchema.optional(),
+    /** Required for a save. */
+    dc: z.number().int().min(1).max(40).optional(),
+    actorIds: z.array(z.uuid()).min(1).max(20),
+    /** A check the players roll blind: they see neither its result nor its DC. A save is never blind: its outcome
+     *  lands on the character. */
+    blind: z.boolean().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((payload) => payload.kind === "check" || payload.dc !== undefined, {
+    error: "A saving throw needs a DC."
+  })
+  .refine((payload) => payload.kind === "check" || payload.blind !== true, {
+    error: "A saving throw can't be rolled blind: its outcome lands on the character."
+  })
+  .refine((payload) => payload.kind === "check" || (payload.skill === undefined && payload.tool === undefined), {
+    error: "A saving throw takes no skill or tool."
+  })
+  .refine((payload) => new Set(payload.actorIds).size === payload.actorIds.length, {
+    error: "Name each character once."
+  });
+
+/** A character answers a check call: the server rolls it (or takes the typed `face`). */
+export const RollCallAnswerSchema = z
+  .object({
+    commandId: z.uuid(),
+    callId: z.uuid(),
+    actorId: z.uuid(),
+    face: z.number().int().min(1).max(20).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** The GM closes a call; the saves it opened that nobody answered are dismissed. */
+export const RollCallCloseSchema = z
+  .object({
+    commandId: z.uuid(),
+    callId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** The GM gives or takes a character's Heroic Inspiration. */
+export const ActorSetHeroicInspirationSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    has: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -663,6 +896,15 @@ export const ActorRestSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Bring a dead creature back (GM): the hit points the revival gives, clamped to 1 and the maximum. */
+export const ActorReviveSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    hitPoints: z.number().int().min(1).max(10000),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** Re-make a pick a feature allows on a rest (`replaces`); `id` must be one the original pick allowed. */
 export const ActorRechooseSchema = z
   .object({
@@ -688,12 +930,86 @@ export const ActorSpendHitDiceSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** A limited-use pool, as its counter is keyed (`uses.pool ?? action.id`), and how many uses to move. */
+const PoolAmountFields = {
+  commandId: z.uuid(),
+  actorId: z.uuid(),
+  poolId: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .max(120),
+  amount: z.number().int().min(1).max(100),
+  expectedRevision: z.number().int().nonnegative().optional()
+} as const;
+/** Spend several uses of a pool at once: the character's player or the GM. */
+export const ActorSpendUsesSchema = z.object(PoolAmountFields).strict();
+/** Give back spent uses of a pool (GM). */
+export const ActorRestoreUsesSchema = z.object(PoolAmountFields).strict();
+/** A player asks the GM for a Long Rest for their character, or takes the ask back (`withdraw`). */
+export const RestAskSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    withdraw: z.boolean().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM answers a Long Rest request: `approve` gives the rest now, otherwise it is turned down. */
+export const RestAnswerSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    approve: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM rests several characters at once. Long: the rest happens now and 8 hours pass. Short: it opens, each
+ *  player spends Hit Dice on their own device, and it ends when the GM finishes it. */
+export const RestPartySchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["short", "long"]),
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((value) => new Set(value.actorIds).size === value.actorIds.length, {
+    message: "Each character can rest only once.",
+    path: ["actorIds"]
+  });
+/** A member of the party's Short Rest is done choosing (or not, with `done: false`). */
+export const RestMarkDoneSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    done: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM ends the party's Short Rest: `apply` gives its benefits and an hour passes; otherwise it is called off. */
+export const RestFinishSchema = z
+  .object({
+    commandId: z.uuid(),
+    apply: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM moves game time forward, which the 16-hour rule between Long Rests reads. */
+export const TimePassSchema = z
+  .object({
+    commandId: z.uuid(),
+    hours: z.number().int().min(1).max(720),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetSlotSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
+    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -706,11 +1022,64 @@ export const CharacterSetPreparedSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Closes the prepare step a Long Rest opened: the prepared list stands until the next one. */
+export const CharacterFinishPreparingSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Puts a spell on the prepared list in place of one the class chose: another spell of the class's list, or a
+ *  Wizard's from the spellbook. */
+export const CharacterSwapSpellSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    spellId: z.string().min(1).max(80),
+    /** The spell on the sheet it replaces. */
+    replaces: z.string().min(1).max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Adds a Wizard spell to the spellbook: a pick the Wizard's levels give, or a copy from a Spell Scroll the character
+ *  carries (`itemId`) or from another spellbook. */
+export const CharacterAddToSpellbookSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    spellId: z.string().min(1).max(80),
+    from: z.enum(["level", "scroll", "book"]),
+    itemId: z.string().min(1).max(120).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetInventorySchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     item: InventoryItemSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Picks up the ammunition a character fired outside a fight: half of each row's fired pieces come back. */
+export const CharacterRecoverAmmunitionSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Moves one carried row, whole, from one character to another, with the charges it has spent (GM). */
+export const CharacterGiveItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -738,6 +1107,17 @@ export const CharacterSetProficienciesSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The class each character level went to, in order: index 0 is level 1, the starting class. */
+const ClassLevelsSchema = z
+  .array(
+    z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+  )
+  .min(1)
+  .max(20);
+
 /** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
@@ -761,6 +1141,9 @@ export const CharacterCreateSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** A multiclass build: the class each character level went to, in order. Index 0 is level 1 and must be
+     *  `classId`; the list is `level` long. Absent when every level is `classId`. */
+    classLevels: ClassLevelsSchema.optional(),
     abilityMethod: BuilderAbilityMethodSchema,
     baseScores: z
       .object({
@@ -775,12 +1158,17 @@ export const CharacterCreateSchema = z
     backgroundBonusAllocation: z
       .array(z.object({ ability: AbilitySchema, amount: z.number().int().min(1).max(3) }).strict())
       .max(3),
+    /** "average" takes the fixed value, "entries" carries typed rolls per level (2..level), "roll" has the server
+     *  throw every level that has no recorded roll. */
     hp: z
       .object({
-        mode: z.enum(["average", "entries"]),
+        mode: z.enum(["average", "entries", "roll"]),
         entries: z.array(z.number().int().min(1).max(12)).max(19).optional()
       })
       .strict(),
+    /** The `builder.roll-abilities` roll the "roll"/"custom" scores came from, when the table has players' rolls
+     *  thrown by the server. */
+    abilityRollId: z.uuid().optional(),
     choices: z.array(CharacterChoiceSchema).max(200),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -797,6 +1185,7 @@ export const BuilderOffersSchema = z
     backgroundId: BuilderContentIdSchema.optional(),
     classId: BuilderContentIdSchema.optional(),
     level: z.number().int().min(1).max(20),
+    classLevels: ClassLevelsSchema.optional(),
     picks: z
       .record(OfferKeySchema, z.array(BuilderContentIdSchema).max(40))
       .refine((picks) => Object.keys(picks).length <= 200)
@@ -808,7 +1197,23 @@ export const BuilderOffersSchema = z
       )
       .refine((increases) => Object.keys(increases).length <= 40)
       .optional(),
-    choices: z.array(CharacterChoiceSchema).max(200).optional()
+    choices: z.array(CharacterChoiceSchema).max(200).optional(),
+    sheet: z
+      .object({
+        level: z.number().int().min(1).max(20),
+        abilityScores: z
+          .object({
+            str: z.number().int().min(1).max(30),
+            dex: z.number().int().min(1).max(30),
+            con: z.number().int().min(1).max(30),
+            int: z.number().int().min(1).max(30),
+            wis: z.number().int().min(1).max(30),
+            cha: z.number().int().min(1).max(30)
+          })
+          .strict()
+      })
+      .strict()
+      .optional()
   })
   .strict()
   .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
@@ -830,6 +1235,22 @@ export const CharacterGenerateSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80)
+      .optional(),
+    /** A multiclass character: each class with its levels, the starting class first; the levels add up to `level`. */
+    classes: z
+      .array(
+        z
+          .object({
+            classId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(80),
+            level: z.number().int().min(1).max(20)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(4)
       .optional(),
     name: z.string().trim().min(1).max(120).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -857,6 +1278,10 @@ export const BuilderSetPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).optional(),
     /** Whether players may roll a random character themselves; omitted keeps the stored setting. */
     playerRandom: z.enum(["open", "gm-only"]).optional(),
+    /** Whether players may type what their physical dice show, for every roll they make; omitted keeps the stored setting. */
+    typedRolls: z.enum(["open", "gm-only"]).optional(),
+    /** Whether a rolled hit-point level is raised to the average; omitted keeps the stored setting. */
+    hitPointRollFloor: z.enum(["none", "average"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -880,11 +1305,18 @@ export const DiceRollSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** How a token move travels (SRD Movement): on foot or by one of the special speeds, spending movement; by
+ *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
+export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
+export type MoveMode = z.infer<typeof MoveModeSchema>;
+
 export const TokenMoveSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     position: EncounterTokenPositionSchema.nullable(),
+    /** Absent: walking. A player may teleport only with the GM's go-ahead, and only the GM moves a creature by force. */
+    mode: MoveModeSchema.optional(),
     sceneId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
     override: RulesOverrideSchema.optional(),
@@ -897,6 +1329,15 @@ export const ActorSetSpeedSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     speedFeet: z.number().int().min(0).max(500).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set Armor Class that replaces the one derived from equipment; null clears it back to the derived AC. */
+export const ActorSetArmorClassSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    armorClass: z.number().int().min(1).max(40).nullable(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -982,6 +1423,26 @@ export const AnnotationColorSetSchema = z
     commandId: z.uuid(),
     id: z.uuid(),
     color: HexColorSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Places a spell's lingering area on the map (GM): one a player's cast left unplaced, or a new spot for it. Its
+ *  zone acts there from then on (`SpellZone`). */
+export const SpellZonePlaceSchema = z
+  .object({
+    commandId: z.uuid(),
+    zoneId: z.string().min(1).max(120),
+    template: z
+      .object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema })
+      .strict(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Ends a spell's lingering area (GM): the webs burned away, a guardian dismissed, or a ruling. */
+export const SpellZoneEndSchema = z
+  .object({
+    commandId: z.uuid(),
+    zoneId: z.string().min(1).max(120),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

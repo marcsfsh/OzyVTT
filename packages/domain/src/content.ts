@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { AbilitySchema, HitDieSchema, PickBudgetScalingSchema, type ActionReaction } from "@vtt/schemas";
+import {
+  AbilitySchema,
+  AmmunitionKindSchema,
+  HitDieSchema,
+  PickBudgetScalingSchema,
+  type ActionReaction,
+  type DamageType
+} from "@vtt/schemas";
 import type { Wire } from "./wire.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
@@ -15,6 +22,8 @@ export const ContentMonsterSummarySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   challengeRating: z.number(),
+  /** XP for defeating it, for the encounter budget; null for a homebrew CR the SRD table doesn't list. */
+  experiencePoints: z.number().int().nullable(),
   type: z.string(),
   size: z.string(),
   armorClass: z.number().int(),
@@ -25,6 +34,21 @@ export type ContentMonstersResult = {
   ok: boolean;
   message?: string;
   monsters?: readonly ContentMonsterSummary[];
+  attribution?: string;
+};
+/** One Rules Glossary term for the in-app rules reference; public information for any joined session. */
+export const ContentGlossaryEntrySchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  /** The bracketed family the SRD gives the term ("Condition", "Action", "Hazard"), or null. */
+  tag: z.string().nullable(),
+  description: z.string()
+});
+export type ContentGlossaryEntry = Wire<z.infer<typeof ContentGlossaryEntrySchema>>;
+export type ContentGlossaryResult = {
+  ok: boolean;
+  message?: string;
+  glossary?: readonly ContentGlossaryEntry[];
   attribution?: string;
 };
 /** SRD condition reference (name + rules text) for pickers and tooltips; public information for any joined session. */
@@ -96,6 +120,12 @@ export const ContentEquipmentSummarySchema = z.strictObject({
       damageType: z.string(),
       rangeFeet: z.number().int().nullable(),
       longRangeFeet: z.number().int().nullable(),
+      /** Melee or ranged weapon (the Weapons table's band); absent on homebrew that doesn't say. */
+      melee: z.boolean().optional(),
+      /** A Versatile weapon's two-handed die. */
+      versatileDice: z.string().optional(),
+      /** What an Ammunition weapon fires ("arrow", "bolt"). */
+      ammunition: AmmunitionKindSchema.optional(),
       mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
       properties: z.array(slug(40)).max(12).optional()
     })
@@ -109,7 +139,11 @@ export const ContentEquipmentSummarySchema = z.strictObject({
       strengthRequired: z.number().int().nullable()
     })
     .nullable(),
-  appliesTo: z.strictObject({ label: z.string(), baseIds: z.array(slug(60)).min(1).max(40) }).nullable()
+  appliesTo: z.strictObject({ label: z.string(), baseIds: z.array(slug(60)).min(1).max(40) }).nullable(),
+  /** The damage types the GM may pick for the item's resistance ("The GM chooses the type"). */
+  damageTypeChoice: z.array(slug(20)).max(13).optional(),
+  /** A Spell Scroll: the spell levels one copy can bear, as its name prints them; the pick is the row's `spellId`. */
+  spellScroll: z.strictObject({ minLevel: z.number().int(), maxLevel: z.number().int() }).optional()
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
 export type ContentEquipmentResult = {
@@ -163,7 +197,10 @@ export const ContentFeatureChoiceSummarySchema = z.strictObject({
   minSpellLevel: z.number().int().min(0).max(9).nullable(),
   /** Options drawn from the character's own earlier picks; `offer` names the budget, `where` a predicate slug. */
   fromPicks: z
-    .strictObject({ offer: z.string(), where: z.enum(["deals-damage", "attack-roll", "ranged"]).nullable() })
+    .strictObject({
+      offer: z.string(),
+      where: z.enum(["deals-damage", "attack-roll", "ranged", "ranged-damage"]).nullable()
+    })
     .nullable(),
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   get options(): z.ZodArray<typeof ContentFeatureOptionSummarySchema> {
@@ -264,7 +301,9 @@ export const ContentClassSummarySchema = z.strictObject({
       armor: z.array(slug()),
       weapons: z.array(slug()),
       tools: z.array(slug()),
-      skillChoices: ContentChoiceListSchema.nullable()
+      skillChoices: ContentChoiceListSchema.nullable(),
+      /** "One Musical Instrument of your choice" (Bard); null when the class keeps no tool pick. */
+      toolChoices: ContentChoiceListSchema.nullable()
     })
     .nullable(),
   /** Ability minimums for multiclassing into this class; `mode: "any"` covers "STR 13 or DEX 13". Null = always allowed. Display only; the server re-validates. */
@@ -428,10 +467,19 @@ export type ContentNamesResult = {
 };
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{
-  shape: "cone" | "line" | "sphere" | "cube" | "emanation";
+  shape: "cone" | "line" | "sphere" | "cube" | "emanation" | "cylinder";
   sizeFeet: number;
   widthFeet: number | null;
 }>;
+/** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
+ *  ability checks made with it). */
+export const CHOSEN_ABILITY_TAG = "hexed";
+/** Enhance Ability's grant: Advantage on the ability checks made with the ability its caster chooses. */
+export const ENHANCED_ABILITY_TAG = "enhanced-ability";
+/** Whether an action asks its caster to choose an ability (`action.resolve`'s `ability`). */
+export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: readonly string[] }> }>): boolean =>
+  action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true ||
+  action.grants?.tags.includes(ENHANCED_ABILITY_TAG) === true;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
 export type ContentActionSummary = Readonly<{
   id: string;
@@ -449,17 +497,44 @@ export type ContentActionSummary = Readonly<{
   area: ContentActionArea | null;
   attackCount: number | null;
   usesLimit: number | null;
-  usesPer: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
+  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
   /** d6 threshold for usesPer "recharge" ("Recharge 5-6" → 5); rolled automatically at the start of the owner's turn. */ usesRecharge:
     number | null;
   usesPool: string | null;
+  /** Uses one activation spends when it is more than one, or `chosen` when the user picks it (Lay on Hands). */ useCost?:
+    number | "chosen";
   requiresEffectTag: string | null;
-  multiattack: ReadonlyArray<{ actionId: string; count: number }> | null;
+  /** A Multiattack's plan; `or` names the actions that can fill a place instead ("using Scimitar or Shortbow"). */
+  multiattack: ReadonlyArray<{ actionId: string; count: number; or?: readonly string[] }> | null;
   grants: boolean;
   reaction: Wire<ActionReaction> | null;
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
-  /** Builtin targeting: "single" picks one combatant, "none" is a direct tap. */ targeting?: "single" | "none";
+  /** Targeting: "single" picks one combatant, "multi" several (Preserve Life), "none" is a direct tap. */ targeting?:
+    "single" | "multi" | "none";
+  /** The hit points it restores, when it heals (a potion drunk from the pack). */ healing?: Readonly<{
+    formula: string;
+  }> | null;
+  /** How many creatures one use heals when it can be more than one (Prayer of Healing's five). */ healTargets?: number;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
+  /** "Can't take this action again until the start of its next turn." */ legendaryOncePerRound?: true;
+  /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
+  /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
+  /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
+  /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
+  /** The conditions the caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s
+   *  `conditionId`. */ conditionChoices?: readonly string[];
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);
+   *  `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
+    Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>
+  >;
+  /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
+  /** A stat block's spell list (Spellcasting, Divine Aid): the numbers its casts are made with. */ spellList?: Readonly<{
+    ability: z.infer<typeof AbilitySchema>;
+    saveDc: number;
+    attackBonus: number;
+  }>;
+  /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
+  /** The spell it casts. */ spellId?: string;
 }>;
 export type ContentActionsResult = {
   ok: boolean;

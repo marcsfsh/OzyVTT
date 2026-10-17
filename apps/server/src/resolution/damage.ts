@@ -1,9 +1,17 @@
-import type { ActionResolution, ActionResolutionAttack } from "@vtt/domain";
-import { collectRiders, parseDiceFormula, resolveDice, type DiceExpression, type RiderMoment } from "@vtt/rules-5e";
+import { owedDamageParts, type ActionResolution, type ActionResolutionAttack, type DamageTarget } from "@vtt/domain";
+import {
+  collectRiders,
+  parseDiceFormula,
+  resolveDice,
+  type DiceExpression,
+  type RiderCarrier,
+  type RiderMoment
+} from "@vtt/rules-5e";
+import { endEffect } from "../effects.js";
 import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
-function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
+export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
   let firstDice = true;
   const terms = expression.terms.map((term) => {
     if (term.kind !== "dice") return term;
@@ -25,21 +33,74 @@ function rollsDamage(attack: ActionResolutionAttack | null): boolean {
   return attack === null || attack.outcome === "crit" || attack.outcome === "hit" || attack.outcome === "unknown";
 }
 
-/** Typed damage parts (rolled dice and flat bonus lines) of a resolution, for parking or applying. */
+/** Typed damage parts (rolled dice and flat bonus lines) of a resolution, for parking or applying: the shared
+ *  `owedDamageParts`, so what lands is what the card shows. */
 export function damagePartsOf(
   resolution: Pick<ActionResolution, "damage" | "bonusDamage">
 ): Array<{ amount: number; type: string }> {
-  return [
-    ...resolution.damage.map((part) => ({ amount: part.total, type: part.type })),
-    ...(resolution.bonusDamage ?? []).map((part) => ({ amount: part.amount, type: part.type }))
-  ].filter((part) => part.amount > 0);
+  return owedDamageParts(resolution);
 }
 
-/** The action's own damage dice: crit-doubled, Savage Attacks on the first part. */
+const bloodied = (hp: Readonly<{ current: number; maximum: number }>) => hp.current > 0 && hp.current * 2 <= hp.maximum;
+
+/** Whether a stat block's conditional damage holds for this hit; a charge is the attacker's to confirm, so it comes
+ *  through the hit's options instead (`hit-options.ts`). */
+function conditionHolds(
+  ctx: ResolveContext,
+  when: NonNullable<ResolveContext["action"]["conditionalDamage"]>[number]["when"]
+): boolean {
+  const target = ctx.targets[0];
+  switch (when) {
+    case "advantage":
+      return ctx.rollMode?.mode === "advantage";
+    case "self-bloodied":
+      return bloodied(ctx.attacker.hp);
+    case "target-bloodied":
+      return target !== undefined && bloodied(target.hp);
+    case "target-grappled-by-self":
+      return (
+        target !== undefined &&
+        target.effects.some(
+          (effect) => effect.sourceActorId === ctx.attacker.id && effect.linkedConditionIds.includes("grappled")
+        )
+      );
+    case "charge":
+      return false;
+  }
+}
+
+/** The action's damage parts for this hit: a stat block's "or 2 (1d4) Piercing damage if the swarm is Bloodied"
+ *  replaces the first part, and "plus 2 (1d4) Slashing damage if the attack roll had Advantage" adds one. */
+function damageInForce(ctx: ResolveContext): ResolveContext["action"]["damage"] {
+  const variants = (ctx.action.conditionalDamage ?? []).filter((variant) => conditionHolds(ctx, variant.when));
+  const instead = variants.find((variant) => variant.mode === "instead");
+  const base = instead ? [...instead.damage, ...ctx.action.damage.slice(1)] : ctx.action.damage;
+  return [...base, ...variants.filter((variant) => variant.mode === "plus").flatMap((variant) => variant.damage)];
+}
+
+/** The action's own damage dice: crit-doubled, Savage Attacks on the first part. A darts action rolls each dart on
+ *  its own and assigns it: dart i strikes the i-th target listed, the list wrapping round when darts remain. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
-  const { action, deps, damage } = ctx;
-  if (action.damage.length === 0 || !rollsDamage(ctx.attack)) return;
-  action.damage.forEach((part, index) => {
+  const { action, deps, damage, input } = ctx;
+  const parts = damageInForce(ctx);
+  if (parts.length > 0 && action.missDamage === "half" && missed(ctx.attack)) {
+    halfOnAMiss(ctx, parts);
+    return;
+  }
+  if (parts.length === 0 || !rollsDamage(ctx.attack)) return;
+  if (action.darts !== undefined && input.targetIds.length > 0) {
+    for (let dart = 0; dart < action.darts; dart += 1) {
+      const targetId = input.targetIds[dart % input.targetIds.length]!;
+      for (const part of parts) {
+        const rolled = resolveDice(parseDiceFormula(part.formula), deps.random);
+        recordRoll(ctx, rolled, "damage");
+        damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+        ctx.dartTargetIds.push(targetId);
+      }
+    }
+    return;
+  }
+  parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
     const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, deps.random);
@@ -48,20 +109,71 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
   });
 }
 
-/** Riders that add damage, from every carrier (items, feats, features, live effects): typed `extra-damage` as
- *  its own `damage[]` entry (crit-doubled only with `doubleOnCritical`, since 5e doesn't double dice added
- *  after the attack) and moment-gated flat `damage-bonus` as a bonus line. A rider with no `when` fires on
- *  every damage roll of its action; `on-hit`/`on-critical-hit` narrow it. The moments collected here are
- *  `DAMAGE_ROLL_MOMENTS`. */
+const missed = (attack: ActionResolutionAttack | null) =>
+  attack !== null && (attack.outcome === "miss" || attack.outcome === "fumble");
+
+/** SRD Acid Arrow: "On a miss, the arrow splashes the target with acid for half as much of the initial damage only." The
+ *  dice roll as for a hit, and half of each part (rounded down) is owed like Graze's damage. */
+function halfOnAMiss(ctx: ResolveContext, parts: ResolveContext["action"]["damage"]): void {
+  for (const part of parts) {
+    const rolled = resolveDice(parseDiceFormula(part.formula), ctx.deps.random);
+    recordRoll(ctx, rolled, "damage");
+    const amount = Math.floor(rolled.total / 2);
+    if (amount > 0) ctx.bonusDamage.push({ amount, type: part.type, source: `${ctx.action.name} (miss)` });
+  }
+}
+
+/** What a darts action owes each creature its darts struck (`damageTargets`); anything a rider added beyond the
+ *  darts goes to the first. Null for any other action. */
+export function dartDamageTargetsOf(ctx: ResolveContext): DamageTarget[] | null {
+  if (ctx.dartTargetIds.length === 0) return null;
+  const first = ctx.dartTargetIds[0]!;
+  const struck = [...new Set(ctx.dartTargetIds)];
+  return struck.map((targetId) => {
+    const parts = owedDamageParts({
+      damage: ctx.damage.filter((_, index) => (ctx.dartTargetIds[index] ?? first) === targetId),
+      bonusDamage: targetId === first ? ctx.bonusDamage : []
+    });
+    return {
+      targetId,
+      targetName: ctx.targets.find((target) => target.id === targetId)?.name ?? "The target",
+      parts,
+      total: parts.reduce((sum, part) => sum + part.amount, 0)
+    };
+  });
+}
+
+/** The effects the attacker put on the creature its attack roll hit, as carriers of the attacker's riders against it
+ *  alone (Hunter's Mark's extra 1d6): read with `fromEffectSource`, so only `by-effect-source` riders pass. */
+function markCarriers(ctx: ResolveContext): RiderCarrier[] {
+  const { attack, attacker, targets } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit")) return [];
+  const target = targets.find((candidate) => candidate.id === attack.targetId);
+  return (target?.effects ?? [])
+    .filter((effect) => effect.sourceActorId === attacker.id && effect.modifiers.length > 0)
+    .map((effect) => ({ label: effect.name, modifiers: effect.modifiers, sourceEffectId: effect.id }));
+}
+
+/** Riders that add damage, from every carrier (items, feats, features, live effects, and the marks the attacker
+ *  put on the creature it hit): typed `extra-damage` as its own `damage[]` entry (crit-doubled unless
+ *  `doubleOnCritical` is false: a Critical Hit rolls the attack's other damage dice twice too) and moment-gated flat
+ *  `damage-bonus` as a bonus line. A rider with no `when` fires on every damage roll of its action;
+ *  `on-hit`/`on-critical-hit` narrow it. The moments collected here are `DAMAGE_ROLL_MOMENTS`. */
 export function rollRiderDamage(ctx: ResolveContext): void {
   const { attack, crit, derivation, riderFilters, deps, damage, bonusDamage, warnings } = ctx;
   if (!rollsDamage(attack)) return;
   const passes: Array<RiderMoment | null> = [null, "on-damage-roll"];
   if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") passes.push("on-hit");
   if (crit) passes.push("on-critical-hit");
+  const marks = markCarriers(ctx);
   const already = new Set<unknown>();
   for (const moment of passes) {
-    for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment })) {
+    const context = { ...derivation.context, ...riderFilters, moment };
+    const riders = [
+      ...collectRiders(derivation.carriers, context),
+      ...(marks.length > 0 ? collectRiders(marks, { ...context, fromEffectSource: true }) : [])
+    ];
+    for (const rider of riders) {
       const modifier = rider.modifier;
       // Standing flat bonuses (moment null) were already folded into the formula by `withStandingRiders`.
       if (modifier.type === "damage-bonus") {
@@ -88,13 +200,32 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       }
       const expression = parseDiceFormula(modifier.formula);
       const rolled = resolveDice(
-        crit && modifier.doubleOnCritical === true ? criticalExpression(expression) : expression,
+        crit && modifier.doubleOnCritical !== false ? criticalExpression(expression) : expression,
         deps.random
       );
       recordRoll(ctx, rolled, "damage");
       const total = rolled.total + abilityAmount;
       damage.push({ formula: rolled.expression.source, type, total });
       warnings.push(`${rider.label}: +${total} ${type}.`);
+      if (rider.sourceEffectId !== undefined) ctx.damageEffectIds.push(rider.sourceEffectId);
     }
+  }
+}
+
+/** A coat of Basic Poison is spent "once its damage is dealt": an effect with damage uses loses one each hit its
+ *  damage lands on, and ends at none. */
+export function spendDamageUses(ctx: ResolveContext): void {
+  const { state, attacker, damageEffectIds, effectsEnded } = ctx;
+  for (const effectId of new Set(damageEffectIds)) {
+    const effect = attacker.effects.find((candidate) => candidate.id === effectId);
+    if (effect?.damageUses === undefined) continue;
+    if (effect.damageUses > 1) {
+      attacker.effects = attacker.effects.map((candidate) =>
+        candidate.id === effectId ? { ...candidate, damageUses: effect.damageUses! - 1 } : candidate
+      );
+      continue;
+    }
+    endEffect(state, attacker.id, effectId);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
   }
 }

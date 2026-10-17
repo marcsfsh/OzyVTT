@@ -1,7 +1,14 @@
 import { conditionLabel } from "../condition-rules.js";
 import { endEffect } from "../effects.js";
 import { createPendingSaves } from "../saving-throws.js";
-import { masteryHitPushes, masteryHitSaves, VEXED_TAG, type MasterySwing } from "../weapon-mastery.js";
+import {
+  masteryHitPushes,
+  masteryHitSaves,
+  SAPPED_TAG,
+  VEXED_TAG,
+  type MasteryPush,
+  type MasterySwing
+} from "../weapon-mastery.js";
 import { sizeAtMost, type ResolveContext } from "./context.js";
 
 /** The weapon mastery in force on this swing (rules in `weapon-mastery.ts`); null unless a mastery
@@ -67,18 +74,49 @@ function parkMasterySaves(ctx: ResolveContext): void {
   }
 }
 
-/** The push a hit's mastery would offer, for the preview to name; null when none would (a miss, no Push, too big). */
+/** The cantrip a Warlock's Repelling Blast rides: the pick the character made for it. */
+function repellingBlastCantrip(ctx: ResolveContext): string | undefined {
+  return ctx.deps.definition?.character?.choices?.find(
+    (choice) => choice.kind === "cantrip" && choice.payload?.featureId === "repelling-blast"
+  )?.id;
+}
+
+/** Every push a landed hit makes: its weapon's Push mastery, the action's own (a fire giant's Hammer Throw), and SRD
+ *  Repelling Blast's "push the creature up to 10 feet straight away from you" with the cantrip picked for it. */
+function hitPushesOf(ctx: ResolveContext, swing: MasterySwing | null): readonly MasteryPush[] {
+  const { action, attack, attacker } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit")) return masteryHitPushes(swing);
+  const target = { targetId: attack.targetId, targetName: attack.targetName, awayFromActorId: attacker.id };
+  return [
+    ...masteryHitPushes(swing),
+    ...(action.onHitPush
+      ? [
+          {
+            ...target,
+            distanceFeet: action.onHitPush.feet,
+            maxTargetSize: action.onHitPush.maxTargetSize ?? ("gargantuan" as const)
+          }
+        ]
+      : []),
+    ...(action.spellId !== undefined && action.spellId === repellingBlastCantrip(ctx)
+      ? [{ ...target, distanceFeet: 10, maxTargetSize: "large" as const }]
+      : [])
+  ];
+}
+
+/** The push a hit would offer, for the preview to name; null when none would (a miss, no push, too big). */
 export function offeredPush(ctx: ResolveContext): Readonly<{ targetName: string; maxFeet: number }> | null {
-  const forced = masteryHitPushes(masterySwingOf(ctx))[0];
+  const forced = hitPushesOf(ctx, masterySwingOf(ctx))[0];
   if (!forced || !sizeAtMost(ctx.targets[0]?.size, forced.maxTargetSize)) return null;
   return { targetName: forced.targetName, maxFeet: forced.distanceFeet };
 }
 
-/** Mastery forced movement (Push), as far as the attacker chose (SRD "up to"). Failures degrade to a GM-only
- *  sentence, never a rejection; only an accomplished push is narrated to the table. */
+/** A hit's forced movement (the Push mastery, Repelling Blast, a stat block's shove), as far as the attacker chose
+ *  (SRD "up to"). Failures degrade to a GM-only sentence, never a rejection; only an accomplished push is narrated to
+ *  the table. */
 function pushMasteryTargets(ctx: ResolveContext): void {
   const { attacker, targets, deps, input, tableNarration, warnings } = ctx;
-  for (const offered of masteryHitPushes(ctx.masterySwing)) {
+  for (const offered of hitPushesOf(ctx, ctx.masterySwing)) {
     const forced = { ...offered, distanceFeet: Math.min(offered.distanceFeet, input.pushFeet ?? offered.distanceFeet) };
     if (forced.distanceFeet <= 0) {
       warnings.push(`${attacker.name} chose not to push ${forced.targetName}.`);
@@ -119,6 +157,16 @@ function pushMasteryTargets(ctx: ResolveContext): void {
     warnings.push(
       `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`
     );
+  }
+}
+
+/** Sap is spent by the sapped creature's next attack roll, hit or miss (SRD: "Disadvantage on its next attack roll"). */
+export function spendSap(ctx: ResolveContext): void {
+  const { state, attack, attacker, effectsEnded } = ctx;
+  if (attack === null) return;
+  for (const sapped of attacker.effects.filter((effect) => effect.tags.includes(SAPPED_TAG))) {
+    endEffect(state, attacker.id, sapped.id);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: sapped.name });
   }
 }
 

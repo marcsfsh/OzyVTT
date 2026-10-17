@@ -62,7 +62,28 @@
             "name": "Draconic Flight",
             "activation": "bonus-action",
             "description": "Sprout spectral wings for 10 minutes, gaining a Fly Speed equal to your Speed.",
-            "damage": []
+            "damage": [],
+            "grants": {
+              "name": "Draconic Flight",
+              "tags": [
+                "draconic-flight"
+              ],
+              "duration": {
+                "type": "rounds",
+                "rounds": 100
+              },
+              "modifiers": [
+                {
+                  "type": "special-speed",
+                  "movement": "fly",
+                  "equalToSpeed": true
+                }
+              ],
+              "onEnd": [],
+              "target": "self",
+              "voidWhileIncapacitated": true,
+              "concentration": false
+            }
           }
         ],
         "uses": {
@@ -94,10 +115,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Acid)",
+                "name": "Breath Weapon (Acid Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Acid energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Acid energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "acid"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "acid"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Acid Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Acid energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -170,10 +238,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Lightning)",
+                "name": "Breath Weapon (Lightning Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Lightning energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Lightning energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "lightning"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "lightning"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Lightning Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Lightning energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -246,10 +361,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Fire)",
+                "name": "Breath Weapon (Fire Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Fire Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -322,10 +484,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Lightning)",
+                "name": "Breath Weapon (Lightning Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Lightning energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Lightning energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "lightning"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "lightning"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "lightning"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Lightning Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Lightning energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -398,10 +607,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Acid)",
+                "name": "Breath Weapon (Acid Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Acid energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Acid energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "acid"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "acid"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "acid"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Acid Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Acid energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -474,10 +730,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Fire)",
+                "name": "Breath Weapon (Fire Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Fire Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -550,10 +853,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Poison)",
+                "name": "Breath Weapon (Poison Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Poison energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Poison energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "poison"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "poison"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "poison"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Poison Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Poison energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -626,10 +976,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Fire)",
+                "name": "Breath Weapon (Fire Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Fire energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "fire"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "fire"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "fire"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Fire Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Fire energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -702,10 +1099,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Cold)",
+                "name": "Breath Weapon (Cold Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Cold energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Cold energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "cold"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "cold"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Cold Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Cold energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -778,10 +1222,57 @@
             "actions": [
               {
                 "id": "breath-weapon",
-                "name": "Breath Weapon (Cold)",
+                "name": "Breath Weapon (Cold Line)",
                 "activation": "action",
+                "replacesAttack": true,
                 "area": { "shape": "line", "sizeFeet": 30, "widthFeet": 5 },
-                "description": "Replace one attack of your Attack action with a 15-foot Cone or a 30-foot Line (5 feet wide) of Cold energy. Each creature in the area makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "description": "In place of one attack of your Attack action, exhale Cold energy in a 30-foot Line that is 5 feet wide. Each creature in the line makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
+                "save": {
+                  "ability": "dex",
+                  "dc": {
+                    "base": 8,
+                    "ability": "con",
+                    "proficiencyBonus": true
+                  },
+                  "successDamage": "half",
+                  "failureConditions": []
+                },
+                "damage": [
+                  {
+                    "formula": "1d10",
+                    "type": "cold"
+                  }
+                ],
+                "damageByLevel": [
+                  {
+                    "level": 1,
+                    "formula": "1d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 5,
+                    "formula": "2d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 11,
+                    "formula": "3d10",
+                    "type": "cold"
+                  },
+                  {
+                    "level": 17,
+                    "formula": "4d10",
+                    "type": "cold"
+                  }
+                ]
+              },
+              {
+                "id": "breath-weapon-cone",
+                "name": "Breath Weapon (Cold Cone)",
+                "activation": "action",
+                "replacesAttack": true,
+                "area": { "shape": "cone", "sizeFeet": 15, "widthFeet": null },
+                "description": "In place of one attack of your Attack action, exhale Cold energy in a 15-foot Cone. Each creature in the cone makes a Dexterity saving throw, taking full damage on a failure and half as much on a success.",
                 "save": {
                   "ability": "dex",
                   "dc": {
@@ -870,6 +1361,24 @@
         "id": "dwarf-resilience",
         "name": "Dwarven Resilience",
         "description": "You have Resistance to Poison damage. You also have Advantage on saving throws you make to avoid or end the Poisoned condition.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-saving-throw"
+              },
+              {
+                "type": "versus-condition",
+                "conditionIds": [
+                  "poisoned"
+                ]
+              }
+            ]
+          }
+        ],
         "grants": {
           "damageResistances": [
             "poison"
@@ -924,8 +1433,7 @@
     "creatureType": "humanoid",
     "abilityBonuses": [],
     "languages": [
-      "common",
-      "elvish"
+      "common"
     ],
     "languageChoices": {
       "choose": 2,
@@ -946,7 +1454,25 @@
       {
         "id": "elf-fey-ancestry",
         "name": "Fey Ancestry",
-        "description": "You have Advantage on saving throws you make to avoid or end the Charmed condition."
+        "description": "You have Advantage on saving throws you make to avoid or end the Charmed condition.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-saving-throw"
+              },
+              {
+                "type": "versus-condition",
+                "conditionIds": [
+                  "charmed"
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "elf-keen-senses",
@@ -970,19 +1496,30 @@
       {
         "id": "elf-lineage",
         "name": "Elven Lineage",
-        "description": "You are part of an elven lineage that grants you supernatural abilities.",
-        "choice": {
-          "kind": "lineage",
-          "choose": 1,
-          "fromCatalog": "elf-lineages"
-        }
+        "description": "You are part of a lineage that grants you supernatural abilities. Choose a lineage from the Elven Lineages table. You gain the level 1 benefit of that lineage. When you reach character levels 3 and 5, you learn a higher-level spell, as shown on the table. You always have that spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast the spell using any spell slots you have of the appropriate level. Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage). Elven Lineages: Drow (Darkvision 120 feet and the Dancing Lights cantrip; Faerie Fire at 3; Darkness at 5), High Elf (the Prestidigitation cantrip, which you can replace with another Wizard cantrip whenever you finish a Long Rest; Detect Magic at 3; Misty Step at 5), Wood Elf (Speed 35 feet and the Druidcraft cantrip; Longstrider at 3; Pass without Trace at 5).",
+        "choices": [
+          {
+            "kind": "lineage",
+            "choose": 1,
+            "fromCatalog": "elf-lineages"
+          },
+          {
+            "kind": "spellcasting-ability",
+            "choose": 1,
+            "from": [
+              "int",
+              "wis",
+              "cha"
+            ]
+          }
+        ]
       }
     ],
     "lineages": [
       {
         "id": "drow",
         "name": "Drow",
-        "description": "The elves of the Underdark. Your Darkvision has a range of 120 feet, and you know the Dancing Lights cantrip.",
+        "description": "The elves of the Underdark. Your Darkvision has a range of 120 feet and you know the Dancing Lights cantrip. At character level 3 you learn Faerie Fire, and at character level 5 you learn Darkness.",
         "traits": [
           {
             "id": "drow-superior-darkvision",
@@ -994,13 +1531,67 @@
                 "feet": 120
               }
             ]
+          },
+          {
+            "id": "drow-cantrip",
+            "name": "Dancing Lights",
+            "description": "You know the Dancing Lights cantrip.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "dancing-lights",
+                  "level": 0,
+                  "alwaysPrepared": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "drow-lineage-3",
+            "name": "Faerie Fire",
+            "level": 3,
+            "description": "At character level 3 you learn the Faerie Fire spell. You always have this spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast it using any spell slots you have of the appropriate level.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "faerie-fire",
+                  "level": 1,
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
+                }
+              ]
+            },
+            "uses": {
+              "limit": 1,
+              "per": "long-rest"
+            }
+          },
+          {
+            "id": "drow-lineage-5",
+            "name": "Darkness",
+            "level": 5,
+            "description": "At character level 5 you learn the Darkness spell. You always have this spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast it using any spell slots you have of the appropriate level.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "darkness",
+                  "level": 2,
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
+                }
+              ]
+            },
+            "uses": {
+              "limit": 1,
+              "per": "long-rest"
+            }
           }
         ]
       },
       {
         "id": "high-elf",
         "name": "High Elf",
-        "description": "Heirs of arcane tradition. You know the Prestidigitation cantrip and can swap it whenever you finish a Long Rest.",
+        "description": "Heirs of arcane tradition. You know the Prestidigitation cantrip and can swap it whenever you finish a Long Rest. At character level 3 you learn Detect Magic, and at character level 5 you learn Misty Step.",
         "traits": [
           {
             "id": "high-elf-cantrip",
@@ -1011,10 +1602,49 @@
                 {
                   "id": "prestidigitation",
                   "level": 0,
-                  "alwaysPrepared": true,
-                  "ability": "int"
+                  "alwaysPrepared": true
                 }
               ]
+            }
+          },
+          {
+            "id": "high-elf-lineage-3",
+            "name": "Detect Magic",
+            "level": 3,
+            "description": "At character level 3 you learn the Detect Magic spell. You always have this spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast it using any spell slots you have of the appropriate level.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "detect-magic",
+                  "level": 1,
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
+                }
+              ]
+            },
+            "uses": {
+              "limit": 1,
+              "per": "long-rest"
+            }
+          },
+          {
+            "id": "high-elf-lineage-5",
+            "name": "Misty Step",
+            "level": 5,
+            "description": "At character level 5 you learn the Misty Step spell. You always have this spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast it using any spell slots you have of the appropriate level.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "misty-step",
+                  "level": 2,
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
+                }
+              ]
+            },
+            "uses": {
+              "limit": 1,
+              "per": "long-rest"
             }
           }
         ]
@@ -1022,7 +1652,7 @@
       {
         "id": "wood-elf",
         "name": "Wood Elf",
-        "description": "Swift keepers of the wild. Your Speed increases to 35 feet and you know the Druidcraft cantrip.",
+        "description": "Swift keepers of the wild. Your Speed increases to 35 feet and you know the Druidcraft cantrip. At character level 3 you learn Longstrider, and at character level 5 you learn Pass without Trace.",
         "traits": [
           {
             "id": "wood-elf-fleet",
@@ -1034,6 +1664,60 @@
                 "amount": 5
               }
             ]
+          },
+          {
+            "id": "wood-elf-cantrip",
+            "name": "Druidcraft",
+            "description": "You know the Druidcraft cantrip.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "druidcraft",
+                  "level": 0,
+                  "alwaysPrepared": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "wood-elf-lineage-3",
+            "name": "Longstrider",
+            "level": 3,
+            "description": "At character level 3 you learn the Longstrider spell. You always have this spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast it using any spell slots you have of the appropriate level.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "longstrider",
+                  "level": 1,
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
+                }
+              ]
+            },
+            "uses": {
+              "limit": 1,
+              "per": "long-rest"
+            }
+          },
+          {
+            "id": "wood-elf-lineage-5",
+            "name": "Pass without Trace",
+            "level": 5,
+            "description": "At character level 5 you learn the Pass without Trace spell. You always have this spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast it using any spell slots you have of the appropriate level.",
+            "grants": {
+              "spells": [
+                {
+                  "id": "pass-without-trace",
+                  "level": 2,
+                  "alwaysPrepared": true,
+                  "withoutSlot": "free"
+                }
+              ]
+            },
+            "uses": {
+              "limit": 1,
+              "per": "long-rest"
+            }
           }
         ]
       }
@@ -1074,17 +1758,48 @@
       {
         "id": "gnome-cunning",
         "name": "Gnomish Cunning",
-        "description": "You have Advantage on Intelligence, Wisdom, and Charisma saving throws."
+        "description": "You have Advantage on Intelligence, Wisdom, and Charisma saving throws.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-saving-throw"
+              },
+              {
+                "type": "ability-is",
+                "abilities": [
+                  "int",
+                  "wis",
+                  "cha"
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "gnome-lineage",
         "name": "Gnomish Lineage",
         "description": "You are part of a gnomish lineage that grants you supernatural abilities. Choose one of the following options; whichever one you choose, Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage).",
-        "choice": {
-          "kind": "lineage",
-          "choose": 1,
-          "fromCatalog": "gnome-lineages"
-        }
+        "choices": [
+          {
+            "kind": "lineage",
+            "choose": 1,
+            "fromCatalog": "gnome-lineages"
+          },
+          {
+            "kind": "spellcasting-ability",
+            "choose": 1,
+            "from": [
+              "int",
+              "wis",
+              "cha"
+            ]
+          }
+        ]
       }
     ],
     "lineages": [
@@ -1359,7 +2074,43 @@
             "name": "Large Form",
             "activation": "bonus-action",
             "description": "Become Large for 10 minutes: Advantage on Strength checks and +10 feet Speed.",
-            "damage": []
+            "damage": [],
+            "grants": {
+              "name": "Large Form",
+              "tags": [
+                "large-form"
+              ],
+              "duration": {
+                "type": "rounds",
+                "rounds": 100
+              },
+              "modifiers": [
+                {
+                  "type": "roll-mode",
+                  "roll": "check",
+                  "mode": "advantage",
+                  "when": [
+                    {
+                      "type": "on-ability-check"
+                    },
+                    {
+                      "type": "ability-is",
+                      "abilities": [
+                        "str"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "speed",
+                  "amount": 10
+                }
+              ],
+              "onEnd": [],
+              "target": "self",
+              "voidWhileIncapacitated": false,
+              "concentration": false
+            }
           }
         ],
         "uses": {
@@ -1370,7 +2121,25 @@
       {
         "id": "goliath-powerful-build",
         "name": "Powerful Build",
-        "description": "You have Advantage on any ability check you make to end the Grappled condition. You also count as one size larger when determining your carrying capacity."
+        "description": "You have Advantage on any ability check you make to end the Grappled condition. You also count as one size larger when determining your carrying capacity.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "check",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-ability-check"
+              },
+              {
+                "type": "versus-condition",
+                "conditionIds": [
+                  "grappled"
+                ]
+              }
+            ]
+          }
+        ]
       }
     ],
     "lineages": []
@@ -1399,7 +2168,25 @@
       {
         "id": "halfling-brave",
         "name": "Brave",
-        "description": "You have Advantage on saving throws you make to avoid or end the Frightened condition."
+        "description": "You have Advantage on saving throws you make to avoid or end the Frightened condition.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-saving-throw"
+              },
+              {
+                "type": "versus-condition",
+                "conditionIds": [
+                  "frightened"
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "halfling-nimbleness",
@@ -1500,7 +2287,29 @@
             "name": "Adrenaline Rush",
             "activation": "bonus-action",
             "description": "Take the Dash action as a Bonus Action and gain Temporary Hit Points equal to your Proficiency Bonus.",
-            "damage": []
+            "damage": [],
+            "grants": {
+              "name": "Dashing",
+              "tags": [
+                "dashing"
+              ],
+              "duration": {
+                "type": "until-source-next-turn"
+              },
+              "modifiers": [],
+              "onEnd": [],
+              "target": "self",
+              "voidWhileIncapacitated": false,
+              "concentration": false
+            },
+            "healing": {
+              "formula": "0",
+              "self": true,
+              "temporary": true
+            },
+            "adds": {
+              "proficiencyBonus": true
+            }
           }
         ],
         "uses": {
@@ -1570,11 +2379,22 @@
         "id": "tiefling-fiendish-legacy",
         "name": "Fiendish Legacy",
         "description": "You are the recipient of a legacy that grants you supernatural abilities. Choose a legacy from the Fiendish Legacies table. You gain the level 1 benefit of the chosen legacy. When you reach character levels 3 and 5, you learn a higher-level spell, as shown on the table. You always have that spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast the spell using any spell slots you have of the appropriate level. Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the legacy).",
-        "choice": {
-          "kind": "lineage",
-          "choose": 1,
-          "fromCatalog": "tiefling-lineages"
-        }
+        "choices": [
+          {
+            "kind": "lineage",
+            "choose": 1,
+            "fromCatalog": "tiefling-lineages"
+          },
+          {
+            "kind": "spellcasting-ability",
+            "choose": 1,
+            "from": [
+              "int",
+              "wis",
+              "cha"
+            ]
+          }
+        ]
       },
       {
         "id": "tiefling-otherworldly-presence",

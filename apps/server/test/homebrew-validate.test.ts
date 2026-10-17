@@ -146,6 +146,27 @@ describe("tier 1 - the record's own schema", () => {
     expect(validateForPublish("equipment", shape({}), contextWith()).valid).toBe(true);
     expect(validateForPublish("equipment", shape({ slot: null }), contextWith()).valid).toBe(false);
   });
+
+  it("takes magic ammunition as a template over the kinds of ammunition, and refuses a base that isn't one", () => {
+    const arrows = (baseIds: readonly string[]) => ({
+      id: "hb-seeking-arrow-a1b2c3",
+      name: "Seeking Arrow",
+      source: "homebrew",
+      category: "ammunition",
+      slot: "ammunition",
+      costGp: 0,
+      weightLb: 0,
+      description: "A magic arrow.",
+      isMagic: true,
+      appliesTo: { label: "Arrow", baseIds }
+    });
+    expect(validateForPublish("equipment", arrows(["arrows-20"]), contextWith()).valid).toBe(true);
+    const refused = validateForPublish("equipment", arrows(["longsword"]), contextWith());
+    expect(refused.valid).toBe(false);
+    expect(messages(refused)).toContain(
+      '"longsword" is not a kind of ammunition (Arrows, Crossbow Bolts...), so "Seeking Arrow" could never be bound to it.'
+    );
+  });
 });
 
 describe("tier 2 - identity", () => {
@@ -822,7 +843,11 @@ describe("a duplicated SRD record still passes its own gate", () => {
     const copy = rewriteForNewId("species", elf.body, "elf", "hb-shadar-kai-a1b2c3") as Record<string, any>;
     // Keeping `elf-lineages` would resolve against the elf's lineage rows, so lineages added to the copy
     // would never be offered.
-    expect((copy.traits as any[]).map((trait) => trait.choice?.fromCatalog)).toContain("hb-shadar-kai-a1b2c3-lineages");
+    // Elven Lineage asks for the lineage and the spellcasting ability, so the pick sits in `choices`.
+    const catalogs = (copy.traits as any[]).flatMap((trait) =>
+      [trait.choice, ...(trait.choices ?? [])].map((choice) => choice?.fromCatalog)
+    );
+    expect(catalogs).toContain("hb-shadar-kai-a1b2c3-lineages");
     expect(validateForPublish("species", copy, context)).toEqual({ valid: true, issues: [], warnings: [] });
   });
 

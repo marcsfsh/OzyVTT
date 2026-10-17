@@ -434,6 +434,21 @@ const FEATURE_CARRIERS: readonly HomebrewBodyType[] = [
   "subclass"
 ];
 
+/** The save-block keys that say how a failure's conditions end (`SaveOutcomeFields`). */
+const SAVE_LIFETIME_KEYS = [
+  "failureDuration.**",
+  "repeatSave",
+  "escapeDc",
+  "endsOnDamage",
+  "speedZero",
+  "rangeFeet",
+  "failsAtHitPoints",
+  "ongoingDamage.**",
+  "failureHazard",
+  "failurePush.**",
+  "advantageAtSize"
+] as const;
+
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
   // ---- action rider surface (every carrier that mounts actions) ----
@@ -444,9 +459,58 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].useCost",
+    types: ACTION_CARRIERS,
+    reason:
+      "how many uses one activation spends (Lay on Hands' points, its 5-point cure) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsConditions",
+    types: ACTION_CARRIERS,
+    reason:
+      "conditions an action ends on its target (Lay on Hands' cure) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsOneCondition",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cure that ends the one condition its user picks (Lesser Restoration) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].onHitPush.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "how far a hit pushes (a fire giant's Hammer Throw) - read from the action's description as the catalog is built; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].burst.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what bursts after an attack (Ice Knife) - copied from the spell's cast model by the character build, zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].drain.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action's damage drains (a Life Drain) - read from the action's description as the catalog is built, or copied from a spell's cast model; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].legendary.cost",
     types: ACTION_CARRIERS,
     reason: "the per-round pool cost — the record has actionsPerRound, the action has no cost",
+    status: "gap"
+  },
+  {
+    at: "actions[].legendary.oncePerRound",
+    types: ACTION_CARRIERS,
+    reason:
+      "a legendary action that can't be taken again until the creature's next turn - read from stat-block prose; no editor control yet",
     status: "gap"
   },
   {
@@ -491,6 +555,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "the feature save's DERIVED dc object (ability/base/proficiencyBonus) — the rows author the statblock's flat number only",
     status: "gap"
   },
+  ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "how a failed save's conditions end (duration, repeated save, grapple escape and range, ending on damage, Speed 0, an HP gate), where it pushes and who has Advantage on it - read from SRD prose or authored in the class and item overlays; no editor control yet",
+    status: "gap"
+  })),
+  ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason:
+      "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
+    status: "gap"
+  })),
   {
     at: "actions[].grants.**",
     types: ACTION_CARRIERS,
@@ -500,7 +578,21 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "actions[].multiattack[].**",
     types: ACTION_CARRIERS,
-    reason: "126 SRD authors; owned outside this program (census row at vocabulary-parity.mirror.test.ts:3416)",
+    reason: "177 SRD authors; owned outside this program (census row in vocabulary-parity.mirror.test.ts)",
+    status: "gap"
+  },
+  {
+    at: "actions[].multiattackAlternatives",
+    types: ACTION_CARRIERS,
+    reason:
+      'a Multiattack\'s other plan ("or it makes two Hurl Flame attacks") - read from stat-block prose like the plan',
+    status: "gap"
+  },
+  {
+    at: "actions[].multiattackReplacements[].**",
+    types: ACTION_CARRIERS,
+    reason:
+      'an action a Multiattack lets replace one of its attacks ("it can replace one attack with a use of Roar") - read from stat-block prose like the plan',
     status: "gap"
   },
   {
@@ -523,6 +615,42 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].damageTypes",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Chromatic Orb), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].save.ignoresCover",
+    types: ACTION_CARRIERS,
+    reason: "one SRD author (Sacred Flame), copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.ignoresCover",
+    types: ["spell"],
+    reason: "one SRD author (Sacred Flame), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.successEffect.**",
+    types: ACTION_CARRIERS,
+    reason: "one SRD author (Stunning Strike's halved Speed), written in the class content; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.failureEffect.**",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Bane, Faerie Fire), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].darts",
+    types: ACTION_CARRIERS,
+    reason: "synthesised from a spell's cast model by the character build (Magic Missile), zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].area.**",
     types: ACTION_CARRIERS,
     reason: "read from the action's description as the catalog is built; the editor writes the description",
@@ -538,6 +666,46 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "actions[].healing.**",
     types: ACTION_CARRIERS,
     reason: "hit points an action restores - no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].conditionalDamage[].**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a stat block's damage under a printed condition (Bloodied swarms, a charge), read from the hit clause as the catalog is built; no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castsSpells.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spells a stat block's action casts (a Spellcasting list, a Misty Step), read from its text as the catalog is built and made cast actions on a stat block; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].reminder",
+    types: ACTION_CARRIERS,
+    reason: "what the engine leaves to the GM, read from a save's later-turn damage as the catalog is built",
+    status: "gap"
+  },
+  {
+    at: "actions[].healingByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason: "healing that grows with level - feature-carrier actions only, beside damageByLevel",
+    status: "gap"
+  },
+  {
+    at: "actions[].adds.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a level multiple or ability modifier added at build (Second Wind, Divine Spark) - feature-carrier actions only",
+    status: "gap"
+  },
+  {
+    at: "actions[].grantScaling.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a granted damage bonus read off a printed class column at build (Rage Damage) - feature-carrier actions only",
     status: "gap"
   },
   {
@@ -594,6 +762,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "effects[].voidWhileIncapacitated",
     types: FEATURE_CARRIERS,
     reason: "effect linkage vocabulary with no control — no program unit authors it",
+    status: "gap"
+  },
+  {
+    at: "effects[].damageUses",
+    types: FEATURE_CARRIERS,
+    reason:
+      "how many hits an effect's damage riders last (a coat of poison); authored in the item overlay, no control yet",
     status: "gap"
   },
   {
@@ -692,6 +867,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason: "supersession at species-trait scope — the control exists on class features, not here",
     status: "gap"
   },
+  {
+    at: "extraSpellLists",
+    types: "*",
+    reason:
+      "spell lists a feature adds to the class's own picks (Magical Secrets) — no list control at feature scope yet",
+    status: "gap"
+  },
 
   // ---- record-scope gaps, per type ----
   {
@@ -752,13 +934,15 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "multiclassProficiencies.**",
     types: ["class"],
-    reason: "the builder does not multiclass — no reader on the build path and no control",
+    reason:
+      "the builder grants these to a class taken after the first, but its skill and instrument picks (a Bard's, Ranger's or Rogue's) have no control",
     status: "gap"
   },
   {
     at: "multiclassPrerequisites.**",
     types: ["class"],
-    reason: "the builder does not multiclass — the schema key has no reader on the build path and no control",
+    reason:
+      "the builder checks these minimums when a class is taken, but no control authors the mode or the minimums list the rows sit in",
     status: "gap"
   },
   {
@@ -813,6 +997,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "^extensions",
     types: ["monster"],
     reason: "the opaque bag itself — the census's structural blind spot, since the walk cannot see its keys",
+    status: "gap"
+  },
+  {
+    at: "traitMechanics[].**",
+    types: ["monster"],
+    reason:
+      "what a stat block's traits do (Regeneration, auras, Death Burst), read from the trait text as the catalog is built; no editor control yet",
     status: "gap"
   },
   {

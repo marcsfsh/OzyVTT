@@ -1,35 +1,72 @@
 import { useId } from "react";
-import { Button } from "@vtt/ui";
-import { clearTargeting, toggleTarget, type TargetingSession } from "./targeting";
+import type { AbilityId } from "@vtt/domain";
+import { Button, Select, Stepper } from "@vtt/ui";
+import { useSkillCatalog } from "../content/catalogs";
+import { ABILITY_WORDS } from "../dice/roll-call-words";
+import { useRollPreference } from "../dice/roll-preference";
+import { areaWords } from "./action-summary";
+import { FaceEntry } from "./RollControls";
+import {
+  clearTargeting,
+  setCheckSkill,
+  setChosenAbility,
+  setConditionChoice,
+  setDamageType,
+  setTargetDarts,
+  setTargetingSpend,
+  targetingReady,
+  toggleTarget,
+  type TargetingSession
+} from "./targeting";
 
 /**
  * Choosing who an action targets: one (radio) or several (checkboxes), or, for an area, where to drag
- * the template on the map. Back drops the action; Roll sends it to the server.
+ * the template on the map; the skill a check action is made with (Search, Influence) and the ability a
+ * cast chooses (Hex). Back drops the action; Roll sends it to the server, which throws the attack's d20,
+ * or the face a physical die shows is typed in its place while the table lets this browser type.
  */
 export function ActionTargetPicker({
   picking,
   targets,
   onMap = false,
   busy,
-  onRoll
+  onRoll,
+  onInvalidFace
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<{ id: string; label: string }>;
   /** The GM can also pick by clicking tokens on the map, so the heading says so. */
   onMap?: boolean;
   busy: boolean;
-  onRoll: () => void;
+  /** `face` is a typed attack d20. */
+  onRoll: (face?: number) => void;
+  onInvalidFace?: (message: string) => void;
 }>) {
+  const { mayType } = useRollPreference();
+  const skillCatalog = useSkillCatalog();
   const group = useId();
-  const ready = picking.mode === "template" ? Boolean(picking.template?.placed) : picking.selected.length > 0;
+  const ready = targetingReady(picking);
+  // Placing a spell's lingering area (Moonbeam) rolls nothing: Place sets it on the map.
+  const placingZone = picking.placeZoneId !== undefined;
+  const skillName = (id: string) => skillCatalog.items.find((skill) => skill.id === id)?.name ?? id;
+  const darts = picking.darts;
+  const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
   return (
     <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
-      {picking.mode === "template" ? (
+      {picking.mode === "none" ? (
         <p className="action-targeting-head">
-          <strong>{picking.action.name}</strong> - drag the {picking.action.area?.sizeFeet}-ft{" "}
-          {picking.action.area?.shape} on the map
-          {picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught
-          automatically.
+          <strong>{picking.action.name}</strong> -{" "}
+          {picking.action.checkSkills?.length ? "choose the skill, then Roll." : "no target to choose. Roll to use it."}
+        </p>
+      ) : picking.mode === "template" ? (
+        <p className="action-targeting-head">
+          <strong>{picking.action.name}</strong> - place the{" "}
+          {picking.action.area ? areaWords(picking.action.area) : "area"} on the map
+          {placingZone
+            ? picking.template?.placed
+              ? " (placed - Place to set it there)."
+              : ", then Place."
+            : `${picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.`}
         </p>
       ) : (
         <>
@@ -37,6 +74,9 @@ export function ActionTargetPicker({
             <strong>{picking.action.name}</strong> -{" "}
             {picking.mode === "single" ? "choose one target" : "choose targets"}
             {onMap ? (picking.mode === "single" ? " (or click a token)" : " (or click tokens)") : ""}
+            {darts
+              ? `. ${darts.total} darts: ${assigned >= darts.total ? "all assigned" : `${darts.total - Math.min(assigned, darts.total)} left, which go round the chosen targets in order`}.`
+              : ""}
           </p>
           <ul className="action-target-list scroll-y">
             {targets.map((target) => (
@@ -50,19 +90,112 @@ export function ActionTargetPicker({
                   />
                   <span>{target.label}</span>
                 </label>
+                {darts && picking.selected.includes(target.id) && (
+                  <Stepper
+                    value={darts.counts[target.id] ?? 1}
+                    min={1}
+                    max={darts.total}
+                    aria-label={`Darts at ${target.label}`}
+                    onChange={(count) => setTargetDarts(target.id, count)}
+                  />
+                )}
               </li>
             ))}
           </ul>
         </>
       )}
+      {picking.action.checkSkills && picking.action.checkSkills.length > 0 && (
+        <label className="action-damage-type">
+          <span>Skill</span>
+          <Select
+            value={picking.skill ?? ""}
+            onChange={(event) => setCheckSkill(event.target.value === "" ? undefined : event.target.value)}
+          >
+            {/* Escape a Grapple's default is the better of its two skills, which the server works out. */}
+            {picking.action.id === "escape-grapple" && <option value="">The better one</option>}
+            {picking.action.checkSkills.map((skill) => (
+              <option key={skill.id} value={skill.id}>
+                {skillName(skill.id)} ({ABILITY_WORDS[skill.ability]})
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {picking.action.choosesAbility && (
+        <label className="action-damage-type">
+          <span>Ability</span>
+          <Select value={picking.ability ?? ""} onChange={(event) => setChosenAbility(event.target.value as AbilityId)}>
+            {picking.ability === undefined && <option value="">Choose one</option>}
+            {(Object.keys(ABILITY_WORDS) as AbilityId[]).map((ability) => (
+              <option key={ability} value={ability}>
+                {ABILITY_WORDS[ability]}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {/* An action whose user picks its cost (Lay on Hands): how much of the pool goes into it. The server refuses
+          more than is left. */}
+      {picking.action.useCost === "chosen" && (
+        <Stepper
+          label="Points to spend"
+          value={picking.spend ?? 1}
+          onChange={setTargetingSpend}
+          min={1}
+          max={picking.action.usesLimit ?? 100}
+          disabled={busy}
+          aria-label={`How much of ${picking.action.name} to spend`}
+          className="action-targeting-spend"
+        />
+      )}
+      {picking.action.damageTypes && (
+        <label className="action-damage-type">
+          <span>Damage type</span>
+          <Select
+            value={picking.damageType ?? picking.action.damageTypes[0]}
+            onChange={(event) => setDamageType(event.target.value)}
+          >
+            {picking.action.damageTypes.map((type) => (
+              <option key={type} value={type}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {picking.action.conditionChoices && picking.action.conditionChoices.length > 1 && (
+        <label className="action-damage-type">
+          <span>{picking.action.saveAbility ? "Condition on a failed save" : "Condition to end"}</span>
+          <Select
+            value={picking.conditionId ?? picking.action.conditionChoices[0]}
+            onChange={(event) => setConditionChoice(event.target.value)}
+          >
+            {picking.action.conditionChoices.map((id) => (
+              <option key={id} value={id}>
+                {id.charAt(0).toUpperCase() + id.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
       <div className="action-targeting-buttons">
         <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
           Back
         </Button>
-        <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={onRoll}>
-          Roll {picking.action.name}
+        <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
+          {placingZone ? "Place" : `Roll ${picking.action.name}`}
         </button>
       </div>
+      {mayType && ready && picking.mode === "single" && picking.action.attackBonus !== null && (
+        <div className="action-targeting-face">
+          <FaceEntry
+            label={`Attack d20 for ${picking.action.name}`}
+            busy={busy}
+            onInvalid={onInvalidFace}
+            onFace={(face) => onRoll(face)}
+          />
+        </div>
+      )}
     </div>
   );
 }

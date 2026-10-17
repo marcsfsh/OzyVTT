@@ -140,6 +140,7 @@ export const usesField = (label: string, scope: RiderScope): FieldDef => ({
       kind: "select",
       options: [
         opt("turn", "Every turn"),
+        opt("own-turn", "At the start of its next turn"),
         opt("encounter", "Every encounter"),
         opt("short-rest", "On a short rest"),
         opt("long-rest", "On a long rest")
@@ -211,6 +212,7 @@ const spellDcFields = (scope: RiderScope): readonly FieldDef[] =>
  */
 const ACTION_USES_PER: readonly SelectOption[] = [
   opt("turn", "Every turn"),
+  opt("own-turn", "At the start of its next turn"),
   opt("encounter", "Every encounter"),
   opt("short-rest", "On a short rest"),
   opt("long-rest", "On a long rest"),
@@ -306,6 +308,13 @@ export const actionsField = (scope: RiderScope): FieldDef => ({
         opt("other", "No action")
       ]
     },
+    {
+      key: "replacesAttack",
+      label: "Takes the place of one attack",
+      kind: "switch",
+      help: "Like a Breath Weapon: used as one of the attacks of the Attack action.",
+      visibleWhen: (scope_) => scope_.activation === "action"
+    },
     { key: "description", label: "Description", kind: "textarea", wide: true },
     damagePartsField("damage", { label: "Damage", max: 8, newId, help: "Every part is rolled on a hit." }),
     {
@@ -334,6 +343,14 @@ export const actionsField = (scope: RiderScope): FieldDef => ({
           max: 1000,
           unit: "ft",
           help: "The 80 in “range 80/320”. Past it, up to the range, the attack rolls at disadvantage."
+        },
+        {
+          key: "missDamage",
+          label: "A miss deals half the damage",
+          kind: "switch",
+          help: "Like Acid Arrow: on a miss the target still takes half the damage, rounded down.",
+          read: (scope) => scope.missDamage === "half",
+          write: (next, scope) => ({ ...scope, missDamage: next === true ? "half" : undefined })
         }
       ]
     },

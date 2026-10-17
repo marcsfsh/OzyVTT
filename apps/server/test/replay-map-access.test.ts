@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { GameStateSchema } from "@vtt/domain";
 import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 // A player may load a shared replay's own battlefield map and nothing else. Two fights are recorded on
 // two maps and one is shared; sharing must open exactly one image and un-sharing must close it.
@@ -14,16 +15,6 @@ const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 const initialState = () =>
   GameStateSchema.parse({

@@ -1,17 +1,28 @@
 import type { ActorDefinition, ActorDerivedSheet, DerivedDefence } from "@vtt/domain";
 import { ABILITIES, abilityModifier as modifierOf } from "@vtt/rules-5e";
 import { signed } from "./format";
+import { modeLabel } from "./roll-mode-notes";
+import { RollModeNotes, RollModeTag } from "./RollModeTag";
 import type { SrdExtension } from "./sheet-extension";
 import type { SheetRolls } from "./useSheetRolls";
 
 const titleCase = (type: string) => `${type[0]?.toUpperCase() ?? ""}${type.slice(1)}`;
+const ABILITY_WORDS = {
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma"
+} as const;
 
 /** A defence row as the engine applies it: each type, and what grants it when that isn't the stat block. */
 function defenceText(rows: readonly DerivedDefence[]): string {
   return rows.map((row) => (row.source ? `${titleCase(row.type)} (${row.source})` : titleCase(row.type))).join(", ");
 }
 
-/** The six scores with their check rolls, and the stat block's senses, languages and defences. */
+/** The six scores with their check rolls, why any roll has Advantage or Disadvantage, and the stat block's senses,
+ *  languages and defences. */
 export function SheetAbilities({
   definition,
   extension,
@@ -23,7 +34,7 @@ export function SheetAbilities({
   derived: ActorDerivedSheet | null;
   rolls: SheetRolls;
 }>) {
-  const { rolling, rollD20 } = rolls;
+  const { rolling, rollCheck } = rolls;
   // The typed lists the damage pipeline applies, items and species traits included. The stat block's
   // prose is shown only where there is nothing typed, as for an imported monster with prose alone.
   const defence = (typed: readonly DerivedDefence[] | undefined, prose: string | null | undefined) =>
@@ -33,16 +44,18 @@ export function SheetAbilities({
   const immunities = defence(derived?.defences.immunities, extension.damageImmunities);
   const derivedAbility = (ability: (typeof ABILITIES)[number]) =>
     derived?.abilities.find((row) => row.ability === ability) ?? null;
+  // The server's score when it has answered (conditions and items included); the stat block's until then.
+  const passivePerception = derived?.passivePerception ?? extension.passivePerception ?? null;
   return (
     <>
       <div className="sheet-abilities">
         {ABILITIES.map((ability) => {
           const score = definition.abilityScores[ability];
-          // The server's numbers when it has answered; its own arithmetic only until then. The
-          // difference is item `check-bonus` riders, which the client cannot see (rule 2).
+          // The server's numbers when it has answered; the bare modifier only until then. The roll itself is the
+          // server's either way.
           const row = derivedAbility(ability);
           const mod = row?.check ?? modifierOf(score);
-          const withProf = row?.checkWithProficiency ?? modifierOf(score) + definition.proficiencyBonus;
+          const name = `${ABILITY_WORDS[ability]} check`;
           return (
             <div key={ability} className="sheet-ability">
               <span>{ability.toUpperCase()}</span>
@@ -51,42 +64,31 @@ export function SheetAbilities({
                 <button
                   type="button"
                   disabled={rolling}
-                  title={`Roll a ${ability.toUpperCase()} check`}
-                  onClick={() => void rollD20(mod, "check", `${ability.toUpperCase()} check`)}
+                  aria-label={`Roll a ${name}, ${signed(mod)}${modeLabel(row?.checkMode)}`}
+                  onClick={() => void rollCheck({ ability }, name)}
                 >
                   {signed(mod)}
-                </button>
-                <button
-                  type="button"
-                  className="prof"
-                  disabled={rolling}
-                  title={`Roll a ${ability.toUpperCase()} check WITH proficiency (for a GM-called custom/unnamed check)`}
-                  onClick={() => void rollD20(withProf, "check", `${ability.toUpperCase()} check w/ proficiency`)}
-                >
-                  {signed(withProf)}
-                  <em>P</em>
+                  <RollModeTag mode={row?.checkMode} />
                 </button>
               </div>
             </div>
           );
         })}
       </div>
+      <RollModeNotes derived={derived} />
       <dl className="sheet-meta">
         {extension.senses && extension.senses.length > 0 && (
           <div>
             <dt>Senses</dt>
-            <dd>
-              {extension.senses.join(", ")}
-              {extension.passivePerception ? `; passive Perception ${extension.passivePerception}` : ""}
-            </dd>
+            <dd>{extension.senses.join(", ")}</dd>
           </div>
         )}
-        {!extension.senses?.length && extension.passivePerception ? (
+        {passivePerception !== null && (
           <div>
-            <dt>Senses</dt>
-            <dd>passive Perception {extension.passivePerception}</dd>
+            <dt>Passive Perception</dt>
+            <dd>{passivePerception}</dd>
           </div>
-        ) : null}
+        )}
         {extension.languages && (
           <div>
             <dt>Languages</dt>

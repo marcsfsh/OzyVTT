@@ -178,10 +178,14 @@ function rarityId(printed: string): string {
  */
 const WORN_BY_NOUN: ReadonlyArray<readonly [string, string]> = [
   ["neck", "amulets?|necklaces?|periapts?|medallions?|scarabs?|talismans?|brooches|brooch"],
-  ["shoulders", "cloaks?|capes?|mantles?|robes?"],
-  ["head", "helms?|helmets?|hats?|circlets?|headbands?|masks?|goggles|lenses"],
+  ["shoulders", "cloaks?|capes?|mantles?"],
+  // A robe is worn under a cloak, and lenses under a helm: the SRD's one-of-each list names neither.
+  ["body", "robes?"],
+  ["eyes", "goggles|lenses"],
+  ["head", "helms?|helmets?|hats?|circlets?|headbands?|masks?"],
   ["feet", "boots|slippers"],
-  ["hands", "gloves|gauntlets|bracers"],
+  ["hands", "gloves|gauntlets"],
+  ["bracers", "bracers"],
   ["belt", "belts?|girdles?"]
 ];
 
@@ -195,7 +199,7 @@ const HELD_NOT_WORN = (body: string): boolean =>
 function wondrousSlot(entry: Entry): string {
   // Pass 1: the name names the body location. `Eyes of ...` names the body part itself.
   const byName = /^eyes of\b/i.test(entry.name)
-    ? "head"
+    ? "eyes"
     : WORN_BY_NOUN.find(([, nouns]) => new RegExp(`\\b(${nouns})\\b`, "i").test(entry.name))?.[0];
   if (byName) {
     // Pass 3: demote. `Hat of Many Spells` reads "While holding the hat" and is never worn; at `head` the
@@ -263,13 +267,31 @@ function categoryOfRow(type: TypeLine, slotId: string): string {
 // ---- 4. The expansion rule ----------------------------------------------------------------------
 
 /**
- * The five "+1, +2, or +3" ladders expand to one row per tier (each tier has its own rarity and bonus).
- * The seven "Rarity Varies" tables (Armor of Resistance, Potions of Healing...) stay one row each,
- * with the table in the text. 268 = 258 - 5 + 15.
+ * The five "+1, +2, or +3" ladders expand to one row per tier (each tier has its own rarity and bonus), and
+ * so does Potions of Healing, whose table prints four strengths with their own rarity and dice. Its common
+ * strength is the Adventuring Gear Potion of Healing, which `equipment.v1.json` already sells, so three rows
+ * come from it. The six other "Rarity Varies" tables (Armor of Resistance, Spell Scroll...) stay one row each,
+ * with the table in the text. 270 = 258 - 5 + 15 - 1 + 3.
  */
 const LADDER_SUFFIX = /,\s*\+1,\s*\+2,\s*or\s*\+3$/;
 /** "Uncommon (+1), Rare (+2), or Very Rare (+3)" -> the three printed rungs, in tier order. */
 const LADDER_RARITIES = /^(.+?)\s*\(\+1\),\s*(.+?)\s*\(\+2\),\s*or\s*(.+?)\s*\(\+3\)$/;
+/** Entries whose table's first and last columns name each strength and its rarity. */
+const STRENGTH_TABLES = new Set(["Potions of Healing"]);
+
+/** The rows of a strength table ("Potion of Healing (greater)" ... "Uncommon"), except those another bundle sells. */
+function strengthsOf(entry: Entry): Array<{ name: string; printedRarity: string; rarity: string }> {
+  const sold = new Set(
+    (JSON.parse(readFileSync(join(outDir, "equipment.v1.json"), "utf8")) as Array<{ id: string }>).map((row) => row.id)
+  );
+  const rows = [
+    ...entry.body.matchAll(/<tr>\s*<td>([^<]+)<\/td>(?:\s*<td>[^<]*<\/td>)*?\s*<td>([^<]+)<\/td>\s*<\/tr>/g)
+  ];
+  if (rows.length < 2) die(`${entry.name} (line ${entry.line}): its strength table has ${rows.length} rows.`);
+  return rows
+    .map((row) => ({ name: row[1].trim(), printedRarity: row[2].trim(), rarity: rarityId(row[2].trim()) }))
+    .filter((strength) => !sold.has(slug(strength.name)));
+}
 
 // ---- 5. Description -----------------------------------------------------------------------------
 
@@ -277,7 +299,7 @@ const LADDER_RARITIES = /^(.+?)\s*\(\+1\),\s*(.+?)\s*\(\+2\),\s*or\s*(.+?)\s*\(\
  * Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Overflow
  * is cut at the last sentence boundary and marked; the bundle test names every row that is cut.
  */
-const DESCRIPTION_LIMIT = 4000;
+const DESCRIPTION_LIMIT = 12000;
 const TRUNCATION_MARK = " […]";
 
 function renderDescription(entry: Entry, printedTypeLine: string): { text: string; truncated: boolean } {
@@ -318,6 +340,13 @@ const BASE_WEAPONS = z
   .parse(JSON.parse(readFileSync(join(outDir, "weapons.v1.json"), "utf8")))
   .filter((weapon) => !weapon.improvised);
 const BASE_ARMOR = z.array(ArmorReferenceSchema).parse(JSON.parse(readFileSync(join(outDir, "armor.v1.json"), "utf8")));
+/** "Weapon (Any Ammunition)": a piece of magic ammunition is one of the kinds the gear table sells (Arrows,
+ *  Bolts...), so it fits only the launchers that fire that kind. */
+const AMMUNITION_BASE_IDS = (
+  JSON.parse(readFileSync(join(outDir, "equipment.v1.json"), "utf8")) as Array<{ id: string; ammunition?: unknown }>
+)
+  .filter((row) => row.ammunition !== undefined)
+  .map((row) => row.id);
 
 /**
  * A magic shield is a shield: its rarity bonus (an authored `armor-class` rider) stacks on the plain
@@ -418,12 +447,16 @@ function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
 const RESERVED_UNBINDABLE = new Set(["sun-blade", "energy-bow"]);
 
 /**
- * Weapon and body-armor rows get the column; everything else gets null. A magic shield already
- * carries the shield's block (`SHIELD_ARMOR`), so it binds to nothing. Magic ammunition is unbound:
- * there is no ammunition model.
+ * Weapon, body-armor and ammunition rows get the column; everything else gets null. A magic shield
+ * already carries the shield's block (`SHIELD_ARMOR`), so it binds to nothing.
  */
 function appliesToOf(entry: Entry, type: TypeLine, slotId: string): ItemAppliesTo | null {
   if (RESERVED_UNBINDABLE.has(slug(entry.name))) return null;
+  if (slotId === "ammunition") {
+    if (AMMUNITION_BASE_IDS.length === 0)
+      return die(`${entry.name} (line ${entry.line}): equipment.v1.json sells no ammunition to bind it to.`);
+    return { label: type.qualifier ?? "Any Ammunition", baseIds: [...AMMUNITION_BASE_IDS] };
+  }
   if (type.category === "Weapon" && slotId === "weapon") {
     if (!type.qualifier)
       return die(`${entry.name} (line ${entry.line}): a weapon row whose type line names no base weapon.`);
@@ -465,14 +498,16 @@ for (const entry of items) {
         printedRarity: rungs[bonus].trim(),
         rarity: rarityId(rungs[bonus].trim())
       }))
-    : // The printed segment stays verbatim in the description even when the slug collapses to `varies`.
-      [
-        {
-          name: entry.name,
-          printedRarity: type.rarity,
-          rarity: /,| or /.test(type.rarity) ? "varies" : rarityId(type.rarity)
-        }
-      ];
+    : STRENGTH_TABLES.has(entry.name)
+      ? strengthsOf(entry)
+      : // The printed segment stays verbatim in the description even when the slug collapses to `varies`.
+        [
+          {
+            name: entry.name,
+            printedRarity: type.rarity,
+            rarity: /,| or /.test(type.rarity) ? "varies" : rarityId(type.rarity)
+          }
+        ];
 
   for (const tier of tiers) {
     const rarity = tier.rarity;
@@ -502,7 +537,10 @@ for (const entry of items) {
 
 // ---- the guards, all fail-closed --------------------------------------------------------------
 
-if (rows.length !== 268) die(`Expected 268 rows (258 entries - 5 ladders + 15 tiers), emitted ${rows.length}.`);
+if (rows.length !== 270)
+  die(
+    `Expected 270 rows (258 entries - 5 ladders + 15 tiers - Potions of Healing + its 3 strengths), emitted ${rows.length}.`
+  );
 
 const badSlots = rows.filter((row) => !ItemSlotSchema.safeParse(row.slot).success);
 if (badSlots.length > 0)
@@ -516,27 +554,28 @@ if (badRarities.length > 0)
     `${badRarities.length} row(s) carry a rarity outside RARITY_IDS: ${badRarities.map((row) => `${row.name} -> ${row.rarity}`).join(", ")}`
   );
 
-// The eligibility column is total on weapons and body armor and absent everywhere else.
+// The eligibility column is total on weapons, body armor and ammunition, and absent everywhere else.
+const TEMPLATE_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "armor", "ammunition"]);
 const missingAppliesTo = rows.filter(
-  (row) => (row.category === "weapon" || row.category === "armor") && !row.appliesTo && !RESERVED_UNBINDABLE.has(row.id)
+  (row) => TEMPLATE_CATEGORIES.has(row.category) && !row.appliesTo && !RESERVED_UNBINDABLE.has(row.id)
 );
 if (missingAppliesTo.length > 0)
   die(
-    `${missingAppliesTo.length} weapon/armor row(s) carry no appliesTo: ${missingAppliesTo.map((row) => row.id).join(", ")}`
+    `${missingAppliesTo.length} weapon/armor/ammunition row(s) carry no appliesTo: ${missingAppliesTo.map((row) => row.id).join(", ")}`
   );
 const boundReserved = rows.filter((row) => RESERVED_UNBINDABLE.has(row.id) && row.appliesTo);
 if (boundReserved.length > 0)
   die(
     `${boundReserved.length} reserved unbindable row(s) carry an appliesTo they must not: ${boundReserved.map((row) => row.id).join(", ")}`
   );
-const strayAppliesTo = rows.filter((row) => row.category !== "weapon" && row.category !== "armor" && row.appliesTo);
+const strayAppliesTo = rows.filter((row) => !TEMPLATE_CATEGORIES.has(row.category) && row.appliesTo);
 if (strayAppliesTo.length > 0)
   die(
-    `${strayAppliesTo.length} row(s) outside weapon/armor carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`
+    `${strayAppliesTo.length} row(s) outside weapon/armor/ammunition carry an appliesTo: ${strayAppliesTo.map((row) => row.id).join(", ")}`
   );
 
-// Expanding `Potions of Healing` would have minted `potion-of-healing`, which `equipment.v1.json`
-// already ships; this guard turns any such collision into a build failure.
+// Expanding `Potions of Healing` mints its strengths but not `potion-of-healing`, which `equipment.v1.json`
+// already ships; this guard turns any collision into a build failure.
 const OTHER_BUNDLES = ["equipment.v1.json", "weapons.v1.json", "armor.v1.json"] as const;
 const elsewhere = new Map<string, string>();
 for (const file of OTHER_BUNDLES) {

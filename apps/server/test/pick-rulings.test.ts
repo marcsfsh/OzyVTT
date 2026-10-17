@@ -36,7 +36,8 @@ const HUMAN: Row[] = [
 const ACOLYTE_FEAT: Row[] = [
   { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
   { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
-  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } }
+  { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+  { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } }
 ];
 const asiRows = (classId: string, level: number): Row[] =>
   [4, 8, 12, 16]
@@ -546,8 +547,9 @@ describe("ruling E - audit rows 51-53: `fromPicks` over the character's own know
     ).toThrowError(/"prestidigitation" is not an offered option/);
   });
 
-  it("DEFERS rather than dead-ends when no eligible cantrip has been chosen yet", () => {
-    // A pick whose source is not answered yet is not required, and a row that targets it fails with the reason.
+  it("REFUSES the invocation itself while no known Warlock cantrip deals damage (its SRD prerequisite)", () => {
+    // "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage": without one the invocation can't be
+    // learned, so its own pick is never left open.
     const early = warlock11("true-seeing");
     early.choices = early.choices.filter((row) => !(row.kind === "cantrip" && !row.payload));
     early.choices.push(
@@ -563,10 +565,8 @@ describe("ruling E - audit rows 51-53: `fromPicks` over the character's own know
           ["agonizing-blast", "repelling-blast"].includes(row.payload.featureId as string)
         )
     );
-    expect(() => build(early)).not.toThrow();
-    early.choices.push({ level: 1, kind: "cantrip", id: "mage-hand", payload: { featureId: "agonizing-blast" } });
     expect(() => build(early)).toThrowError(
-      /needs "Agonizing Blast" resolved, but Nothing chosen for "class-cantrips" is deals damage yet/
+      /(Agonizing|Repelling) Blast is unavailable until you know a Warlock cantrip that deals damage/
     );
   });
 

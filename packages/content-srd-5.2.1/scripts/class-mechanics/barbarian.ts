@@ -5,11 +5,15 @@ export const barbarian: ClassMechanicsModule = {
   features: {
     /**
      * Uses read off the printed Rages column. The `raging` tag is what `requiresEffectTag` and Mindless
-     * Rage's gate read. Rage Damage (a second column), the 10-minute cap, extending by attacking and the
-     * heavy-armor restriction stay prose.
+     * Rage's gate read, and what the engine's Rage rules key on: it lasts until the end of the Barbarian's next
+     * turn, each attack roll or forced save extends it (so does re-declaring it as a Bonus Action, for no use),
+     * and Incapacitation or Heavy armor ends it. Rage Damage reads the second column at build (`grantScaling`) onto
+     * the damage bonus of attacks using Strength. The engine holds the 10-minute cap, and Persistent Rage's form.
+     * "You regain one expended use when you finish a Short Rest."
      */
     rage: {
       uses: { scaling: { type: "class-resource", id: "rage" }, per: "long-rest" },
+      modifiers: [{ type: "short-rest-regain", poolId: "rage", amount: 1 }],
       actions: [
         {
           id: "rage",
@@ -18,12 +22,19 @@ export const barbarian: ClassMechanicsModule = {
           description:
             "You enter a Rage: Resistance to Bludgeoning, Piercing and Slashing damage, Advantage on Strength checks and Strength saving throws, and a bonus to Strength-based damage. You can't concentrate or cast spells while raging.",
           damage: [],
+          grantScaling: { resource: "rage-damage" },
           grants: {
             name: "Raging",
             tags: ["raging"],
-            duration: { type: "encounter" },
+            duration: { type: "until-source-turn-end" },
             modifiers: [
               { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
+              // "When you make an attack using Strength - with either a weapon or an Unarmed Strike - and deal damage".
+              {
+                type: "damage-bonus",
+                amount: 2,
+                when: [{ type: "on-damage-roll" }, { type: "ability-is", abilities: ["str"] }]
+              },
               {
                 type: "roll-mode",
                 roll: "check",
@@ -51,19 +62,28 @@ export const barbarian: ClassMechanicsModule = {
         { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
       ]
     },
-    // Advantage on Dexterity saves; the Incapacitated exception needs negation and stays prose.
+    // Advantage on Dexterity saves "unless you have the Incapacitated condition" (or one that includes it).
     "danger-sense": {
       modifiers: [
         {
           type: "roll-mode",
           roll: "save",
           mode: "advantage",
-          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+          when: [
+            { type: "on-saving-throw" },
+            { type: "ability-is", abilities: ["dex"] },
+            {
+              type: "while-condition",
+              conditionIds: ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"],
+              present: false
+            }
+          ]
         }
       ]
     },
-    // Authored as `effects` so an activation is synthesised; it lasts until the start of your next turn. "Using
-    // Strength" stays prose: attack advantage cannot be gated on the attack's ability.
+    // Authored as `effects` so an activation is synthesised; it lasts until the start of your next turn. Advantage on
+    // "attack rolls using Strength", any attack roll against you; the engine takes it only with the first attack roll
+    // on your turn (its `reckless-attack` tag).
     "reckless-attack": {
       effects: [
         {
@@ -71,35 +91,45 @@ export const barbarian: ClassMechanicsModule = {
           tags: ["reckless-attack"],
           duration: { type: "until-source-next-turn" },
           modifiers: [
-            { type: "roll-mode", roll: "attack", mode: "advantage" },
+            {
+              type: "roll-mode",
+              roll: "attack",
+              mode: "advantage",
+              when: [{ type: "on-attack-roll" }, { type: "ability-is", abilities: ["str"] }]
+            },
             { type: "roll-mode", roll: "incoming-attack", mode: "advantage" }
           ]
         }
       ]
     },
-    // One more pick from the class skill list. The "as a Strength check" half stays prose.
+    // One more pick from the class skill list. While raging, `checkPlan` makes the five skills' checks as Strength
+    // checks when that is the better roll.
     "primal-knowledge": {
       extraPicks: [{ offer: "class-skills", amount: 1 }]
     },
-    // Currently reaches nothing: it raises `attack.count` only on feature actions, and martial swings
-    // come from inventory. Kept to match the Fighter's identical rider.
+    // A standing rider `effective-actions` folds onto every weapon swing (attack count 2).
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
-    // Ungated: a Barbarian is not proficient with Heavy armor (and `speed` is baked without reading `when`).
+    // "While you aren't wearing Heavy armor": the +10 is in the sheet's Speed, and a live -10 takes it back while
+    // Heavy armor is worn, so sheets built with the +10 stay right.
     "fast-movement": {
-      modifiers: [{ type: "speed", amount: 10 }]
+      modifiers: [
+        { type: "speed", amount: 10 },
+        { type: "speed", amount: -10, when: [{ type: "while-armored", weights: ["heavy"] }] }
+      ]
     },
     /** "Your instincts are so honed that you have Advantage on Initiative rolls." */
     "feral-instinct": {
       modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }]
     },
-    // The once-per-Long-Rest permission only; refilling Rage uses is done by hand.
+    // Once per Long Rest; using it regains every expended Rage. The engine reads the feature by its id for the Rage
+    // that lasts 10 minutes outright and ends early only on Unconscious.
     "persistent-rage": {
       uses: { limit: 1, per: "long-rest" }
     },
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
     // `maximum: 25` lifts the builder's default clamp at 20.
     "primal-champion": {
@@ -112,8 +142,8 @@ export const barbarian: ClassMechanicsModule = {
   subclasses: {
     "path-of-the-berserker": {
       /**
-       * DC 8 + Strength + Proficiency Bonus; a failed save is Frightened. The Emanation targeting, repeat
-       * save and restoring the use by spending a Rage stay prose.
+       * DC 8 + Strength + Proficiency Bonus; a failed save is Frightened for 1 minute, repeating the save at the
+       * end of each of its turns. Restoring the use by spending a Rage stays prose.
        */
       "intimidating-presence": {
         uses: { limit: 1, per: "long-rest" },
@@ -130,15 +160,16 @@ export const barbarian: ClassMechanicsModule = {
               ability: "wis",
               dc: { base: 8, ability: "str", proficiencyBonus: true },
               successDamage: "none",
-              failureConditions: ["frightened"]
+              failureConditions: ["frightened"],
+              failureDuration: { type: "rounds", rounds: 10 },
+              repeatSave: true
             }
           }
         ]
       },
       /**
-       * Immunity gated on the `raging` tag Rage's effect writes, evaluated per read by
-       * `equipment-derivation.ts` and failing closed. Ending an existing Charmed/Frightened condition on
-       * entering Rage is not expressible and stays prose.
+       * Immunity gated on the `raging` tag Rage's effect writes, evaluated per read by `equipment-derivation.ts` and
+       * failing closed. A Charmed or Frightened condition present as the Rage starts ends then (`grant.ts`).
        */
       "mindless-rage": {
         grants: {

@@ -5,7 +5,34 @@
  * A rider is authored only where a consumer reads it and produces the printed effect. Where an item
  * stays prose for a reason worth keeping, a comment in its section says why.
  */
-import type { ItemMechanicsModule } from "./overlay.js";
+import type { DamageType, Modifier } from "@vtt/schemas";
+import type { ItemMechanics, ItemMechanicsModule } from "./overlay.js";
+
+/** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
+/** Extra damage when the weapon hits a creature of one of these types ("an extra 3d6 damage of the weapon's type if the
+ *  target is a Dragon"); with no `damageType` it is the weapon's own. */
+function versusTypes(formula: string, creatureTypes: string[], damageType?: DamageType): Modifier {
+  return {
+    type: "extra-damage",
+    formula,
+    ...(damageType ? { damageType } : {}),
+    doubleOnCritical: true,
+    when: [{ type: "on-hit" }, { type: "versus-creature-type", creatureTypes }]
+  };
+}
+
+const RESISTANCE_TABLE = [
+  "acid",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "poison",
+  "psychic",
+  "radiant",
+  "thunder"
+] satisfies DamageType[];
 
 export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ==== Weapons, armor, shields and ammunition ====================================================
@@ -18,7 +45,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //
   // Recurring limits:
   //   - `damage-bonus` is bounded to +/-10.
-  //   - `versus-creature-type` is inert: nothing sets `RiderContext.targetCreatureType`.
+  //   - `versus-creature-type` reads the target's stat block, so a character target never matches one.
   //   - `armor-class` is read in the standing pass, so it cannot be narrowed to a kind of attack.
   //   - An item's `grants.languages` reaches no reader.
   //
@@ -46,8 +73,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Not modeled: the Reaction reducing forced movement.
   "dwarven-plate": { modifiers: [{ type: "armor-class", amount: 2 }] },
 
-  // "Considered trained with this armor" is not authored: nothing penalises untrained armor.
-  "elven-chain": { modifiers: [{ type: "armor-class", amount: 1 }] },
+  // "You are considered trained with this armor even if you lack training with Medium or Heavy armor": training with
+  // both weights while it is worn, since the chain is a Chain Shirt or Chain Mail.
+  "elven-chain": { grants: { armor: ["medium", "heavy"] }, modifiers: [{ type: "armor-class", amount: 1 }] },
 
   "glamoured-studded-leather": { modifiers: [{ type: "armor-class", amount: 1 }] },
 
@@ -65,27 +93,38 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Not modeled: Advantage on saves against dragon breath (no trigger names a save's source) and the dragon sense.
+  // The dragon's kind sets the type; fire (a red dragon) until the GM picks.
   "dragon-scale-mail": {
     grants: { damageResistances: ["fire"] },
+    damageTypeChoice: ["acid", "cold", "fire", "lightning", "poison"],
     modifiers: [{ type: "armor-class", amount: 1 }]
   },
 
-  // "The GM chooses the type": lightning, the d10 table's row 5.
-  "armor-of-resistance": { grants: { damageResistances: ["lightning"] } },
+  // "If the armor normally imposes Disadvantage on Dexterity (Stealth) checks or has a Strength requirement, the
+  // mithral version of the armor doesn't."
+  "mithral-armor": { removesArmorDrawbacks: true },
+
+  // "The GM chooses the type or determines it randomly": lightning (the d10 table's row 5) until the GM picks.
+  "armor-of-resistance": { grants: { damageResistances: ["lightning"] }, damageTypeChoice: RESISTANCE_TABLE },
 
   // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
   "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
+
+  // Resistance to the type the GM picks per copy (bludgeoning until then), and the curse: attuning locks the armor
+  // on and leaves Vulnerability to the other two while the curse holds, worn or not.
+  "armor-of-vulnerability": {
+    cursed: true,
+    grants: { damageResistances: ["bludgeoning"] },
+    damageTypeChoice: ["bludgeoning", "piercing", "slashing"],
+    vulnerableToOtherChoices: true
+  },
 
   // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
   // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
   // damage (resistance is by damage type, not source) and the redirect of nearby ranged attacks.
   "shield-of-missile-attraction": { cursed: true },
 
-  /**
-   * The Perception half is gated on `ability-is: ["wis"]`, not `skill-is`: the server's Search check
-   * carries no skill, so a skill gate would never fire. This also applies to Searches the SRD would
-   * call Insight, Medicine or Survival.
-   */
+  // Advantage on Initiative and on Wisdom (Perception) checks: a sheet roll, Search or the GM's call made with Perception.
   "sentinel-shield": {
     modifiers: [
       { type: "roll-mode", roll: "initiative", mode: "advantage" },
@@ -93,7 +132,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "check",
         mode: "advantage",
-        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
+      }
+    ]
+  },
+
+  // "Spell attack rolls have Disadvantage against you." The Advantage on saves against spells and other magical
+  // effects has no gate for a save's source and stays the GM's.
+  "spellguard-shield": {
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "incoming-attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
       }
     ]
   },
@@ -106,16 +158,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ---- Ammunition ------------------------------------------------------------------------------
 
   /**
-   * Ammunition has no weapon block, so `attack-bonus` is bearer-scoped; the `when` pair limits it to
-   * ranged attacks so melee swings are unaffected. It applies to all of the bearer's ranged attacks,
-   * not only those using this ammunition. The damage half is not authored.
+   * Ammunition has no weapon block, so its riders are bearer-scoped; `weapon-property-is: ammunition`
+   * limits them to shots from a launcher, so a thrown dagger or a spell gets nothing. The server applies them
+   * only to a shot drawn from this row, which the piece's kind (its bound base) ties to its launchers.
    */
   "ammunition-1": {
     modifiers: [
       {
         type: "attack-bonus",
         amount: 1,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 1,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -124,7 +181,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "attack-bonus",
         amount: 2,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 2,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -133,7 +195,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "attack-bonus",
         amount: 3,
-        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+        when: [{ type: "on-attack-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 3,
+        when: [{ type: "on-damage-roll" }, { type: "weapon-property-is", properties: ["ammunition"] }]
       }
     ]
   },
@@ -163,6 +230,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * "Beast with a Swim Speed" target restriction stays prose.
    */
   "trident-of-fish-command": {
+    charges: { regain: "1d3" },
     casts: [{ spellId: "dominate-beast", saveDc: 15, uses: { limit: 3, per: "long-rest" } }]
   },
 
@@ -213,11 +281,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: 2d10 Radiant vs Fiends/Undead (creature-type gate) and the ally aura.
+  // Not modeled: the aura's Advantage on saves against spells for the wielder's allies.
   "holy-avenger": {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
-      { type: "damage-bonus", amount: 3 }
+      { type: "damage-bonus", amount: 3 },
+      versusTypes("2d10", ["fiend", "undead"], "radiant")
     ]
   },
 
@@ -253,28 +322,52 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The extra 2d6 vs Giants needs a creature-type gate and a "weapon's type" damage.
+  // The extra 2d6 of the weapon's type against a Giant; the Giant's save against Prone is not modeled.
   "giant-slayer": {
-    modifiers: [
-      { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
-    ]
+    modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }, versusTypes("2d6", ["giant"])]
   },
 
-  // The extra 3d6 vs Dragons needs a creature-type gate and a "weapon's type" damage.
+  // "The weapon deals an extra 3d6 damage of the weapon's type if the target is a Dragon."
   "dragon-slayer": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
+      { type: "damage-bonus", amount: 1 },
+      versusTypes("3d6", ["dragon"])
     ]
   },
 
-  // Not modeled: +3 vs Constructs (creature-type gate) and the crit-only 7 Bludgeoning.
+  // +3 against a Construct, and 7 Bludgeoning more on a Critical Hit (14 against a Construct); a mace's damage is
+  // Bludgeoning, so a flat bonus carries it. Destroying a Construct at 25 Hit Points or fewer is not modeled.
   "mace-of-smiting": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
+      { type: "damage-bonus", amount: 1 },
+      {
+        type: "attack-bonus",
+        amount: 2,
+        when: [{ type: "on-attack-roll" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+      },
+      {
+        type: "damage-bonus",
+        amount: 2,
+        when: [{ type: "on-hit" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+      },
+      { type: "damage-bonus", amount: 7, when: [{ type: "on-critical-hit" }] },
+      {
+        type: "damage-bonus",
+        amount: 7,
+        when: [{ type: "on-critical-hit" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+      }
     ]
+  },
+
+  // "When you hit a Fiend or an Undead with this magic weapon, that creature takes an extra 2d6 Radiant damage." The
+  // save against destruction at 25 Hit Points or fewer is not modeled.
+  "mace-of-disruption": { modifiers: [versusTypes("2d6", ["fiend", "undead"], "radiant")] },
+
+  // "An extra 2d6 damage to any creature it hits", of the weapon's own type.
+  "vicious-weapon": {
+    modifiers: [{ type: "extra-damage", formula: "2d6", doubleOnCritical: true, when: [{ type: "on-hit" }] }]
   },
 
   // Not modeled: the thrown thunderclap area, Giant's Bane and Might of Giants (cross-item triggers).
@@ -285,8 +378,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: +1 HP per level (`hit-points-per-level` is refused on items) and the curse.
+  // The curse's attunement lock is authored (SRD: attunement to a cursed item can't be ended voluntarily). Not
+  // modeled: +1 HP per level (`hit-points-per-level` is refused on items) and the curse's berserk save.
   "berserker-axe": {
+    cursed: true,
     modifiers: [
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
@@ -303,11 +398,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Prose-only items:
   //   `javelin-of-lightning` - Lightning instead of Piercing, and a Line area.
-  //   `mace-of-disruption` - the extra Radiant needs a creature-type gate.
   //   `sun-blade`, `energy-bow` - deal Radiant/Force instead of the weapon's type; unbound until
   //       weapon-swing overrides exist. Energy Bow's arrow options are not expressible either.
-  //   `vicious-weapon` - extra damage "of the same type as the weapon" (`extra-damage` needs a type).
-  //   `spellguard-shield` - needs a "spell" attack kind and an "against spells" save gate.
   //   `thunderous-greatclub` - "your Strength is 20" is `ability-score`, refused on items; areas.
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
   //   `mithral-armor` - no rider removes a base armor's stealth disadvantage or Strength requirement.
@@ -318,14 +410,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   `ammunition-of-slaying` - entirely gated on creature type.
   //   `oathbow` - everything is gated on a player-declared sworn enemy.
   //   `sword-of-life-stealing`, `sword-of-sharpness` - crit damage of 15 and 14 exceeds the range.
-  //   `armor-of-vulnerability` - no `grants.damageVulnerabilities`; authoring only the resistance
-  //       would make the cursed item strictly better than plain armor.
 
   // ==== Wands, staffs, rods, rings and the spell scroll ===========================================
   //
   // Recurring limits:
   //   - One use spends exactly one charge, so only one-charge properties are authored.
-  //   - "Regains 1d6 + 1 expended charges daily at dawn" becomes a full recharge on a long rest.
+  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a long rest, and "if you
+  //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
   //   - Use pools are capped at 20.
   //   - Staffs and rods have no weapon block, so "+N to attack and damage rolls made with it" would be
   //     bearer-scoped (every weapon) or inert; it is not authored.
@@ -335,8 +426,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //     damage, Magic Missile rolls one dart, Web always deals its fire damage, and Faerie Fire,
   //     Protection from Evil and Good and Ray of Enfeeblement gain an attack roll. Those casts are not
   //     authored.
-  //   - `spell-attack-bonus` has no reader (the overlay refuses it), and no "spell" attack kind is
-  //     ever announced.
+  //   - `spell-attack-bonus` lands on the bearer's spell attacks while the item is held.
 
   // ---- Rings -----------------------------------------------------------------------------------
 
@@ -345,6 +435,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * carries no `saveDc`. "Fear (affects Beasts only)" stays prose.
    */
   "ring-of-animal-influence": {
+    charges: { regain: "1d3" },
     casts: [
       {
         spellId: "animal-friendship",
@@ -362,6 +453,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Auto-succeeding a save is not expressible; the reaction and its 3-charge pool are, and the GM rules the success.
   "ring-of-evasion": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "evade",
@@ -396,7 +488,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `ring-of-regeneration` - no out-of-combat healing timer.
 
   // "The GM chooses the type": fire (the d10's Garnet row). Copy the item to choose another.
-  "ring-of-resistance": { grants: { damageResistances: ["fire"] } },
+  // As Armor of Resistance: fire until the GM picks from the same d10 table.
+  "ring-of-resistance": { grants: { damageResistances: ["fire"] }, damageTypeChoice: RESISTANCE_TABLE },
 
   /**
    * The two cantrips are at will; Shooting Stars is the ring's own effect, at its one-charge size.
@@ -404,6 +497,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * 2-3 charge Shooting Stars (multi-charge).
    */
   "ring-of-shooting-stars": {
+    charges: { regain: "1d6" },
     casts: [{ spellId: "dancing-lights" }, { spellId: "light" }],
     actions: [
       {
@@ -422,7 +516,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `ring-of-spell-storing` - needs per-copy storage and the original caster's numbers.
   // `ring-of-spell-turning` - no "save against a spell" filter; ungated it would apply to every save.
-  // `ring-of-swimming` - `speed` is walking speed; there is no Swim Speed.
+  /** "You have a Swim Speed of 40 feet while wearing this ring." */
+  "ring-of-swimming": { modifiers: [{ type: "special-speed", movement: "swim", feet: 40 }] },
 
   /** "While wearing this ring, you can cast Telekinesis from it." At will, no charges, no DC override. */
   "ring-of-telekinesis": { casts: [{ spellId: "telekinesis" }] },
@@ -443,9 +538,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `rod-of-absorption` - needs per-copy storage and a spell slot refund.
 
   /**
-   * Initiative and Perception advantage, four at-will detection casts, and the Protective Aura's
-   * once-per-dawn counter (the ally buff is prose). The Perception half is gated on `ability-is:
-   * ["wis"]` because the server's Search check carries no skill, so `skill-is` would never fire.
+   * Initiative and Wisdom (Perception) advantage, four at-will detection casts, and the Protective Aura's
+   * once-per-dawn counter (the ally buff is prose).
    */
   "rod-of-alertness": {
     modifiers: [
@@ -454,7 +548,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "check",
         mode: "advantage",
-        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
       }
     ],
     casts: [
@@ -497,14 +591,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- The scroll ------------------------------------------------------------------------------
 
-  // `spell-scroll` - a per-copy template (spell, DC, attack bonus by level); one `spellId` would fix
-  // every scroll to one spell. Mint concrete scrolls in the homebrew editor.
+  // One spell per carried copy, of any level, picked when it is added; the DC and attack bonus come from
+  // the scroll table by the spell's level (the server's `scrolls.ts`).
+  "spell-scroll": { spellScroll: { minLevel: 0, maxLevel: 9 }, consumedOnUse: true },
 
   // ---- Staffs ----------------------------------------------------------------------------------
 
   // All three one-charge casts on one pool. No `saveDc`: the cast uses the wielder's own DC, as
   // printed. Reflect and Resist Enchantment (save outcomes) are not expressible.
   "staff-of-charming": {
+    charges: { regain: "1d8 + 2", lastChargeRoll: true },
     casts: [
       { spellId: "charm-person", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
       { spellId: "command", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
@@ -514,12 +610,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Fireball (3) and Wall of Fire (4) are multi-charge.
   "staff-of-fire": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     grants: { damageResistances: ["fire"] },
     casts: [{ spellId: "burning-hands", uses: { limit: 10, per: "long-rest", pool: "staff-of-fire-charges" } }]
   },
 
   // Wall of Ice, Ice Storm and Cone of Cold are multi-charge.
   "staff-of-frost": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     grants: { damageResistances: ["cold"] },
     casts: [{ spellId: "fog-cloud", uses: { limit: 10, per: "long-rest", pool: "staff-of-frost-charges" } }]
   },
@@ -528,14 +626,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // is multi-charge.
 
   /**
-   * The AC and save bonuses only. Not authored: Magic Missile and Ray of Enfeeblement (wrong cast
-   * effects), the spell attack bonus (no reader), the +2 Quarterstaff (no weapon block), the
-   * multi-charge spells, and Retributive Strike (damage from live charge count).
+   * The AC, save and spell attack bonuses. Not authored: Magic Missile and Ray of Enfeeblement (wrong cast
+   * effects), the +2 Quarterstaff (no weapon block), the multi-charge spells, and Retributive Strike (damage from
+   * live charge count).
    */
   "staff-of-power": {
     modifiers: [
       { type: "armor-class", amount: 2 },
-      { type: "save-bonus", amount: 2 }
+      { type: "save-bonus", amount: 2 },
+      { type: "spell-attack-bonus", amount: 2 }
     ]
   },
 
@@ -543,6 +642,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Insect Cloud's counter; the Heavily Obscured area is a GM ruling. Giant Insect and Insect Plague are multi-charge.
   "staff-of-swarming-insects": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
     actions: [
       {
         id: "insect-cloud",
@@ -557,19 +657,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * The four zero-charge casts; 50 charges exceed the pool cap. Not authored: Protection from Evil and
-   * Good (bogus attack roll), the spell attack bonus, the +2 Quarterstaff, advantage on saves against
-   * spells, the multi-charge rows, Spell Absorption and Retributive Strike.
+   * The four zero-charge casts and the +2 to spell attack rolls; 50 charges exceed the pool cap. Not authored:
+   * Protection from Evil and Good (bogus attack roll), the +2 Quarterstaff, advantage on saves against spells, the
+   * multi-charge rows, Spell Absorption and Retributive Strike.
    */
   "staff-of-the-magi": {
+    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
     casts: [{ spellId: "arcane-lock" }, { spellId: "detect-magic" }, { spellId: "enlargereduce" }, { spellId: "light" }]
   },
 
   // `staff-of-the-python` - summoning a controlled creature is not expressible.
 
-  // The three one-charge properties on the 6-charge pool. Not authored: the spell attack bonus, the
+  // The three one-charge properties on the 6-charge pool and the +2 to spell attack rolls. Not authored: the
   // +2 Quarterstaff, the multi-charge spells.
   "staff-of-the-woodlands": {
+    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
+    charges: { regain: "1d6", lastChargeRoll: true },
     casts: [
       { spellId: "animal-friendship", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
       { spellId: "speak-with-animals", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } }
@@ -609,7 +712,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         area: { shape: "emanation", sizeFeet: 60, widthFeet: null },
         description:
           "The staff produces a thunderclap audible out to 600 feet. Every creature within a 60-foot Emanation originating from you makes a DC 17 Constitution saving throw. On a failed save, a creature takes 2d6 Thunder damage and has the Deafened condition for 1 minute. On a successful save, a creature takes half as much damage only.",
-        save: { ability: "con", dc: 17, successDamage: "half", failureConditions: ["deafened"] },
+        save: {
+          ability: "con",
+          dc: 17,
+          successDamage: "half",
+          failureConditions: ["deafened"],
+          failureDuration: { type: "rounds", rounds: 10 }
+        },
         damage: [{ formula: "2d6", type: "thunder" }],
         uses: { limit: 1, per: "long-rest" }
       }
@@ -624,6 +733,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // The detection is GM information; the charge is real.
   "wand-of-enemy-detection": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "detect-enemies",
@@ -638,6 +748,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Command at the wand's printed DC. Fear (3 charges) is multi-charge.
   "wand-of-fear": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [{ spellId: "command", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" } }]
   },
 
@@ -646,6 +757,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * level. The 2-3 charge upcasts are multi-charge.
    */
   "wand-of-fireballs": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       {
         spellId: "fireball",
@@ -657,6 +769,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** The Fireball wand's twin: Lightning Bolt (save DC 15), 1 charge, 7 charges. Upcasts are multi-charge. */
   "wand-of-lightning-bolts": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       {
         spellId: "lightning-bolt",
@@ -668,6 +781,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "This wand has 3 charges. While holding it, you can expend 1 charge to cast Detect Magic from it." Complete. */
   "wand-of-magic-detection": {
+    charges: { regain: "1d3" },
     casts: [{ spellId: "detect-magic", uses: { limit: 3, per: "long-rest", pool: "wand-of-magic-detection-charges" } }]
   },
 
@@ -675,6 +789,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // The wand's own effect.
   "wand-of-paralysis": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "paralyzing-ray",
@@ -682,7 +797,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to send a thin blue ray toward a creature you can see within 60 feet. The target must succeed on a DC 15 Constitution saving throw or have the Paralyzed condition for 1 minute. At the end of each of its turns, it repeats the save, ending the effect on itself on a success.",
-        save: { ability: "con", dc: 15, successDamage: "none", failureConditions: ["paralyzed"] },
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["paralyzed"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
         uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" }
       }
     ]
@@ -690,12 +812,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "expend 1 charge to cast Polymorph (save DC 15) from it." One charge, one spell, printed DC. Complete. */
   "wand-of-polymorph": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     casts: [
       { spellId: "polymorph", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-polymorph-charges" } }
     ]
   },
 
   "wand-of-secrets": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "find-secrets",
@@ -708,13 +832,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `wand-of-the-war-mage-1`, `wand-of-the-war-mage-2`, `wand-of-the-war-mage-3` - a spell attack
-  // bonus (no reader) and ignoring Half Cover on spell attacks (no "spell" attack kind).
+  // The bonus to spell attack rolls by rarity. Ignoring Half Cover on a spell attack is not authored: no rider sets
+  // aside the target's cover.
+  "wand-of-the-war-mage-1": { modifiers: [{ type: "spell-attack-bonus", amount: 1 }] },
+  "wand-of-the-war-mage-2": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
+  "wand-of-the-war-mage-3": { modifiers: [{ type: "spell-attack-bonus", amount: 3 }] },
 
   // `wand-of-web` - the spell record's 2d4 Fire would be dealt on every cast.
 
   // The d100 effect table is GM-rolled; the charge is real.
   "wand-of-wonder": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true },
     actions: [
       {
         id: "wild-surge",
@@ -777,21 +905,29 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `boots-of-speed` - doubled speed, a 10-minute budget, and opportunity-attack disadvantage (the
   //     defender's incoming-attack riders get no attack-kind filters).
   // `boots-of-striding-and-springing` - a speed floor, encumbrance and jumping are not modeled.
-  // `slippers-of-spider-climbing` - no climb speed or surface model.
+  /** "You have a Climb Speed equal to your Speed." Walls, ceilings and slippery surfaces are the GM's. */
+  "slippers-of-spider-climbing": { modifiers: [{ type: "special-speed", movement: "climb", equalToSpeed: true }] },
 
   // Ungated in the SRD. Cold tolerance and ignoring ice or snow difficult terrain are not modeled.
   "boots-of-the-winterlands": { grants: { damageResistances: ["cold"] } },
 
-  // Charge-alone: 4 charges exact; the Fly Speed is GM-adjudicated.
+  // 4 charges exact; the Fly Speed lasts until the wearer ends it on the sheet, the hour being the GM's to count.
   "winged-boots": {
+    charges: { regain: "1d4" },
     actions: [
       {
         id: "fly",
         name: "Winged Flight",
         activation: "action",
         description:
-          "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
-        uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" }
+          "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land. End it on your sheet once the hour is up.",
+        uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" },
+        grants: {
+          name: "Winged Flight (1 hour)",
+          tags: ["winged-flight"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", feet: 30 }]
+        }
       }
     ]
   },
@@ -877,6 +1013,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "brooch-of-shielding": { grants: { damageResistances: ["force"] } },
 
   "medallion-of-thoughts": {
+    charges: { regain: "1d4" },
     casts: [
       {
         spellId: "detect-thoughts",
@@ -901,8 +1038,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // AC only. Preservation (save outcome, crumbles when spent) and spell-save advantage are not expressible.
   "scarab-of-protection": { modifiers: [{ type: "armor-class", amount: 1 }] },
 
-  // `talisman-of-pure-good`, `talisman-of-ultimate-evil` - spell attack bonus (no reader), touch damage
-  //     by creature type, and charges that destroy the item.
+  // The +2 to spell attack rolls. The touch damage by creature type and the charges that destroy a creature are not
+  // authored.
+  "talisman-of-pure-good": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
+  "talisman-of-ultimate-evil": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
   // `talisman-of-the-sphere` - Arcana advantage only against a Sphere of Annihilation, which the engine does not hold.
 
   // ---- Shoulders -------------------------------------------------------------------------------
@@ -933,6 +1072,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Charge-alone: 3 charges exact; the GM applies the Invisible condition.
   "cloak-of-invisibility": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "vanish",
@@ -977,6 +1117,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * for the duration, and the stun ending with the effect (the GM clears it).
    */
   "robe-of-scintillating-colors": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "dazzle",
@@ -1002,22 +1143,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ==== Carried wondrous items (slot wondrous), potions and oils ==================================
   //
   // Recurring limits:
-  //   - Consumed items cannot be authored: no `per` value means "never recharges", and an unpooled
-  //     action would be unlimited. This rules out every potion and oil and most dusts, beads and gems.
-  //   - `itemAction` keeps only `attack`, `save`, `damage` and `uses`; `onHit`, `grants` and the rest
-  //     are dropped, so an item action cannot apply a timed effect or an on-hit condition.
+  //   - A consumed item is `consumedOnUse`: each use of its actions takes one from the stack. An item with
+  //     several charges that it spends as it goes (beads, dust pinches) still has no `per` value to say so.
+  //   - `itemAction` keeps `attack`, `save`, `damage`, `healing`, `uses`, `grants`, `area` and
+  //     `replacesAttack`; `onHit` and the rest are dropped, so an item action cannot apply an on-hit condition.
   //   - An item's `effects` ignore `duration`, so "Resistance for 1 hour" would be permanent.
   //   - Spell records describe the spell's text, not one cast (see the wands section), and there
-  //     is no healing or temporary-HP rider.
+  //     is no temporary-HP rider.
   //   - One use spends one charge, and pools are capped at 20.
   //   - `ability-score` is refused on items.
-  //   - Item actions only resolve inside an encounter. Outside one, `iron-bands` (the only one with an
-  //     attack) can still be rolled through the loose route, which spends no charge.
+  //   - Item actions only resolve inside an encounter. Outside one, the loose route rolls them and spends the
+  //     charge, as `action.use` says.
   //
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys: the elemental summons, `bag-of-tricks`, `gem-of-seeing`,
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
-  // (`pearl-of-power`). "Regains 1dN at dawn" becomes a full refill on a long rest.
+  // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a long rest.
   //
   // Trap items (`bag-of-devouring`, `potion-of-poison`, `dust-of-sneezing-and-choking`) are not
   // authored: a button naming the real effect would spoil the trap.
@@ -1128,6 +1269,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Gate and Plane Shift on one shared 3-charge pool. Which plane each side opens is the GM's.
   "cubic-gate": {
+    charges: { regain: "1d3" },
     casts: [
       { spellId: "gate", uses: { limit: 3, per: "long-rest", pool: "cubic-gate-charges" } },
       { spellId: "plane-shift", uses: { limit: 3, per: "long-rest", pool: "cubic-gate-charges" } }
@@ -1167,6 +1309,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Charge-alone. Not cast as True Seeing (that spell targets someone you touch); the Truesight is narrated.
   "gem-of-seeing": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "peer",
@@ -1236,11 +1379,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `pearl-of-power` - no rider refunds a spent spell slot (`spell-slot` raises the maximum).
 
   /**
-   * Spends a charge and puts a real DC 15 Wisdom save on the target that Frightens on a failure. Not
-   * modeled: the 1-minute duration (the GM clears the condition), the
-   * repeat save, and the 24-hour immunity after a success.
+   * Spends a charge and puts a real DC 15 Wisdom save on the target that Frightens on a failure for 1 minute,
+   * repeating the save at the end of each of its turns. Not modeled: the 24-hour immunity after a success.
    */
   "pipes-of-haunting": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "play",
@@ -1248,7 +1391,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to play an eerie, spellbinding tune. Each creature of your choice within 30 feet of you must succeed on a DC 15 Wisdom saving throw or have the Frightened condition for 1 minute. A creature that fails the save repeats it at the end of each of its turns, ending the effect on itself on a success. A creature that succeeds on its save is immune to the effect of these pipes for 24 hours.",
-        save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["frightened"] },
+        save: {
+          ability: "wis",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["frightened"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
         uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" }
       }
     ]
@@ -1260,6 +1410,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * made by the swarm, so it is not this action's `save`.
    */
   "pipes-of-the-sewers": {
+    charges: { regain: "1d3" },
     actions: [
       {
         id: "call",
@@ -1317,11 +1468,58 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { type: "check-bonus", amount: 1 },
       { type: "save-bonus", amount: 1 }
     ]
-  }
+  },
 
   // `universal-solvent` - consumed ounces.
   // `well-of-many-worlds` - a rolled 1d8-hour cooldown and planar travel.
   // `wind-fan` - each reuse risks tearing it; authoring the cast alone would remove the risk.
 
-  // Potions and oils: none authored. Each is consumed, which no `per` value can express.
+  // ---- Potions -----------------------------------------------------------------------------------
+
+  // Potions of Healing: each strength is its own row, and the common one is the gear Potion of Healing. SRD
+  // Potions: "Drinking a potion or administering it to another creature requires a Bonus Action."
+  "potion-of-healing-greater": healingPotion("Potion of Healing (greater)", "4d4 + 4"),
+  "potion-of-healing-superior": healingPotion("Potion of Healing (superior)", "8d4 + 8"),
+  "potion-of-healing-supreme": healingPotion("Potion of Healing (supreme)", "10d4 + 20"),
+
+  // "You gain a Fly Speed equal to your Speed for 1 hour and can hover." The drinker ends it once the hour is up.
+  "potion-of-flying": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "drink",
+        name: "Drink Potion of Flying",
+        activation: "bonus-action",
+        description:
+          "Drink it: you gain a Fly Speed equal to your Speed for 1 hour and can hover. If you're in the air when it wears off, you fall unless you have some other means of staying aloft. End it on your sheet once the hour is up.",
+        damage: [],
+        grants: {
+          name: "Potion of Flying (1 hour)",
+          tags: ["potion-of-flying"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", equalToSpeed: true, hover: true }]
+        }
+      }
+    ]
+  }
+
+  // The other potions and the oils stay prose: their effects last an hour or more, which an effect can't count
+  // without the GM ending it.
 };
+
+/** A potion that heals its printed dice when drunk or given to a creature within 5 feet, and is used up. */
+function healingPotion(name: string, formula: string): ItemMechanics {
+  return {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "drink",
+        name: `Drink ${name}`,
+        activation: "bonus-action",
+        description: `Drink it, or give it to a creature within 5 feet of you. The drinker regains ${formula} Hit Points.`,
+        damage: [],
+        healing: { formula }
+      }
+    ]
+  };
+}

@@ -1,5 +1,5 @@
-/* `flex-wrap` lets the damage-type chooser take its own line (`flex-basis: 100%`); the five buttons
-   are `flex: 1` (basis 0) and always share one line. Child combinators (`> input`, `> button`) keep
+/* `flex-wrap` lets the damage-type chooser take its own line (`flex-basis: 100%`); the buttons grow to
+   share a line and never shrink below a tap target, so a sixth wraps on a phone. Child combinators (`> input`, `> button`) keep
    these rules out of the shared Combobox's own `<input>` and option `<button>`s. */
 .hp-editor {
   display: flex;
@@ -17,6 +17,7 @@
 }
 .hp-editor > button {
   flex: 1;
+  min-width: var(--tap-min);
   min-height: var(--tap-min);
   padding: 0.45rem 0.3rem;
   border: 1px solid var(--line-strong);

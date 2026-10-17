@@ -44,11 +44,24 @@
 .save-prompt-roll {
   flex: 0 0 auto;
 }
+/* A typed face and its button: the button keeps its whole label ("Reroll · Heroic Inspiration") and drops under the
+   field when a phone's row is too narrow for both. */
 .save-prompt-manual {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 0.3rem;
   flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.save-prompt-manual > .nh-input {
+  flex: 1 1 6rem;
+  min-width: 0;
+  width: auto;
+}
+.save-prompt-manual > button {
+  flex: none;
 }
 .save-prompt-actions input {
   flex: 1 1 auto;
@@ -143,11 +156,59 @@
 .initiative-gathering span {
   flex: 1 1 12rem;
 }
+/* The spell areas the server runs: one line each, an unplaced one marked as not finished. */
+.spell-areas {
+  margin-bottom: var(--space-2);
+  padding: var(--space-2) 0.65rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--indigo);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.spell-areas-head {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-label);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--indigo-text);
+}
+.spell-areas-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.spell-area-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.spell-area-row.unplaced .spell-area-text {
+  color: var(--caution-hi);
+}
+.spell-area-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.spell-area-buttons {
+  display: inline-flex;
+  gap: var(--space-1);
+}
 .reaction-prompt .save-prompt-label {
   color: var(--cyan-hi);
 }
 .reaction-prompt .save-prompt-label strong {
   color: var(--text);
+}
+/* The GM's forced Advantage or Disadvantage: a pair kept together when the confirm row wraps. */
+.roll-force {
+  display: inline-flex;
+  gap: var(--space-1);
 }
 .save-die-mode {
   padding: 0.35rem 0.6rem;
@@ -208,6 +269,32 @@
 }
 /* What the target's defences did, on its own line under the rolled result. */
 .save-prompt-defences {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+/* A hit's extras: each a toggle, with its type or slot picked once it is on. */
+.hit-offers {
+  display: grid;
+  gap: var(--space-2);
+}
+.hit-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.hit-offer .save-die-mode {
+  min-height: var(--tap-min);
+  padding: 0.4rem 0.8rem;
+  font-size: var(--fs-sm);
+}
+.hit-offer-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.hit-offer-note {
   flex-basis: 100%;
   color: var(--text-dim);
   font-size: var(--fs-xs);

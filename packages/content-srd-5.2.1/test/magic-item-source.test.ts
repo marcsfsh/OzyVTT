@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 /**
  * Pins the vendored `magic-items.md` so a re-vendor cannot silently shift rows under the parser. The
  * hash fixes every byte; `build-magic-items.ts` refuses a parse that does not find the 260 entries
- * and 268 rows it expects, and `content-pipeline.test.ts` holds its output to the committed bundle.
+ * and 270 rows it expects, and `content-pipeline.test.ts` holds its output to the committed bundle.
  */
 
 const SOURCE = fileURLToPath(new URL("../sources/dnd-5e-srd-markdown/magic-items.md", import.meta.url));

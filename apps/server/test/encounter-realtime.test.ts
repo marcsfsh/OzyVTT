@@ -6,21 +6,12 @@ import { io as connect, type Socket } from "socket.io-client";
 import { describe, expect, it } from "vitest";
 import { ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS } from "@vtt/api-contract";
 import { createServer } from "../src/server.js";
+import { png } from "./image-fixtures.js";
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const SECRET_ID = "10000000-0000-4000-8000-000000000002";
 const START_COMMAND_ID = "30000000-0000-4000-8000-000000000001";
 const NEXT_COMMAND_ID = "30000000-0000-4000-8000-000000000002";
-
-function png(width: number, height: number) {
-  const buffer = Buffer.alloc(24);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write("IHDR", 12, "ascii");
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  return buffer;
-}
 
 function initialState() {
   return GameStateSchema.parse({
@@ -571,8 +562,17 @@ describe("live authoritative encounter workflow", () => {
       });
       expect(stale).toMatchObject({ ok: false });
       expect(stale.message).toContain("outdated");
+      // Off the map and back would move a player's token anywhere for free; only the GM takes it off mid-fight.
       expect(
         await emitCommand(ownerSocket, "token:move", {
+          commandId: "61000000-0000-4000-8000-000000000009",
+          actorId: HERO_ID,
+          position: null,
+          expectedRevision: 4
+        })
+      ).toMatchObject({ ok: false, message: "Only the GM takes a token off the map during a fight." });
+      expect(
+        await emitCommand(gmSocket, "token:move", {
           commandId: "61000000-0000-4000-8000-000000000007",
           actorId: HERO_ID,
           position: null,

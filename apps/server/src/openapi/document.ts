@@ -804,7 +804,7 @@ export const openApiDocument = {
         operationId: "getBuilderOffers",
         security: gameSecurityWithPlayer("game:read"),
         description:
-          "What the content asks a character-builder draft to pick, worked out by the same survey `POST /game/characters` validates against, so a builder offers exactly what a create accepts. Each offer names its builder step, its options (named, with spell levels), its capacity after every feature that raises it, the level its rows are stamped with (one offer per grant level, so each Ability Score Improvement is its own), and the options this build cannot usefully take. The reply also carries the answers the build still accepts (an answer it no longer offers is dropped) and the ledger rows they make, which a create sends as `choices`. Send the answers by offer key, or a stored ledger as `choices` to read a character back for a rebuild. The GM always; a player session while the table's builder policy lets players build.",
+          "What the content asks a character-builder draft to pick, worked out by the same survey `POST /game/characters` validates against, so a builder offers exactly what a create accepts. Each offer names its builder step, its options (named, with spell levels), its capacity after every feature that raises it, the level its rows are stamped with (one offer per grant level, so each Ability Score Improvement is its own), and the options this build cannot usefully take. The reply also carries the answers the build still accepts (an answer it no longer offers is dropped) and the ledger rows they make, which a create sends as `choices`. Send the answers by offer key, or a stored ledger as `choices` to read a character back for a rebuild. A multiclass draft adds `classLevels`, the class each level went to (index 0 is level 1, the starting class); a later class's own picks are filed under keys suffixed with its id (`class-cantrips:wizard`) and stamped with the level it reached them at. The GM always; a player session while the table's builder policy lets players build.",
         parameters: [
           {
             name: "draft",
@@ -980,6 +980,22 @@ export const openApiDocument = {
           "401": apiError,
           "403": apiError,
           "404": apiError
+        }
+      }
+    },
+    [CONTENT_PATHS.glossary]: {
+      get: {
+        operationId: "listContentGlossary",
+        security: gameSecurityWithPlayer("game:read"),
+        description:
+          "The SRD 5.2.1 Rules Glossary, one entry per term with its bracketed tag (public information - any GM, player, or integration session). Includes the CC BY 4.0 attribution line.",
+        responses: {
+          "200": {
+            description: "Rules Glossary entries",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ContentGlossaryResponse" } } }
+          },
+          "401": apiError,
+          "403": apiError
         }
       }
     },
@@ -2077,6 +2093,14 @@ export const openApiDocument = {
           backgroundId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
           classId: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
           level: { type: "integer", minimum: 1, maximum: 20 },
+          classLevels: {
+            type: "array",
+            minItems: 1,
+            maxItems: 20,
+            items: { type: "string", pattern: "^[a-z0-9-]+$", maxLength: 80 },
+            description:
+              "A multiclass draft: the class each level went to, in order. Index 0 is level 1 and is `classId`; absent for one class."
+          },
           picks: {
             type: "object",
             maxProperties: 200,
@@ -2098,6 +2122,27 @@ export const openApiDocument = {
             maxItems: 200,
             items: { $ref: "#/components/schemas/BuilderChoiceRow" },
             description: "A stored choice ledger, read back onto the offers it answers."
+          },
+          sheet: {
+            type: "object",
+            additionalProperties: false,
+            required: ["level", "abilityScores"],
+            description:
+              "With `choices`: the stored sheet's own level and ability scores, so the reply's `abilities` can say how those scores were made.",
+            properties: {
+              level: { type: "integer", minimum: 1, maximum: 20 },
+              abilityScores: {
+                type: "object",
+                additionalProperties: false,
+                required: ["str", "dex", "con", "int", "wis", "cha"],
+                properties: Object.fromEntries(
+                  ["str", "dex", "con", "int", "wis", "cha"].map((ability) => [
+                    ability,
+                    { type: "integer", minimum: 1, maximum: 30 }
+                  ])
+                )
+              }
+            }
           }
         }
       },
@@ -2130,6 +2175,7 @@ export const openApiDocument = {
       },
       ContentMonsterActionsResponse: envelopeSchema("#/components/schemas/ContentMonsterActionsData"),
       ContentConditionsResponse: envelopeSchema("#/components/schemas/ContentConditionsData"),
+      ContentGlossaryResponse: envelopeSchema("#/components/schemas/ContentGlossaryData"),
       ContentSkillsResponse: envelopeSchema("#/components/schemas/ContentSkillsData"),
       ContentLanguagesResponse: envelopeSchema("#/components/schemas/ContentLanguagesData"),
       ContentSpellsResponse: envelopeSchema("#/components/schemas/ContentSpellsData"),

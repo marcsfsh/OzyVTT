@@ -2,19 +2,67 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ActorAction } from "@vtt/schemas";
-import { areaOfProse, withProseFacts } from "../src/action-prose.js";
+import { areaOfProse, drainOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { loadSpells } from "../src/index.js";
 
 const action = (fields: Partial<ActorAction>): ActorAction =>
   ({ id: "x", name: "X", activation: "action", description: "", damage: [], ...fields }) as ActorAction;
 
 describe("reading an action's prose facts", () => {
+  it("reads what damage drains: the Hit Point maximum, that type alone, and the healing the dealer regains", () => {
+    expect(
+      drainOfProse(
+        "If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken."
+      )
+    ).toEqual({ reducesMaximum: true });
+    expect(
+      drainOfProse(
+        "The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount."
+      )
+    ).toEqual({ damageType: "necrotic", reducesMaximum: true, heals: "all" });
+    // A fixed amount stays the GM's.
+    expect(
+      drainOfProse("Subsequent Failures: The Poisoned target's Hit Point maximum decreases by 5 (1d10).")
+    ).toBeNull();
+    expect(
+      withProseFacts(
+        action({
+          description: "its Hit Point maximum decreases by an amount equal to the damage taken.",
+          damage: [{ formula: "4d8", type: "necrotic" }]
+        })
+      ).drain
+    ).toEqual({ reducesMaximum: true });
+  });
+
   it("reads the SRD area phrasings, and nothing else", () => {
     expect(areaOfProse("each creature in a 60-foot Cone")).toEqual({ shape: "cone", sizeFeet: 60, widthFeet: null });
     expect(areaOfProse("a 60-foot-long, 5-foot-wide Line")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });
     expect(areaOfProse("a 20-foot-radius Sphere")).toEqual({ shape: "sphere", sizeFeet: 20, widthFeet: null });
     expect(areaOfProse("a 15-foot Emanation")).toEqual({ shape: "emanation", sizeFeet: 15, widthFeet: null });
     expect(areaOfProse("a 10-foot Cube")).toEqual({ shape: "cube", sizeFeet: 10, widthFeet: null });
+    // A Cylinder keeps its radius, however its height is printed, and a square on the ground is a Cube.
+    expect(areaOfProse("in a 5-foot-radius, 40-foot-high Cylinder")).toEqual({
+      shape: "cylinder",
+      sizeFeet: 5,
+      widthFeet: null
+    });
+    expect(areaOfProse("in a 40-foot-tall, 20-foot-radius Cylinder")).toEqual({
+      shape: "cylinder",
+      sizeFeet: 20,
+      widthFeet: null
+    });
+    expect(areaOfProse("in a 50-foot-radius, 100 foot high Cylinder")).toEqual({
+      shape: "cylinder",
+      sizeFeet: 50,
+      widthFeet: null
+    });
+    // A Line printed before its size, in words.
+    expect(areaOfProse("A Line of strong wind 60 feet long and 10 feet wide blasts from you")).toEqual({
+      shape: "line",
+      sizeFeet: 60,
+      widthFeet: 10
+    });
+    expect(areaOfProse("fill a 20-foot square on ground")).toEqual({ shape: "cube", sizeFeet: 20, widthFeet: null });
     expect(areaOfProse("Melee Attack Roll: +9, reach 10 ft.")).toBeNull();
   });
 
@@ -86,6 +134,98 @@ function bundledActions(): Array<{ bundle: string; action: ActorAction }> {
   return found;
 }
 
+describe("reading a Multiattack", () => {
+  /** A stat block's other actions by their printed names. */
+  const sheet = (...names: string[]) => {
+    const ids = new Map(names.map((name) => [name.toLowerCase(), name.toLowerCase().replace(/ /g, "-")]));
+    return (name: string) => ids.get(name.toLowerCase());
+  };
+
+  it("reads every listed attack, not only the first group", () => {
+    expect(
+      multiattackOfProse(
+        "The devil makes two Claw attacks and one Infernal Sting attack.",
+        sheet("Claw", "Infernal Sting")
+      )?.plan
+    ).toEqual([
+      { actionId: "claw", count: 2 },
+      { actionId: "infernal-sting", count: 1 }
+    ]);
+    expect(
+      multiattackOfProse(
+        "The pit fiend makes one Bite attack, two Devilish Claw attacks, and one Fiery Mace attack.",
+        sheet("Bite", "Devilish Claw", "Fiery Mace")
+      )?.plan
+    ).toEqual([
+      { actionId: "bite", count: 1 },
+      { actionId: "devilish-claw", count: 2 },
+      { actionId: "fiery-mace", count: 1 }
+    ]);
+  });
+
+  it("reads the actions it uses, and the places any of several actions can fill", () => {
+    expect(
+      multiattackOfProse("The behir makes one Bite attack and uses Constrict.", sheet("Bite", "Constrict"))?.plan
+    ).toEqual([
+      { actionId: "bite", count: 1 },
+      { actionId: "constrict", count: 1 }
+    ]);
+    expect(
+      multiattackOfProse(
+        "The kraken makes two Tentacle attacks and uses Fling, Lightning Strike, or Swallow.",
+        sheet("Tentacle", "Fling", "Lightning Strike", "Swallow")
+      )?.plan
+    ).toEqual([
+      { actionId: "tentacle", count: 2 },
+      { actionId: "fling", count: 1, or: ["lightning-strike", "swallow"] }
+    ]);
+    expect(
+      multiattackOfProse(
+        "The goblin makes two attacks, using Scimitar or Shortbow in any combination.",
+        sheet("Scimitar", "Shortbow")
+      )?.plan
+    ).toEqual([{ actionId: "scimitar", count: 2, or: ["shortbow"] }]);
+    expect(
+      multiattackOfProse("The rust monster makes one Bite attack and uses Antennae twice.", sheet("Bite", "Antennae"))
+        ?.plan
+    ).toEqual([
+      { actionId: "bite", count: 1 },
+      { actionId: "antennae", count: 2 }
+    ]);
+  });
+
+  it("reads the plan it can be instead, and its replacements", () => {
+    const barbed = multiattackOfProse(
+      "The devil makes one Claws attack and one Tail attack, or it makes two Hurl Flame attacks.",
+      sheet("Claws", "Tail", "Hurl Flame")
+    );
+    expect(barbed?.alternatives).toEqual([[{ actionId: "hurl-flame", count: 2 }]]);
+    expect(
+      multiattackOfProse(
+        "The lion makes two Rend attacks. It can replace one attack with a use of Roar.",
+        sheet("Rend", "Roar")
+      )?.replacements
+    ).toEqual([{ actionIds: ["roar"], attacks: 1 }]);
+    expect(
+      multiattackOfProse(
+        "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Sleep Breath or (B) Spellcasting to cast Scorching Ray.",
+        sheet("Rend", "Sleep Breath", "Spellcasting")
+      )?.replacements
+    ).toEqual([{ actionIds: ["sleep-breath", "spellcasting"], attacks: 1 }]);
+    expect(
+      multiattackOfProse(
+        "The chimera makes one Ram attack, one Bite attack, and one Claw attack. It can replace the Claw attack with a use of Fire Breath if available.",
+        sheet("Ram", "Bite", "Claw", "Fire Breath")
+      )?.replacements
+    ).toEqual([{ actionIds: ["fire-breath"], attacks: 1, of: "claw" }]);
+  });
+
+  it("leaves prose a plan it can't say for sure, or one naming an action the stat block lacks", () => {
+    expect(multiattackOfProse("The hydra makes as many Bite attacks as it has heads.", sheet("Bite"))).toBeNull();
+    expect(multiattackOfProse("The ogre makes two Club attacks.", sheet("Greatclub"))).toBeNull();
+  });
+});
+
 describe("the bundles carry what their prose says, so play never reads it", () => {
   it("gives every action whose text names an area that area", () => {
     const missing = bundledActions()
@@ -104,6 +244,10 @@ describe("the bundles carry what their prose says, so play never reads it", () =
   it("gives every spell whose text names an area that area", () => {
     const lightningBolt = loadSpells().find((spell) => spell.id === "lightning-bolt")!;
     expect(lightningBolt.area).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
+    const areaOf = (id: string) => loadSpells().find((spell) => spell.id === id)!.area;
+    expect(areaOf("flame-strike")).toEqual({ shape: "cylinder", sizeFeet: 10, widthFeet: null });
+    expect(areaOf("gust-of-wind")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 10 });
+    expect(areaOf("entangle")).toEqual({ shape: "cube", sizeFeet: 20, widthFeet: null });
     expect(
       loadSpells()
         .filter((spell) => areaOfProse(spell.description) !== null && spell.area === null)

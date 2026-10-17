@@ -13,7 +13,7 @@ import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary, type ContentView } from "../src/content-library.js";
 import { CommandRejectedError } from "../src/game-store.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
-import { deriveEquipment, weaponPropertiesOf } from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf, weaponPropertiesOf } from "../src/equipment-derivation.js";
 import { startEncounter } from "../src/encounter.js";
 
 // End-to-end `character.create` assembly against the real content bundles: a Fighter 5 and a Wizard 3
@@ -94,6 +94,7 @@ const wizardInput = (): MutableCreateInput => ({
     { level: 1, classId: "wizard", kind: "skill", id: "insight" },
     { level: 1, kind: "skill", id: "perception", payload: { featureId: "elf-keen-senses" } },
     { level: 1, kind: "lineage", id: "high-elf" },
+    { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "elf-lineage" } },
     { level: 2, classId: "wizard", kind: "expertise", id: "arcana", payload: { featureId: "scholar" } },
     { level: 3, classId: "wizard", kind: "subclass", id: "evoker" },
     { level: 3, kind: "spell", id: "shatter", payload: { featureId: "evocation-savant" } },
@@ -105,6 +106,7 @@ const wizardInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "dancing-lights", payload: { featureId: "magic-initiate-wizard" } },
     // Magic Initiate's level-1 spell pick.
     { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+    { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } },
     { level: 1, kind: "spell", id: "magic-missile" },
     { level: 1, kind: "spell", id: "mage-armor" },
     { level: 1, kind: "spell", id: "detect-magic" },
@@ -180,6 +182,12 @@ const warlockInput = (): MutableCreateInput => ({
       id: "repelling-blast",
       payload: { featureId: "eldritch-invocations" }
     },
+    // Agonizing Blast, Eldritch Spear and Repelling Blast each need a known Warlock cantrip that deals damage, and
+    // each points at one.
+    { level: 1, classId: "warlock", kind: "cantrip", id: "eldritch-blast" },
+    { level: 1, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } },
+    { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "eldritch-spear" } },
+    { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "repelling-blast" } },
     { level: 3, classId: "warlock", kind: "subclass", id: "fiend-patron" },
     { level: 4, classId: "warlock", kind: "asi-or-feat", id: "ability-score-improvement" },
     { level: 4, kind: "ability-score", id: "cha", payload: { featureId: "ability-score-improvement" } },
@@ -187,6 +195,7 @@ const warlockInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "sacred-flame", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "equipment", id: "warlock-a" },
     { level: 1, kind: "equipment", id: "acolyte-a" }
   ]
@@ -225,9 +234,24 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     expect(definition.proficiencyBonus).toBe(3);
   });
 
-  it("computes rolled HP as max(roll, average) per level on the class hit die", () => {
-    // Level 1: 10+2. Rolls 1/10/4/6 vs d10 average 6 -> 6/10/6/6, +2 Con each = 48.
-    expect(definition.hitPoints.maximum).toBe(48);
+  it("adds Alert's Proficiency Bonus to initiative on top of Dexterity", () => {
+    // Dex 13 (+1) and Alert at level 5 (PB 3).
+    expect(definition.initiativeBonus).toBe(4);
+  });
+
+  it("counts each rolled level as rolled, on the class hit die (SRD)", () => {
+    // Level 1: 10+2. Rolls 1/10/4/6, +2 Con each = 41.
+    expect(definition.hitPoints.maximum).toBe(41);
+  });
+
+  it("raises a roll below the average to it only when the table's policy says so", () => {
+    // Rolls 1/10/4/6 vs the d10 average 6 -> 6/10/6/6, +2 Con each = 48.
+    const floored = buildCharacterDefinition(
+      fighterInput(),
+      library,
+      BuilderPolicySchema.parse({ hitPointRollFloor: "average" })
+    );
+    expect(floored.hitPoints.maximum).toBe(48);
   });
 
   it("derives AC from the equipped starting armor via the shared rules function, plus the Defense rider", () => {
@@ -236,9 +260,9 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
     const chainMail = definition.startingInventory?.find((item) => item.id === "chain-mail");
     expect(chainMail?.equipped).toBe(true);
     expect(chainMail?.armor?.acBase).toBe(16);
-    // The flat, non-equipment part travels with the sheet so every path that re-derives AC from the live
-    // loadout can add it back.
-    expect((definition.extensions["open5e.srd-2024"] as { armorClassBonus?: number }).armorClassBonus).toBe(1);
+    // No flat rider is stored on the sheet: the live AC collects Defense from the feat itself, so it follows the
+    // armor worn later rather than the armor worn at build.
+    expect((definition.extensions["open5e.srd-2024"] as { armorClassBonus?: number }).armorClassBonus).toBeUndefined();
   });
 
   it("holds a whileArmored AC rider back when no armor is worn", () => {
@@ -306,11 +330,22 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
       "defense",
       "savage-attacker"
     ]);
-    // The ledger is the input's rows verbatim, plus the rolled hit points the build consumed, so a
-    // level-down/level-up round trip lands on the same maximum.
-    expect((definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll")).toEqual(
-      fighterInput().choices
-    );
+    // The ledger is the input's rows verbatim, plus how the scores were made and the rolled hit points the
+    // build consumed, so a level-down/level-up round trip lands on the same sheet.
+    expect(
+      (definition.character?.choices ?? []).filter((row) => row.kind !== "hp-roll" && row.kind !== "ability-scores")
+    ).toEqual(fighterInput().choices);
+    expect((definition.character?.choices ?? []).filter((row) => row.kind === "ability-scores")).toEqual([
+      {
+        level: 1,
+        kind: "ability-scores",
+        id: "standard-array",
+        payload: {
+          baseScores: fighterInput().baseScores,
+          backgroundBonusAllocation: fighterInput().backgroundBonusAllocation
+        }
+      }
+    ]);
     expect((definition.character?.choices ?? []).filter((row) => row.kind === "hp-roll")).toEqual(
       (fighterInput().hp.entries ?? []).map((roll, index) => ({
         level: index + 2,
@@ -364,14 +399,14 @@ describe("buildCharacterDefinition - Fighter 5 (human soldier, Champion)", () =>
 
   it("lands through importActorDefinition with the non-negotiable import-<actorId> keying and seeded pools", () => {
     const state = emptyState();
-    importActorDefinition(state, definition, ACTOR_ID, "public");
+    importActorDefinition(state, definition, ACTOR_ID, "public", equipmentCatalogOf(library));
     const actor = state.actors[0];
     expect(actor.id).toBe(ACTOR_ID);
     expect(actor.kind).toBe("player-character");
     expect(actor.definitionId).toBe(`import-${ACTOR_ID}`);
     expect(state.definitions.map((entry) => entry.id)).toEqual([`import-${ACTOR_ID}`]);
-    expect(actor.hp).toEqual({ current: 48, maximum: 48, temporary: 0 });
-    // `instantiate` re-derives AC from the loadout, so the builder's flat rider (Defense +1) must survive.
+    expect(actor.hp).toEqual({ current: 41, maximum: 41, temporary: 0 });
+    // `instantiate` re-derives AC from the loadout, and Defense (+1 while armored) rides the feat's own rider.
     expect(actor.armorClass).toBe(17);
     expect(actor.armorClass).toBe(definition.armorClass);
     expect(actor.hitDice).toMatchObject({
@@ -434,13 +469,17 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     ]);
     expect(spells.get("fire-bolt")?.alwaysPrepared).toBe(true); // class cantrip
     expect(spells.get("prestidigitation")?.alwaysPrepared).toBe(true); // High Elf lineage grant
+    // Magic Initiate keeps its level 1 spell always prepared with a free casting, so the class pick of the
+    // same spell is not charged to the prepared cap.
     expect(spells.get("magic-missile")).toMatchObject({
       level: 1,
       prepared: true,
-      alwaysPrepared: false,
-      classId: "wizard"
+      alwaysPrepared: true,
+      freeActionId: "spell-magic-missile-free"
     });
-    expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: true }); // savant pick, outside the prepared cap
+    expect(spells.get("mage-armor")).toMatchObject({ alwaysPrepared: false, classId: "wizard" });
+    // Evocation Savant adds to the spellbook ("add them to your spellbook for free"): known, not prepared.
+    expect(spells.get("shatter")).toMatchObject({ level: 2, prepared: false, alwaysPrepared: false });
   });
 
   it("marks Scholar expertise on a proficient skill and folds species + background proficiencies", () => {
@@ -449,7 +488,8 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
     expect(skills.get("arcana")).toBe("expertise");
     expect(definition.proficiencies?.saves).toEqual(["int", "wis"]);
     expect(definition.proficiencies?.tools).toEqual(["calligraphers-supplies"]);
-    expect(definition.proficiencies?.languages).toEqual(["common", "elvish", "dwarvish", "giant"]);
+    // SRD 5.2.1: Common plus two standard languages; the 2024 Elf grants no language of its own.
+    expect(definition.proficiencies?.languages).toEqual(["common", "dwarvish", "giant"]);
     expect(definition.character?.race).toEqual({
       id: "elf",
       name: "Elf",
@@ -509,9 +549,7 @@ describe("buildCharacterDefinition - Wizard 3 (high-elf sage, Evoker)", () => {
       "magic-missile",
       "minor-illusion",
       "misty-step",
-      "prestidigitation",
-      "shatter",
-      "thunderwave"
+      "prestidigitation"
     ]);
   });
 });
@@ -560,10 +598,14 @@ describe("buildCharacterDefinition - loud rejections", () => {
       /not on the Wizard spell list/
     );
     const overCap = wizardInput();
+    // Mage Armor and Misty Step are charged; Magic Missile is Magic Initiate's and Detect Magic the level-3 High
+    // Elf's, both always prepared and uncharged.
     overCap.choices.push(
       { level: 1, kind: "spell", id: "shield" },
       { level: 1, kind: "spell", id: "sleep" },
-      { level: 1, kind: "spell", id: "burning-hands" }
+      { level: 1, kind: "spell", id: "burning-hands" },
+      { level: 1, kind: "spell", id: "chromatic-orb" },
+      { level: 1, kind: "spell", id: "feather-fall" }
     );
     expect(() => buildCharacterDefinition(overCap, library, defaultPolicy)).toThrowError(
       /prepares 6 spells at level 3; got 7/
@@ -687,6 +729,7 @@ const clericInput = (): MutableCreateInput => ({
     { level: 1, kind: "cantrip", id: "guidance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "resistance", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "spell", id: "bless", payload: { featureId: "magic-initiate-cleric" } },
+    { level: 1, kind: "spellcasting-ability", id: "wis", payload: { featureId: "magic-initiate-cleric" } },
     { level: 1, kind: "cantrip", id: "light" },
     { level: 1, kind: "cantrip", id: "sacred-flame" },
     { level: 1, kind: "cantrip", id: "spare-the-dying" },
@@ -924,8 +967,14 @@ describe("extra picks raise the budget the server validates against", () => {
   ];
   const warlockWithInvocations = (count: number): MutableCreateInput => {
     const input = warlockInput();
+    const taken = INVOCATIONS.slice(0, count);
     input.choices = input.choices
       .filter((row) => row.kind !== "eldritch-invocation")
+      // An invocation not taken has no cantrip of its own to point at.
+      .filter((row) => {
+        const featureId = row.payload?.featureId;
+        return typeof featureId !== "string" || !INVOCATIONS.includes(featureId) || taken.includes(featureId);
+      })
       .concat(
         INVOCATIONS.slice(0, count).map((id) => ({
           level: 1,
@@ -1191,7 +1240,8 @@ describe("the same feat cannot be taken twice across different offers", () => {
     differentList.choices.push(
       { level: 1, kind: "cantrip", id: "fire-bolt", payload: { featureId: "magic-initiate-wizard" } },
       { level: 1, kind: "cantrip", id: "prestidigitation", payload: { featureId: "magic-initiate-wizard" } },
-      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } }
+      { level: 1, kind: "spell", id: "magic-missile", payload: { featureId: "magic-initiate-wizard" } },
+      { level: 1, kind: "spellcasting-ability", id: "int", payload: { featureId: "magic-initiate-wizard" } }
     );
     const built = buildCharacterDefinition(differentList, library, defaultPolicy);
     // The Versatile pick replaced Alert here, so the sheet holds both Magic Initiate flavours: same feat
@@ -1242,9 +1292,10 @@ describe("a feature whose only rider is limited USES still lands as a trackable 
       state,
       {
         mapAssetId: "20000000-0000-5000-8000-000000000001",
+        // Action Surge is taken "on your turn", so the Fighter goes first.
         entries: [
-          { actorId: other, score: 20 },
-          { actorId: ACTOR_ID, score: 5 }
+          { actorId: ACTOR_ID, score: 20 },
+          { actorId: other, score: 5 }
         ]
       },
       () => 1,
@@ -1293,7 +1344,7 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
       definitionId: undefined,
       actionUses: {}
     });
-    // The foe holds the turn, so the action-economy slot never masks the limited-use gate.
+    // The action economy is off, so neither the turn nor the action slot masks the limited-use gate.
     startEncounter(
       state,
       {
@@ -1306,6 +1357,7 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
       () => 1,
       { width: 900, height: 600, calibration: null }
     );
+    state.combat = { ...state.combat, ruleExceptions: { economy: "freeform" } };
     return state;
   }
   const deps = (): ResolveDependencies => ({
@@ -1352,6 +1404,65 @@ describe("an action that shares a pool is gated on the POOL's size", () => {
         deps()
       )
     ).toThrowError(/no uses remaining \(2\/long rest\)/);
+  });
+});
+
+describe("a Cleric's Channel Divinity heals and harms by the printed formula", () => {
+  // Wisdom 15 + 2 = 17: +3.
+  const definition = buildCharacterDefinition(clericInput(), library, defaultPolicy);
+  const actionOf = (id: string) => definition.actions.find((action) => action.id === id)!;
+
+  it("adds the Wisdom modifier to Divine Spark, and gives it its healing branch", () => {
+    expect(actionOf("divine-spark").damage).toEqual([{ formula: "1d8 + 3", type: "radiant" }]);
+    expect(actionOf("divine-spark-heal")).toMatchObject({
+      healing: { formula: "1d8 + 3" },
+      uses: { pool: "channel-divinity" }
+    });
+  });
+
+  it("divides Preserve Life's five times the Cleric level among Bloodied targets, none past half its maximum", () => {
+    expect(actionOf("preserve-life").healing).toEqual({ formula: "15", divided: true, upToFractionOfMaximum: 0.5 });
+    const state = emptyState();
+    importActorDefinition(state, definition, ACTOR_ID, "public");
+    const FRIEND = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d13";
+    state.actors.push({
+      ...state.actors[0],
+      id: FRIEND,
+      name: "Friend",
+      definitionId: undefined,
+      hp: { current: 2, maximum: 40, temporary: 0 }
+    });
+    state.actors[0].hp = { ...state.actors[0].hp, current: 1 };
+    startEncounter(
+      state,
+      {
+        mapAssetId: "20000000-0000-5000-8000-000000000001",
+        entries: [
+          { actorId: ACTOR_ID, score: 20 },
+          { actorId: FRIEND, score: 5 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
+    const cast = resolveDefinitionAction(
+      state,
+      actionOf("preserve-life"),
+      { actorId: ACTOR_ID, targetIds: [ACTOR_ID, FRIEND], commandId: "50000000-0000-4000-8000-00000000003a" },
+      {
+        random: () => 1,
+        newRollId: () => "40000000-0000-4000-8000-00000000003a",
+        gmSessionId: "30000000-0000-4000-8000-00000000000a",
+        now: () => "2026-07-27T00:00:00.000Z",
+        definition
+      }
+    );
+    // 15 split: the Cleric (max 24) can take 11 to reach half, so 7 each, then the rest to whoever has room.
+    const cleric = state.actors[0];
+    const friend = state.actors.find((actor) => actor.id === FRIEND)!;
+    expect(cast.healing?.targets.reduce((sum, target) => sum + target.regained, 0)).toBe(15);
+    expect(cleric.hp.current).toBeLessThanOrEqual(Math.floor(cleric.hp.maximum / 2));
+    expect(friend.hp.current).toBeLessThanOrEqual(20);
   });
 });
 
@@ -1523,8 +1634,10 @@ describe("buildCharacterDefinition - Warlock 5 (Pact Magic)", () => {
 
   it("gives a Warlock its Pact Magic slots - all at one level, not a sparse row", () => {
     const definition = buildCharacterDefinition(warlockInput(), library, defaultPolicy);
-    // SRD: a Warlock 5 has two level-3 slots and no level-1 or level-2 slots.
-    expect(definition.spellcasting?.slots).toEqual([{ level: 3, max: 2 }]);
+    // SRD: a Warlock 5 has two level-3 Pact Magic slots and no level-1 or level-2 slots. They are their own pool
+    // (back on a Short Rest), so none of them is a spell slot.
+    expect(definition.spellcasting?.pact).toEqual({ level: 3, max: 2 });
+    expect(definition.spellcasting?.slots).toEqual([]);
     expect(definition.spellcasting?.ability).toBe("cha");
     expect(definition.hitPoints.maximum).toBe(38); // d8: 8 + 4x5, then +2 Con x5
   });

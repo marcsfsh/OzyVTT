@@ -78,7 +78,8 @@ describe("setPreparedSpell", () => {
 });
 
 describe("long rest restores spellcasting", () => {
-  it("refills slots and resets prepared to the sheet defaults", () => {
+  // SRD: a Long Rest lets a prepared caster change its list; it no longer undoes the changes the player made.
+  it("refills slots and keeps the prepared list the player chose", () => {
     const state = stateWith(
       [
         { level: 1, remaining: 0 },
@@ -91,6 +92,6 @@ describe("long rest restores spellcasting", () => {
       { level: 1, remaining: 4 },
       { level: 2, remaining: 3 }
     ]);
-    expect([...state.actors[0].preparedSpellIds].sort()).toEqual(["fire-bolt", "shield"]);
+    expect([...state.actors[0].preparedSpellIds].sort()).toEqual(["misty-step"]);
   });
 });

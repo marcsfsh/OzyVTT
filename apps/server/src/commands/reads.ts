@@ -7,10 +7,13 @@ import { storedDefinition } from "../actor-roster.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builderOffers } from "../builder-offers.js";
 import { draftOwnerOf } from "../character-drafts.js";
-import { BUILTIN_ACTIONS, BUILTIN_TARGETING } from "../builtin-actions.js";
-import { actionSummaryOf, type ContentView } from "../content-library.js";
+import { BUILTIN_TARGETING, builtinActionsFor } from "../builtin-actions.js";
+import { builtinCheckSkills } from "../resolution/builtins.js";
+import { actionSummariesOf, actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
+import { rechoicesOf } from "../ledger-rechoice.js";
+import { spellChoicesOf } from "../spell-choices.js";
 import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
@@ -29,6 +32,7 @@ import type { ReadSpec } from "./pipeline.js";
  *  (ADR-0015): reference text, and the character builder's choices. */
 const PUBLIC_CATALOGS = [
   ["content:conditions", CONTENT_PATHS.conditions, "conditions", (catalog) => catalog.conditionSummaries()],
+  ["content:glossary", CONTENT_PATHS.glossary, "glossary", (catalog) => catalog.glossaryEntries()],
   ["content:skills", CONTENT_PATHS.skills, "skills", (catalog) => catalog.skillSummaries()],
   ["content:languages", CONTENT_PATHS.languages, "languages", (catalog) => catalog.languageSummaries()],
   ["content:spells", CONTENT_PATHS.spells, "spells", (catalog) => catalog.spellSummaries()],
@@ -80,16 +84,21 @@ export const gameReads = [
       const imported = storedDefinition(kit.read(), definitionId);
       // Browse uses the catalog's own lookup (honours draft/published/deleted), not the play-time resolver.
       const definition = imported ?? catalog.monster(definitionId);
-      const actions = imported ? imported.actions.map(actionSummaryOf) : catalog.monsterActionSummaries(definitionId);
+      const actions = imported ? actionSummariesOf(imported.actions) : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
-      const builtins = BUILTIN_ACTIONS.filter(
-        (candidate) => !definition?.actions.some((declared) => declared.id === candidate.id)
-      ).map((candidate) => ({
-        ...actionSummaryOf(candidate),
-        builtin: true,
-        targeting: BUILTIN_TARGETING[candidate.id] ?? ("none" as const)
-      }));
+      const builtins = builtinActionsFor(definition)
+        .filter((candidate) => !definition?.actions.some((declared) => declared.id === candidate.id))
+        .map((candidate) => {
+          // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
+          const checkSkills = builtinCheckSkills(candidate.id);
+          return {
+            ...actionSummaryOf(candidate),
+            builtin: true,
+            targeting: BUILTIN_TARGETING[candidate.id] ?? ("none" as const),
+            ...(checkSkills.length > 0 ? { checkSkills } : {})
+          };
+        });
       return {
         actions: [...actions, ...builtins],
         ...(definition?.legendary ? { legendary: definition.legendary } : {})
@@ -138,14 +147,14 @@ export const gameReads = [
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
       const catalog = kit.equipmentCatalog();
       const available = effectiveActions(definition, actor, catalog);
-      const builtins = BUILTIN_ACTIONS.filter(
+      const builtins = builtinActionsFor(definition).filter(
         (candidate) => !available.some((declared) => declared.id === candidate.id)
       );
       return {
         rulesMode: state.combat.rulesMode,
         actions: [
-          ...actionAvailability(state, actor, available, definition, false, available),
-          ...actionAvailability(state, actor, builtins, definition, true, available)
+          ...actionAvailability(state, actor, available, definition, false, available, catalog),
+          ...actionAvailability(state, actor, builtins, definition, true, available, catalog)
         ],
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
         // request rather than the broadcast projection (see `actor-derived.ts`).
@@ -155,7 +164,11 @@ export const gameReads = [
           deriveEquipment(actor, definition, catalog),
           kit.catalogFor(principal).skillSummaries(),
           catalog
-        )
+        ),
+        // Read against the GM's content, as `actor.rechoose` checks them.
+        rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm")),
+        // Read against the GM's content and the table's builder policy, as the swap and the spellbook check them.
+        spellChoices: spellChoicesOf(actor, definition, kit.contentLibrary.forAudience("gm"), state.builderPolicy)
       };
     }
   },

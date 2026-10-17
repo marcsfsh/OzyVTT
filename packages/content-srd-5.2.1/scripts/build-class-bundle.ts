@@ -11,7 +11,14 @@
  * bundles the earlier steps wrote.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { CLASS_MECHANICS, LIVE_CLASS_RESOURCES, SUBCLASS_MECHANICS, applyMechanics } from "./class-mechanics/index.js";
+import {
+  CLASS_MECHANICS,
+  CLASS_STAGES,
+  LIVE_CLASS_RESOURCES,
+  SUBCLASS_MECHANICS,
+  SUBCLASS_STAGES,
+  applyMechanics
+} from "./class-mechanics/index.js";
 import { slug, strip, withTables } from "./markdown.js";
 import { join } from "node:path";
 import { z } from "zod";
@@ -103,14 +110,31 @@ function featuresTable(body: string, className: string): { columns: string[]; ro
  * The `#### Name` entries under one `### Heading`, as FeatureOptions carrying their own prose
  * (Metamagic, Eldritch Invocations).
  */
-function optionSection(body: string, heading: string) {
+function optionSection(body: string, heading: string, featureId: string) {
   const after = body.split(new RegExp(`^### ${heading}$`, "m"))[1];
   if (!after) throw new Error(`no "${heading}" section`);
   const tail = after.split(/^### /m)[0];
   const parts = tail.split(/^#### (.+)$/m);
-  const options: { id: string; name: string; description: string }[] = [];
+  const options: {
+    id: string;
+    name: string;
+    description: string;
+    level?: number;
+    requires?: { offer: string; id: string };
+  }[] = [];
   for (let i = 1; i < parts.length; i += 2) {
     const name = strip(parts[i]);
+    // "Prerequisite: Level 12+ Warlock, Thirsting Blade Invocation": a class level, and maybe another option of
+    // this same pick. A cantrip prerequisite ("a Warlock Cantrip That Deals Damage") is left to the option's text.
+    const prerequisite = /^_Prerequisite: Level (\d+)\+ \w+(?:, ([^_]+?) Invocation)?(?:, [^_]*)?_$/m.exec(
+      parts[i + 1]
+    );
+    const gates = prerequisite
+      ? {
+          level: Number(prerequisite[1]),
+          ...(prerequisite[2] ? { requires: { offer: `feature:${featureId}`, id: slug(prerequisite[2]) } } : {})
+        }
+      : {};
     const description = withTables(parts[i + 1])
       .split("\n")
       .map((line) => line.trim())
@@ -119,8 +143,12 @@ function optionSection(body: string, heading: string) {
       .replace(/[*_]/g, "")
       .replace(/\s+/g, " ")
       .trim();
-    if (name && description) options.push({ id: slug(name), name, description: description.slice(0, 4000) });
+    if (name && description) options.push({ id: slug(name), name, description: description.slice(0, 4000), ...gates });
   }
+  // A required option must be one of these, or the gate could never open.
+  const ids = new Set(options.map((option) => option.id));
+  const dangling = options.find((option) => option.requires && !ids.has(option.requires.id));
+  if (dangling) throw new Error(`${dangling.id} requires "${dangling.requires!.id}", which is not a ${heading} entry`);
   return options;
 }
 
@@ -143,10 +171,14 @@ function featureProse(body: string): Map<string, string> {
       .replace(/\s+/g, " ")
       .trim();
     if (!text) continue;
-    const bare = heading.match(LEVEL_HEADING)?.[2];
-    // First write wins: "Level 4: Ability Score Improvement" repeats at 4, 8, 12, 16 and 19.
+    const levelled = heading.match(LEVEL_HEADING);
+    const bare = levelled?.[2];
+    // "Level 4: Ability Score Improvement" repeats at 4, 8, 12, 16 and 19 with the same text, kept once; a repeat
+    // that says something new (Improved Brutal Strike at 17) is appended under its level.
     for (const key of [slug(heading), ...(bare ? [slug(bare)] : [])]) {
-      if (!out.has(key)) out.set(key, text);
+      const earlier = out.get(key);
+      if (earlier === undefined) out.set(key, text);
+      else if (levelled && !earlier.includes(text)) out.set(key, `${earlier} At level ${levelled[1]}: ${text}`);
     }
   }
   return out;
@@ -205,9 +237,10 @@ const ALL_SKILLS = [
   "survival"
 ];
 
-// `repeatable`: an ASI may be taken at several levels, and the server rejects a repeated option id
-// unless the choice allows it. Expertise and Metamagic pick a different entry each time.
-const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "general-feats", repeatable: true };
+// "The Ability Score Improvement feat or another feat of your choice for which you qualify": every category,
+// with prerequisites checked by the build. `repeatable`: an ASI may be taken at several levels, and the server
+// rejects a repeated option id unless the choice allows it (a feat that is not repeatable is still refused).
+const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "feats", repeatable: true };
 const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromCatalog: "weapons" });
 
 /**
@@ -294,8 +327,7 @@ const CONFIG: Record<string, ClassConfig> = {
     choices: {
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
       "ability-score-improvement": asiChoice,
-      "bard-subclass": { kind: "subclass", choose: 1, fromCatalog: "bard-subclasses" },
-      "magical-secrets": { kind: "spell", choose: 2, fromCatalog: "bard-spells" }
+      "bard-subclass": { kind: "subclass", choose: 1, fromCatalog: "bard-subclasses" }
     }
   },
   druid: {
@@ -484,6 +516,48 @@ function skillsOf(text: string): { choose: number; from: string[] } {
   return { choose, from };
 }
 
+/** What a class's "As a Multiclass Character" section grants: the first bullet names the Core Traits it keeps. */
+type MulticlassTraits = {
+  armor: string[];
+  weapons: string[];
+  tools: string[];
+  skills?: { choose: number; from: string[] };
+  toolChoices?: { choose: number; from: string[] };
+};
+
+/**
+ * "Gain the following traits from the Core Rogue Traits table: Hit Point Die, proficiency in one skill of your
+ * choice from the Rogue's skill list, proficiency with Thieves' Tools, and training with Light armor." The Hit
+ * Point Die is the class's own and needs no field; no class keeps its Saving Throw proficiencies.
+ */
+function multiclassTraitsOf(
+  body: string,
+  className: string,
+  classSkills: readonly string[],
+  instruments: readonly string[]
+): MulticlassTraits {
+  const section = body.split(/^#### As a Multiclass Character\s*$/m)[1]?.split(/^#{3,4} /m)[0];
+  const bullet = section
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find((line) => /^[•-]/.test(line));
+  if (!bullet) throw new Error(`${className}: no "As a Multiclass Character" traits`);
+  const text = strip(bullet.replace(/^[•-]\s*/, ""));
+  const traits: MulticlassTraits = {
+    armor: armorOf(/training with (.+?)\.?$/i.exec(text)?.[1] ?? ""),
+    weapons: weaponsOf(/proficiency with (\w+) weapons/i.exec(text)?.[1] ?? ""),
+    tools: [...text.matchAll(/proficiency with (?!one )([A-Z][\w' ]*?(?:Tools|Kit|Supplies))/g)].map((match) =>
+      slug(match[1])
+    )
+  };
+  const skill = /proficiency in one skill of your choice( from the [\w' ]+ skill list)?/i.exec(text);
+  if (skill) traits.skills = { choose: 1, from: skill[1] ? [...classSkills] : [...ALL_SKILLS] };
+  // The Bard's "one Musical Instrument of your choice": any instrument the equipment catalog prints.
+  if (/proficiency with one Musical Instrument of your choice/i.test(text))
+    traits.toolChoices = { choose: 1, from: [...instruments] };
+  return traits;
+}
+
 const ITEM_ALIASES: Record<string, string> = {
   // The class tables use the SRD's shorthand; the equipment catalog carries the specific variants.
   "holy-symbol": "holy-symbol-amulet",
@@ -560,6 +634,8 @@ function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unres
 // ---- Build --------------------------------------------------------------------------------------
 
 const catalog = catalogIndex();
+/** Every Musical Instrument the equipment catalog prints, by id (its name slugs start "musical-instrument-"). */
+const INSTRUMENTS = [...catalog.keys()].filter((id) => id.startsWith("instrument-")).sort();
 const unresolvedItems: string[] = [];
 const parsed = new Map<string, ReturnType<typeof parseClass>>();
 
@@ -579,6 +655,8 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
   const entryId = entry.id;
   /** feature id -> the first level that grants it, for FeatureRecord.level. */
   const featureIds = new Map<string, number>();
+  /** feature id -> its name as the table prints it ("Monk's Focus"), which the id's slug loses. */
+  const featureNames = new Map<string, string>();
   const table: ClassLevelRow[] = rows.map((cells) => {
     const row: Record<string, unknown> = { features: [], classResources: [] };
     const slots = new Array(9).fill(0);
@@ -646,11 +724,14 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
       .filter(Boolean);
     row.features = named.map((label) => slug(label)).filter((id) => id && id !== "subclass-feature");
     for (const id of row.features as string[]) featureIds.set(id, (featureIds.get(id) ?? row.level) as number);
+    // A curly apostrophe in the source ("Nature’s Veil") is set straight, as the rest of the SRD prints it.
+    for (const label of named)
+      if (!featureNames.has(slug(label))) featureNames.set(slug(label), label.replace(/[‘’]/g, "'"));
     if (sawSlot && slots.some((count) => count > 0)) row.spellSlots = slots;
     if (pact) row.pactSlots = pact;
     return row as unknown as ClassLevelRow;
   });
-  return { table, featureIds };
+  return { table, featureIds, featureNames };
 }
 
 const built: unknown[] = [];
@@ -664,7 +745,7 @@ for (const [id, entry] of parsed) {
   const config = CONFIG[id];
   if (!config) throw new Error(`no CONFIG for class "${id}"`);
   const { traits } = entry;
-  const { table, featureIds } = levelTable(entry, config);
+  const { table, featureIds, featureNames } = levelTable(entry, config);
 
   const primary = abilitiesIn(traits["Primary Ability"] ?? "");
   const anyOf = /\bor\b/i.test(traits["Primary Ability"] ?? "");
@@ -672,7 +753,7 @@ for (const [id, entry] of parsed) {
   const toolText = traits["Tool Proficiencies"] ?? traits["Tool Proficiency"] ?? "";
   const equipment = equipmentOf(traits["Starting Equipment"] ?? "", id, catalog, unresolvedItems);
 
-  const features = [...featureIds].map(([featureId, level]) => {
+  const printedFeatures = [...featureIds].map(([featureId, level]) => {
     const description =
       entry.prose.get(featureId) ??
       entry.prose.get(featureId.replace(new RegExp(`^${id}-`), "")) ??
@@ -683,20 +764,31 @@ for (const [id, entry] of parsed) {
       ? (() => {
           const { optionsFrom, ...rest } = configured;
           // `from` is derived from the option ids by the schema - authoring both is rejected.
-          return { ...rest, options: optionSection(entry.body, optionsFrom) };
+          return { ...rest, options: optionSection(entry.body, optionsFrom, featureId) };
         })()
       : configured;
     return {
       id: featureId,
-      name: featureId
-        .split("-")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" "),
+      // The table's own wording keeps the apostrophes and lowercase small words the id drops; the id stays the slug.
+      name:
+        featureNames.get(featureId) ??
+        featureId
+          .split("-")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" "),
       level,
       description: description.slice(0, 4000),
       ...(choice ? { choice } : {})
     };
   });
+
+  // Staged features join the printed ones, and their level's row of the table.
+  const stages = CLASS_STAGES[id] ?? [];
+  for (const stage of stages) (table[stage.level - 1].features as string[]).push(stage.id);
+  const features: Array<Record<string, unknown> & { id: string }> = [
+    ...printedFeatures,
+    ...stages.map((stage) => ({ ...stage }))
+  ];
 
   const record = {
     id,
@@ -714,6 +806,7 @@ for (const [id, entry] of parsed) {
     weaponProficiencies: weaponsOf(traits["Weapon Proficiencies"] ?? ""),
     toolProficiencies: /choose/i.test(toolText) ? [] : toolText ? [slug(toolText)] : [],
     startingEquipment: equipment,
+    multiclassProficiencies: multiclassTraitsOf(entry.body, entry.name, skills.from, INSTRUMENTS),
     multiclassPrerequisites: {
       mode: anyOf ? "any" : "all",
       minimums: primary.map((ability) => ({ ability, minimum: 13 }))
@@ -813,10 +906,10 @@ for (const [id, entry] of parsed) {
     subclassLevel: CONFIG[id].subclassLevel,
     summary: intro.split(". ")[0].slice(0, 200) || `${title}, the SRD 5.2.1 ${entry.name} subclass.`,
     description: intro.slice(0, 4000) || `${title}.`,
-    features
+    features: [...features, ...(SUBCLASS_STAGES[subclassId] ?? []).map((stage) => ({ ...stage }))]
   };
   // The subclass half of the overlay, keyed on (subclassId, featureId).
-  overlayMisses.push(...applyMechanics(subclassId, features, SUBCLASS_MECHANICS));
+  overlayMisses.push(...applyMechanics(subclassId, record.features, SUBCLASS_MECHANICS));
   // Parsed for the same reason a class is.
   SubclassReferenceSchema.parse(record);
   builtSubclasses.push(record);
@@ -864,6 +957,11 @@ for (const record of authoredClasses) {
     }
   }
   const skills = skillsOf(traits["Skill Proficiencies"] ?? "");
+  // The multiclass traits are compared whole: a weapon group too many is a proficiency the SRD withholds.
+  const multiclass = JSON.stringify(multiclassTraitsOf(entry.body, entry.name, skills.from, INSTRUMENTS));
+  const authoredMulticlass = JSON.stringify(record.multiclassProficiencies ?? null);
+  if (multiclass !== authoredMulticlass)
+    disagreements.push(`${record.id}.multiclassProficiencies: source ${multiclass} vs authored ${authoredMulticlass}`);
   if (skills.choose !== record.skillChoices.choose)
     disagreements.push(
       `${record.id}.skillChoices.choose: source ${skills.choose} vs authored ${record.skillChoices.choose}`

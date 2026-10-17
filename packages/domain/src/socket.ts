@@ -4,6 +4,7 @@ import type {
   ContentBackgroundsResult,
   ContentClassesResult,
   ContentConditionsResult,
+  ContentGlossaryResult,
   ContentEquipmentResult,
   ContentFeatsResult,
   ContentLanguagesResult,
@@ -16,6 +17,7 @@ import type {
   ContentSubclassesResult
 } from "./content.js";
 import type {
+  ActionResolution,
   ActionResolveResult,
   BuilderOffersRequest,
   BuilderOffersResult,
@@ -24,14 +26,18 @@ import type {
   ActorMovementResult,
   AnnotationAddResult,
   CharacterDraftResult,
+  CheckRollResult,
   DamageApplyResult,
   DeathSaveResult,
   DiceRollResult,
+  LooseSaveOutcome,
   MutationResult,
+  SpellbookResult,
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
-  SceneCreateResult
+  SceneCreateResult,
+  StabilizeResult
 } from "./results.js";
 import type { ClientRole, CombatLogEntry, GmView, PlayerView } from "./views.js";
 
@@ -46,9 +52,18 @@ import type {
   ActorRechooseSchema,
   ActorRemoveSchema,
   ActorRestSchema,
+  ActorReviveSchema,
   ActorSetSpeedSchema,
+  ActorSetArmorClassSchema,
+  ActorSetHeroicInspirationSchema,
+  ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
+  ActorSpendUsesSchema,
+  ActorRestoreUsesSchema,
   AddCombatantSchema,
+  RemoveCombatantSchema,
+  SpellZoneEndSchema,
+  SpellZonePlaceSchema,
   AnnotationAddSchema,
   AnnotationClearSchema,
   AnnotationColorSetSchema,
@@ -67,10 +82,17 @@ import type {
   CharacterSetCurrencySchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
+  CharacterGiveItemSchema,
+  CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
+  CharacterFinishPreparingSchema,
+  CharacterSwapSpellSchema,
+  CharacterAddToSpellbookSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
+  CheckRerollSchema,
+  CheckRollSchema,
   CommandIdentitySchema,
   DamageResolveSchema,
   DeathSaveRollSchema,
@@ -89,9 +111,18 @@ import type {
   InitiativeRollRemainingSchema,
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
+  InitiativeSwapSchema,
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
+  RollCallAnswerSchema,
+  RollCallCloseSchema,
+  RollCallStartSchema,
+  RestAnswerSchema,
+  RestAskSchema,
+  RestFinishSchema,
+  RestMarkDoneSchema,
+  RestPartySchema,
   RulesAnswerSchema,
   RulesAskSchema,
   RulesSetPolicySchema,
@@ -119,6 +150,7 @@ import type {
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema,
   TempHpSchema,
+  TimePassSchema,
   TokenMoveSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
@@ -246,19 +278,60 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof RulesSetPolicySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  /** `route` is `resolved` (on this creature's turn in the fight) or `loose` (no fight). Off turn it returns `blocked`. */
+  /** `route` is `resolved` (on this creature's turn in the fight) or `loose` (no fight). Off turn it returns `blocked`.
+   *  A loose heal says who regained what (`healing`), as the fight's resolution does. */
   "action:use": (
     payload: CommandPayload<typeof ActionUseSchema>,
     acknowledgement: (
-      result: MutationResult & { route?: "resolved" | "loose"; rollIds?: readonly string[]; warning?: string }
+      result: MutationResult & {
+        route?: "resolved" | "loose";
+        rollIds?: readonly string[];
+        warning?: string;
+        healing?: ActionResolution["healing"];
+      }
     ) => void
   ) => void;
   /** Roll a saving throw: answers a matching pending save (`route: "answered"`), else a loose attributed save. */
   "save:roll": (
     payload: CommandPayload<typeof SaveRollSchema>,
     acknowledgement: (
-      result: MutationResult & { route?: "answered" | "loose"; saveId?: string; rollId?: string }
+      result: MutationResult & {
+        route?: "answered" | "loose";
+        saveId?: string;
+        rollId?: string;
+        outcome?: NonNullable<SaveAnswerResult["outcome"]> | LooseSaveOutcome;
+      }
     ) => void
+  ) => void;
+  /** Roll an ability check on the server: an ability, a skill or a tool. */
+  "check:roll": (
+    payload: CommandPayload<typeof CheckRollSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** Reroll one die of a character's latest check: Heroic Inspiration for a player, free for the GM. */
+  "check:reroll": (
+    payload: CommandPayload<typeof CheckRerollSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** GM: call for a check or a save from one or several characters. */
+  "roll-call:start": (
+    payload: CommandPayload<typeof RollCallStartSchema>,
+    acknowledgement: (result: MutationResult & { callId?: string }) => void
+  ) => void;
+  /** Answer a check call for your character (the GM for anyone). */
+  "roll-call:answer": (
+    payload: CommandPayload<typeof RollCallAnswerSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** GM: close a call; its unanswered saves are dismissed. */
+  "roll-call:close": (
+    payload: CommandPayload<typeof RollCallCloseSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: give or take a character's Heroic Inspiration. */
+  "actor:set-heroic-inspiration": (
+    payload: CommandPayload<typeof ActorSetHeroicInspirationSchema>,
+    acknowledgement: (result: MutationResult) => void
   ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */
   "rules:ask": (
@@ -305,6 +378,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorSetSpeedSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "actor:set-armor-class": (
+    payload: CommandPayload<typeof ActorSetArmorClassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   /** `damageType` types a bare manual `amount` (ignored when `parts` is present); `damageOverride` replaces a
    * rolled total while keeping its types. */
   "actor:apply-damage": (
@@ -330,6 +407,10 @@ export interface ClientToServerEvents {
   "content:conditions": (
     payload: Record<string, never>,
     acknowledgement: (result: ContentConditionsResult) => void
+  ) => void;
+  "content:glossary": (
+    payload: Record<string, never>,
+    acknowledgement: (result: ContentGlossaryResult) => void
   ) => void;
   "content:skills": (payload: Record<string, never>, acknowledgement: (result: ContentSkillsResult) => void) => void;
   "content:languages": (
@@ -377,6 +458,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof DeathSaveRollSchema>,
     acknowledgement: (result: DeathSaveResult) => void
   ) => void;
+  /** Stabilize a creature at 0 HP (first aid, a Healer's Kit, Spare the Dying, or the GM's ruling). */
+  "actor:stabilize": (
+    payload: CommandPayload<typeof ActorStabilizeSchema>,
+    acknowledgement: (result: StabilizeResult) => void
+  ) => void;
   "encounter:set-rules-mode": (
     payload: CommandPayload<typeof SetRulesModeSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -405,6 +491,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorRestSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** GM-only: bring a dead creature back with the hit points the revival gives. */
+  "actor:revive": (
+    payload: CommandPayload<typeof ActorReviveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   /** Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type, Fiendish Resilience's damage type). `offer` is the offer key the build already uses. */
   "actor:rechoose": (
     payload: CommandPayload<typeof ActorRechooseSchema>,
@@ -412,6 +503,46 @@ export interface ClientToServerEvents {
   ) => void;
   "actor:spend-hit-dice": (
     payload: CommandPayload<typeof ActorSpendHitDiceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Spend several uses of a limited-use pool at once (the character's player or the GM). */
+  "actor:spend-uses": (
+    payload: CommandPayload<typeof ActorSpendUsesSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: give back spent uses of a limited-use pool. */
+  "actor:restore-uses": (
+    payload: CommandPayload<typeof ActorRestoreUsesSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A player asks the GM for a Long Rest for their character, or takes the ask back. */
+  "rest:ask": (
+    payload: CommandPayload<typeof RestAskSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: approve a Long Rest request (the rest happens now) or turn it down. */
+  "rest:answer": (
+    payload: CommandPayload<typeof RestAnswerSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: rest several characters at once; a Short Rest stays open until the GM finishes it. */
+  "rest:party": (
+    payload: CommandPayload<typeof RestPartySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A member of the party's Short Rest is done spending Hit Dice. */
+  "rest:mark-done": (
+    payload: CommandPayload<typeof RestMarkDoneSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: end the party's Short Rest, with its benefits or without. */
+  "rest:finish": (
+    payload: CommandPayload<typeof RestFinishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: move game time forward. */
+  "time:pass": (
+    payload: CommandPayload<typeof TimePassSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (
@@ -422,9 +553,29 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CharacterSetPreparedSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "character:finish-preparing": (
+    payload: CommandPayload<typeof CharacterFinishPreparingSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:swap-spell": (
+    payload: CommandPayload<typeof CharacterSwapSpellSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:add-to-spellbook": (
+    payload: CommandPayload<typeof CharacterAddToSpellbookSchema>,
+    acknowledgement: (result: SpellbookResult) => void
+  ) => void;
   // Optional item keys are declared so the type states the whole wire contract; the server validates `baseId`.
   "character:set-inventory": (
     payload: CommandPayload<typeof CharacterSetInventorySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:give-item": (
+    payload: CommandPayload<typeof CharacterGiveItemSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:recover-ammunition": (
+    payload: CommandPayload<typeof CharacterRecoverAmmunitionSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-currency": (
@@ -498,8 +649,16 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof AddCombatantSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "encounter:remove-combatant": (
+    payload: CommandPayload<typeof RemoveCombatantSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "initiative:set": (
     payload: CommandPayload<typeof InitiativeScoreSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "initiative:swap": (
+    payload: CommandPayload<typeof InitiativeSwapSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:roll-self": (
@@ -593,6 +752,14 @@ export interface ClientToServerEvents {
   ) => void;
   "annotation:move": (
     payload: CommandPayload<typeof AnnotationMoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "spell-zone:place": (
+    payload: CommandPayload<typeof SpellZonePlaceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "spell-zone:end": (
+    payload: CommandPayload<typeof SpellZoneEndSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:remove": (

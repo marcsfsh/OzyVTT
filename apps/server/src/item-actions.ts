@@ -1,12 +1,21 @@
 import type { FeatureAction, FeatureSaveDc, FeatureUses, ItemSpellCast, SpellReference } from "@vtt/content-srd-5.2.1";
+import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import {
   abilityModifier,
   formulaPlus,
+  isMeleeWeapon,
   isMonkWeapon,
   weaponAbilityModifierFrom,
   type RiderAbility
 } from "@vtt/rules-5e";
-import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
+import {
+  catalogIdOf,
+  MAX_ACTION_USES,
+  type ActorAction,
+  type ActorDefinition,
+  type InventoryItem,
+  type OngoingDamage
+} from "@vtt/schemas";
 
 /**
  * Actions synthesised from what a character carries: an equipped weapon's swing, an item's declared actions and
@@ -32,19 +41,36 @@ function bearerLevel(definition: ActorDefinition | undefined): number {
   return total >= 1 ? total : 1;
 }
 
-/** Authored uses to `ActionUsesSchema`, clamped to 1-20 like `resolvedUseLimit`; below 1 means no charges. An
- *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). */
+/** A carried item: its row id, and the catalog record it copies. */
+export type CarriedItem = Readonly<{ id: string; recordId?: string }>;
+
+/**
+ * An item's shared charge pool, counted per carried copy: the row's id stands in for the record's, so two Wands of
+ * Fireballs are two pools and a wand's spent charges are its own ("wand-of-fireballs-charges" on the row
+ * "wand-of-fireballs-2" counts as "wand-of-fireballs-2-charges"). Kept within the pool slug's 60 characters.
+ */
+export function itemPool(item: CarriedItem, pool: string): string {
+  const catalogId = catalogIdOf(item);
+  const suffix = pool.startsWith(`${catalogId}-`) ? pool.slice(catalogId.length + 1) : pool;
+  const key = `${item.id}-${suffix}`;
+  return key.length <= 60 ? key : `${item.id.slice(0, Math.max(1, 59 - suffix.length))}-${suffix}`.slice(0, 60);
+}
+
+/** Authored uses to `ActionUsesSchema`, clamped to its range like `resolvedUseLimit`; below 1 means no charges. An
+ *  item action carries the action form (with `recharge`), a cast the feature form (with `scaling`). A shared pool
+ *  is counted per carried copy (`itemPool`); an unpooled use is already, by the action's own id. */
 function usesOf(
   uses: FeatureUses | ActorAction["uses"],
-  definition: ActorDefinition | undefined
+  definition: ActorDefinition | undefined,
+  item: CarriedItem
 ): ActorAction["uses"] | undefined {
   if (!uses) return undefined;
   const limit = uses.limit ?? ("scaling" in uses ? scaledLimit(uses.scaling, definition) : undefined);
   if (limit === undefined || limit < 1) return undefined;
   return {
-    limit: Math.min(20, limit),
+    limit: Math.min(MAX_ACTION_USES, limit),
     per: uses.per,
-    ...(uses.pool ? { pool: uses.pool } : {}),
+    ...(uses.pool ? { pool: itemPool(item, uses.pool) } : {}),
     ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})
   };
 }
@@ -76,10 +102,11 @@ const scoreModifierOf = (definition: ActorDefinition | undefined, ability: Rider
 
 /** An item action with attack and save resolved: the read-time twin of `interpretAction`. */
 export function itemAction(
-  itemId: string,
+  item: CarriedItem,
   declared: FeatureAction,
   definition: ActorDefinition | undefined
 ): ActorAction {
+  const itemId = item.id;
   const caster = casterNumbers(definition);
   let attack: ActorAction["attack"];
   if (declared.attack) {
@@ -99,7 +126,7 @@ export function itemAction(
         ...(declared.save.dc === "spellcasting" ? { spellcasting: true } : {})
       }
     : undefined;
-  const uses = usesOf(declared.uses, definition);
+  const uses = usesOf(declared.uses, definition, item);
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
@@ -108,7 +135,14 @@ export function itemAction(
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
     damage: declared.damage.map((part) => ({ ...part })),
-    ...(uses ? { uses } : {})
+    // A Potion of Healing's 2d4 + 2.
+    ...(declared.healing ? { healing: { ...declared.healing } } : {}),
+    ...(uses ? { uses } : {}),
+    // A thrown flask takes one attack of the Attack action, not the whole action.
+    ...(declared.replacesAttack ? { replacesAttack: true } : {}),
+    // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
+    ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
+    ...(declared.area ? { area: { ...declared.area } } : {})
   };
 }
 
@@ -127,15 +161,16 @@ const clampDc = (value: number) => Math.max(1, Math.min(40, Math.round(value)));
 /** A synthesised cast action with the spell's mechanics. `atLevel` picks the SRD upcast row; `ability`
  *  and `saveDc` override; an unresolvable spell degrades to a name-only action. */
 export function castAction(
-  itemId: string,
+  item: CarriedItem,
   cast: ItemSpellCast,
   itemName: string,
   definition: ActorDefinition | undefined,
   spell: SpellReference | undefined
 ): ActorAction {
+  const itemId = item.id;
   const spellName = spell?.name ?? cast.spellId.replace(/-/g, " ");
   const level = cast.atLevel ?? spell?.level ?? 0;
-  const uses = usesOf(cast.uses, definition);
+  const uses = usesOf(cast.uses, definition, item);
   const base: ActorAction = {
     id: itemActionId(itemId, `cast-${cast.spellId}`),
     name: `Cast ${spellName} (${itemName})`,
@@ -173,7 +208,16 @@ export function castAction(
     { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
     { roll: upcast }
   );
-  return { ...base, ...(spell.area ? { area: spell.area } : {}), ...mechanics };
+  // A healing area heals the creatures the caster picks (up to its count), so it is picked rather than templated.
+  return { ...base, ...(spell.area && !mechanics.healing ? { area: spell.area } : {}), ...mechanics };
+}
+
+/** A cast's grant, its "spellcasting ability modifier" fixed at the caster's for this spell. */
+function castGrant(grant: NonNullable<ActorAction["grants"]>, modifier: number): NonNullable<ActorAction["grants"]> {
+  const copy = structuredClone(grant);
+  if (copy.temporaryHitPointsEachTurn !== "spellcasting-modifier") return copy;
+  const { temporaryHitPointsEachTurn: _each, ...rest } = copy;
+  return modifier >= 1 ? { ...rest, temporaryHitPointsEachTurn: Math.min(100, modifier) } : rest;
 }
 
 /** What an action casting this spell does, from the spell's cast model (`SpellReference.effect`): its spell
@@ -184,33 +228,260 @@ export function spellCastMechanics(
   spell: SpellReference,
   numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
   scaled: Readonly<{ roll?: string | null; attacks?: number }> = {}
-): Pick<ActorAction, "damage"> & Partial<Pick<ActorAction, "attack" | "save" | "healing">> {
+): Pick<ActorAction, "damage"> &
+  Partial<
+    Pick<
+      ActorAction,
+      | "attack"
+      | "save"
+      | "healing"
+      | "darts"
+      | "damageTypes"
+      | "grants"
+      | "onHit"
+      | "missDamage"
+      | "burst"
+      | "drain"
+      | "endsConditions"
+      | "endsOneCondition"
+    >
+  > {
   // No cast model: the save still applies, and the rest is the GM's.
   const effect = spell.effect ?? { attacks: 0, damage: [], healing: null };
   const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
   const attacks = scaled.attacks ?? effect.attacks;
+  // A save made later or by someone else (Spirit Guardians, Haste) is not the cast's.
+  const castSave = effect.noCastSave ? null : spell.save;
+  const damage = spellDamage(effect.damage, scale, numbers.modifier);
   return {
-    damage: effect.damage.map((part) => ({ formula: scale(part.formula), type: part.type })),
+    damage,
+    // What its damage drains as it lands (Vampiric Touch's healing, Harm's lower Hit Point maximum).
+    ...(effect.drain ? { drain: { ...effect.drain } } : {}),
+    ...(effect.darts ? { darts: effect.darts } : {}),
+    // The type the caster picks: of the damage (Chromatic Orb), or of the Resistance it grants (Protection from Energy).
+    ...(effect.damageTypes && (damage.length > 0 || effect.grant !== undefined)
+      ? { damageTypes: [...effect.damageTypes] }
+      : {}),
     ...(attacks > 0
-      ? { attack: { bonus: numbers.attackBonus, ...(attacks > 1 ? { count: Math.min(10, attacks) } : {}) } }
-      : spell.save
-        ? { save: { ...spell.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+      ? {
+          attack: {
+            bonus: numbers.attackBonus,
+            ...(attacks > 1 ? { count: Math.min(10, attacks) } : {}),
+            ...spellAttackReach(spell)
+          },
+          // What a hit lands besides its damage (Ray of Sickness's Poisoned), and what a miss still deals (Acid Arrow).
+          ...(effect.onHit ? { onHit: structuredClone(effect.onHit) } : {}),
+          ...(effect.missDamage ? { missDamage: effect.missDamage } : {}),
+          // What bursts after the attack, at the caster's spell save DC (Ice Knife).
+          ...(effect.burst ? { burst: { ...structuredClone(effect.burst), dc: numbers.saveDc } } : {})
+        }
+      : castSave
+        ? {
+            save: {
+              ...castSave,
+              dc: numbers.saveDc,
+              ...(numbers.bearersDc ? { spellcasting: true } : {}),
+              ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {})
+            }
+          }
         : {}),
+    // What the cast leaves on its targets (Bless, Hunter's Mark), sourced by the caster; Heroism's Temporary Hit Points
+    // are the caster's modifier for this spell.
+    ...(effect.grant ? { grants: castGrant(effect.grant, numbers.modifier) } : {}),
     ...(effect.healing
       ? {
           healing: {
-            formula: formulaPlus(scale(effect.healing.formula), effect.healing.addsModifier ? numbers.modifier : 0)
+            formula: formulaPlus(scale(effect.healing.formula), effect.healing.addsModifier ? numbers.modifier : 0),
+            ...(effect.healing.divided ? { divided: true as const } : {}),
+            ...(effect.healing.toMaximum ? { toMaximum: true as const } : {}),
+            ...(effect.healing.self ? { self: true as const } : {}),
+            ...(effect.healing.temporary ? { temporary: true as const } : {})
           }
+        }
+      : {}),
+    // Conditions the cast ends (Heal's Blinded, Deafened and Poisoned; Lesser Restoration's pick).
+    ...(effect.endsConditions
+      ? {
+          endsConditions: [...effect.endsConditions],
+          ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
         }
       : {})
   };
+}
+
+/** A cast model's damage parts as an action's: scaled (an upcast row, a cantrip tier), and with the caster's
+ *  spellcasting modifier where the spell adds it (Spiritual Weapon's 1d8 + it). */
+function spellDamage(
+  parts: NonNullable<SpellReference["effect"]>["damage"],
+  scale: (formula: string) => string,
+  modifier: number
+): ActorAction["damage"] {
+  return parts.map((part) => ({
+    formula: part.addsModifier ? formulaPlus(scale(part.formula), modifier) : scale(part.formula),
+    type: part.type
+  }));
+}
+
+/** The id of the action that casts a spell as a Ritual. */
+export const ritualSpellActionId = (spellId: string): string => `spell-${spellId}-ritual`;
+
+/** A casting time of a minute or more ("10 minutes", "8 hours"). */
+export const isLongCastingTime = (castingTime: string): boolean => /\b\d+\s*(?:minute|hour)s?\b/i.test(castingTime);
+
+/** The id of the action a spell's later action is minted as ("spell-spirit-guardians-then-save"). */
+export const laterSpellActionId = (spellId: string, name: string): string =>
+  `spell-${spellId}-then-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+/** The later action of a spell this action id names, if it is one. */
+export function laterRowOf(
+  spell: SpellReference,
+  actionId: string
+): NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number] | undefined {
+  return (spell.effect?.laterActions ?? []).find((row) => laterSpellActionId(spell.id, row.name) === actionId);
+}
+
+/** One of the things a spell lets its caster do after the cast (`SpellReference.effect.laterActions`), as an action
+ *  with the caster's numbers: no slot, the spell's own level (a cantrip's tier through `scaled.roll`). */
+export function laterSpellAction(
+  spell: SpellReference,
+  later: NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number],
+  numbers: Readonly<{ attackBonus: number; saveDc: number; bearersDc: boolean; modifier: number }>,
+  scaled: Readonly<{ roll?: string | null }> = {}
+): ActorAction {
+  const scale = (formula: string) => (scaled.roll && formula === spell.damage.roll ? scaled.roll : formula);
+  const damage = spellDamage(later.damage, scale, numbers.modifier);
+  return {
+    id: laterSpellActionId(spell.id, later.name),
+    name: `${spell.name}: ${later.name}`,
+    activation: later.activation,
+    description: `${later.when}\n\n${spell.description}`.slice(0, 12000),
+    damage,
+    ...(later.attackRange
+      ? {
+          attack: {
+            bonus: numbers.attackBonus,
+            ...(later.attackRange.kind === "melee"
+              ? { reachFeet: later.attackRange.feet }
+              : { rangeFeet: later.attackRange.feet })
+          },
+          ...(later.onHit ? { onHit: structuredClone(later.onHit) } : {})
+        }
+      : later.save
+        ? { save: { ...later.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+        : {}),
+    ...(spell.effect?.damageTypes && damage.length > 0 ? { damageTypes: [...spell.effect.damageTypes] } : {}),
+    ...(later.area ? { area: later.area } : {}),
+    ...(later.drain ? { drain: { ...later.drain } } : {}),
+    // Moving a mark lands the cast's grant on the new creature (`moveMark`).
+    ...(later.movesGrant && spell.effect?.grant ? { grants: structuredClone(spell.effect.grant) } : {}),
+    spellId: spell.id
+  };
+}
+
+/** Where a spell's attack reaches, as the attack block carries it: a melee spell attack's `reachFeet` or a ranged
+ *  one's `rangeFeet` (no long range: a spell has one range). A cast model from before the build recorded it falls
+ *  back to the spell's range, Touch and Self being melee. */
+export function spellAttackReach(
+  spell: Pick<SpellReference, "effect" | "range">
+): Pick<NonNullable<ActorAction["attack"]>, "reachFeet" | "rangeFeet"> {
+  const feet = spellRangeFeet(spell.range);
+  const reach =
+    spell.effect?.attackRange ??
+    (feet !== null
+      ? { kind: "ranged" as const, feet }
+      : spell.range.text !== null && !/^(?:touch|self)/i.test(spell.range.text)
+        ? null
+        : { kind: "melee" as const, feet: 5 });
+  // A range the map can't measure (Sight) is left unchecked rather than read as a 5-foot reach.
+  if (reach === null) return { rangeFeet: 5280 };
+  return reach.kind === "melee" ? { reachFeet: reach.feet } : { rangeFeet: reach.feet };
+}
+
+/** A spell action made before its attack carried a range (an older sheet), given the spell's: otherwise the economy
+ *  reads it as a 5-foot melee swing. Unchanged when it has one, or casts no attack. */
+export function withSpellAttackReach(action: ActorAction, spell: SpellReference | undefined): ActorAction {
+  const attack = action.attack;
+  if (!attack || !spell || attack.reachFeet !== undefined || attack.rangeFeet !== undefined) return action;
+  return { ...action, attack: { ...attack, ...spellAttackReach(spell) } };
+}
+
+/** A spell action made before the cast model carried effects (an older sheet), given the spell's: Bless's d4 and
+ *  Bane's penalty land without a rebuild. A later action (Spiritual Weapon's attack) leaves none. */
+export function withSpellEffects(action: ActorAction, spell: SpellReference | undefined): ActorAction {
+  const effect = spell?.effect;
+  if (!spell || !effect || action.spellId !== spell.id) return action;
+  const later = (effect.laterActions ?? []).find((row) => laterSpellActionId(spell.id, row.name) === action.id);
+  if (later)
+    return {
+      ...action,
+      ...(action.attack && action.onHit === undefined && later.onHit ? { onHit: structuredClone(later.onHit) } : {}),
+      ...(action.drain === undefined && later.drain ? { drain: { ...later.drain } } : {})
+    };
+  const hitRiders =
+    action.attack !== undefined
+      ? {
+          ...(action.onHit === undefined && effect.onHit ? { onHit: structuredClone(effect.onHit) } : {}),
+          ...(action.missDamage === undefined && effect.missDamage ? { missDamage: effect.missDamage } : {})
+        }
+      : {};
+  action = {
+    ...action,
+    ...hitRiders,
+    ...(action.drain === undefined && effect.drain ? { drain: { ...effect.drain } } : {}),
+    ...(action.endsConditions === undefined && effect.endsConditions
+      ? {
+          endsConditions: [...effect.endsConditions],
+          ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
+        }
+      : {})
+  };
+  const grants = action.grants === undefined && effect.grant ? structuredClone(effect.grant) : undefined;
+  const failureEffect =
+    action.save && !action.save.failureEffect && effect.failureEffect
+      ? structuredClone(effect.failureEffect)
+      : undefined;
+  const saveFields = action.save ? newerSaveFields(action.save, spell.save) : {};
+  if (!grants && !failureEffect && Object.keys(saveFields).length === 0) return action;
+  return {
+    ...action,
+    ...(grants ? { grants } : {}),
+    ...(action.save ? { save: { ...action.save, ...saveFields, ...(failureEffect ? { failureEffect } : {}) } } : {})
+  };
+}
+
+/** The conditions a caster picks one of for this action's failed save (Blindness/Deafness), read from the spell too
+ *  for a sheet built before its cast carried them, or the ones a cure ends one of; empty when the action offers no
+ *  choice. */
+export function conditionChoicesOf(
+  action: Pick<ActorAction, "save" | "spellId" | "endsConditions" | "endsOneCondition">,
+  spell: SpellReference | undefined
+): readonly string[] {
+  // The one condition a cure ends (Lesser Restoration).
+  if (action.endsOneCondition && action.endsConditions) return action.endsConditions;
+  if (!action.save) return [];
+  return action.save.conditionChoices ?? (spell?.id === action.spellId ? (spell?.save?.conditionChoices ?? []) : []);
+}
+
+/** Save outcome fields the build has added since a sheet was made, which its cast copied without: the conditions a
+ *  caster picks from (Blindness/Deafness). */
+const NEWER_SAVE_FIELDS = ["conditionChoices"] as const;
+
+function newerSaveFields(
+  save: NonNullable<ActorAction["save"]>,
+  printed: SpellReference["save"]
+): Partial<NonNullable<ActorAction["save"]>> {
+  if (!printed) return {};
+  const fields: Record<string, unknown> = {};
+  for (const key of NEWER_SAVE_FIELDS)
+    if (save[key] === undefined && printed[key] !== undefined) fields[key] = structuredClone(printed[key]);
+  return fields as Partial<NonNullable<ActorAction["save"]>>;
 }
 
 /** Martial Arts reaches this swing: the bearer has it, it is in force (no armour, no shield) and this is a Monk weapon. */
 function martialArtsSwing(item: InventoryItem, definition: ActorDefinition, martialArtsInForce: boolean) {
   const weapon = item.weapon;
   if (!martialArtsInForce || !weapon || !definition.character?.martialArts) return null;
-  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet)
+  return isMonkWeapon(weapon.category, weapon.properties ?? [], weapon.rangeFeet, weapon.melee)
     ? definition.character.martialArts
     : null;
 }
@@ -277,33 +548,44 @@ export function weaponAction(
 /** A weapon's attack action, with the dice and ability modifier its damage was built from. */
 export type WeaponSwing = Readonly<{ action: ActorAction; dice: string; modifier: number }>;
 
+/** The id suffix of a Versatile weapon's two-handed attack. */
+export const TWO_HANDED_SUFFIX = "two-handed";
+
+/** `twoHanded` mints a Versatile weapon's two-handed attack (its own action, `item-<id>-two-handed`), rolling the
+ *  Versatile die; null when the weapon has none. */
 export function weaponSwing(
   item: InventoryItem,
   definition: ActorDefinition | undefined,
   grantedWeapons: readonly string[] = [],
-  martialArtsInForce = false
+  martialArtsInForce = false,
+  options: Readonly<{ twoHanded?: boolean }> = {}
 ): WeaponSwing | null {
   const weapon = item.weapon;
   if (!weapon || !definition) return null;
+  if (options.twoHanded && !weapon.versatileDice) return null;
   const properties = weapon.properties ?? [];
   const modifier = weaponAbilityModifier(item, definition, martialArtsInForce);
+  const weaponDice = options.twoHanded ? weapon.versatileDice! : weapon.damageDice;
   // Martial Arts: the Monk may roll its die in place of the weapon's, so the bigger one is rolled.
   const martialArts = martialArtsSwing(item, definition, martialArtsInForce);
-  const dice = martialArts ? biggerDie(weapon.damageDice, martialArts.die) : weapon.damageDice;
+  const dice = martialArts ? biggerDie(weaponDice, martialArts.die) : weaponDice;
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
-  const ids = item.baseId !== undefined ? [item.id, item.baseId] : [item.id];
+  const ids = item.baseId !== undefined ? [catalogIdOf(item), item.baseId] : [catalogIdOf(item)];
   const proficient =
     trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
   const action: ActorAction = {
-    id: itemActionId(item.id),
-    name: item.name,
+    id: itemActionId(item.id, options.twoHanded ? TWO_HANDED_SUFFIX : undefined),
+    name: options.twoHanded ? `${item.name} (two-handed)` : item.name,
     activation: "action",
-    description: `Attack with ${item.name}.`,
+    description: options.twoHanded
+      ? `Attack with ${item.name} in both hands (Versatile).`
+      : `Attack with ${item.name}.`,
     attack: {
       bonus,
-      ...(weapon.rangeFeet === null || properties.includes("thrown")
+      // Only a Melee weapon has a reach: a Dart thrown at an adjacent creature is still a ranged attack.
+      ...(isMeleeWeapon(properties, weapon.rangeFeet, weapon.melee)
         ? { reachFeet: properties.includes("reach") ? 10 : 5 }
         : {}),
       ...(weapon.rangeFeet !== null
@@ -315,9 +597,12 @@ export function weaponSwing(
   return { action, dice, modifier };
 }
 
-/** "1d8 + 3", "1d4 - 1", or the dice alone; a flat die ("1", a blowgun) keeps its own term. */
+/** "1d8 + 3", "1d4 - 1", or the dice alone. A fixed amount ("1", a Blowgun) stays as it is: the SRD adds no ability
+ *  modifier to fixed damage that doesn't use a roll. */
 const withModifier = (dice: string, modifier: number) =>
-  `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
+  !/d/i.test(dice)
+    ? dice
+    : `${dice}${modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`}`;
 
 /**
  * The extra attack a weapon can make beside its own (SRD 5.2.1), minted with it: the Light property's (after an
@@ -354,22 +639,99 @@ export function extraAttackAction(
   };
 }
 
-/** The action cast with a higher slot: the spell's printed row for that slot replaces the dice its own roll gave, in
- *  the damage and the healing. Unchanged where the spell prints no dice for the slot (Magic Missile adds darts). */
-export function upcastAction(action: ActorAction, spell: SpellReference, level: number): ActorAction {
-  const roll = spell.castingOptions.find((option) => option.type === `slot_level_${level}`)?.damageRoll;
-  const base = spell.damage.roll;
-  if (!roll || !base) return action;
-  const swap = (formula: string): string => {
-    if (formula === base) return roll;
-    const match = /^(\d+d\d+)(?:\s*([+-])\s*(\d+))?$/i.exec(formula.trim());
-    return match && match[1] === base
-      ? formulaPlus(roll, (match[2] === "-" ? -1 : 1) * Number(match[3] ?? 0))
-      : formula;
+/** The action cast with a higher slot, from the spell's printed row for that slot: its roll replaces the one the
+ *  cast's own roll gave, in the damage and the healing (Cure Wounds' 4d8, Heal's 80), and its count is the rays or
+ *  darts the cast makes (Scorching Ray's fourth ray, Magic Missile's fourth dart). A count of targets (Bless, Hold
+ *  Person) is a targeting limit, not read here. */
+/** "The damage (both initial and later) increases": what a hit leaves dealing later (Acid Arrow's 2d4) gains the dice
+ *  the higher slot adds to the hit, die for die. */
+function withScaledOngoing<Rider extends Readonly<{ ongoingDamage?: OngoingDamage }>>(
+  rider: Rider,
+  base: string | null,
+  roll: string | null
+): Rider {
+  const dice = (formula: string | null) => /^(\d+)d(\d+)$/.exec(formula?.trim() ?? "");
+  const from = dice(base);
+  const to = dice(roll);
+  if (!rider.ongoingDamage || !from || !to || from[2] !== to[2]) return rider;
+  const added = Number(to[1]) - Number(from[1]);
+  if (added <= 0) return rider;
+  return {
+    ...rider,
+    ongoingDamage: {
+      ...rider.ongoingDamage,
+      damage: rider.ongoingDamage.damage.map((part) => {
+        const own = dice(part.formula);
+        return own && own[2] === from[2] ? { ...part, formula: `${Number(own[1]) + added}d${own[2]}` } : part;
+      })
+    }
   };
+}
+
+/** A burst's dice at a slot `above` the spell's level ("The Cold damage increases by 1d6 for each spell slot level
+ *  above 1"). */
+function burstAt(burst: NonNullable<ActorAction["burst"]>, above: number): NonNullable<ActorAction["burst"]> {
+  const added = (burst.diceAddedPerSlot ?? 0) * Math.max(0, above);
+  if (added === 0) return burst;
+  return {
+    ...burst,
+    damage: burst.damage.map((part, index) => {
+      const dice = /^(\d+)(d\d+)(.*)$/.exec(part.formula);
+      return index === 0 && dice ? { ...part, formula: `${Number(dice[1]) + added}${dice[2]}${dice[3]}` } : part;
+    })
+  };
+}
+
+export function upcastAction(action: ActorAction, spell: SpellReference, level: number): ActorAction {
+  const row = spell.castingOptions.find((option) => option.type === `slot_level_${level}`);
+  if (!row) return action;
+  const roll = row.damageRoll;
+  const swapFrom =
+    (base: string | null | undefined) =>
+    (formula: string): string => {
+      if (!roll || !base) return formula;
+      if (formula === base) return roll;
+      const match = /^(\d+d\d+)(?:\s*([+-])\s*(\d+))?$/i.exec(formula.trim());
+      return match && match[1] === base
+        ? formulaPlus(roll, (match[2] === "-" ? -1 : 1) * Number(match[3] ?? 0))
+        : formula;
+    };
+  const damage = swapFrom(spell.damage.roll);
+  const healing = swapFrom(spell.effect?.healing?.formula ?? spell.damage.roll);
+  const above = Math.max(0, level - spell.level);
+  // A flat amount for each level above ("5 additional Temporary Hit Points for each spell slot level above 1").
+  const healingPerSlot = (spell.effect?.healing?.perSlot ?? 0) * above;
+  const count = row.targetCount;
+  const rays = count !== null && action.attack !== undefined && (spell.effect?.attacks ?? 0) > 1;
+  const darts = count !== null && action.darts !== undefined;
   return {
     ...action,
-    damage: action.damage.map((part) => ({ ...part, formula: swap(part.formula) })),
-    ...(action.healing ? { healing: { formula: swap(action.healing.formula) } } : {})
+    damage: action.damage.map((part) => ({ ...part, formula: damage(part.formula) })),
+    ...(action.onHit ? { onHit: action.onHit.map((rider) => withScaledOngoing(rider, spell.damage.roll, roll)) } : {}),
+    // A cast that deals no damage of its own scales its failure's damage on later turns (Ensnaring Strike's 1d6).
+    ...(action.save?.ongoingDamage && action.damage.length === 0
+      ? { save: { ...action.save, ...withScaledOngoing(action.save, spell.damage.roll, roll) } }
+      : {}),
+    ...(action.healing
+      ? { healing: { ...action.healing, formula: formulaPlus(healing(action.healing.formula), healingPerSlot) } }
+      : {}),
+    // Aid's "Each target's Hit Points increase by 5 for each spell slot level above 2."
+    ...(action.grants?.hitPointMaximumGain?.perSlot
+      ? {
+          grants: {
+            ...action.grants,
+            hitPointMaximumGain: {
+              ...action.grants.hitPointMaximumGain,
+              amount: Math.min(
+                100,
+                action.grants.hitPointMaximumGain.amount + action.grants.hitPointMaximumGain.perSlot * above
+              )
+            }
+          }
+        }
+      : {}),
+    ...(action.burst ? { burst: burstAt(action.burst, above) } : {}),
+    ...(rays ? { attack: { ...action.attack!, count: Math.min(10, count) } } : {}),
+    ...(darts ? { darts: Math.min(20, count) } : {})
   };
 }

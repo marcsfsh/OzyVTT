@@ -66,10 +66,14 @@
         "name": "Evocation Savant",
         "level": 3,
         "description": "Choose two Wizard spells from the Evocation school, each of which must be level 1 or 2, and add them to your spellbook for free.",
+        "tags": [
+          "spellbook"
+        ],
         "choice": {
           "kind": "spell",
           "choose": 2,
-          "fromCatalog": "wizard-spells",
+          "fromCatalog": "wizard-spells-of-evocation",
+          "minSpellLevel": 1,
           "maxSpellLevel": 2
         }
       },
@@ -233,8 +237,16 @@
             "id": "preserve-life",
             "name": "Channel Divinity: Preserve Life",
             "activation": "action",
-            "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet (up to half each target's Hit Point maximum).",
-            "damage": []
+            "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet (up to half each target's Hit Point maximum). The engine splits it evenly among the creatures you pick.",
+            "damage": [],
+            "healing": {
+              "formula": "0",
+              "divided": true,
+              "upToFractionOfMaximum": 0.5
+            },
+            "adds": {
+              "classLevel": 5
+            }
           }
         ],
         "uses": {

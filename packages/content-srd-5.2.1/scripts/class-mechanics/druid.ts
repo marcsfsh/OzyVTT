@@ -1,5 +1,84 @@
 // Druid and Circle of the Land mechanics, merged over the ETL-generated prose.
-import type { ClassMechanicsModule } from "./overlay.js";
+import { potentSpellcasting, type ClassMechanicsModule, type TableSpell } from "./overlay.js";
+
+/** The SRD Druid cantrips that deal damage, which Potent Spellcasting adds to. */
+const DRUID_DAMAGE_CANTRIPS = ["poison-spray", "produce-flame", "starry-wisp"];
+
+/** The Circle of the Land table: each land's spells by Druid level (3, 5, 7, 9). */
+const LANDS: ReadonlyArray<{
+  id: string;
+  name: string;
+  tiers: ReadonlyArray<readonly [number, readonly TableSpell[]]>;
+}> = [
+  {
+    id: "arid",
+    name: "Arid",
+    tiers: [
+      [
+        3,
+        [
+          ["blur", "Blur", 2],
+          ["burning-hands", "Burning Hands", 1],
+          ["fire-bolt", "Fire Bolt", 0]
+        ]
+      ],
+      [5, [["fireball", "Fireball", 3]]],
+      [7, [["blight", "Blight", 4]]],
+      [9, [["wall-of-stone", "Wall of Stone", 5]]]
+    ]
+  },
+  {
+    id: "polar",
+    name: "Polar",
+    tiers: [
+      [
+        3,
+        [
+          ["fog-cloud", "Fog Cloud", 1],
+          ["hold-person", "Hold Person", 2],
+          ["ray-of-frost", "Ray of Frost", 0]
+        ]
+      ],
+      [5, [["sleet-storm", "Sleet Storm", 3]]],
+      [7, [["ice-storm", "Ice Storm", 4]]],
+      [9, [["cone-of-cold", "Cone of Cold", 5]]]
+    ]
+  },
+  {
+    id: "temperate",
+    name: "Temperate",
+    tiers: [
+      [
+        3,
+        [
+          ["misty-step", "Misty Step", 2],
+          ["shocking-grasp", "Shocking Grasp", 0],
+          ["sleep", "Sleep", 1]
+        ]
+      ],
+      [5, [["lightning-bolt", "Lightning Bolt", 3]]],
+      [7, [["freedom-of-movement", "Freedom of Movement", 4]]],
+      [9, [["tree-stride", "Tree Stride", 5]]]
+    ]
+  },
+  {
+    id: "tropical",
+    name: "Tropical",
+    tiers: [
+      [
+        3,
+        [
+          ["acid-splash", "Acid Splash", 0],
+          ["ray-of-sickness", "Ray of Sickness", 1],
+          ["web", "Web", 2]
+        ]
+      ],
+      [5, [["stinking-cloud", "Stinking Cloud", 3]]],
+      [7, [["polymorph", "Polymorph", 4]]],
+      [9, [["insect-plague", "Insect Plague", 5]]]
+    ]
+  }
+];
 
 export const druid: ClassMechanicsModule = {
   features: {
@@ -39,12 +118,13 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * The use pool only, read off the printed column (2 -> 3 -> 4). Known Beast forms (needs a creature
-     * catalog with CR and Fly Speed filters), the temporary HP, form replacement and the Short Rest
-     * partial recovery stay prose.
+     * The use pool, read off the printed column (2 -> 3 -> 4), one use of which comes back on a Short Rest, and the
+     * Temporary Hit Points equal to the Druid level. Known Beast forms (needs a creature catalog with CR and Fly Speed
+     * filters) and the form replacement stay prose.
      */
     "wild-shape": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest" },
+      modifiers: [{ type: "short-rest-regain", poolId: "wild-shape", amount: 1 }],
       actions: [
         {
           id: "wild-shape",
@@ -52,7 +132,9 @@ export const druid: ClassMechanicsModule = {
           activation: "bonus-action",
           description:
             "Shape-shift into a Beast form you have learned for this feature. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action, and you gain Temporary Hit Points equal to your Druid level when you assume a form.",
-          damage: []
+          damage: [],
+          healing: { formula: "0", self: true, temporary: true },
+          adds: { classLevel: 1 }
         }
       ]
     },
@@ -76,7 +158,8 @@ export const druid: ClassMechanicsModule = {
             id: "potent-spellcasting",
             name: "Potent Spellcasting",
             description:
-              "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet."
+              "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet.",
+            modifiers: [potentSpellcasting(DRUID_DAMAGE_CANTRIPS)]
           },
           {
             id: "primal-strike",
@@ -89,7 +172,7 @@ export const druid: ClassMechanicsModule = {
                 name: "Primal Strike",
                 activation: "other",
                 description:
-                  "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit. The printed damage is Cold, Fire, Lightning or Thunder, your choice each time; the rollable below is recorded as Lightning.",
+                  "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit: Cold, Fire, Lightning or Thunder, your choice each time. Add it when you confirm the hit.",
                 damage: [{ formula: "1d8", type: "lightning" }],
                 damageByLevel: [
                   { level: 7, formula: "1d8", type: "lightning" },
@@ -130,13 +213,43 @@ export const druid: ClassMechanicsModule = {
     },
 
     "epic-boon": {
-      choice: { kind: "feat", choose: 1, fromCatalog: "epic-boon-feats" }
+      choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     }
 
     // Not modeled: Wild Resurgence, Archdruid and Natural Recovery (resource conversion between pools)
     // and Beast Spells (a permission, not a rider).
   },
 
+  // "You have the spells listed for your Druid level and lower prepared": each later row is a staged feature
+  // whose one legal option is the chosen land's, adopted without a pick.
+  subclassStages: {
+    "circle-of-the-land": [5, 7, 9].map((level, row) => ({
+      id: `circle-of-the-land-spells-${level}`,
+      name: `Circle of the Land Spells (Level ${level})`,
+      level,
+      description: `When you reach Druid level ${level}, you always have your land's level ${level} spell prepared: ${LANDS.map(
+        (land) => `${land.name}, ${land.tiers[row + 1][1].map(([, name]) => name).join(", ")}`
+      ).join("; ")}.`,
+      tags: ["spellcasting"],
+      choice: {
+        kind: `land-spells-${level}`,
+        choose: 1,
+        options: LANDS.map((land) => ({
+          id: `${land.id}-${level}`,
+          name: `${land.name} Land (Level ${level})`,
+          description: `${land.tiers[row + 1][1].map(([, name]) => name).join(", ")}, always prepared.`,
+          requires: { offer: "feature:circle-of-the-land-spells", id: land.id },
+          grants: {
+            spells: land.tiers[row + 1][1].map(([id, , spellLevel]) => ({
+              id,
+              level: spellLevel,
+              alwaysPrepared: true
+            }))
+          }
+        }))
+      }
+    }))
+  },
   subclasses: {
     "circle-of-the-land": {
       /**
@@ -165,38 +278,23 @@ export const druid: ClassMechanicsModule = {
       },
 
       /**
-       * "Choose one type of land": four inline options carrying only their names, read back by Nature's
-       * Ward. Each land's tiered spell set stays prose (`grants.spells` has no character-level gate, and
-       * the overlay cannot split the feature into staged records).
+       * "Choose one type of land": four inline options, each granting that land's level-3 spells always
+       * prepared; the table's later rows are staged features (`subclassStages`), which read this answer back,
+       * as Nature's Ward does.
        */
       "circle-of-the-land-spells": {
-        // Re-chosen on every Long Rest: the override lives in `actor.choiceOverrides` and the next Long Rest clears it.
+        // Re-chosen after each Long Rest: the new land replaces the ledger answer and the sheet is rebuilt, so the
+        // land's spells and Nature's Ward follow it.
         replaces: [{ offer: "feature:circle-of-the-land-spells", when: "long-rest", amount: 1 }],
         choice: {
           kind: "land",
           choose: 1,
-          options: [
-            {
-              id: "arid",
-              name: "Arid Land",
-              description: "Blur, Burning Hands, Fire Bolt, Blight, Fireball, Wall of Fire."
-            },
-            {
-              id: "polar",
-              name: "Polar Land",
-              description: "Fog Cloud, Hold Person, Ray of Frost, Sleet Storm, Slow, Ice Storm."
-            },
-            {
-              id: "temperate",
-              name: "Temperate Land",
-              description: "Misty Step, Shocking Grasp, Lightning Bolt, Sleet Storm, Freedom of Movement, Ice Storm."
-            },
-            {
-              id: "tropical",
-              name: "Tropical Land",
-              description: "Acid Splash, Ray of Sickness, Web, Stinking Cloud, Polymorph, Insect Plague."
-            }
-          ]
+          options: LANDS.map((land) => ({
+            id: land.id,
+            name: `${land.name} Land`,
+            description: `${land.tiers.map(([level, spells]) => `Level ${level}: ${spells.map(([, name]) => name).join(", ")}`).join(". ")}.`,
+            grants: { spells: land.tiers[0][1].map(([id, , level]) => ({ id, level, alwaysPrepared: true })) }
+          }))
         }
       },
 

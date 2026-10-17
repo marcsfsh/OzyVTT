@@ -72,6 +72,15 @@
     "goldPieces": 75
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -624,6 +633,13 @@
      },
      "per": "long-rest"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "rage",
+      "amount": 1
+     }
+    ],
     "actions": [
      {
       "id": "rage",
@@ -631,13 +647,16 @@
       "activation": "bonus-action",
       "description": "You enter a Rage: Resistance to Bludgeoning, Piercing and Slashing damage, Advantage on Strength checks and Strength saving throws, and a bonus to Strength-based damage. You can't concentrate or cast spells while raging.",
       "damage": [],
+      "grantScaling": {
+       "resource": "rage-damage"
+      },
       "grants": {
        "name": "Raging",
        "tags": [
         "raging"
        ],
        "duration": {
-        "type": "encounter"
+        "type": "until-source-turn-end"
        },
        "modifiers": [
         {
@@ -646,6 +665,21 @@
           "bludgeoning",
           "piercing",
           "slashing"
+         ]
+        },
+        {
+         "type": "damage-bonus",
+         "amount": 2,
+         "when": [
+          {
+           "type": "on-damage-roll"
+          },
+          {
+           "type": "ability-is",
+           "abilities": [
+            "str"
+           ]
+          }
          ]
         },
         {
@@ -737,6 +771,17 @@
         "abilities": [
          "dex"
         ]
+       },
+       {
+        "type": "while-condition",
+        "conditionIds": [
+         "incapacitated",
+         "paralyzed",
+         "petrified",
+         "stunned",
+         "unconscious"
+        ],
+        "present": false
        }
       ]
      }
@@ -760,7 +805,18 @@
        {
         "type": "roll-mode",
         "roll": "attack",
-        "mode": "advantage"
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
        },
        {
         "type": "roll-mode",
@@ -802,7 +858,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -827,6 +883,18 @@
      {
       "type": "speed",
       "amount": 10
+     },
+     {
+      "type": "speed",
+      "amount": -10,
+      "when": [
+       {
+        "type": "while-armored",
+        "weights": [
+         "heavy"
+        ]
+       }
+      ]
      }
     ]
    },
@@ -865,7 +933,7 @@
     "id": "improved-brutal-strike",
     "name": "Improved Brutal Strike",
     "level": 13,
-    "description": "You have honed new ways to attack furiously. The following effects are now among your Brutal Strike options. Staggering Blow. The target has Disadvantage on the next saving throw it makes, and it can't make Opportunity Attacks until the start of your next turn. Sundering Blow. Before the start of your next turn, the next attack roll made by another creature against the target gains a +5 bonus to the roll. An attack roll can gain only one Sundering Blow bonus."
+    "description": "You have honed new ways to attack furiously. The following effects are now among your Brutal Strike options. Staggering Blow. The target has Disadvantage on the next saving throw it makes, and it can't make Opportunity Attacks until the start of your next turn. Sundering Blow. Before the start of your next turn, the next attack roll made by another creature against the target gains a +5 bonus to the roll. An attack roll can gain only one Sundering Blow bonus. At level 17: The extra damage of your Brutal Strike increases to 2d10. In addition, you can use two different Brutal Strike effects whenever you use your Brutal Strike feature."
    },
    {
     "id": "persistent-rage",
@@ -891,7 +959,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
@@ -1003,6 +1071,51 @@
     "goldPieces": 90
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": [],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "acrobatics",
+     "animal-handling",
+     "arcana",
+     "athletics",
+     "deception",
+     "history",
+     "insight",
+     "intimidation",
+     "investigation",
+     "medicine",
+     "nature",
+     "perception",
+     "performance",
+     "persuasion",
+     "religion",
+     "sleight-of-hand",
+     "stealth",
+     "survival"
+    ]
+   },
+   "toolChoices": {
+    "choose": 1,
+    "from": [
+     "instrument-bagpipes",
+     "instrument-drum",
+     "instrument-dulcimer",
+     "instrument-flute",
+     "instrument-horn",
+     "instrument-lute",
+     "instrument-lyre",
+     "instrument-pan-flute",
+     "instrument-shawm",
+     "instrument-viol"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -1626,7 +1739,7 @@
    },
    {
     "id": "jack-of-all-trades",
-    "name": "Jack Of All Trades",
+    "name": "Jack of All Trades",
     "level": 2,
     "description": "You can add half your Proficiency Bonus (round down) to any ability check you make that uses a skill proficiency you lack and that doesn't otherwise use your Proficiency Bonus. For example, if you make a Strength (Athletics) check and lack Athletics proficiency, you can add half your Proficiency Bonus to the check."
    },
@@ -1649,15 +1762,21 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
    {
     "id": "font-of-inspiration",
-    "name": "Font Of Inspiration",
+    "name": "Font of Inspiration",
     "level": 5,
-    "description": "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration."
+    "description": "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration.",
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "bardic-inspiration"
+     }
+    ]
    },
    {
     "id": "countercharm",
@@ -1670,11 +1789,11 @@
     "name": "Magical Secrets",
     "level": 10,
     "description": "You've learned secrets from various magical traditions. Whenever you reach a Bard level (including this level) and the Prepared Spells number in the Bard Features table increases, you can choose any of your new prepared spells from the Bard, Cleric, Druid, and Wizard spell lists, and the chosen spells count as Bard spells for you (see a class's section for its spell list). In addition, whenever you replace a spell prepared for this class, you can replace it with a spell from those lists.",
-    "choice": {
-     "kind": "spell",
-     "choose": 2,
-     "fromCatalog": "bard-spells"
-    }
+    "extraSpellLists": [
+     "cleric",
+     "druid",
+     "wizard"
+    ]
    },
    {
     "id": "superior-inspiration",
@@ -1690,12 +1809,12 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
     "id": "words-of-creation",
-    "name": "Words Of Creation",
+    "name": "Words of Creation",
     "level": 20,
     "description": "You have mastered two of the Words of Creation: the words of life and death. You therefore always have the Power Word Heal and Power Word Kill spells prepared. When you cast either spell, you can target a second creature with it if that creature is within 10 feet of the first target.",
     "grants": {
@@ -2465,7 +2584,7 @@
       "id": "divine-spark",
       "name": "Channel Divinity: Divine Spark",
       "activation": "action",
-      "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. On a successful save, the creature takes half as much damage (round down). You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8). The rollable below is the damaging branch, recorded as Radiant; the healing branch and the added Wisdom modifier are resolved from this text.",
+      "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. On a successful save, the creature takes half as much damage (round down). You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8). This is the damaging branch, recorded as Radiant; the healing branch is its own action.",
       "save": {
        "ability": "con",
        "dc": "spellcasting",
@@ -2499,7 +2618,41 @@
         "formula": "4d8",
         "type": "radiant"
        }
-      ]
+      ],
+      "adds": {
+       "abilityModifier": "wis"
+      }
+     },
+     {
+      "id": "divine-spark-heal",
+      "name": "Channel Divinity: Divine Spark (heal)",
+      "activation": "action",
+      "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier: the creature regains Hit Points equal to that total. You roll an additional d8 when you reach Cleric levels 7 (2d8), 13 (3d8), and 18 (4d8).",
+      "damage": [],
+      "healing": {
+       "formula": "1d8"
+      },
+      "healingByLevel": [
+       {
+        "level": 2,
+        "formula": "1d8"
+       },
+       {
+        "level": 7,
+        "formula": "2d8"
+       },
+       {
+        "level": 13,
+        "formula": "3d8"
+       },
+       {
+        "level": 18,
+        "formula": "4d8"
+       }
+      ],
+      "adds": {
+       "abilityModifier": "wis"
+      }
      },
      {
       "id": "turn-undead",
@@ -2513,7 +2666,12 @@
        "failureConditions": [
         "frightened",
         "incapacitated"
-       ]
+       ],
+       "failureDuration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "endsOnDamage": true
       },
       "damage": []
      }
@@ -2538,7 +2696,14 @@
        }
       ]
      }
-    }
+    },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "channel-divinity",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "cleric-subclass",
@@ -2564,7 +2729,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -2595,7 +2760,7 @@
          "id": "divine-strike",
          "name": "Divine Strike",
          "activation": "other",
-         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit. The printed damage is Necrotic or Radiant, your choice each time; the rollable below is recorded as Radiant.",
+         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon, add this damage to that hit: Necrotic or Radiant, your choice each time. Add it when you confirm the hit.",
          "damage": [
           {
            "formula": "1d8",
@@ -2625,7 +2790,24 @@
       {
        "id": "potent-spellcasting",
        "name": "Potent Spellcasting",
-       "description": "Add your Wisdom modifier to the damage you deal with any Cleric cantrip. When Improved Blessed Strikes takes effect at Cleric level 14, casting a Cleric cantrip that damages a creature also grants you or a creature within 60 feet Temporary Hit Points equal to twice your Wisdom modifier."
+       "description": "Add your Wisdom modifier to the damage you deal with any Cleric cantrip. When Improved Blessed Strikes takes effect at Cleric level 14, casting a Cleric cantrip that damages a creature also grants you or a creature within 60 feet Temporary Hit Points equal to twice your Wisdom modifier.",
+       "modifiers": [
+        {
+         "type": "extra-damage",
+         "abilityModifier": "wis",
+         "when": [
+          {
+           "type": "on-damage-roll"
+          },
+          {
+           "type": "spell-id-is",
+           "spellIds": [
+            "sacred-flame"
+           ]
+          }
+         ]
+        }
+       ]
       }
      ]
     }
@@ -2690,7 +2872,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
@@ -2791,6 +2973,14 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "shields"
+   ],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -3414,13 +3604,28 @@
      },
      "per": "long-rest"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "wild-shape",
+      "amount": 1
+     }
+    ],
     "actions": [
      {
       "id": "wild-shape",
       "name": "Wild Shape",
       "activation": "bonus-action",
       "description": "Shape-shift into a Beast form you have learned for this feature. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action, and you gain Temporary Hit Points equal to your Druid level when you assume a form.",
-      "damage": []
+      "damage": [],
+      "healing": {
+       "formula": "0",
+       "self": true,
+       "temporary": true
+      },
+      "adds": {
+       "classLevel": 1
+      }
      }
     ]
    },
@@ -3467,7 +3672,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -3489,7 +3694,26 @@
       {
        "id": "potent-spellcasting",
        "name": "Potent Spellcasting",
-       "description": "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet."
+       "description": "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet.",
+       "modifiers": [
+        {
+         "type": "extra-damage",
+         "abilityModifier": "wis",
+         "when": [
+          {
+           "type": "on-damage-roll"
+          },
+          {
+           "type": "spell-id-is",
+           "spellIds": [
+            "poison-spray",
+            "produce-flame",
+            "starry-wisp"
+           ]
+          }
+         ]
+        }
+       ]
       },
       {
        "id": "primal-strike",
@@ -3500,7 +3724,7 @@
          "id": "primal-strike",
          "name": "Primal Strike",
          "activation": "other",
-         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit. The printed damage is Cold, Fire, Lightning or Thunder, your choice each time; the rollable below is recorded as Lightning.",
+         "description": "Once on each of your turns, when you hit a creature with an attack roll using a weapon or a Beast form's attack, add this damage to that hit: Cold, Fire, Lightning or Thunder, your choice each time. Add it when you confirm the hit.",
          "damage": [
           {
            "formula": "1d8",
@@ -3574,7 +3798,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
@@ -3711,7 +3935,6 @@
     "shields"
    ],
    "weapons": [
-    "simple",
     "martial"
    ],
    "tools": []
@@ -4320,7 +4543,14 @@
       "name": "Second Wind",
       "activation": "bonus-action",
       "description": "Regain Hit Points equal to 1d10 plus your Fighter level.",
-      "damage": []
+      "damage": [],
+      "healing": {
+       "formula": "1d10",
+       "self": true
+      },
+      "adds": {
+       "classLevel": 1
+      }
      }
     ],
     "uses": {
@@ -4342,7 +4572,14 @@
        }
       ]
      }
-    }
+    },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "second-wind",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "weapon-mastery",
@@ -4423,7 +4660,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -4507,7 +4744,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
@@ -4595,6 +4832,11 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -4744,7 +4986,8 @@
    },
    {
     "features": [
-     "empowered-strikes"
+     "empowered-strikes",
+     "unarmored-movement-6"
     ],
     "classResources": [
      {
@@ -4849,7 +5092,8 @@
    {
     "features": [
      "heightened-focus",
-     "self-restoration"
+     "self-restoration",
+     "unarmored-movement-10"
     ],
     "classResources": [
      {
@@ -4951,7 +5195,8 @@
    },
    {
     "features": [
-     "disciplined-survivor"
+     "disciplined-survivor",
+     "unarmored-movement-14"
     ],
     "classResources": [
      {
@@ -5053,7 +5298,8 @@
    },
    {
     "features": [
-     "superior-defense"
+     "superior-defense",
+     "unarmored-movement-18"
     ],
     "classResources": [
      {
@@ -5152,7 +5398,7 @@
    },
    {
     "id": "monks-focus",
-    "name": "Monks Focus",
+    "name": "Monk's Focus",
     "level": 2,
     "description": "Your focus and martial training allow you to harness a well of extraordinary energy within yourself. This energy is represented by Focus Points. Your Monk level determines the number of points you have, as shown in the Focus Points column of the Monk Features table. You can expend these points to enhance or fuel certain Monk features. You start knowing three such features: Flurry of Blows, Patient Defense, and Step of the Wind, each of which is detailed below. When you expend a Focus Point, it is unavailable until you finish a Short or Long Rest, at the end of which you regain all your expended points. Some features that use Focus Points require your target to make a saving throw. The save DC equals 8 plus your Wisdom modifier and Proficiency Bonus. Flurry of Blows. You can expend 1 Focus Point to make two Unarmed Strikes as a Bonus Action. Patient Defense. You can take the Disengage action as a Bonus Action. Alternatively, you can expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Step of the Wind. You can take the Dash action as a Bonus Action. Alternatively, you can expend 1 Focus Point to take both the Disengage and Dash actions as a Bonus Action, and your jump distance is doubled for the turn.",
     "uses": {
@@ -5208,7 +5454,18 @@
     "id": "unarmored-movement",
     "name": "Unarmored Movement",
     "level": 2,
-    "description": "Your speed increases by 10 feet while you aren't wearing armor or wielding a Shield. This bonus increases when you reach certain Monk levels, as shown on the Monk Features table."
+    "description": "Your speed increases by 10 feet while you aren't wearing armor or wielding a Shield. This bonus increases when you reach certain Monk levels, as shown on the Monk Features table.",
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": 10,
+      "when": [
+       {
+        "type": "while-unarmored"
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "uncanny-metabolism",
@@ -5245,7 +5502,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -5297,7 +5554,32 @@
        "successDamage": "none",
        "failureConditions": [
         "stunned"
-       ]
+       ],
+       "failureDuration": {
+        "type": "until-source-next-turn"
+       },
+       "successEffect": {
+        "name": "Stunning Strike",
+        "tags": [
+         "speed-halved",
+         "until-attacked"
+        ],
+        "duration": {
+         "type": "until-source-next-turn"
+        },
+        "modifiers": [
+         {
+          "type": "roll-mode",
+          "roll": "incoming-attack",
+          "mode": "advantage",
+          "when": [
+           {
+            "type": "on-attack-roll"
+           }
+          ]
+         }
+        ]
+       }
       }
      }
     ]
@@ -5328,7 +5610,7 @@
    },
    {
     "id": "self-restoration",
-    "name": "Self Restoration",
+    "name": "Self-Restoration",
     "level": 10,
     "description": "Through sheer force of will, you can remove one of the following conditions from yourself at the end of each of your turns: Charmed, Frightened, or Poisoned. In addition, forgoing food and drink doesn't give you levels of Exhaustion."
    },
@@ -5365,35 +5647,51 @@
     "name": "Superior Defense",
     "level": 18,
     "description": "At the start of your turn, you can expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to all damage except Force damage.",
-    "effects": [
+    "uses": {
+     "scaling": {
+      "type": "class-resource",
+      "id": "focus-points"
+     },
+     "per": "short-rest",
+     "pool": "focus-points"
+    },
+    "actions": [
      {
+      "id": "superior-defense",
       "name": "Superior Defense",
-      "tags": [
-       "superior-defense"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 10
-      },
-      "modifiers": [
-       {
-        "type": "damage-resistance",
-        "damageTypes": [
-         "acid",
-         "bludgeoning",
-         "cold",
-         "fire",
-         "lightning",
-         "necrotic",
-         "piercing",
-         "poison",
-         "psychic",
-         "radiant",
-         "slashing",
-         "thunder"
-        ]
-       }
-      ]
+      "activation": "other",
+      "description": "At the start of your turn, expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to every damage type except Force.",
+      "damage": [],
+      "useCost": 3,
+      "grants": {
+       "name": "Superior Defense",
+       "tags": [
+        "superior-defense"
+       ],
+       "duration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "acid",
+          "bludgeoning",
+          "cold",
+          "fire",
+          "lightning",
+          "necrotic",
+          "piercing",
+          "poison",
+          "psychic",
+          "radiant",
+          "slashing",
+          "thunder"
+         ]
+        }
+       ]
+      }
      }
     ]
    },
@@ -5405,12 +5703,12 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
     "id": "body-and-mind",
-    "name": "Body And Mind",
+    "name": "Body and Mind",
     "level": 20,
     "description": "You have developed your body and mind to new heights. Your Dexterity and Wisdom scores increase by 4, to a maximum of 25.",
     "modifiers": [
@@ -5425,6 +5723,78 @@
       "ability": "wis",
       "amount": 4,
       "maximum": 25
+     }
+    ]
+   },
+   {
+    "id": "unarmored-movement-6",
+    "name": "Unarmored Movement",
+    "level": 6,
+    "description": "Your speed increases by 15 feet while you aren't wearing armor or wielding a Shield.",
+    "replacesFeatureId": "unarmored-movement",
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": 15,
+      "when": [
+       {
+        "type": "while-unarmored"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "unarmored-movement-10",
+    "name": "Unarmored Movement",
+    "level": 10,
+    "description": "Your speed increases by 20 feet while you aren't wearing armor or wielding a Shield.",
+    "replacesFeatureId": "unarmored-movement-6",
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": 20,
+      "when": [
+       {
+        "type": "while-unarmored"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "unarmored-movement-14",
+    "name": "Unarmored Movement",
+    "level": 14,
+    "description": "Your speed increases by 25 feet while you aren't wearing armor or wielding a Shield.",
+    "replacesFeatureId": "unarmored-movement-10",
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": 25,
+      "when": [
+       {
+        "type": "while-unarmored"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "unarmored-movement-18",
+    "name": "Unarmored Movement",
+    "level": 18,
+    "description": "Your speed increases by 30 feet while you aren't wearing armor or wielding a Shield.",
+    "replacesFeatureId": "unarmored-movement-14",
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": 30,
+      "when": [
+       {
+        "type": "while-unarmored"
+       }
+      ]
      }
     ]
    }
@@ -5520,6 +5890,17 @@
     "goldPieces": 150
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "medium",
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -6059,7 +6440,121 @@
     "id": "lay-on-hands",
     "name": "Lay On Hands",
     "level": 1,
-    "description": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you finish a Long Rest. With that pool, you can restore a total number of Hit Points equal to five times your Paladin level. As a Bonus Action, you can touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool. You can also expend 5 Hit Points from the pool of healing power to remove the Poisoned condition from the creature; those points don't also restore Hit Points to the creature."
+    "description": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you finish a Long Rest. With that pool, you can restore a total number of Hit Points equal to five times your Paladin level. As a Bonus Action, you can touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool. You can also expend 5 Hit Points from the pool of healing power to remove the Poisoned condition from the creature; those points don't also restore Hit Points to the creature.",
+    "uses": {
+     "scaling": {
+      "type": "by-level",
+      "table": [
+       {
+        "level": 1,
+        "limit": 5
+       },
+       {
+        "level": 2,
+        "limit": 10
+       },
+       {
+        "level": 3,
+        "limit": 15
+       },
+       {
+        "level": 4,
+        "limit": 20
+       },
+       {
+        "level": 5,
+        "limit": 25
+       },
+       {
+        "level": 6,
+        "limit": 30
+       },
+       {
+        "level": 7,
+        "limit": 35
+       },
+       {
+        "level": 8,
+        "limit": 40
+       },
+       {
+        "level": 9,
+        "limit": 45
+       },
+       {
+        "level": 10,
+        "limit": 50
+       },
+       {
+        "level": 11,
+        "limit": 55
+       },
+       {
+        "level": 12,
+        "limit": 60
+       },
+       {
+        "level": 13,
+        "limit": 65
+       },
+       {
+        "level": 14,
+        "limit": 70
+       },
+       {
+        "level": 15,
+        "limit": 75
+       },
+       {
+        "level": 16,
+        "limit": 80
+       },
+       {
+        "level": 17,
+        "limit": 85
+       },
+       {
+        "level": 18,
+        "limit": 90
+       },
+       {
+        "level": 19,
+        "limit": 95
+       },
+       {
+        "level": 20,
+        "limit": 100
+       }
+      ]
+     },
+     "per": "long-rest",
+     "pool": "lay-on-hands"
+    },
+    "actions": [
+     {
+      "id": "lay-on-hands",
+      "name": "Lay on Hands",
+      "activation": "bonus-action",
+      "description": "As a Bonus Action, touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool.",
+      "damage": [],
+      "useCost": "chosen",
+      "healing": {
+       "formula": "1",
+       "perUse": true
+      }
+     },
+     {
+      "id": "lay-on-hands-cure-poison",
+      "name": "Lay on Hands: Cure Poison",
+      "activation": "bonus-action",
+      "description": "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove the Poisoned condition from it; those points don't also restore Hit Points to the creature.",
+      "damage": [],
+      "useCost": 5,
+      "endsConditions": [
+       "poisoned"
+      ]
+     }
+    ]
    },
    {
     "id": "spellcasting",
@@ -6104,7 +6599,7 @@
    },
    {
     "id": "paladins-smite",
-    "name": "Paladins Smite",
+    "name": "Paladin's Smite",
     "level": 2,
     "description": "You always have the Divine Smite spell prepared. In addition, you can cast it without expending a spell slot, but you must finish a Long Rest before you can cast it in this way again.",
     "uses": {
@@ -6135,6 +6630,13 @@
      "per": "long-rest",
      "pool": "channel-divinity"
     },
+    "modifiers": [
+     {
+      "type": "short-rest-regain",
+      "poolId": "channel-divinity",
+      "amount": 1
+     }
+    ],
     "tags": [
      "channel-divinity"
     ],
@@ -6167,7 +6669,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -6205,7 +6707,7 @@
    },
    {
     "id": "aura-of-protection",
-    "name": "Aura Of Protection",
+    "name": "Aura of Protection",
     "level": 6,
     "description": "You radiate a protective, unseeable aura in a 10-foot Emanation that originates from you. The aura is inactive while you have the Incapacitated condition. You and your allies in the aura gain a bonus to saving throws equal to your Charisma modifier (minimum bonus of +1). If another Paladin is present, a creature can benefit from only one Aura of Protection at a time; the creature chooses which aura while in them."
    },
@@ -6235,19 +6737,37 @@
        "successDamage": "none",
        "failureConditions": [
         "frightened"
-       ]
+       ],
+       "failureDuration": {
+        "type": "rounds",
+        "rounds": 10
+       },
+       "endsOnDamage": true
       }
      }
     ]
    },
    {
     "id": "aura-of-courage",
-    "name": "Aura Of Courage",
+    "name": "Aura of Courage",
     "level": 10,
     "description": "You and your allies have Immunity to the Frightened condition while in your Aura of Protection. If a Frightened ally enters the aura, that condition has no effect on that ally while there.",
     "grants": {
      "conditionImmunities": [
       "frightened"
+     ],
+     "when": [
+      {
+       "type": "while-condition",
+       "conditionIds": [
+        "incapacitated",
+        "paralyzed",
+        "petrified",
+        "stunned",
+        "unconscious"
+       ],
+       "present": false
+      }
      ]
     }
    },
@@ -6268,7 +6788,7 @@
        {
         "type": "attack-kind-is",
         "kinds": [
-         "melee",
+         "melee-weapon",
          "unarmed"
         ]
        }
@@ -6296,7 +6816,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    }
   ]
@@ -6402,6 +6922,30 @@
     "goldPieces": 150
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "medium",
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": [],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "animal-handling",
+     "athletics",
+     "insight",
+     "investigation",
+     "nature",
+     "perception",
+     "stealth",
+     "survival"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -7051,7 +7595,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -7076,6 +7620,18 @@
      {
       "type": "speed",
       "amount": 10
+     },
+     {
+      "type": "speed",
+      "amount": -10,
+      "when": [
+       {
+        "type": "while-armored",
+        "weights": [
+         "heavy"
+        ]
+       }
+      ]
      }
     ]
    },
@@ -7109,7 +7665,15 @@
       "name": "Tireless",
       "activation": "action",
       "description": "As a Magic action, you give yourself Temporary Hit Points equal to 1d8 plus your Wisdom modifier (minimum of 1). Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1.",
-      "damage": []
+      "damage": [],
+      "healing": {
+       "formula": "1d8",
+       "self": true,
+       "temporary": true
+      },
+      "adds": {
+       "abilityModifier": "wis"
+      }
      }
     ]
    },
@@ -7121,7 +7685,7 @@
    },
    {
     "id": "natures-veil",
-    "name": "Natures Veil",
+    "name": "Nature's Veil",
     "level": 14,
     "description": "You invoke spirits of nature to magically hide yourself. As a Bonus Action, you can give yourself the Invisible condition until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
     "uses": {
@@ -7138,7 +7702,24 @@
       "name": "Nature's Veil",
       "activation": "bonus-action",
       "description": "You invoke spirits of nature to magically hide yourself, giving yourself the Invisible condition until the end of your next turn.",
-      "damage": []
+      "damage": [],
+      "grants": {
+       "name": "Nature's Veil",
+       "tags": [
+        "natures-veil"
+       ],
+       "duration": {
+        "type": "until-source-turn-end"
+       },
+       "modifiers": [],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false,
+       "conditions": [
+        "invisible"
+       ]
+      }
      }
     ]
    },
@@ -7169,7 +7750,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
@@ -7282,6 +7863,30 @@
     "goldPieces": 100
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": [
+    "thieves-tools"
+   ],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "acrobatics",
+     "athletics",
+     "deception",
+     "insight",
+     "intimidation",
+     "investigation",
+     "perception",
+     "persuasion",
+     "sleight-of-hand",
+     "stealth"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -7629,7 +8234,7 @@
       "id": "sneak-attack",
       "name": "Sneak Attack",
       "activation": "other",
-      "description": "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's, which is why the part below is labelled \"weapon\" rather than a fixed type.",
+      "description": "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's. Add it when you confirm a qualifying hit.",
       "damage": [],
       "damageByLevel": [
        {
@@ -7688,7 +8293,7 @@
    },
    {
     "id": "thieves-cant",
-    "name": "Thieves Cant",
+    "name": "Thieves' Cant",
     "level": 1,
     "description": "You picked up various languages in the communities where you plied your roguish talents. You know Thieves' Cant and one other language of your choice, which you choose from the language tables in \"Character Creation.\"",
     "grants": {
@@ -7770,7 +8375,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -7849,12 +8454,12 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
     "id": "stroke-of-luck",
-    "name": "Stroke Of Luck",
+    "name": "Stroke of Luck",
     "level": 20,
     "description": "You have a marvelous knack for succeeding when you need to. If you fail a D20 Test, you can turn the roll into a 20. Once you use this feature, you can't use it again until you finish a Short or Long Rest.",
     "uses": {
@@ -7937,6 +8542,11 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -8527,7 +9137,7 @@
    },
    {
     "id": "font-of-magic",
-    "name": "Font Of Magic",
+    "name": "Font of Magic",
     "level": 2,
     "description": "You can tap into the wellspring of magic within yourself. This wellspring is represented by Sorcery Points, which allow you to create a variety of magical effects. You have 2 Sorcery Points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer Features table. You can't have more Sorcery Points than the number shown in the table for your level. You regain all expended Sorcery Points when you finish a Long Rest. You can use your Sorcery Points to fuel the options below, along with other features, such as Metamagic, that use those points. Converting Spell Slots to Sorcery Points. You can expend a spell slot to gain a number of Sorcery Points equal to the slot's level (no action required). Creating Spell Slots. As a Bonus Action, you can transform unexpended Sorcery Points into one spell slot. The Creating Spell Slots table shows the cost of creating a spell slot of a given level, and it lists the minimum Sorcerer level you must be to create a slot. You can create a spell slot no higher than level 5. Any spell slot you create with this feature vanishes when you finish a Long Rest. Creating Spell Slots Spell Slot Level 1: Sorcery Point Cost 2, Min. Sorcerer Level 2; Spell Slot Level 2: Sorcery Point Cost 3, Min. Sorcerer Level 3; Spell Slot Level 3: Sorcery Point Cost 5, Min. Sorcerer Level 5; Spell Slot Level 4: Sorcery Point Cost 6, Min. Sorcerer Level 7; Spell Slot Level 5: Sorcery Point Cost 7, Min. Sorcerer Level 9.",
     "uses": {
@@ -8684,7 +9294,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -8712,7 +9322,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
@@ -8809,6 +9419,13 @@
     "goldPieces": 100
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -9259,6 +9876,7 @@
        "id": "agonizing-blast",
        "name": "Agonizing Blast",
        "description": "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage Choose one of your known Warlock cantrips that deals damage. You can add your Charisma modifier to that spell's damage rolls. Repeatable. You can gain this invocation more than once. Each time you do so, choose a different eligible cantrip.",
+       "level": 2,
        "choice": {
         "kind": "cantrip",
         "choose": 1,
@@ -9305,6 +9923,7 @@
        "id": "ascendant-step",
        "name": "Ascendant Step",
        "description": "Prerequisite: Level 5+ Warlock You can cast Levitate on yourself without expending a spell slot.",
+       "level": 5,
        "grants": {
         "spells": [
          {
@@ -9319,33 +9938,52 @@
       {
        "id": "devils-sight",
        "name": "Devil's Sight",
-       "description": "Prerequisite: Level 2+ Warlock You can see normally in Dim Light and Darkness—both magical and nonmagical—within 120 feet of yourself."
+       "description": "Prerequisite: Level 2+ Warlock You can see normally in Dim Light and Darkness—both magical and nonmagical—within 120 feet of yourself.",
+       "level": 2
       },
       {
        "id": "devouring-blade",
        "name": "Devouring Blade",
-       "description": "Prerequisite: Level 12+ Warlock, Thirsting Blade Invocation The Extra Attack of your Thirsting Blade invocation confers two extra attacks rather than one."
+       "description": "Prerequisite: Level 12+ Warlock, Thirsting Blade Invocation The Extra Attack of your Thirsting Blade invocation confers two extra attacks rather than one.",
+       "level": 12,
+       "requires": {
+        "offer": "feature:eldritch-invocations",
+        "id": "thirsting-blade"
+       }
       },
       {
        "id": "eldritch-mind",
        "name": "Eldritch Mind",
-       "description": "You have Advantage on Constitution saving throws that you make to maintain Concentration."
+       "description": "You have Advantage on Constitution saving throws that you make to maintain Concentration.",
+       "modifiers": [
+        {
+         "type": "roll-mode",
+         "roll": "concentration",
+         "mode": "advantage"
+        }
+       ]
       },
       {
        "id": "eldritch-smite",
        "name": "Eldritch Smite",
-       "description": "Prerequisite: Level 5+ Warlock, Pact of the Blade Invocation Once per turn when you hit a creature with your pact weapon, you can expend a Pact Magic spell slot to deal an extra 1d8 Force damage to the target, plus another 1d8 per level of the spell slot, and you can give the target the Prone condition if it is Huge or smaller."
+       "description": "Prerequisite: Level 5+ Warlock, Pact of the Blade Invocation Once per turn when you hit a creature with your pact weapon, you can expend a Pact Magic spell slot to deal an extra 1d8 Force damage to the target, plus another 1d8 per level of the spell slot, and you can give the target the Prone condition if it is Huge or smaller.",
+       "level": 5,
+       "requires": {
+        "offer": "feature:eldritch-invocations",
+        "id": "pact-of-the-blade"
+       }
       },
       {
        "id": "eldritch-spear",
        "name": "Eldritch Spear",
        "description": "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage Choose one of your known Warlock cantrips that deals damage and has a range of 10+ feet. When you cast that spell, its range increases by a number of feet equal to 30 times your Warlock level. Repeatable. You can gain this invocation more than once. Each time you do so, choose a different eligible cantrip.",
+       "level": 2,
        "choice": {
         "kind": "cantrip",
         "choose": 1,
         "fromPicks": {
          "offer": "class-cantrips",
-         "where": "ranged"
+         "where": "ranged-damage"
         }
        }
       },
@@ -9353,6 +9991,7 @@
        "id": "fiendish-vigor",
        "name": "Fiendish Vigor",
        "description": "Prerequisite: Level 2+ Warlock You can cast False Life on yourself without expending a spell slot. When you cast the spell with this feature, you don't roll the die for the Temporary Hit Points; you automatically get the highest number on the die.",
+       "level": 2,
        "grants": {
         "spells": [
          {
@@ -9367,12 +10006,14 @@
       {
        "id": "gaze-of-two-minds",
        "name": "Gaze of Two Minds",
-       "description": "Prerequisite: Level 5+ Warlock You can use a Bonus Action to touch a willing creature and perceive through its senses until the end of your next turn. As long as the creature is on the same plane of existence as you, you can take a Bonus Action on subsequent turns to maintain this connection, extending the duration until the end of your next turn. The connection ends if you don't maintain it in this way. While perceiving through the other creature's senses, you benefit from any special senses possessed by that creature, and you can cast spells as if you were in your space or the other creature's space if the two of you are within 60 feet of each other."
+       "description": "Prerequisite: Level 5+ Warlock You can use a Bonus Action to touch a willing creature and perceive through its senses until the end of your next turn. As long as the creature is on the same plane of existence as you, you can take a Bonus Action on subsequent turns to maintain this connection, extending the duration until the end of your next turn. The connection ends if you don't maintain it in this way. While perceiving through the other creature's senses, you benefit from any special senses possessed by that creature, and you can cast spells as if you were in your space or the other creature's space if the two of you are within 60 feet of each other.",
+       "level": 5
       },
       {
        "id": "gift-of-the-depths",
        "name": "Gift of the Depths",
        "description": "Prerequisite: Level 5+ Warlock You can breathe underwater, and you gain a Swim Speed equal to your Speed. You can also cast Water Breathing once without expending a spell slot. You regain the ability to cast it in this way again when you finish a Long Rest.",
+       "level": 5,
        "grants": {
         "spells": [
          {
@@ -9391,27 +10032,44 @@
       {
        "id": "gift-of-the-protectors",
        "name": "Gift of the Protectors",
-       "description": "Prerequisite: Level 9+ Warlock, Pact of the Tome Invocation A new page appears in your Book of Shadows when you conjure it. With your permission, a creature can take an action to write its name on that page, which can contain a number of names equal to your Charisma modifier (minimum of one name). When any creature whose name is on the page is reduced to 0 Hit Points but not killed outright, the creature magically drops to 1 Hit Point instead. Once this magic is triggered, no creature can benefit from it until you finish a Long Rest. As a Magic action, you can erase a name on the page by touching it."
+       "description": "Prerequisite: Level 9+ Warlock, Pact of the Tome Invocation A new page appears in your Book of Shadows when you conjure it. With your permission, a creature can take an action to write its name on that page, which can contain a number of names equal to your Charisma modifier (minimum of one name). When any creature whose name is on the page is reduced to 0 Hit Points but not killed outright, the creature magically drops to 1 Hit Point instead. Once this magic is triggered, no creature can benefit from it until you finish a Long Rest. As a Magic action, you can erase a name on the page by touching it.",
+       "level": 9,
+       "requires": {
+        "offer": "feature:eldritch-invocations",
+        "id": "pact-of-the-tome"
+       }
       },
       {
        "id": "investment-of-the-chain-master",
        "name": "Investment of the Chain Master",
-       "description": "Prerequisite: Level 5+ Warlock, Pact of the Chain Invocation When you cast Find Familiar, you infuse the summoned familiar with a measure of your eldritch power, granting the creature the following benefits. Aerial or Aquatic. The familiar gains either a Fly Speed or a Swim Speed (your choice) of 40 feet. Quick Attack. As a Bonus Action, you can command the familiar to take the Attack action. Necrotic or Radiant Damage. Whenever the familiar deals Bludgeoning, Piercing, or Slashing damage, you can make it deal Necrotic or Radiant damage instead. Your Save DC. If the familiar forces a creature to make a saving throw, it uses your spell save DC. Resistance. When the familiar takes damage, you can take a Reaction to grant it Resistance against that damage."
+       "description": "Prerequisite: Level 5+ Warlock, Pact of the Chain Invocation When you cast Find Familiar, you infuse the summoned familiar with a measure of your eldritch power, granting the creature the following benefits. Aerial or Aquatic. The familiar gains either a Fly Speed or a Swim Speed (your choice) of 40 feet. Quick Attack. As a Bonus Action, you can command the familiar to take the Attack action. Necrotic or Radiant Damage. Whenever the familiar deals Bludgeoning, Piercing, or Slashing damage, you can make it deal Necrotic or Radiant damage instead. Your Save DC. If the familiar forces a creature to make a saving throw, it uses your spell save DC. Resistance. When the familiar takes damage, you can take a Reaction to grant it Resistance against that damage.",
+       "level": 5,
+       "requires": {
+        "offer": "feature:eldritch-invocations",
+        "id": "pact-of-the-chain"
+       }
       },
       {
        "id": "lessons-of-the-first-ones",
        "name": "Lessons of the First Ones",
-       "description": "Prerequisite: Level 2+ Warlock You have received knowledge from an elder entity of the multiverse, allowing you to gain one Origin feat of your choice (see \"Feats\"). Repeatable. You can gain this invocation more than once. Each time you do so, choose a different Origin feat."
+       "description": "Prerequisite: Level 2+ Warlock You have received knowledge from an elder entity of the multiverse, allowing you to gain one Origin feat of your choice (see \"Feats\"). Repeatable. You can gain this invocation more than once. Each time you do so, choose a different Origin feat.",
+       "level": 2
       },
       {
        "id": "lifedrinker",
        "name": "Lifedrinker",
-       "description": "Prerequisite: Level 9+ Warlock, Pact of the Blade Invocation Once per turn when you hit a creature with your pact weapon, you can deal an extra 1d6 Necrotic, Psychic, or Radiant damage (your choice) to the creature, and you can expend one of your Hit Point Dice to roll it and regain a number of Hit Points equal to the roll plus your Constitution modifier (minimum of 1 Hit Point)."
+       "description": "Prerequisite: Level 9+ Warlock, Pact of the Blade Invocation Once per turn when you hit a creature with your pact weapon, you can deal an extra 1d6 Necrotic, Psychic, or Radiant damage (your choice) to the creature, and you can expend one of your Hit Point Dice to roll it and regain a number of Hit Points equal to the roll plus your Constitution modifier (minimum of 1 Hit Point).",
+       "level": 9,
+       "requires": {
+        "offer": "feature:eldritch-invocations",
+        "id": "pact-of-the-blade"
+       }
       },
       {
        "id": "mask-of-many-faces",
        "name": "Mask of Many Faces",
        "description": "Prerequisite: Level 2+ Warlock You can cast Disguise Self without expending a spell slot.",
+       "level": 2,
        "grants": {
         "spells": [
          {
@@ -9427,6 +10085,7 @@
        "id": "master-of-myriad-forms",
        "name": "Master of Myriad Forms",
        "description": "Prerequisite: Level 5+ Warlock You can cast Alter Self without expending a spell slot.",
+       "level": 5,
        "grants": {
         "spells": [
          {
@@ -9442,6 +10101,7 @@
        "id": "misty-visions",
        "name": "Misty Visions",
        "description": "Prerequisite: Level 2+ Warlock You can cast Silent Image without expending a spell slot.",
+       "level": 2,
        "grants": {
         "spells": [
          {
@@ -9457,6 +10117,7 @@
        "id": "one-with-shadows",
        "name": "One with Shadows",
        "description": "Prerequisite: Level 5+ Warlock While you're in an area of Dim Light or Darkness, you can cast Invisibility on yourself without expending a spell slot.",
+       "level": 5,
        "grants": {
         "spells": [
          {
@@ -9472,6 +10133,7 @@
        "id": "otherworldly-leap",
        "name": "Otherworldly Leap",
        "description": "Prerequisite: Level 2+ Warlock You can cast Jump on yourself without expending a spell slot.",
+       "level": 2,
        "grants": {
         "spells": [
          {
@@ -9522,6 +10184,7 @@
        "id": "repelling-blast",
        "name": "Repelling Blast",
        "description": "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage via an Attack Roll Choose one of your known Warlock cantrips that requires an attack roll. When you hit a Large or smaller creature with that cantrip, you can push the creature up to 10 feet straight away from you. Repeatable. You can gain this invocation more than once. Each time you do so, choose a different eligible cantrip.",
+       "level": 2,
        "choice": {
         "kind": "cantrip",
         "choose": 1,
@@ -9534,12 +10197,18 @@
       {
        "id": "thirsting-blade",
        "name": "Thirsting Blade",
-       "description": "Prerequisite: Level 5+ Warlock, Pact of the Blade Invocation You gain the Extra Attack feature for your pact weapon only. With that feature, you can attack twice with the weapon instead of once when you take the Attack action on your turn."
+       "description": "Prerequisite: Level 5+ Warlock, Pact of the Blade Invocation You gain the Extra Attack feature for your pact weapon only. With that feature, you can attack twice with the weapon instead of once when you take the Attack action on your turn.",
+       "level": 5,
+       "requires": {
+        "offer": "feature:eldritch-invocations",
+        "id": "pact-of-the-blade"
+       }
       },
       {
        "id": "visions-of-distant-realms",
        "name": "Visions of Distant Realms",
        "description": "Prerequisite: Level 9+ Warlock You can cast Arcane Eye without expending a spell slot.",
+       "level": 9,
        "grants": {
         "spells": [
          {
@@ -9555,6 +10224,7 @@
        "id": "whispers-of-the-grave",
        "name": "Whispers of the Grave",
        "description": "Prerequisite: Level 7+ Warlock You can cast Speak with Dead without expending a spell slot.",
+       "level": 7,
        "grants": {
         "spells": [
          {
@@ -9569,7 +10239,8 @@
       {
        "id": "witch-sight",
        "name": "Witch Sight",
-       "description": "Prerequisite: Level 15+ Warlock You have Truesight with a range of 30 feet."
+       "description": "Prerequisite: Level 15+ Warlock You have Truesight with a range of 30 feet.",
+       "level": 15
       }
      ]
     },
@@ -9621,7 +10292,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -9646,7 +10317,7 @@
    },
    {
     "id": "mystic-arcanum-level-6-spell",
-    "name": "Mystic Arcanum Level 6 Spell",
+    "name": "Mystic Arcanum (level 6 spell)",
     "level": 11,
     "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
@@ -9663,7 +10334,7 @@
    },
    {
     "id": "mystic-arcanum-level-7-spell",
-    "name": "Mystic Arcanum Level 7 Spell",
+    "name": "Mystic Arcanum (level 7 spell)",
     "level": 13,
     "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
@@ -9680,7 +10351,7 @@
    },
    {
     "id": "mystic-arcanum-level-8-spell",
-    "name": "Mystic Arcanum Level 8 Spell",
+    "name": "Mystic Arcanum (level 8 spell)",
     "level": 15,
     "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
@@ -9697,7 +10368,7 @@
    },
    {
     "id": "mystic-arcanum-level-9-spell",
-    "name": "Mystic Arcanum Level 9 Spell",
+    "name": "Mystic Arcanum (level 9 spell)",
     "level": 17,
     "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
@@ -9720,7 +10391,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
@@ -10433,7 +11104,7 @@
     "choice": {
      "kind": "asi-or-feat",
      "choose": 1,
-     "fromCatalog": "general-feats",
+     "fromCatalog": "feats",
      "repeatable": true
     }
    },
@@ -10476,7 +11147,7 @@
     "choice": {
      "kind": "feat",
      "choose": 1,
-     "fromCatalog": "epic-boon-feats"
+     "fromCatalog": "feats"
     }
    },
    {
@@ -10488,6 +11159,7 @@
      "kind": "spell",
      "choose": 2,
      "fromCatalog": "wizard-spells",
+     "minSpellLevel": 3,
      "maxSpellLevel": 3
     },
     "uses": {

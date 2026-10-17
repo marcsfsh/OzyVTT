@@ -36,9 +36,23 @@ type ItemInput = z.input<typeof EquipmentReferenceSchema>;
  * text. A curse therefore needs an item the SRD already gates behind attunement.
  */
 export type ItemRiderKey =
-  "tags" | "actions" | "effects" | "uses" | "grants" | "modifiers" | "cursed" | "casts" | "grantsFeatIds";
+  | "tags"
+  | "actions"
+  | "effects"
+  | "uses"
+  | "grants"
+  | "modifiers"
+  | "cursed"
+  | "casts"
+  | "grantsFeatIds"
+  | "charges"
+  | "damageTypeChoice"
+  | "vulnerableToOtherChoices"
+  | "removesArmorDrawbacks"
+  | "consumedOnUse"
+  | "spellScroll";
 
-/** The same nine, as a value, so the empty-rider check below iterates the list it is typed against. */
+/** The same fifteen, as a value, so the empty-rider check below iterates the list it is typed against. */
 const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "tags",
   "actions",
@@ -48,7 +62,13 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "modifiers",
   "cursed",
   "casts",
-  "grantsFeatIds"
+  "grantsFeatIds",
+  "charges",
+  "damageTypeChoice",
+  "vulnerableToOtherChoices",
+  "removesArmorDrawbacks",
+  "consumedOnUse",
+  "spellScroll"
 ] as const);
 
 /** The riders one magic item may carry. Every key optional: an entry authors only what it names. */
@@ -73,14 +93,18 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "spell-save-dc": "standing",
   "spell-slot": "standing",
   "resource-bonus": "standing",
+  "short-rest-regain": "standing",
   "critical-range": "standing",
   "critical-bonus-dice": "standing",
   "extra-attack": "standing",
+  "armor-class": "standing",
+  "attunement-slots": "standing",
+  "special-speed": "standing",
   "roll-mode": "at-its-moment",
   "extra-damage": "at-its-moment",
   "damage-bonus": "standing",
   "check-bonus": "standing",
-  "spell-attack-bonus": "unread",
+  "spell-attack-bonus": "standing",
   "damage-reduction": "at-its-moment",
   "damage-resistance": "standing",
   "damage-vulnerability": "standing",
@@ -357,7 +381,7 @@ export function applyItemMechanics(
     const unknown = Object.keys(entry).filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
     if (unknown.length > 0) {
       refused.push(
-        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The nine are: ${ITEM_RIDER_KEYS.join(", ")}`
+        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The fifteen are: ${ITEM_RIDER_KEYS.join(", ")}`
       );
       continue;
     }

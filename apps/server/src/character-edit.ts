@@ -1,6 +1,8 @@
 import type { GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
+import { reconcileEquipment } from "./inventory.js";
 
 /** Resolves the per-PC editable definition (keyed `import-<actorId>`, 1:1 with the actor). Shared bundle
  *  content is never editable this way, so an edit only touches this one character's sheet. */
@@ -16,12 +18,21 @@ function editableDefinition(state: GameState, actorId: string): { definitionId: 
   return { definitionId, definition: entry.definition };
 }
 
-/** Persists an edited definition, re-validated through the schema so the stored sheet stays canonical. */
-function replaceDefinition(state: GameState, definitionId: string, next: ActorDefinition): void {
+/** Persists an edited definition, re-validated through the schema so the stored sheet stays canonical. What the
+ *  actor stores from its sheet is derived again: a feat, a class feature or armor training can move its AC. */
+function replaceDefinition(
+  state: GameState,
+  actorId: string,
+  definitionId: string,
+  next: ActorDefinition,
+  catalog: EquipmentCatalog | undefined
+): void {
   const parsed = ActorDefinitionSchema.parse(next);
   state.definitions = state.definitions.map((entry) =>
     entry.id === definitionId ? { id: entry.id, definition: parsed } : entry
   );
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (actor) reconcileEquipment(actor, parsed, { ...(catalog ? { catalog } : {}) });
 }
 
 /**
@@ -58,7 +69,36 @@ function mergeClassRows(stored: readonly ClassRow[], supplied: readonly ClassRow
   return [...merged, ...stored.filter((row) => !suppliedIds.has(row.id))];
 }
 
-export function setCharacterIdentity(state: GameState, actorId: string, character: ActorDefinition["character"]): void {
+/**
+ * What a character's identity does at the table, with the display names left out: class rows (id, level,
+ * hit die, subclass id), species and background ids, feats, features, the choice ledger and Martial Arts. Feat
+ * and feature riders, Weapon Mastery unlocks and the Hit Dice pool all read these.
+ */
+function mechanicsOf(identity: CharacterIdentity | undefined): string {
+  return JSON.stringify({
+    classes: (identity?.classes ?? []).map((row) => [row.id, row.level, row.hitDie ?? null, row.subclass?.id ?? null]),
+    race: [identity?.race?.id ?? null, identity?.race?.subrace?.id ?? null],
+    background: identity?.background?.id ?? null,
+    feats: (identity?.feats ?? []).map((feat) => feat.id),
+    features: identity?.features ?? null,
+    choices: identity?.choices ?? null,
+    martialArts: identity?.martialArts ?? null
+  });
+}
+
+/**
+ * A light hand-edit of identity. A player may rename (class, subclass, species, background) but changes nothing
+ * the rules read: levels, classes, feats, features and the choice ledger are the GM's, or the builder's. On a
+ * sheet built here (it carries the choice ledger) the builder owns all of those, for the GM too, since a hand
+ * change would not be validated and the next rebuild would drop it.
+ */
+export function setCharacterIdentity(
+  state: GameState,
+  actorId: string,
+  character: ActorDefinition["character"],
+  editor: Readonly<{ gm: boolean }> = { gm: true },
+  catalog?: EquipmentCatalog
+): void {
   const { definitionId, definition } = editableDefinition(state, actorId);
   // The table's level cap applies here too, or the free-text identity editor bypasses it. Summed across classes.
   const requested = (character?.classes ?? []).reduce((total, row) => total + row.level, 0);
@@ -70,17 +110,28 @@ export function setCharacterIdentity(state: GameState, actorId: string, characte
     merged !== undefined && stored !== undefined
       ? { ...merged, classes: mergeClassRows(stored.classes, merged.classes) }
       : merged;
-  replaceDefinition(state, definitionId, { ...definition, character: next });
+  const built = stored?.choices !== undefined;
+  if ((built || !editor.gm) && mechanicsOf(next) !== mechanicsOf(stored))
+    throw new CommandRejectedError(
+      built
+        ? "This character was built here: change classes, levels and feats in the Level flow, which checks them."
+        : "Only the GM can change a character's classes, levels or feats - you can rename them."
+    );
+  replaceDefinition(state, actorId, definitionId, { ...definition, character: next }, catalog);
 }
 
 export function setCharacterProficiencies(
   state: GameState,
   actorId: string,
-  proficiencies: ActorDefinition["proficiencies"]
+  proficiencies: ActorDefinition["proficiencies"],
+  catalog?: EquipmentCatalog
 ): void {
   const { definitionId, definition } = editableDefinition(state, actorId);
-  replaceDefinition(state, definitionId, {
-    ...definition,
-    proficiencies: carryForwardOmitted(definition.proficiencies, proficiencies)
-  });
+  replaceDefinition(
+    state,
+    actorId,
+    definitionId,
+    { ...definition, proficiencies: carryForwardOmitted(definition.proficiencies, proficiencies) },
+    catalog
+  );
 }

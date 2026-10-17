@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary, GmActor, PlayerActor } from "@vtt/domain";
+import type {
+  ActorDefinition,
+  ActorDerivedSheet,
+  ContentActionSummary,
+  GmActor,
+  PlayerActor,
+  Rechoice,
+  SpellChoices
+} from "@vtt/domain";
 import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 
@@ -10,13 +18,16 @@ registerContentCache(() => sheetCache.clear());
 
 /** One row of `actor:available-actions`. The display fields are additive-optional on the wire
     (ADR-0007), so every one is read defensively. */
-type AvailabilityRow = Readonly<{
+export type AvailabilityRow = Readonly<{
   id: string;
   name: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
   available: boolean;
+  /** Why it isn't available now, rule by rule. */
+  violations?: ReadonlyArray<{ rule: string; message: string }>;
   usesRemaining: number | null;
   builtin?: boolean;
+  ridesAHit?: true;
   description?: string;
   attackBonus?: number | null;
   reachFeet?: number | null;
@@ -29,14 +40,29 @@ type AvailabilityRow = Readonly<{
   usesLimit?: number | null;
   usesPer?: ContentActionSummary["usesPer"];
   usesPool?: string | null;
+  useCost?: number | "chosen" | null;
   requiresEffectTag?: string | null;
   multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
   reaction?: ContentActionSummary["reaction"];
+  healing?: Readonly<{ formula: string }> | null;
+  healTargets?: number | null;
+  targeting?: "none" | "single" | "multi" | null;
+  darts?: number | null;
+  damageTypes?: ContentActionSummary["damageTypes"] | null;
+  checkSkills?: ContentActionSummary["checkSkills"];
 }>;
 
+/** A spell's later action whose spell isn't up on its caster (Spiritual Weapon's attack before the cast), which
+ *  isn't offered until it is. */
+export const awaitsItsSpell = (row: AvailabilityRow) =>
+  /^spell-.+-then-/.test(row.id) &&
+  (row.violations ?? []).some((violation) => violation.rule === "feature.requires-effect");
+
 /** The wire row in the shape every action surface here already speaks. */
-function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
+export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
   return {
+    ...(row.builtin ? { builtin: true, targeting: row.targeting ?? "none" } : {}),
+    ...(row.ridesAHit ? { ridesAHit: true as const } : {}),
     id: row.id,
     name: row.name,
     activation: row.activation,
@@ -54,25 +80,36 @@ function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
     usesPer: row.usesPer ?? null,
     usesRecharge: null,
     usesPool: row.usesPool ?? null,
+    ...(row.useCost !== undefined && row.useCost !== null ? { useCost: row.useCost } : {}),
     requiresEffectTag: row.requiresEffectTag ?? null,
     multiattack: row.multiattack ?? null,
     grants: false,
-    reaction: row.reaction ?? null
+    reaction: row.reaction ?? null,
+    ...(row.healing ? { healing: row.healing } : {}),
+    ...(row.healTargets ? { healTargets: row.healTargets } : {}),
+    ...(row.targeting ? { targeting: row.targeting } : {}),
+    // A spell an item casts picks as the spell's own cast does (Magic Missile's darts, Chromatic Orb's type).
+    ...(row.darts ? { darts: row.darts } : {}),
+    ...(row.damageTypes ? { damageTypes: row.damageTypes } : {}),
+    // Search, Study and the like pick the skill they are made with.
+    ...(row.checkSkills ? { checkSkills: row.checkSkills } : {})
   };
 }
 
 /**
  * What the sheet draws from: the actor's stat block, the server's action list and the server's
  * derived numbers. The GM fetches bundled definitions; a player's own definition comes on the live
- * actor and wins, so identity and proficiency edits show at once.
+ * actor and wins, so identity and proficiency edits show at once. `liveDefinition` is the GM's copy of a
+ * stored sheet from the game state, which wins over the fetch the same way, so a rebuilt sheet shows at once.
  */
 export function useSheetDefinition(
   actor: GmActor | PlayerActor,
   role: "gm" | "player",
-  onFeedback: (text: string) => void
+  onFeedback: (text: string) => void,
+  liveDefinition?: ActorDefinition | null
 ) {
   const definitionId = "definitionId" in actor ? actor.definitionId : undefined;
-  const ownDefinition = "definition" in actor ? (actor.definition ?? null) : null;
+  const ownDefinition = "definition" in actor ? (actor.definition ?? liveDefinition ?? null) : (liveDefinition ?? null);
   const [fetched, setFetched] = useState<ActorDefinition | null>(
     definitionId ? (sheetCache.get(definitionId) ?? null) : null
   );
@@ -89,22 +126,38 @@ export function useSheetDefinition(
    * effects, conditions and HP as well as inventory, since riders can depend on them.
    */
   const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);
+  /** The picks this character may re-make on a rest (a land after a Long Rest), from the same read. */
+  const [rechoices, setRechoices] = useState<readonly Rechoice[]>([]);
+  /** What a prepared caster may swap in after a Long Rest, and a Wizard's spellbook, from the same read. */
+  const [spellChoices, setSpellChoices] = useState<SpellChoices | null>(null);
   const loadoutSignature = [
     (actor.inventory ?? [])
-      .map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`)
+      .map(
+        (item) =>
+          `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}:${item.baseId ?? ""}:${item.spellId ?? ""}`
+      )
       .join(","),
-    (actor.conditions ?? []).map((condition) => (typeof condition === "string" ? condition : condition.id)).join(","),
+    // Exhaustion's level changes the numbers too.
+    (actor.conditions ?? [])
+      .map((condition) => (typeof condition === "string" ? condition : `${condition.id}${condition.level ?? ""}`))
+      .join(","),
     (actor.effects ?? []).map((effect) => effect.id).join(","),
     "kind" in actor.hp
       ? actor.hp.kind === "exact"
         ? String(actor.hp.current)
         : actor.hp.kind
-      : String(actor.hp.current)
+      : String(actor.hp.current),
+    // A pick re-made into the ledger rebuilds the sheet: its actions and re-choices are read again.
+    (ownDefinition?.character?.choices ?? []).map((row) => `${row.kind}:${row.id}`).join(","),
+    // A spell added to a Wizard's spellbook changes what can be prepared from it.
+    (actor.spellbook ?? []).map((entry) => entry.id).join(",")
   ].join("|");
   useEffect(() => {
     if (!definitionId) {
       setServerActions([]);
       setDerived(null);
+      setRechoices([]);
+      setSpellChoices(null);
       return;
     }
     let live = true;
@@ -115,6 +168,8 @@ export function useSheetDefinition(
       if (rows) setServerActions(rows.filter((row) => !row.builtin).map(summaryOfAvailability));
       // Absent only from an older server; the fallback covers that.
       if (result.derived) setDerived(result.derived);
+      setRechoices(result.rechoices ?? []);
+      setSpellChoices(result.spellChoices ?? null);
     });
     return () => {
       live = false;
@@ -137,5 +192,5 @@ export function useSheetDefinition(
     sheetCache.set(definitionId, next);
     setFetched(next);
   };
-  return { definitionId, definition, serverActions, derived, showEdited };
+  return { definitionId, definition, serverActions, derived, rechoices, spellChoices, showEdited };
 }
