@@ -614,6 +614,26 @@
   min-width: 0;
 }
 
+/* ---- The wizard ----
+   A focused flow: it takes the whole workspace, and "All homebrew" leads back to the list at every width. The
+   detail pane stops scrolling as a whole; the wizard's step and preview scroll themselves. */
+.hb-root.is-wizard .hb-workspace {
+  display: flex;
+  flex-direction: column;
+}
+.hb-root.is-wizard .hb-rail {
+  display: none;
+}
+.hb-root.is-wizard .hb-main {
+  flex: 1 1 auto;
+}
+.hb-root.is-wizard .hb-back {
+  display: inline-flex;
+}
+.hb-detail--wizard {
+  gap: var(--space-3);
+}
+
 /* ---- Create modal ---- */
 .hb-create-body {
   display: flex;
@@ -626,6 +646,10 @@
 }
 
 @media (max-width: 760px) {
+  /* A phone spends its height on the step: the library's counts and packs wait until the wizard is closed. */
+  .hb-root.is-wizard .hb-modebar {
+    display: none;
+  }
   /* Single-pane swap: a flex column so the visible pane takes the fill. */
   .hb-workspace {
     display: flex;

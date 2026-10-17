@@ -21,6 +21,7 @@ import {
   ContentActionsSchema,
   VisionPreviewSchema
 } from "@vtt/domain/commands";
+import { srdMonsterBenchmarks } from "../monster-benchmarks.js";
 import { partyViewerIds } from "../vision/audience.js";
 import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
@@ -73,6 +74,17 @@ export const gameReads = [
       const catalog = kit.catalogFor(principal);
       return { monsters: catalog.monsterSummaries(), attribution: catalog.attribution };
     }
+  },
+
+  {
+    event: "content:monster-benchmarks",
+    path: CONTENT_PATHS.monsterBenchmarks,
+    scope: "game:read",
+    gmOnly: "Only the GM writes monsters.",
+    run: (principal, _input, kit) => ({
+      benchmarks: srdMonsterBenchmarks(),
+      attribution: kit.catalogFor(principal).attribution
+    })
   },
 
   {

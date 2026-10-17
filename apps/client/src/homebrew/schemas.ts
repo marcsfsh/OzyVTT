@@ -114,6 +114,30 @@ const spellcastingGroup = (ownerWord: string): FieldDef => ({
 
 /* -------------------------------------------------------------- shared bits ----- */
 
+/** "Every minimum" or "any one of them" (Grappler's "Strength or Dexterity 13+"), the mode beside a list of minimums. */
+const MINIMUM_MODES = [opt("all", "Every minimum"), opt("any", "Any one of them")];
+
+/** A list of ability-score minimums ({ability, minimum}), as a feat's prerequisite and a class's multiclass
+    requirement both store it. */
+const abilityMinimums = (key: string, extra: Partial<FieldDef> = {}): FieldDef => ({
+  key,
+  label: "Ability score minimums",
+  kind: "rows",
+  addLabel: "Add a minimum",
+  emptyText: "No ability score minimums.",
+  maxRows: 6,
+  maxRowsReason: "One minimum for each ability is as many as there can be.",
+  rowKey: (row, index) => `${(row as { ability?: string }).ability ?? ""}-${index}`,
+  newRow: () => ({ ability: "str", minimum: 13 }),
+  rowLabel: (row) =>
+    `${ABILITIES.find((entry) => entry.value === (row as { ability?: string }).ability)?.label ?? "Ability"} ${(row as { minimum?: number }).minimum ?? ""}`,
+  rows: [
+    { key: "ability", label: "Ability", kind: "select", options: ABILITIES },
+    { key: "minimum", label: "At least", kind: "number", min: 1, max: 20 }
+  ],
+  ...extra
+});
+
 const choiceGroup = (
   key: string,
   label: string,
@@ -303,16 +327,26 @@ const CLASS_SCHEMA: HomebrewSchema = {
         {
           key: "multiclassPrerequisites",
           label: "Multiclass minimums",
-          kind: "rows",
-          addLabel: "Add a minimum",
-          emptyText: "No multiclass minimums.",
-          rowKey: (row, index) => `${(row as { ability?: string }).ability ?? ""}-${index}`,
-          newRow: () => ({ ability: "str", minimum: 13 }),
-          rowLabel: (row) =>
-            `${ABILITIES.find((entry) => entry.value === (row as { ability?: string }).ability)?.label ?? "Ability"} ${(row as { minimum?: number }).minimum ?? ""}`,
+          kind: "group",
+          help: "A character needs these scores to take this class after another one. The SRD asks for 13 in each primary ability.",
           rows: [
-            { key: "ability", label: "Ability", kind: "select", options: ABILITIES },
-            { key: "minimum", label: "At least", kind: "number", min: 1, max: 20 }
+            abilityMinimums("multiclassPrerequisites.minimums", {
+              // The block needs one minimum at least, so the last one off takes the whole block with it.
+              write: (next, scope) => {
+                const rows = next as unknown[];
+                if (rows.length > 0) return setAt(scope, "multiclassPrerequisites.minimums", rows);
+                const { multiclassPrerequisites: _gone, ...rest } = scope;
+                return rest;
+              }
+            }),
+            {
+              key: "multiclassPrerequisites.mode",
+              label: "A character needs",
+              kind: "select",
+              options: MINIMUM_MODES,
+              visibleWhen: (scope) =>
+                ((getAt(scope, "multiclassPrerequisites.minimums") as unknown[] | undefined)?.length ?? 0) > 1
+            }
           ]
         },
         {
@@ -531,8 +565,22 @@ const FEAT_SCHEMA: HomebrewSchema = {
           kind: "group",
           rows: [
             { key: "prerequisite.level", label: "Minimum level", kind: "number", min: 1, max: 20 },
-            { key: "prerequisite.ability", label: "Ability", kind: "select", options: ABILITIES },
-            { key: "prerequisite.minimum", label: "At least", kind: "number", min: 1, max: 20 }
+            abilityMinimums("prerequisite.abilityScores"),
+            {
+              key: "prerequisite.abilityScoreMode",
+              label: "A character needs",
+              kind: "select",
+              options: MINIMUM_MODES,
+              visibleWhen: (scope) =>
+                ((getAt(scope, "prerequisite.abilityScores") as unknown[] | undefined)?.length ?? 0) > 1
+            },
+            {
+              key: "prerequisite.text",
+              label: "Anything else it needs",
+              placeholder: "Spellcasting or Pact Magic feature",
+              emptyValue: "omit",
+              help: "The builder shows this beside the feat and does not check it."
+            }
           ]
         }
       ]
@@ -635,7 +683,8 @@ const SPELL_SCHEMA: HomebrewSchema = {
           label: "Damage",
           kind: "group",
           rows: [
-            { key: "damage.roll", label: "Formula", placeholder: "8d6", validate: diceValidate },
+            // Nullable: an emptied formula is no damage, not an unreadable "" the checklist would refuse.
+            { key: "damage.roll", label: "Formula", placeholder: "8d6", validate: diceValidate, emptyValue: "null" },
             // A spell can deal several types at once (Ice Knife), so this is a list.
             { key: "damage.types", label: "Types", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes }
           ]

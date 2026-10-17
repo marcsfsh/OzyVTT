@@ -257,8 +257,14 @@ const PLAYER_READABLE_CONTENT_READS = [
   "content:feats",
   "content:names"
 ] as const;
-/** The bestiary and stat blocks: GM-grade only, and that gate is asserted below rather than assumed. */
-const GM_ONLY_CONTENT_READS = ["content:monsters", "content:monster-actions", "content:monster-sheet"] as const;
+/** The bestiary, stat blocks and the monster wizard's benchmarks (SRD only, so no homebrew can ride them): GM-grade
+ *  only, and that gate is asserted below rather than assumed. */
+const GM_ONLY_CONTENT_READS = [
+  "content:monsters",
+  "content:monster-actions",
+  "content:monster-sheet",
+  "content:monster-benchmarks"
+] as const;
 
 const readAs = (game: GameCommands, event: string, principal: GamePrincipal) =>
   game.read(

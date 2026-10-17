@@ -19,7 +19,9 @@ It has two parts:
   receive what the GM has revealed.
 
 Characters can be built in a guided builder, imported from a D&D Beyond PDF, or authored as
-homebrew. SRD 5.2.1 monsters, spells, equipment and magic items are included.
+homebrew. SRD 5.2.1 monsters, spells, equipment and magic items are included. The GM makes
+homebrew of every kind, from a class to a monster, step by step in a wizard, with the full editor
+one tap away.
 
 ## Running it
 

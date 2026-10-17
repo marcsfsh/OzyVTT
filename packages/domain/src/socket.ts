@@ -8,6 +8,7 @@ import type {
   ContentEquipmentResult,
   ContentFeatsResult,
   ContentLanguagesResult,
+  ContentMonsterBenchmarksResult,
   ContentMonstersResult,
   ContentNamesResult,
   ContentSheetResult,
@@ -235,6 +236,11 @@ export interface ClientToServerEvents {
   "content:monsters": (
     payload: Record<string, never>,
     acknowledgement: (result: ContentMonstersResult) => void
+  ) => void;
+  /** What the bundled stat blocks of each challenge rating have, for the homebrew monster wizard. */
+  "content:monster-benchmarks": (
+    payload: Record<string, never>,
+    acknowledgement: (result: ContentMonsterBenchmarksResult) => void
   ) => void;
   /** `joinEncounter` also adds the new combatant to the running fight (initiative + tray token) in the same command. Ignored when no fight is running. */
   "actor:add-from-definition": (

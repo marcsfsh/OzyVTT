@@ -1102,6 +1102,24 @@ export const openApiDocument = {
         }
       }
     },
+    [CONTENT_PATHS.monsterBenchmarks]: {
+      get: {
+        operationId: "listContentMonsterBenchmarks",
+        security: gameSecurity("game:read"),
+        description:
+          "What the bundled SRD stat blocks of each challenge rating have (GM-grade only): how many there are, and the lowest, median and highest armor class, hit points, attack bonus, save DC and damage in one turn at average rolls. The homebrew monster wizard compares a new creature against these. Includes the CC BY 4.0 attribution line.",
+        responses: {
+          "200": {
+            description: "Benchmarks by challenge rating + attribution",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/ContentMonsterBenchmarksResponse" } }
+            }
+          },
+          "401": apiError,
+          "403": apiError
+        }
+      }
+    },
     [CONTENT_PATHS.monsterById]: {
       get: {
         operationId: "getContentMonster",
@@ -2360,6 +2378,7 @@ export const openApiDocument = {
       },
       BuilderOffersResponse: envelopeSchema("#/components/schemas/BuilderOffersData"),
       ContentMonstersResponse: envelopeSchema("#/components/schemas/ContentMonstersData"),
+      ContentMonsterBenchmarksResponse: envelopeSchema("#/components/schemas/ContentMonsterBenchmarksData"),
       ContentMonsterSheetData: {
         type: "object",
         additionalProperties: false,

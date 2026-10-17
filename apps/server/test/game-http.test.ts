@@ -512,9 +512,23 @@ describe("public game API over /api/v1", () => {
     });
     expect(missing.status).toBe(404);
 
-    // Players may read conditions (public reference) but not the bestiary.
+    // The monster wizard's benchmarks: one row per CR the bestiary has, every stat block counted once.
+    const benchmarks = await fetch(base + CONTENT_PATHS.monsterBenchmarks, { headers: bearer(reader.token) });
+    expect(benchmarks.status).toBe(200);
+    const benchmarkRows = (await benchmarks.json()).data.benchmarks as ReadonlyArray<{
+      challengeRating: number;
+      count: number;
+      hitPoints: { min: number; median: number; max: number };
+    }>;
+    expect(benchmarkRows.reduce((sum, entry) => sum + entry.count, 0)).toBe(monstersBody.data.monsters.length);
+    const crThree = benchmarkRows.find((entry) => entry.challengeRating === 3)!;
+    expect(crThree.hitPoints.min).toBeLessThanOrEqual(crThree.hitPoints.median);
+    expect(crThree.hitPoints.median).toBeLessThanOrEqual(crThree.hitPoints.max);
+
+    // Players may read conditions (public reference) but not the bestiary or its benchmarks.
     expect((await fetch(base + CONTENT_PATHS.conditions, { headers: bearer(playerToken) })).status).toBe(200);
     expect((await fetch(base + CONTENT_PATHS.monsters, { headers: bearer(playerToken) })).status).toBe(403);
+    expect((await fetch(base + CONTENT_PATHS.monsterBenchmarks, { headers: bearer(playerToken) })).status).toBe(403);
 
     // Combat log: GM-only lines reach GM-grade principals, never player sessions.
     await post(base, GAME_PATHS.encounterStart, gmToken, {

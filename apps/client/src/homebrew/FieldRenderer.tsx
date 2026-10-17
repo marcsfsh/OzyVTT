@@ -155,6 +155,41 @@ export function FieldRenderer(props: FieldRendererProps) {
 
     case "select": {
       const options = resolveOptions(field, ctx, draft);
+      if (field.chips) {
+        const chosen = asString(raw);
+        // The multiselect's group of pressed chips, with one pressed at a time; a pressed chip stays pressed.
+        return (
+          <div className={field.wide ? "nh-fieldgrid-wide hb-field" : "hb-field"} id={fieldId}>
+            <span className="nh-field-label" id={`${fieldId}-label`}>
+              {field.label}
+            </span>
+            <div
+              className="hb-chips"
+              role="group"
+              aria-labelledby={`${fieldId}-label`}
+              aria-describedby={help || error ? `${fieldId}-help` : undefined}
+            >
+              {options.map((option) => (
+                <Chip
+                  key={option.value}
+                  pressed={chosen === option.value}
+                  disabled={isDisabled || option.disabled}
+                  onClick={() => {
+                    if (chosen !== option.value) set(option.value);
+                  }}
+                >
+                  {option.label}
+                </Chip>
+              ))}
+            </div>
+            {(help || error) && (
+              <p className={error ? "nh-field-help hb-field-error" : "nh-field-help"} id={`${fieldId}-help`}>
+                {error ?? help}
+              </p>
+            )}
+          </div>
+        );
+      }
       if (field.searchable) {
         const entries = field.catalog === "equipment" ? ctx.equipment : field.catalog === "spells" ? ctx.spells : [];
         return wrap(
@@ -237,6 +272,8 @@ export function FieldRenderer(props: FieldRendererProps) {
               {help}
             </p>
           )}
+          {/* A live value error, like a text field's, under the group it is about. */}
+          {error && <p className="nh-field-help hb-field-error">{error}</p>}
           {full && field.maxRowsReason && <p className="nh-field-help">{field.maxRowsReason}</p>}
         </div>
       );
@@ -347,6 +384,45 @@ export function FieldRenderer(props: FieldRendererProps) {
       /** Native `<input list>` + `<datalist>`: suggestions are one tap away, yet any value is
           typeable, since `school`, `category`, `rarity` and `creatureType` are open slugs. */
       const suggestions = resolveSuggestions(field, ctx, draft);
+
+      /** `presets`: the common answers as chips, and the input for anything else; both write the same text. */
+      if (field.presets) {
+        const text = asString(raw);
+        return (
+          <div className={field.wide ? "nh-fieldgrid-wide hb-field" : "hb-field"}>
+            <span className="nh-field-label" id={`${fieldId}-label`}>
+              {field.label}
+            </span>
+            <div className="hb-chips" role="group" aria-labelledby={`${fieldId}-label`}>
+              {field.presets.map((preset) => (
+                <Chip
+                  key={preset.value}
+                  pressed={text === preset.value}
+                  disabled={isDisabled}
+                  onClick={() => set(preset.value)}
+                >
+                  {preset.label}
+                </Chip>
+              ))}
+            </div>
+            <Input
+              id={fieldId}
+              aria-label={`${field.label}, in your own words`}
+              value={text}
+              placeholder={field.placeholder}
+              disabled={isDisabled}
+              invalid={!!error}
+              maxLength={field.max}
+              onChange={(event) =>
+                event.target.value === "" && field.emptyValue ? setEmpty() : set(event.target.value)
+              }
+            />
+            {(help || error) && (
+              <p className={error ? "nh-field-help hb-field-error" : "nh-field-help"}>{error ?? help}</p>
+            )}
+          </div>
+        );
+      }
 
       /** `pick`: the same open contract with the list visible (a datalist has no visible cue, and no
           control at all on iOS Safari). Clearing goes through `setEmpty()`. See `FieldDef.pick`. */
