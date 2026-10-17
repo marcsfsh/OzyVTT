@@ -16,7 +16,7 @@ import { ActionResolveSchema, ActorRestoreUsesSchema, ActorSpendUsesSchema } fro
 import { ToastProvider } from "@vtt/ui";
 import { socket } from "../socket";
 import { ActionTargetPicker } from "./ActionTargetPicker";
-import { SheetPools } from "./SheetPools";
+import { poolsOf, SheetPools } from "./SheetPools";
 import { beginTargeting, clearTargeting, resolveTargeting, toggleTarget, useTargeting } from "./targeting";
 
 type EmitCall = [event: string, payload: Record<string, unknown>, ack: (result: unknown) => void];
@@ -80,6 +80,22 @@ describe("a pool spent by any amount", () => {
       poolId: "lay-on-hands",
       amount: 3
     });
+  });
+
+  it("names a pool by the action that owns it, the one action that spends it, or else its key", () => {
+    const smite = action({
+      id: "spell-divine-smite-free",
+      name: "Divine Smite (no slot)",
+      usesLimit: 1,
+      usesPool: "paladins-smite"
+    });
+    const flurry = action({ id: "flurry-of-blows", name: "Flurry of Blows", usesLimit: 5, usesPool: "focus-points" });
+    const patient = action({ id: "patient-defense", name: "Patient Defense", usesLimit: 5, usesPool: "focus-points" });
+    expect(poolsOf([HEAL, CURE, smite, flurry, patient]).map((pool) => pool.name)).toEqual([
+      "Lay on Hands",
+      "Divine Smite (no slot)",
+      "Focus Points"
+    ]);
   });
 
   it("lets the GM give uses back", async () => {

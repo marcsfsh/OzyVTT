@@ -69,8 +69,14 @@ describe("Lay on Hands", () => {
   it("is a pool of five points per Paladin level", () => {
     const state = table();
     const hero = state.actors.find((actor) => actor.id === PALADIN)!;
-    const pool = actionPools(effectiveActions(paladin, hero, catalog)).find((entry) => entry.id === "lay-on-hands");
-    expect(pool).toMatchObject({ limit: 25, per: "long-rest" });
+    const pools = actionPools(effectiveActions(paladin, hero, catalog));
+    expect(pools.find((entry) => entry.id === "lay-on-hands")).toMatchObject({
+      name: "Lay on Hands",
+      limit: 25,
+      per: "long-rest"
+    });
+    // A pool one action spends goes by that action's name, not its key.
+    expect(pools.find((entry) => entry.id === "paladins-smite")?.name).toBe("Divine Smite (no slot)");
   });
 
   /** The Paladin and Bryn in a fight, the Paladin's turn first. */

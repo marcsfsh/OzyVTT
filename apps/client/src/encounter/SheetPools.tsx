@@ -20,21 +20,24 @@ const titleOf = (slug: string) =>
     .join(" ");
 
 /** The sheet's limited-use pools as the server counts them (`uses.pool ?? action.id`, its largest limit), named as
- *  the server names them. One that comes back every turn lives with the turn, so it isn't listed. */
+ *  the server names them (`actionPools`): by the action whose id is the pool's, else by the one action that spends
+ *  it, else by the pool's own name. One that comes back every turn lives with the turn, so it isn't listed. */
 export function poolsOf(actions: readonly ContentActionSummary[]): Pool[] {
-  const pools = new Map<string, Pool>();
+  const pools = new Map<string, Pool & { named: boolean }>();
   for (const action of actions) {
     if (action.usesLimit === null || action.usesPer === null || action.usesPer === "turn") continue;
     const id = action.usesPool ?? action.id;
     const known = pools.get(id);
+    const named = action.id === id || (known?.named ?? false);
     pools.set(id, {
       id,
-      name: action.id === id ? action.name : (known?.name ?? titleOf(id)),
+      name: action.id === id ? action.name : known ? (known.named ? known.name : titleOf(id)) : action.name,
       limit: Math.max(known?.limit ?? 0, action.usesLimit),
-      per: action.usesPer
+      per: action.usesPer,
+      named
     });
   }
-  return [...pools.values()];
+  return [...pools.values()].map(({ named: _named, ...pool }) => pool);
 }
 
 /**
