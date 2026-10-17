@@ -5,7 +5,8 @@ import {
   type ActionResolution,
   type GameState
 } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
+import { conditionChoicesOf } from "./item-actions.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
 import { builtinCheckSkills } from "./resolution/builtins.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
@@ -308,6 +309,9 @@ export function actionAvailability(
       // A spell cast from an item picks as the spell's own cast does: darts by target, the type to deal.
       darts: action.darts ?? null,
       damageTypes: action.damageTypes ? [...action.damageTypes] : null,
+      ...(conditionChoicesOf(action, spell).length > 0
+        ? { conditionChoices: [...conditionChoicesOf(action, spell)] as SaveCondition[] }
+        : {}),
       // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
       ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
     };

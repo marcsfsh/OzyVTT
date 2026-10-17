@@ -1203,6 +1203,9 @@ export const SaveOutcomeFields = {
   successDamage: z.enum(["half", "none"]).default("half"),
   /** Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated). */
   failureConditions: z.array(SaveConditionSchema).max(4).default([]),
+  /** The condition is the caster's pick from these ("has the Blinded or Deafened condition"); `failureConditions`
+   *  holds the first, which a failure imposes when none is picked. */
+  conditionChoices: z.array(SaveConditionSchema).min(2).max(6).optional(),
   /** Cover gives no bonus to this save (Sacred Flame: "The target gains no benefit from Half Cover or
    *  Three-Quarters Cover for this save"). */
   ignoresCover: z.boolean().optional(),

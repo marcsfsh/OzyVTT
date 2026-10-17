@@ -110,6 +110,19 @@ describe("save outcomes in the shipped content", () => {
     expect(spellSave("banishment")).toMatchObject({ failureConditions: ["incapacitated"] });
   });
 
+  it("keeps 'the X or Y condition' as the caster's pick, the first standing until one is picked", () => {
+    expect(spellSave("blindnessdeafness")).toEqual({
+      ability: "con",
+      successDamage: "none",
+      failureConditions: ["blinded"],
+      conditionChoices: ["blinded", "deafened"],
+      repeatSave: true
+    });
+    // Only Blindness/Deafness prints a choice of conditions for a failed save.
+    const choosing = loadSpells().filter((spell) => spell.save?.conditionChoices !== undefined);
+    expect(choosing.map((spell) => spell.id)).toEqual(["blindnessdeafness"]);
+  });
+
   it("reads how long a failure's conditions last", () => {
     // "until the end of its next turn" is the target's own turn.
     expect(monsterAction("ghoul", "claw").save).toMatchObject({ failureDuration: { type: "until-bearer-turn-end" } });

@@ -361,12 +361,38 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
     action.save && !action.save.failureEffect && effect.failureEffect
       ? structuredClone(effect.failureEffect)
       : undefined;
-  if (!grants && !failureEffect) return action;
+  const saveFields = action.save ? newerSaveFields(action.save, spell.save) : {};
+  if (!grants && !failureEffect && Object.keys(saveFields).length === 0) return action;
   return {
     ...action,
     ...(grants ? { grants } : {}),
-    ...(failureEffect && action.save ? { save: { ...action.save, failureEffect } } : {})
+    ...(action.save ? { save: { ...action.save, ...saveFields, ...(failureEffect ? { failureEffect } : {}) } } : {})
   };
+}
+
+/** The conditions a caster picks one of for this action's failed save (Blindness/Deafness), read from the spell too
+ *  for a sheet built before its cast carried them; empty when the action offers no choice. */
+export function conditionChoicesOf(
+  action: Pick<ActorAction, "save" | "spellId">,
+  spell: SpellReference | undefined
+): readonly string[] {
+  if (!action.save) return [];
+  return action.save.conditionChoices ?? (spell?.id === action.spellId ? (spell?.save?.conditionChoices ?? []) : []);
+}
+
+/** Save outcome fields the build has added since a sheet was made, which its cast copied without: the conditions a
+ *  caster picks from (Blindness/Deafness). */
+const NEWER_SAVE_FIELDS = ["conditionChoices"] as const;
+
+function newerSaveFields(
+  save: NonNullable<ActorAction["save"]>,
+  printed: SpellReference["save"]
+): Partial<NonNullable<ActorAction["save"]>> {
+  if (!printed) return {};
+  const fields: Record<string, unknown> = {};
+  for (const key of NEWER_SAVE_FIELDS)
+    if (save[key] === undefined && printed[key] !== undefined) fields[key] = structuredClone(printed[key]);
+  return fields as Partial<NonNullable<ActorAction["save"]>>;
 }
 
 /** Martial Arts reaches this swing: the bearer has it, it is in force (no armour, no shield) and this is a Monk weapon. */

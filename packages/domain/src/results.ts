@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { ActionReactionSchema, CharacterChoiceSchema, DamageTypeSchema, type CharacterChoice } from "@vtt/schemas";
+import {
+  ActionReactionSchema,
+  CharacterChoiceSchema,
+  DamageTypeSchema,
+  SaveConditionSchema,
+  type CharacterChoice
+} from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
 import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
 import type { Wire } from "./wire.js";
@@ -323,6 +329,8 @@ export const ActionAvailabilitySchema = z.strictObject({
   darts: z.number().int().nullable().optional(),
   /** The damage types its caster picks from (Chromatic Orb). */
   damageTypes: z.array(DamageTypeSchema).nullable().optional(),
+  /** The conditions its caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s `conditionId`. */
+  conditionChoices: z.array(SaveConditionSchema).optional(),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
   checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional()
 });

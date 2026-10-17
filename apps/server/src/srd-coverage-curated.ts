@@ -818,9 +818,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:befuddlement": guided(
     "The save and its 10d12 Psychic damage are applied. Keeping the target from casting spells and taking the Magic action is the GM's."
   ),
-  "spell:blindnessdeafness": guided(
-    "A failed save imposes Blinded, repeated at the end of each of the target's turns. The content build keeps the first of \"Blinded or Deafened\" (save-outcomes.ts), so choosing Deafened is the GM's."
-  ),
   "spell:chill-touch": guided(
     "The hit's Necrotic damage is applied. Keeping the target from regaining Hit Points is the GM's."
   ),

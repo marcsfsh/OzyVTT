@@ -15,6 +15,7 @@ import {
 export type SaveOutcome = {
   successDamage: "half" | "none";
   failureConditions: SaveCondition[];
+  conditionChoices?: SaveCondition[];
   failureDuration?: SaveFailureDuration;
   repeatSave?: true;
   escapeDc?: number;
@@ -34,19 +35,22 @@ const conditionIdsOf = (names: string): SaveCondition[] =>
     .map((name) => name.toLowerCase())
     .filter((id): id is SaveCondition => CONDITIONS.has(id));
 
+type NamedConditions = Readonly<{ conditions: SaveCondition[]; choices?: SaveCondition[] }>;
+
 /**
  * The conditions the first "has the X condition" or "has the X and Y conditions" names. Only the first
  * phrase: later ones are usually conditional ("Failure by 5 or More") or describe what the first condition
- * already does; the "while X, also Y" and "until the grapple ends" sentences are read separately.
+ * already does; the "while X, also Y" and "until the grapple ends" sentences are read separately. "X or Y" is the
+ * caster's choice of one ("the Blinded or Deafened condition"): the first stands until one is picked.
  */
-function namedConditions(clause: string): SaveCondition[] {
+function namedConditions(clause: string): NamedConditions {
   const match = clause.match(
     /\b(?:has|have|gains?|having) the ([A-Z][a-z]+(?:,? (?:and |or )?[A-Z][a-z]+)*) conditions?\b/
   );
-  if (!match) return [];
-  // "X or Y" is a choice, not both: keep the first, as the engine cannot pick.
-  const names = /\bor\b/.test(match[1]) ? match[1].split(/,? or /)[0]! : match[1];
-  return [...new Set(conditionIdsOf(names))];
+  if (!match) return { conditions: [] };
+  if (!/\bor\b/.test(match[1])) return { conditions: [...new Set(conditionIdsOf(match[1]))] };
+  const choices = [...new Set(conditionIdsOf(match[1].replace(/,? or /g, ", ")))];
+  return choices.length > 1 ? { conditions: choices.slice(0, 1), choices } : { conditions: choices };
 }
 
 /** "While Charmed, the creature has the Incapacitated condition" and "it has the Restrained condition until the
@@ -178,7 +182,8 @@ export function withoutOngoingDamage(text: string): string | null {
 }
 
 /** Everything a failure clause says about its conditions' lifetime. */
-function failureLifetime(clause: string, first: readonly SaveCondition[]): Omit<SaveOutcome, "successDamage"> {
+function failureLifetime(clause: string, named: NamedConditions): Omit<SaveOutcome, "successDamage"> {
+  const first = named.conditions;
   const failureConditions = [...new Set([...first, ...companionConditions(clause, first)])].slice(0, 4);
   if (failureConditions.length === 0) return { failureConditions };
   const escape = first.includes("grappled") ? clause.match(/\(escape DC (\d+)\)/) : null;
@@ -186,6 +191,7 @@ function failureLifetime(clause: string, first: readonly SaveCondition[]): Omit<
   const ongoing = ongoingDamageOf(clause);
   return {
     failureConditions,
+    ...(named.choices ? { conditionChoices: named.choices } : {}),
     ...(duration ? { failureDuration: duration } : {}),
     ...(repeatsEachTurn(clause) ? { repeatSave: true as const } : {}),
     ...(escape ? { escapeDc: Number.parseInt(escape[1]!, 10) } : {}),
@@ -238,16 +244,16 @@ function spellSaveOutcome(description: string): SaveOutcome {
   const failureSentences = sentences
     .filter((sentence) => /saving throw,? or\b|failed save|fails (?:the|its|a|this) save|on a failure/i.test(sentence))
     .join(" ");
-  const first = namedConditions(failureSentences);
+  const named = namedConditions(failureSentences);
   // The failure sentence and the ones after it, where spells say what else the condition does and how it ends.
   const after = failureIndex === -1 ? "" : sentences.slice(failureIndex).join(" ");
   const duration = failureDurationOf(failureSentences);
-  const lifetime = failureLifetime(after, first);
+  const lifetime = failureLifetime(after, named);
   const { failureDuration: _later, ...rest } = lifetime;
   return {
     successDamage: half ? "half" : "none",
     ...rest,
-    ...(duration && first.length > 0 ? { failureDuration: duration } : {})
+    ...(duration && named.conditions.length > 0 ? { failureDuration: duration } : {})
   };
 }
 

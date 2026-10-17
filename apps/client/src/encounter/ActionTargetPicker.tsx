@@ -9,6 +9,7 @@ import {
   clearTargeting,
   setCheckSkill,
   setChosenAbility,
+  setConditionChoice,
   setDamageType,
   setTargetDarts,
   setTargetingSpend,
@@ -150,6 +151,21 @@ export function ActionTargetPicker({
             {picking.action.damageTypes.map((type) => (
               <option key={type} value={type}>
                 {type.charAt(0).toUpperCase() + type.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {picking.action.conditionChoices && picking.action.conditionChoices.length > 1 && (
+        <label className="action-damage-type">
+          <span>Condition on a failed save</span>
+          <Select
+            value={picking.conditionId ?? picking.action.conditionChoices[0]}
+            onChange={(event) => setConditionChoice(event.target.value)}
+          >
+            {picking.action.conditionChoices.map((id) => (
+              <option key={id} value={id}>
+                {id.charAt(0).toUpperCase() + id.slice(1)}
               </option>
             ))}
           </Select>

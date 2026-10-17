@@ -518,6 +518,8 @@ export type ContentActionSummary = Readonly<{
   /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
+  /** The conditions the caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s
+   *  `conditionId`. */ conditionChoices?: readonly string[];
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);
    *  `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
     Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>

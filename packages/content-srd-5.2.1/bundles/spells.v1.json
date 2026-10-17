@@ -2337,6 +2337,10 @@
    "failureConditions": [
     "blinded"
    ],
+   "conditionChoices": [
+    "blinded",
+    "deafened"
+   ],
    "repeatSave": true
   },
   "target": {

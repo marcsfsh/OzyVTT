@@ -41,6 +41,8 @@ export type TargetingSession = Readonly<{
   skill?: string;
   /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
   ability?: AbilityId;
+  /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
+  conditionId?: string;
   /** The GM places a spell's lingering area rather than resolving an action: the zone it is for. */
   placeZoneId?: string;
 }>;
@@ -178,6 +180,12 @@ export function setDamageType(damageType: string) {
   session = { ...session, damageType: picked };
   emit();
 }
+/** Picks the condition a failed save imposes, for an action whose caster chooses one (Blindness/Deafness). */
+export function setConditionChoice(conditionId: string) {
+  if (!session?.action.conditionChoices?.includes(conditionId)) return;
+  session = { ...session, conditionId };
+  emit();
+}
 /** Picks the skill a check action is made with; undefined lets Escape a Grapple use the better one. */
 export function setCheckSkill(skill: string | undefined) {
   if (!session) return;
@@ -270,7 +278,20 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template, slotLevel, spend, darts, damageType, skill, ability } = session;
+  const {
+    attackerId,
+    action,
+    mode,
+    selected,
+    template,
+    slotLevel,
+    spend,
+    darts,
+    damageType,
+    skill,
+    ability,
+    conditionId
+  } = session;
   if (session.placeZoneId !== undefined) {
     if (!template?.placed) return;
     const zoneId = session.placeZoneId;
@@ -305,6 +326,7 @@ export function resolveTargeting(
     ...(damageType !== undefined ? { damageType } : {}),
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
+    ...(conditionId !== undefined ? { conditionId } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };

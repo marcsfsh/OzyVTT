@@ -16,7 +16,7 @@ import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives } from "../rules-families.js";
 import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
-import { isItemActionId, upcastAction } from "../item-actions.js";
+import { conditionChoicesOf, isItemActionId, upcastAction } from "../item-actions.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
 import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
@@ -78,10 +78,10 @@ export const actionCommands = [
       // A player types the face their die shows, never a total: the server adds the bonus and reads a 1 or a 20.
       if (isPlayer && (attackTotal !== undefined || critical !== undefined || fumble !== undefined))
         throw new GameAccessDeniedError("Type the d20 your die shows; the server adds your bonus.");
-      const effectiveConditionId = isPlayer ? null : (conditionId ?? null);
+      const requestedConditionId = conditionId ?? null;
       const effectiveCover = isPlayer ? null : (request.cover ?? null);
       const effectiveNote = request.note ?? null;
-      if (effectiveConditionId !== null && !kit.catalogFor(principal).hasCondition(effectiveConditionId))
+      if (requestedConditionId !== null && !kit.catalogFor(principal).hasCondition(requestedConditionId))
         throw new CommandRejectedError("That condition is not in the bundled reference.");
       // The grid is fetched up front (async) so template containment and token-distance rules can run
       // inside the synchronous mutation.
@@ -109,6 +109,18 @@ export const actionCommands = [
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
         const action = withChosenCost(listed, request.spend);
+        // The GM may impose any condition; a player picks only among the ones the action lets its caster choose
+        // (Blindness/Deafness), read from the spell too for a sheet built before the action carried them.
+        const offered = conditionChoicesOf(
+          action,
+          action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined
+        );
+        const effectiveConditionId =
+          requestedConditionId === null || !isPlayer
+            ? requestedConditionId
+            : offered.includes(requestedConditionId)
+              ? requestedConditionId
+              : null;
         let resolvedTargetIds: readonly string[];
         if (template) {
           if (action.attack)
