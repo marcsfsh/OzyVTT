@@ -302,7 +302,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-acid-arrow-level-3"
       ],
       "attacks": 1
      }
@@ -317,6 +317,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightful-presence",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    },
    {
@@ -395,7 +408,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Fear, Acid Arrow\n- **1/Day Each:** Speak with Dead, Vitriolic Sphere",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-fear",
+       "spellId": "fear",
+       "name": "Fear"
+      },
+      {
+       "id": "spellcasting-acid-arrow",
+       "spellId": "acid-arrow",
+       "name": "Acid Arrow"
+      },
+      {
+       "id": "spellcasting-speak-with-dead",
+       "spellId": "speak-with-dead",
+       "name": "Speak with Dead",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-vitriolic-sphere",
+       "spellId": "vitriolic-sphere",
+       "name": "Vitriolic Sphere",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-acid-arrow-level-3",
+       "spellId": "acid-arrow",
+       "name": "Acid Arrow",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -501,6 +554,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "self": true,
+     "spells": [
+      {
+       "id": "cloaked-flight",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
     }
    },
    {
@@ -518,7 +584,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-shatter"
       ],
       "attacks": 1
      }
@@ -553,6 +619,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "self": true,
+     "spells": [
+      {
+       "id": "sonic-boom",
+       "spellId": "shatter",
+       "name": "Shatter"
+      }
+     ]
     }
    },
    {
@@ -611,7 +690,46 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):\n\n- **At Will:** Detect Magic, Invisibility, Mage Hand, Shatter\n- **1/Day Each:** Scrying, Sending",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-shatter",
+       "spellId": "shatter",
+       "name": "Shatter"
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-sending",
+       "spellId": "sending",
+       "name": "Sending",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -712,6 +830,19 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "self": true,
+     "spells": [
+      {
+       "id": "blazing-light",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      }
+     ]
     }
    },
    {
@@ -730,7 +861,7 @@
      {
       "actionIds": [
        "sleep-breath",
-       "spellcasting"
+       "spellcasting-scorching-ray"
       ],
       "attacks": 1
      }
@@ -857,7 +988,51 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Detect Magic, Minor Illusion, Scorching Ray, Shapechange, Speak with Animals\n- **1/Day Each:** Detect Thoughts, Control Weather",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-scorching-ray",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -960,6 +1135,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 10,
+     "self": true,
+     "spells": [
+      {
+       "id": "guiding-light",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -978,7 +1167,7 @@
      {
       "actionIds": [
        "repulsion-breath",
-       "spellcasting"
+       "spellcasting-guiding-bolt-level-2"
       ],
       "attacks": 1
      }
@@ -1111,7 +1300,57 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17, +10 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Guiding Bolt, Shapechange, Speak with Animals, Thaumaturgy\n- **1/Day Each:** Detect Thoughts, Water Breathing",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 10,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-guiding-bolt",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-water-breathing",
+       "spellId": "water-breathing",
+       "name": "Water Breathing",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-guiding-bolt-level-2",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1247,7 +1486,7 @@
      {
       "actionIds": [
        "slowing-breath",
-       "spellcasting"
+       "spellcasting-mind-spike-level-4"
       ],
       "attacks": 1
      }
@@ -1262,6 +1501,20 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "mind-jolt",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 4
+      }
+     ]
     }
    },
    {
@@ -1358,7 +1611,52 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n\n- **At Will:** Detect Magic, Mind Spike, Minor Illusion, Shapechange\n- **1/Day Each:** Greater Restoration, Major Image",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mind-spike",
+       "spellId": "mind-spike",
+       "name": "Mind Spike"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-greater-restoration",
+       "spellId": "greater-restoration",
+       "name": "Greater Restoration",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-spike-level-4",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 4
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1494,7 +1792,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting",
+       "spellcasting-guiding-bolt-level-2",
        "weakening-breath"
       ],
       "attacks": 1
@@ -1509,6 +1807,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "self": true,
+     "spells": [
+      {
+       "id": "guiding-light",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -1605,7 +1917,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21, +13 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Guiding Bolt, Shapechange\n- **1/Day Each:** Flame Strike, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-guiding-bolt",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-flame-strike",
+       "spellId": "flame-strike",
+       "name": "Flame Strike",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-guiding-bolt-level-2",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1712,6 +2064,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "mind-invasion",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 3
+      }
+     ]
     }
    },
    {
@@ -1729,7 +2095,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-mind-spike-level-3"
       ],
       "attacks": 1
      }
@@ -1838,7 +2204,36 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n- **At Will:** Detect Magic, Mind Spike\n- **1/Day Each:** Geas",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mind-spike",
+       "spellId": "mind-spike",
+       "name": "Mind Spike"
+      },
+      {
+       "id": "spellcasting-geas",
+       "spellId": "geas",
+       "name": "Geas",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-spike-level-3",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -1949,6 +2344,20 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "commanding-presence",
+       "spellId": "command",
+       "name": "Command",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -1966,7 +2375,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-scorching-ray"
       ],
       "attacks": 1
      }
@@ -1981,6 +2390,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "fiery-rays",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      }
+     ]
     }
    },
    {
@@ -2059,7 +2481,35 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 20, +12 to hit with spell attacks):\n\n- **At Will:** Command, Detect Magic, Scorching Ray\n- **1/Day Each:** Fireball",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-command",
+       "spellId": "command",
+       "name": "Command"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-scorching-ray",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      },
+      {
+       "id": "spellcasting-fireball",
+       "spellId": "fireball",
+       "name": "Fireball",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -2161,6 +2611,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 19,
+     "attackBonus": 11,
+     "self": true,
+     "spells": [
+      {
+       "id": "chill",
+       "spellId": "hold-monster",
+       "name": "Hold Monster"
+      }
+     ]
     }
    },
    {
@@ -2179,7 +2642,7 @@
      {
       "actionIds": [
        "paralyzing-breath",
-       "spellcasting"
+       "spellcasting-ice-knife"
       ],
       "attacks": 1
      }
@@ -2311,7 +2774,46 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 19, +11 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Hold Monster, Ice Knife, Shapechange\n- **1/Day Each:** Ice Storm, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 19,
+     "attackBonus": 11,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-hold-monster",
+       "spellId": "hold-monster",
+       "name": "Hold Monster"
+      },
+      {
+       "id": "spellcasting-ice-knife",
+       "spellId": "ice-knife",
+       "name": "Ice Knife"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-ice-storm",
+       "spellId": "ice-storm",
+       "name": "Ice Storm",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -2525,6 +3027,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightful-presence",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    }
   ],
@@ -2917,7 +3432,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-acid-arrow-level-4"
       ],
       "attacks": 1
      }
@@ -2932,6 +3447,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightful-presence",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    },
    {
@@ -3010,7 +3538,53 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21, +13 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Fear, Acid Arrow\n- **1/Day Each:** Create Undead, Speak with Dead, Vitriolic Sphere",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-fear",
+       "spellId": "fear",
+       "name": "Fear"
+      },
+      {
+       "id": "spellcasting-acid-arrow",
+       "spellId": "acid-arrow",
+       "name": "Acid Arrow"
+      },
+      {
+       "id": "spellcasting-create-undead",
+       "spellId": "create-undead",
+       "name": "Create Undead",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-speak-with-dead",
+       "spellId": "speak-with-dead",
+       "name": "Speak with Dead",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-vitriolic-sphere",
+       "spellId": "vitriolic-sphere",
+       "name": "Vitriolic Sphere",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-acid-arrow-level-4",
+       "spellId": "acid-arrow",
+       "name": "Acid Arrow",
+       "atLevel": 4
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3116,6 +3690,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "self": true,
+     "spells": [
+      {
+       "id": "cloaked-flight",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
     }
    },
    {
@@ -3133,7 +3720,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-shatter-level-3"
       ],
       "attacks": 1
      }
@@ -3168,6 +3755,20 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "self": true,
+     "spells": [
+      {
+       "id": "sonic-boom",
+       "spellId": "shatter",
+       "name": "Shatter",
+       "atLevel": 3
+      }
+     ]
     }
    },
    {
@@ -3226,7 +3827,52 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 22):\n\n- **At Will:** Detect Magic, Invisibility, Mage Hand, Shatter\n- **1/Day Each:** Scrying, Sending",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-shatter",
+       "spellId": "shatter",
+       "name": "Shatter"
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-sending",
+       "spellId": "sending",
+       "name": "Sending",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-shatter-level-3",
+       "spellId": "shatter",
+       "name": "Shatter",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3327,6 +3973,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "blazing-light",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray",
+       "atLevel": 3
+      }
+     ]
     }
    },
    {
@@ -3345,7 +4005,7 @@
      {
       "actionIds": [
        "sleep-breath",
-       "spellcasting"
+       "spellcasting-scorching-ray-level-3"
       ],
       "attacks": 1
      }
@@ -3472,7 +4132,57 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 20):\n\n- **At Will:** Detect Magic, Minor Illusion, Scorching Ray, Shapechange, Speak with Animals\n- **1/Day Each:** Control Weather, Detect Thoughts",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-scorching-ray",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scorching-ray-level-3",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3575,6 +4285,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "self": true,
+     "spells": [
+      {
+       "id": "guiding-light",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -3593,7 +4317,7 @@
      {
       "actionIds": [
        "repulsion-breath",
-       "spellcasting"
+       "spellcasting-guiding-bolt-level-2"
       ],
       "attacks": 1
      }
@@ -3726,7 +4450,69 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 22, +14 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Guiding Bolt, Shapechange, Speak with Animals, Thaumaturgy\n- **1/Day Each:** Detect Thoughts, Control Water, Scrying, Water Breathing",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 22,
+     "attackBonus": 14,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-guiding-bolt",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-control-water",
+       "spellId": "control-water",
+       "name": "Control Water",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-water-breathing",
+       "spellId": "water-breathing",
+       "name": "Water Breathing",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-guiding-bolt-level-2",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -3862,7 +4648,7 @@
      {
       "actionIds": [
        "slowing-breath",
-       "spellcasting"
+       "spellcasting-mind-spike-level-5"
       ],
       "attacks": 1
      }
@@ -3877,6 +4663,20 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "self": true,
+     "spells": [
+      {
+       "id": "mind-jolt",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 5
+      }
+     ]
     }
    },
    {
@@ -3973,7 +4773,58 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21):\n\n- **At Will:** Detect Magic, Mind Spike, Minor Illusion, Shapechange\n- **1/Day Each:** Greater Restoration, Major Image, Project Image",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mind-spike",
+       "spellId": "mind-spike",
+       "name": "Mind Spike"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-greater-restoration",
+       "spellId": "greater-restoration",
+       "name": "Greater Restoration",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-project-image",
+       "spellId": "project-image",
+       "name": "Project Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-spike-level-5",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 5
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -4109,7 +4960,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting",
+       "spellcasting-guiding-bolt-level-4",
        "weakening-breath"
       ],
       "attacks": 1
@@ -4124,6 +4975,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 24,
+     "attackBonus": 16,
+     "self": true,
+     "spells": [
+      {
+       "id": "guiding-light",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 4
+      }
+     ]
     }
    },
    {
@@ -4220,7 +5085,53 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 24, +16 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Guiding Bolt, Shapechange\n- **1/Day Each:** Flame Strike, Word of Recall, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 24,
+     "attackBonus": 16,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-guiding-bolt",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-flame-strike",
+       "spellId": "flame-strike",
+       "name": "Flame Strike",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-word-of-recall",
+       "spellId": "word-of-recall",
+       "name": "Word of Recall",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-guiding-bolt-level-4",
+       "spellId": "guiding-bolt",
+       "name": "Guiding Bolt",
+       "atLevel": 4
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -4327,6 +5238,20 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "self": true,
+     "spells": [
+      {
+       "id": "mind-invasion",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 5
+      }
+     ]
     }
    },
    {
@@ -4344,7 +5269,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-mind-spike-level-5"
       ],
       "attacks": 1
      }
@@ -4453,7 +5378,42 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21):\n\n- **At Will:** Detect Magic, Mind Spike\n- **1/Day Each:** Geas, Modify Memory",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mind-spike",
+       "spellId": "mind-spike",
+       "name": "Mind Spike"
+      },
+      {
+       "id": "spellcasting-geas",
+       "spellId": "geas",
+       "name": "Geas",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-modify-memory",
+       "spellId": "modify-memory",
+       "name": "Modify Memory",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-spike-level-5",
+       "spellId": "mind-spike",
+       "name": "Mind Spike",
+       "atLevel": 5
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -4564,6 +5524,20 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "self": true,
+     "spells": [
+      {
+       "id": "commanding-presence",
+       "spellId": "command",
+       "name": "Command",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -4581,7 +5555,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-scorching-ray-level-3"
       ],
       "attacks": 1
      }
@@ -4596,6 +5570,20 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "self": true,
+     "spells": [
+      {
+       "id": "fiery-rays",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray",
+       "atLevel": 3
+      }
+     ]
     }
    },
    {
@@ -4674,7 +5662,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):\n\n- **At Will:** Command, Detect Magic, Scorching Ray\n- **1/Day Each:** Fireball, Scrying",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "spells": [
+      {
+       "id": "spellcasting-command",
+       "spellId": "command",
+       "name": "Command"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-scorching-ray",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray"
+      },
+      {
+       "id": "spellcasting-fireball",
+       "spellId": "fireball",
+       "name": "Fireball",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scorching-ray-level-3",
+       "spellId": "scorching-ray",
+       "name": "Scorching Ray",
+       "atLevel": 3
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -4776,6 +5804,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "self": true,
+     "spells": [
+      {
+       "id": "chill",
+       "spellId": "hold-monster",
+       "name": "Hold Monster"
+      }
+     ]
     }
    },
    {
@@ -4794,7 +5835,7 @@
      {
       "actionIds": [
        "paralyzing-breath",
-       "spellcasting"
+       "spellcasting-ice-knife-level-2"
       ],
       "attacks": 1
      }
@@ -4926,7 +5967,64 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dragon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23, +15 to hit with spell attacks):\n\n- **At Will:** Detect Magic, Hold Monster, Ice Knife, Shapechange\n- **1/Day Each:** Control Weather, Ice Storm, Teleport, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 23,
+     "attackBonus": 15,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-hold-monster",
+       "spellId": "hold-monster",
+       "name": "Hold Monster"
+      },
+      {
+       "id": "spellcasting-ice-knife",
+       "spellId": "ice-knife",
+       "name": "Ice Knife"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-ice-storm",
+       "spellId": "ice-storm",
+       "name": "Ice Storm",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-teleport",
+       "spellId": "teleport",
+       "name": "Teleport",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-ice-knife-level-2",
+       "spellId": "ice-knife",
+       "name": "Ice Knife",
+       "atLevel": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -5140,6 +6238,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightful-presence",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    }
   ],
@@ -6059,6 +7170,19 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "misty-step-3-day",
+       "spellId": "misty-step",
+       "name": "Misty Step"
+      }
+     ]
     }
    },
    {
@@ -6113,7 +7237,90 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The archmage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 17):\n\n- **At Will:** Detect Magic, Detect Thoughts, Disguise Self, Invisibility, Light, Mage Armor, Mage Hand, Prestidigitation\n- **2/Day Each:** Fly, Lightning Bolt\n- **1/Day Each:** Cone of Cold, Mind Blank, Scrying, Teleport",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      },
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-mage-armor",
+       "spellId": "mage-armor",
+       "name": "Mage Armor"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-prestidigitation",
+       "spellId": "prestidigitation",
+       "name": "Prestidigitation"
+      },
+      {
+       "id": "spellcasting-fly",
+       "spellId": "fly",
+       "name": "Fly",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-lightning-bolt",
+       "spellId": "lightning-bolt",
+       "name": "Lightning Bolt",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-cone-of-cold",
+       "spellId": "cone-of-cold",
+       "name": "Cone of Cold",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-mind-blank",
+       "spellId": "mind-blank",
+       "name": "Mind Blank",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-teleport",
+       "spellId": "teleport",
+       "name": "Teleport",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -11244,6 +12451,19 @@
     "uses": {
      "limit": 1,
      "per": "short-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "self": true,
+     "spells": [
+      {
+       "id": "phantasms-recharge-after-a-short-or-long-rest",
+       "spellId": "mirror-image",
+       "name": "Mirror Image"
+      }
+     ]
     }
    },
    {
@@ -11349,7 +12569,20 @@
     "name": "Misty Step",
     "activation": "bonus-action",
     "description": "The giant casts the Misty Step spell, using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "self": true,
+     "spells": [
+      {
+       "id": "misty-step",
+       "spellId": "misty-step",
+       "name": "Misty Step"
+      }
+     ]
+    }
    },
    {
     "id": "multiattack",
@@ -11369,7 +12602,7 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-fog-cloud"
       ],
       "attacks": 1
      }
@@ -11428,7 +12661,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The giant casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\n\n- **At Will:** Detect Magic, Fog Cloud, Light\n- **1/Day Each:** Control Weather, Gaseous Form, Telekinesis",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-fog-cloud",
+       "spellId": "fog-cloud",
+       "name": "Fog Cloud"
+      },
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-gaseous-form",
+       "spellId": "gaseous-form",
+       "name": "Gaseous Form",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-telekinesis",
+       "spellId": "telekinesis",
+       "name": "Telekinesis",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -11996,6 +13269,28 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "spells": [
+      {
+       "id": "divine-aid-2-day-bless",
+       "spellId": "bless",
+       "name": "Bless"
+      },
+      {
+       "id": "divine-aid-2-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      },
+      {
+       "id": "divine-aid-2-day-sanctuary",
+       "spellId": "sanctuary",
+       "name": "Sanctuary"
+      }
+     ]
     }
    },
    {
@@ -12026,7 +13321,64 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The couatl casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability (spell save DC 15):\n\n- **At Will:** Detect Evil and Good, Detect Magic, Detect Thoughts, Shapechange\n- **1/Day Each:** Create Food and Water, Dream, Greater Restoration, Scrying, Sleep",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-create-food-and-water",
+       "spellId": "create-food-and-water",
+       "name": "Create Food and Water",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dream",
+       "spellId": "dream",
+       "name": "Dream",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-greater-restoration",
+       "spellId": "greater-restoration",
+       "name": "Greater Restoration",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-sleep",
+       "spellId": "sleep",
+       "name": "Sleep",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -12445,6 +13797,19 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "self": true,
+     "spells": [
+      {
+       "id": "spiritual-weapon-2-day",
+       "spellId": "spiritual-weapon",
+       "name": "Spiritual Weapon"
+      }
+     ]
     }
    },
    {
@@ -12452,7 +13817,36 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 12, +4 to hit with spell attacks):\n\n- **At Will:** Light, Thaumaturgy\n- **1/Day Each:** Hold Person\n- **2/Day Each:** Command",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-hold-person",
+       "spellId": "hold-person",
+       "name": "Hold Person",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-command",
+       "spellId": "command",
+       "name": "Command",
+       "perDay": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -12862,6 +14256,28 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "divine-aid-2-day-cure-wounds",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds"
+      },
+      {
+       "id": "divine-aid-2-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      },
+      {
+       "id": "divine-aid-2-day-remove-curse",
+       "spellId": "remove-curse",
+       "name": "Remove Curse"
+      }
+     ]
     }
    },
    {
@@ -12902,7 +14318,36 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The deva casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n\n- **At Will:** Detect Evil and Good, Shapechange\n- **1/Day Each:** Commune, Raise Dead",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-shapechange",
+       "spellId": "shapechange",
+       "name": "Shapechange"
+      },
+      {
+       "id": "spellcasting-commune",
+       "spellId": "commune",
+       "name": "Commune",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-raise-dead",
+       "spellId": "raise-dead",
+       "name": "Raise Dead",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -13192,7 +14637,72 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The djinni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n\n- **At Will:** Detect Evil and Good, Detect Magic\n- **2/Day Each:** Create Food and Water, Tongues, Wind Walk\n- **1/Day Each:** Creation, Gaseous Form, Invisibility, Major Image, Plane Shift",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-create-food-and-water",
+       "spellId": "create-food-and-water",
+       "name": "Create Food and Water",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-tongues",
+       "spellId": "tongues",
+       "name": "Tongues",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-wind-walk",
+       "spellId": "wind-walk",
+       "name": "Wind Walk",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-creation",
+       "spellId": "creation",
+       "name": "Creation",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-gaseous-form",
+       "spellId": "gaseous-form",
+       "name": "Gaseous Form",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -13361,7 +14871,20 @@
     "name": "Read Thoughts",
     "activation": "action",
     "description": "The doppelganger casts Detect Thoughts, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 12).\n\n- **At Will:** Detect Thoughts",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "self": true,
+     "spells": [
+      {
+       "id": "read-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -13847,6 +15370,28 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "magic-of-the-spider-queen-recharge-5-6-darkness",
+       "spellId": "darkness",
+       "name": "Darkness"
+      },
+      {
+       "id": "magic-of-the-spider-queen-recharge-5-6-faerie-fire",
+       "spellId": "faerie-fire",
+       "name": "Faerie Fire"
+      },
+      {
+       "id": "magic-of-the-spider-queen-recharge-5-6-web",
+       "spellId": "web",
+       "name": "Web"
+      }
+     ]
     }
    },
    {
@@ -14045,7 +15590,54 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The druid casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 13):\n\n- **At Will:** Druidcraft, Speak with Animals\n- **2/Day Each:** Entangle, Thunderwave\n- **1/Day Each:** Animal Messenger, Longstrider, Moonbeam",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "spellcasting-druidcraft",
+       "spellId": "druidcraft",
+       "name": "Druidcraft"
+      },
+      {
+       "id": "spellcasting-speak-with-animals",
+       "spellId": "speak-with-animals",
+       "name": "Speak with Animals"
+      },
+      {
+       "id": "spellcasting-entangle",
+       "spellId": "entangle",
+       "name": "Entangle",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-thunderwave",
+       "spellId": "thunderwave",
+       "name": "Thunderwave",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-animal-messenger",
+       "spellId": "animal-messenger",
+       "name": "Animal Messenger",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-longstrider",
+       "spellId": "longstrider",
+       "name": "Longstrider",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-moonbeam",
+       "spellId": "moonbeam",
+       "name": "Moonbeam",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -14139,7 +15731,7 @@
       ]
      },
      {
-      "actionId": "spellcasting",
+      "actionId": "spellcasting-charm-monster",
       "count": 1
      }
     ]
@@ -14188,7 +15780,41 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The dryad casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Animal Friendship, Charm Monster, Druidcraft\n- **1/Day Each:** Entangle, Pass without Trace",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-animal-friendship",
+       "spellId": "animal-friendship",
+       "name": "Animal Friendship"
+      },
+      {
+       "id": "spellcasting-charm-monster",
+       "spellId": "charm-monster",
+       "name": "Charm Monster"
+      },
+      {
+       "id": "spellcasting-druidcraft",
+       "spellId": "druidcraft",
+       "name": "Druidcraft"
+      },
+      {
+       "id": "spellcasting-entangle",
+       "spellId": "entangle",
+       "name": "Entangle",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-pass-without-trace",
+       "spellId": "pass-without-trace",
+       "name": "Pass without Trace",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -14330,6 +15956,19 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 10,
+     "attackBonus": 2,
+     "self": true,
+     "spells": [
+      {
+       "id": "sleep-1-day",
+       "spellId": "sleep",
+       "name": "Sleep"
+      }
+     ]
     }
    }
   ],
@@ -14742,7 +16381,60 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The efreeti casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Detect Magic, Elementalism\n- **1/Day Each:** Gaseous Form, Invisibility, Major Image, Plane Shift, Tongues, Wall of Fire",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-elementalism",
+       "spellId": "elementalism",
+       "name": "Elementalism"
+      },
+      {
+       "id": "spellcasting-gaseous-form",
+       "spellId": "gaseous-form",
+       "name": "Gaseous Form",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-tongues",
+       "spellId": "tongues",
+       "name": "Tongues",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-wall-of-fire",
+       "spellId": "wall-of-fire",
+       "name": "Wall of Fire",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -16839,7 +18531,20 @@
     "name": "Etherealness",
     "activation": "action",
     "description": "The ghost casts the Etherealness spell, requiring no spell components and using Charisma as the spellcasting ability. The ghost is visible on the Material Plane while on the Border Ethereal and vice versa, but it can't affect or be affected by anything on the other plane.\n\n- **At Will:** Etherealness",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "self": true,
+     "spells": [
+      {
+       "id": "etherealness",
+       "spellId": "etherealness",
+       "name": "Etherealness"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -18941,7 +20646,30 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The owl casts one of the following spells, requiring no spell components and using Wisdom as the spellcasting ability:\n\n- **At Will:** Detect Evil and Good, Detect Magic\n- **1/Day Each:** Clairvoyance",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-clairvoyance",
+       "spellId": "clairvoyance",
+       "name": "Clairvoyance",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -20423,7 +22151,12 @@
       "actionId": "pummel",
       "count": 1,
       "or": [
-       "spellcasting"
+       "spellcasting-darkness",
+       "spellcasting-detect-magic",
+       "spellcasting-dispel-magic",
+       "spellcasting-confusion",
+       "spellcasting-fly",
+       "spellcasting-power-word-stun"
       ]
      }
     ]
@@ -20478,7 +22211,47 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The glabrezu casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Darkness, Detect Magic, Dispel Magic\n- **1/Day Each:** Confusion, Fly, Power Word Stun",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-darkness",
+       "spellId": "darkness",
+       "name": "Darkness"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic"
+      },
+      {
+       "id": "spellcasting-confusion",
+       "spellId": "confusion",
+       "name": "Confusion",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-fly",
+       "spellId": "fly",
+       "name": "Fly",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-power-word-stun",
+       "spellId": "power-word-stun",
+       "name": "Power Word Stun",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -21952,7 +23725,39 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The hag casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 12, +4 to hit with spell attacks):\n\n- **At Will:** Dancing Lights, Disguise Self, Invisibility, Minor Illusion, Ray of Sickness",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "spellcasting-dancing-lights",
+       "spellId": "dancing-lights",
+       "name": "Dancing Lights"
+      },
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-ray-of-sickness",
+       "spellId": "ray-of-sickness",
+       "name": "Ray of Sickness"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -22685,7 +24490,49 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The naga casts one of the following spells, requiring no Somatic or Material components and using Wisdom as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Thaumaturgy\n- **1/Day Each:** Clairvoyance, Cure Wounds, Flame Strike, Geas, True Seeing",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-clairvoyance",
+       "spellId": "clairvoyance",
+       "name": "Clairvoyance",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-cure-wounds",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-flame-strike",
+       "spellId": "flame-strike",
+       "name": "Flame Strike",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-geas",
+       "spellId": "geas",
+       "name": "Geas",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-true-seeing",
+       "spellId": "true-seeing",
+       "name": "True Seeing",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -24715,6 +26562,20 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 6
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "ice-wall",
+       "spellId": "wall-of-ice",
+       "name": "Wall of Ice",
+       "atLevel": 8
+      }
+     ]
     }
    }
   ],
@@ -24870,6 +26731,19 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 11,
+     "attackBonus": 3,
+     "self": true,
+     "spells": [
+      {
+       "id": "fog-cloud",
+       "spellId": "fog-cloud",
+       "name": "Fog Cloud"
+      }
+     ]
     }
    }
   ],
@@ -25014,7 +26888,20 @@
     "name": "Invisibility",
     "activation": "action",
     "description": "The imp casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.\n\n- **At Will:** Invisibility",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "self": true,
+     "spells": [
+      {
+       "id": "invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -25163,7 +27050,36 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The incubus casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15):\n\n- **At Will:** Disguise Self, Etherealness\n- **1/Day Each:** Dream, Hypnotic Pattern",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "spells": [
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-etherealness",
+       "spellId": "etherealness",
+       "name": "Etherealness"
+      },
+      {
+       "id": "spellcasting-dream",
+       "spellId": "dream",
+       "name": "Dream",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-hypnotic-pattern",
+       "spellId": "hypnotic-pattern",
+       "name": "Hypnotic Pattern",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -26390,7 +28306,42 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The lamia casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n\n- **At Will:** Disguise Self, Minor Illusion\n- **1/Day Each:** Geas, Major Image, Scrying",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-geas",
+       "spellId": "geas",
+       "name": "Geas",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -26671,6 +28622,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "frightening-gaze",
+       "spellId": "fear",
+       "name": "Fear"
+      }
+     ]
     }
    },
    {
@@ -26706,7 +28670,96 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The lich casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 20):\n\n- **At Will:** Detect Magic, Detect Thoughts, Dispel Magic, Fireball, Invisibility, Lightning Bolt, Mage Hand, Prestidigitation\n- **2/Day Each:** Animate Dead, Dimension Door, Plane Shift\n- **1/Day Each:** Chain Lightning, Finger of Death, Power Word Kill, Scrying",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      },
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic"
+      },
+      {
+       "id": "spellcasting-fireball",
+       "spellId": "fireball",
+       "name": "Fireball"
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "spellcasting-lightning-bolt",
+       "spellId": "lightning-bolt",
+       "name": "Lightning Bolt"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-prestidigitation",
+       "spellId": "prestidigitation",
+       "name": "Prestidigitation"
+      },
+      {
+       "id": "spellcasting-animate-dead",
+       "spellId": "animate-dead",
+       "name": "Animate Dead",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-dimension-door",
+       "spellId": "dimension-door",
+       "name": "Dimension Door",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-chain-lightning",
+       "spellId": "chain-lightning",
+       "name": "Chain Lightning",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-finger-of-death",
+       "spellId": "finger-of-death",
+       "name": "Finger of Death",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-power-word-kill",
+       "spellId": "power-word-kill",
+       "name": "Power Word Kill",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-scrying",
+       "spellId": "scrying",
+       "name": "Scrying",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -27063,6 +29116,19 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "self": true,
+     "spells": [
+      {
+       "id": "misty-step-3-day",
+       "spellId": "misty-step",
+       "name": "Misty Step"
+      }
+     ]
     }
    },
    {
@@ -27117,7 +29183,63 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The mage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Detect Magic, Light, Mage Armor, Mage Hand, Prestidigitation\n- **2/Day Each:** Fireball, Invisibility\n- **1/Day Each:** Cone of Cold, Fly",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-mage-armor",
+       "spellId": "mage-armor",
+       "name": "Mage Armor"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-prestidigitation",
+       "spellId": "prestidigitation",
+       "name": "Prestidigitation"
+      },
+      {
+       "id": "spellcasting-fireball",
+       "spellId": "fireball",
+       "name": "Fireball",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-cone-of-cold",
+       "spellId": "cone-of-cold",
+       "name": "Cone of Cold",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-fly",
+       "spellId": "fly",
+       "name": "Fly",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -29225,6 +31347,20 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "dread-command",
+       "spellId": "command",
+       "name": "Command",
+       "atLevel": 2
+      }
+     ]
     }
    },
    {
@@ -29255,7 +31391,42 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The mummy casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 17, +9 to hit with spell attacks):\n\n- **At Will:** Dispel Magic, Thaumaturgy\n- **1/Day Each:** Animate Dead, Harm, Insect Plague",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "spells": [
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-animate-dead",
+       "spellId": "animate-dead",
+       "name": "Animate Dead",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-harm",
+       "spellId": "harm",
+       "name": "Harm",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-insect-plague",
+       "spellId": "insect-plague",
+       "name": "Insect Plague",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -29583,7 +31754,41 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The hag casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Detect Magic, Etherealness, Magic Missile\n- **2/Day Each:** Phantasmal Killer, Plane Shift",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-etherealness",
+       "spellId": "etherealness",
+       "name": "Etherealness"
+      },
+      {
+       "id": "spellcasting-magic-missile",
+       "spellId": "magic-missile",
+       "name": "Magic Missile"
+      },
+      {
+       "id": "spellcasting-phantasmal-killer",
+       "spellId": "phantasmal-killer",
+       "name": "Phantasmal Killer",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 2
+      }
+     ]
+    }
    },
    {
     "id": "nightmare-haunting",
@@ -29594,6 +31799,19 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "self": true,
+     "spells": [
+      {
+       "id": "nightmare-haunting",
+       "spellId": "dream",
+       "name": "Dream"
+      }
+     ]
     }
    }
   ],
@@ -30377,7 +32595,20 @@
     "name": "Invisibility",
     "activation": "bonus-action",
     "description": "The oni casts Invisibility on itself, requiring no spell components and using the same spellcasting ability as Spellcasting.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "self": true,
+     "spells": [
+      {
+       "id": "invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
+    }
    },
    {
     "id": "multiattack",
@@ -30397,7 +32628,10 @@
     "multiattackReplacements": [
      {
       "actionIds": [
-       "spellcasting"
+       "spellcasting-charm-person",
+       "spellcasting-darkness",
+       "spellcasting-gaseous-form",
+       "spellcasting-sleep"
       ],
       "attacks": 1
      }
@@ -30463,7 +32697,38 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n\n- **At Will:**\n- **1/Day Each:** Charm Person, Darkness, Gaseous Form, Sleep",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "spellcasting-charm-person",
+       "spellId": "charm-person",
+       "name": "Charm Person",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-darkness",
+       "spellId": "darkness",
+       "name": "Darkness",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-gaseous-form",
+       "spellId": "gaseous-form",
+       "name": "Gaseous Form",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-sleep",
+       "spellId": "sleep",
+       "name": "Sleep",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -31888,6 +34153,33 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "divine-aid-2-day-cure-wounds",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds"
+      },
+      {
+       "id": "divine-aid-2-day-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      },
+      {
+       "id": "divine-aid-2-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      },
+      {
+       "id": "divine-aid-2-day-remove-curse",
+       "spellId": "remove-curse",
+       "name": "Remove Curse"
+      }
+     ]
     }
    },
    {
@@ -31959,7 +34251,43 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The planetar casts one of the following spells, requiring no Material components and using Charisma as spellcasting ability (spell save DC 20):\n\n- **At Will:** Detect Evil and Good\n- **1/Day Each:** Commune, Control Weather, Dispel Evil and Good, Raise Dead",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-commune",
+       "spellId": "commune",
+       "name": "Commune",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dispel-evil-and-good",
+       "spellId": "dispel-evil-and-good",
+       "name": "Dispel Evil and Good",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-raise-dead",
+       "spellId": "raise-dead",
+       "name": "Raise Dead",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -32359,6 +34687,33 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "divine-aid-3-day-bless",
+       "spellId": "bless",
+       "name": "Bless"
+      },
+      {
+       "id": "divine-aid-3-day-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic"
+      },
+      {
+       "id": "divine-aid-3-day-healing-word",
+       "spellId": "healing-word",
+       "name": "Healing Word"
+      },
+      {
+       "id": "divine-aid-3-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      }
+     ]
     }
    },
    {
@@ -32418,7 +34773,30 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:\n\n- **At Will:** Light, Thaumaturgy\n- **1/Day Each:** Spirit Guardians",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "spells": [
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-spirit-guardians",
+       "spellId": "spirit-guardians",
+       "name": "Spirit Guardians",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -32506,6 +34884,28 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "divine-aid-1-day-bless",
+       "spellId": "bless",
+       "name": "Bless"
+      },
+      {
+       "id": "divine-aid-1-day-healing-word",
+       "spellId": "healing-word",
+       "name": "Healing Word"
+      },
+      {
+       "id": "divine-aid-1-day-sanctuary",
+       "spellId": "sanctuary",
+       "name": "Sanctuary"
+      }
+     ]
     }
    },
    {
@@ -32549,7 +34949,24 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The priest casts one of the following spells, using Wisdom as the spellcasting ability:\n\n- **At Will:** Light, Thaumaturgy",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 12,
+     "attackBonus": 4,
+     "spells": [
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -33094,7 +35511,20 @@
     "name": "Invisibility",
     "activation": "action",
     "description": "The quasit casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 10,
+     "attackBonus": 2,
+     "self": true,
+     "spells": [
+      {
+       "id": "invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -33261,7 +35691,63 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The rakshasa casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18):\n\n- **At Will:** Detect Magic, Detect Thoughts, Disguise Self, Mage Hand, Minor Illusion\n- **1/Day Each:** Fly, Invisibility, Major Image, Plane Shift",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts"
+      },
+      {
+       "id": "spellcasting-disguise-self",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-fly",
+       "spellId": "fly",
+       "name": "Fly",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-major-image",
+       "spellId": "major-image",
+       "name": "Major Image",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -35394,7 +37880,20 @@
     "name": "Illusory Appearance",
     "activation": "action",
     "description": "The hag casts Disguise Self, using Constitution as the spellcasting ability (spell save DC 13). The spell's duration is 24 hours.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "con",
+     "saveDc": 13,
+     "attackBonus": 5,
+     "self": true,
+     "spells": [
+      {
+       "id": "illusory-appearance",
+       "spellId": "disguise-self",
+       "name": "Disguise Self"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -36401,6 +38900,29 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 25,
+     "attackBonus": 17,
+     "spells": [
+      {
+       "id": "divine-aid-3-day-cure-wounds-level-2",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds",
+       "atLevel": 2
+      },
+      {
+       "id": "divine-aid-3-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      },
+      {
+       "id": "divine-aid-3-day-remove-curse",
+       "spellId": "remove-curse",
+       "name": "Remove Curse"
+      }
+     ]
     }
    },
    {
@@ -36490,7 +39012,43 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The solar casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 25):\n\n- **At Will:** Detect Evil and Good\n- **1/Day Each:** Commune, Control Weather, Dispel Evil and Good, Resurrection",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 25,
+     "attackBonus": 17,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-commune",
+       "spellId": "commune",
+       "name": "Commune",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dispel-evil-and-good",
+       "spellId": "dispel-evil-and-good",
+       "name": "Dispel Evil and Good",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-resurrection",
+       "spellId": "resurrection",
+       "name": "Resurrection",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -36825,7 +39383,75 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The sphinx casts one of the following spells, requiring no Material components and using Intelligence as the spellcasting ability (spell save DC 16):\n\n- **At Will:** Detect Magic, Identify, Mage Hand, Minor Illusion, Prestidigitation\n- **1/Day Each:** Dispel Magic, Legend Lore, Locate Object, Plane Shift, Remove Curse, Tongues",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 16,
+     "attackBonus": 8,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-identify",
+       "spellId": "identify",
+       "name": "Identify"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-prestidigitation",
+       "spellId": "prestidigitation",
+       "name": "Prestidigitation"
+      },
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-legend-lore",
+       "spellId": "legend-lore",
+       "name": "Legend Lore",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-locate-object",
+       "spellId": "locate-object",
+       "name": "Locate Object",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-plane-shift",
+       "spellId": "plane-shift",
+       "name": "Plane Shift",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-remove-curse",
+       "spellId": "remove-curse",
+       "name": "Remove Curse",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-tongues",
+       "spellId": "tongues",
+       "name": "Tongues",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -37034,7 +39660,54 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The sphinx casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 20):\n\n- **At Will:** Detect Evil and Good, Thaumaturgy\n- **1/Day Each:** Detect Magic, Dispel Magic, Greater Restoration, Heroes' Feast, Zone of Truth",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-thaumaturgy",
+       "spellId": "thaumaturgy",
+       "name": "Thaumaturgy"
+      },
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dispel-magic",
+       "spellId": "dispel-magic",
+       "name": "Dispel Magic",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-greater-restoration",
+       "spellId": "greater-restoration",
+       "name": "Greater Restoration",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-heroes-feast",
+       "spellId": "heroes-feast",
+       "name": "Heroes' Feast",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-zone-of-truth",
+       "spellId": "zone-of-truth",
+       "name": "Zone of Truth",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -37422,7 +40095,58 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The naga casts one of the following spells, requiring no Somatic or Material components and using Intelligence as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Detect Magic, Mage Hand, Minor Illusion, Water Breathing\n- **2/Day Each:** Detect Thoughts, Dimension Door, Hold Person, Lightning Bolt",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-mage-hand",
+       "spellId": "mage-hand",
+       "name": "Mage Hand"
+      },
+      {
+       "id": "spellcasting-minor-illusion",
+       "spellId": "minor-illusion",
+       "name": "Minor Illusion"
+      },
+      {
+       "id": "spellcasting-water-breathing",
+       "spellId": "water-breathing",
+       "name": "Water Breathing"
+      },
+      {
+       "id": "spellcasting-detect-thoughts",
+       "spellId": "detect-thoughts",
+       "name": "Detect Thoughts",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-dimension-door",
+       "spellId": "dimension-door",
+       "name": "Dimension Door",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-hold-person",
+       "spellId": "hold-person",
+       "name": "Hold Person",
+       "perDay": 2
+      },
+      {
+       "id": "spellcasting-lightning-bolt",
+       "spellId": "lightning-bolt",
+       "name": "Lightning Bolt",
+       "perDay": 2
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -37574,7 +40298,20 @@
     "name": "Invisibility",
     "activation": "action",
     "description": "The sprite casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 10,
+     "attackBonus": 2,
+     "self": true,
+     "spells": [
+      {
+       "id": "invisibility",
+       "spellId": "invisibility",
+       "name": "Invisibility"
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -38208,6 +40945,19 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "castsSpells": {
+     "ability": "con",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "slow-recharge-5-6",
+       "spellId": "slow",
+       "name": "Slow"
+      }
+     ]
     }
    },
    {
@@ -38442,7 +41192,30 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The giant casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 18):\n\n- **At Will:** Detect Magic, Light\n- **1/Day Each:** Control Weather",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "wis",
+     "saveDc": 18,
+     "attackBonus": 10,
+     "spells": [
+      {
+       "id": "spellcasting-detect-magic",
+       "spellId": "detect-magic",
+       "name": "Detect Magic"
+      },
+      {
+       "id": "spellcasting-light",
+       "spellId": "light",
+       "name": "Light"
+      },
+      {
+       "id": "spellcasting-control-weather",
+       "spellId": "control-weather",
+       "name": "Control Weather",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -38585,7 +41358,21 @@
     "name": "Charm",
     "activation": "action",
     "description": "The succubus casts Dominate Person (level 8 version), requiring no spell components and using Charisma as the spellcasting ability (spell save DC 15).",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 15,
+     "attackBonus": 7,
+     "self": true,
+     "spells": [
+      {
+       "id": "charm",
+       "spellId": "dominate-person",
+       "name": "Dominate Person",
+       "atLevel": 8
+      }
+     ]
+    }
    },
    {
     "id": "draining-kiss",
@@ -40845,6 +43632,23 @@
     "uses": {
      "limit": 3,
      "per": "long-rest"
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "unicorn-s-blessing-3-day-cure-wounds",
+       "spellId": "cure-wounds",
+       "name": "Cure Wounds"
+      },
+      {
+       "id": "unicorn-s-blessing-3-day-lesser-restoration",
+       "spellId": "lesser-restoration",
+       "name": "Lesser Restoration"
+      }
+     ]
     }
    },
    {
@@ -40895,7 +43699,54 @@
     "name": "Spellcasting",
     "activation": "action",
     "description": "The unicorn casts one of the following spells, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 14):\n\n- **At Will:** Detect Evil and Good, Druidcraft\n- **1/Day Each:** Calm Emotions, Dispel Evil and Good, Entangle, Pass without Trace, Word of Recall",
-    "damage": []
+    "damage": [],
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "spells": [
+      {
+       "id": "spellcasting-detect-evil-and-good",
+       "spellId": "detect-evil-and-good",
+       "name": "Detect Evil and Good"
+      },
+      {
+       "id": "spellcasting-druidcraft",
+       "spellId": "druidcraft",
+       "name": "Druidcraft"
+      },
+      {
+       "id": "spellcasting-calm-emotions",
+       "spellId": "calm-emotions",
+       "name": "Calm Emotions",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-dispel-evil-and-good",
+       "spellId": "dispel-evil-and-good",
+       "name": "Dispel Evil and Good",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-entangle",
+       "spellId": "entangle",
+       "name": "Entangle",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-pass-without-trace",
+       "spellId": "pass-without-trace",
+       "name": "Pass without Trace",
+       "perDay": 1
+      },
+      {
+       "id": "spellcasting-word-of-recall",
+       "spellId": "word-of-recall",
+       "name": "Word of Recall",
+       "perDay": 1
+      }
+     ]
+    }
    }
   ],
   "token": {
@@ -41060,6 +43911,19 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "beguile",
+       "spellId": "command",
+       "name": "Command"
+      }
+     ]
     }
    },
    {
@@ -41072,6 +43936,19 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "charm-recharge-5-6",
+       "spellId": "charm-person",
+       "name": "Charm Person"
+      }
+     ]
     }
    },
    {

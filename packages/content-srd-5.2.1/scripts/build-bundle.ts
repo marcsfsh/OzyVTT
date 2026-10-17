@@ -42,6 +42,7 @@ import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-eff
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
+import { withSpellcasting } from "./monster-spells.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -713,6 +714,7 @@ const report = {
   restUses: 0,
   legendaryCreatures: 0,
   traitMechanics: 0,
+  castingActions: 0,
   typedDefenses: 0,
   corrections: [] as string[],
   untypedDamage: [] as string[],
@@ -725,6 +727,10 @@ const KNOWN_CONDITION_IDS = new Set(
     .map((condition) => condition.fields.describes)
 );
 const KNOWN_DAMAGE_TYPES = new Set<string>(DAMAGE_TYPES);
+/** The SRD spells a stat block can cast, by the id the spell bundle gives them. */
+const SRD_SPELL_IDS: ReadonlySet<string> = new Set(
+  spells.filter((spell) => spell.fields.document === "srd-2024").map((spell) => slugOf(spell.pk))
+);
 
 const monsters: ActorDefinition[] = creatures
   .filter((creature) => creature.fields.document === "srd-2024" && !EXCLUSIONS.has(creature.pk))
@@ -897,7 +903,23 @@ const monsters: ActorDefinition[] = creatures
         ...(enrichment ?? {})
       });
     });
-    const actions = linkedActions(creatureActions, siblingIdOf);
+    // The spells its actions cast, each a cast action in play; only spells the SRD spell list holds.
+    const actions = withSpellcasting(
+      linkedActions(creatureActions, siblingIdOf),
+      {
+        abilityScores: {
+          str: fields.ability_score_strength,
+          dex: fields.ability_score_dexterity,
+          con: fields.ability_score_constitution,
+          int: fields.ability_score_intelligence,
+          wis: fields.ability_score_wisdom,
+          cha: fields.ability_score_charisma
+        },
+        proficiencyBonus: fields.proficiency_bonus ?? proficiencyFromChallenge(challenge)
+      },
+      (spellId) => SRD_SPELL_IDS.has(spellId)
+    );
+    report.castingActions += actions.filter((action) => action.castsSpells).length;
     const senses = [
       fields.darkvision_range ? `darkvision ${fields.darkvision_range} ft.` : null,
       fields.blindsight_range ? `blindsight ${fields.blindsight_range} ft.` : null,
@@ -1445,7 +1467,7 @@ console.log(
   `rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, save-for-damage actions ${report.saveDamage}, monsters with typed defenses ${report.typedDefenses}`
 );
 console.log(
-  `limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures} | traits the engine runs: ${report.traitMechanics}`
+  `limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures} | traits the engine runs: ${report.traitMechanics} | actions that cast spells: ${report.castingActions}`
 );
 console.log(
   `conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`

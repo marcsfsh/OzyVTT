@@ -639,6 +639,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].castsSpells.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spells a stat block's action casts (a Spellcasting list, a Misty Step), read from its text as the catalog is built and made cast actions on a stat block; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].reminder",
     types: ACTION_CARRIERS,
     reason: "what the engine leaves to the GM, read from a save's later-turn damage as the catalog is built",

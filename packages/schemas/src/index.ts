@@ -1250,8 +1250,42 @@ export const MultiattackComponentSchema = z
     or: z
       .array(z.string().regex(/^[a-z0-9-]+$/))
       .min(1)
-      .max(3)
+      .max(8)
       .optional()
+  })
+  .strict();
+
+/**
+ * The spells a stat block's action casts (SRD 5.2.1 monsters), read from its text when the bundle is built: a
+ * Spellcasting action's lists ("At Will: Detect Magic, Fear", "1/Day Each: Fireball"), or the spell or choice of spells
+ * another action casts ("The mage casts Misty Step"). The engine makes each entry a cast action, `id`, with the spell's
+ * attack, save, damage and effects at these numbers and no slot: an `atLevel` cast at that level ("level 5 version"),
+ * a `perDay` one that many times between Long Rests (any other the action's own uses limit). `self`: the action is
+ * itself the cast of its one spell (a legendary "uses Spellcasting to cast Fear"), keeping its own cost.
+ */
+export const CastsSpellsSchema = z
+  .object({
+    ability: AbilitySchema,
+    saveDc: z.number().int().min(1).max(40),
+    attackBonus: z.number().int().min(-10).max(30),
+    self: z.literal(true).optional(),
+    spells: z
+      .array(
+        z
+          .object({
+            id: z.string().regex(/^[a-z0-9-]+$/),
+            spellId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(80),
+            name: z.string().min(1).max(120),
+            atLevel: z.number().int().min(1).max(9).optional(),
+            perDay: z.number().int().min(1).max(9).optional()
+          })
+          .strict()
+      )
+      .min(1)
+      .max(24)
   })
   .strict();
 
@@ -1332,7 +1366,7 @@ export const ActionSchema = z.object({
           actionIds: z
             .array(z.string().regex(/^[a-z0-9-]+$/))
             .min(1)
-            .max(3),
+            .max(8),
           attacks: z.number().int().min(1).max(3),
           any: z.literal(true).optional(),
           of: z
@@ -1413,6 +1447,8 @@ export const ActionSchema = z.object({
   /** The area it covers, for the map template. Filled from the description where the action enters the system
    *  (the content build, a homebrew save, an import), so play never reads the prose. */
   area: ActionAreaSchema.optional(),
+  /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
+  castsSpells: CastsSpellsSchema.optional(),
   /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
    *  Advantage", "or 2 (1d4) Piercing damage if the swarm is Bloodied"). The engine applies what it can see; a
    *  charge, which it can't, is offered on the hit for the attacker to confirm. */
