@@ -1,3 +1,4 @@
+import type { LooseSaveOutcome } from "@vtt/domain";
 import { aggregateRollMode, otherDiceOf } from "@vtt/rules-5e";
 import { requireActorAccess, requireGm } from "../authorization.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "../condition-rules.js";
@@ -66,7 +67,7 @@ export const saveCommands = [
       // Loose save: the resolver's own rules, with no DC and nothing to apply.
       const distance = await kit.creatureDistance();
       const rollId = kit.context.newId();
-      let outcome: Readonly<Record<string, unknown>> | undefined;
+      let outcome: LooseSaveOutcome | undefined;
       const { state, duplicate } = await execute((draft) => {
         const live = draft.actors.find((candidate) => candidate.id === actorId);
         if (!live) throw new CommandRejectedError("That combatant no longer exists.");
@@ -140,10 +141,10 @@ export const saveCommands = [
       });
       if (duplicate) return { route: "loose", rollId };
       kit.publishRolls(state, commandId);
-      if (outcome && "autoFailed" in outcome)
+      if (outcome?.autoFailed)
         kit.context.appendLog({
           kind: "save",
-          text: `${kit.actorName(actorId)} automatically fails the ${ability.toUpperCase()} save (${conditionLabel(String(outcome.autoFailed))}).`,
+          text: `${kit.actorName(actorId)} automatically fails the ${ability.toUpperCase()} save (${conditionLabel(outcome.autoFailed)}).`,
           actorId,
           actorIds: [actorId],
           gmOnly: kit.actorHidden(actorId)

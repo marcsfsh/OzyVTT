@@ -93,7 +93,10 @@ export function useSheetDefinition(
     (actor.inventory ?? [])
       .map((item) => `${item.id}:${item.equipped ? 1 : 0}${item.attuned ? 1 : 0}:${item.quantity}`)
       .join(","),
-    (actor.conditions ?? []).map((condition) => (typeof condition === "string" ? condition : condition.id)).join(","),
+    // Exhaustion's level changes the numbers too.
+    (actor.conditions ?? [])
+      .map((condition) => (typeof condition === "string" ? condition : `${condition.id}${condition.level ?? ""}`))
+      .join(","),
     (actor.effects ?? []).map((effect) => effect.id).join(","),
     "kind" in actor.hp
       ? actor.hp.kind === "exact"

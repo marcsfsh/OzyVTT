@@ -244,6 +244,13 @@ export type SaveAnswerResult = MutationResult & {
     /** Flat reduction taken off before Resistance. */ flatReduction?: number;
   };
 };
+/** A loose saving throw (none was owed): its total and d20, or the condition that failed it without a roll. */
+export type LooseSaveOutcome = Readonly<{
+  total: number;
+  natural?: number;
+  rollMode?: ActionRollMode;
+  autoFailed?: string;
+}>;
 /** Outcome of answering a reaction prompt; any damage it settles is already applied server-side. A strike (an
  *  opportunity attack, Hellish Rebuke) and a parked attack finished by the answer carry their full `resolution`. */
 export type ReactionAnswerResult = MutationResult & {

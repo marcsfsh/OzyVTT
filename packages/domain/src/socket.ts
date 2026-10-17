@@ -29,6 +29,7 @@ import type {
   DamageApplyResult,
   DeathSaveResult,
   DiceRollResult,
+  LooseSaveOutcome,
   MutationResult,
   ReactionAnswerResult,
   RulesBlocked,
@@ -273,7 +274,7 @@ export interface ClientToServerEvents {
         route?: "answered" | "loose";
         saveId?: string;
         rollId?: string;
-        outcome?: SaveAnswerResult["outcome"];
+        outcome?: NonNullable<SaveAnswerResult["outcome"]> | LooseSaveOutcome;
       }
     ) => void
   ) => void;

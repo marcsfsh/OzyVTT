@@ -31,7 +31,7 @@ export const ROLL_VISIBILITY_WORD: Readonly<Record<RollVisibility, string>> = {
  * Who may choose what. The GM gets two: for a GM roller `self-only` and `gm-only` reach the same
  * eyes (`apps/server/src/combat-log.ts`), so a third option would be a second name for one audience.
  */
-const VISIBILITY_OPTIONS: Readonly<Record<"gm" | "player", readonly RollVisibility[]>> = {
+export const VISIBILITY_OPTIONS: Readonly<Record<"gm" | "player", readonly RollVisibility[]>> = {
   gm: ["public", "gm-only"],
   player: ["public", "self-only", "blind"]
 };

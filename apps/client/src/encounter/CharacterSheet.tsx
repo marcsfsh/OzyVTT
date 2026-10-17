@@ -6,13 +6,14 @@ import type {
   PendingSave,
   PlayerActor,
   PlayerPendingSave,
-  PlayerView
+  PlayerView,
+  RollVisibility
 } from "@vtt/domain";
-import { Button, IconButton, Modal, SegmentedControl, IconX, useToast } from "@vtt/ui";
+import { Button, IconButton, Modal, SegmentedControl, Select, IconX, useToast } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
 import { SavePrompt } from "./SavePrompt";
 import { RichText } from "./RichText";
-import { DicePanel } from "../dice/DicePanel";
+import { DicePanel, ROLL_VISIBILITY_WORD, VISIBILITY_OPTIONS } from "../dice/DicePanel";
 import { useRollPreference } from "../dice/roll-preference";
 import { summaryOfOwnAction } from "./PlayerActionRunner";
 import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
@@ -23,8 +24,9 @@ import { initialsOf } from "../scene/tokenGlyph";
 import { SheetAbilities } from "./SheetAbilities";
 import { SheetActions } from "./SheetActions";
 import { SheetIdentityEditor } from "./SheetIdentityEditor";
+import { SheetInspiration } from "./SheetInspiration";
 import { SheetInventory } from "./SheetInventory";
-import { SheetProficiencies } from "./SheetProficiencies";
+import { SheetProficiencies, type Quarry } from "./SheetProficiencies";
 import { SheetRest } from "./SheetRest";
 import { SheetSpells } from "./SheetSpells";
 import { SheetVitals } from "./SheetVitals";
@@ -127,14 +129,11 @@ export function CharacterSheet({
   const { busy, edit } = useSheetEdit(setFeedback);
   const rolls = useSheetRolls(actor.id, setFeedback);
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
-  // The shared per-browser dice-input preference: digital vs manual entry, and whether a typed d20
-  // gets its bonus added.
+  // The shared per-browser dice-input preference: thrown by the server, or a typed face from a physical die.
   const {
     rollInput,
-    bonusMode,
     sheetAttackMode,
     setRollInput: chooseRollInput,
-    setBonusMode: chooseBonusMode,
     setSheetAttackMode: chooseSheetAttackMode
   } = useRollPreference();
   // Only the embedded panel can jump to the initiative view and back, so elsewhere the picker is
@@ -151,6 +150,25 @@ export function CharacterSheet({
   };
   // The latest roll from this character, shown under the rolls bar (hidden when the log is visible).
   const latestRoll = state ? ([...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null) : null;
+  // A check this sheet rolled is rerolled while it is still the character's latest roll: with Heroic Inspiration for a
+  // player, freely by the GM. Without the roll history (the embedded sheet) the server judges that.
+  const holdsInspiration = "heroicInspiration" in actor && actor.heroicInspiration === true;
+  const canReroll =
+    rolls.lastCheck !== null &&
+    (state === undefined || rolls.lastCheck.rollId === latestRoll?.id) &&
+    (role === "gm" || holdsInspiration);
+  // The creatures this character's Hunter's Mark is on: its Perception and Survival checks to find them have Advantage.
+  const quarry: Quarry[] = (state?.actors ?? []).flatMap((other: GmActor | PlayerActor) =>
+    other.id !== actor.id &&
+    other.effects.some(
+      (effect) =>
+        effect.tags.includes("hunters-mark") &&
+        (("yours" in effect && effect.yours === true) ||
+          ("sourceActorId" in effect && effect.sourceActorId === actor.id))
+    )
+      ? [{ id: other.id, name: other.name }]
+      : []
+  );
   // "modal" is the docked main panel; "floating" detaches it into a movable, resizable in-tab panel.
   const [presentation, setPresentation] = useState<"modal" | "floating">("modal");
   const [rect, setRect] = useState({ x: 48, y: 48, width: 760, height: 620 });
@@ -260,7 +278,14 @@ export function CharacterSheet({
           onDone={() => setEditMode(null)}
         />
       )}
-      <SheetVitals actor={actor} role={role} definition={definition} extension={extension} onFeedback={setFeedback} />
+      <SheetVitals
+        actor={actor}
+        role={role}
+        definition={definition}
+        extension={extension}
+        speedFeet={derived?.speedFeet ?? null}
+        onFeedback={setFeedback}
+      />
       <div className="sheet-conditions">
         <span className="sheet-section-label">Conditions</span>
         <ConditionEditor
@@ -272,6 +297,15 @@ export function CharacterSheet({
           onFeedback={setFeedback}
         />
       </div>
+      {actor.kind === "player-character" && (role === "gm" || "heroicInspiration" in actor) && (
+        <SheetInspiration
+          actorId={actor.id}
+          name={actor.name}
+          held={holdsInspiration}
+          role={role}
+          onFeedback={setFeedback}
+        />
+      )}
       {/* A save owed outside a fight (a concentration check after a trap): in a fight it waits on the
         initiative row instead. */}
       {state && !state.combat.active && savesOwed.length > 0 && (
@@ -304,6 +338,7 @@ export function CharacterSheet({
             definition={definition}
             derived={derived}
             rolls={rolls}
+            quarry={quarry}
             editing={editMode === "prof"}
             onEditingChange={(editing) => setEditMode(editing ? "prof" : null)}
             busy={busy}
@@ -491,18 +526,18 @@ export function CharacterSheet({
           { value: "manual", label: "Manual" }
         ]}
       />
-      {rollInput === "manual" && (
-        <SegmentedControl
-          size="sm"
-          ariaLabel="Typed bonus handling"
-          value={bonusMode}
-          onChange={(mode) => chooseBonusMode(mode as "auto" | "total")}
-          options={[
-            { value: "auto", label: "Auto-add bonus" },
-            { value: "total", label: "Final total" }
-          ]}
-        />
-      )}
+      <Select
+        className="sheet-roll-visibility"
+        aria-label="Who sees the sheet's rolls"
+        value={rolls.visibility}
+        onChange={(event) => rolls.setVisibility(event.target.value as RollVisibility)}
+      >
+        {VISIBILITY_OPTIONS[role].map((value) => (
+          <option key={value} value={value}>
+            {ROLL_VISIBILITY_WORD[value]}
+          </option>
+        ))}
+      </Select>
       {/* Mid-fight only: whether an attack tapped here resolves inline or on the initiative view. */}
       {liveCombat?.active === true && actor.kind === "player-character" && onJumpToInitiative && (
         <>
@@ -549,6 +584,13 @@ export function CharacterSheet({
             <strong className="sheet-last-roll-total">{latestRoll.total}</strong>
           </span>
         </button>
+      )}
+      {canReroll && (
+        <div className="sheet-last-reroll">
+          <Button size="sm" variant="secondary" disabled={rolls.rolling} onClick={() => void rolls.rerollCheck()}>
+            {role === "gm" ? "Reroll" : "Reroll · Heroic Inspiration"}
+          </Button>
+        </div>
       )}
       <div className="sheet-workspace-cols">
         {/* The sheet's pane is the declared scroll region in all four presentations. */}
