@@ -771,6 +771,14 @@ export const CharacterSetInventorySchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Picks up the ammunition a character fired outside a fight: half of each row's fired pieces come back. */
+export const CharacterRecoverAmmunitionSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** Moves one carried row, whole, from one character to another, with the charges it has spent (GM). */
 export const CharacterGiveItemSchema = z
   .object({

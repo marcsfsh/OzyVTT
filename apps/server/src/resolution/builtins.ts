@@ -3,6 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { checkRollMode } from "../ability-checks.js";
 import { exhaustionPenalty } from "../condition-rules.js";
 import { addEffect, endEffect, makeEffect } from "../effects.js";
+import { putOutFire } from "../hazards.js";
 import { checkRiderBonus } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor } from "../saving-throws.js";
@@ -16,6 +17,8 @@ export type BuiltinHandler = Readonly<{
   prepare?: (ctx: ResolveContext) => DefinitionAction;
   /** The check roll the action is. */
   check?: (ctx: ResolveContext) => void;
+  /** What the action does to its user that no field can say (rolling on the ground puts out a fire). */
+  apply?: (ctx: ResolveContext) => void;
   /** Flat damage added on a hit. */
   hitDamage?: (ctx: ResolveContext) => void;
   /** The granted effect's name in place of the grant's own; null keeps it. */
@@ -42,7 +45,7 @@ function skillBonusFromExtension(definition: ActorDefinition | undefined, skill:
 /** One d20 plus `modifier`, Exhaustion and the check-bonus riders, with `roll-mode {roll: "check"}` riders, both
  *  narrowed to the check's ability and skill (Boots of Elvenkind on Hide) as the sheet's rows are, recorded like
  *  any roll. Null success: no DC, the GM adjudicates. */
-function rollCheck(
+export function rollCheck(
   ctx: ResolveContext,
   label: string,
   narrow: CheckNarrowing,
@@ -122,6 +125,20 @@ function escapeGrapple(ctx: ResolveContext): void {
   }
 }
 
+/** SRD Burning: rolling on the ground puts out the fire on yourself, and leaves you Prone. */
+function rollOnTheGround(ctx: ResolveContext): void {
+  const { state, attacker, deps } = ctx;
+  const { ended, events } = putOutFire(state, attacker, {
+    selfApplied: deps.initiatorRole === "player",
+    immunities: {
+      ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {}),
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    }
+  });
+  for (const name of ended) ctx.effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name });
+  for (const event of events) ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+}
+
 /** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */
 const unarmedDc = (definition: ActorDefinition | undefined): number =>
   Math.max(1, 8 + abilityModifier(definition, "str") + (definition?.proficiencyBonus ?? 0));
@@ -176,6 +193,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   search: { check: skillCheck("Wisdom (Search)", { ability: "wis" }, null) },
   study: { check: skillCheck("Intelligence (Study)", { ability: "int" }, null) },
   "escape-grapple": { check: escapeGrapple },
+  "extinguish-fire": { apply: rollOnTheGround },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. */
   "unarmed-strike": {

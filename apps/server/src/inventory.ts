@@ -1,4 +1,5 @@
 import type { Actor, GameState } from "@vtt/domain";
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
@@ -6,6 +7,7 @@ import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipmen
 import { castAction, itemAction } from "./item-actions.js";
 import { keepAmmunitionCount } from "./ammunition.js";
 import { CommandRejectedError } from "./game-store.js";
+import { scrollSpellProblem } from "./scrolls.js";
 
 const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
@@ -30,6 +32,9 @@ export type InventoryDeps = Readonly<{
   catalog?: EquipmentCatalog;
   /** Who is writing. A GM write bypasses the attunement cap and slot capacity (the audited override). */
   role?: "gm" | "player";
+  /** The spells this writer may put on a scroll: a player's own catalog, so a GM-only spell can't be probed for.
+   *  Absent: the catalog's. */
+  pickableSpell?: (id: string) => SpellReference | undefined;
 }>;
 
 /** Reconciles equipment onto the actor after an inventory write, recomputed whole so unequipping needs no
@@ -145,6 +150,29 @@ function withDamageTypeChoice(actor: Actor, item: InventoryItem, deps: Inventory
   return item;
 }
 
+/**
+ * A Spell Scroll bears one spell (`spellId`), checked against the catalog and the levels the scroll holds. An omitted
+ * pick keeps the stored one, only the GM may change a pick once made, a row the bearer's catalog no longer knows
+ * keeps its stored pick, and a row of anything else carries none. Unpicked, a scroll stays legal and casts nothing.
+ */
+function withScrollSpell(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
+  if (!deps.catalog) return item;
+  const record = deps.catalog.equipmentRecord(catalogIdOf(item));
+  const { spellId: sent, ...rest } = item;
+  if (!record?.spellScroll) return rest;
+  const spellId = sent ?? stored?.spellId;
+  if (spellId === undefined) return rest;
+  if (spellId === stored?.spellId) return { ...rest, spellId };
+  if (deps.role !== "gm" && stored?.spellId !== undefined)
+    throw new CommandRejectedError(`${item.name} already bears a spell - only the GM can change it.`);
+  const lookup = deps.role !== "gm" && deps.pickableSpell ? deps.pickableSpell : deps.catalog.spellRecord;
+  const spell = lookup?.(spellId);
+  if (!spell) throw new CommandRejectedError(`There is no spell "${spellId}" to put on ${item.name}.`);
+  const problem = scrollSpellProblem(record, spell, item.name);
+  if (problem) throw new CommandRejectedError(problem);
+  return { ...rest, spellId };
+}
+
 /** Once attuned, a cursed item can't be unattuned, unequipped or deleted by a player; a GM can ("remove curse"). */
 function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps): void {
   if (deps.role === "gm" || !deps.catalog) return;
@@ -232,6 +260,16 @@ function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: In
     throw new CommandRejectedError(`${item.name} is already bound - remove it and add it again to change what it is.`);
   }
   const base = deps.catalog?.equipmentRecord(baseId);
+  // Magic ammunition is a piece of one kind (an arrow, a bolt): the pick says which launchers fire it, and it has no
+  // weapon stats to copy.
+  if (record.category === "ammunition") {
+    const { weapon: _weapon, armor: _armor, ...bare } = item;
+    if (appliesTo.baseIds.includes(baseId) && base?.ammunition !== undefined) return { ...bare, baseId };
+    if (stored?.baseId === baseId) return { ...bare, baseId };
+    throw new CommandRejectedError(
+      `${item.name} applies to ${appliesTo.label} - "${baseId}" is not one of the kinds it can be.`
+    );
+  }
   const stats = record.category === "weapon" ? base?.weapon : base?.armor;
   const shieldBase = record.category !== "weapon" && base?.category === "shield";
   const invalid =
@@ -326,6 +364,12 @@ export function setInventoryItem(
       actor.inventory.find((entry) => entry.id === item.id)
     );
   item = withDamageTypeChoice(actor, item, deps);
+  if (item.quantity > 0)
+    item = withScrollSpell(
+      item,
+      deps,
+      actor.inventory.find((entry) => entry.id === item.id)
+    );
   item = keepAmmunitionCount(
     actor.inventory.find((entry) => entry.id === item.id),
     item,

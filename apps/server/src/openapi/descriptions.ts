@@ -193,7 +193,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     armor: "Populated for armor and shields only",
     slot: "WHERE it is worn or held - the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield)",
     appliesTo:
-      "Makes the item a TEMPLATE (the SRD's \"Weapon, +1 (Any Simple or Martial)\"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from - publish refuses an id the merged catalog cannot resolve, a non-weapon/armor category, and fixed stats alongside a template. The picked base's stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`.",
+      'Makes the item a TEMPLATE (the SRD\'s "Weapon, +1 (Any Simple or Martial)"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from - publish refuses an id the merged catalog cannot resolve, a category other than weapon, armor or ammunition, and fixed stats alongside a template. The picked base\'s stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`. Magic AMMUNITION names the gear table\'s ammunition ("Any Ammunition": Arrows, Crossbow Bolts...): its pick copies no stats and says which launchers fire it.',
     rarity:
       'Display and filtering only ("uncommon", "legendary"). An OPEN slug: rarity is identity, not a mechanical hook',
     attunement: "Attunement requirement and its advisory class/species restriction",
@@ -210,6 +210,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'This row is ammunition sold in bundles: each one of its quantity is `count` pieces of `kind` ("Arrows (20)" is 20 arrows). A shot from a weapon that fires that kind spends a piece, and half the pieces fired come back when the encounter ends. Absent on magic ammunition, counted one piece per quantity',
     damageTypeChoice:
       '"The GM chooses the type" (Ring of Resistance, Dragon Scale Mail): the types the GM may pick for the ONE resistance in `grants.damageResistances`, which is the printed default until the GM picks. The pick is stored per carried copy as the row\'s `chosenDamageType`, which only the GM can set',
+    vulnerableToOtherChoices:
+      "Armor of Vulnerability's curse: while the bearer is attuned, worn or not, Vulnerability to every `damageTypeChoice` type except the one it resists. Needs `cursed` and `damageTypeChoice`",
+    spellScroll:
+      "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`",
     grantsFeatIds:
       "Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional - nothing ever grants an item back - so a cycle cannot be drawn rather than merely being checked for",
     tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
@@ -423,7 +427,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
     replacesAttack:
-      'Taken in place of ONE attack of the Attack action (Breath Weapon): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
+      'Taken in place of ONE attack of the Attack action (Breath Weapon, a thrown flask of Acid): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
       "Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge",
     spellId:
@@ -458,7 +462,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     legendary:
       'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
     replacesAttack:
-      'Taken in place of ONE attack of the Attack action (Breath Weapon): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
+      'Taken in place of ONE attack of the Attack action (Breath Weapon, a thrown flask of Acid): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
       "Resolving this action ALSO spends one of the bearer's own spell slots of this level - the mechanical half of an item cast authored with `consumesSpellSlot`. Checked and spent by the same economy pass that owns limited uses, so a preview never spends one and an empty pool refuses in the same voice as an empty charge",
     spellId:
@@ -484,7 +488,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "save.failsAtHitPoints":
       "No save when it lands: a target with this many hit points or fewer has the failure outright and only the repeated save ends it (Power Word Stun)",
     "save.ongoingDamage":
-      "Damage the failure's conditions bring at the start of each turn while they last, rolled and applied by the engine: on the target's own turns (bearer-turn-start) or the source's (source-turn-start, a swallow's acid)"
+      "Damage the failure's conditions bring at the start of each turn while they last, rolled and applied by the engine: on the target's own turns (bearer-turn-start) or the source's (source-turn-start, a swallow's acid)",
+    "save.failureHazard":
+      'A hazard a failure starts, by the SRD\'s own rules: "burning" (1d4 Fire at the start of each of its turns until the burning creature uses an action to put it out, Alchemist\'s Fire) or "oil" (Fire damage it takes in the next minute deals 5 more Fire damage, Oil)'
   },
   FeatureAttack: {
     "": 'An attack a FEATURE grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is DERIVED: the feature names the ability (or "spellcasting") and the builder resolves the number.'
@@ -700,7 +706,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     endsWithTag:
       "The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage)",
     target: "Who receives it: the acting creature, or the action's single chosen target (Help)",
-    voidWhileIncapacitated: "Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)"
+    voidWhileIncapacitated: "Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)",
+    damageUses:
+      "The effect ends once its damage riders have landed this many times (a coat of Basic Poison: one weapon hit, or three pieces of ammunition)"
   },
   EffectDurationRounds: {
     "": "A fixed number of rounds."
@@ -1372,8 +1380,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "What an Ammunition weapon fires (the Weapons table's \"Ammunition (Range 150/600; Arrow)\"); a Sling's bullets and a firearm's are different items",
     "equipment[].damageTypeChoice":
       "The damage types the GM may pick for the item's resistance, as the SRD prints them (absent when the item has no such choice)",
+    "equipment[].spellScroll":
+      "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else",
     "equipment[].appliesTo":
-      'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon/armor templates. A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
+      'The eligibility column for a TEMPLATE magic item - the printed type-line qualifier ("Any Simple or Martial") plus the base ids it RESOLVED to at build/authoring time. Null everywhere except weapon, armor and ammunition templates (the bases of magic ammunition are the kinds of ammunition, which decide the launchers that fire it). A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
   },
   ContentFeature: {
     "": "The browse-and-pick projection of a bundle FeatureRecord. Prose is the display source of truth; a feature's structured riders (granted actions, effects, modifiers, limited uses) stay server-side - the server applies them when it builds the character, so the wizard never becomes a second rules engine.",
@@ -1539,7 +1549,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "actions[].rangeNormalFeet": "Normal range band; shots beyond it up to rangeFeet roll at disadvantage",
     "actions[].saveDc": "Save DC including item riders",
     "actions[].usesLimit": "Total limited uses including any item that raised the pool; null when unlimited",
-    "actions[].usesPool": "Shared pool key; actions naming one pool spend one counter"
+    "actions[].usesPool": "Shared pool key; actions naming one pool spend one counter",
+    "actions[].healing": "The hit points the action restores (a potion's 2d4 + 2); null when it heals nothing",
+    "actions[].targeting":
+      'Who a tap picks, as resolution takes it: "single" (an attack, a heal such as a potion, a grant aimed at a target), "multi" (a save, damage with no attack roll, or a grant on each creature it targets), "none" (it acts on its user: a self heal, Rage, a scroll of a spell with no target); null when nothing structured resolves. A builtin reports the targeting the stat block list gives it',
+    "actions[].darts":
+      "Darts the action makes, each dealing its damage to a target the caller assigns (Magic Missile, read from a scroll or cast from a wand); null otherwise",
+    "actions[].damageTypes":
+      "The damage types the caster picks one of when it resolves (Chromatic Orb), sent as the resolve's `damageType`; null when the action deals its own"
   },
   BuilderOffersData: {
     "offers[].key": "Stable key the draft's answers are filed under",

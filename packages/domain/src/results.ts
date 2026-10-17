@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ActionReactionSchema, CharacterChoiceSchema, type CharacterChoice } from "@vtt/schemas";
+import { ActionReactionSchema, CharacterChoiceSchema, DamageTypeSchema, type CharacterChoice } from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
 import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
 import type { Wire } from "./wire.js";
@@ -265,7 +265,15 @@ export const ActionAvailabilitySchema = z.strictObject({
   usesPool: z.string().nullable(),
   requiresEffectTag: z.string().nullable(),
   multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
-  reaction: ActionReactionSchema.nullable()
+  reaction: ActionReactionSchema.nullable(),
+  /** The hit points it restores (a potion's 2d4 + 2), for display. */
+  healing: z.strictObject({ formula: z.string() }).nullable().optional(),
+  /** Who a tap picks: one creature, several, or none (it acts on its user); null when nothing structured resolves. */
+  targeting: z.enum(["none", "single", "multi"]).nullable().optional(),
+  /** Darts it makes, each assigned to a target (Magic Missile read from a scroll or cast from a wand). */
+  darts: z.number().int().nullable().optional(),
+  /** The damage types its caster picks from (Chromatic Orb). */
+  damageTypes: z.array(DamageTypeSchema).nullable().optional()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
 /** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. */

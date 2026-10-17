@@ -130,7 +130,12 @@ export function itemAction(
     damage: declared.damage.map((part) => ({ ...part })),
     // A Potion of Healing's 2d4 + 2.
     ...(declared.healing ? { healing: { ...declared.healing } } : {}),
-    ...(uses ? { uses } : {})
+    ...(uses ? { uses } : {}),
+    // A thrown flask takes one attack of the Attack action, not the whole action.
+    ...(declared.replacesAttack ? { replacesAttack: true } : {}),
+    // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
+    ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
+    ...(declared.area ? { area: { ...declared.area } } : {})
   };
 }
 
