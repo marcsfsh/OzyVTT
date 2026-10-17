@@ -1,6 +1,7 @@
 import type { CombatLogEntry, PlayerCombatView, PlayerHp, PlayerRollRecord, RollRecord } from "@vtt/domain";
 import { playerFeedId } from "./combat-log.js";
 import type { EncounterArchiveDocument, EncounterArchiveTurn } from "./encounter-archive.js";
+import type { EncounterArchiveSummary } from "./game-store.js";
 import { conditionLabels, playerHp, playerRoll, projectPlayerCombat } from "./projections.js";
 import { partySight, type AudienceSight } from "./vision/audience.js";
 import type { SightContent } from "./vision/senses.js";
@@ -40,6 +41,30 @@ export type PlayerReplayDocument = Readonly<{
   rolls: readonly PlayerRollRecord[];
   attribution: string | null;
 }>;
+
+/** A shared replay in a player's list: the GM's name for it, and never the name of the scene it was fought on. */
+export type PlayerArchiveSummary = Readonly<{
+  id: number;
+  archivedAt: string;
+  startedAt: string | null;
+  endedAt: string;
+  turnCount: number;
+  playerVisible: boolean;
+  name: string | null;
+}>;
+
+/** Builds a player's list entry field by field, so a field added to the GM's summary never reaches a player by itself. */
+export function projectPlayerArchiveSummary(entry: EncounterArchiveSummary): PlayerArchiveSummary {
+  return {
+    id: entry.id,
+    archivedAt: entry.archivedAt,
+    startedAt: entry.startedAt,
+    endedAt: entry.endedAt,
+    turnCount: entry.turnCount,
+    playerVisible: entry.playerVisible,
+    name: entry.name
+  };
+}
 
 /** Log rows from this boundary's revision up to the next boundary's; the last turn takes the rest. */
 function logSliceFor(document: EncounterArchiveDocument, turnIndex: number): readonly CombatLogEntry[] {

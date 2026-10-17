@@ -21,7 +21,7 @@ import {
 } from "./commands/index.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import { expressPath, issuesOf, pathParam, sendData, sendFailure } from "./http-kit.js";
-import { projectPlayerReplay } from "./replay-projection.js";
+import { projectPlayerArchiveSummary, projectPlayerReplay } from "./replay-projection.js";
 import { callerOf, isUnauthenticated, refuse, type CredentialVerifiers } from "./request-auth.js";
 import type { SightContent } from "./vision/senses.js";
 
@@ -238,7 +238,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
         encounters: options.archives
           .list()
           .filter((entry) => entry.playerVisible)
-          .map(({ sceneName: _sceneName, ...entry }) => entry)
+          .map(projectPlayerArchiveSummary)
       });
     return sendData(res, 200, { encounters: options.archives.list() });
   });
