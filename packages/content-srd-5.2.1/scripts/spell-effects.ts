@@ -210,6 +210,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "attack",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action moves the sword up to 30 feet and repeats the attack.",
+      laterTurnsOnly: true,
       attackRange: melee(95),
       damage: [{ formula: "4d12", type: "force", addsModifier: true }]
     }
@@ -279,6 +280,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "attack",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action teleports the spirit up to 30 feet and makes the attack (a hit also Frightens the target until the start of your next turn).",
+      laterTurnsOnly: true,
       attackRange: melee(65),
       onHit: [{ conditions: [{ id: "frightened" }], duration: { type: "until-source-next-turn" } }],
       damage: [{ formula: "3d12", type: "psychic", addsModifier: true }]
@@ -377,7 +379,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "bonus-action",
       when: "If the cursed creature drops to 0 Hit Points before the spell ends, a Bonus Action on a later turn curses a new creature.",
       damage: [],
-      movesGrant: true
+      movesGrant: true,
+      laterTurnsOnly: true
     }
   ],
   "heat-metal": [
@@ -385,6 +388,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "heat again",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action deals the damage again if the object is within range; a creature holding or wearing it makes a Constitution save or drops it.",
+      laterTurnsOnly: true,
       damage: [{ formula: "2d8", type: "fire" }]
     }
   ],
@@ -473,6 +477,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "attack",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action moves the force up to 20 feet and repeats the attack.",
+      laterTurnsOnly: true,
       attackRange: melee(65),
       damage: [{ formula: "1d8", type: "force", addsModifier: true }]
     }

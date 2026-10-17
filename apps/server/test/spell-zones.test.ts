@@ -25,6 +25,7 @@ import {
   FOE,
   FOE2,
   HERO,
+  heroTurnAgain,
   wizardInput,
   type Fight
 } from "./spell-casters.js";
@@ -525,8 +526,12 @@ describe("what a spell lets its caster do on later turns, while it lasts and at 
     );
     caster.resolve("spell-spiritual-weapon", { slotLevel: 3 }, [15, 4, 4]);
     expect(caster.action("spell-spiritual-weapon-then-attack").damage).toEqual([{ formula: "2d8 + 4", type: "force" }]);
-    // The next round, as a Bonus Action.
+    // "On your later turns": not on the turn of the cast, even with the Bonus Action unspent.
     caster.state.combat.turn = { ...caster.state.combat.turn, bonusActionUsed: false };
+    expect(() => caster.resolve("spell-spiritual-weapon-then-attack", {}, [15, 4, 4])).toThrowError(
+      /Mira cast Spiritual Weapon this turn, and Spiritual Weapon: attack comes on later turns/
+    );
+    heroTurnAgain(caster.state);
     expect(caster.resolve("spell-spiritual-weapon-then-attack", {}, [15, 4, 4]).damageTotal).toBe(12);
   });
 
@@ -575,6 +580,11 @@ describe("Heat Metal", () => {
       "Goblin drops the heated object, if it can. If it can't (armor it wears), give it Disadvantage on attack rolls and ability checks until the start of Maelin's next turn."
     );
     expect(caster.action("spell-heat-metal-then-heat-again").damage).toEqual([{ formula: "3d8", type: "fire" }]);
+    // "On each of your later turns".
+    expect(() => caster.resolve("spell-heat-metal-then-heat-again", {}, [2, 2, 2])).toThrowError(
+      /cast Heat Metal this turn/
+    );
+    heroTurnAgain(caster.state);
     const again = caster.resolve("spell-heat-metal-then-heat-again", {}, [2, 2, 2]);
     expect(again.damageTotal).toBe(6);
     expect(savesOf(caster.state, FOE)).toHaveLength(1);

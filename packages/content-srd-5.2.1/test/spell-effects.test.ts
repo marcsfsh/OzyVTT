@@ -44,9 +44,18 @@ describe("what one cast of an SRD spell does", () => {
     // A Self spell's touch; a summoned weapon strikes 5 feet past where it appears.
     expect(effectOf("vampiric-touch")!.attackRange).toEqual({ kind: "melee", feet: 5 });
     expect(effectOf("spiritual-weapon")!.attackRange).toEqual({ kind: "melee", feet: 65 });
-    // Produce Flame's cast makes no attack; its hurl on a later turn reaches 60 feet.
+    // Produce Flame's cast makes no attack; its hurl, "until the spell ends", reaches 60 feet.
     expect(effectOf("produce-flame")!.attacks).toBe(0);
     expect(effectOf("produce-flame")!.laterActions?.[0]?.attackRange).toEqual({ kind: "ranged", feet: 60 });
+  });
+
+  it("waits for a later turn only where the text says so", () => {
+    const waiting = loadSpells()
+      .filter((spell) => spell.effect?.laterActions?.some((row) => row.laterTurnsOnly))
+      .map((spell) => spell.id);
+    expect(waiting).toEqual(["arcane-sword", "conjure-fey", "heat-metal", "hex", "spiritual-weapon"]);
+    // "Until the spell ends, you can take a Magic action": the turn of the cast too.
+    expect(effectOf("produce-flame")!.laterActions?.[0]?.laterTurnsOnly).toBeUndefined();
   });
 
   it("declares the reactions the table can offer, and none it can't see the trigger of", () => {

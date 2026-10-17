@@ -57,6 +57,8 @@ const RULE_FAMILIES = {
   "spell.untrained-armor": "economy",
   // A Spell Scroll in a spell the reader's lists don't have is unintelligible.
   "spell.scroll-unreadable": "economy",
+  // What a spell offers "on your later turns" isn't taken on the turn it was cast (Spiritual Weapon, Heat Metal).
+  "spell.later-turn": "economy",
   // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed, not taken alone.
   "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.

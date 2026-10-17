@@ -121,6 +121,9 @@ export const SpellLaterActionSchema = z
     area: ActionAreaSchema.optional(),
     /** It moves the cast's `grant` from a creature at 0 Hit Points to its own target (Hunter's Mark, Hex). */
     movesGrant: z.literal(true).optional(),
+    /** It is taken only on the caster's turns after the one it cast the spell on ("As a Bonus Action on your later
+     *  turns": Spiritual Weapon, Heat Metal). */
+    laterTurnsOnly: z.literal(true).optional(),
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */

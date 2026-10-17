@@ -48,7 +48,7 @@ import {
   parkHeldObjectSave,
   parkReaction
 } from "./resolution/pending.js";
-import { markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
+import { markCastTurn, markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -134,6 +134,7 @@ export function resolveDefinitionAction(
   applyMasteryForces(ctx);
   startConcentration(ctx);
   markSpellUp(ctx);
+  markCastTurn(ctx);
   openSpellZone(ctx);
   applyGrant(ctx);
   applyHealing(ctx);

@@ -81,6 +81,8 @@ describe("rule families", () => {
       ["spell.untrained-armor", "economy"],
       // A scroll whose spell the reader's lists lack: what the character can do at all.
       ["spell.scroll-unreadable", "economy"],
+      // A later-turn spell action on the turn of its cast: what this turn has done.
+      ["spell.later-turn", "economy"],
       // Sneak Attack or a smite taken alone, with no hit to add to.
       ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],

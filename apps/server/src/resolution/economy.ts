@@ -33,7 +33,7 @@ import {
   type RuleId
 } from "../rules-families.js";
 import { laterRowOf, laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
-import { spellUpLevel, takenWhileUp } from "../lasting-spells.js";
+import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
@@ -179,6 +179,7 @@ export function evaluateActionEconomy(
   checkTargeting(evaluation, distanceFeet);
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
+  if (spell) checkLaterTurn(evaluation, spell);
   if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
@@ -230,6 +231,18 @@ function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, sp
   violations.push({
     rule: "feature.requires-effect",
     message: `${attacker.name} doesn't have ${spell.name} up - cast it first.`
+  });
+}
+
+/** What a spell offers "on your later turns" (Spiritual Weapon's attack, Heat Metal's heat, moving Hex) waits for a
+ *  turn after the one its caster cast it on. */
+function checkLaterTurn({ state, attacker, action, violations }: Evaluation, spell: SpellReference): void {
+  const row = laterRowOf(spell, action.id);
+  if (!row?.laterTurnsOnly || state.combat.turnActorId !== attacker.id) return;
+  if ((state.combat.turn.turnUses[castThisTurnKey(attacker.id, spell.id)] ?? 0) === 0) return;
+  violations.push({
+    rule: "spell.later-turn",
+    message: `${attacker.name} cast ${spell.name} this turn, and ${action.name} comes on later turns.`
   });
 }
 
