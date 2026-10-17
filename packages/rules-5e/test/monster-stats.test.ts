@@ -55,7 +55,7 @@ describe("a stat block's numbers", () => {
     });
   });
 
-  it("adds the best bonus action and leaves legendary actions and reactions out", () => {
+  it("adds the best Bonus Action and leaves legendary actions and reactions out", () => {
     const numbers = statblockNumbers({
       armorClass: 18,
       hitPoints: { maximum: 200 },

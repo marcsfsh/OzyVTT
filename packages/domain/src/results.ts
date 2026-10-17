@@ -95,7 +95,7 @@ export type HitOffer = Readonly<{
   name: string;
   /** What it adds, for the label ("3d6 Piercing", "2d8 Radiant"). */
   dice: string;
-  /** What choosing it spends ("1st-level slot and your Bonus Action", "once per turn"), or null. */
+  /** What choosing it spends ("a level 1 spell slot and your Bonus Action", "once per turn"), or null. */
   cost: string | null;
   /** Pick one when choosing it (Divine Strike: Necrotic or Radiant). */
   damageTypes?: readonly string[];

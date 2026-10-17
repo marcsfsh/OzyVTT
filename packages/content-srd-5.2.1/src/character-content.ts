@@ -586,7 +586,7 @@ export const ClassLevelRowSchema = z
     level: ContentLevelSchema,
     proficiencyBonus: z.number().int().min(2).max(6),
     features: z.array(ContentIdSchema).max(12).default([]),
-    /** Nine counts, index 0 = 1st-level slots. Absent for a non-caster row. */
+    /** Nine counts, index 0 = level 1 slots. Absent for a non-caster row. */
     spellSlots: z.array(z.number().int().min(0).max(4)).length(9).optional(),
     /** Warlock Pact Magic: one uniform slot level with its own count. */
     pactSlots: z
@@ -624,7 +624,7 @@ export type ClassLevelRow = z.infer<typeof ClassLevelRowSchema>;
 export const ContentSpellcastingSchema = z
   .object({
     ability: AbilitySchema,
-    /** "known" = a fixed spells-known list; "prepared" = re-chosen on a long rest. */
+    /** "known" = a fixed spells-known list; "prepared" = re-chosen on a Long Rest. */
     prepares: z.enum(["known", "prepared"]),
     ritual: z.boolean().default(false),
     /** Spellcasting focus slug ("arcane-focus", "holy-symbol", "druidic-focus"); null = none. */

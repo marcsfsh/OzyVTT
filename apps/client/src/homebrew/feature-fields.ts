@@ -318,8 +318,8 @@ function extraPicksField(): FieldDef {
   };
 }
 
-/** `replaces`: a pick budget whose answer may be re-made later (on level-up, or after a short or
-    long rest via `actor.rechoose`, which rebuilds the sheet when the build reads the answer). Same open
+/** `replaces`: a pick budget whose answer may be re-made later (on level-up, or after a Short or
+    Long Rest via `actor.rechoose`, which rebuilds the sheet when the build reads the answer). Same open
     offer box as `extraPicks`, since the server validates both against one namespace. */
 function replacesField(): FieldDef {
   return {

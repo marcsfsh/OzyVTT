@@ -1343,7 +1343,7 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
     ).toThrow();
     expect(built.hero.actionUses["signature-spells"]).toBe(2); // the refusal spent nothing
 
-    // A short rest gives them back. Overchannel, once per long rest, is the control and must not come back.
+    // A Short Rest gives them back. Overchannel, once per Long Rest, is the control and must not come back.
     built.hero.actionUses = { ...built.hero.actionUses, overchannel: 1 };
     endEncounter(built.state);
     applyRest(built.state, IDS.hero, "short", () => built.definition, built.catalog);

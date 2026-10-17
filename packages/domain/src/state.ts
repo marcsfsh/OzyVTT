@@ -770,7 +770,7 @@ const sceneCombatShape = {
   /** The spell areas that act on creatures later (see SpellZoneSchema). GM-only. */
   spellZones: z.array(SpellZoneSchema).max(20).default([]),
   /** Action economy of the current turn's actor, reset on turn change. `actionInstance` holds remaining components
-   * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound bonus action (Flurry of
+   * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound Bonus Action (Flurry of
    * Blows); `turnUses` is keyed `${actorId}:${actionId}`. */
   turn: z
     .object({

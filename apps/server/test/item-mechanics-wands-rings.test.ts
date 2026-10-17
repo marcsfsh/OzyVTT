@@ -201,7 +201,7 @@ describe("a Wand of Fireballs spends a charge, rolls real damage, and refuses at
     // And nothing was rolled or spent on the refused press.
     expect(actor.actionUses[CHARGES]).toBe(7);
 
-    // The pool re-arms on a long rest. Known over-recovery: the SRD recharges 1d6 + 1 at dawn, this
+    // The pool re-arms on a Long Rest. Known over-recovery: the SRD recharges 1d6 + 1 at dawn, this
     // restores all seven.
     state.combat = { ...state.combat, active: false, initiative: [] };
     applyRest(state, IDS.hero, "long", () => definition, catalog);

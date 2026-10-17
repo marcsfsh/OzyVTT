@@ -145,7 +145,7 @@ function usesAfterShortRest(
   return after;
 }
 
-/** Which re-choices a rest ends: a short rest clears those naming it; a long rest clears everything. */
+/** Which re-choices a rest ends: a Short Rest clears those naming it; a Long Rest clears everything. */
 function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "short"): Actor["choiceOverrides"] {
   if (kind === "long") return {};
   return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
@@ -211,13 +211,13 @@ export function applyRest(
     actor.actionUses = dawn.stillSpent;
     charges.lines.push(...dawn.lines);
   } else actor.actionUses = {};
-  // Both kinds lapse on a long rest.
+  // Both kinds lapse on a Long Rest.
   actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
   // Rested, by whatever path: nothing left to ask the GM for.
   state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
-  // SRD long rest: spell slots (and Pact Magic) refill.
+  // SRD Long Rest: spell slots (and Pact Magic) refill.
   // No spellcasting leaves these untouched.
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
     // `spellSlotMaxima` covers derived multiclass tables and item-added slots, shared with seeding and the

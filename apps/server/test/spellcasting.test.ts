@@ -77,7 +77,7 @@ describe("setPreparedSpell", () => {
   });
 });
 
-describe("long rest restores spellcasting", () => {
+describe("Long Rest restores spellcasting", () => {
   // SRD: a Long Rest lets a prepared caster change its list; it no longer undoes the changes the player made.
   it("refills slots and keeps the prepared list the player chose", () => {
     const state = stateWith(

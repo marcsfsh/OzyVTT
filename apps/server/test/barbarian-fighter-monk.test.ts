@@ -1273,7 +1273,7 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
 });
 
 describe("Monk: Flurry of Blows opens its own Unarmed Strikes", () => {
-  it("opens two strikes as a bonus action, each spent by an Unarmed Strike, leaving the Attack action alone", () => {
+  it("opens two strikes as a Bonus Action, each spent by an Unarmed Strike, leaving the Attack action alone", () => {
     const built = onTheTable(build(monkInput(5)));
     expect(actionOf(built, "flurry-of-blows").multiattack).toEqual([{ actionId: "unarmed-strike", count: 2 }]);
     use(built, "flurry-of-blows");

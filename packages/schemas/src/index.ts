@@ -523,7 +523,7 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
-  /** An extra spell slot of one level. Layered over the single-sourced slot maxima, so the seed, the long rest and the spend-clamp cannot disagree. */
+  /** An extra spell slot of one level. Layered over the single-sourced slot maxima, so the seed, the Long Rest and the spend-clamp cannot disagree. */
   z
     .object({
       type: z.literal("spell-slot"),
@@ -1076,7 +1076,7 @@ export const ActorSchema = z.object({
     .strict()
     .nullable()
     .default(null),
-  /** Spell ids prepared right now, re-chosen on a long rest. Owner-only. */
+  /** Spell ids prepared right now, re-chosen on a Long Rest. Owner-only. */
   preparedSpellIds: z.array(z.string().max(80)).max(400).default([]),
   /** A Wizard's spellbook beyond the Wizard spells on its sheet: spells its Wizard levels added that the build didn't
    *  list, and spells copied in (`copied`: from a scroll or another book, paid for). Owner-only. */
@@ -2063,7 +2063,7 @@ export const ActorDefinitionSchema = z
     damageVulnerabilities: z.array(DamageTypeIdSchema).max(20).optional(),
     /** Seeded onto the actor's `conditionImmunities`, which the engine enforces. */
     conditionImmunities: z.array(ConditionIdSchema).max(20).optional(),
-    /** Legendary creature resources (SRD 2024): legendary actions per round (spent on other creatures' turns) and Legendary Resistance per day (re-arms on a long rest). */
+    /** Legendary creature resources (SRD 2024): legendary actions per round (spent on other creatures' turns) and Legendary Resistance per day (re-arms on a Long Rest). */
     legendary: z
       .object({
         actionsPerRound: z.number().int().min(1).max(5).optional(),

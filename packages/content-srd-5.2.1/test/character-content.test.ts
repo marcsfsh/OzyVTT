@@ -1613,7 +1613,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       attunement: { required: true, restrictedTo: ["cleric"] },
       casts: [{ spellId: "message", uses: { limit: 1, per: "long-rest" } }]
     });
-    // "Once per day" is a long rest: this app already treats a long rest as the day.
+    // "Once per day" is a Long Rest: this app already treats a Long Rest as the day.
     expect(amulet.casts[0]).toMatchObject({
       spellId: "message",
       consumesSpellSlot: false,
@@ -1689,7 +1689,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(dagger.modifiers[0].when?.map((trigger) => trigger.type)).toEqual(["on-attack-roll", "attack-kind-is"]);
   });
 
-  it("8. an amulet granting one extra 1st-level spell slot", () => {
+  it("8. an amulet granting one extra level 1 spell slot", () => {
     const amulet = item({
       id: "hb-amulet-slots",
       name: "Amulet of the Adept",

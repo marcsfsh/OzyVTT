@@ -54,7 +54,7 @@ describe("a charged item counts its own charges", () => {
   });
 });
 
-describe("a long rest gives charges back by the item's own dice", () => {
+describe("a Long Rest gives charges back by the item's own dice", () => {
   it("rolls 1d6 + 1 for a Wand of Fireballs and 1d3 for a Wand of Magic Detection, and refills the rest", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
     write(table, IDS.wizard, wand());

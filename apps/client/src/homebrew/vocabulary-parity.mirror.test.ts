@@ -1217,7 +1217,7 @@ describe("uses read off the class table's own column: through both paths", () =>
 /**
  * `ActionUsesSchema.per: "recharge"` with its threshold, the "(Recharge 5-6)" on breath weapons.
  * `encounter.ts` rolls a d6 at the start of the owner's turn, re-arms on a roll at or above the
- * threshold and narrates both outcomes; `rests.ts` clears recharge pools on a short rest.
+ * threshold and narrates both outcomes; `rests.ts` clears recharge pools on a Short Rest.
  *
  * The control is on the action's `uses`, outside the record-level `FeatureUsesSchema`: an item's record
  * uses are not read, and a feature's are folded into actions without a threshold, which would make

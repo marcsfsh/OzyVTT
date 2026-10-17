@@ -132,7 +132,7 @@ describe("multiclass seeding", () => {
     expect(hitDieSizesToSpend(actorOf(game).hitDice!.entries, 9)).toEqual([10, 10, 10, 6, 6]);
   });
 
-  it("spends the pool largest die first and a long rest restores every die size", () => {
+  it("spends the pool largest die first and a Long Rest restores every die size", () => {
     const game = gameWith(fighterWizard());
     // Four dice spent: all three d10s, then one d6.
     spendHitDice(game, ACTOR, [5, 5, 5, 3], { role: "gm" }, resolver(game));
@@ -164,7 +164,7 @@ describe("multiclass seeding", () => {
     // The top-level slot list is empty on this shape; seeding from it would give a caster zero slots.
     expect(definition.spellcasting?.slots).toEqual([]);
     const game = gameWith(definition);
-    // SRD multiclassing: Fighter contributes nothing, Wizard 2 -> caster level 2 -> three 1st-level slots.
+    // SRD multiclassing: Fighter contributes nothing, Wizard 2 -> caster level 2 -> three level 1 spell slots.
     expect(actorOf(game).spellSlots).toEqual([{ level: 1, remaining: 3 }]);
     expect(spellSlotMaxima(fighterWizard())).toEqual([{ level: 1, max: 3 }]);
     expect(actorOf(game).preparedSpellIds).toEqual(["magic-missile"]);
@@ -207,7 +207,7 @@ describe("multiclass seeding", () => {
       ]
     });
     // SRD 5.2.1: "Half your levels (round up) in the Paladin and Ranger classes". Paladin 3 (-> 2) +
-    // Wizard 1 = caster level 3, so 4/2; rounding down would drop the 2nd-level row.
+    // Wizard 1 = caster level 3, so 4/2; rounding down would drop the level 2 row.
     const paladin3Wizard1 = fighterWizard({
       hitPoints: { maximum: 34, formula: "4d10" },
       character: {
@@ -266,7 +266,7 @@ describe("multiclass seeding", () => {
     expect(actorOf(game).pactSlots).toEqual({ level: 2, remaining: 2 });
   });
 
-  it("a long rest refills derived slots, and the spend clamp uses the same maxima", () => {
+  it("a Long Rest refills derived slots, and the spend clamp uses the same maxima", () => {
     const game = gameWith(fighterWizard());
     setSpellSlotRemaining(game, ACTOR, 1, 0, resolver(game));
     expect(actorOf(game).spellSlots).toEqual([{ level: 1, remaining: 0 }]);
@@ -313,7 +313,7 @@ describe("multiclass seeding", () => {
       remaining: 2,
       entries: [{ die: "d12", maximum: 7, remaining: 2 }]
     });
-    // ...and a long rest on that normalised save still restores the whole pool.
+    // ...and a Long Rest on that normalised save still restores the whole pool.
     applyRest(legacy, ACTOR, "long", () => undefined);
     expect(actorOf(legacy).hitDice).toEqual({
       die: "d12",

@@ -367,7 +367,7 @@ function addLethargy(state: GameState, actor: Actor, haste: EffectInstance, even
 }
 
 /** Tolerant single-effect removal used by every sweep; returns false when the effect is already gone. A fight's end
- *  or a long rest (`sweeping`) starts nothing that would outlast it, such as Haste's lethargy. */
+ *  or a Long Rest (`sweeping`) starts nothing that would outlast it, such as Haste's lethargy. */
 function endEffectInternal(
   state: GameState,
   actor: Actor,
@@ -646,7 +646,7 @@ export function endEncounterEffects(state: GameState, combatantIds: readonly str
   return events;
 }
 
-/** A long rest: eight hours pass and the creature sleeps (Unconscious, so its Concentration ends). Its effects
+/** A Long Rest: eight hours pass and the creature sleeps (Unconscious, so its Concentration ends). Its effects
  *  measured in turns or rounds end; "until ended" ones (a curse, a disease) stay. */
 export function endEffectsAtLongRest(state: GameState, actorId: string): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);

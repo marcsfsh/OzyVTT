@@ -72,7 +72,7 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
   const myTurn = state.combat.turnActorId === actor.id;
   if (!myTurn) return null;
   const turn = state.combat.turn;
-  // An open compound bonus action (Flurry of Blows) pays for its strikes before any slot is asked.
+  // An open compound Bonus Action (Flurry of Blows) pays for its strikes before any slot is asked.
   const bonusOpen = turn.bonusActionInstance?.actorId === actor.id ? turn.bonusActionInstance.components : null;
   const fromBonus =
     bonusOpen && !action.multiattack

@@ -217,7 +217,7 @@ describe("Moonbeam: entering the Cylinder or ending a turn there, once per turn"
     expect(savesOf(state, FOE)).toEqual([expect.objectContaining({ proposedDamage: 10 })]);
   });
 
-  it("rolls at the level it was cast at: 3d10 from a 3rd-level slot", () => {
+  it("rolls at the level it was cast at: 3d10 from a level 3 spell slot", () => {
     const { state } = moonbeam(3);
     walk(
       state,

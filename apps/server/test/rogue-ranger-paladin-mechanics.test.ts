@@ -716,7 +716,7 @@ describe("Ranger: Favored Enemy, audit row 32", () => {
   it("gives exactly as many free casts as the printed Favored Enemy column, at two levels", () => {
     // The column reads 2 at level 1 and 6 at level 17, via `scaling: {type: "class-resource"}`. The free casts
     // are Hunter's Mark cast without a slot, counted on the feature's pool.
-    // A bonus action each, so each cast is its own turn, and each marks the foe.
+    // A Bonus Action each, so each cast is its own turn, and each marks the foe.
     const mark = (built: Table) => {
       newTurn(built);
       return resolve(built, "spell-hunters-mark-free", []);

@@ -150,7 +150,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "Until the next dawn" is a long rest.
+  // "Until the next dawn" is a Long Rest.
   "plate-armor-of-etherealness": {
     casts: [{ spellId: "etherealness", uses: { limit: 1, per: "long-rest" } }]
   },
@@ -415,7 +415,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //
   // Recurring limits:
   //   - One use spends exactly one charge, so only one-charge properties are authored.
-  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a long rest, and "if you
+  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a Long Rest, and "if you
   //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
   //   - Use pools are capped at 20.
   //   - Staffs and rods have no weapon block, so "+N to attack and damage rolls made with it" would be
@@ -874,7 +874,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys, as with `winged-boots` and `cloak-of-invisibility`.
-  // Recharge "1dN at dawn" becomes a full refill on a long rest.
+  // Recharge "1dN at dawn" becomes a full refill on a Long Rest.
 
   // ---- Belt ------------------------------------------------------------------------------------
 
@@ -1158,7 +1158,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys: the elemental summons, `bag-of-tricks`, `gem-of-seeing`,
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
-  // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a long rest.
+  // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a Long Rest.
   //
   // Trap items (`bag-of-devouring`, `potion-of-poison`, `dust-of-sneezing-and-choking`) are not
   // authored: a button naming the real effect would spoil the trap.

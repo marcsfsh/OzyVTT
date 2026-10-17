@@ -38,7 +38,7 @@ export function takenWhileUp(row: LaterRow): boolean {
   return row.movesGrant !== true && (row.activation === "action" || row.activation === "bonus-action");
 }
 
-/** A later action rolled at the level its spell was cast at (Spiritual Weapon from a 3rd-level slot hits for 2d8). */
+/** A later action rolled at the level its spell was cast at (Spiritual Weapon from a level 3 spell slot hits for 2d8). */
 export function atSpellUpLevel(action: ActorAction, spell: SpellReference, actor: Pick<Actor, "effects">): ActorAction {
   if (!laterRowOf(spell, action.id)) return action;
   const level = spellUpLevel(actor, spell);

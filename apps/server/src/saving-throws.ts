@@ -686,7 +686,7 @@ export function answerSave(
 
   let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc);
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
-  // the flag; the pool rides actionUses["legendary-resistance"] and a long rest re-arms it.
+  // the flag; the pool rides actionUses["legendary-resistance"] and a Long Rest re-arms it.
   let legendaryNote: string | null = null;
   if (legendaryResistance) {
     if (!commit) throw new CommandRejectedError("Commit the save to spend Legendary Resistance.");

@@ -1039,7 +1039,7 @@ export const ActorRechooseSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Spend Hit Point Dice to heal on a short rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
+/** Spend Hit Point Dice to heal on a Short Rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
 export const ActorSpendHitDiceSchema = z
   .object({
     commandId: z.uuid(),

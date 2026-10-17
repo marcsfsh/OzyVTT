@@ -350,7 +350,7 @@ export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
 
 /**
  * How a charged item's charges come back, beside the pools its actions and casts declare: `regain` is rolled on a
- * long rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
+ * Long Rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
  * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
  */
 export const ItemChargesSchema = z

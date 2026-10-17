@@ -18,7 +18,7 @@ const SMITE: HitOffer = {
   id: "spell-divine-smite",
   name: "Divine Smite",
   dice: "2d8 Radiant",
-  cost: "a 1st-level spell slot and your Bonus Action",
+  cost: "a level 1 spell slot and your Bonus Action",
   slotLevels: [1, 2]
 };
 const STRIKE: HitOffer = {

@@ -178,7 +178,7 @@ export function PlayerTurnEconomy({
 
 /** What the table puts in a player's panel besides the fight: the prompt slot, the dice, the log, the party. */
 export type PlayerPanelSlots = Readonly<{
-  /** The prompt slot (and a short rest to spend Hit Dice in), above the tabs. */
+  /** The prompt slot (and a Short Rest to spend Hit Dice in), above the tabs. */
   top?: ReactNode;
   dice?: ReactNode;
   log?: ReactNode;

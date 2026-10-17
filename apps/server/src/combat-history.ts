@@ -47,7 +47,7 @@ function restorableSlice(state: GameState): string {
       effects: actor.effects,
       deathSaves: actor.deathSaves,
       actionUses: actor.actionUses,
-      // A rewound Fireball gives its slot back; a rewound short rest its Hit Dice.
+      // A rewound Fireball gives its slot back; a rewound Short Rest its Hit Dice.
       spellSlots: actor.spellSlots,
       pactSlots: actor.pactSlots,
       hitDice: actor.hitDice

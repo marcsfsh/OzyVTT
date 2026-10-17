@@ -145,7 +145,7 @@ export const usesField = (label: string, scope: RiderScope): FieldDef => ({
         opt("short-rest", "On a Short Rest"),
         opt("long-rest", "On a Long Rest")
       ],
-      // No "day" option: a long rest is this app's day.
+      // No "day" option: a Long Rest is this app's day.
       ...(scope === "item"
         ? { help: 'A Long Rest is the day at this table, so "once per day" means "on a Long Rest".' }
         : {})

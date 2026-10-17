@@ -68,7 +68,7 @@ export function seedHitDice(definition: ActorDefinition): Actor["hitDice"] {
 }
 
 /** Spell-slot maxima by level: the SRD multiclass table when only per-class casters are declared,
- *  plus item slots. Seeding, long rest and the spend clamp all read this. */
+ *  plus item slots. Seeding, Long Rest and the spend clamp all read this. */
 export function spellSlotMaxima(
   definition: ActorDefinition | undefined,
   equipmentSlots: readonly { level: number; amount: number }[] = []
@@ -157,7 +157,7 @@ export function seedPactSlots(definition: ActorDefinition): Actor["pactSlots"] {
   return pact ? { level: pact.level, remaining: pact.max } : null;
 }
 
-/** The spells a sheet starts the day with prepared (defaults the long rest also restores). */
+/** The spells a sheet starts the day with prepared (defaults the Long Rest also restores). */
 export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
   return definition.spellcasting
     ? definition.spellcasting.spells.filter((spell) => spell.prepared || spell.alwaysPrepared).map((spell) => spell.id)

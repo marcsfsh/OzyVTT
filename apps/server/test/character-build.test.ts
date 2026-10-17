@@ -1316,7 +1316,7 @@ describe("a feature whose only rider is limited USES still lands as a trackable 
       deps
     );
     expect(state.actors[0].actionUses["action-surge"]).toBe(1);
-    // ...and the second attempt is refused: the pool is 1 per short rest.
+    // ...and the second attempt is refused: the pool is 1 per Short Rest.
     expect(() =>
       resolveDefinitionAction(
         state,

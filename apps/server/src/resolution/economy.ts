@@ -58,7 +58,7 @@ export type EconomyPlan = Readonly<{
     parentId?: string;
     replacements?: Record<string, number>;
   }> | null;
-  /** The same for a compound bonus action (Flurry of Blows). */
+  /** The same for a compound Bonus Action (Flurry of Blows). */
   bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope: `amount` uses of it (one, or the action's cost). */
   spendUse: Readonly<{ key: string; per: NonNullable<DefinitionAction["uses"]>["per"]; amount: number }> | null;
@@ -766,7 +766,7 @@ type SlotPlan = Pick<
   "markAction" | "markBonus" | "markReaction" | "instance" | "bonusInstance" | "extraAction"
 >;
 
-/** The action, bonus action and reaction slots, with the compound instance an action or bonus action opens or
+/** The action, Bonus Action and reaction slots, with the compound instance an action or Bonus Action opens or
  *  continues. */
 function checkActionSlots(evaluation: Evaluation): SlotPlan {
   const { state, attacker, action, onOwnTurn, violations } = evaluation;
@@ -778,7 +778,7 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     bonusInstance: state.combat.turn.bonusActionInstance,
     extraAction: null
   };
-  // An open compound bonus action (Flurry of Blows) spends its own strikes first and costs no further slot.
+  // An open compound Bonus Action (Flurry of Blows) spends its own strikes first and costs no further slot.
   const bonusOpen = state.combat.turn.bonusActionInstance;
   if (onOwnTurn && bonusOpen && bonusOpen.actorId === attacker.id && !action.multiattack) {
     const components = { ...bonusOpen.components };
@@ -807,7 +807,7 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
         rule: "economy.bonus-action-used",
         message: `${attacker.name} has already used a Bonus Action this turn.`
       });
-    // A compound bonus action opens its plan, which later swings spend (no rolls are consumed opening it).
+    // A compound Bonus Action opens its plan, which later swings spend (no rolls are consumed opening it).
     return {
       ...unchanged,
       markBonus: true,

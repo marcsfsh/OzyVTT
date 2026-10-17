@@ -31,7 +31,7 @@ export function setSpellSlotRemaining(
   const slot = actor.spellSlots?.find((entry) => entry.level === level);
   if (!slot) throw new CommandRejectedError(`${actor.name} has no level ${level} spell slots.`);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-  // The same maxima seeding and the long rest use, so derived multiclass tables aren't clamped down.
+  // The same maxima seeding and the Long Rest use, so derived multiclass tables aren't clamped down.
   const max =
     spellSlotMaxima(definition, deriveEquipment(actor, definition, catalog).spellSlots).find(
       (entry) => entry.level === level

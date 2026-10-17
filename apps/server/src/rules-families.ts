@@ -84,7 +84,7 @@ const RULE_FAMILIES = {
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",
   "attack.cleave-too-far": "targeting",
-  // A spell aimed at more creatures than it can target (Hold Person at two Humanoids from a 2nd-level slot).
+  // A spell aimed at more creatures than it can target (Hold Person at two Humanoids from a level 2 spell slot).
   "target.too-many": "targeting",
   // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
   "attack.hit-option-unqualified": "targeting",

@@ -193,7 +193,7 @@ const resolve = (
   );
 
 describe("report test 1: Rage and Frenzy on round 1", () => {
-  it("blocks Frenzy without an active Rage, offers the legal path, and blocks a second bonus action", () => {
+  it("blocks Frenzy without an active Rage, offers the legal path, and blocks a second Bonus Action", () => {
     const game = buildGame();
     // Frenzy with no Rage is refused.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])).toThrow(
@@ -203,7 +203,7 @@ describe("report test 1: Rage and Frenzy on round 1", () => {
       /requires an active Raging effect/
     );
 
-    // The legal path: Rage as the bonus action grants the effect and spends a use.
+    // The legal path: Rage as the Bonus Action grants the effect and spends a use.
     const rage = resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
     expect(rage.effectGranted).toEqual({ name: "Rage", tags: ["raging"] });
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
@@ -211,7 +211,7 @@ describe("report test 1: Rage and Frenzy on round 1", () => {
     expect(torva.actionUses.rage).toBe(1);
     expect(game.combat.turn.bonusActionUsed).toBe(true);
 
-    // Frenzy now satisfies its Rage requirement but the bonus action is spent, so strict mode rejects it.
+    // Frenzy now satisfies its Rage requirement but the Bonus Action is spent, so strict mode rejects it.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])).toThrow(
       /already used a Bonus Action/
     );
@@ -684,7 +684,7 @@ describe("report test 9: zero HP, dying, and healing", () => {
 });
 
 describe("report test 12: GM override", () => {
-  it("rejects an illegal second bonus action, then allows it with an audited override", () => {
+  it("rejects an illegal second Bonus Action, then allows it with an audited override", () => {
     const game = buildGame();
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])).toThrow(
@@ -697,13 +697,13 @@ describe("report test 12: GM override", () => {
       {
         actorId: IDS.torva,
         targetIds: [IDS.croc1],
-        override: { reason: "Homebrew: haste variant grants a second bonus action" }
+        override: { reason: "Homebrew: haste variant grants a second Bonus Action" }
       },
       [15, 6]
     );
     expect(overridden.overridden).toEqual({
       rule: "economy.bonus-action-used",
-      reason: "Homebrew: haste variant grants a second bonus action"
+      reason: "Homebrew: haste variant grants a second Bonus Action"
     });
     expect(overridden.attack?.outcome).toBe("hit");
   });
@@ -711,7 +711,7 @@ describe("report test 12: GM override", () => {
   it("keeps one economy override in force for the rest of the creature's turn, then clears it next turn", () => {
     const game = buildGame();
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
-    // A second bonus action this turn is blocked until the GM overrides once.
+    // A second Bonus Action this turn is blocked until the GM overrides once.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])).toThrow(
       RulesBlockedError
     );
@@ -723,7 +723,7 @@ describe("report test 12: GM override", () => {
       [15, 6]
     );
     expect(game.combat.turn.rulesOverriddenFamilies).toEqual(["economy"]);
-    // A third bonus action the same turn needs no fresh override (nat-1 keeps it a harmless miss): the
+    // A third Bonus Action the same turn needs no fresh override (nat-1 keeps it a harmless miss): the
     // override is once per turn.
     expect(() =>
       resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [1, 6])
@@ -1320,7 +1320,7 @@ describe("reaction prompts: Uncanny Dodge (ADR-0020 amendment)", () => {
 });
 
 describe("incapacitation gates the action economy (SRD 2024 Incapacitated)", () => {
-  it("blocks actions, bonus actions, and reactions for an incapacitated combatant, with the rule named", () => {
+  it("blocks actions, Bonus Actions, and reactions for an incapacitated combatant, with the rule named", () => {
     const game = buildGame();
     game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "unconscious" }];
     try {
@@ -1433,7 +1433,7 @@ describe("available-actions projection (server-computed availability)", () => {
     const rageRow = before.find((row) => row.id === "rage")!;
     expect(rageRow).toMatchObject({ available: true, usesRemaining: 4 });
 
-    // Rage, then the first Greataxe swing: the report tracks the spent bonus action, the spent use,
+    // Rage, then the first Greataxe swing: the report tracks the spent Bonus Action, the spent use,
     // and the open Extra Attack instance.
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
     resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6, 6]);
@@ -3019,7 +3019,7 @@ describe("surprise: initiative Disadvantage (SRD 2024 Surprise)", () => {
   });
 });
 
-describe("rests (SRD Resting): short rests re-arm only per-short-rest pools", () => {
+describe("rests (SRD Resting): Short Rests re-arm only per-short-rest pools", () => {
   const FIGHTER_ID = "10000000-0000-4000-8000-00000000000f";
   const withSecondWind: ActorDefinition = {
     ...pipDefinition,
@@ -3057,7 +3057,7 @@ describe("rests (SRD Resting): short rests re-arm only per-short-rest pools", ()
   const resolveDef = (game: GameState) => (definitionId: string) =>
     game.definitions.find((entry) => entry.id === definitionId)?.definition;
 
-  it("a short rest clears per-short-rest pools, leaves other pools and hit points alone", () => {
+  it("a Short Rest clears per-short-rest pools, leaves other pools and hit points alone", () => {
     const game = buildResting();
     applyRest(game, FIGHTER_ID, "short", resolveDef(game));
     const fighter = game.actors.find((actor) => actor.id === FIGHTER_ID)!;
@@ -3065,7 +3065,7 @@ describe("rests (SRD Resting): short rests re-arm only per-short-rest pools", ()
     expect(fighter.hp.current).toBe(6);
   });
 
-  it("a long rest still clears everything and restores hit points", () => {
+  it("a Long Rest still clears everything and restores hit points", () => {
     const game = buildResting();
     applyRest(game, FIGHTER_ID, "long", resolveDef(game));
     const fighter = game.actors.find((actor) => actor.id === FIGHTER_ID)!;
@@ -3604,7 +3604,7 @@ describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () =>
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBeUndefined();
   });
 
-  it("short and long rests re-arm recharge pools out of combat", () => {
+  it("Short and Long Rests re-arm recharge pools out of combat", () => {
     for (const kind of ["short", "long"] as const) {
       const game = GameStateSchema.parse({
         schemaVersion: 1,
@@ -3886,7 +3886,7 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     expect(dis.outcome.rollMode?.mode).toBe("disadvantage");
   });
 
-  it("Legendary Resistance rejects when exhausted, spends nothing on a natural success, and re-arms on a long rest", () => {
+  it("Legendary Resistance rejects when exhausted, spends nothing on a natural success, and re-arms on a Long Rest", () => {
     const exhausted = buildBossGame({ "legendary-resistance": 3 });
     resolve(exhausted, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
     expect(() =>
@@ -3918,7 +3918,7 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     );
     expect(committed.outcome.success).toBe(true);
     expect(fresh.actors.find((actor) => actor.id === BOSS)!.actionUses["legendary-resistance"]).toBeUndefined();
-    // Long rest re-arms the daily pool (day = long rest, out of combat).
+    // Long rest re-arms the daily pool (day = Long Rest, out of combat).
     const resting = GameStateSchema.parse({
       schemaVersion: 1,
       actors: [
@@ -4064,7 +4064,7 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
     return game;
   }
 
-  it("a long rest restores all spent Hit Point Dice (SRD 5.2.1 Regain All HP)", () => {
+  it("a Long Rest restores all spent Hit Point Dice (SRD 5.2.1 Regain All HP)", () => {
     const game = buildRestingGame(2, 10);
     applyRest(game, HERO, "long", resolveTorva(game));
     // The stored save uses the single-class single-object shape; it normalizes into a one-entry pool.

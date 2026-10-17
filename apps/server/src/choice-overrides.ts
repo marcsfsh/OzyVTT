@@ -33,7 +33,7 @@ type ReplaceableRecord = Readonly<{
 /** One offer this character may re-choose on a rest, with the answers that are legal for it. */
 export type ReplaceableOffer = Readonly<{
   offer: string;
-  /** The rest that clears the override. A `short-rest` clause is satisfied by a long rest too. */
+  /** The rest that clears the override. A `short-rest` clause is satisfied by a Long Rest too. */
   per: "short-rest" | "long-rest";
   /** The feature's display name, for the refusal message and the GM's log line. */
   label: string;
@@ -154,7 +154,7 @@ const defenceGrantsOf = (record: GrantingRecord | undefined) =>
   ungated(record) ? [...(record?.grants?.damageResistances ?? []), ...(record?.grants?.damageImmunities ?? [])] : [];
 
 /** What the character chose, resolved for the damage pipeline (e.g. Fiendish Resilience re-chosen on a
- *  short rest). Fails open wherever a lookup misses, since a damage roll must never throw. */
+ *  Short Rest). Fails open wherever a lookup misses, since a damage roll must never throw. */
 export function choiceOverrideDefenses(
   definition: ActorDefinition | undefined,
   overrides: Actor["choiceOverrides"] | undefined,

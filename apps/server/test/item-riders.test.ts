@@ -366,7 +366,7 @@ describe("criterion 4: an item that casts a spell on a limited pool", () => {
     casts: [{ spellId: "message", uses: { limit: 1, per: "long-rest" } }]
   };
 
-  it("synthesises a charged action that spends and then recovers on a long rest", () => {
+  it("synthesises a charged action that spends and then recovers on a Long Rest", () => {
     const definition = definitionOf();
     const catalog = catalogOf([AMULET]);
     const state = fight(
@@ -681,7 +681,7 @@ describe("criterion 7: a dagger granting advantage on opportunity attacks", () =
   });
 });
 
-describe("criterion 8: an amulet granting one extra 1st-level spell slot", () => {
+describe("criterion 8: an amulet granting one extra level 1 spell slot", () => {
   const AMULET = {
     id: "amulet-of-reserves",
     name: "Amulet of Reserves",
@@ -706,7 +706,7 @@ describe("criterion 8: an amulet granting one extra 1st-level spell slot", () =>
     expect(state.actors[0].spellSlots).toEqual([{ level: 1, remaining: 2 }]); // clamped, never stranded above max
   });
 
-  it("refills to the RAISED maximum on a long rest, because every reader goes through spellSlotMaxima", () => {
+  it("refills to the RAISED maximum on a Long Rest, because every reader goes through spellSlotMaxima", () => {
     const definition = caster();
     const catalog = catalogOf([AMULET]);
     const state = stateWith(

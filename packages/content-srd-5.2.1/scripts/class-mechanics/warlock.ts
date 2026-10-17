@@ -183,7 +183,7 @@ export const warlock: ClassMechanicsModule = {
       },
       /**
        * Twelve inline options, one resistance each. Re-choosing on a rest is runtime state
-       * (`actor.choiceOverrides`); declared `short-rest` because a long rest also satisfies it.
+       * (`actor.choiceOverrides`); declared `short-rest` because a Long Rest also satisfies it.
        */
       "fiendish-resilience": {
         replaces: [{ offer: "feature:fiendish-resilience", when: "short-rest", amount: 1 }],

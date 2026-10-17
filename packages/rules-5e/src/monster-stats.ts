@@ -106,7 +106,7 @@ export type StatblockNumbers = Readonly<{
   attackBonus: number | null;
   /** The highest save DC among its actions; null when nothing it does forces a save. */
   saveDc: number | null;
-  /** The most its action and bonus action deal in one turn at average rolls, every attack hitting and every save
+  /** The most its action and Bonus Action deal in one turn at average rolls, every attack hitting and every save
    *  failed. Legendary actions and reactions happen on other turns and are left out. */
   damagePerRound: number;
 }>;

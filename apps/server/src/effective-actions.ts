@@ -20,7 +20,7 @@ export function effectiveActions(
   catalog: EquipmentCatalog | undefined
 ): readonly ActorAction[] {
   const declared = definition?.actions ?? [];
-  // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a 3rd-level slot).
+  // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a level 3 spell slot).
   const taken = declared.map((action) =>
     withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition)
   );

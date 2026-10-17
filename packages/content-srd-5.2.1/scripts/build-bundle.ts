@@ -488,7 +488,7 @@ const usesSuffix = (action: ActionFields): string => {
 /**
  * Limited-use pool from the upstream uses fields (ADR-0020): "Recharge X-Y" is a start-of-turn d6
  * pool, "Recharge after a Short or Long Rest" is short-rest, and "N/Day" is long-rest (the app treats
- * a long rest as a day). Upstream `RECHARGE` with a numeric param is a roll recharge.
+ * a Long Rest as a day). Upstream `RECHARGE` with a numeric param is a roll recharge.
  */
 const usesOf = (
   action: ActionFields

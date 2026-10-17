@@ -679,7 +679,7 @@ describe("Divine Intervention: a pool that now costs the action the SRD prints",
     expect(actionOf(definition, "divine-spark")?.save).toMatchObject({ dc: spellDc, spellcasting: true });
   });
 
-  it("is a Magic action with one use per long rest, and the use really goes", () => {
+  it("is a Magic action with one use per Long Rest, and the use really goes", () => {
     // A feature with `uses` and no `actions` gets a synthesized action; the SRD says "As a Magic action".
     const definition = build(clericInput());
     const intervention = actionOf(definition, "divine-intervention");
