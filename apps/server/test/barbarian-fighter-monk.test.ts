@@ -303,6 +303,30 @@ describe("Barbarian: the sheet's own numbers", () => {
     expect(definition.speedFeet).toBe(40); // Halfling 30 + 10
   });
 
+  it("Fast Movement is off while Heavy armor is worn", () => {
+    const built = onTheTable(build(barbarianInput(5)), { fight: false });
+    expect(currentSpeedFeet(built.hero, derivationOf(built))).toBe(40);
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      {
+        id: "plate",
+        name: "Plate Armor",
+        quantity: 1,
+        equipped: true,
+        attuned: false,
+        category: "armor",
+        armor: {
+          acBase: 18,
+          addDexModifier: false,
+          dexModifierCap: null,
+          stealthDisadvantage: true,
+          strengthRequired: null
+        }
+      }
+    ];
+    expect(currentSpeedFeet(built.hero, derivationOf(built))).toBe(30);
+  });
+
   it("Rage's uses come off the printed Rages column at THIS level, not a copy of it", () => {
     // 6 at level 20, 2 at level 1, from the printed column rather than the overlay.
     expect(definition.actions.find((action) => action.id === "rage")?.uses).toEqual({ limit: 6, per: "long-rest" });

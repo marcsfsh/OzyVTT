@@ -867,6 +867,18 @@
      {
       "type": "speed",
       "amount": 10
+     },
+     {
+      "type": "speed",
+      "amount": -10,
+      "when": [
+       {
+        "type": "while-armored",
+        "weights": [
+         "heavy"
+        ]
+       }
+      ]
      }
     ]
    },
@@ -7270,6 +7282,18 @@
      {
       "type": "speed",
       "amount": 10
+     },
+     {
+      "type": "speed",
+      "amount": -10,
+      "when": [
+       {
+        "type": "while-armored",
+        "weights": [
+         "heavy"
+        ]
+       }
+      ]
      }
     ]
    },

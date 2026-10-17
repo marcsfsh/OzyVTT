@@ -108,9 +108,13 @@ export const barbarian: ClassMechanicsModule = {
     "extra-attack": {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
-    // Ungated: a Barbarian is not proficient with Heavy armor (and `speed` is baked without reading `when`).
+    // "While you aren't wearing Heavy armor": the +10 is in the sheet's Speed, and a live -10 takes it back while
+    // Heavy armor is worn, so sheets built with the +10 stay right.
     "fast-movement": {
-      modifiers: [{ type: "speed", amount: 10 }]
+      modifiers: [
+        { type: "speed", amount: 10 },
+        { type: "speed", amount: -10, when: [{ type: "while-armored", weights: ["heavy"] }] }
+      ]
     },
     /** "Your instincts are so honed that you have Advantage on Initiative rolls." */
     "feral-instinct": {

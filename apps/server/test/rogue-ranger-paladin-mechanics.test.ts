@@ -750,6 +750,31 @@ describe("Ranger - the rest of the kit", () => {
     expect(table(rangerInput(5)).definition.speedFeet).toBe(30);
   });
 
+  it("takes Roving's 10 feet away while Heavy armor is worn", () => {
+    const built = table(rangerInput(6));
+    const speed = () => currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, built.catalog));
+    expect(speed()).toBe(40);
+    built.hero.inventory = [
+      ...built.hero.inventory.map((item) => (item.armor ? { ...item, equipped: false } : item)),
+      {
+        id: "plate",
+        name: "Plate Armor",
+        quantity: 1,
+        equipped: true,
+        attuned: false,
+        category: "armor",
+        armor: {
+          acBase: 18,
+          addDexModifier: false,
+          dexModifierCap: null,
+          stealthDisadvantage: true,
+          strengthRequired: null
+        }
+      }
+    ];
+    expect(speed()).toBe(30);
+  });
+
   it("scales Tireless off the FINAL Wisdom modifier, so an ASI moves the pool", () => {
     // `scaling: {type: "ability-modifier"}` resolves against the built scores: same record, same level,
     // two different numbers.
