@@ -32,10 +32,11 @@ import {
 
 /**
  * The SRD coverage manifest (`docs/srd-coverage.md`): every SRD record, classified as enforced (the server applies
- * it), guided (the app tracks it and walks the table through it, a person applies the rest) or reference (readable
- * in the app, nothing to apply). Records are classified from the mechanics their bundle carries, because the engine
- * is data-driven; the curated tables cover what data can't say (conditions, the glossary, monster traits) and
- * records the engine handles in code. A freshness test fails when this drifts.
+ * it), guided (the app tracks it or applies part of it, and a person applies the rest) or reference (the app shows
+ * the text and applies nothing). Records are classified from the mechanics their bundle carries, because the engine
+ * is data-driven; the curated tables cover what data can't say (conditions, the glossary, monster traits), records
+ * the engine handles in code and records whose data applies only part of the rule. A freshness test fails when this
+ * drifts, and a few curated claims are checked against the engine.
  */
 
 export type CoverageRow = Readonly<{ group: string; id: string; name: string; state: CoverageState; note?: string }>;
@@ -333,10 +334,12 @@ const TABLE_GROUPS = new Set(["Monster traits", "Conditions", "Rules glossary"])
 
 /** How the rows of each kind of group get their state, for the page's opening. */
 const CLASSIFICATION = [
-  "- **Spells:** enforced when a cast applies its attack, save, damage, healing or lasting effect, or the area it",
-  "  leaves applies them as creatures enter it or start or end a turn there (`spell-zones.ts`). Guided when the app",
-  "  spends the slot and holds the Concentration, the area or a save while a person applies what the spell does. A",
-  "  spell whose cast leaves a rider to the table (Ray of Frost's lower Speed) is curated as guided, with a note.",
+  "- **Spells:** a cast resolves in `action-resolution.ts` and the steps in `resolution/`, at the caster's own",
+  "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, or",
+  "  when the area it leaves applies them as creatures enter it or start or end a turn there (`spell-zones.ts`).",
+  "  Guided when the app spends the slot and holds the Concentration, the area or a save while a person applies",
+  "  what the spell does. A spell whose cast leaves a rider to the table (Ray of Frost's lower Speed) is curated",
+  "  as guided, with a note.",
   "- **Monster actions:** enforced when the attack, save, damage, healing or effect resolves, or when the server",
   "  offers the action as the generic action it names (Nimble Escape's Disengage or Hide). An action that casts",
   "  spells takes the state of the spells it casts, each a cast action at the stat block's numbers. Guided when the",
@@ -415,7 +418,7 @@ export function renderSrdCoverage(): string {
       const body =
         group === "Monster actions" && state === "enforced"
           ? "too many to list, so the guided and reference actions below stand out."
-          : inState.map((row) => row.name).join(", ");
+          : inState.map((row) => row.name).join(" · ");
       lines.push(`**${capitalized(state)} (${inState.length}):** ${body}`, "");
     }
     const noted = inGroup.filter((row) => row.note !== undefined);
