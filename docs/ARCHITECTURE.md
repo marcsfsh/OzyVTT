@@ -14,10 +14,11 @@ projection computed for their role. Nothing is sent as full state and filtered o
 ```
 Player browser ─┐                                  ┌─▶ game store ─────────┐
                 ├─ Socket.IO (game) ─┐             ├─▶ codex store         │
-GM browser ─────┤                    ├─▶ validate ─┼─▶ homebrew store      ├─ data/vtt.sqlite
-                └─ HTTP /api/v1 ─────┘   authorize ├─▶ viewer presentation │
+GM browser ─────┤                    ├─▶ validate ─┼─▶ homebrew store      │
+                └─ HTTP /api/v1 ─────┘   authorize ├─▶ viewer presentation ├─ data/vtt.sqlite
+                                                   ├─▶ sound board         │
                                                    └─▶ combat log ─────────┘
-Table viewer ◀── SSE + cookie, player-safe presentation projection only
+Table viewer ◀── SSE + cookie, player-safe presentation projection only (and what the sound board plays)
 ```
 
 The stores are independent. Each has its own revision counter and its own change notification,
@@ -82,6 +83,8 @@ Socket.IO over the same origin as HTTP. Server-to-client events come in two kind
 - **Ping channels** carry only a revision: `codex:changed` and `homebrew:changed`. Naming what
   changed would tell players which part of the world the GM is editing, so clients refetch
   their own projected view instead.
+- **GM-only channels** go to GM sockets alone: `sound:changed` carries the sound board and the table
+  screens' sound state. A player's socket is never sent it.
 
 On connect the server sends a full projected snapshot. The client keeps its token in
 `localStorage` and passes it in `socket.auth`, so reconnects resume without a new join. Presence
@@ -117,7 +120,10 @@ audience. There are four:
   room that may hold non-players. Only public actors with a position become tokens; annotations
   are public and unexpired; initiative appears only during combat; nothing is shown while
   paused. The fields that may cross are the `ViewerEncounterScene` and
-  `ViewerPresentationProjection` types.
+  `ViewerPresentationProjection` types, plus `sound` (`ViewerSoundProjection`, added by
+  `viewer-coordinator.ts` when the feed is sent): only what is playing, by file id, level and
+  position, never a name, the playlist or the library. The screen may fetch a sound file only
+  while it is in that projection.
 - **Codex** (`codex-projections.ts`): a player gets the player half of a revealed record and
   nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target, and
   `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields (staged
@@ -237,6 +243,20 @@ names no family is the GM's own ruling on the whole command.
   the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
   imported as an actor definition.
 
+## Sound
+
+Music and ambient sound play on the table screen only (ADR-0024); players' devices and the GM's never
+play it. The GM's library is content-addressed files under `data/sound-assets/` with names in its own
+table (`audio-assets.ts`, `sound-catalog.ts`, GM-only routes in `sound-http.ts`); an upload is sniffed
+from its bytes and walked far enough to read its length and refuse a truncated, video or non-sound
+file. The board (`sound-board.ts`, persisted by `sound-store.ts`, run by `sound-service.ts`) is apart
+from the game state so it never bumps the game revision: a playlist the server moves on by itself with
+a crossfade, looping ambient layers, one-shot effects, levels, pause, and a sound per scene that starts
+when the scene goes live. The `sound.*` commands sit in the game command table but write that store.
+The table screen's engine (`viewer/sound-engine.ts`) streams each file through a Web Audio gain, joins
+at the position the feed gives, shows "Tap to turn on sound" until its browser allows sound, and
+reports which of the two it is in for the GM's board.
+
 ## Codex
 
 The worldbuilding Codex has its own store (`codex-store.ts`, a facade over one module per
@@ -267,7 +287,7 @@ envelopes), and a caught error reaches the caller only as a known refusal, never
 ## Persistence
 
 All stores share `data/vtt.sqlite` (WAL). Integration credentials have their own SQLite file;
-GM auth is `data/auth.json`; map, token and Codex images are files under `data/`. Paths are
+GM auth is `data/auth.json`; map, token and Codex images and the sound library's files are files under `data/`. Paths are
 chosen in `apps/server/src/index.ts`. `data/` is git-ignored.
 
 Every store opens its database and runs its migrations through `apps/server/src/database.ts`. Each
@@ -287,6 +307,6 @@ Rules checks on the client are hints only; the server decides.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 homebrew, settings and the API reference, the character builder and level flow, replays, the map
-library and the shared-screen controls. pdf.js loads with the first imported PDF. The build targets
+library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets
 current phone and laptop browsers (Chrome and Edge 111, Firefox 121, Safari 16.4; `build.target` in
 `apps/client/vite.config.ts`), the floor the stylesheets' `:has()` and `dvh` already set.
