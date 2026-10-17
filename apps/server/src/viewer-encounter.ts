@@ -2,12 +2,19 @@ import type { GameState } from "@vtt/domain";
 import { healthBandOf } from "./hit-points.js";
 import { conditionLabels, projectPublicInitiative } from "./projections.js";
 import { visibleTerrain } from "./terrain.js";
-import { exploredRectsOf, partySight, partyViewerIds, visionOf, type AudienceSight } from "./vision/audience.js";
+import {
+  exploredRectsOf,
+  partySight,
+  partyViewerIds,
+  tokenShown,
+  visionOf,
+  type AudienceSight
+} from "./vision/audience.js";
 import type { SightContent } from "./vision/senses.js";
 import type { ViewerEncounterScene, ViewerInitiative } from "./viewer-presentation.js";
 
-/** The shared screen is in a room that may hold anyone, so with dynamic vision on it sees through the whole party:
- *  a creature no character perceives is hidden from it as a GM-only one is. */
+/** The shared screen is in a room that may hold anyone, so it sees through the whole party: a creature no character
+ *  perceives (dynamic vision) or that stands wholly under the fog is hidden from it as a GM-only one is. */
 export function projectViewerInitiative(
   state: GameState,
   content: SightContent = {},
@@ -44,19 +51,16 @@ export function projectViewerEncounterScene(
   // As for players: only the terrain the fog reveals, and with dynamic vision only what the party has seen.
   const terrain = visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined);
   const visionBlock = visionOf(state, partyViewerIds(state), content);
-  const vision = visionBlock.enabled ? { vision: { visible: visionBlock.visible, explored: visionBlock.explored } } : {};
+  const vision = visionBlock.enabled
+    ? { vision: { visible: visionBlock.visible, explored: visionBlock.explored } }
+    : {};
   // A live scene shows its map, fog and terrain immediately; tokens and drawings appear only once combat runs,
   // so no combatant data reaches the public screen before then.
   if (!state.combat.active)
     return { mapAssetId: state.combat.mapAssetId, tokens: [], annotations: [], fog, terrain, ...vision };
   const publicActors = new Map(
     state.actors
-      .filter(
-        (actor) =>
-          actor.visibility === "public" &&
-          !sight.hidden.has(actor.id) &&
-          (!sight.enabled || sight.perceived.has(actor.id))
-      )
+      .filter((actor) => actor.visibility === "public" && !sight.hidden.has(actor.id) && tokenShown(sight, actor.id))
       .map((actor) => [actor.id, actor])
   );
   return {

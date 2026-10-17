@@ -9,19 +9,24 @@ import { ENCOUNTER_ARCHIVE_PATHS, GAME_PATHS } from "@vtt/api-contract";
 import { createServer } from "../src/server.js";
 import { png } from "./image-fixtures.js";
 
-// The boundary dynamic vision draws, end to end (ADR-0023): a goblin the walls hide from every character never
-// reaches a player, over the socket (state, feed and toasts), over HTTP, on the table screen or in the replay.
+// The boundary dynamic vision and manual fog draw, end to end (ADR-0023): a goblin the walls hide from every
+// character, or that stands wholly under the fog, never reaches a player, over the socket (state, feed and toasts),
+// over HTTP, on the table screen or in the replay.
 
 const HERO = "10000000-0000-4000-8000-000000000001";
 const GOBLIN = "10000000-0000-4000-8000-000000000003";
 const GOBLIN_NAME = "Skulking Goblin";
+/** Half in the fog's reveal, in the fog test. */
+const ORC = "10000000-0000-4000-8000-000000000004";
 
 const SCENE = "60000000-0000-4000-8000-000000000001";
 const DIVIDER = "50000000-0000-4000-8000-000000000001";
+const REVEAL = "50000000-0000-4000-8000-000000000002";
 
-/** The roster, and, when `mapAssetId` is given, the crypt scene the GM prepared: vision on, a wall down the middle,
- *  the hero on one side and the goblin on the other. */
-const initialState = (mapAssetId?: string) =>
+/** The roster, and, when `mapAssetId` is given, the crypt scene the GM prepared. With vision: a wall down the middle,
+ *  the hero on one side and the goblin on the other. With fog: only the left strip revealed (x 0 to 260), the hero in
+ *  it, the orc's space 10 pixels into it and the goblin's wholly out of it. */
+const initialState = (mapAssetId?: string, mode: "vision" | "fog" = "vision") =>
   GameStateSchema.parse({
     schemaVersion: 1,
     combat: {
@@ -34,17 +39,30 @@ const initialState = (mapAssetId?: string) =>
               combat: {
                 initiative: [
                   { actorId: HERO, score: 0 },
-                  { actorId: GOBLIN, score: 0 }
+                  { actorId: GOBLIN, score: 0 },
+                  ...(mode === "fog" ? [{ actorId: ORC, score: 0 }] : [])
                 ],
                 tokens: [
                   { actorId: HERO, position: { x: 75, y: 275 }, sizePx: 41, gridSizePx: 50 },
-                  { actorId: GOBLIN, position: { x: 425, y: 275 }, sizePx: 41, gridSizePx: 50 }
+                  { actorId: GOBLIN, position: { x: 425, y: 275 }, sizePx: 41, gridSizePx: 50 },
+                  ...(mode === "fog"
+                    ? [{ actorId: ORC, position: { x: 275, y: 425 }, sizePx: 41, gridSizePx: 50 }]
+                    : [])
                 ],
-                vision: {
-                  enabled: true,
-                  walls: [{ id: DIVIDER, kind: "wall", a: { x: 250, y: 0 }, b: { x: 250, y: 600 } }],
-                  measure: { width: 1000, height: 600, pixelsPerFoot: 10 }
-                }
+                ...(mode === "vision"
+                  ? {
+                      vision: {
+                        enabled: true,
+                        walls: [{ id: DIVIDER, kind: "wall", a: { x: 250, y: 0 }, b: { x: 250, y: 600 } }],
+                        measure: { width: 1000, height: 600, pixelsPerFoot: 10 }
+                      }
+                    }
+                  : {
+                      fog: {
+                        enabled: true,
+                        shapes: [{ kind: "rect", id: REVEAL, op: "reveal", x: 0, y: 0, width: 260, height: 600 }]
+                      }
+                    })
               }
             }
           ]
@@ -59,7 +77,8 @@ const initialState = (mapAssetId?: string) =>
         visibility: "public",
         hp: { current: 7, maximum: 7 },
         notes: "Waits behind the wall"
-      }
+      },
+      { id: ORC, name: "Orc", kind: "monster", visibility: "public", hp: { current: 15, maximum: 15 } }
     ]
   });
 
@@ -88,8 +107,8 @@ const emit = (socket: Socket, event: string, payload: Record<string, unknown>) =
   );
 
 /** A server with a calibrated 1000 x 600 battlemap (50-pixel, 5-foot cells), a GM and one player; with `prepared`, the
- *  crypt scene is already set up on it. */
-async function table(prepared = false) {
+ *  crypt scene is already set up on it, with vision or with fog. */
+async function table(prepared = false, mode: "vision" | "fog" = "vision") {
   const directory = await mkdtemp(join(tmpdir(), "vtt-vision-"));
   // Map ids are the image's content hash, so the same picture is the same id on every server.
   const mapAssetId = prepared ? await mapIdOf(png(1000, 600)) : undefined;
@@ -101,7 +120,7 @@ async function table(prepared = false) {
     webDist: join(directory, "dist"),
     useDevelopmentClient: true,
     developmentClientPort: 5173,
-    initialGameState: initialState(mapAssetId)
+    initialGameState: initialState(mapAssetId, mode)
   });
   cleanups.push(async () => {
     server.close();
@@ -168,14 +187,23 @@ describe("dynamic vision end to end", () => {
     expect(mapAssetId).toBe(server.store.snapshot.combat.scenes[0]!.mapAssetId);
     // More walls go up in the prepared scene, and then it goes live and the fight starts.
     expect(
-      await emit(gm, "wall:add", { kind: "window", points: [{ x: 600, y: 0 }, { x: 600, y: 100 }], sceneId: SCENE })
+      await emit(gm, "wall:add", {
+        kind: "window",
+        points: [
+          { x: 600, y: 0 },
+          { x: 600, y: 100 }
+        ],
+        sceneId: SCENE
+      })
     ).toMatchObject({ ok: true });
     expect(await emit(gm, "scene:activate", { sceneId: SCENE })).toMatchObject({ ok: true });
     expect(await emit(gm, "encounter:start", { mapAssetId })).toMatchObject({ ok: true });
     // A few turns pass, the goblin moving about behind the wall.
     for (let turn = 0; turn < 3; turn++) {
       if (server.store.snapshot.combat.turnActorId === GOBLIN)
-        expect(await emit(gm, "token:move", { actorId: GOBLIN, position: { x: 475, y: 225 + 50 * turn } })).toMatchObject({
+        expect(
+          await emit(gm, "token:move", { actorId: GOBLIN, position: { x: 475, y: 225 + 50 * turn } })
+        ).toMatchObject({
           ok: true
         });
       expect(await emit(gm, "initiative:next", {})).toMatchObject({ ok: true });
@@ -225,6 +253,102 @@ describe("dynamic vision end to end", () => {
     expect(mentionsGoblin(replay)).toBe(false);
   });
 
+  it("keeps a goblin wholly under the fog out of every player channel, the table screen and the replay", async () => {
+    // The GM prepared the crypt with fog: the goblin wholly under it, the orc's space partly revealed.
+    const { server, gm, player, received, http, gmToken, playerToken, mapAssetId } = await table(true, "fog");
+    expect(await emit(gm, "scene:activate", { sceneId: SCENE })).toMatchObject({ ok: true });
+    expect(await emit(gm, "encounter:start", { mapAssetId })).toMatchObject({ ok: true });
+    // A few turns pass, the goblin moving about under the fog.
+    for (let turn = 0; turn < 3; turn++) {
+      if (server.store.snapshot.combat.turnActorId === GOBLIN)
+        expect(
+          await emit(gm, "token:move", { actorId: GOBLIN, position: { x: 475, y: 225 + 50 * turn } })
+        ).toMatchObject({
+          ok: true
+        });
+      expect(await emit(gm, "initiative:next", {})).toMatchObject({ ok: true });
+    }
+    const gmView = (await (await http(GAME_PATHS.snapshot, gmToken)).json()) as { data: unknown };
+    expect(mentionsGoblin(gmView)).toBe(true);
+    // The player gets their own hero and the half-revealed orc, and the fog's shapes; nothing of the goblin.
+    const playerView = (await (await http(GAME_PATHS.snapshot, playerToken)).json()) as {
+      data: { game: { combat: { tokens: Array<{ actorId: string }>; fog: { enabled: boolean } } } };
+    };
+    expect(playerView.data.game.combat.tokens.map((token) => token.actorId).sort()).toEqual([HERO, ORC].sort());
+    expect(playerView.data.game.combat.fog.enabled).toBe(true);
+    expect(mentionsGoblin(playerView)).toBe(false);
+    expect(mentionsGoblin(await (await http(`${GAME_PATHS.log}?limit=1000`, playerToken)).json())).toBe(false);
+    expect(received.length).toBeGreaterThan(0);
+    expect(received.filter(mentionsGoblin)).toEqual([]);
+    expect(mentionsGoblin(server.viewerPresentation.snapshot)).toBe(false);
+    expect(JSON.stringify(server.viewerPresentation.snapshot)).toContain(ORC);
+    // Nor can the player aim at it by id.
+    const attack = await emit(player, "action:resolve", {
+      actorId: HERO,
+      actionId: "unarmed-strike",
+      targetIds: [GOBLIN]
+    });
+    expect(attack).toMatchObject({ ok: false, message: "You can only target combatants you can see." });
+
+    // The fight ends and the GM shares it: the replay keeps the goblin hidden in every turn.
+    expect(await emit(gm, "encounter:end", {})).toMatchObject({ ok: true });
+    const archives = (await (await http(ENCOUNTER_ARCHIVE_PATHS.collection, gmToken)).json()) as {
+      data: { encounters: Array<{ id: number }> };
+    };
+    const archiveId = archives.data.encounters[0]!.id;
+    const share = await http(ENCOUNTER_ARCHIVE_PATHS.visibility.replace("{id}", String(archiveId)), gmToken, {
+      method: "POST",
+      body: JSON.stringify({ playerVisible: true })
+    });
+    expect(share.status).toBe(200);
+    const replay = (await (
+      await http(ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(archiveId)), playerToken)
+    ).json()) as { data: { document: { turns: unknown[] } } };
+    expect(replay.data.document.turns.length).toBeGreaterThan(1);
+    expect(mentionsGoblin(replay)).toBe(false);
+    expect(JSON.stringify(replay)).toContain(ORC);
+  });
+
+  it("shows a creature once the fog over it lifts, and lets a player's move pass over it until then", async () => {
+    const { gm, player, http, playerToken, mapAssetId } = await table();
+    expect(
+      await emit(gm, "encounter:start", {
+        mapAssetId,
+        entries: [
+          { actorId: HERO, score: 20 },
+          { actorId: GOBLIN, score: 10 }
+        ]
+      })
+    ).toMatchObject({ ok: true });
+    expect(await emit(gm, "token:move", { actorId: HERO, position: { x: 75, y: 275 } })).toMatchObject({ ok: true });
+    expect(await emit(gm, "token:move", { actorId: GOBLIN, position: { x: 125, y: 275 } })).toMatchObject({ ok: true });
+    // Fog over everything but the hero's square.
+    expect(await emit(gm, "fog:set-enabled", { enabled: true })).toMatchObject({ ok: true });
+    expect(await emit(gm, "fog:paint", { op: "reveal", rect: { x: 50, y: 250, width: 50, height: 50 } })).toMatchObject(
+      { ok: true }
+    );
+    const tokensOf = async () =>
+      (
+        (await (await http(GAME_PATHS.snapshot, playerToken)).json()) as {
+          data: { game: { combat: { tokens: Array<{ actorId: string }> } } };
+        }
+      ).data.game.combat.tokens.map((token) => token.actorId);
+    expect(await tokensOf()).toEqual([HERO]);
+    // A move into the goblin's square isn't refused, which would give it away.
+    expect(await emit(player, "token:move", { actorId: HERO, position: { x: 125, y: 275 } })).toMatchObject({
+      ok: true
+    });
+    expect(await emit(gm, "token:move", { actorId: HERO, position: { x: 75, y: 275 } })).toMatchObject({ ok: true });
+    // The GM lifts the fog off it: the player sees it and may aim at it.
+    expect(
+      await emit(gm, "fog:paint", { op: "reveal", rect: { x: 100, y: 250, width: 50, height: 50 } })
+    ).toMatchObject({ ok: true });
+    expect((await tokensOf()).sort()).toEqual([HERO, GOBLIN].sort());
+    expect(
+      await emit(player, "action:resolve", { actorId: HERO, actionId: "unarmed-strike", targetIds: [GOBLIN] })
+    ).toMatchObject({ ok: true });
+  });
+
   it("lets a player open a door beside their character, and shows what lies beyond", async () => {
     const { server, gm, player, http, playerToken, mapAssetId } = await table();
     expect(
@@ -241,12 +365,30 @@ describe("dynamic vision end to end", () => {
     expect(await emit(gm, "vision:set-enabled", { enabled: true })).toMatchObject({ ok: true });
     // A wall with a closed door in it, right beside the hero (the door spans row 5 at x = 250).
     expect(
-      await emit(gm, "wall:add", { kind: "wall", points: [{ x: 250, y: 0 }, { x: 250, y: 250 }] })
+      await emit(gm, "wall:add", {
+        kind: "wall",
+        points: [
+          { x: 250, y: 0 },
+          { x: 250, y: 250 }
+        ]
+      })
     ).toMatchObject({ ok: true });
     expect(
-      await emit(gm, "wall:add", { kind: "wall", points: [{ x: 250, y: 300 }, { x: 250, y: 600 }] })
+      await emit(gm, "wall:add", {
+        kind: "wall",
+        points: [
+          { x: 250, y: 300 },
+          { x: 250, y: 600 }
+        ]
+      })
     ).toMatchObject({ ok: true });
-    const door = (await emit(gm, "wall:add", { kind: "door", points: [{ x: 251, y: 249 }, { x: 249, y: 302 }] })) as {
+    const door = (await emit(gm, "wall:add", {
+      kind: "door",
+      points: [
+        { x: 251, y: 249 },
+        { x: 249, y: 302 }
+      ]
+    })) as {
       ok: boolean;
       wallIds: string[];
     };
@@ -273,7 +415,9 @@ describe("dynamic vision end to end", () => {
     });
 
     // Walls and lights are the GM's: a player can't place one, nor prep a parked scene's doors.
-    expect(await emit(player, "light:add", { position: { x: 100, y: 100 }, brightFeet: 20, dimFeet: 20 })).toMatchObject({
+    expect(
+      await emit(player, "light:add", { position: { x: 100, y: 100 }, brightFeet: 20, dimFeet: 20 })
+    ).toMatchObject({
       ok: false
     });
     expect(

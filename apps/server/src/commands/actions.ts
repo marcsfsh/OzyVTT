@@ -133,10 +133,13 @@ export const actionCommands = [
         } else {
           resolvedTargetIds = targetIds ?? [];
         }
-        // A player may target only public combatants: resolving against a hidden actor would leak its
-        // name/AC/outcome through the ack (and in direct mode damage it).
-        if (isPlayer && resolvedTargetIds.some((targetId) => !canPlayerTarget(draft, targetId)))
-          throw new CommandRejectedError("You can only target combatants you can see.");
+        // A player may target only public combatants they can see: resolving against a hidden actor would leak
+        // its name/AC/outcome through the ack (and in direct mode damage it).
+        if (isPlayer) {
+          const unseen = kit.unseenBy(initiator, draft);
+          if (resolvedTargetIds.some((targetId) => !canPlayerTarget(draft, targetId, unseen)))
+            throw new CommandRejectedError("You can only target combatants you can see.");
+        }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
           geometry ? (tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null) : null;

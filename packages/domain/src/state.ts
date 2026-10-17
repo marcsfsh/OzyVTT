@@ -610,9 +610,7 @@ export const PendingRuleAskSchema = z
 export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
 
 /** A point on the battlemap, in image pixels. */
-const VisionPointSchema = z
-  .object({ x: z.number().min(0).max(100000), y: z.number().min(0).max(100000) })
-  .strict();
+const VisionPointSchema = z.object({ x: z.number().min(0).max(100000), y: z.number().min(0).max(100000) }).strict();
 
 /** A wall in image pixels (ADR-0023). A wall blocks sight, light and movement; a door does too while it is closed; a
  * window blocks movement only. `open` is a door's alone. */
@@ -796,8 +794,8 @@ const sceneCombatShape = {
   /** Legendary actions spent since each creature's last turn start (SRD refresh). Stripped from the player projection. */
   legendaryUsed: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** Manual fog of war (ADR-0022): an ordered list of reveal/hide rects applied over "all hidden"; enabled with
-   * no shapes means a fully hidden map. Rects are in image-pixel space. Fog is presentation, not the security
-   * boundary: hidden actors and annotations are stripped by their own projections, so players get this verbatim. */
+   * no shapes means a fully hidden map. Rects are in image-pixel space. Players get the shapes verbatim; a creature
+   * whose whole space lies under the fog is left out of their projections (ADR-0023). */
   fog: z
     .object({
       enabled: z.boolean().default(false),

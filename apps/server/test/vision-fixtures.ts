@@ -55,6 +55,8 @@ export type VisionGameOptions = Readonly<{
   actors?: Readonly<Record<string, Record<string, unknown>>>;
   definitions?: readonly unknown[];
   active?: boolean;
+  /** Manual fog over the map: on, with these reveals (rects in pixels) in order. */
+  reveals?: ReadonlyArray<Readonly<{ x: number; y: number; width: number; height: number; op?: "reveal" | "hide" }>>;
 }>;
 
 /** A fight on the map: Hero (A) at cell (1,5), the goblin at (8,5), Friend (B) and the orc unplaced unless placed. */
@@ -89,7 +91,28 @@ export function visionGame(options: VisionGameOptions = {}): GameState {
       turnActorId: HERO,
       mapAssetId: MAP,
       initiative: actors.map((actor, index) => ({ actorId: actor.id, score: 20 - index })),
-      tokens: actors.map((actor) => ({ actorId: actor.id, position: positions[actor.id] ?? null, sizePx: 41, gridSizePx: 50 })),
+      tokens: actors.map((actor) => ({
+        actorId: actor.id,
+        position: positions[actor.id] ?? null,
+        sizePx: 41,
+        gridSizePx: 50
+      })),
+      ...(options.reveals
+        ? {
+            fog: {
+              enabled: true,
+              shapes: options.reveals.map((rect, index) => ({
+                kind: "rect",
+                id: `70000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+                op: rect.op ?? "reveal",
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height
+              }))
+            }
+          }
+        : {}),
       vision: {
         enabled: options.enabled ?? true,
         ambient: options.ambient ?? "bright",

@@ -1,6 +1,7 @@
-import type { GameState } from "@vtt/domain";
+import type { CombatState, GameState } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
+import { subtractRect, unionRect, type Rect } from "./rect-region.js";
 
 export type FogMapGeometry = LayerMapGeometry;
 export type FogRectInput = PaintRectInput;
@@ -41,4 +42,16 @@ export function paintFog(
   if (kept.length >= MAX_FOG_SHAPES)
     throw new CommandRejectedError("The fog has too many strokes - Reset it and reveal again.");
   slice.write({ ...slice.fog, shapes: [...kept, { kind: "rect", id: input.id, op: input.op, ...rect }] });
+}
+
+/** The area players can see through the fog: everything when fog is off, else the reveals and hides in order
+ *  over a map that starts hidden. */
+export function revealedRegion(fog: CombatState["fog"]): readonly Rect[] | "everything" {
+  if (!fog.enabled) return "everything";
+  let region: Rect[] = [];
+  for (const shape of fog.shapes) {
+    const rect = { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+    region = shape.op === "reveal" ? unionRect(region, rect) : subtractRect(region, rect);
+  }
+  return region;
 }

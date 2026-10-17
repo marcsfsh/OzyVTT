@@ -105,9 +105,15 @@ export const mapCommands = [
           "You may only move your claimed character token."
         );
         const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
-        // Dynamic vision, as the mover set off: what it perceived, and who saw it go.
+        // Dynamic vision, as the mover set off: what it perceived, and who saw it go. A player's move also passes over
+        // the creatures hidden from them under the fog, as their preview does.
         const sight = sceneSight(state, kit.sightContent());
         const perceivedAtStart = sight.enabled ? sight.perceivedBy([actorId]) : null;
+        const unseenByMover = kit.unseenBy(initiatorOf(principal), state);
+        const perceives =
+          perceivedAtStart || unseenByMover.size > 0
+            ? (id: string) => (perceivedAtStart?.has(id) ?? true) && !unseenByMover.has(id)
+            : null;
         const seenAtStart = sight.enabled
           ? new Set(state.actors.filter((actor) => sight.sees(actor.id, actorId)).map((actor) => actor.id))
           : null;
@@ -150,7 +156,7 @@ export const mapCommands = [
           override: request.override ?? null,
           resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
           catalog: kit.equipmentCatalog(),
-          ...(perceivedAtStart ? { perceives: (id: string) => perceivedAtStart.has(id) } : {}),
+          ...(perceives ? { perceives } : {}),
           ...(seenAtStart ? { seenBy: (id: string) => seenAtStart.has(id) } : {}),
           newPromptId: kit.context.newId,
           now: Date.now,

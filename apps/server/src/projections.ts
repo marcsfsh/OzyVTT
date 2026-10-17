@@ -20,7 +20,7 @@ import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
 import { visibleTerrain } from "./terrain.js";
-import { exploredRectsOf, playerSight, visionOf, type AudienceSight } from "./vision/audience.js";
+import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
 import type { SightContent } from "./vision/senses.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
@@ -253,8 +253,9 @@ function ownedBy(state: GameState, actorId: string, playerSessionId: string | un
   return owner !== null && owner === playerSessionId;
 }
 
-/** The combat a player sees. With dynamic vision on, a creature none of their characters perceive is hidden from them
- *  as a GM-only one is (`AudienceSight.hidden`); a spectator (no session) sees through the whole party. */
+/** The combat a player sees. A creature none of their characters perceive (dynamic vision) or that stands wholly under
+ *  the fog is hidden from them as a GM-only one is (`AudienceSight`); a spectator (no session) sees through the whole
+ *  party. */
 export function projectPlayerCombat(
   state: GameState,
   playerSessionId?: string,
@@ -269,8 +270,7 @@ export function projectPlayerCombat(
       .map((actor) => actor.id)
   );
   const currentIsPublic = initiative.some((entry) => entry.active);
-  const showsToken = (actorId: string) =>
-    publicActorIds.has(actorId) && (!sight.enabled || sight.perceived.has(actorId));
+  const showsToken = (actorId: string) => publicActorIds.has(actorId) && tokenShown(sight, actorId);
   return {
     active: state.combat.active,
     round: state.combat.round,
@@ -322,7 +322,7 @@ export function projectPlayerCombat(
     playerInitiativeMode: state.combat.playerInitiativeMode,
     underwater: state.combat.underwater,
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => publicActorIds.has(actorId)),
-    // Fog carries geometry only and is never the security boundary; hidden actors are stripped regardless.
+    // The fog's shapes; what lies wholly under them was already left out above (`AudienceSight.fogged`).
     fog: { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) },
     // Only the revealed part: terrain under the fog would show the layout of ground players haven't seen.
     terrain: visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined),
@@ -549,7 +549,7 @@ export function projectPlayerView(
   now = Date.now(),
   content: SightContent = {}
 ): PlayerView {
-  // With dynamic vision on, the creatures this player's characters don't perceive are hidden from them like gm-only.
+  // The creatures this player's characters don't perceive, or that stand wholly under the fog, are hidden like gm-only.
   const sight = playerSight(state, playerSessionId, content);
   // Archived characters are hidden from players entirely, like gm-only actors.
   const publicActorIds = new Set(
@@ -587,7 +587,7 @@ export function projectPlayerView(
     rollCalls: projectPlayerRollCalls(state, playerSessionId),
     combat: projectPlayerCombat(state, playerSessionId, now, content, sight),
     rest: playerRest(state, yourActorIds),
-    // Tiers subtract fields, never entries; only gm-only visibility and archiving remove an actor.
+    // Tiers subtract fields, never entries; only gm-only visibility, archiving and sight remove an actor.
     actors: state.actors
       .filter((actor) => actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id))
       .map((source) => {

@@ -16,6 +16,7 @@ import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
 import { mapDistance } from "./movement-narration.js";
+import { revealedRegion } from "./fog.js";
 import { intersectRegions, subtractRect, unionRect, type Rect } from "./rect-region.js";
 import type { TokenMapGeometry } from "./token-placement.js";
 import { blocksMovement } from "./vision/sight.js";
@@ -46,18 +47,6 @@ export function paintTerrain(
 export function resetTerrain(state: GameState, sceneId: string | undefined) {
   const slice = layerSlice(state, sceneId, "terrain", LIVE_REFUSAL);
   slice.write({ difficult: [] });
-}
-
-/** The area players can see through the fog: everything when fog is off, else the reveals and hides in order
- *  over a map that starts hidden. */
-function revealedRegion(fog: CombatState["fog"]): readonly Rect[] | "everything" {
-  if (!fog.enabled) return "everything";
-  let region: Rect[] = [];
-  for (const shape of fog.shapes) {
-    const rect = { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
-    region = shape.op === "reveal" ? unionRect(region, rect) : subtractRect(region, rect);
-  }
-  return region;
 }
 
 /** Terrain as players and the table screen get it: only what the fog reveals, and with dynamic vision only what the

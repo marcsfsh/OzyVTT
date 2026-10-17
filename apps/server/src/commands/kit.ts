@@ -23,7 +23,7 @@ import { tokenCreatureDistance } from "../movement-narration.js";
 import { withoutSourceName } from "../projections.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { TokenMapGeometry } from "../token-placement.js";
-import { partySight } from "../vision/audience.js";
+import { partySight, playerSight } from "../vision/audience.js";
 import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
@@ -134,7 +134,10 @@ export function createKit(context: CommandContext) {
     definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
     catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
   });
-  /** Hidden from the table: GM-only, or (with dynamic vision on) a creature no character perceives. */
+  /** The creatures hidden from this initiator by sight or the fog, which it may not target; none for the GM. */
+  const unseenBy = (initiator: Initiator, state: GameState): ReadonlySet<string> =>
+    initiator.role === "gm" ? new Set() : playerSight(state, initiator.sessionId, sightContent()).hidden;
+  /** Hidden from the table: GM-only, or a creature no character perceives (dynamic vision) or wholly under the fog. */
   const actorHidden = (actorId: string) => {
     const state = read();
     return (
@@ -173,6 +176,7 @@ export function createKit(context: CommandContext) {
     read,
     actorName,
     actorHidden,
+    unseenBy,
     resolveDefinitionIn,
     sightContent,
     /** The same lookup against the committed state, for reads outside a command transaction. */
