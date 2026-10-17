@@ -522,12 +522,16 @@ const sceneCombatShape = {
     .object({
       actionUsed: z.boolean().default(false),
       bonusActionUsed: z.boolean().default(false),
-      /** `slotLevel`: the slot a multi-attack spell (Scorching Ray) was cast with, which its later rays roll at. */
+      /** `slotLevel`: the slot a multi-attack spell (Scorching Ray) was cast with, which its later rays roll at. A
+       *  component keyed "a|b" is filled by either action. A Multiattack's instance names it (`parentId`) and the
+       *  replacements it has left, keyed by their actions ("roar": 1); neither is projected. */
       actionInstance: z
         .object({
           actorId: z.uuid(),
           components: z.record(z.string(), z.number().int().nonnegative()),
-          slotLevel: z.number().int().min(1).max(9).optional()
+          slotLevel: z.number().int().min(1).max(9).optional(),
+          parentId: z.string().max(120).optional(),
+          replacements: z.record(z.string(), z.number().int().nonnegative()).optional()
         })
         .strict()
         .nullable()

@@ -268,7 +268,9 @@ export const ActionAvailabilitySchema = z.strictObject({
   usesPer: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
   usesPool: z.string().nullable(),
   requiresEffectTag: z.string().nullable(),
-  multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
+  multiattack: z
+    .array(z.strictObject({ actionId: z.string(), count: z.number().int(), or: z.array(z.string()).optional() }))
+    .nullable(),
   reaction: ActionReactionSchema.nullable()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;

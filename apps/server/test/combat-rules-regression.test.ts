@@ -3170,7 +3170,11 @@ describe("multiattack ergonomics - no pre-selection needed (report bug 5)", () =
     // Bite straight away (no Multiattack tap first): the plan opens with the Tail still owed.
     // (Face 2 misses AC 15 so the grapple rider doesn't block the Tail's later targeting.)
     resolve(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.torva] }, [2, 6, 6, 6]);
-    expect(game.combat.turn.actionInstance).toEqual({ actorId: IDS.croc1, components: { bite: 0, tail: 1 } });
+    expect(game.combat.turn.actionInstance).toEqual({
+      actorId: IDS.croc1,
+      components: { bite: 0, tail: 1 },
+      parentId: "multiattack"
+    });
     // Tapping the Multiattack row now is a continue (reports the remaining plan), not an override dialog.
     const plan = resolve(game, crocodileDefinition, "multiattack", { actorId: IDS.croc1 }, []);
     expect(plan.componentsRemaining).toEqual({ bite: 0, tail: 1 });
@@ -4324,5 +4328,112 @@ describe("Opportunity attacks: one melee attack with a weapon or an Unarmed Stri
     expect(punch.used).toBe(true);
     expect(punch.resolution?.attack).toMatchObject({ naturalRoll: 18 });
     expect(game.combat.reactionsUsed).toContain(IDS.pip);
+  });
+});
+
+describe("Monster actions as the stat block prints them (Multiattack)", () => {
+  const MONSTER = "10000000-0000-4000-8000-000000000007";
+  /** A bundled monster and Torva in a fight; `heroFirst` puts Torva's turn first, for legendary actions. */
+  const fight = (externalId: string, heroFirst = false) => {
+    const definition = loadMonsterDefinitions().find((monster) => monster.source.externalId === externalId)!;
+    const game = GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: [
+        {
+          id: MONSTER,
+          name: definition.name,
+          kind: "monster",
+          visibility: "public",
+          hp: { current: definition.hitPoints.maximum, maximum: definition.hitPoints.maximum },
+          armorClass: definition.armorClass,
+          definitionId: externalId,
+          size: definition.size,
+          speedFeet: definition.speedFeet
+        },
+        {
+          id: IDS.torva,
+          name: "Torva Grimtusk",
+          kind: "player-character",
+          visibility: "public",
+          hp: { current: 75, maximum: 75 },
+          armorClass: 15,
+          definitionId: "import-torva",
+          size: "medium",
+          speedFeet: 40
+        }
+      ],
+      definitions: [
+        { id: externalId, definition },
+        { id: "import-torva", definition: torvaDefinition }
+      ]
+    });
+    startEncounter(
+      game,
+      {
+        mapAssetId: IDS.map,
+        entries: heroFirst
+          ? [
+              { actorId: IDS.torva, score: 20 },
+              { actorId: MONSTER, score: 10 }
+            ]
+          : [
+              { actorId: MONSTER, score: 20 },
+              { actorId: IDS.torva, score: 10 }
+            ]
+      },
+      () => 1,
+      GEOMETRY,
+      (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+    );
+    /** Resolves one of the monster's actions against Torva (or none): a 15 on the d20, every damage die its top face. */
+    const act = (actionId: string, targetIds: readonly string[] = [IDS.torva]) =>
+      resolveDefinitionAction(
+        game,
+        definition.actions.find((action) => action.id === actionId)!,
+        { actorId: MONSTER, targetIds, commandId: nextCommandId(), rollMode: null, override: null },
+        {
+          ...deps([], definition),
+          random: (sides) => Math.min(sides, 15),
+          resolveDefinition: (definitionId) => game.definitions.find((entry) => entry.id === definitionId)?.definition
+        }
+      );
+    return { game, definition, act };
+  };
+
+  it("lets the bone devil make both Claws and its Infernal Sting, in either order", () => {
+    const inOrder = fight("bone-devil");
+    inOrder.act("claw");
+    inOrder.act("claw");
+    expect(inOrder.act("infernal-sting").componentsRemaining).toBeNull();
+    expect(() => inOrder.act("claw")).toThrow(/no attacks remaining|no Claw left/);
+    const stingFirst = fight("bone-devil");
+    stingFirst.act("infernal-sting");
+    stingFirst.act("claw");
+    stingFirst.act("claw");
+    expect(() => stingFirst.act("infernal-sting")).toThrow(RulesBlockedError);
+  });
+
+  it("lets the lion replace one Rend with Roar, once", () => {
+    const { act } = fight("lion");
+    act("rend");
+    expect(act("roar").componentsRemaining).toBeNull();
+    expect(() => act("rend")).toThrow(/no attacks remaining|no Rend left/);
+    const roarFirst = fight("lion");
+    roarFirst.act("roar");
+    expect(roarFirst.act("rend").componentsRemaining).toBeNull();
+  });
+
+  it("lets the barbed devil's first Hurl Flame make it the other plan: two Hurl Flames, no Claws", () => {
+    const { act } = fight("barbed-devil");
+    act("hurl-flame");
+    act("hurl-flame");
+    expect(() => act("claws")).toThrow(/no attacks remaining|no Claws left/);
+  });
+
+  it("lets the goblin boss make two attacks with Scimitar or Shortbow in any combination", () => {
+    const { act } = fight("goblin-boss");
+    act("scimitar");
+    act("shortbow");
+    expect(() => act("scimitar")).toThrow(/no attacks remaining|no Scimitar left/);
   });
 });

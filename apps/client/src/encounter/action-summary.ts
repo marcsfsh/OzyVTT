@@ -23,7 +23,12 @@ export function actionSummaryParts(action: ContentActionSummary, all: readonly C
   if (action.attackCount !== null && action.attackCount > 1) parts.push(`${action.attackCount} attacks`);
   if (action.multiattack)
     parts.push(
-      action.multiattack.map((component) => `${component.count}× ${componentName(component.actionId)}`).join(" + ")
+      action.multiattack
+        .map(
+          (component) =>
+            `${component.count}× ${[component.actionId, ...(component.or ?? [])].map(componentName).join(" or ")}`
+        )
+        .join(" + ")
     );
   if (action.saveAbility !== null) parts.push(`DC ${action.saveDc} ${action.saveAbility.toUpperCase()} save`);
   for (const part of action.damage) parts.push(`${part.formula} ${part.type} damage`);
@@ -39,12 +44,20 @@ export function actionSummaryParts(action: ContentActionSummary, all: readonly C
   return parts;
 }
 
-/** What is left of an open compound action ("1× Tail, 2× any attack"), so the GM picks the next attack. */
+/** What is left of an open compound action ("1× Tail, 2× any attack", "2× Scimitar or Shortbow"), so the GM picks
+ *  the next attack. */
 export const componentLabel = (components: Record<string, number>, actions: readonly ContentActionSummary[] | null) =>
   Object.entries(components)
     .filter(([, remaining]) => remaining > 0)
     .map(
-      ([id, remaining]) =>
-        `${remaining}× ${id === "attack" ? "any attack" : (actions?.find((candidate) => candidate.id === id)?.name ?? id)}`
+      ([key, remaining]) =>
+        `${remaining}× ${
+          key === "attack"
+            ? "any attack"
+            : key
+                .split("|")
+                .map((id) => actions?.find((candidate) => candidate.id === id)?.name ?? id)
+                .join(" or ")
+        }`
     )
     .join(", ");

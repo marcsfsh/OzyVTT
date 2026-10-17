@@ -146,6 +146,24 @@ describe("SRD 5.2.1 monster bundle", () => {
     expect(tail.targetRules).toEqual(["not-grappled-by-source"]);
   });
 
+  it("reads every Multiattack the SRD prints but the hydra's, with its replacements and other plans", () => {
+    const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
+    const multiattackOf = (id: string) => byId(id).actions.find((action) => action.id === "multiattack")!;
+    expect(multiattackOf("bone-devil").multiattack).toEqual([
+      { actionId: "claw", count: 2 },
+      { actionId: "infernal-sting", count: 1 }
+    ]);
+    expect(multiattackOf("lion").multiattackReplacements).toEqual([{ actionIds: ["roar"], attacks: 1 }]);
+    expect(multiattackOf("barbed-devil").multiattackAlternatives).toEqual([[{ actionId: "hurl-flame", count: 2 }]]);
+    expect(multiattackOf("goblin-boss").multiattack).toEqual([{ actionId: "scimitar", count: 2, or: ["shortbow"] }]);
+    const prose = monsters.flatMap((monster) =>
+      monster.actions
+        .filter((action) => /multiattack/i.test(action.name) && action.activation === "action" && !action.multiattack)
+        .map(() => monster.source.externalId)
+    );
+    expect(prose).toEqual(["hydra"]);
+  });
+
   it("carries structured limited-use pools (recharge and rest scopes)", () => {
     const byId = (id: string) => monsters.find((monster) => monster.source.externalId === id)!;
     expect(byId("white-dragon-wyrmling").actions.find((action) => action.id === "cold-breath")!.uses).toEqual({

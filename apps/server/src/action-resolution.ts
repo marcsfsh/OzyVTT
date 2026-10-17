@@ -252,7 +252,11 @@ export function actionAvailability(
       usesPool: action.uses?.pool ?? null,
       requiresEffectTag: action.requiresEffectTag ?? null,
       multiattack: action.multiattack
-        ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count }))
+        ? action.multiattack.map((component) => ({
+            actionId: component.actionId,
+            count: component.count,
+            ...(component.or ? { or: [...component.or] } : {})
+          }))
         : null,
       reaction: action.reaction ?? null
     };

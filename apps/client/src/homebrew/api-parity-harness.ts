@@ -525,7 +525,21 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "actions[].multiattack[].**",
     types: ACTION_CARRIERS,
-    reason: "126 SRD authors; owned outside this program (census row at vocabulary-parity.mirror.test.ts:3416)",
+    reason: "177 SRD authors; owned outside this program (census row in vocabulary-parity.mirror.test.ts)",
+    status: "gap"
+  },
+  {
+    at: "actions[].multiattackAlternatives",
+    types: ACTION_CARRIERS,
+    reason:
+      'a Multiattack\'s other plan ("or it makes two Hurl Flame attacks") - read from stat-block prose like the plan',
+    status: "gap"
+  },
+  {
+    at: "actions[].multiattackReplacements[].**",
+    types: ACTION_CARRIERS,
+    reason:
+      'an action a Multiattack lets replace one of its attacks ("it can replace one attack with a use of Roar") - read from stat-block prose like the plan',
     status: "gap"
   },
   {

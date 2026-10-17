@@ -26,6 +26,13 @@ const isTargetless = (action: ContentActionSummary) =>
   action.targeting !== "multi" &&
   (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
 
+/** How many places an open action has left for this action: its own, and those it shares ("Claw or Tail"). */
+const placesLeft = (components: Readonly<Record<string, number>>, actionId: string) =>
+  Object.entries(components).reduce(
+    (sum, [key, count]) => (key === actionId || key.split("|").includes(actionId) ? sum + count : sum),
+    0
+  );
+
 /**
  * Client-side availability hint (ADR-0020). The server decides: rows stay tappable and a
  * strict-mode rejection opens the audited override.
@@ -66,14 +73,20 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
     const extra = turn.extraActions?.actorId === actor.id ? turn.extraActions : undefined;
     const hasted = actor.effects.some((effect) => effect.tags.includes("hasted")) && extra?.hasteUsed !== true;
     if ((extra?.surges ?? 0) > 0 || hasted) return null;
-    const instance = turn.actionInstance?.actorId === actor.id ? turn.actionInstance.components : null;
+    const open = turn.actionInstance?.actorId === actor.id ? turn.actionInstance : null;
+    const instance = open?.components ?? null;
     // The Multiattack plan row stays a live "continue" while any component remains.
     if (action.multiattack && instance && Object.values(instance).some((count) => count > 0))
       return "In progress - pick the next attack";
     // A weapon attack or an Unarmed Strike spends one of the Attack action's attacks.
     const attackMember = action.attackBonus !== null || action.replacesAttack === true;
-    const remaining = instance ? (instance[action.id] ?? 0) + (attackMember ? (instance["attack"] ?? 0) : 0) : 0;
+    const remaining = instance ? placesLeft(instance, action.id) + (attackMember ? (instance["attack"] ?? 0) : 0) : 0;
     if (remaining > 0) return `${remaining} attack${remaining === 1 ? "" : "s"} left`;
+    // "It can replace one attack with a use of Roar": the server takes it in an attack's place.
+    if (
+      Object.entries(open?.replacements ?? {}).some(([key, count]) => count > 0 && key.split("|").includes(action.id))
+    )
+      return null;
     return "Action used";
   }
   if (action.activation === "reaction" && state.combat.reactionsUsed.includes(actor.id)) return "Reaction used";

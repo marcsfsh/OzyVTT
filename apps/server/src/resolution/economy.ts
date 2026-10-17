@@ -33,7 +33,13 @@ export type EconomyPlan = Readonly<{
   markReaction: boolean;
   /** The compound-action components remaining after this resolve (null leaves no instance), with the slot a
    *  multi-attack spell opening it was cast with. */
-  instance: Readonly<{ actorId: string; components: Record<string, number>; slotLevel?: number }> | null;
+  instance: Readonly<{
+    actorId: string;
+    components: Record<string, number>;
+    slotLevel?: number;
+    parentId?: string;
+    replacements?: Record<string, number>;
+  }> | null;
   /** The same for a compound bonus action (Flurry of Blows). */
   bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope. */
@@ -420,14 +426,105 @@ export function noUsesRemaining(action: DefinitionAction, limit: number): string
   }).`;
 }
 
-/** The action-slot multiattack parents (sibling actions) that list `action` as a component. A bonus-action plan
- *  (Flurry of Blows) is not one: its strikes come from the bonus instance, never from an Attack action. */
+type PlanComponent = NonNullable<DefinitionAction["multiattack"]>[number];
+
+/** Whether a Multiattack's plans or replacements name this action. */
+function multiattackNames(parent: DefinitionAction, actionId: string): boolean {
+  const inPlan = (plan: readonly PlanComponent[]) =>
+    plan.some((component) => component.actionId === actionId || (component.or?.includes(actionId) ?? false));
+  return (
+    [parent.multiattack ?? [], ...(parent.multiattackAlternatives ?? [])].some(inPlan) ||
+    (parent.multiattackReplacements ?? []).some((replacement) => replacement.actionIds.includes(actionId))
+  );
+}
+
+/** The action-slot multiattack parents (sibling actions) whose plans or replacements name `action`. A bonus-action
+ *  plan (Flurry of Blows) is not one: its strikes come from the bonus instance, never from an Attack action. */
 function multiattackParents(siblings: ReadonlyArray<DefinitionAction>, action: DefinitionAction): DefinitionAction[] {
   return siblings.filter(
     (candidate) =>
       candidate.activation !== "bonus-action" &&
-      (candidate.multiattack?.some((component) => component.actionId === action.id) ?? false)
+      candidate.multiattack !== undefined &&
+      multiattackNames(candidate, action.id)
   );
+}
+
+/** A component's key in an open instance: its action's id, or "a|b" when another action can fill its place. */
+const componentKey = (component: PlanComponent) =>
+  component.or && component.or.length > 0 ? [component.actionId, ...component.or].join("|") : component.actionId;
+
+/** The place in an open instance this action fills: its own, or an "a|b" place naming it. Null when none is left. */
+function placeFor(components: Readonly<Record<string, number>>, actionId: string): string | null {
+  if ((components[actionId] ?? 0) > 0) return actionId;
+  return (
+    Object.keys(components).find(
+      (key) => (components[key] ?? 0) > 0 && key.includes("|") && key.split("|").includes(actionId)
+    ) ?? null
+  );
+}
+
+/** The replacements a Multiattack's instance starts with, keyed by their actions: one each, or one for every attack
+ *  when "any attack" may be replaced. */
+function replacementMap(parent: DefinitionAction): Record<string, number> {
+  const attacks = Object.values(componentMap(parent.multiattack)).reduce((sum, count) => sum + count, 0);
+  return Object.fromEntries(
+    (parent.multiattackReplacements ?? []).map((replacement) => [
+      replacement.actionIds.join("|"),
+      replacement.any ? attacks : 1
+    ])
+  );
+}
+
+type OpenPlan = Readonly<{ components: Record<string, number>; replacements: Record<string, number> }>;
+
+/** What an open instance records of its Multiattack: which one it is, and the replacements it has left (most stat
+ *  blocks have none). */
+const planRecord = (parentId: string, replacements: Readonly<Record<string, number>>) => ({
+  parentId,
+  ...(Object.keys(replacements).length > 0 ? { replacements: { ...replacements } } : {})
+});
+
+/** SRD "It can replace one attack with a use of Roar": takes the attacks the replacement stands for (the one it names,
+ *  else any attack left) and one of its uses. Null when this action isn't one, or nothing is left for it. */
+function replaced(
+  parent: DefinitionAction,
+  open: OpenPlan,
+  action: DefinitionAction,
+  siblings: ReadonlyArray<DefinitionAction>
+): OpenPlan | null {
+  const replacement = parent.multiattackReplacements?.find((entry) => entry.actionIds.includes(action.id));
+  if (!replacement) return null;
+  const key = replacement.actionIds.join("|");
+  if ((open.replacements[key] ?? 0) <= 0) return null;
+  const isAttack = (place: string) =>
+    place.split("|").some((id) => siblings.some((sibling) => sibling.id === id && sibling.attack !== undefined));
+  const components = { ...open.components };
+  for (let taken = 0; taken < replacement.attacks; taken++) {
+    const place = replacement.of
+      ? placeFor(components, replacement.of)
+      : (Object.keys(components).find((candidate) => (components[candidate] ?? 0) > 0 && isAttack(candidate)) ?? null);
+    if (place === null) return null;
+    components[place] -= 1;
+  }
+  return { components, replacements: { ...open.replacements, [key]: open.replacements[key] - 1 } };
+}
+
+/** The Multiattack instance this action opens: its place taken in the plan, or in a plan the Multiattack can be instead,
+ *  or as a replacement. Null when it fills none. */
+function openedBy(
+  parent: DefinitionAction,
+  action: DefinitionAction,
+  siblings: ReadonlyArray<DefinitionAction>
+): OpenPlan | null {
+  const replacements = replacementMap(parent);
+  for (const plan of [parent.multiattack ?? [], ...(parent.multiattackAlternatives ?? [])]) {
+    const components = componentMap(plan);
+    const place = placeFor(components, action.id);
+    if (place === null) continue;
+    components[place] -= 1;
+    return { components, replacements };
+  }
+  return replaced(parent, { components: componentMap(parent.multiattack), replacements }, action, siblings);
 }
 
 /** The attacks left after the first of a count-based attack. Weapon attacks share a generic pool, so Extra Attack can
@@ -462,10 +559,13 @@ export function castLevelOf(
   return continuedSpellSlot({ state, attacker, action }) ?? castSlot(attacker, action.spellSlot.level, requested).level;
 }
 
-function componentMap(parent: DefinitionAction): Record<string, number> {
+/** A plan's components as an open instance counts them. */
+function componentMap(plan: readonly PlanComponent[] | undefined): Record<string, number> {
   const components: Record<string, number> = {};
-  for (const entry of parent.multiattack ?? [])
-    components[entry.actionId] = (components[entry.actionId] ?? 0) + entry.count;
+  for (const entry of plan ?? []) {
+    const key = componentKey(entry);
+    components[key] = (components[key] ?? 0) + entry.count;
+  }
   return components;
 }
 
@@ -507,7 +607,9 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     return {
       ...unchanged,
       markBonus: true,
-      ...(action.multiattack ? { bonusInstance: { actorId: attacker.id, components: componentMap(action) } } : {})
+      ...(action.multiattack
+        ? { bonusInstance: { actorId: attacker.id, components: componentMap(action.multiattack) } }
+        : {})
     };
   }
   if (onOwnTurn && action.activation === "action") return checkActionSlot(evaluation);
@@ -533,13 +635,17 @@ function freshActionSlot(
 ): SlotPlan {
   const parents = multiattackParents(siblings, action);
   let components: Record<string, number> | null = null;
+  let multiattack: ReturnType<typeof planRecord> | null = null;
+  const opened = extraAction !== "haste" && parents.length === 1 ? openedBy(parents[0], action, siblings) : null;
   if (extraAction === "haste") {
     components = action.attack || action.replacesAttack ? {} : null;
   } else if (action.multiattack) {
-    components = componentMap(action); // resolving the parent itself opens the full plan, no rolls consumed
-  } else if (parents.length === 1) {
-    components = componentMap(parents[0]);
-    components[action.id] = (components[action.id] ?? 1) - 1;
+    // Resolving the parent itself opens the full plan, no rolls consumed.
+    components = componentMap(action.multiattack);
+    multiattack = planRecord(action.id, replacementMap(action));
+  } else if (opened) {
+    components = opened.components;
+    multiattack = planRecord(parents[0].id, opened.replacements);
   } else if (parents.length > 1) {
     if (action.attack && (action.attack.count ?? 1) > 1) components = attackPool(action);
     notes.push(`${action.name} belongs to more than one Multiattack - tracking it standalone.`);
@@ -554,7 +660,7 @@ function freshActionSlot(
     markAction: true,
     markBonus: false,
     markReaction: false,
-    instance: components ? { actorId: attacker.id, components } : null,
+    instance: components ? { actorId: attacker.id, components, ...(multiattack ?? {}) } : null,
     bonusInstance: state.combat.turn.bonusActionInstance,
     extraAction
   };
@@ -629,41 +735,66 @@ function checkActionSlot(evaluation: Evaluation): SlotPlan {
     return { ...plan, instance };
   };
   if (!active) return refuse(`${attacker.name} has already used an action this turn.`, current);
-  const components = { ...active.components };
-  const continued = {
+  const parent = active.parentId ? siblings.find((candidate) => candidate.id === active.parentId) : undefined;
+  const continued = (open: OpenPlan): SlotPlan => ({
     ...plan,
     instance: {
       actorId: attacker.id,
-      components,
-      ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {})
+      components: open.components,
+      ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {}),
+      ...(active.parentId !== undefined ? planRecord(active.parentId, open.replacements) : {})
     }
-  };
-  const componentName = (id: string) =>
-    id === "attack" ? "attack" : (siblings.find((candidate) => candidate.id === id)?.name ?? id);
+  });
+  const components = { ...active.components };
+  const replacements = { ...(active.replacements ?? {}) };
+  const componentName = (key: string) =>
+    key === "attack"
+      ? "attack"
+      : key
+          .split("|")
+          .map((id) => siblings.find((candidate) => candidate.id === id)?.name ?? id)
+          .join(" or ");
   const leftovers = () =>
     Object.entries(components)
       .filter(([, count]) => count > 0)
-      .map(([id, count]) => `${count}× ${componentName(id)}`);
+      .map(([key, count]) => `${count}× ${componentName(key)}`);
   if (action.multiattack) {
     // Tapping the Multiattack plan mid-instance is a continue, not a violation.
     if (leftovers().length === 0) return refuse(`${attacker.name} has no attacks remaining in this action.`, current);
-  } else if ((components[action.id] ?? 0) > 0) {
-    components[action.id] -= 1;
-  } else if (
-    ((action.attack && action.spellId === undefined) || action.replacesAttack) &&
-    (components["attack"] ?? 0) > 0
-  ) {
-    components["attack"] -= 1;
-  } else {
-    const named = leftovers();
-    return refuse(
-      named.length > 0
-        ? `${attacker.name} has no ${action.name} left in this action - remaining: ${named.join(", ")}.`
-        : `${attacker.name} has no attacks remaining in this action.`,
-      current
-    );
+    return continued({ components, replacements });
   }
-  return continued;
+  const place = placeFor(components, action.id);
+  if (place !== null) {
+    components[place] -= 1;
+    return continued({ components, replacements });
+  }
+  if (((action.attack && action.spellId === undefined) || action.replacesAttack) && (components["attack"] ?? 0) > 0) {
+    components["attack"] -= 1;
+    return continued({ components, replacements });
+  }
+  if (parent) {
+    // A replacement takes attacks' places; an action from a plan the Multiattack can be instead switches to it, so long
+    // as nothing of this plan was taken yet.
+    const swapped = replaced(parent, { components, replacements }, action, siblings);
+    if (swapped) return continued(swapped);
+    const untouched = Object.entries(componentMap(parent.multiattack)).every(
+      ([key, count]) => (components[key] ?? 0) === count
+    );
+    for (const alternative of untouched ? (parent.multiattackAlternatives ?? []) : []) {
+      const switched = componentMap(alternative);
+      const at = placeFor(switched, action.id);
+      if (at === null) continue;
+      switched[at] -= 1;
+      return continued({ components: switched, replacements });
+    }
+  }
+  const named = leftovers();
+  return refuse(
+    named.length > 0
+      ? `${attacker.name} has no ${action.name} left in this action - remaining: ${named.join(", ")}.`
+      : `${attacker.name} has no attacks remaining in this action.`,
+    current
+  );
 }
 
 /** How many attacks the Attack action makes: the most any one attack action makes, which is where Extra Attack is
@@ -1043,7 +1174,10 @@ export function commitEconomy({
     ? {
         actorId: plan.instance.actorId,
         components: { ...plan.instance.components },
-        ...(plan.instance.slotLevel !== undefined ? { slotLevel: plan.instance.slotLevel } : {})
+        ...(plan.instance.slotLevel !== undefined ? { slotLevel: plan.instance.slotLevel } : {}),
+        ...(plan.instance.parentId !== undefined
+          ? planRecord(plan.instance.parentId, plan.instance.replacements ?? {})
+          : {})
       }
     : null;
   if (plan.markAction || plan.markBonus) {

@@ -1198,6 +1198,19 @@ export const SaveFailureEffectSchema = z
   })
   .strict();
 
+/** One place in a Multiattack's plan: an action taken `count` times, or any of `or` in its place. */
+export const MultiattackComponentSchema = z
+  .object({
+    actionId: z.string().regex(/^[a-z0-9-]+$/),
+    count: z.number().int().min(1).max(6),
+    or: z
+      .array(z.string().regex(/^[a-z0-9-]+$/))
+      .min(1)
+      .max(3)
+      .optional()
+  })
+  .strict();
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -1252,11 +1265,34 @@ export const ActionSchema = z.object({
   /** The damage types the caster picks from on each use (Chromatic Orb); the resolve names one, and every damage
    *  part takes it. Absent: the damage's own types. */
   damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
-  /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
-  multiattack: z
-    .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())
+  /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). A
+   *  component's `or` names other actions that can fill its place ("using Scimitar or Shortbow in any combination"). */
+  multiattack: z.array(MultiattackComponentSchema).min(1).max(6).optional(),
+  /** Plans a Multiattack can be instead of `multiattack` ("or it makes two Hurl Flame attacks"), chosen by the first
+   *  attack taken. */
+  multiattackAlternatives: z.array(z.array(MultiattackComponentSchema).min(1).max(6)).min(1).max(2).optional(),
+  /** What can take the place of a Multiattack's attacks ("It can replace one attack with a use of Roar"): one of
+   *  `actionIds` replaces `attacks` of them, once, or for any attack (`any`), or only the one `of` names ("the Claw
+   *  attack"). */
+  multiattackReplacements: z
+    .array(
+      z
+        .object({
+          actionIds: z
+            .array(z.string().regex(/^[a-z0-9-]+$/))
+            .min(1)
+            .max(3),
+          attacks: z.number().int().min(1).max(3),
+          any: z.literal(true).optional(),
+          of: z
+            .string()
+            .regex(/^[a-z0-9-]+$/)
+            .optional()
+        })
+        .strict()
+    )
     .min(1)
-    .max(4)
+    .max(3)
     .optional(),
   /** On-hit conditions applied to the target as one source-linked effect (Bite: Grappled + Restrained, escape DC 15). */
   onHit: z

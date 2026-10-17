@@ -486,7 +486,8 @@ export type ContentActionSummary = Readonly<{
     number | null;
   usesPool: string | null;
   requiresEffectTag: string | null;
-  multiattack: ReadonlyArray<{ actionId: string; count: number }> | null;
+  /** A Multiattack's plan; `or` names the actions that can fill a place instead ("using Scimitar or Shortbow"). */
+  multiattack: ReadonlyArray<{ actionId: string; count: number; or?: readonly string[] }> | null;
   grants: boolean;
   reaction: Wire<ActionReaction> | null;
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
