@@ -274,10 +274,17 @@ export function PlayerActionRunner({
         <ActionTargetPicker
           picking={picking}
           targets={targets
-            // A heal may be for the healer too (a potion drunk, not handed over).
+            // A heal may be for the healer too (a potion drunk, not handed over), and so may a touch that cures or
+            // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
             .filter(
               (target) =>
-                target.actorId !== actorId || picking.action.healing != null || healingOf(picking.action) !== undefined
+                target.actorId !== actorId ||
+                picking.action.healing != null ||
+                healingOf(picking.action) !== undefined ||
+                (picking.action.builtin !== true &&
+                  picking.action.attackBonus === null &&
+                  picking.action.saveAbility === null &&
+                  picking.action.damage.length === 0)
             )
             .map((target) => ({ id: target.actorId, label: target.name }))}
           busy={busy}
