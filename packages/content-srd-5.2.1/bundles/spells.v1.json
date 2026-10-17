@@ -4348,7 +4348,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 10,
    "widthFeet": null
   },
@@ -9260,7 +9260,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 10,
    "widthFeet": null
   },
@@ -11305,7 +11305,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 60,
+   "widthFeet": 10
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -13001,7 +13005,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 20,
    "widthFeet": null
   },
@@ -14616,7 +14620,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 10,
    "widthFeet": null
   },
@@ -16203,7 +16207,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 5,
    "widthFeet": null
   },
@@ -18671,7 +18675,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cylinder",
+   "sizeFeet": 50,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -20211,7 +20219,7 @@
   },
   "shape": null,
   "area": {
-   "shape": "sphere",
+   "shape": "cylinder",
    "sizeFeet": 20,
    "widthFeet": null
   },

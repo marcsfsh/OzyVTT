@@ -7,6 +7,7 @@ import {
   useTargetingBusy,
   type TargetingSession
 } from "../encounter/targeting";
+import { areaWords } from "../encounter/action-summary";
 import "./target-bar.css";
 
 /**
@@ -33,7 +34,7 @@ export function TargetBar({
       ? placingZone
         ? " - placed; Place to set it there"
         : " - placed; Roll to catch everyone under it"
-      : ` - drag the ${activeTargeting.action.area?.sizeFeet}-ft ${activeTargeting.action.area?.shape} on the map`
+      : ` - place the ${activeTargeting.action.area ? areaWords(activeTargeting.action.area) : "area"} on the map`
     : activeTargeting.mode === "none"
       ? " - choose the skill in the turn order, then Roll"
       : names.length

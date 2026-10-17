@@ -133,3 +133,29 @@ describe("the condition Lesser Restoration ends", () => {
     expect(await lastResolve()).toMatchObject({ targetIds: [GOBLIN], conditionId: "poisoned" });
   });
 });
+
+describe("an area the GM places", () => {
+  it("names a Cylinder by its radius, and maps it to a circle on the map", () => {
+    const moonbeam = {
+      ...MISSILE,
+      id: "spell-moonbeam",
+      name: "Moonbeam",
+      darts: undefined,
+      damage: [{ formula: "2d10", type: "radiant" }],
+      saveAbility: "con",
+      area: { shape: "cylinder", sizeFeet: 5, widthFeet: null }
+    };
+    beginTargeting(moonbeam as unknown as ContentActionSummary, CASTER, 2);
+    render(<Picker />);
+    expect(screen.getByRole("group", { name: "Targets for Moonbeam" }).textContent).toContain(
+      "place the 5-ft-radius cylinder on the map"
+    );
+    let shape: string | undefined;
+    function Shape() {
+      shape = useTargeting()?.template?.shape;
+      return null;
+    }
+    render(<Shape />);
+    expect(shape).toBe("circle");
+  });
+});

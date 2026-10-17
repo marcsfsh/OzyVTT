@@ -1283,7 +1283,7 @@ export const SaveOutcomeFields = {
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
 export const ActionAreaSchema = z
   .object({
-    shape: z.enum(["cone", "line", "sphere", "cube", "emanation"]),
+    shape: z.enum(["cone", "line", "sphere", "cube", "emanation", "cylinder"]),
     sizeFeet: z.number().int().min(1).max(1000),
     widthFeet: z.number().int().min(1).max(100).nullable()
   })

@@ -7,13 +7,16 @@ import type { ActionArea, ActionReaction, ActorAction, DamageDrain, ForcedPush }
 /**
  * The area of effect a description names. SRD 2024 phrasing is consistent enough to pattern-match ("60-foot
  * Cone", "60-foot-long, 5-foot-wide Line", "20-foot-radius Sphere", "15-foot Emanation", "10-foot Cube").
- * Null when it names none, and the GM targets tokens directly. A line that omits its width is 5 feet wide. On a flat
- * map a Cylinder is the circle of its radius ("5-foot-radius, 40-foot-high Cylinder"), and an "N-foot square" on the
- * ground is a Cube of that side.
+ * Null when it names none, and the GM targets tokens directly. A line that omits its width is 5 feet wide, and one
+ * printed after its name gives its length and width in words ("a Line of strong wind 60 feet long and 10 feet wide").
+ * A Cylinder keeps its radius ("5-foot-radius, 40-foot-high Cylinder"), drawn on a flat map as that circle, and an
+ * "N-foot square" on the ground is a Cube of that side.
  */
 export function areaOfProse(description: string): ActionArea | null {
   const line = /(\d+)-foot(?:-long)?(?:,?\s*(\d+)-foot-wide)?\s+Line/i.exec(description);
   if (line) return { shape: "line", sizeFeet: Number(line[1]), widthFeet: line[2] ? Number(line[2]) : 5 };
+  const namedLine = /\bLine\b[^.]*?\b(\d+) feet long and (\d+) feet wide/i.exec(description);
+  if (namedLine) return { shape: "line", sizeFeet: Number(namedLine[1]), widthFeet: Number(namedLine[2]) };
   const cone = /(\d+)-foot\s+Cone/i.exec(description);
   if (cone) return { shape: "cone", sizeFeet: Number(cone[1]), widthFeet: null };
   const radial = /(\d+)-foot(?:-radius)?\s+(Sphere|Emanation)/i.exec(description);
@@ -24,9 +27,9 @@ export function areaOfProse(description: string): ActionArea | null {
       widthFeet: null
     };
   const cylinder =
-    /(\d+)-foot-radius,?\s+(?:\d+-foot-(?:high|tall)\s+)?Cylinder/i.exec(description) ??
-    /\d+-foot-(?:high|tall),\s+(\d+)-foot-radius\s+Cylinder/i.exec(description);
-  if (cylinder) return { shape: "sphere", sizeFeet: Number(cylinder[1]), widthFeet: null };
+    /(\d+)-foot-radius,?\s+(?:\d+[- ]foot[- ](?:high|tall)\s+)?Cylinder/i.exec(description) ??
+    /\d+[- ]foot[- ](?:high|tall),\s+(\d+)-foot-radius\s+Cylinder/i.exec(description);
+  if (cylinder) return { shape: "cylinder", sizeFeet: Number(cylinder[1]), widthFeet: null };
   const cube = /(\d+)-foot\s+Cube/i.exec(description) ?? /(\d+)-foot[- ]square\b/i.exec(description);
   if (cube) return { shape: "cube", sizeFeet: Number(cube[1]), widthFeet: null };
   return null;

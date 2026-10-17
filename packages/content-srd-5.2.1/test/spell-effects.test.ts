@@ -153,7 +153,7 @@ describe("what one cast of an SRD spell does", () => {
     expect(areaOf("wall-of-fire")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });
     expect(areaOf("blade-barrier")).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
     expect(areaOf("flaming-sphere")).toEqual({ shape: "sphere", sizeFeet: 5, widthFeet: null });
-    expect(areaOf("moonbeam")).toEqual({ shape: "sphere", sizeFeet: 5, widthFeet: null });
+    expect(areaOf("moonbeam")).toEqual({ shape: "cylinder", sizeFeet: 5, widthFeet: null });
   });
 
   it("says how many creatures a cast targets, and how many more a higher slot adds", () => {

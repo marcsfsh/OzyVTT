@@ -14713,7 +14713,7 @@
     "damage": [],
     "reminder": "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage.",
     "area": {
-     "shape": "sphere",
+     "shape": "cylinder",
      "sizeFeet": 20,
      "widthFeet": null
     }
@@ -41335,7 +41335,7 @@
      "recharge": 5
     },
     "area": {
-     "shape": "sphere",
+     "shape": "cylinder",
      "sizeFeet": 10,
      "widthFeet": null
     }

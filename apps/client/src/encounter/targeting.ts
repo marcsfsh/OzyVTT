@@ -91,9 +91,13 @@ export function beginTargeting(
     ...(action.useCost === "chosen" ? { spend: 1 } : {})
   };
   if (area) {
-    // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
+    // Map the SRD area shape onto a drawable annotation shape (sphere/cylinder/emanation → circle, cube → square).
     const shape: AnnotationShapeKind =
-      area.shape === "sphere" || area.shape === "emanation" ? "circle" : area.shape === "cube" ? "square" : area.shape;
+      area.shape === "sphere" || area.shape === "cylinder" || area.shape === "emanation"
+        ? "circle"
+        : area.shape === "cube"
+          ? "square"
+          : area.shape;
     session = {
       action,
       attackerId,

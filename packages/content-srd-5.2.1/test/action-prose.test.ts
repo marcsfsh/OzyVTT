@@ -40,16 +40,27 @@ describe("reading an action's prose facts", () => {
     expect(areaOfProse("a 20-foot-radius Sphere")).toEqual({ shape: "sphere", sizeFeet: 20, widthFeet: null });
     expect(areaOfProse("a 15-foot Emanation")).toEqual({ shape: "emanation", sizeFeet: 15, widthFeet: null });
     expect(areaOfProse("a 10-foot Cube")).toEqual({ shape: "cube", sizeFeet: 10, widthFeet: null });
-    // On the map, a Cylinder is the circle of its radius and a square on the ground is a Cube.
+    // A Cylinder keeps its radius, however its height is printed, and a square on the ground is a Cube.
     expect(areaOfProse("in a 5-foot-radius, 40-foot-high Cylinder")).toEqual({
-      shape: "sphere",
+      shape: "cylinder",
       sizeFeet: 5,
       widthFeet: null
     });
     expect(areaOfProse("in a 40-foot-tall, 20-foot-radius Cylinder")).toEqual({
-      shape: "sphere",
+      shape: "cylinder",
       sizeFeet: 20,
       widthFeet: null
+    });
+    expect(areaOfProse("in a 50-foot-radius, 100 foot high Cylinder")).toEqual({
+      shape: "cylinder",
+      sizeFeet: 50,
+      widthFeet: null
+    });
+    // A Line printed before its size, in words.
+    expect(areaOfProse("A Line of strong wind 60 feet long and 10 feet wide blasts from you")).toEqual({
+      shape: "line",
+      sizeFeet: 60,
+      widthFeet: 10
     });
     expect(areaOfProse("fill a 20-foot square on ground")).toEqual({ shape: "cube", sizeFeet: 20, widthFeet: null });
     expect(areaOfProse("Melee Attack Roll: +9, reach 10 ft.")).toBeNull();
@@ -234,7 +245,8 @@ describe("the bundles carry what their prose says, so play never reads it", () =
     const lightningBolt = loadSpells().find((spell) => spell.id === "lightning-bolt")!;
     expect(lightningBolt.area).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
     const areaOf = (id: string) => loadSpells().find((spell) => spell.id === id)!.area;
-    expect(areaOf("flame-strike")).toEqual({ shape: "sphere", sizeFeet: 10, widthFeet: null });
+    expect(areaOf("flame-strike")).toEqual({ shape: "cylinder", sizeFeet: 10, widthFeet: null });
+    expect(areaOf("gust-of-wind")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 10 });
     expect(areaOf("entangle")).toEqual({ shape: "cube", sizeFeet: 20, widthFeet: null });
     expect(
       loadSpells()

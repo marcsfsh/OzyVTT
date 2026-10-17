@@ -467,7 +467,7 @@ export type ContentNamesResult = {
 };
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{
-  shape: "cone" | "line" | "sphere" | "cube" | "emanation";
+  shape: "cone" | "line" | "sphere" | "cube" | "emanation" | "cylinder";
   sizeFeet: number;
   widthFeet: number | null;
 }>;

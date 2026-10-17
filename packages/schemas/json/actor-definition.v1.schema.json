@@ -975,7 +975,8 @@
                 "line",
                 "sphere",
                 "cube",
-                "emanation"
+                "emanation",
+                "cylinder"
               ]
             },
             "sizeFeet": {

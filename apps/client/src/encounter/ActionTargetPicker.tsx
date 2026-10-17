@@ -4,6 +4,7 @@ import { Button, Select, Stepper } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
 import { ABILITY_WORDS } from "../dice/roll-call-words";
 import { useRollPreference } from "../dice/roll-preference";
+import { areaWords } from "./action-summary";
 import { FaceEntry } from "./RollControls";
 import {
   clearTargeting,
@@ -56,8 +57,8 @@ export function ActionTargetPicker({
         </p>
       ) : picking.mode === "template" ? (
         <p className="action-targeting-head">
-          <strong>{picking.action.name}</strong> - drag the {picking.action.area?.sizeFeet}-ft{" "}
-          {picking.action.area?.shape} on the map
+          <strong>{picking.action.name}</strong> - place the{" "}
+          {picking.action.area ? areaWords(picking.action.area) : "area"} on the map
           {picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught
           automatically.
         </p>
