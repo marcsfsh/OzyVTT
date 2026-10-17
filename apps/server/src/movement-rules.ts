@@ -123,7 +123,7 @@ export function movementStatus(
           const budget = travelBudgetFeet(actor, derivation, definition, mode);
           return budget === null
             ? []
-            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode) }];
+            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode, derivation) }];
         })
       : [];
   return {
@@ -295,7 +295,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     police(state, input, "movement.no-speed", `${mover.name} has no ${MODE_NAMES[travel]} Speed.`, outcome);
     budget = travelBudgetFeet(mover, derivation, moverDefinition, "walk");
   }
-  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel);
+  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel, derivation);
   const extraPerStep = (slowed ? 1 : 0) + (input.dragging?.costsExtra ? 1 : 0);
   const options: MovementCostOptions = {
     extraPerStep,

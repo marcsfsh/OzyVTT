@@ -9386,7 +9386,29 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "fly",
+      "feet": 60,
+      "hover": true
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Fly",
+    "tags": [
+     "fly-spell"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -9742,7 +9764,27 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "swim",
+      "equalToSpeed": true
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Freedom of Movement",
+    "tags": [
+     "freedom-of-movement"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -14001,7 +14043,26 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": 10
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Longstrider",
+    "tags": [
+     "longstrider"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -20118,7 +20179,27 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "climb",
+      "equalToSpeed": true
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Spider Climb",
+    "tags": [
+     "spider-climb"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "sorcerer",

@@ -66,8 +66,14 @@ export type SpecialSpeeds = Readonly<Partial<Record<SpecialMode, number>> & { ho
 const SPECIAL_MODES: readonly SpecialMode[] = ["fly", "swim", "climb", "burrow"];
 
 /** The special speeds a creature has before anything changes them: what its stat block prints (Fly, Swim, Climb,
- *  Burrow, and whether it hovers), and a Ranger's Roving Climb and Swim Speeds equal to its Speed. */
-export function specialSpeedsOf(actor: Actor, definition: ActorDefinition | undefined): SpecialSpeeds {
+ *  Burrow, and whether it hovers), a Ranger's Roving Climb and Swim Speeds equal to its Speed, and what its items
+ *  and effects grant (`special-speed`: Fly's 60 feet, Spider Climb's Climb Speed equal to its Speed, a Ring of
+ *  Swimming). The best of each counts. */
+export function specialSpeedsOf(
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  derivation?: EquipmentDerivation
+): SpecialSpeeds {
   const speeds: Partial<Record<SpecialMode, number>> & { hover: boolean } = { hover: false };
   const extension = (definition?.extensions ?? {})[STATBLOCK_EXTENSION];
   const printed = (extension && typeof extension === "object" ? (extension as { speeds?: unknown }).speeds : null) as
@@ -84,13 +90,28 @@ export function specialSpeedsOf(actor: Actor, definition: ActorDefinition | unde
     speeds.climb = Math.max(speeds.climb ?? 0, actor.speedFeet);
     speeds.swim = Math.max(speeds.swim ?? 0, actor.speedFeet);
   }
+  for (const rider of derivation
+    ? collectRiders(derivation.carriers, { ...derivation.context, moment: null })
+    : []) {
+    const modifier = rider.modifier;
+    if (modifier.type !== "special-speed" || modifier.movement === undefined) continue;
+    // "Equal to your Speed" is the Speed before changes; the budget then moves it with Speed, as it does any speed.
+    const feet = modifier.equalToSpeed ? (actor.speedFeet ?? 0) : (modifier.feet ?? 0);
+    if (feet > 0) speeds[modifier.movement] = Math.max(speeds[modifier.movement] ?? 0, feet);
+    if (modifier.hover && modifier.movement === "fly") speeds.hover = true;
+  }
   return speeds;
 }
 
 /** Whether moving this way costs an extra foot for every foot: climbing or swimming without the matching speed
  *  (SRD "Climbing", "Swimming"). */
-export function travelCostsExtra(actor: Actor, definition: ActorDefinition | undefined, mode: TravelMode): boolean {
-  return (mode === "climb" || mode === "swim") && specialSpeedsOf(actor, definition)[mode] === undefined;
+export function travelCostsExtra(
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  mode: TravelMode,
+  derivation?: EquipmentDerivation
+): boolean {
+  return (mode === "climb" || mode === "swim") && specialSpeedsOf(actor, definition, derivation)[mode] === undefined;
 }
 
 /**
@@ -107,7 +128,7 @@ export function travelBudgetFeet(
 ): number | null {
   const walking = effectiveSpeedFeet(actor, derivation);
   if (mode === "walk") return walking;
-  const special = specialSpeedsOf(actor, definition)[mode];
+  const special = specialSpeedsOf(actor, definition, derivation)[mode];
   if (special === undefined) return mode === "climb" || mode === "swim" ? walking : null;
   if (walking === null) return null;
   if (speedZeroed(actor)) return 0;

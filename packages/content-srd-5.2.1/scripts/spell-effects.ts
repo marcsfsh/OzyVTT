@@ -649,6 +649,38 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "target",
     duration: { type: "manual" }
   }),
+  // "Gains a Fly Speed of 60 feet and can hover."
+  fly: spellGrant({
+    name: "Fly",
+    tags: ["fly-spell"],
+    target: "targets",
+    duration: rounds(100),
+    modifiers: [{ type: "special-speed", movement: "fly", feet: 60, hover: true }]
+  }),
+  // "The target also gains a Climb Speed equal to its Speed." Walls and ceilings are the GM's.
+  "spider-climb": spellGrant({
+    name: "Spider Climb",
+    tags: ["spider-climb"],
+    target: "targets",
+    duration: { type: "manual" },
+    modifiers: [{ type: "special-speed", movement: "climb", equalToSpeed: true }]
+  }),
+  // "The target's Speed increases by 10 feet until the spell ends."
+  longstrider: spellGrant({
+    name: "Longstrider",
+    tags: ["longstrider"],
+    target: "targets",
+    duration: { type: "manual" },
+    modifiers: [{ type: "speed", amount: 10 }]
+  }),
+  // "The target also has a Swim Speed equal to its Speed." Its other protections stay with the GM.
+  "freedom-of-movement": spellGrant({
+    name: "Freedom of Movement",
+    tags: ["freedom-of-movement"],
+    target: "targets",
+    duration: { type: "manual" },
+    modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
+  }),
   haste: spellGrant({
     name: "Haste",
     tags: ["hasted"],

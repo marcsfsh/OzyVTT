@@ -364,6 +364,19 @@ export const ModifierSchema = z.discriminatedUnion("type", [
   /** Baked into the sheet's speed at build time on a feature unless gated (then read with the live loadout);
    *  summed live on an effect, so it ends with it. */
   z.object({ type: z.literal("speed"), amount: z.number().int().min(-30).max(60), ...riderGate }).strict(),
+  /** A Fly, Swim, Climb or Burrow Speed: `feet` (Fly's 60, a Ring of Swimming's 40), or with `equalToSpeed` the
+   *  creature's Speed as it stands (Spider Climb); `hover` lets a flier hover. Read live by the movement rules from
+   *  items and effects, so it ends with them. */
+  z
+    .object({
+      type: z.literal("special-speed"),
+      movement: z.enum(["fly", "swim", "climb", "burrow"]),
+      feet: z.number().int().min(5).max(300).optional(),
+      equalToSpeed: z.boolean().optional(),
+      hover: z.boolean().optional(),
+      ...riderGate
+    })
+    .strict(),
   /**
    * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and
    * stays because shipped bundles use it.

@@ -5315,9 +5315,39 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Flying",
+    "activation": "bonus-action",
+    "description": "Drink it: you gain a Fly Speed equal to your Speed for 1 hour and can hover. If you're in the air when it wears off, you fall unless you have some other means of staying aloft. End it on your sheet once the hour is up.",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Flying (1 hour)",
+     "tags": [
+      "potion-of-flying"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "fly",
+       "equalToSpeed": true,
+       "hover": true
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -6362,7 +6392,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "swim",
+    "feet": 40
+   }
+  ]
  },
  {
   "id": "ring-of-telekinesis",
@@ -7359,7 +7395,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "climb",
+    "equalToSpeed": true
+   }
+  ]
  },
  {
   "id": "sovereign-glue",
@@ -9591,8 +9633,28 @@
     "id": "fly",
     "name": "Winged Flight",
     "activation": "action",
-    "description": "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
+    "description": "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land. End it on your sheet once the hour is up.",
     "damage": [],
+    "grants": {
+     "name": "Winged Flight (1 hour)",
+     "tags": [
+      "winged-flight"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "fly",
+       "feet": 30
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
     "uses": {
      "limit": 4,
      "per": "long-rest",
