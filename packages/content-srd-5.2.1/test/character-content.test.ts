@@ -1848,7 +1848,9 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(
       FeatureRecordSchema.parse({ id: "f", name: "F", description: "d", modifiers: everyRider }).modifiers
     ).toHaveLength(8);
-    expect(ModifierSchema.options).toHaveLength(26);
+    // A granted Fly, Swim, Climb or Burrow Speed rides the same vocabulary.
+    expect(feat([{ type: "special-speed", movement: "climb", equalToSpeed: true }]).feature.modifiers).toHaveLength(1);
+    expect(ModifierSchema.options).toHaveLength(27);
   });
 
   it("15. an item that grants a feat", () => {

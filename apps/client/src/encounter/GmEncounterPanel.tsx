@@ -12,6 +12,7 @@ import { ConfirmRow } from "./ConfirmRow";
 import { FightMenu } from "./FightMenu";
 import { ActingConsole } from "./ActingConsole";
 import { GmInitiativeRow } from "./GmInitiativeRow";
+import { SpellAreas } from "./SpellAreas";
 import { useTargeting, useTargetingResult } from "./targeting";
 import { holdsTheTurn } from "../table/NeedsYou";
 import { isDefeatedMonster } from "../table/needs";
@@ -450,6 +451,8 @@ export function GmEncounterPanel({
               {confirm.message}
             </ConfirmRow>
           )}
+          {/* The spell areas the server runs on the map; one a player cast waits here to be placed. */}
+          <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
           {/* The GM's tracker scroll region; the topbar, start/stop controls and gathering notice stay
           pinned above it. */}
           <div className="encounter-region scroll-y">

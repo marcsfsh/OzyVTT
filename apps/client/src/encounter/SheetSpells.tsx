@@ -5,12 +5,14 @@ import {
   type ContentSpellSummary,
   type GmActor,
   type PlayerActor,
-  type Rechoice
+  type Rechoice,
+  type SpellChoices
 } from "@vtt/domain";
-import { Select } from "@vtt/ui";
+import { Button, Select } from "@vtt/ui";
 import { cantripTierAt } from "@vtt/content-srd-5.2.1/schemas";
 import { spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { SpellCard, useSpellReference } from "./spells";
+import { SpellbookModal, SpellSwapModal, type CopyableScroll } from "./SpellChoiceModals";
 import { ordinal, signed, titleCase } from "./format";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
@@ -244,7 +246,10 @@ export function SheetSpells({
   spellSaveDcBonus = 0,
   policeSlots = true,
   canPrepare = true,
-  rechoices = []
+  rechoices = [],
+  spellChoices = null,
+  gm = false,
+  readiedActionId = null
 }: Readonly<{
   actor: GmActor | PlayerActor;
   definition: ActorDefinition;
@@ -266,6 +271,12 @@ export function SheetSpells({
   /** Picks the character may re-make on a rest; one made after a Long Rest (a Land Druid's land) is chosen here, when
    *  the prepared spells are. */
   rechoices?: readonly Rechoice[];
+  /** What a prepared caster may swap in after a Long Rest, and a Wizard's spellbook (null: the sheet can't change). */
+  spellChoices?: SpellChoices | null;
+  /** The GM's sheet: copies from another spellbook, which the GM knows the contents of. */
+  gm?: boolean;
+  /** The cast a Ready holds, already paid for: released by casting it, whatever slots are left. */
+  readiedActionId?: string | null;
 }>) {
   const { rollFlat } = rolls;
   const spellcasting = definition.spellcasting;
@@ -278,6 +289,7 @@ export function SheetSpells({
   // SRD spell reference (session-cached): base and upcast damage for the "Cast at" control.
   const spellRef = useSpellReference();
   const [openSpell, setOpenSpell] = useState<ContentSpellSummary | null>(null);
+  const [choosing, setChoosing] = useState<null | "swap" | "add" | "copy">(null);
   if (!spellcasting) return null;
   const preparedIds = new Set<string>(actor.preparedSpellIds ?? []);
   const liveSlotRemaining = new Map<number, number>(
@@ -380,6 +392,39 @@ export function SheetSpells({
       );
     else onFeedback(`Cast ${spell.name}.`);
   };
+  // A swap needs a spell to take and one the class chose to give up.
+  const swappable = (spellChoices?.swaps ?? []).some((swap) => swap.spellIds.length > 0 && swap.replaces.length > 0);
+  const book = spellChoices?.spellbook ?? null;
+  const onSheet = new Set(spellcasting.spells.map((spell) => spell.id));
+  const bookOnly = (book?.spellIds ?? []).filter((id) => !onSheet.has(id));
+  // A Spell Scroll in the pack whose Wizard spell could go in the book.
+  const copyableScrolls: CopyableScroll[] = (actor.inventory ?? []).flatMap((row) =>
+    row.spellId && row.quantity > 0 && book?.addable.includes(row.spellId)
+      ? [{ itemId: row.id, spellId: row.spellId }]
+      : []
+  );
+  const nameOf = (id: string) => spellIndex.get(id)?.name ?? id;
+  const swapIn = (spellId: string, replaces: string) =>
+    void edit("character:swap-spell", { actorId: actor.id, spellId, replaces }).then((result) => {
+      if (!result.ok) return;
+      setChoosing(null);
+      onFeedback(`${nameOf(spellId)} is prepared in place of ${nameOf(replaces)}.`);
+    });
+  const addToBook = (spellId: string, from: "level" | "scroll" | "book", itemId?: string) =>
+    void edit("character:add-to-spellbook", {
+      actorId: actor.id,
+      spellId,
+      from,
+      ...(itemId !== undefined ? { itemId } : {})
+    }).then((result) => {
+      if (!result.ok) return;
+      setChoosing(null);
+      onFeedback(
+        result.inBook === false
+          ? `The copy of ${nameOf(spellId)} failed, and the scroll is gone.`
+          : `${nameOf(spellId)} is in your spellbook.`
+      );
+    });
   return (
     <>
       <section className="sheet-section">
@@ -448,6 +493,13 @@ export function SheetSpells({
                 </Select>
               </label>
             ))}
+        {canPrepare && swappable && (
+          <div className="sheet-spell-choices">
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => setChoosing("swap")}>
+              Swap in a spell
+            </Button>
+          </div>
+        )}
         {pact && pact.max > 0 && (
           <div className="sheet-spell-group-head">
             <h4>Pact Magic · {ordinal(pact.level)} level</h4>
@@ -550,7 +602,7 @@ export function SheetSpells({
                               slotMaxByLevel={slotMaxByLevel}
                               liveRemaining={liveSlotRemaining}
                               pact={pact}
-                              policeSlots={policeSlots}
+                              policeSlots={policeSlots && spell.actionId !== readiedActionId}
                               prepared={isPrepared || !keepsPreparedList}
                               free={freeCastOf(spell)}
                               ritual={spell.ritualActionId !== undefined}
@@ -569,8 +621,50 @@ export function SheetSpells({
               );
             });
         })()}
+        {book && (
+          <div className="sheet-spellbook" role="group" aria-label="Spellbook">
+            <h4>Spellbook</h4>
+            <p>
+              {bookOnly.length > 0
+                ? `Also in your book: ${bookOnly.map(nameOf).join(", ")}.`
+                : "Every spell in your book is on this sheet."}
+            </p>
+            <div className="sheet-spellbook-actions">
+              {book.freeLeft > 0 && (
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => setChoosing("add")}>
+                  Add from your levels ({book.freeLeft})
+                </Button>
+              )}
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => setChoosing("copy")}>
+                Copy a spell
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
       {openSpell && <SpellCard spell={openSpell} onClose={() => setOpenSpell(null)} />}
+      {choosing === "swap" && spellChoices && (
+        <SpellSwapModal
+          swaps={spellChoices.swaps}
+          spellIndex={spellIndex}
+          preparedIds={preparedIds}
+          busy={busy}
+          onSwap={swapIn}
+          onClose={() => setChoosing(null)}
+        />
+      )}
+      {(choosing === "add" || choosing === "copy") && book && (
+        <SpellbookModal
+          mode={choosing}
+          spellbook={book}
+          scrolls={copyableScrolls}
+          gm={gm}
+          spellIndex={spellIndex}
+          busy={busy}
+          onAdd={addToBook}
+          onClose={() => setChoosing(null)}
+        />
+      )}
     </>
   );
 }

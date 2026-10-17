@@ -362,7 +362,7 @@ describe("public game API over /api/v1", () => {
     });
     expect(hiddenTarget.status).toBe(409);
     const hiddenBody = JSON.stringify(await hiddenTarget.json());
-    expect(hiddenBody).toContain("target combatants you can see");
+    expect(hiddenBody).toContain("Every target must be in this encounter.");
     expect(hiddenBody).not.toContain("Unrevealed Tyrant");
 
     // A player may aim an area for their own character, but an attack never takes one (and this map has no grid).

@@ -1,4 +1,4 @@
-import { endEffect, READIED_TAG } from "../effects.js";
+import { endEffect, releaseReadied } from "../effects.js";
 import type { ResolveContext } from "./context.js";
 
 /** Rule consequences of having acted: attacking reveals a hidden creature, and a Reaction taken off-turn uses up
@@ -14,10 +14,12 @@ export function releaseHideAndReady(ctx: ResolveContext): void {
   };
   // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends.
   if (action.attack !== undefined || action.save !== undefined) end("hidden");
+  // A spell the ready held, released now or not, goes with it.
   if (
     state.combat.turnActorId !== attacker.id &&
     action.id !== "ready" &&
     (plan.markReaction || action.activation === "reaction")
   )
-    end(READIED_TAG);
+    for (const name of releaseReadied(state, attacker.id))
+      effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name });
 }

@@ -2,6 +2,7 @@ import type { Actor } from "@vtt/domain";
 import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
 import { withTakenActions } from "./builtin-actions.js";
+import { atSpellUpLevel } from "./lasting-spells.js";
 import {
   deriveEquipment,
   sourceItemOf,
@@ -19,13 +20,20 @@ export function effectiveActions(
   catalog: EquipmentCatalog | undefined
 ): readonly ActorAction[] {
   const declared = definition?.actions ?? [];
-  const taken = declared.map(withTakenActions);
+  // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a 3rd-level slot).
+  const taken = declared.map((action) => atLevelUp(withTakenActions(action), actor, catalog));
   // The definition's own list when nothing changed, so a caller holding it sees the same array.
   const base = taken.every((action, index) => action === declared[index]) ? declared : taken;
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
   return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor));
+}
+
+/** A later action of a spell its caster has up at a higher level, rolled at that level; anything else unchanged. */
+function atLevelUp(action: ActorAction, actor: Actor | undefined, catalog: EquipmentCatalog | undefined): ActorAction {
+  const spell = actor && action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined;
+  return spell && actor ? atSpellUpLevel(action, spell, actor) : action;
 }
 
 /** Folds the standing riders that apply to one action into the numbers the resolver reads. */

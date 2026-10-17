@@ -31,6 +31,7 @@ import type {
   DiceRollResult,
   LooseSaveOutcome,
   MutationResult,
+  SpellbookResult,
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
@@ -64,6 +65,8 @@ import type {
   ActorRestoreUsesSchema,
   AddCombatantSchema,
   RemoveCombatantSchema,
+  SpellZoneEndSchema,
+  SpellZonePlaceSchema,
   AnnotationAddSchema,
   AnnotationClearSchema,
   AnnotationColorSetSchema,
@@ -86,6 +89,8 @@ import type {
   CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
+  CharacterSwapSpellSchema,
+  CharacterAddToSpellbookSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
@@ -569,6 +574,14 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CharacterFinishPreparingSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "character:swap-spell": (
+    payload: CommandPayload<typeof CharacterSwapSpellSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:add-to-spellbook": (
+    payload: CommandPayload<typeof CharacterAddToSpellbookSchema>,
+    acknowledgement: (result: SpellbookResult) => void
+  ) => void;
   // Optional item keys are declared so the type states the whole wire contract; the server validates `baseId`.
   "character:set-inventory": (
     payload: CommandPayload<typeof CharacterSetInventorySchema>,
@@ -802,6 +815,14 @@ export interface ClientToServerEvents {
   ) => void;
   "annotation:move": (
     payload: CommandPayload<typeof AnnotationMoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "spell-zone:place": (
+    payload: CommandPayload<typeof SpellZonePlaceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "spell-zone:end": (
+    payload: CommandPayload<typeof SpellZoneEndSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:remove": (

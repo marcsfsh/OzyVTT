@@ -29,9 +29,13 @@ export type HealthBand = "healthy" | "bloodied" | "down";
 export type PlayerHp =
   { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
- * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's. `yours` marks one the
+ * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's, and so does its magic
+ * mark, which only Magic Resistance reads. `yours` marks one the
  * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
-export type PlayerEffect = Omit<EffectInstance, "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage"> & {
+export type PlayerEffect = Omit<
+  EffectInstance,
+  "sourceActorId" | "sourceActionId" | "castId" | "ongoingDamage" | "spell" | "magical"
+> & {
   yours?: true;
 };
 /** A creature as one player sees it. Their own claimed character gets everything; another player's is limited by
@@ -71,6 +75,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"];
     pactSlots?: Actor["pactSlots"];
     preparedSpellIds?: Actor["preparedSpellIds"];
+    /** A Wizard's spellbook beyond its sheet. Same gate as `preparedSpellIds`. */ spellbook?: Actor["spellbook"];
     preparation?: Actor["preparation"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];
@@ -92,9 +97,22 @@ export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: bool
  *  wire (the call reaches the player through `rollCalls`), and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<
   PendingSave,
-  "sourceActorId" | "endsEffects" | "repeatOf" | "onFailEffect" | "callId"
+  | "sourceActorId"
+  | "endsEffects"
+  | "repeatOf"
+  | "onFailEffect"
+  | "callId"
+  | "onSuccessEffect"
+  | "failureNote"
+  | "breaksConcentration"
+  | "zoneId"
+  | "magical"
+  | "immuneOnSuccess"
 > & {
-  onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "castId" | "sourceActionId" | "ongoingDamage">;
+  onFailEffect?: Omit<
+    NonNullable<PendingSave["onFailEffect"]>,
+    "castId" | "sourceActionId" | "ongoingDamage" | "magical"
+  >;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. */

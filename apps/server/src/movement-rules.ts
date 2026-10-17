@@ -3,9 +3,11 @@ import type { MoveMode } from "@vtt/domain/commands";
 import type { ActorDefinition } from "@vtt/schemas";
 import { footprintOrigin } from "@vtt/rules-5e";
 import { RulesBlockedError } from "./game-store.js";
+import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
+import { READIED_TAG, releaseReadied } from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
@@ -70,6 +72,8 @@ export type MovementRulesOutcome = Readonly<{
   prompts: ReadonlyArray<{ actorId: string; name: string }>;
   /** It crawled (Prone), for the narration. */
   crawled: boolean;
+  /** It was a Readied creature's move off its turn, taken with its Reaction. */
+  readied?: true;
 }>;
 
 /**
@@ -90,6 +94,20 @@ export type MovementRulesOutcome = Readonly<{
  */
 /** A move spends movement only on the mover's own turn in combat, with movement rules on. While a wait-mode
  *  fight gathers initiative no turn has begun, so tokens are still being positioned. */
+/** SRD Ready: a Readied creature may "move up to your Speed in response" to its trigger, with its Reaction, off its
+ *  own turn. Counted like any move (unless the movement rules are off), but against its Speed, not the turn's. */
+function readiedMove(state: GameState, mover: GameState["actors"][number], mode: MoveMode): boolean {
+  return (
+    turnsRunning(state) &&
+    state.combat.turnActorId !== mover.id &&
+    mode !== "teleport" &&
+    mode !== "forced" &&
+    state.combat.initiative.some((entry) => entry.actorId === mover.id) &&
+    mover.effects.some((effect) => effect.tags.includes(READIED_TAG)) &&
+    familyModeFor(state.combat, "movement") !== "freeform"
+  );
+}
+
 function movementCounts(state: GameState, actorId: string): boolean {
   return (
     turnsRunning(state) &&
@@ -129,7 +147,7 @@ export function movementStatus(
           const budget = travelBudgetFeet(actor, derivation, definition, mode);
           return budget === null
             ? []
-            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode) }];
+            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode, derivation) }];
         })
       : [];
   return {
@@ -139,7 +157,9 @@ export function movementStatus(
     enforcement: effectiveModeFor(state.combat, "movement.exceeds-speed"),
     ...(modes.length > 0 ? { modes } : {}),
     ...(actor?.conditions.some((condition) => condition.id === "prone") ? { crawling: true } : {}),
-    ...(actor && dragCostsExtra(state, actor.id, grappledBy(state, actor.id)) ? { dragging: true } : {})
+    ...(actor && dragCostsExtra(state, actor.id, grappledBy(state, actor.id), input.resolveDefinition)
+      ? { dragging: true }
+      : {})
   };
 }
 
@@ -155,8 +175,17 @@ export function grappledBy(state: GameState, grapplerId: string): readonly strin
 const SIZE_RANK: Readonly<Record<string, number>> = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gargantuan: 5 };
 
 /** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
- *  unless you are Tiny or two or more sizes smaller than it." */
-export function dragCostsExtra(state: GameState, grapplerId: string, grappledIds: readonly string[]): boolean {
+ *  unless you are Tiny or two or more sizes smaller than it." A bugbear's Abduct: it "needn't spend extra movement to
+ *  move a creature it is grappling". */
+export function dragCostsExtra(
+  state: GameState,
+  grapplerId: string,
+  grappledIds: readonly string[],
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined
+): boolean {
+  const grappler = state.actors.find((actor) => actor.id === grapplerId);
+  const definition = grappler?.definitionId ? resolveDefinition?.(grappler.definitionId) : undefined;
+  if (holdsFeature(definition, "abduct", "Abduct")) return false;
   const rank = (actorId: string) =>
     SIZE_RANK[state.actors.find((actor) => actor.id === actorId)?.size ?? "medium"] ?? SIZE_RANK.medium!;
   return grappledIds.some((actorId) => {
@@ -242,15 +271,25 @@ function cellsAt(calibration: SquareGridCalibration, position: Point, sizeCells:
   return cells;
 }
 
+/** Traits that let a creature end its move in another's space ("The elemental can enter a creature's space and stop
+ *  there"); a swarm's works both ways ("The swarm can occupy another creature's space and vice versa"). */
+const SHARES_SPACE = ["Air Form", "Fire Form", "Water Form", "Swarm"] as const;
+const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInput, swarmOnly = false): boolean => {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
+  return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
+};
+
 /** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
  *  the refusal can't give one away; neither do the creatures the mover drags. */
 function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point): boolean {
-  if (!input.calibration) return false;
+  if (!input.calibration || sharesSpace(state, input.actorId, input)) return false;
   const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
   const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
   return state.combat.tokens.some((token) => {
     if (token.actorId === input.actorId || !token.position || input.dragging?.actorIds.includes(token.actorId))
       return false;
+    if (sharesSpace(state, token.actorId, input, true)) return false;
     if (state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
     if (input.perceives && !input.perceives(token.actorId)) return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
@@ -265,17 +304,30 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   const mover = state.actors.find((candidate) => candidate.id === actorId);
   const prompts: Array<{ actorId: string; name: string }> = [];
   const outcome: Policing = { warnings: [], overridden: null };
+  let readied = false;
   const done = (crawled = false): MovementRulesOutcome => ({
     warning: outcome.warnings.length > 0 ? outcome.warnings.join(" ") : null,
     overridden: outcome.overridden,
     prompts,
-    crawled
+    crawled,
+    ...(readied ? { readied: true as const } : {})
   });
   // Forced movement is the GM's (the command refuses a player's), and spends nothing.
   if (!mover || from === null || to === null || mode === "forced") return done();
-  const counted = movementCounts(state, actorId);
-  // SRD: you move on your own turn. A player's move off it (a readied move, a reaction that moves) is the GM's call.
-  if (input.byPlayer && turnsRunning(state) && state.combat.turnActorId !== actorId)
+  readied = readiedMove(state, mover, mode);
+  const counted = movementCounts(state, actorId) || readied;
+  // A readied move is the creature's Reaction: one it still has.
+  if (readied && state.combat.reactionsUsed.includes(mover.id))
+    police(
+      state,
+      input,
+      "economy.reaction-used",
+      `${mover.name} has no reaction left to take the readied move with.`,
+      outcome
+    );
+  // SRD: you move on your own turn. A player's move off it (a reaction that moves) is the GM's call; a readied move
+  // is the creature's own Reaction.
+  if (input.byPlayer && turnsRunning(state) && state.combat.turnActorId !== actorId && !readied)
     police(
       state,
       input,
@@ -302,13 +354,14 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     police(state, input, "movement.no-speed", `${mover.name} has no ${MODE_NAMES[travel]} Speed.`, outcome);
     budget = travelBudgetFeet(mover, derivation, moverDefinition, "walk");
   }
-  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel);
+  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel, derivation);
   const extraPerStep = (slowed ? 1 : 0) + (input.dragging?.costsExtra ? 1 : 0);
   const options: MovementCostOptions = {
     extraPerStep,
     carried: input.dragging?.actorIds ?? [],
     resolveDefinition: input.resolveDefinition,
-    ...(input.perceives ? { perceives: input.perceives } : {})
+    ...(input.perceives ? { perceives: input.perceives } : {}),
+    ...(sharesSpace(state, actorId, input) ? { passesCreatures: true } : {})
   };
   const straight = (): MovementCost | null => {
     const distance = input.distance(from, to);
@@ -330,7 +383,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   const moved = charge?.feet ?? null;
   const difficultFeet = charge?.difficultFeet ?? 0;
   if (moved !== null && budget !== null && moved > 0.05) {
-    const used = state.combat.turn.movementUsedFeet;
+    // A readied move is its own: up to its Speed, whatever the creature whose turn it is has moved.
+    const used = readied ? 0 : state.combat.turn.movementUsedFeet;
     const overrun = used + moved > budget + 1e-6;
     if (overrun) {
       const how = [
@@ -352,7 +406,12 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
         true
       );
     }
-    state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
+    if (!readied) state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
+  }
+  // The readied move spends the Reaction and uses up the ready, and a spell it held with it.
+  if (readied) {
+    state.combat = { ...state.combat, reactionsUsed: [...new Set([...state.combat.reactionsUsed, mover.id])] };
+    releaseReadied(state, mover.id);
   }
   openOpportunityAttacks(state, input, mover, charge?.path ?? [from, to], prompts);
   return done(crawling);
@@ -369,6 +428,10 @@ function openOpportunityAttacks(
 ): void {
   const { actorId } = input;
   if (mover.visibility === "gm-only" || mover.effects.some((effect) => effect.tags.includes("disengaged"))) return;
+  // "The rat doesn't provoke Opportunity Attacks when it moves out of an enemy's reach"; Flyby, when it flies out.
+  const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
+  if (holdsFeature(moverDefinition, "agile", "Agile")) return;
+  if ((input.mode ?? "walk") === "fly" && holdsFeature(moverDefinition, "flyby", "Flyby")) return;
   for (const entry of state.combat.initiative) {
     if (entry.actorId === actorId || state.combat.pendingReactions.length >= 20) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);

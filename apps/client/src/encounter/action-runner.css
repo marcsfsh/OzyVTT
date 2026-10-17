@@ -506,6 +506,7 @@
 }
 .action-spellcasting-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
   margin: 0.35rem 0 0.1rem;
@@ -515,6 +516,38 @@
 }
 .action-spellcasting-head span {
   color: var(--violet-hi);
+}
+/* A stat block's numbers wrap under the list's name on a phone rather than crowding it. */
+.action-spellcasting-head .action-spellcasting-numbers {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.action-spellcasting .action-list {
+  margin-top: var(--space-1);
+}
+.action-spellcasting-plain {
+  margin: var(--space-1) 0.2rem 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.action-spellcasting-plain span {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.action-spellcasting-text > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0.2rem;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.action-spellcasting-text > summary:hover {
+  color: var(--text-dim);
 }
 .spellcasting-text {
   margin: 0.35rem 0 0.1rem;

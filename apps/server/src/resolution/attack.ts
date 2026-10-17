@@ -23,7 +23,7 @@ import {
   requireTypedReroll,
   spendRerollRight
 } from "../held-rolls.js";
-import { GM_CHOICE } from "../saving-throws.js";
+import { GM_CHOICE, magicResistanceOf } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
 import { endEffect, STEADY_AIM_TAG } from "../effects.js";
 import {
@@ -37,7 +37,10 @@ import { builtinBaseId } from "../builtin-actions.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { VEXED_TAG } from "../weapon-mastery.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
+import { holdsFeature } from "../class-features.js";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
+import { auraOfAuthority } from "../statblock-traits.js";
 import { sceneSight } from "../vision/sight.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -273,6 +276,38 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
   }
 }
 
+/** Stat-block traits that give an attack roll Advantage: Bloodied Fury and Frenzy, Blood Frenzy, an ally's Aura of
+ *  Authority, and Pack Tactics ("if at least one of the [attacker's] allies is within 5 feet of the creature and the ally
+ *  doesn't have the Incapacitated condition"), read from the tokens. Where the map can't measure, the GM's roll mode
+ *  decides. */
+function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeClaims): void {
+  const { state, attacker, deps } = ctx;
+  const bloodied = attacker.hp.current > 0 && attacker.hp.current * 2 <= attacker.hp.maximum;
+  // SRD Bloodied Fury (boars) and Bloodied Frenzy (the berserker): "While Bloodied, ... Advantage on attack rolls".
+  for (const name of ["Bloodied Fury", "Bloodied Frenzy"])
+    if (bloodied && holdsFeature(deps.definition, name.toLowerCase().replace(" ", "-"), name))
+      sources.advantage.push({ source: "bloodied-fury", label: `${name} (Bloodied)` });
+  // SRD Blood Frenzy (the sahuagin): "Advantage on attack rolls against any creature that doesn't have all its Hit
+  // Points."
+  if (target.hp.current < target.hp.maximum && holdsFeature(deps.definition, "blood-frenzy", "Blood Frenzy"))
+    sources.advantage.push({ source: "blood-frenzy", label: "Blood Frenzy (target is hurt)" });
+  const authority = auraOfAuthority(state, attacker, deps);
+  if (authority) sources.advantage.push(authority);
+  if (!deps.distanceFeet || !holdsFeature(deps.definition, "pack-tactics", "Pack Tactics")) return;
+  for (const entry of state.combat.initiative) {
+    const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
+    if (!ally || ally.id === attacker.id || ally.id === target.id) continue;
+    if (!areAllies(attacker, ally, deps.resolveDefinition) || ally.hp.current <= 0 || isIncapacitated(ally)) continue;
+    // An ally the players can't see never gives a visible attacker Advantage: the roll would reveal it.
+    if (ally.visibility !== "public" && attacker.visibility === "public") continue;
+    const apart = deps.distanceFeet(ally.id, target.id);
+    if (apart !== null && apart <= 5 + DISTANCE_TOLERANCE_FEET) {
+      sources.advantage.push({ source: "pack-tactics", label: `Pack Tactics (${ally.name} within 5 ft)` });
+      return;
+    }
+  }
+}
+
 /** Advantage/disadvantage sources the engine can see; the explicit GM rollMode choice wins over all of them. */
 function attackRollSources(
   ctx: ResolveContext,
@@ -284,6 +319,7 @@ function attackRollSources(
   riderClaims(ctx, targetDerivation, sources);
   conditionClaims(ctx, target, distance, sources);
   positionClaims(ctx, distance, sources);
+  traitClaims(ctx, target, sources);
   return sources;
 }
 
@@ -475,6 +511,14 @@ export function rollAttack(ctx: ResolveContext): void {
         : total >= targetAc
           ? ("hit" as const)
           : ("miss" as const);
+  // SRD Greater Magic Resistance: "the attack rolls of spells automatically miss it". Said to the GM only, since the
+  // reason names a trait of the stat block.
+  if (action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds") {
+    outcome = "miss";
+    ctx.crit = false;
+    if (deps.initiatorRole !== "player")
+      warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
+  }
   if (outcome === "hit" && (has(target, "unconscious") || has(target, "paralyzed"))) {
     if ((distance !== null && distance <= 5) || (distance === null && action.attack.reachFeet !== undefined)) {
       outcome = "crit";

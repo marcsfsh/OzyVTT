@@ -58,6 +58,7 @@ import { withTakenActions } from "./builtin-actions.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import type { CharacterFeatureRef } from "./equipment-derivation.js";
 import { statblockFacts } from "./statblock-facts.js";
+import { withMonsterSpells } from "./monster-spells.js";
 
 /** Who reads a catalog. GM-grade principals also see published homebrew that isn't player-visible.
  *  The public viewer never reads content, so there is no viewer audience. */
@@ -186,7 +187,11 @@ export class ContentLibrary {
   /** Play-time only and audience-free: resolves any homebrew monster row (even draft or deleted) so a live
    *  actor keeps its actions mid-fight. Never use it for browse. */
   monsterForInstance(definitionId: string): ActorDefinition | undefined {
-    return SRD_ONLY_CATALOG.monstersById.get(definitionId) ?? this.homebrew?.monsterForInstance(definitionId);
+    const bundled = SRD_ONLY_CATALOG.monstersById.get(definitionId);
+    if (bundled) return bundled;
+    const homebrew = this.homebrew?.monsterForInstance(definitionId);
+    // Its spells as cast actions, as the catalog gives a bundled stat block's.
+    return homebrew ? withMonsterSpells(homebrew, (spellId) => this.forAudience("gm").spellRecord(spellId)) : undefined;
   }
 }
 
@@ -228,8 +233,32 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
       : {}),
     // So does a touch that ends a condition (Lay on Hands' cure).
-    ...(action.endsConditions && !action.healing ? { targeting: "single" as const } : {})
+    ...(action.endsConditions && !action.healing ? { targeting: "single" as const } : {}),
+    // A stat block's spell list: its numbers head the casts that follow it.
+    ...(action.castsSpells && !action.castsSpells.self
+      ? {
+          spellList: {
+            ability: action.castsSpells.ability,
+            saveDc: action.castsSpells.saveDc,
+            attackBonus: action.castsSpells.attackBonus
+          }
+        }
+      : {}),
+    ...(action.spellId !== undefined ? { spellId: action.spellId } : {})
   };
+}
+
+/** A stat block's rows, each cast from a spell list marked with the list it belongs to (`castFrom`), so the list
+ *  can show its spells under it. */
+export function actionSummariesOf(actions: ActorDefinition["actions"]): ContentActionSummary[] {
+  const listOf = new Map<string, string>();
+  for (const action of actions)
+    if (action.castsSpells && !action.castsSpells.self)
+      for (const entry of action.castsSpells.spells) listOf.set(entry.id, action.id);
+  return actions.map((action) => {
+    const list = listOf.get(action.id);
+    return { ...actionSummaryOf(action), ...(list !== undefined ? { castFrom: list } : {}) };
+  });
 }
 
 /** "V, S, M (a pinch of soot)" from the structured components, or "None" for a spell with no components. */
@@ -611,8 +640,14 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
   }));
 
   const monstersById = new Map<string, ActorDefinition>();
+  // A stat block's spells become cast actions here, from this audience's spells, so every reader sees them.
+  const spellsById = new Map(spells.map((spell) => [spell.id, spell]));
   for (const definition of merged(loadMonsterDefinitions(), homebrew.monsters)) {
-    if (definition.source.externalId) monstersById.set(definition.source.externalId, definition);
+    if (definition.source.externalId)
+      monstersById.set(
+        definition.source.externalId,
+        withMonsterSpells(definition, (spellId) => spellsById.get(spellId))
+      );
   }
   const monsterSummaries: readonly ContentMonsterSummary[] = [...monstersById.entries()]
     .map(([id, definition]) => {
@@ -722,7 +757,10 @@ function viewOf(audience: ContentAudience, data: CatalogData, attribution: strin
     nameBundles: () => data.nameBundles,
     monsterSummaries: () => data.monsterSummaries,
     monster: (definitionId) => data.monstersById.get(definitionId),
-    monsterActionSummaries: (definitionId) => data.monstersById.get(definitionId)?.actions.map(actionSummaryOf),
+    monsterActionSummaries: (definitionId) => {
+      const definition = data.monstersById.get(definitionId);
+      return definition ? actionSummariesOf(definition.actions) : undefined;
+    },
     catalogChoiceCatalogs: () => ({
       classes: data.classSummaries,
       subclasses: data.subclassSummaries,
