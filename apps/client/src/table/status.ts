@@ -12,8 +12,13 @@ export function tableStatus(view: View): string {
     const mine =
       view.role === "player" && view.state.actors.some((actor) => actor.id === turnId && actor.claimStatus === "mine");
     if (mine) return `Round ${combat.round} · your turn`;
-    const name = view.state.actors.find((actor) => actor.id === turnId)?.name;
-    return name ? `Round ${combat.round} · ${name} is acting` : `Round ${combat.round}`;
+    const acting = view.state.actors.find((actor) => actor.id === turnId);
+    if (!acting) return `Round ${combat.round}`;
+    // A character at 0 HP making death saves is dying on its turn, which the table should read at a glance.
+    const saves = acting.deathSaves;
+    const dying = saves !== undefined && saves !== null && !saves.stable && saves.failures < 3;
+    const down = "kind" in acting.hp ? acting.hp.kind === "exact" && acting.hp.current === 0 : acting.hp.current === 0;
+    return `Round ${combat.round} · ${acting.name} ${dying && down ? "is dying" : "is acting"}`;
   }
   if (combat.mapAssetId) return view.role === "gm" ? "Scene is live · no fight yet" : "Exploring · no fight";
   return "No fight running yet";

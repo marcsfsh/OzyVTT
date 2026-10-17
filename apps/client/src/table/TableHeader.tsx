@@ -69,10 +69,13 @@ export function TableHeader(
               Staging <strong>{staged.name}</strong> · GM only
             </span>
           </span>
-          <Button variant="ghost" size="sm" onClick={gm.onBackToLive} title="Return to the scene players see">
-            <IconChevronLeft />
-            Back to live
-          </Button>
+          {/* Back to live only when a scene is live to go back to. */}
+          {live && (
+            <Button variant="ghost" size="sm" onClick={gm.onBackToLive} title="Return to the scene players see">
+              <IconChevronLeft />
+              Back to live
+            </Button>
+          )}
           <Button variant="primary" size="sm" onClick={() => gm.onMakeLive(staged.id)}>
             <IconPlay />
             Make live

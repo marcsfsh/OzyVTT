@@ -257,7 +257,7 @@ export function PromptSlot({
         {announcement}
       </p>
       {(first || outcome) && (
-        <section className="prompt-slot" aria-label="Answer now" ref={slot}>
+        <section className="prompt-slot scroll-y" aria-label="Answer now" ref={slot}>
           {card}
           {entries.length > 1 && (
             <p className="prompt-slot-more">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
-import { Button, Chip, Switch, IconArrow, IconChevronLeft, IconPlus, Eyebrow } from "@vtt/ui";
+import { Button, Chip, Switch, IconArrow, IconChevronLeft, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
 import { CharacterSheet } from "./CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
@@ -492,17 +492,7 @@ export function GmEncounterPanel({
       <Button variant="secondary" size="sm" className="encounter-end" disabled={busy} onClick={() => void end()}>
         End fight
       </Button>
-      {/* Mid-fight reinforcements are a combat action, so one visible tap. */}
-      <button
-        type="button"
-        className="encounter-menu-toggle"
-        disabled={busy}
-        title="Add monsters to this fight (SRD)"
-        aria-label="Add monsters to this fight"
-        onClick={() => setBrowsing(true)}
-      >
-        <IconPlus />
-      </button>
+      {/* Adding monsters mid-fight is in the fight menu beside it, so the bar keeps room for the turn. */}
       <FightMenu
         state={state}
         busy={busy}

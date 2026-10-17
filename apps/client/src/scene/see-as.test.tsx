@@ -44,7 +44,9 @@ const actors = [
     presence: null
   }
 ] as unknown as GmView["actors"];
-const tokens = [{ actorId: LYRA, position: { x: 75, y: 75 }, sizePx: 41, gridSizePx: 50, sizeCells: 1 }];
+const tokens = [
+  { actorId: LYRA, position: { x: 75, y: 75 }, sizePx: 41, gridSizePx: 50, gridRotationRadians: null, sizeCells: 1 }
+];
 const vision = {
   enabled: true,
   ambient: "dim",

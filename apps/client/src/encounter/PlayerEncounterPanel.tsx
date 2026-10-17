@@ -50,7 +50,8 @@ export function PlayerTurnEconomy({
   mySpeedFeet,
   revision,
   endWaits,
-  quiet = false
+  quiet = false,
+  unconscious = false
 }: Readonly<{
   combat: PlayerView["combat"];
   myId: string;
@@ -62,6 +63,8 @@ export function PlayerTurnEconomy({
   endWaits?: string;
   /** Another primary leads the view (a roll to make), so End turn steps down. */
   quiet?: boolean;
+  /** The character is Unconscious, so it can't take a reaction. */
+  unconscious?: boolean;
 }>) {
   const [busy, setBusy] = useState(false);
   const budget = useMovementBudget(myTurn && revision !== undefined ? myId : null, revision ?? 0);
@@ -126,8 +129,14 @@ export function PlayerTurnEconomy({
         type="button"
         className="economy-slot"
         aria-pressed={reactionUsed}
-        disabled={busy || (reactionUsed && giveBackLocked)}
-        title={reactionUsed && giveBackLocked ? lockedTitle : "Reactions refresh when your turn starts"}
+        disabled={busy || unconscious || (reactionUsed && giveBackLocked)}
+        title={
+          unconscious
+            ? "Unconscious: no reactions"
+            : reactionUsed && giveBackLocked
+              ? lockedTitle
+              : "Reactions refresh when your turn starts"
+        }
         onClick={() =>
           emit(
             () => command("turn:use-reaction", { actorId: myId, used: !reactionUsed }),
@@ -266,6 +275,13 @@ export function PlayerEncounterPanel({
           <p className="encounter-quiet-note">
             {actingName ? `${actingName} is acting.` : "Waiting for the next turn."}
           </p>
+        )}
+        {/* The player's own hit points, which their row never showed. */}
+        {myActor && myActor.hp.kind === "exact" && (
+          <span className="player-turn-hp">
+            HP {myActor.hp.current}/{myActor.hp.maximum}
+            {myActor.hp.temporary > 0 ? ` +${myActor.hp.temporary}` : ""}
+          </span>
         )}
         {combat.rewound && <p className="encounter-quiet-note">The GM is reviewing an earlier turn.</p>}
       </div>
@@ -428,6 +444,7 @@ export function PlayerEncounterPanel({
           mySpeedFeet={myActor?.speedFeet}
           revision={state.revision}
           quiet={rollPending}
+          unconscious={myActor !== null && isDying(myActor)}
           {...(myActor && owesDeathSave(state, myActor) ? { endWaits: "Roll your death save first." } : {})}
         />
       </div>

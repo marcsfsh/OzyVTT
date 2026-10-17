@@ -61,6 +61,10 @@
   flex: 0 1 auto;
   max-height: 42%;
   min-height: 0;
+  overflow: hidden;
+}
+.encounter-fight .encounter-region {
+  min-height: 2.75rem;
 }
 .encounter-fight > .encounter-acting {
   flex: 1 1 0;
@@ -105,7 +109,7 @@
   letter-spacing: 0;
   text-transform: none;
 }
-/* The turn's controls in the panel's footer: Previous, Next turn taking the room, End fight, add and the menu. */
+/* The turn's controls in the panel's footer: Previous, Next turn taking the room, End fight and the fight menu. */
 .table-panel-foot .turn-controls {
   --control-h: var(--tap-min);
   display: flex;
@@ -121,6 +125,7 @@
   min-height: var(--control-h);
 }
 .table-panel-foot .turn-controls > .turn-prev {
+  flex: none;
   display: grid;
   place-items: center;
   width: var(--control-h);
@@ -156,6 +161,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+.player-turn-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.player-turn-hp {
+  color: var(--text-dim);
+  font: 700 var(--fs-sm) / 1 var(--font-numeric);
 }
 .player-turn-title {
   display: flex;
@@ -1107,11 +1123,10 @@
 .encounter-topbar .encounter-end {
   flex: none;
 }
-/* On a phone the bar under the thumb keeps Previous, Next turn and the fight menu; adding monsters and ending the
-   fight are in that menu. */
+/* On a phone the bar under the thumb keeps Previous, Next turn and the fight menu; ending the fight is in that
+   menu. */
 @media (max-width: 979px) {
-  .table-panel-foot .turn-controls > .encounter-end,
-  .table-panel-foot .turn-controls > .encounter-menu-toggle:not([aria-haspopup]) {
+  .table-panel-foot .turn-controls > .encounter-end {
     display: none;
   }
 }

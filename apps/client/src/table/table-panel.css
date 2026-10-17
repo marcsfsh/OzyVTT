@@ -13,6 +13,9 @@
   flex: none;
   max-height: 50%;
 }
+.table-panel > .prompt-slot {
+  padding: var(--space-2) var(--space-3) 0;
+}
 .table-panel-tabs {
   flex: none;
   margin: var(--space-2) var(--space-3) 0;
