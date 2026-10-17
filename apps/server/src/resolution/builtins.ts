@@ -43,7 +43,8 @@ export function rollCheck(
   ctx: ResolveContext,
   subject: CheckSubject,
   dc: number | null,
-  label?: string
+  label?: string,
+  stakes: readonly string[] = []
 ): boolean | null {
   const warded = ctx.deps.resolveDefinition
     ? wardedConditions(ctx.state, ctx.attacker, {
@@ -52,7 +53,8 @@ export function rollCheck(
       })
     : [];
   const plan = checkPlan(ctx.attacker, ctx.deps.definition, ctx.derivation, subject, {
-    ...(warded.length > 0 ? { warded } : {})
+    ...(warded.length > 0 ? { warded } : {}),
+    ...(stakes.length > 0 ? { stakes } : {})
   });
   const forced = label === undefined ? (ctx.input.rollMode ?? undefined) : undefined;
   const mode = forced ?? plan.rollMode.mode;
@@ -162,7 +164,8 @@ function escapeGrapple(ctx: ResolveContext): void {
       ? athletics
       : acrobatics;
   const subject = input.skill === "athletics" ? athletics : input.skill === "acrobatics" ? acrobatics : better;
-  if (rollCheck(ctx, subject, escapable.escapeDc)) {
+  // What the escape would end, for a rider that helps against it (Powerful Build: "to end the Grappled condition").
+  if (rollCheck(ctx, subject, escapable.escapeDc, undefined, escapable.linkedConditionIds)) {
     endEffect(state, attacker.id, escapable.id);
     ctx.effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: escapable.name });
   }

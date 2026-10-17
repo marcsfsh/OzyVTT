@@ -41,11 +41,14 @@ export function checkRollMode(
 
 function checkRiderClaims(
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>
+  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
+  stakes: readonly string[] = []
 ): RollModeClaims {
   return rollModeClaims(derivation, ["check"], "on-ability-check", {
     ...(narrow.ability !== undefined ? { ability: narrow.ability } : {}),
-    ...(narrow.skill !== undefined ? { skill: narrow.skill } : {})
+    ...(narrow.skill !== undefined ? { skill: narrow.skill } : {}),
+    // The conditions the check would end (escaping a grapple: Grappled), for a `versus-condition` rider.
+    ...(stakes.length > 0 ? { targetConditionIds: stakes } : {})
   });
 }
 
@@ -60,9 +63,10 @@ export function abilityCheckClaims(
   actor: Actor,
   derivation: EquipmentDerivation,
   narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
-  warded: readonly string[] = []
+  warded: readonly string[] = [],
+  stakes: readonly string[] = []
 ): RollModeClaims {
-  const claims = checkRiderClaims(derivation, narrow);
+  const claims = checkRiderClaims(derivation, narrow, stakes);
   for (const condition of CHECK_DISADVANTAGE_CONDITIONS)
     if (actor.conditions.some((held) => held.id === condition) && !warded.includes(condition))
       claims.disadvantage.push({ source: `condition-${condition}`, label: conditionLabel(condition) });
@@ -157,6 +161,9 @@ export type CheckContext = Readonly<{
   finding?: Actor;
   /** Conditions an ally's aura keeps from having any effect where the roller stands (Aura of Courage). */
   warded?: readonly string[];
+  /** Conditions the check would end (escaping a grapple: Grappled), which a `versus-condition` rider reads (Powerful
+   *  Build). */
+  stakes?: readonly string[];
 }>;
 
 /** The flat part of a skill check (SRD Skills, Expertise, Jack of All Trades): a GM-typed total, else the stat block's
@@ -204,7 +211,7 @@ export function checkPlan(
             (toolProficient ? (definition?.proficiencyBonus ?? 0) : 0),
           proficient: toolProficient
         };
-  const claims = abilityCheckClaims(actor, derivation, narrow, context.warded);
+  const claims = abilityCheckClaims(actor, derivation, narrow, context.warded, context.stakes);
   // SRD Tools: "If you have proficiency in the skill that's also used with that check, you have Advantage".
   if (
     subject.tool !== undefined &&

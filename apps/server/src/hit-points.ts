@@ -390,6 +390,30 @@ function fallToZero(
   return { instantDeath, defeated };
 }
 
+/** SRD Relentless Endurance (Orc): "When you are reduced to 0 Hit Points but not killed outright, you can drop to 1 Hit
+ *  Point instead", once a Long Rest. It is taken the first time it can be, since staying up is never the worse
+ *  choice. True when it held the creature at 1. */
+function relentlessEndurance(
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  overflow: number,
+  events: EffectNarration[]
+): boolean {
+  if (overflow >= actor.hp.maximum) return false;
+  const trait = definition?.actions.find((action) => /(^|-)relentless-endurance$/.test(action.id));
+  if (!trait?.uses) return false;
+  const key = trait.uses.pool ?? trait.id;
+  if ((actor.actionUses[key] ?? 0) >= trait.uses.limit) return false;
+  actor.actionUses = { ...actor.actionUses, [key]: (actor.actionUses[key] ?? 0) + 1 };
+  actor.hp = { ...actor.hp, current: 1 };
+  events.push({
+    kind: "condition",
+    text: `${actor.name} drops to 1 Hit Point instead (${trait.name}).`,
+    actorId: actor.id
+  });
+  return true;
+}
+
 /** Marks the effect that holds what drained damage took off a creature's Hit Point maximum. */
 export const DRAINED_TAG = "drained";
 
@@ -594,6 +618,14 @@ export function applyDamageDetailed(
       text: `${actor.name} was knocked out - Unconscious at 1 HP until it regains hit points.`,
       actorId
     });
+  } else if (
+    isPlayerCharacter &&
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    relentlessEndurance(actor, definition, damageToHp - hpBefore, events)
+  ) {
+    // Up at 1 Hit Point: nothing falls.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
     const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
     instantDeath = fell.instantDeath;

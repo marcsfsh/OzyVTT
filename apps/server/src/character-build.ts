@@ -286,7 +286,8 @@ function interpretAction(
   if (adds) {
     const bonus =
       (adds.classLevel ?? 0) * context.level +
-      (adds.abilityModifier ? abilityModifier(context.finalScores[adds.abilityModifier]) : 0);
+      (adds.abilityModifier ? abilityModifier(context.finalScores[adds.abilityModifier]) : 0) +
+      (adds.proficiencyBonus ? context.proficiencyBonus : 0);
     const damage = assembled.damage as ActorAction["damage"] | undefined;
     if (damage && damage.length > 0)
       assembled.damage = [{ ...damage[0], formula: formulaPlus(damage[0].formula, bonus) }, ...damage.slice(1)];

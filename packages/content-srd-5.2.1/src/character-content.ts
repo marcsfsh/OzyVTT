@@ -173,7 +173,9 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
   adds: z
     .object({
       classLevel: z.number().int().min(1).max(10).optional(),
-      abilityModifier: AbilitySchema.optional()
+      abilityModifier: AbilitySchema.optional(),
+      /** The Proficiency Bonus ("Temporary Hit Points equal to your Proficiency Bonus", Adrenaline Rush). */
+      proficiencyBonus: z.literal(true).optional()
     })
     .strict()
     .optional(),

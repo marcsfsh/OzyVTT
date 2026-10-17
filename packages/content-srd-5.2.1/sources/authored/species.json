@@ -62,7 +62,28 @@
             "name": "Draconic Flight",
             "activation": "bonus-action",
             "description": "Sprout spectral wings for 10 minutes, gaining a Fly Speed equal to your Speed.",
-            "damage": []
+            "damage": [],
+            "grants": {
+              "name": "Draconic Flight",
+              "tags": [
+                "draconic-flight"
+              ],
+              "duration": {
+                "type": "rounds",
+                "rounds": 100
+              },
+              "modifiers": [
+                {
+                  "type": "special-speed",
+                  "movement": "fly",
+                  "equalToSpeed": true
+                }
+              ],
+              "onEnd": [],
+              "target": "self",
+              "voidWhileIncapacitated": true,
+              "concentration": false
+            }
           }
         ],
         "uses": {
@@ -1340,6 +1361,24 @@
         "id": "dwarf-resilience",
         "name": "Dwarven Resilience",
         "description": "You have Resistance to Poison damage. You also have Advantage on saving throws you make to avoid or end the Poisoned condition.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-saving-throw"
+              },
+              {
+                "type": "versus-condition",
+                "conditionIds": [
+                  "poisoned"
+                ]
+              }
+            ]
+          }
+        ],
         "grants": {
           "damageResistances": [
             "poison"
@@ -1415,7 +1454,25 @@
       {
         "id": "elf-fey-ancestry",
         "name": "Fey Ancestry",
-        "description": "You have Advantage on saving throws you make to avoid or end the Charmed condition."
+        "description": "You have Advantage on saving throws you make to avoid or end the Charmed condition.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-saving-throw"
+              },
+              {
+                "type": "versus-condition",
+                "conditionIds": [
+                  "charmed"
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "elf-keen-senses",
@@ -1701,7 +1758,27 @@
       {
         "id": "gnome-cunning",
         "name": "Gnomish Cunning",
-        "description": "You have Advantage on Intelligence, Wisdom, and Charisma saving throws."
+        "description": "You have Advantage on Intelligence, Wisdom, and Charisma saving throws.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-saving-throw"
+              },
+              {
+                "type": "ability-is",
+                "abilities": [
+                  "int",
+                  "wis",
+                  "cha"
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "gnome-lineage",
@@ -1997,7 +2074,43 @@
             "name": "Large Form",
             "activation": "bonus-action",
             "description": "Become Large for 10 minutes: Advantage on Strength checks and +10 feet Speed.",
-            "damage": []
+            "damage": [],
+            "grants": {
+              "name": "Large Form",
+              "tags": [
+                "large-form"
+              ],
+              "duration": {
+                "type": "rounds",
+                "rounds": 100
+              },
+              "modifiers": [
+                {
+                  "type": "roll-mode",
+                  "roll": "check",
+                  "mode": "advantage",
+                  "when": [
+                    {
+                      "type": "on-ability-check"
+                    },
+                    {
+                      "type": "ability-is",
+                      "abilities": [
+                        "str"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "speed",
+                  "amount": 10
+                }
+              ],
+              "onEnd": [],
+              "target": "self",
+              "voidWhileIncapacitated": false,
+              "concentration": false
+            }
           }
         ],
         "uses": {
@@ -2008,7 +2121,25 @@
       {
         "id": "goliath-powerful-build",
         "name": "Powerful Build",
-        "description": "You have Advantage on any ability check you make to end the Grappled condition. You also count as one size larger when determining your carrying capacity."
+        "description": "You have Advantage on any ability check you make to end the Grappled condition. You also count as one size larger when determining your carrying capacity.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "check",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-ability-check"
+              },
+              {
+                "type": "versus-condition",
+                "conditionIds": [
+                  "grappled"
+                ]
+              }
+            ]
+          }
+        ]
       }
     ],
     "lineages": []
@@ -2037,7 +2168,25 @@
       {
         "id": "halfling-brave",
         "name": "Brave",
-        "description": "You have Advantage on saving throws you make to avoid or end the Frightened condition."
+        "description": "You have Advantage on saving throws you make to avoid or end the Frightened condition.",
+        "modifiers": [
+          {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "advantage",
+            "when": [
+              {
+                "type": "on-saving-throw"
+              },
+              {
+                "type": "versus-condition",
+                "conditionIds": [
+                  "frightened"
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "halfling-nimbleness",
@@ -2138,7 +2287,29 @@
             "name": "Adrenaline Rush",
             "activation": "bonus-action",
             "description": "Take the Dash action as a Bonus Action and gain Temporary Hit Points equal to your Proficiency Bonus.",
-            "damage": []
+            "damage": [],
+            "grants": {
+              "name": "Dashing",
+              "tags": [
+                "dashing"
+              ],
+              "duration": {
+                "type": "until-source-next-turn"
+              },
+              "modifiers": [],
+              "onEnd": [],
+              "target": "self",
+              "voidWhileIncapacitated": false,
+              "concentration": false
+            },
+            "healing": {
+              "formula": "0",
+              "self": true,
+              "temporary": true
+            },
+            "adds": {
+              "proficiencyBonus": true
+            }
           }
         ],
         "uses": {

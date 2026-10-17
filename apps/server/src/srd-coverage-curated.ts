@@ -639,8 +639,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:smite-of-protection": enforced(
     "resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts)."
   ),
-  "feature:dwarf-resilience": guided(
-    "Resistance to Poison damage is applied. Advantage on saves to avoid or end the Poisoned condition is the GM's."
+  "feature:orc-relentless-endurance": enforced(
+    "hit-points.ts holds an Orc reduced to 0 Hit Points, but not killed outright, at 1 Hit Point instead, once a Long Rest. It is taken the first time it can be."
+  ),
+  "feature:goliath-large-form": guided(
+    "The Bonus Action gives +10 feet of Speed and Advantage on Strength checks for 10 minutes. Becoming Large on the map, and whether the space is big enough, are the GM's."
+  ),
+  "feature:goliath-powerful-build": enforced(
+    "The escape from a grapple rolls with Advantage (resolution/builtins.ts). The app doesn't track carrying capacity, so counting one size larger for it is the GM's."
   ),
   "feature:goliath-giant-ancestry": guided(
     "The chosen ancestry and its uses are recorded, and Storm's Thunder is offered as a Reaction. The other boons' damage, push and teleport are the GM's."
