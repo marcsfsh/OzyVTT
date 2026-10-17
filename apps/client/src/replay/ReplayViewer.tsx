@@ -5,7 +5,14 @@ import { navigate } from "../router";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { useConfirm } from "../components/feedback";
 import { command } from "../lib/command";
-import { exportDocument, stepsOf, type ArchiveDocument, type PlayerReplayDocument } from "./replays";
+import {
+  exportDocument,
+  replayTitle,
+  stepsOf,
+  useReplays,
+  type ArchiveDocument,
+  type PlayerReplayDocument
+} from "./replays";
 import {
   ReplayFrame,
   ReplayNotice,
@@ -22,6 +29,13 @@ import { countOf } from "@vtt/domain";
 const ROUTED_REFUSALS = ["scene_room_full", "history_review"] as const;
 type RoutedRefusal = (typeof ROUTED_REFUSALS)[number];
 
+/** The replay's name from the list this viewer may read, the same name the list shows; "Replay" until it loads. */
+function useReplayName(archiveId: number, token: string): string {
+  const { archives } = useReplays(token);
+  const summary = archives?.find((archive) => archive.id === archiveId);
+  return summary ? replayTitle(summary) : "Replay";
+}
+
 // The GM viewer
 
 function GmViewer({
@@ -31,6 +45,7 @@ function GmViewer({
   onLaunched
 }: Readonly<{ gmToken: string; archiveId: number; onBack: () => void; onLaunched: () => void }>) {
   const { document, error } = useArchiveDocument<ArchiveDocument>(archiveId, gmToken);
+  const name = useReplayName(archiveId, gmToken);
   const [launching, setLaunching] = useState(false);
   /** A refusal with somewhere to go stays on screen (an Alert, not a toast): it is a state with a next step. */
   const [refused, setRefused] = useState<{ code: RoutedRefusal; message: string } | null>(null);
@@ -94,7 +109,7 @@ function GmViewer({
           <IconChevronLeft /> Replays
         </Button>
         <div className="replay-header-text">
-          <h2>Replay</h2>
+          <h2>{name}</h2>
           <p className="replay-meta">
             {when(document.startedAt)} to {when(document.endedAt)} · {countOf(document.turns.length, "turn")}
           </p>
@@ -222,6 +237,7 @@ function PlayerViewer({
   onBack
 }: Readonly<{ token: string; archiveId: number; onBack: () => void }>) {
   const { document, error } = useArchiveDocument<PlayerReplayDocument>(archiveId, token);
+  const name = useReplayName(archiveId, token);
   const turns = document?.turns ?? [];
   const playback = usePlayback(turns.length);
   const turn = turns[playback.index];
@@ -266,7 +282,7 @@ function PlayerViewer({
           <IconChevronLeft /> Back
         </Button>
         <div className="replay-header-text">
-          <h2>Replay</h2>
+          <h2>{name}</h2>
           <p className="replay-meta">You&rsquo;re watching this fight as the party saw it.</p>
         </div>
       </div>
