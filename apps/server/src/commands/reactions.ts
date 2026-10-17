@@ -5,7 +5,7 @@ import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
 import { pushTokenAway } from "../forced-movement.js";
 import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome } from "../reactions.js";
 import type { ActionResolution } from "@vtt/domain";
-import { withoutSourceName } from "../projections.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 

@@ -7,7 +7,8 @@ import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
-import type { ResolveContext } from "./context.js";
+import { HIDDEN_SOURCE } from "../hidden-source.js";
+import { tableLineOf, type ResolveContext } from "./context.js";
 import { coverBonusOf, coverFor } from "../cover.js";
 import { damagePartsOf } from "./damage.js";
 
@@ -265,9 +266,11 @@ export function parkActionSave(ctx: ResolveContext): void {
               speedZero: true
             })
           );
+          // A caster hidden from the table is "A hidden threat" in the table's line.
+          const casterName = ctx.hiddenFromTable(attacker.id) ? HIDDEN_SOURCE : attacker.name;
           ctx.tableNarration.push({
             kind: "effect",
-            text: `${target.name}'s Speed is 0 until the start of ${attacker.name}'s next turn.`,
+            text: `${target.name}'s Speed is 0 until the start of ${casterName}'s next turn.`,
             actorIds: [target.id]
           });
         }
@@ -290,8 +293,7 @@ export function parkActionSave(ctx: ResolveContext): void {
             )
           : [])
       ];
-      for (const event of events)
-        ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+      for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
     }
   }
   if (saving.length === 0) return;

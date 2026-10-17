@@ -6,7 +6,14 @@ import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect } from "../effec
 import { putOutFire } from "../hazards.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
-import { abilityModifier, endedEffect, recordRoll, type DefinitionAction, type ResolveContext } from "./context.js";
+import {
+  abilityModifier,
+  endedEffect,
+  recordRoll,
+  tableLineOf,
+  type DefinitionAction,
+  type ResolveContext
+} from "./context.js";
 
 /** What the declarative action vocabulary can't express about a builtin action (`builtin-actions.ts`),
  *  one hook per moment of a resolve. A hook runs only for an action taken from the builtin catalog, so a
@@ -170,7 +177,7 @@ function rollOnTheGround(ctx: ResolveContext): void {
     }
   });
   for (const effect of ended) ctx.effectsEnded.push(endedEffect(attacker, effect));
-  for (const event of events) ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+  for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */

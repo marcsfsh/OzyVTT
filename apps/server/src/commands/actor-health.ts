@@ -3,7 +3,7 @@ import { setCondition } from "../actor-conditions.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { replaceableOffers } from "../choice-overrides.js";
 import type { EffectNarration } from "../effects.js";
-import { HIDDEN_SOURCE } from "../projections.js";
+import { HIDDEN_SOURCE } from "../hidden-source.js";
 import {
   ActorRechooseSchema,
   ActorRestoreUsesSchema,

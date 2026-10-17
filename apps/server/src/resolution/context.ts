@@ -18,6 +18,8 @@ import type { ActorDefinition } from "@vtt/schemas";
 import type { EquipmentCatalog, EquipmentDerivation } from "../equipment-derivation.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "../roll-history.js";
 import type { RuleId, RulesOverride } from "../rules-families.js";
+import type { EffectNarration } from "../effects.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { hiddenFrom } from "../vision/audience.js";
 import type { MasterySwing } from "../weapon-mastery.js";
 import type { BuiltinHandler } from "./builtins.js";
@@ -155,6 +157,24 @@ export function resolveHiddenCheck(
     },
     forInitiator && deps.initiatorRole === "player" ? deps.initiatorSessionId : undefined
   );
+}
+
+/** A rules event as a line of this resolve's table narration. A source hidden from the initiator is masked as
+ *  `publishNarrations` masks one, since the line goes to the table and back in the reply; a GM-only event stays so. */
+export function tableLineOf(
+  ctx: Pick<ResolveContext, "state" | "hiddenFromInitiator" | "hiddenFromTable">,
+  event: EffectNarration,
+  kind: ActionTableNarration["kind"] = "effect"
+): ActionTableNarration {
+  const source = event.source;
+  const masked = source !== undefined && ctx.hiddenFromInitiator(source.actorId) && !ctx.hiddenFromTable(event.actorId);
+  const sourceName = source?.name ?? ctx.state.actors.find((actor) => actor.id === source?.actorId)?.name ?? null;
+  return {
+    kind,
+    text: masked ? withoutSourceName(event.text, sourceName) : event.text,
+    actorIds: [event.actorId],
+    ...(event.gmOnly ? { gmOnly: true } : {})
+  };
 }
 
 /** One resolve's inputs and everything its steps have decided so far. Each step reads what the earlier

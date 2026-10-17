@@ -48,6 +48,24 @@ describe("rules and refusals with a creature hidden by sight or the fog", () => 
     expect(rollMode?.disadvantage ?? []).toEqual([]);
   });
 
+  it("gives a wolf no Pack Tactics from an ally the table can't see", async () => {
+    // The wolf is in plain sight beside Borin; the Invisible goblin beside Borin is its ally.
+    const table = await hiddenTable({
+      order: [ORC, HERO, GOBLIN],
+      positions: { [HERO]: { x: 75, y: 275 }, [GOBLIN]: { x: 125, y: 275 }, [ORC]: { x: 75, y: 225 } },
+      vision: { enabled: true, ambient: "bright" },
+      actors: { [ORC]: { name: "Wolf", definitionId: "wolf" }, [GOBLIN]: { conditions: [{ id: "invisible" }] } }
+    });
+    expect(mentionsGoblin(table.latest())).toBe(false);
+    const bite = await emit(table.gm, "action:resolve", { actorId: ORC, actionId: "bite", targetIds: [HERO] });
+    expect(bite).toMatchObject({ ok: true });
+    await settle();
+    // The bite's public roll is one d20: Advantage would have shown the goblin is there.
+    const rolled = table.latest().rolls.filter((roll) => roll.actorId === ORC && roll.purpose === "attack");
+    expect(rolled).toHaveLength(1);
+    expect(rolled[0]!.dice.filter((die) => die.sides === 20)).toHaveLength(1);
+  });
+
   it("refuses Hide without naming an enemy wholly under the fog", async () => {
     const table = await hiddenTable({
       order: [HERO, GOBLIN],

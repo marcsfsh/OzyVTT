@@ -35,6 +35,7 @@ import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { hiddenFrom } from "../vision/audience.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
@@ -366,7 +367,7 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
 /** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
-function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
+function checkAbleToAct({ state, attacker, action, resolveDefinition, violations }: Evaluation): void {
   if (action.activation !== "other" || !ANSWERS_A_ROLL.has(action.id)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
@@ -383,11 +384,17 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
   }
   // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
   const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
-  if (reeling && (action.activation === "action" || action.activation === "bonus-action"))
+  if (reeling && (action.activation === "action" || action.activation === "bonus-action")) {
+    // Named as the creature's own sheet shows it: a caster hidden from the table is "A hidden threat".
+    const hiddenCaster =
+      reeling.sourceActorId !== null &&
+      hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(reeling.sourceActorId);
+    const name = hiddenCaster ? withoutSourceName(reeling.name, reeling.sourceName) : reeling.name;
     violations.push({
       rule: "condition.incapacitated",
-      message: `${attacker.name} is reeling from ${reeling.name} and can't take an action or a Bonus Action this turn.`
+      message: `${attacker.name} is reeling from ${name} and can't take an action or a Bonus Action this turn.`
     });
+  }
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
     violations.push({

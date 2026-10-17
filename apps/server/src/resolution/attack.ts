@@ -305,8 +305,8 @@ function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
     const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!ally || ally.id === attacker.id || ally.id === target.id) continue;
     if (!areAllies(attacker, ally, deps.resolveDefinition) || ally.hp.current <= 0 || isIncapacitated(ally)) continue;
-    // An ally the players can't see never gives a visible attacker Advantage: the roll would reveal it.
-    if (ally.visibility !== "public" && attacker.visibility === "public") continue;
+    // An ally hidden from the table never gives a visible attacker Advantage: the roll would reveal it.
+    if (ctx.hiddenFromTable(ally.id) && !ctx.hiddenFromTable(attacker.id)) continue;
     const apart = deps.distanceFeet(ally.id, target.id);
     if (apart !== null && apart <= 5 + DISTANCE_TOLERANCE_FEET) {
       sources.advantage.push({ source: "pack-tactics", label: `Pack Tactics (${ally.name} within 5 ft)` });

@@ -23,7 +23,7 @@ import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
 import type { SoundDeps } from "../sound-board.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
-import { withoutSourceName } from "../projections.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { ZoneDeps } from "../spell-zones.js";
 import type { TokenMapGeometry } from "../token-placement.js";

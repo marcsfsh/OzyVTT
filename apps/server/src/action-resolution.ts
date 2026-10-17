@@ -23,7 +23,7 @@ import type {
   ResolveDependencies,
   ResolveInput
 } from "./resolution/context.js";
-import { withoutSourceName } from "./projections.js";
+import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";

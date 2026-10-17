@@ -238,7 +238,7 @@ function traitSaveClaims(
   state: GameState,
   target: Actor,
   definition: ActorDefinition | undefined,
-  deps: Pick<SaveAnswerDependencies, "resolveDefinition" | "distanceFeet">
+  deps: Pick<SaveAnswerDependencies, "resolveDefinition" | "distanceFeet" | "catalog">
 ): Array<{ source: string; label: string }> {
   const bloodied = target.hp.current > 0 && target.hp.current * 2 <= target.hp.maximum;
   const authority = auraOfAuthority(state, target, deps);
@@ -821,7 +821,15 @@ export function answerSave(
     events.push(
       ...applyFailureEffect(state, target.id, pending.onSuccessEffect, `${commandId}:${saveId}:success`, immunities)
     );
-  if (!success && pending.failureNote) events.push({ kind: "effect", text: pending.failureNote, actorId: target.id });
+  // The note can name the source (Heat Metal's "until the start of the caster's next turn"), so it carries it to be
+  // masked when hidden.
+  if (!success && pending.failureNote)
+    events.push({
+      kind: "effect",
+      text: pending.failureNote,
+      actorId: target.id,
+      ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
+    });
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
   if (outcomeCondition)

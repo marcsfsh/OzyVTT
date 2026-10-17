@@ -1,6 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import { conditionLabel } from "./condition-rules.js";
-import { HIDDEN_SOURCE, withoutSourceName } from "./projections.js";
+import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 
 type Effect = GameState["actors"][number]["effects"][number];
 

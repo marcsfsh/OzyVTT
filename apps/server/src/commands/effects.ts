@@ -5,7 +5,7 @@ import { CommandRejectedError } from "../game-store.js";
 import { EffectAddSchema, EffectEndSchema } from "@vtt/domain/commands";
 import type { GameState } from "@vtt/domain";
 import type { RulesOverride } from "../rules-families.js";
-import { withoutSourceName } from "../projections.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { initiatorOf, isGmGrade } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 

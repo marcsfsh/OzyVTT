@@ -8,7 +8,7 @@ import { RulesBlockedError } from "../game-store.js";
 import { upcastAction } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
-import { recordRoll, sizeAtMost, type DefinitionAction, type ResolveContext } from "./context.js";
+import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { beginConcentration } from "./concentration.js";
 import { criticalExpression } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy } from "./economy.js";
@@ -252,8 +252,7 @@ export function rollHitOptions(ctx: ResolveContext): void {
         ended,
         ctx.deps
       );
-      for (const event of ended)
-        ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+      for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
       ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
     }
     if (rider.lingers) lingerOn(ctx, target, action, cast, rider.lingers);

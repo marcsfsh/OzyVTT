@@ -38,7 +38,7 @@ import { endZone } from "../spell-zone-state.js";
 import { placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
-import { HIDDEN_SOURCE } from "../projections.js";
+import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { sceneSight } from "../vision/sight.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";

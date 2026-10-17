@@ -4,7 +4,7 @@ import { addEffect, CONCENTRATING_TAG, makeEffect, type EffectNarration } from "
 import { laterRowOf, laterSpellActionId } from "../item-actions.js";
 import { endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
-import type { ResolveContext } from "./context.js";
+import { tableLineOf, type ResolveContext } from "./context.js";
 
 /** A spell's printed duration as an effect duration: up to ten minutes counts rounds; longer ones last until
  *  ended (the engine keeps no clock outside a fight). */
@@ -75,7 +75,7 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
     conditionIds: []
   });
   // The previous Concentration ending is the table's news.
-  for (const event of ended) ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+  for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /** A spell with no Concentration that its caster acts with on later turns (Produce Flame's hurl, Guardian of Faith's
