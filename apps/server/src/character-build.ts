@@ -335,7 +335,8 @@ function cantripActionFor(
       ...(tier?.targetCount && spell.effect?.attacks ? { attacks: tier.targetCount } : {})
     }
   );
-  if (mechanics.damage.length === 0 && !mechanics.save) return null;
+  // A cantrip that lasts and acts later (Produce Flame) is cast to start it, with nothing to roll.
+  if (mechanics.damage.length === 0 && !mechanics.save && (spell.effect?.laterActions ?? []).length === 0) return null;
   return {
     id: spellActionId(spell.id),
     name: spell.name,
@@ -384,7 +385,9 @@ function leveledSpellActionFor(
     mechanics.healing !== undefined ||
     mechanics.attack ||
     mechanics.grants !== undefined ||
-    spell.effect?.reaction !== undefined;
+    spell.effect?.reaction !== undefined ||
+    // A spell that lasts and acts on later turns (Flame Blade) is cast to start it.
+    (spell.effect?.laterActions ?? []).length > 0;
   if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;
   return {

@@ -86,6 +86,25 @@ export function tokensInTemplate(
   return caught;
 }
 
+/** Whether a footprint at `position` would be caught by the template, by the same rule as `tokensInTemplate`: any of
+ *  its cells' centres inside. For a creature moving through a lingering area, point by point. */
+export function footprintInTemplate(
+  calibration: SquareGridCalibration,
+  geometry: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>,
+  shape: AnnotationShapeKind,
+  widthFeet: number | null,
+  position: AnnotationPoint,
+  sizeCells: number
+): boolean {
+  const inside = containmentTest(
+    shape,
+    imageToGrid(calibration, geometry.origin),
+    imageToGrid(calibration, geometry.target),
+    (widthFeet ?? calibration.distancePerCell) / calibration.distancePerCell
+  );
+  return footprintCellCenters(calibration, position, sizeCells).some((center) => inside(center));
+}
+
 /** Convenience for tests/preview: the image-space center of a grid cell. */
 export function cellCenterImage(calibration: SquareGridCalibration, column: number, row: number): AnnotationPoint {
   return gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });

@@ -1399,6 +1399,26 @@ export const AnnotationColorSetSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Places a spell's lingering area on the map (GM): one a player's cast left unplaced, or a new spot for it. Its
+ *  zone acts there from then on (`SpellZone`). */
+export const SpellZonePlaceSchema = z
+  .object({
+    commandId: z.uuid(),
+    zoneId: z.string().min(1).max(120),
+    template: z
+      .object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema })
+      .strict(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Ends a spell's lingering area (GM): the webs burned away, a guardian dismissed, or a ruling. */
+export const SpellZoneEndSchema = z
+  .object({
+    commandId: z.uuid(),
+    zoneId: z.string().min(1).max(120),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const AnnotationMoveSchema = z
   .object({
     commandId: z.uuid(),

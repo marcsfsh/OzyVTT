@@ -31,8 +31,8 @@ import {
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
-import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
-import { startConcentration } from "./resolution/concentration.js";
+import { parkActionSave, parkForAcReaction, parkHeldObjectSave, parkReaction } from "./resolution/pending.js";
+import { markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -100,6 +100,8 @@ export function resolveDefinitionAction(
   applyOnHitEffects(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
+  markSpellUp(ctx);
+  openSpellZone(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
@@ -107,6 +109,7 @@ export function resolveDefinitionAction(
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  parkHeldObjectSave(ctx);
   applyRageRules(ctx);
 
   commitEconomy(ctx);
@@ -212,6 +215,8 @@ export function actionAvailability(
   catalog?: EquipmentCatalog
 ): ReadonlyArray<ActionAvailability> {
   return actions.map((action): ActionAvailability => {
+    // The spell an action casts, so a later action shows as waiting for it while the spell isn't up.
+    const spell = action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined;
     const evaluation = evaluateActionEconomy(
       state,
       attacker,
@@ -222,7 +227,8 @@ export function actionAvailability(
       siblings,
       undefined,
       false,
-      catalog
+      catalog,
+      spell
     );
     let usesRemaining: number | null = null;
     if (action.uses) {

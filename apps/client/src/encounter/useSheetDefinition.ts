@@ -22,6 +22,8 @@ export type AvailabilityRow = Readonly<{
   name: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
   available: boolean;
+  /** Why it isn't available now, rule by rule. */
+  violations?: ReadonlyArray<{ rule: string; message: string }>;
   usesRemaining: number | null;
   builtin?: boolean;
   ridesAHit?: true;
@@ -47,6 +49,12 @@ export type AvailabilityRow = Readonly<{
   damageTypes?: ContentActionSummary["damageTypes"] | null;
   checkSkills?: ContentActionSummary["checkSkills"];
 }>;
+
+/** A spell's later action whose spell isn't up on its caster (Spiritual Weapon's attack before the cast), which
+ *  isn't offered until it is. */
+export const awaitsItsSpell = (row: AvailabilityRow) =>
+  /^spell-.+-then-/.test(row.id) &&
+  (row.violations ?? []).some((violation) => violation.rule === "feature.requires-effect");
 
 /** The wire row in the shape every action surface here already speaks. */
 export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {

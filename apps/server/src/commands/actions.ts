@@ -29,6 +29,7 @@ import { rollSettledCheck } from "../check-rolls.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { castSlotLevel } from "../resolution/economy.js";
+import { zoneRowOf } from "../spell-zones.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
@@ -129,7 +130,9 @@ export const actionCommands = [
           ).filter(
             (id) => (id !== actorId || !casterOutside) && draft.combat.initiative.some((entry) => entry.actorId === id)
           );
-          if (resolvedTargetIds.length === 0) throw new CommandRejectedError("No combatants are inside that area.");
+          // A spell that leaves its area behind (Moonbeam, Web, a wall) may be placed where no one stands yet.
+          if (resolvedTargetIds.length === 0 && !(spell && zoneRowOf(spell)))
+            throw new CommandRejectedError("No combatants are inside that area.");
         } else {
           resolvedTargetIds = targetIds ?? [];
         }
@@ -178,7 +181,8 @@ export const actionCommands = [
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
-            ...(request.hitOptions ? { hitOptions: request.hitOptions } : {})
+            ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
+            ...(template ? { areaPlaced: true } : {})
           },
           {
             random: (sides) => kit.context.random(sides),

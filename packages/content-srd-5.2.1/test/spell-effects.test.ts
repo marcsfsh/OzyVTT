@@ -106,6 +106,45 @@ describe("what one cast of an SRD spell does", () => {
     expect(effectOf("fireball")!.noCastSave).toBeUndefined();
   });
 
+  it("marks the areas the server watches: when they act, where, on whom, and once a turn where the text says so", () => {
+    const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
+    expect(zoneOf("moonbeam")).toEqual({ on: ["enter", "end-turn"], oncePerTurn: true });
+    expect(zoneOf("spirit-guardians")).toEqual({
+      on: ["enter", "end-turn"],
+      oncePerTurn: true,
+      around: "caster",
+      feet: 15,
+      affects: "enemies"
+    });
+    expect(zoneOf("web")).toEqual({ on: ["enter", "start-turn"] });
+    expect(zoneOf("stinking-cloud")).toEqual({ on: ["start-turn"] });
+    expect(zoneOf("spike-growth")).toEqual({ on: ["travel"] });
+    expect(zoneOf("flaming-sphere")).toEqual({ on: ["end-turn"], around: "point", feet: 5 });
+    expect(zoneOf("guardian-of-faith")).toMatchObject({ affects: "enemies", damageCap: 60 });
+    // Damage with no save (a wall of fire), and a fixed amount (the guardian's 20).
+    expect(effectOf("wall-of-fire")!.laterActions?.[0]).toMatchObject({ zone: { on: ["enter", "end-turn"] } });
+    expect(effectOf("wall-of-fire")!.laterActions?.[0]!.save).toBeUndefined();
+    expect(effectOf("guardian-of-faith")!.laterActions?.[0]!.damage).toEqual([{ formula: "20", type: "radiant" }]);
+    // What the caster does itself on later turns has no zone.
+    for (const id of ["spiritual-weapon", "produce-flame", "call-lightning", "sunbeam", "vampiric-touch"])
+      expect(
+        effectOf(id)!.laterActions?.every((row) => row.zone === undefined),
+        id
+      ).toBe(true);
+    expect(effectOf("flaming-sphere")!.laterActions?.map((row) => [row.name, row.activation])).toEqual([
+      ["save", "other"],
+      ["ram", "bonus-action"]
+    ]);
+  });
+
+  it("gives a wall and a thing placed at a point an area the GM can place", () => {
+    const areaOf = (id: string) => loadSpells().find((spell) => spell.id === id)!.area;
+    expect(areaOf("wall-of-fire")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });
+    expect(areaOf("blade-barrier")).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
+    expect(areaOf("flaming-sphere")).toEqual({ shape: "sphere", sizeFeet: 5, widthFeet: null });
+    expect(areaOf("moonbeam")).toEqual({ shape: "sphere", sizeFeet: 5, widthFeet: null });
+  });
+
   it("says how many creatures a cast targets, and how many more a higher slot adds", () => {
     expect(effectOf("bless")!.targets).toEqual({ count: 3, perSlot: 1 });
     expect(effectOf("mass-cure-wounds")!.targets).toEqual({ count: 6 });

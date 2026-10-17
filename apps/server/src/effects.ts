@@ -3,6 +3,7 @@ import type { ActorDefinition, SaveFailureDuration } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { conditionLabel, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { endZonesOfCast } from "./spell-zone-state.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, clearing linked conditions and firing onEnd grants. Returns narration events rather than writing
@@ -23,6 +24,10 @@ export type EffectNarration = Readonly<{
 
 const MAX_EFFECTS = 20;
 
+/** The bearer can't take an action or a Bonus Action while this lasts (SRD Stinking Cloud's poisoning). */
+export const NO_ACTIONS_TAG = "no-actions";
+/** On an escapable effect: the escape is a Strength (Athletics) check alone (a spell's restraint: Web, Entangle). */
+export const ESCAPE_ATHLETICS_TAG = "escape-athletics";
 /** The tag on a caster's own "Concentrating on X" effect; ending it ends everything its cast made. */
 export const CONCENTRATING_TAG = "concentrating";
 /** The Barbarian's Rage: it ends early on Incapacitated or in Heavy armor, and blocks spells and Concentration. */
@@ -364,13 +369,14 @@ function endEffectInternal(
       events.push(...applyExhaustionDeath(state, actor));
   }
   if (effect.tags.includes(HASTED_TAG) && !sweeping) addLethargy(state, actor, effect, events);
-  // The caster's "Concentrating on X" ending ends everything that cast made, on every creature.
+  // The caster's "Concentrating on X" ending ends everything that cast made, on every creature, and the area it left.
   if (effect.tags.includes(CONCENTRATING_TAG) && effect.castId !== undefined) {
     for (const bearer of state.actors) {
       for (const sustained of [...bearer.effects]) {
         if (sustained.castId === effect.castId) endEffectInternal(state, bearer, sustained.id, events, sweeping);
       }
     }
+    endZonesOfCast(state, effect.castId);
   }
   // Cascade: effects that exist only while another tag is present end with it.
   for (const dependent of [...actor.effects]) {

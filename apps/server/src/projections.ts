@@ -177,7 +177,12 @@ const PENDING_SAVE_FIELDS = {
   // Names the effect a repeated save would end; the prompt's action name already says which.
   repeatOf: "never",
   // The call reaches the player through `rollCalls`, which carries only their own part of it.
-  callId: "never"
+  callId: "never",
+  // What a success or a failure brings is narrated when it lands; the spell area names its caster.
+  onSuccessEffect: "never",
+  failureNote: "never",
+  breaksConcentration: "never",
+  zoneId: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -198,7 +203,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   sourceActorId: "derived",
   castId: "never",
   sourceActionId: "never",
-  ongoingDamage: "never"
+  ongoingDamage: "never",
+  currentTurn: "player"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {

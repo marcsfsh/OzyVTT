@@ -92,7 +92,15 @@ export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: bool
  *  wire (the call reaches the player through `rollCalls`), and a hidden source's name is masked server-side. */
 export type PlayerPendingSave = Omit<
   PendingSave,
-  "sourceActorId" | "endsEffects" | "repeatOf" | "onFailEffect" | "callId"
+  | "sourceActorId"
+  | "endsEffects"
+  | "repeatOf"
+  | "onFailEffect"
+  | "callId"
+  | "onSuccessEffect"
+  | "failureNote"
+  | "breaksConcentration"
+  | "zoneId"
 > & {
   onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "castId" | "sourceActionId" | "ongoingDamage">;
 };

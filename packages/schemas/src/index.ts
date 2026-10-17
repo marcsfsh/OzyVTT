@@ -671,7 +671,19 @@ export const EffectInstanceSchema = z
       .strict()
       .optional(),
     /** How many more times its damage riders may land before it ends (a coat of Basic Poison). */
-    damageUses: z.number().int().min(1).max(10).optional()
+    damageUses: z.number().int().min(1).max(10).optional(),
+    /** The spell this effect keeps up on its caster and the level it was cast at, so what the spell lets the caster do
+     *  on later turns (Spiritual Weapon's attack) is offered while it lasts, at that level. */
+    spell: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        level: z.number().int().min(0).max(9)
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;

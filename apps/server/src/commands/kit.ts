@@ -16,12 +16,13 @@ import type { CombatLogStore } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
 import type { ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
-import type { InitiativeRollDeps, InitiativeRollSink } from "../encounter.js";
+import type { InitiativeRollDeps, InitiativeRollSink, TurnAdvanceDeps } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { withoutSourceName } from "../projections.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
+import type { ZoneDeps } from "../spell-zones.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
@@ -179,6 +180,35 @@ export function createKit(context: CommandContext) {
       }
       creates.set(sessionId, [...recent, now]);
       return true;
+    },
+
+    /** What a spell area reads to act on creatures in `state` (`spell-zones.ts`): the live map, stat blocks, items and
+     *  the server's dice. */
+    zoneDeps: (state: GameState, geometry: TokenMapGeometry | null): ZoneDeps => ({
+      geometry,
+      resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
+      rollDie: (sides) => context.random(sides),
+      newId: context.newId,
+      now: () => new Date().toISOString()
+    }),
+
+    /** The deps a turn change runs with in `state`: recharge and ongoing-damage dice, repeat saves, and the spell
+     *  areas on the live map. */
+    turnAdvanceDeps: (state: GameState, geometry: TokenMapGeometry | null): TurnAdvanceDeps => ({
+      resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
+      rollDie: (sides) => context.random(sides),
+      newId: context.newId,
+      now: () => new Date().toISOString(),
+      geometry
+    }),
+
+    /** The live map's geometry, read before a command's turn in the queue; null with no map or one gone missing, so a
+     *  turn still changes and only what needs the map waits. */
+    async liveGeometry(): Promise<TokenMapGeometry | null> {
+      const mapAssetId = read().combat.mapAssetId;
+      return mapAssetId ? context.tokenGeometryFor(mapAssetId).catch(() => null) : null;
     },
 
     /** What an initiative roll reads about its roller in `state`: stat blocks and items for its riders. */

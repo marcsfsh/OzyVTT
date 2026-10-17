@@ -5,7 +5,15 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
-import { HASTED_TAG, hasEffectTag, RAGING_TAG, READIED_TAG, RECKLESS_TAG, STEADY_AIM_TAG } from "../effects.js";
+import {
+  HASTED_TAG,
+  hasEffectTag,
+  NO_ACTIONS_TAG,
+  RAGING_TAG,
+  READIED_TAG,
+  RECKLESS_TAG,
+  STEADY_AIM_TAG
+} from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
 import { SCROLL_UNREADABLE, scrollOfAction, scrollReading } from "../scrolls.js";
 import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
@@ -20,7 +28,8 @@ import {
   rememberOverride,
   type RuleId
 } from "../rules-families.js";
-import { laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { laterRowOf, laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
@@ -165,6 +174,7 @@ export function evaluateActionEconomy(
   }
   checkTargeting(evaluation, distanceFeet);
   if (spell) checkMarkMove(evaluation, spell);
+  if (spell) checkSpellUp(evaluation, spell);
   if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
@@ -204,6 +214,19 @@ function checkMarkMove({ state, attacker, action, violations }: Evaluation, spel
       rule: "target.mark-still-standing",
       message: `${spell.name} moves only once its creature drops to 0 Hit Points - ${standing.bearer.name} hasn't.`
     });
+}
+
+/** What a spell lets its caster do on later turns (Spiritual Weapon's attack, Call Lightning's bolt) is there "until the
+ *  spell ends": while its caster still has it up. */
+function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, spell: SpellReference): void {
+  const row = laterRowOf(spell, action.id);
+  if (!row || !takenWhileUp(row) || spellUpLevel(attacker, spell) !== null) return;
+  // A sheet built before the cast itself was an action (Produce Flame's) has no way to start it, so it isn't asked to.
+  if (!siblings.some((sibling) => sibling.spellId === spell.id && !laterRowOf(spell, sibling.id))) return;
+  violations.push({
+    rule: "feature.requires-effect",
+    message: `${attacker.name} doesn't have ${spell.name} up - cast it first.`
+  });
 }
 
 /** In wait mode the order is provisional until every player has rolled, and the turn economy resets when
@@ -343,6 +366,13 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
         message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.`
       });
   }
+  // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
+  const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
+  if (reeling && (action.activation === "action" || action.activation === "bonus-action"))
+    violations.push({
+      rule: "condition.incapacitated",
+      message: `${attacker.name} is reeling from ${reeling.name} and can't take an action or a Bonus Action this turn.`
+    });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
     violations.push({

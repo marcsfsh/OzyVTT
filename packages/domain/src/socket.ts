@@ -60,6 +60,8 @@ import type {
   ActorRestoreUsesSchema,
   AddCombatantSchema,
   RemoveCombatantSchema,
+  SpellZoneEndSchema,
+  SpellZonePlaceSchema,
   AnnotationAddSchema,
   AnnotationClearSchema,
   AnnotationColorSetSchema,
@@ -732,6 +734,14 @@ export interface ClientToServerEvents {
   ) => void;
   "annotation:move": (
     payload: CommandPayload<typeof AnnotationMoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "spell-zone:place": (
+    payload: CommandPayload<typeof SpellZonePlaceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "spell-zone:end": (
+    payload: CommandPayload<typeof SpellZoneEndSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:remove": (

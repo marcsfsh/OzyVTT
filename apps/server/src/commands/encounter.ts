@@ -238,6 +238,7 @@ export const encounterCommands = [
       const { actorId } = request;
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
           throw new CommandRejectedError(
@@ -247,13 +248,7 @@ export const encounterCommands = [
         // Its turn ends first, recorded like any other, so Previous can bring it back.
         if (draft.combat.turnActorId === actorId && draft.combat.initiative.length > 1 && !gathering)
           outcome = planNextTurn(draft, timeline, false, (advancing) =>
-            nextInitiativeTurn(advancing, effectEvents, {
-              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
-              catalog: kit.equipmentCatalog(),
-              rollDie: (sides) => kit.context.random(sides),
-              newId: kit.context.newId,
-              now: () => new Date().toISOString()
-            })
+            nextInitiativeTurn(advancing, effectEvents, kit.turnAdvanceDeps(advancing, geometry))
           );
         else if (draft.combat.turnActorId === actorId && gathering) {
           const order = draft.combat.initiative.filter((entry) => entry.actorId !== actorId);
@@ -382,15 +377,10 @@ export const encounterCommands = [
       // Rewound and changed: rewrite history only after GM confirmation (TimelineConfirmationRequired).
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         outcome = planNextTurn(draft, timeline, request.confirmRewrite === true, (advancing) =>
-          nextInitiativeTurn(advancing, effectEvents, {
-            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
-            catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides),
-            newId: kit.context.newId,
-            now: () => new Date().toISOString()
-          })
+          nextInitiativeTurn(advancing, effectEvents, kit.turnAdvanceDeps(advancing, geometry))
         );
       });
       if (duplicate) return;
@@ -430,6 +420,7 @@ export const encounterCommands = [
     async run({ principal, executeTimeline }, kit) {
       // End Turn is a live forward step like the GM's Next. Players cannot advance while the table is rewound.
       const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
           throw new CommandRejectedError(
@@ -437,13 +428,7 @@ export const encounterCommands = [
             "history_review"
           );
         planNextTurn(draft, timeline, false, (advancing) =>
-          endTurn(advancing, initiatorOf(principal), effectEvents, {
-            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
-            catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides),
-            newId: kit.context.newId,
-            now: () => new Date().toISOString()
-          })
+          endTurn(advancing, initiatorOf(principal), effectEvents, kit.turnAdvanceDeps(advancing, geometry))
         );
       });
       if (duplicate) return;

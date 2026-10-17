@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 114 commands · 232 HTTP paths
+- 14 GameState fields · 116 commands · 234 HTTP paths
 
 ## GameState shape
 
@@ -36,7 +36,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `table`, `terrain`, `time`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -144,6 +144,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `scene.rename` | `scene:write` |
 | `scene.reorder` | `scene:write` |
 | `scene.set-combatants` | `scene:write` |
+| `spell-zone.end` | `combat:write` |
+| `spell-zone.place` | `combat:write` |
 | `table.set-party-visibility` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
 | `terrain.paint` | `scene:write` |
@@ -342,6 +344,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/scenes/{sceneId}/duplicate`
 - `POST /api/v1/game/scenes/{sceneId}/rename`
 - `POST /api/v1/game/scenes/reorder`
+- `POST /api/v1/game/spell-zones/{zoneId}/end`
+- `POST /api/v1/game/spell-zones/{zoneId}/place`
 - `POST /api/v1/game/table/party-visibility`
 - `POST /api/v1/game/table/staging-defaults`
 - `POST /api/v1/game/terrain/paint`

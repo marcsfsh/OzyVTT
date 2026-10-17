@@ -26,10 +26,13 @@ export function TargetBar({
 }>) {
   const targetingBusy = useTargetingBusy();
   const isTemplate = activeTargeting.mode === "template";
+  const placingZone = activeTargeting.placeZoneId !== undefined;
   const names = activeTargeting.selected.map((id) => actorsById.get(id)?.name ?? "?");
   const label = isTemplate
     ? activeTargeting.template?.placed
-      ? " - placed; Roll to catch everyone under it"
+      ? placingZone
+        ? " - placed; Place to set it there"
+        : " - placed; Roll to catch everyone under it"
       : ` - drag the ${activeTargeting.action.area?.sizeFeet}-ft ${activeTargeting.action.area?.shape} on the map`
     : activeTargeting.mode === "none"
       ? " - choose the skill in the turn order, then Roll"
@@ -68,7 +71,7 @@ export function TargetBar({
             )
           }
         >
-          Roll {activeTargeting.action.name}
+          {placingZone ? "Place" : `Roll ${activeTargeting.action.name}`}
         </button>
       </span>
     </div>
