@@ -3,7 +3,7 @@ import type { GameState, RollRecord } from "@vtt/domain";
 import { projectPlayerView } from "../src/projections.js";
 import { projectPlayerReplay } from "../src/replay-projection.js";
 import { projectViewerEncounter } from "../src/viewer-encounter.js";
-import { rememberExplored } from "../src/vision/audience.js";
+import { exploredRectsOf, rememberExplored } from "../src/vision/audience.js";
 import type { EncounterArchiveDocument } from "../src/encounter-archive.js";
 import {
   cell,
@@ -203,5 +203,35 @@ describe("dynamic vision on the shared screen and in replays", () => {
     // The roll fell in the first turn, when no one saw the goblin.
     expect(mentionsGoblin(replay.rolls)).toBe(false);
     expect(second!.combat.tokens.map((token) => token.actorId)).toContain(GOBLIN);
+  });
+
+  it("draws no circle round a hidden creature's carried light, for the player, the table screen or the party's memory", () => {
+    // The goblin carries a torch behind a short wall; its light still reaches ground Borin can see.
+    const at = { x: 375, y: 75 };
+    const state = visionGame({
+      ambient: "dark",
+      walls: [wall({ x: 300, y: 0 }, { x: 300, y: 150 })],
+      lights: [
+        { id: "60000000-0000-4000-8000-000000000009", position: null, actorId: GOBLIN, brightFeet: 20, dimFeet: 20 }
+      ],
+      positions: { [GOBLIN]: at }
+    });
+    const onTheCircle = (polygons: readonly (readonly number[])[]) =>
+      polygons.flatMap((flat) =>
+        flat.flatMap((_, index) =>
+          index % 2 === 0 && Math.abs(Math.hypot(flat[index]! - at.x, flat[index + 1]! - at.y) - 400) < 0.5
+            ? [index]
+            : []
+        )
+      ).length;
+    const view = asPlayer(frozen(structuredClone(state)), SESSION_A);
+    expect(mentionsGoblin(view)).toBe(false);
+    expect(view.combat.vision.enabled && onTheCircle(view.combat.vision.visible)).toBe(0);
+    const screen = projectViewerEncounter(frozen(structuredClone(state)), 1_000).encounter;
+    expect(onTheCircle(screen.vision?.visible ?? [])).toBe(0);
+    // Nothing the light alone showed is remembered either.
+    const remembered = structuredClone(state);
+    rememberExplored(remembered, {});
+    expect(exploredRectsOf(remembered)).toEqual([]);
   });
 });

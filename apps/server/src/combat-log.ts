@@ -1,3 +1,4 @@
+import { createHmac, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { CombatLogEntry, PlayerRollRecord, RollRecord, RollVisibility } from "@vtt/domain";
 import { migrate, openDatabase, type Migration } from "./database.js";
@@ -44,6 +45,16 @@ const MIGRATIONS: readonly Migration[] = [
   }
 ];
 
+// Drawn once per server run: a player's feed ids hold for as long as the server runs, which is all the client needs to
+// match a live line to the same line in its backfill.
+const FEED_ID_KEY = randomBytes(32);
+
+/** A feed row's id as a player gets it: the same for the same row, and with no order, so the gaps between two lines
+ *  can't count the GM-only lines in between (what a hidden creature's turn writes). */
+export function playerFeedId(id: number): number {
+  return Number.parseInt(createHmac("sha256", FEED_ID_KEY).update(String(id)).digest("hex").slice(0, 12), 16);
+}
+
 /** Who is reading the feed. `sessionId` is the reader's own, the only thing that unlocks a `self-only` roll row. */
 export type FeedReader = Readonly<{ gm: boolean; sessionId?: string }>;
 
@@ -63,10 +74,10 @@ export function projectFeedRow(row: StoredFeedRow, reader: FeedReader): CombatLo
   switch (row.visibility) {
     case null:
     case "public":
-      return row.entry;
+      return { ...row.entry, id: playerFeedId(row.entry.id) };
     case "self-only":
       return row.initiatorSessionId !== null && row.initiatorSessionId === reader.sessionId
-        ? { ...row.entry, private: true }
+        ? { ...row.entry, id: playerFeedId(row.entry.id), private: true }
         : null;
     // gm-only and blind rows are stored with gm_only = 1 and refused above; this catches a mis-stored row.
     default:

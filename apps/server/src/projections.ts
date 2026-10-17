@@ -19,6 +19,7 @@ import type {
 import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
+import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 import { visibleTerrain } from "./terrain.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
 import type { SightContent } from "./vision/senses.js";
@@ -138,18 +139,7 @@ export function projectPlayerAnnotations(
     .map((annotation) => safeAnnotation(annotation, playerSessionId));
 }
 
-// The one mask a hidden source's identity collapses to; shared so adjacent fields never disagree.
-export const HIDDEN_SOURCE = "A hidden threat";
-
-/** Scrubs a hidden source's name out of a free-form label ("Grappled by Vashkar") at the security
- *  boundary, since resolvers interpolate it and blanking would leave an empty chip. Word-boundary match;
- *  it can't catch other spellings, so resolvers must only interpolate the source's own `sourceName`. */
-export function withoutSourceName(text: string, sourceName: string | null): string {
-  const needle = sourceName?.trim() ?? "";
-  if (needle.length === 0) return text;
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return text.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "giu"), HIDDEN_SOURCE);
-}
+export { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 
 type FieldAudience = "player" | "derived" | "never";
 type PlayerKeys<M> = { [K in keyof M]: M[K] extends "player" ? K : never }[keyof M];

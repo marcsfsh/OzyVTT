@@ -23,11 +23,11 @@ import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
 import type { SoundDeps } from "../sound-board.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
-import { withoutSourceName } from "../projections.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { ZoneDeps } from "../spell-zones.js";
 import type { TokenMapGeometry } from "../token-placement.js";
-import { partySight, playerSight } from "../vision/audience.js";
+import { hiddenFrom, playerSight } from "../vision/audience.js";
 import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
@@ -155,13 +155,17 @@ export function createKit(context: CommandContext) {
   /** The creatures hidden from this initiator by sight or the fog, which it may not target; none for the GM. */
   const unseenBy = (initiator: Initiator, state: GameState): ReadonlySet<string> =>
     initiator.role === "gm" ? new Set() : playerSight(state, initiator.sessionId, sightContent()).hidden;
-  /** Hidden from the table: GM-only, or a creature no character perceives (dynamic vision) or wholly under the fog. */
+  /** The shared hidden check (`hiddenFrom`) as the table sees `state`, which every public line and die follows. */
+  const hiddenFromTable = (state: GameState) => hiddenFrom(state, sightContent());
+  /** The same check for whoever acts: the table's view for the GM, that player's own for a player, since a reply or
+   *  refusal reaches only them. */
+  const hiddenFor = (initiator: Initiator, state: GameState) =>
+    hiddenFrom(state, sightContent(), initiator.role === "player" ? initiator.sessionId : undefined);
+  /** Hidden from the table now: GM-only, or a creature no character perceives or wholly under the fog. An actor no
+   *  longer on the roster is not, so a line about one just removed reads as before. */
   const actorHidden = (actorId: string) => {
     const state = read();
-    return (
-      state.actors.find((actor) => actor.id === actorId)?.visibility === "gm-only" ||
-      partySight(state, sightContent()).hidden.has(actorId)
-    );
+    return state.actors.some((actor) => actor.id === actorId) && hiddenFromTable(state)(actorId);
   };
 
   /** Play-time definition lookup: imported stat blocks first; `monsterForInstance` ignores homebrew status so
@@ -194,6 +198,8 @@ export function createKit(context: CommandContext) {
     read,
     actorName,
     actorHidden,
+    hiddenFromTable,
+    hiddenFor,
     unseenBy,
     resolveDefinitionIn,
     sightContent,

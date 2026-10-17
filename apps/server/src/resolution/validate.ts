@@ -22,7 +22,14 @@ import { areEnemies } from "../creature-sides.js";
 import { sceneSight } from "../vision/sight.js";
 import { scrollOfAction } from "../scrolls.js";
 import { builtinHandlerFor } from "./builtins.js";
-import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
+import {
+  resolveHiddenCheck,
+  type DefinitionAction,
+  type LiveActor,
+  type ResolveContext,
+  type ResolveDependencies,
+  type ResolveInput
+} from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
@@ -90,8 +97,14 @@ function combatantsOf(
 }
 
 /** The enemies on the map that see the creature and that it sees, by name; none while dynamic vision is off. A
- *  creature hidden from the table never counts for a public one. */
-function enemiesWatching(state: GameState, hider: LiveActor, deps: ResolveDependencies): string[] {
+ *  creature hidden from whoever asks (by sight, the fog or GM-only) never counts for one they can see, or the refusal
+ *  would name it. */
+function enemiesWatching(
+  state: GameState,
+  hider: LiveActor,
+  deps: ResolveDependencies,
+  hidden: (actorId: string) => boolean
+): string[] {
   const sight = sceneSight(state, {
     ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
     ...(deps.catalog ? { catalog: deps.catalog } : {})
@@ -100,7 +113,7 @@ function enemiesWatching(state: GameState, hider: LiveActor, deps: ResolveDepend
   return state.combat.initiative.flatMap((entry) => {
     const enemy = state.actors.find((actor) => actor.id === entry.actorId);
     if (!enemy || enemy.id === hider.id || isIncapacitated(enemy)) return [];
-    if (enemy.visibility !== "public" && hider.visibility === "public") return [];
+    if (hidden(enemy.id) && !hidden(hider.id)) return [];
     if (!areEnemies(hider, enemy, deps.resolveDefinition)) return [];
     return sight.sees(hider.id, enemy.id) && sight.sees(enemy.id, hider.id) ? [enemy.name] : [];
   });
@@ -114,6 +127,8 @@ export function openResolve(
   input: ResolveInput,
   deps: ResolveDependencies
 ): ResolveContext {
+  const hiddenFromTable = resolveHiddenCheck(state, deps, false);
+  const hiddenFromInitiator = resolveHiddenCheck(state, deps, true);
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
   const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog, spell);
@@ -175,7 +190,7 @@ export function openResolve(
   // only an enemy the hider sees counts ("if you can see a creature, you can discern whether it can see you"), so
   // the refusal never gives away one the player doesn't know of.
   if (input.builtin && builtinBaseId(action.id) === "hide") {
-    const watchers = enemiesWatching(state, attacker, deps);
+    const watchers = enemiesWatching(state, attacker, deps, hiddenFromInitiator);
     const mode = effectiveModeFor(state.combat, "hide.seen");
     if (watchers.length > 0 && mode !== "freeform") {
       const message = `${watchers.join(" and ")} can see ${attacker.name}. Hide out of every enemy's sight.`;
@@ -193,6 +208,8 @@ export function openResolve(
     action,
     input,
     deps,
+    hiddenFromTable,
+    hiddenFromInitiator,
     attacker,
     targets,
     builtin,

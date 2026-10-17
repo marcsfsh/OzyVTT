@@ -135,17 +135,17 @@ export const gameReads = [
     // The same evaluation as resolution, read-only. GM-grade any combatant; a player their own.
     run: (principal, input, kit) => {
       const state = kit.read();
-      const actor = state.actors.find(
-        (candidate) => candidate.id === (input as z.output<typeof ActorAvailableActionsSchema>).actorId
-      );
-      if (!actor) throw new GameNotFoundError("That combatant no longer exists.");
+      const actorId = (input as z.output<typeof ActorAvailableActionsSchema>).actorId;
+      // Access first: a missing creature and someone else's get one answer, so a player can't probe which ids exist.
       requireActorAccess(
         initiatorOf(principal),
         state,
-        actor.id,
+        actorId,
         "check",
         "You can only check your own character's actions."
       );
+      const actor = state.actors.find((candidate) => candidate.id === actorId);
+      if (!actor) throw new GameNotFoundError("That combatant no longer exists.");
       const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
       if (actor.definitionId && !definition) throw new GameNotFoundError("That combatant's stat block is unavailable.");
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
@@ -195,8 +195,7 @@ export const gameReads = [
     run: (principal, input, kit) => {
       const state = kit.read();
       const actorId = (input as z.output<typeof ActorMovementSchema>).actorId;
-      if (!state.actors.some((candidate) => candidate.id === actorId))
-        throw new GameNotFoundError("That combatant no longer exists.");
+      // Access first, as for the actions read: one answer for a missing creature and someone else's.
       requireActorAccess(
         initiatorOf(principal),
         state,
@@ -204,6 +203,8 @@ export const gameReads = [
         "check",
         "You can only check your own character's movement."
       );
+      if (!state.actors.some((candidate) => candidate.id === actorId))
+        throw new GameNotFoundError("That combatant no longer exists.");
       return movementStatus(state, actorId, {
         resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
         catalog: kit.equipmentCatalog()
@@ -251,10 +252,12 @@ export const gameReads = [
       const sight = sceneSight(state, kit.sightContent());
       if (!sight.enabled) return { enabled: false, visible: [], actorIds: [] };
       const viewers = actorId === undefined ? partyViewerIds(state) : [actorId];
+      const perceived = sight.perceivedBy(viewers);
       return {
         enabled: true,
-        visible: sight.areaOf(viewers).map(flatPolygon),
-        actorIds: [...sight.perceivedBy(viewers)]
+        // As the projections draw it: no light carried by a creature these eyes don't perceive.
+        visible: sight.areaOf(viewers, (carrierId) => perceived.has(carrierId)).map(flatPolygon),
+        actorIds: [...perceived]
       };
     }
   },

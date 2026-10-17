@@ -2,7 +2,7 @@ import { conditionLabel } from "../condition-rules.js";
 import { endEffect } from "../effects.js";
 import { createPendingSaves } from "../saving-throws.js";
 import { masteryHitPushes, masteryHitSaves, SAPPED_TAG, VEXED_TAG, type MasterySwing } from "../weapon-mastery.js";
-import { sizeAtMost, type ResolveContext } from "./context.js";
+import { endedEffect, sizeAtMost, type ResolveContext } from "./context.js";
 
 /** The weapon mastery in force on this swing (rules in `weapon-mastery.ts`); null unless a mastery
  *  applies to an attack that rolled. */
@@ -22,9 +22,10 @@ export function masterySwingOf(ctx: ResolveContext): MasterySwing | null {
   };
 }
 
-/** The resolver's own gate for table lines (`appendLog` re-checks). Unknown or non-public fails toward hiding. */
+/** The resolver's own gate for table lines (`appendLog` re-checks): the shared hidden check, where an unknown id
+ *  fails toward hiding. */
 function namesAHiddenCombatant(ctx: ResolveContext, ...actorIds: readonly string[]): boolean {
-  return actorIds.some((id) => ctx.state.actors.find((actor) => actor.id === id)?.visibility !== "public");
+  return actorIds.some(ctx.hiddenFromTable);
 }
 
 /** What a landed mastery forces on its target: a saving throw (Topple) and forced movement (Push). */
@@ -128,7 +129,7 @@ export function spendSap(ctx: ResolveContext): void {
   if (attack === null) return;
   for (const sapped of attacker.effects.filter((effect) => effect.tags.includes(SAPPED_TAG))) {
     endEffect(state, attacker.id, sapped.id);
-    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: sapped.name });
+    effectsEnded.push(endedEffect(attacker, sapped));
   }
 }
 
@@ -143,5 +144,5 @@ export function spendVex(ctx: ResolveContext): void {
   );
   if (!marker) return;
   endEffect(state, target.id, marker.id);
-  effectsEnded.push({ actorId: target.id, actorName: target.name, name: marker.name });
+  effectsEnded.push(endedEffect(target, marker));
 }

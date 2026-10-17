@@ -7,6 +7,7 @@ paths:
   - "apps/server/src/codex/visibility.ts"
   - "apps/server/src/codex-http.ts"
   - "apps/client/src/viewer/**"
+  - "apps/server/src/vision/audience.ts"
 ---
 
 # Projection safety
@@ -19,7 +20,9 @@ quantity and no identity, position or existence of a hidden thing. When in doubt
   delete keys from it.
 - Fog and dynamic vision are part of the boundary (ADR-0023). A creature no player character
   perceives, or one wholly under fog, is left out of players' and the viewer's payloads exactly
-  like a GM-only one.
+  like a GM-only one. Anything else that might name it, bend a public die for it or point at it
+  (narration, refusals, prompts, rules) asks `hiddenFrom` in `vision/audience.ts`, never
+  `visibility === "gm-only"` alone.
 - In the Codex a player gets the player half of a revealed record and nothing else. A revealed
   child must not leak an unrevealed parent or target. A hidden record is a 404, never a 403.
 

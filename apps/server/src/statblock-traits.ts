@@ -7,6 +7,7 @@ import { areAllies } from "./creature-sides.js";
 import { addEffect, makeEffect, turnEndDuration, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { createPendingSaves, rollSaveAtOnce } from "./saving-throws.js";
+import { hiddenFrom } from "./vision/audience.js";
 
 /**
  * What a stat block's traits do when damage lands (`ActorDefinition.traitMechanics`, read from the trait text when
@@ -42,8 +43,8 @@ export function traitOf<Kind extends TraitMechanic["kind"]>(
 /**
  * SRD Aura of Authority (the hobgoblin captain): "While in a 10-foot Emanation originating from the hobgoblin, the
  * hobgoblin and its allies have Advantage on attack rolls and saving throws, provided the hobgoblin doesn't have the
- * Incapacitated condition." The roll's source, or null. A hidden captain never gives a visible creature Advantage,
- * which would reveal it.
+ * Incapacitated condition." The roll's source, or null. A captain hidden from the table (the shared check: GM-only, out
+ * of every character's sight or under the fog) never gives a visible creature Advantage, which would reveal it.
  */
 export function auraOfAuthority(
   state: GameState,
@@ -51,13 +52,18 @@ export function auraOfAuthority(
   deps: Readonly<{
     resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
     distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+    catalog?: EquipmentCatalog;
   }>
 ): Readonly<{ source: string; label: string }> | null {
+  const hidden = hiddenFrom(state, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
   for (const captain of state.actors) {
     if (captain.hp.current <= 0 || isIncapacitated(captain)) continue;
-    if (captain.visibility !== "public" && creature.visibility === "public") continue;
     const definition = captain.definitionId ? deps.resolveDefinition?.(captain.definitionId) : undefined;
     if (!holdsFeature(definition, "aura-of-authority", "Aura of Authority")) continue;
+    if (hidden(captain.id) && !hidden(creature.id)) continue;
     if (captain.id !== creature.id) {
       if (!state.combat.initiative.some((entry) => entry.actorId === captain.id)) continue;
       if (!areAllies(captain, creature, deps.resolveDefinition)) continue;

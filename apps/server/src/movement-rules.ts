@@ -58,6 +58,9 @@ export type MovementRulesInput = Readonly<{
   /** With dynamic vision on: whether a creature saw the mover as it set off, which an opportunity attack needs. The
    *  conditions alone decide (Blinded, Invisible) when absent. */
   seenBy?: (actorId: string) => boolean;
+  /** The mover was hidden from the table as it set off (the shared check: out of every character's sight or under the
+   *  fog). A player's character can't see it go, and its prompt would point at it, so none opens for one. */
+  moverHiddenFromPlayers?: boolean;
   newPromptId: () => string;
   now: () => number;
   commandId: string;
@@ -471,6 +474,7 @@ function openOpportunityAttacks(
     }
     if (left === null) continue;
     if (input.seenBy ? !input.seenBy(enemy.id) : !seesMover(enemy, enemyDefinition, mover, left)) continue;
+    if (input.moverHiddenFromPlayers === true && enemy.ownerSessionId !== null) continue;
     if (
       state.combat.pendingReactions.some(
         (prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId

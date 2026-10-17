@@ -34,6 +34,8 @@ import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { hitRiderOf } from "./hit-riders.js";
+import { hiddenFrom } from "../vision/audience.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
@@ -198,7 +200,10 @@ export function evaluateActionEconomy(
 
 /** SRD Hunter's Mark and Hex move "if the target drops to 0 Hit Points before this spell ends": the caster's
  *  Concentration on the spell holds a mark, and the marked creature is down. */
-function checkMarkMove({ state, attacker, action, violations }: Evaluation, spell: SpellReference): void {
+function checkMarkMove(
+  { state, attacker, action, resolveDefinition, violations }: Evaluation,
+  spell: SpellReference
+): void {
   if (!markMoveOf(spell, action.id)) return;
   const marks = castMarks(state, attacker, spell);
   if (marks.length === 0) {
@@ -209,10 +214,13 @@ function checkMarkMove({ state, attacker, action, violations }: Evaluation, spel
     return;
   }
   const standing = marks.find(({ bearer }) => bearer.hp.current > 0);
+  // A marked creature hidden from the table (the shared check) isn't named in the refusal.
   if (standing)
     violations.push({
       rule: "target.mark-still-standing",
-      message: `${spell.name} moves only once its creature drops to 0 Hit Points - ${standing.bearer.name} hasn't.`
+      message: hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(standing.bearer.id)
+        ? `${spell.name} moves only once its creature drops to 0 Hit Points.`
+        : `${spell.name} moves only once its creature drops to 0 Hit Points - ${standing.bearer.name} hasn't.`
     });
 }
 
@@ -268,18 +276,16 @@ export function isReadiedResponse(
 
 /** SRD: an action and a Bonus Action are taken on your own turn. Off it a creature acts only with a Reaction (a
  *  readied action is one), a legendary action, or a feature that answers an event. The current creature is named
- *  only when the table can see it. */
-function checkOwnTurn({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+ *  only when the table can see it (the shared hidden check). */
+function checkOwnTurn({ state, attacker, action, onOwnTurn, resolveDefinition, violations }: Evaluation): void {
   if (onOwnTurn || !state.combat.active || action.legendary !== undefined) return;
   if (action.activation !== "action" && action.activation !== "bonus-action") return;
   if (isReadiedResponse(state, attacker, action)) return;
   const current = state.actors.find((candidate) => candidate.id === state.combat.turnActorId);
+  const shown = current && !hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(current.id);
   violations.push({
     rule: "economy.not-your-turn",
-    message:
-      current && current.visibility === "public"
-        ? `Not your turn yet - ${current.name} is up.`
-        : "Not your turn yet - wait for your turn."
+    message: shown ? `Not your turn yet - ${current.name} is up.` : "Not your turn yet - wait for your turn."
   });
 }
 
@@ -361,7 +367,7 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
 /** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
-function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
+function checkAbleToAct({ state, attacker, action, resolveDefinition, violations }: Evaluation): void {
   if (action.activation !== "other" || !ANSWERS_A_ROLL.has(action.id)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
@@ -378,11 +384,17 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
   }
   // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
   const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
-  if (reeling && (action.activation === "action" || action.activation === "bonus-action"))
+  if (reeling && (action.activation === "action" || action.activation === "bonus-action")) {
+    // Named as the creature's own sheet shows it: a caster hidden from the table is "A hidden threat".
+    const hiddenCaster =
+      reeling.sourceActorId !== null &&
+      hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(reeling.sourceActorId);
+    const name = hiddenCaster ? withoutSourceName(reeling.name, reeling.sourceName) : reeling.name;
     violations.push({
       rule: "condition.incapacitated",
-      message: `${attacker.name} is reeling from ${reeling.name} and can't take an action or a Bonus Action this turn.`
+      message: `${attacker.name} is reeling from ${name} and can't take an action or a Bonus Action this turn.`
     });
+  }
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
     violations.push({

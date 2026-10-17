@@ -2,7 +2,7 @@ import { addEffect, CONCENTRATING_TAG, makeEffect, READIED_TAG, type EffectNarra
 import { CommandRejectedError } from "../game-store.js";
 import { isItemActionId, laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { spellOf } from "./concentration.js";
-import type { ResolveContext } from "./context.js";
+import { tableLineOf, type ResolveContext } from "./context.js";
 
 /**
  * SRD Ready: "When you Ready a spell, you cast it as normal (expending any resources used to cast it) but hold its
@@ -69,5 +69,5 @@ export function holdReadiedSpell(ctx: ResolveContext): void {
   for (const effect of [holding, readied])
     ctx.effectsApplied.push({ targetId: attacker.id, targetName: attacker.name, name: effect.name, conditionIds: [] });
   // The Concentration the caster held before ends: the table's news.
-  for (const event of ended) ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+  for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
 }

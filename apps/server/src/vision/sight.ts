@@ -44,8 +44,10 @@ export type SceneSight = Readonly<{
   sees: (viewerId: string, targetId: string) => boolean;
   /** Whether a point has light enough to see by, ambient or from a light that reaches it. */
   lit: (point: Point) => boolean;
-  /** Where the viewers see together, as polygons whose union is the area. */
-  areaOf: (viewerIds: readonly string[]) => Polygon[];
+  /** Where the viewers see together, as polygons whose union is the area. With `showsLight`, a light carried by a
+   *  creature it refuses adds nothing: its circle would draw the carrier's position for an audience that can't know of
+   *  it. */
+  areaOf: (viewerIds: readonly string[], showsLight?: (carrierId: string) => boolean) => Polygon[];
   /** Every creature the viewers perceive together, the viewers included. */
   perceivedBy: (viewerIds: readonly string[]) => ReadonlySet<string>;
 }>;
@@ -121,14 +123,21 @@ function samplesOf(token: Token): Point[] {
   ];
 }
 
+/** Whether `content` has every piece the engine reads. Only such a sight is cached: a partial one has fewer senses and
+ *  lights, and caching it would give every later reader of the same state that poorer answer. */
+const complete = (content: SightContent) => content.definition !== undefined && content.catalog !== undefined;
+
 /** The scene's sight for this state. Cached on a committed (frozen) state; a draft mid-command is computed fresh. */
 export function sceneSight(state: GameState, content: SightContent = {}): SceneSight {
   const known = sightCache.get(state);
   if (known) return known;
   const sight = buildSight(state, content);
-  if (Object.isFrozen(state)) sightCache.set(state, sight);
+  if (Object.isFrozen(state) && complete(content)) sightCache.set(state, sight);
   return sight;
 }
+
+/** Whether `sight` is the one cached for `state`, so answers derived from it may be cached on that state too. */
+export const sightIsCached = (state: GameState, sight: SceneSight) => sightCache.get(state) === sight;
 
 function buildSight(state: GameState, content: SightContent): SceneSight {
   // A recording made before dynamic vision existed has none.
@@ -237,7 +246,8 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     return result;
   };
 
-  const areaOf = (viewerIds: readonly string[]): Polygon[] => {
+  const areaOf = (viewerIds: readonly string[], showsLight?: (carrierId: string) => boolean): Polygon[] => {
+    const shown = (light: Light) => light.carrierId === null || showsLight === undefined || showsLight(light.carrierId);
     const pieces: Polygon[] = [];
     for (const viewerId of viewerIds) {
       const viewer = viewerOf(viewerId);
@@ -252,13 +262,13 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
         continue;
       }
       // In the dark: as far as its own senses and the light it carries reach, then what other lights show it.
-      const own = lights.filter((light) => light.carrierId === viewerId);
+      const own = lights.filter((light) => light.carrierId === viewerId && shown(light));
       const reach = Math.max(
         Math.max(senses.darkvision, senses.blindsight, senses.truesight) * pixelsPerFoot,
         ...own.map((light) => light.reachPx)
       );
       if (reach > 0) pieces.push(polygonFrom(viewer.at, reach));
-      const others = lights.filter((light) => light.carrierId !== viewerId && light.reachPx > 0);
+      const others = lights.filter((light) => light.carrierId !== viewerId && light.reachPx > 0 && shown(light));
       if (others.length === 0) continue;
       const sight = polygonFrom(viewer.at);
       for (const light of others) {
