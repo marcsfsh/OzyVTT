@@ -68,6 +68,8 @@ import { SoundService } from "./sound-service.js";
 import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
+import { partySight, rememberExplored } from "./vision/audience.js";
+import type { SightContent } from "./vision/senses.js";
 
 export type CreateServerOptions = {
   authPath: string;
@@ -100,8 +102,19 @@ export function createServer(options: CreateServerOptions) {
     cors: options.clientOrigin ? { origin: options.clientOrigin } : undefined
   });
   const auth = new AuthService(options.authPath);
+  // Late-bound: the content library is built below, and the store only calls this from a command.
+  let sightContent: () => SightContent = () => ({});
   const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState(), {
-    timelineDirtied
+    timelineDirtied,
+    // What the party sees joins what it has seen, in the same transaction as the move or door that showed it. A
+    // failure here must not undo the command; the next one catches up.
+    afterMutate: (state) => {
+      try {
+        rememberExplored(state, sightContent());
+      } catch (error) {
+        console.error("remembering what the party saw failed:", error instanceof Error ? error.message : error);
+      }
+    }
   });
   // Every read of the game state outside a command's own transaction goes through here.
   const committedState = createStateReader(store);
@@ -127,6 +140,10 @@ export function createServer(options: CreateServerOptions) {
   // `publishedFor(audience)` gives `ContentLibrary` only published (and, for players, player-visible)
   // records; drafts are in neither slice.
   const contentLibrary = new ContentLibrary(homebrewStore);
+  sightContent = () => ({
+    definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
+    catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+  });
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   // The codex authorization callbacks, shared by `createCodexRouter` and the `POST /codex/import` guard
   // so "who may write the codex" has one definition.
@@ -198,7 +215,10 @@ export function createServer(options: CreateServerOptions) {
         socket.disconnect(true);
         continue;
       }
-      socket.emit("state:updated", gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor));
+      socket.emit(
+        "state:updated",
+        gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor, Date.now(), sightContent())
+      );
     }
   }
   /** Sends the sound board to the GM's devices; a player's socket is never sent it. */
@@ -266,10 +286,14 @@ export function createServer(options: CreateServerOptions) {
       logged?: boolean;
     }>
   ) {
-    const { actors } = committedState.read();
+    const current = committedState.read();
+    const { actors } = current;
     const actorIds = event.actorIds ?? [];
+    // Dynamic vision: a creature no character perceives is as hidden from the table as a GM-only one.
+    const unseen = partySight(current, sightContent()).hidden;
     const publicToPlayers =
-      !event.gmOnly && actorIds.every((id) => actors.find((actor) => actor.id === id)?.visibility === "public");
+      !event.gmOnly &&
+      actorIds.every((id) => actors.find((actor) => actor.id === id)?.visibility === "public" && !unseen.has(id));
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
@@ -294,9 +318,10 @@ export function createServer(options: CreateServerOptions) {
   ) {
     const current = committedState.read();
     const actorIds = entry.actorIds ?? [];
+    const unseen = partySight(current, sightContent()).hidden;
     const gmOnly =
       entry.gmOnly === true ||
-      actorIds.some((id) => current.actors.find((actor) => actor.id === id)?.visibility !== "public");
+      actorIds.some((id) => current.actors.find((actor) => actor.id === id)?.visibility !== "public" || unseen.has(id));
     const row = combatLog.append({
       kind: entry.kind,
       text: entry.text,
@@ -374,7 +399,10 @@ export function createServer(options: CreateServerOptions) {
   }
   async function publishGameState(state: GameState) {
     try {
-      await viewerCoordinator.synchronizeEncounter(state.revision, projectViewerEncounter(state, Date.now()));
+      await viewerCoordinator.synchronizeEncounter(
+        state.revision,
+        projectViewerEncounter(state, Date.now(), sightContent())
+      );
     } catch {
       for (const socket of io.sockets.sockets.values())
         if (auth.verify(socket.handshake.auth?.token))
@@ -423,7 +451,7 @@ export function createServer(options: CreateServerOptions) {
     logTimelineOutcome,
     scheduleAnnotationExpiry,
     gmView: (state) => gmView(state),
-    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
+    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor, Date.now(), sightContent()),
     random: (sides) => randomInt(1, sides + 1),
     newId: randomUUID,
     // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
@@ -646,7 +674,8 @@ export function createServer(options: CreateServerOptions) {
       }
     },
     revision: () => store.revision,
-    newId: randomUUID
+    newId: randomUUID,
+    sightContent: () => sightContent()
   });
   const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",
@@ -763,7 +792,13 @@ export function createServer(options: CreateServerOptions) {
       );
     socket.emit(
       "state:updated",
-      projectPlayerView(committedState.read(), auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor)
+      projectPlayerView(
+        committedState.read(),
+        auth.verifyPlayer(socket.handshake.auth.token)?.sessionId,
+        presenceFor,
+        Date.now(),
+        sightContent()
+      )
     );
   });
 
@@ -791,7 +826,10 @@ export function createServer(options: CreateServerOptions) {
     // The store's startup seeds may change the state without a revision bump.
     committedState.reset();
     await reconcileContentDerived();
-    await viewerCoordinator.synchronizeEncounter(store.revision, projectViewerEncounter(committedState.read()));
+    await viewerCoordinator.synchronizeEncounter(
+      store.revision,
+      projectViewerEncounter(committedState.read(), Date.now(), sightContent())
+    );
   }
   function close() {
     presence.dispose();

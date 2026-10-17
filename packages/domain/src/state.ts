@@ -609,6 +609,79 @@ export const PendingRuleAskSchema = z
   .strict();
 export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
 
+/** A point on the battlemap, in image pixels. */
+const VisionPointSchema = z.object({ x: z.number().min(0).max(100000), y: z.number().min(0).max(100000) }).strict();
+
+/** A wall in image pixels (ADR-0023). A wall blocks sight, light and movement; a door does too while it is closed; a
+ * window blocks movement only. `open` is a door's alone. */
+export const VisionWallSchema = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(["wall", "door", "window"]),
+    a: VisionPointSchema,
+    b: VisionPointSchema,
+    open: z.boolean().optional()
+  })
+  .strict();
+export type VisionWall = z.infer<typeof VisionWallSchema>;
+
+/** A light: placed on the map (`position`) or carried by a token (`actorId`), never both. Radii are in feet as the SRD
+ * prints them: Bright Light out to `brightFeet`, and Dim Light for `dimFeet` more. */
+export const VisionLightSchema = z
+  .object({
+    id: z.uuid(),
+    position: VisionPointSchema.nullable().default(null),
+    actorId: z.uuid().nullable().default(null),
+    brightFeet: z.number().min(0).max(1000),
+    dimFeet: z.number().min(0).max(1000)
+  })
+  .strict()
+  .refine((light) => (light.position === null) !== (light.actorId === null), {
+    message: "A light is either placed on the map or carried by a token."
+  });
+export type VisionLight = z.infer<typeof VisionLightSchema>;
+
+/** The scene's dynamic vision (ADR-0023). Off by default, so a scene without it behaves as before. `measure` is the
+ * map's size and scale, written by the server whenever the GM edits it, so feet convert to pixels without the map
+ * catalog (a replay of the fight reads it too). `explored` is what the party has seen in this scene: a bitmap over the
+ * map in `cellPx` squares, row-major, base64. GM-only as stored; players get their own projection. */
+export const SceneVisionSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    ambient: z.enum(["bright", "dim", "dark"]).default("bright"),
+    walls: z.array(VisionWallSchema).max(1000).default([]),
+    lights: z.array(VisionLightSchema).max(100).default([]),
+    measure: z
+      .object({
+        width: z.number().positive().max(100000),
+        height: z.number().positive().max(100000),
+        pixelsPerFoot: z.number().positive().max(10000)
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    explored: z
+      .object({
+        cellPx: z.number().positive().max(100000),
+        columns: z.number().int().min(1).max(256),
+        rows: z.number().int().min(1).max(256),
+        bits: z.string().max(11000)
+      })
+      .strict()
+      .nullable()
+      .default(null)
+  })
+  .strict();
+export type SceneVision = z.infer<typeof SceneVisionSchema>;
+export const EMPTY_SCENE_VISION: SceneVision = {
+  enabled: false,
+  ambient: "bright",
+  walls: [],
+  lights: [],
+  measure: null,
+  explored: null
+};
+
 /** Combat fields shared by the live combat and each parked scene: everything except the map and scene bookkeeping. */
 const sceneCombatShape = {
   active: z.boolean().default(false),
@@ -721,8 +794,8 @@ const sceneCombatShape = {
   /** Legendary actions spent since each creature's last turn start (SRD refresh). Stripped from the player projection. */
   legendaryUsed: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** Manual fog of war (ADR-0022): an ordered list of reveal/hide rects applied over "all hidden"; enabled with
-   * no shapes means a fully hidden map. Rects are in image-pixel space. Fog is presentation, not the security
-   * boundary: hidden actors and annotations are stripped by their own projections, so players get this verbatim. */
+   * no shapes means a fully hidden map. Rects are in image-pixel space. Players get the shapes verbatim; a creature
+   * whose whole space lies under the fog is left out of their projections (ADR-0023). */
   fog: z
     .object({
       enabled: z.boolean().default(false),
@@ -766,6 +839,9 @@ const sceneCombatShape = {
     })
     .strict()
     .prefault({ difficult: [] }),
+  /** Walls, doors, lights and what the party has seen (ADR-0023). With `enabled`, the server sends each player only
+   * what their characters can see; scene dressing like fog, so a rewind keeps it. */
+  vision: SceneVisionSchema.prefault({}),
   pendingSaves: z.array(PendingSaveSchema).max(100).default([]),
   pendingReactions: z.array(PendingReactionSchema).max(20).default([]),
   /** GM-only (see PendingDamageSchema). */
@@ -851,6 +927,10 @@ export const CombatStateSchema = z
         active.combat.fog.enabled ||
         active.combat.fog.shapes.length > 0 ||
         active.combat.terrain.difficult.length > 0 ||
+        active.combat.vision.enabled ||
+        active.combat.vision.walls.length > 0 ||
+        active.combat.vision.lights.length > 0 ||
+        active.combat.vision.explored !== null ||
         active.combat.pendingSaves.length > 0 ||
         active.combat.pendingReactions.length > 0 ||
         active.combat.pendingDamage.length > 0 ||

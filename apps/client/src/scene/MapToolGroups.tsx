@@ -9,11 +9,22 @@ import {
   IconColor,
   IconEye,
   IconEyeOff,
+  IconSparkle,
   IconTerrain,
+  IconWall,
   IconX
 } from "@vtt/ui";
 import type { DockPosition } from "../encounter/DockPicker";
-import { drawingAudienceOptions, NEEDS_GRID, type ClearScope, type MapTool, type MapToolbarProps } from "./mapTools";
+import {
+  drawingAudienceOptions,
+  LIGHT_PRESETS,
+  NEEDS_GRID,
+  type ClearScope,
+  type LightPresetId,
+  type MapTool,
+  type MapToolbarProps,
+  type VisionTool
+} from "./mapTools";
 
 const SHAPE_TOOLS: ReadonlyArray<{ id: AnnotationShapeKind; label: string }> = [
   { id: "circle", label: "Circle" },
@@ -255,6 +266,119 @@ export function TerrainGroup({
       <div className="map-toolbar-actions">
         <Button variant="secondary" block disabled={terrainBusy || !hasTerrain} onClick={onClearTerrain}>
           Clear all terrain
+        </Button>
+      </div>
+    </>
+  );
+}
+
+const VISION_TOOLS: ReadonlyArray<{ id: VisionTool; label: string; title: string }> = [
+  { id: "vision-wall", label: "Wall", title: "Drag a wall. Sight and light stop at it, and so does movement." },
+  { id: "vision-door", label: "Door", title: "Drag a door. It starts closed, and a tap opens or closes it." },
+  { id: "vision-window", label: "Window", title: "Drag a window. Sight goes through it, and movement stops at it." },
+  { id: "vision-light", label: "Light", title: "Tap the map to place a light." },
+  { id: "vision-erase", label: "Remove", title: "Tap a wall, door, window or light to remove it." }
+];
+
+export function VisionGroup({
+  tool,
+  visionEnabled,
+  visionBusy,
+  onVisionEnabledChange,
+  ambient,
+  onAmbientChange,
+  lightPreset,
+  onLightPresetChange,
+  hasWalls,
+  onClearWalls,
+  onForgetExplored,
+  lookThrough,
+  onLookThroughChange,
+  lookThroughOptions,
+  id,
+  onPickTool
+}: MapToolbarProps & { id: string; onPickTool: (tool: MapTool) => void }) {
+  return (
+    <>
+      <Switch
+        className="map-toolbar-switch"
+        checked={visionEnabled}
+        disabled={visionBusy}
+        onChange={onVisionEnabledChange}
+        label="Dynamic vision"
+      />
+      <p className="map-toolbar-note">
+        {visionEnabled
+          ? "Each player sees only what their characters can. Walls and closed doors block sight and movement."
+          : "Turn this on to hide what the characters can't see. Walls do nothing until then."}
+      </p>
+      <Field label="Light" className="map-toolbar-field">
+        <SegmentedControl
+          ariaLabel="Ambient light"
+          size="sm"
+          className="map-toolbar-segmented"
+          value={ambient}
+          onChange={(value) => onAmbientChange(value as "bright" | "dim" | "dark")}
+          options={[
+            { value: "bright", label: "Bright" },
+            { value: "dim", label: "Dim" },
+            { value: "dark", label: "Dark" }
+          ]}
+        />
+      </Field>
+      <div className="map-toolbar-choices" role="group" aria-label="Vision tools">
+        {VISION_TOOLS.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            className="map-toolbar-choice tap-target interactive"
+            aria-pressed={tool === entry.id}
+            disabled={visionBusy}
+            title={entry.title}
+            onClick={() => onPickTool(tool === entry.id ? "select" : entry.id)}
+          >
+            <span className="map-toolbar-row-icon" aria-hidden="true">
+              {entry.id === "vision-light" ? <IconSparkle /> : entry.id === "vision-erase" ? <IconX /> : <IconWall />}
+            </span>
+            {entry.label}
+          </button>
+        ))}
+      </div>
+      <Field label="Light to place" htmlFor={`${id}-light`} className="map-toolbar-field">
+        <Select
+          id={`${id}-light`}
+          value={lightPreset}
+          onChange={(event) => onLightPresetChange(event.target.value as LightPresetId)}
+        >
+          {LIGHT_PRESETS.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Look through" htmlFor={`${id}-look`} className="map-toolbar-field">
+        <Select
+          id={`${id}-look`}
+          value={lookThrough ?? ""}
+          disabled={!visionEnabled}
+          onChange={(event) => onLookThroughChange(event.target.value || null)}
+        >
+          <option value="">Nobody (see everything)</option>
+          <option value="party">The whole party</option>
+          {lookThroughOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <div className="map-toolbar-actions">
+        <Button variant="secondary" block disabled={visionBusy || !hasWalls} onClick={onClearWalls}>
+          Remove all walls
+        </Button>
+        <Button variant="secondary" block disabled={visionBusy || !visionEnabled} onClick={onForgetExplored}>
+          Forget what the party has seen
         </Button>
       </div>
     </>

@@ -1,0 +1,246 @@
+import type { CombatState, GameState, PlayerVision, PlayerVisionWall, VisionPolygon, VisionRect } from "@vtt/domain";
+import { revealedRegion } from "../fog.js";
+import { intersect, type Rect } from "../rect-region.js";
+import { flatPolygon, type Point, type Polygon } from "./geometry.js";
+import {
+  decodeBits,
+  emptyBits,
+  encodeBits,
+  exploredGridFor,
+  isMarked,
+  markedRects,
+  markPolygons,
+  type ExploredGrid
+} from "./explored.js";
+import type { SightContent } from "./senses.js";
+import { sceneSight } from "./sight.js";
+
+/**
+ * What each audience may know of the creatures on the map (ADR-0023): a player sees through their own characters, the
+ * table screen and a replay through the whole party. With dynamic vision on, that is what those characters perceive;
+ * with manual fog on, a creature wholly under the fog is left out too. This is the projections' one source for "may
+ * this audience know of that creature".
+ */
+
+type Actor = GameState["actors"][number];
+type Token = CombatState["tokens"][number];
+
+export type AudienceSight = Readonly<{
+  /** Dynamic vision is on for the live scene; when false `perceived` doesn't apply. */
+  enabled: boolean;
+  /** Creatures this audience must not learn of at all, treated as hidden from it like a GM-only one: on the live
+   *  scene, those that aren't player characters and that none of its viewers perceive or that stand wholly under the
+   *  fog; and those staged in a prepared scene in the same way, until they stand where the party can see them. */
+  hidden: ReadonlySet<string>;
+  /** With dynamic vision on, the placed creatures whose tokens it may receive. */
+  perceived: ReadonlySet<string>;
+  /** Placed creatures, its viewers aside, whose whole space the live scene's manual fog covers: their tokens stay off
+   *  its map. */
+  fogged: ReadonlySet<string>;
+  /** Whose eyes it sees through. */
+  viewerIds: readonly string[];
+}>;
+
+const NONE: ReadonlySet<string> = new Set();
+const OFF: AudienceSight = { enabled: false, hidden: NONE, perceived: NONE, fogged: NONE, viewerIds: [] };
+
+/** Whether an audience may receive a creature's token (the creature itself being known to it). */
+export const tokenShown = (sight: AudienceSight, actorId: string) =>
+  !sight.fogged.has(actorId) && (!sight.enabled || sight.perceived.has(actorId));
+
+/** A token's space as a rect: its cells, or the drawn token on a map without a grid. */
+function spaceOf(token: Token): Rect | null {
+  if (!token.position) return null;
+  const side = Math.max(token.sizePx, (token.gridSizePx ?? 0) * token.sizeCells);
+  return { x: token.position.x - side / 2, y: token.position.y - side / 2, width: side, height: side };
+}
+
+/** The placed creatures whose whole space a scene's manual fog covers; none while its fog is off. A token any part of
+ *  which is revealed is not covered. */
+export function fogCovered(combat: Readonly<{ fog?: CombatState["fog"]; tokens: readonly Token[] }>): Set<string> {
+  const covered = new Set<string>();
+  if (combat.fog?.enabled !== true) return covered;
+  const revealed = revealedRegion(combat.fog);
+  if (revealed === "everything") return covered;
+  for (const token of combat.tokens) {
+    const space = spaceOf(token);
+    if (space && !revealed.some((rect) => intersect(rect, space) !== null)) covered.add(token.actorId);
+  }
+  return covered;
+}
+
+/** The creatures other than player characters staged in a prepared scene, and not on the live map, that the party
+ *  couldn't see there: all of them with that scene's vision on, those wholly under its fog with fog on. The GM's
+ *  ambush stays a secret while it is set up. */
+function stagedUnseen(state: GameState): Set<string> {
+  const live = new Set(state.combat.initiative.map((entry) => entry.actorId));
+  const staged = new Set<string>();
+  for (const scene of state.combat.scenes) {
+    if (scene.id === state.combat.activeSceneId) continue;
+    // A recording made before dynamic vision has none on its scenes either.
+    const unseen =
+      scene.combat.vision?.enabled === true
+        ? new Set(scene.combat.initiative.map((entry) => entry.actorId))
+        : fogCovered(scene.combat);
+    for (const actorId of unseen) if (!live.has(actorId)) staged.add(actorId);
+  }
+  const kinds = new Map(state.actors.map((actor) => [actor.id, actor.kind]));
+  for (const actorId of staged) if (kinds.get(actorId) === "player-character") staged.delete(actorId);
+  return staged;
+}
+
+const placed = (state: GameState, actorId: string) =>
+  state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
+const inPlay = (actor: Actor) => actor.visibility === "public" && !actor.archived;
+
+/** A player's own characters on the live map. */
+export function playerViewerIds(state: GameState, sessionId: string): string[] {
+  return state.actors
+    .filter((actor) => actor.ownerSessionId === sessionId && inPlay(actor) && placed(state, actor.id))
+    .map((actor) => actor.id);
+}
+
+/** The party's characters on the live map, claimed or not: the table screen and a replay see through them. */
+export function partyViewerIds(state: GameState): string[] {
+  return state.actors
+    .filter((actor) => actor.kind === "player-character" && inPlay(actor) && placed(state, actor.id))
+    .map((actor) => actor.id);
+}
+
+const audienceCache = new WeakMap<GameState, Map<string, AudienceSight>>();
+
+function cached<T>(cache: WeakMap<GameState, Map<string, T>>, state: GameState, key: string, compute: () => T): T {
+  if (!Object.isFrozen(state)) return compute();
+  let byKey = cache.get(state);
+  if (!byKey) cache.set(state, (byKey = new Map()));
+  const known = byKey.get(key);
+  if (known !== undefined) return known;
+  const value = compute();
+  byKey.set(key, value);
+  return value;
+}
+
+/** What an audience seeing through `viewerIds` may know of the creatures on the live and prepared scenes. */
+export function audienceSight(state: GameState, viewerIds: readonly string[], content: SightContent): AudienceSight {
+  const sight = sceneSight(state, content);
+  return cached(audienceCache, state, `${sight.enabled}|${viewerIds.join(",")}`, () => {
+    const hidden = stagedUnseen(state);
+    // Its own characters are never lost to it under the fog.
+    const fogged = fogCovered(state.combat);
+    for (const viewerId of viewerIds) fogged.delete(viewerId);
+    const kinds = new Map(state.actors.map((actor) => [actor.id, actor.kind]));
+    const unknown = (actorId: string) => kinds.get(actorId) !== "player-character";
+    for (const actorId of fogged) if (unknown(actorId)) hidden.add(actorId);
+    if (!sight.enabled) return hidden.size === 0 && fogged.size === 0 ? OFF : { ...OFF, hidden, fogged, viewerIds };
+    const perceived = sight.perceivedBy(viewerIds);
+    const combatants = new Set([
+      ...state.combat.initiative.map((entry) => entry.actorId),
+      ...state.combat.tokens.map((token) => token.actorId)
+    ]);
+    for (const actorId of combatants) if (unknown(actorId) && !perceived.has(actorId)) hidden.add(actorId);
+    return { enabled: true, hidden, perceived, fogged, viewerIds };
+  });
+}
+
+/** A player's audience: their own characters' eyes. Without a session (a spectator), the party's. */
+export function playerSight(state: GameState, sessionId: string | undefined, content: SightContent): AudienceSight {
+  return audienceSight(
+    state,
+    sessionId === undefined ? partyViewerIds(state) : playerViewerIds(state, sessionId),
+    content
+  );
+}
+
+export function partySight(state: GameState, content: SightContent): AudienceSight {
+  return audienceSight(state, partyViewerIds(state), content);
+}
+
+/** The party's remembered squares, decoded; null while nothing is remembered or the map's size changed under it. */
+function explored(state: GameState): { grid: ExploredGrid; bytes: Uint8Array } | null {
+  const vision = state.combat.vision;
+  if (!vision.measure || !vision.explored) return null;
+  const grid = exploredGridFor(vision.measure);
+  const stored = vision.explored;
+  if (stored.columns !== grid.columns || stored.rows !== grid.rows || Math.abs(stored.cellPx - grid.cellPx) > 1e-6)
+    return null;
+  return { grid, bytes: decodeBits(grid, stored.bits) };
+}
+
+/** What the party has seen on the live scene, as disjoint rects. */
+export function exploredRectsOf(state: GameState): VisionRect[] {
+  const memory = explored(state);
+  return memory ? markedRects(memory.grid, memory.bytes) : [];
+}
+
+/** Points just either side of a wall along its length, to ask whether the squares beside it are in sight. */
+function wallSamples(a: Point, b: Point, spacing: number): Point[] {
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  if (length === 0) return [a];
+  const normal = { x: -(b.y - a.y) / length, y: (b.x - a.x) / length };
+  const steps = Math.max(1, Math.ceil(length / spacing));
+  const offset = spacing * 0.6;
+  const samples: Point[] = [];
+  for (let step = 0; step <= steps; step++) {
+    const t = step / steps;
+    const at = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    samples.push({ x: at.x + normal.x * offset, y: at.y + normal.y * offset });
+    samples.push({ x: at.x - normal.x * offset, y: at.y - normal.y * offset });
+  }
+  return samples;
+}
+
+const visionCache = new WeakMap<GameState, Map<string, PlayerVision>>();
+
+/** The vision block of one audience's projection: where it sees now, what the party has seen, and the walls in it. */
+export function visionOf(state: GameState, viewerIds: readonly string[], content: SightContent): PlayerVision {
+  const sight = sceneSight(state, content);
+  const measure = state.combat.vision.measure;
+  if (!sight.enabled || !measure) return { enabled: false };
+  return cached(visionCache, state, viewerIds.join(","), () => {
+    const area = sight.areaOf(viewerIds);
+    const memory = explored(state);
+    const grid = memory?.grid ?? exploredGridFor(measure);
+    const now = emptyBits(grid);
+    markPolygons(grid, now, area);
+    const known = (point: Point) =>
+      isMarked(grid, now, point) || (memory ? isMarked(grid, memory.bytes, point) : false);
+    const walls: PlayerVisionWall[] = [];
+    for (const wall of state.combat.vision.walls) {
+      const samples = wallSamples(wall.a, wall.b, grid.cellPx);
+      if (!samples.some(known)) continue;
+      const inSight = wall.kind === "door" && samples.some((point) => isMarked(grid, now, point));
+      walls.push({
+        id: wall.id,
+        kind: wall.kind,
+        a: { ...wall.a },
+        b: { ...wall.b },
+        ...(inSight ? { open: wall.open === true } : {})
+      });
+    }
+    return {
+      enabled: true,
+      visible: area.map((polygon): VisionPolygon => flatPolygon(polygon)),
+      explored: exploredRectsOf(state),
+      walls
+    };
+  });
+}
+
+/** Adds what the party sees now to what it has seen. Runs after every command, inside it; a no-op unless the live
+ *  scene's vision is on. */
+export function rememberExplored(state: GameState, content: SightContent): void {
+  const vision = state.combat.vision;
+  const sight = sceneSight(state, content);
+  if (!sight.enabled || !vision.measure) return;
+  const viewers = partyViewerIds(state);
+  if (viewers.length === 0) return;
+  const area: Polygon[] = sight.areaOf(viewers);
+  const memory = explored(state);
+  const grid = memory?.grid ?? exploredGridFor(vision.measure);
+  const bytes = memory?.bytes ?? emptyBits(grid);
+  if (!markPolygons(grid, bytes, area) && memory) return;
+  state.combat = {
+    ...state.combat,
+    vision: { ...vision, explored: { ...grid, bits: encodeBits(bytes) } }
+  };
+}

@@ -1053,6 +1053,25 @@ export const openApiDocument = {
         }
       }
     },
+    [GAME_PATHS.visionPreview]: {
+      get: {
+        operationId: "previewVision",
+        security: gameSecurity("scene:read"),
+        description:
+          "What one creature sees on the live scene, or with no `actorId` the whole party (ADR-0023): the area as image-pixel polygons (`[x0, y0, x1, y1, ...]`) whose union is what it sees, and the creatures it perceives. The same computation that decides what each player and the table screen receive. GM-grade only; empty while the scene's dynamic vision is off.",
+        parameters: [{ name: "actorId", in: "query", required: false, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": {
+            description: "Where the creature or the party sees now",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/VisionPreviewResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "403": apiError,
+          "404": apiError
+        }
+      }
+    },
     [SESSION_PATHS.player]: {
       post: {
         operationId: "issuePlayerSession",
@@ -2273,6 +2292,7 @@ export const openApiDocument = {
       },
       ActorAvailableActionsResponse: envelopeSchema("#/components/schemas/ActorAvailableActionsData"),
       ActorMovementResponse: envelopeSchema("#/components/schemas/ActorMovementData"),
+      VisionPreviewResponse: envelopeSchema("#/components/schemas/VisionPreviewData"),
       CharacterDraftResponse: envelopeSchema("#/components/schemas/CharacterDraftData"),
       BuilderOffersDraft: {
         type: "object",

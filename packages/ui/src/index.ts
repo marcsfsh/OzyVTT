@@ -70,6 +70,7 @@ export {
   IconDraw,
   IconFog,
   IconTerrain,
+  IconWall,
   IconColor,
   IconCleanup,
   IconScene,

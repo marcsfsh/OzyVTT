@@ -8,10 +8,14 @@ import type {
   HealthDisplay,
   PlayerActor,
   PlayerAnnotation,
-  PlayerView
+  PlayerView,
+  PlayerVision,
+  SceneVision,
+  VisionPreviewReply
 } from "@vtt/domain";
 import { Button, useToastMute } from "@vtt/ui";
 import { CharacterSheet } from "../encounter/CharacterSheet";
+import { read } from "../lib/command";
 import type { DockPosition } from "../encounter/DockPicker";
 import { useTargeting } from "../encounter/targeting";
 import { FogOverlay } from "./FogOverlay";
@@ -22,8 +26,8 @@ import { useAuthorizedMapImage } from "./mapImage";
 import { MapToken } from "./MapToken";
 import { MapTokenTray } from "./MapTokenTray";
 import { MapToolbar } from "./MapToolbar";
-import type { MapTool } from "./mapTools";
-import { alliesByKind, extraPerStepFor, moveLabel, previewMove, type MoveMode } from "./movePreview";
+import { isVisionTool, LIGHT_PRESETS, type LightPresetId, type MapTool } from "./mapTools";
+import { alliesByKind, extraPerStepFor, moveLabel, movementWallsOf, previewMove, type MoveMode } from "./movePreview";
 import { MoveModeBar } from "./MoveModeBar";
 import { useMovementBudget } from "./useMovementBudget";
 import { SceneControls } from "./SceneControls";
@@ -34,6 +38,7 @@ import { TokenContextMenu } from "./TokenContextMenu";
 import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
+import { VisionLayer } from "./VisionLayer";
 import "./encounter-map.css";
 
 type Actor = GmActor | PlayerActor;
@@ -112,6 +117,7 @@ export function EncounterMap({
   reactionsUsed = [],
   fog,
   terrain,
+  vision,
   dock,
   moveSceneId,
   onScenePrep,
@@ -136,6 +142,9 @@ export function EncounterMap({
   fog?: FogState;
   /** Difficult terrain on this map; a player's is already clipped to what the fog reveals. */
   terrain?: TerrainState;
+  /** Dynamic vision: the scene's own (walls, lights, the switch) for the GM, the player's projection of it for a
+   *  player (where their characters see, what the party has seen, the walls in it). */
+  vision?: SceneVision | PlayerVision;
   dock?: Readonly<{
     node: React.ReactNode;
     position: DockPosition;
@@ -179,6 +188,13 @@ export function EncounterMap({
   // "GM ink": new drawings land GM-only, and only GM-only drawings are interactive while it is on.
   const [gmLayer, setGmLayer] = useState(false);
   const { muted: notificationsMuted, setMuted: setNotificationsMuted } = useToastMute();
+  // Dynamic vision: the GM has the scene's own layer, a player the server's projection of it.
+  const gmVision = vision && "measure" in vision ? vision : null;
+  const playerVision = vision && "visible" in vision ? vision : null;
+  const [lightPreset, setLightPreset] = useState<LightPresetId>("torch");
+  /** Whose eyes the GM looks through: "party", an actor id, or nobody. The live table only. */
+  const [lookThrough, setLookThrough] = useState<string | null>(null);
+  const [lookedThrough, setLookedThrough] = useState<VisionPreviewReply | null>(null);
   const [sessionColor, setSessionColor] = useState<string>(
     () => localStorage.getItem("vtt.annotation-color") ?? (role === "gm" ? "#ff2e9a" : PLAYER_COLORS[0])
   );
@@ -243,6 +259,23 @@ export function EncounterMap({
     }
   });
   const { message, busyActorId } = commands;
+  const looking = role === "gm" && !moveSceneId && gmVision?.enabled === true ? lookThrough : null;
+  useEffect(() => {
+    if (looking === null) {
+      setLookedThrough(null);
+      return;
+    }
+    let live = true;
+    void read("vision:preview", looking === "party" ? {} : { actorId: looking }).then((reply) => {
+      if (!live) return;
+      if (reply.ok && reply.enabled && reply.visible && reply.actorIds)
+        setLookedThrough({ enabled: true, visible: reply.visible, actorIds: reply.actorIds });
+      else setLookedThrough(null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [looking, revision]);
   const { gesture, handlers, keyboardMove } = useMapGestures({
     role,
     tool,
@@ -261,7 +294,11 @@ export function EncounterMap({
     tokensById,
     resetKey: `${assetId}|${token}`,
     onSelect: setSelectedId,
-    onContextMenu: setContextMenu
+    onContextMenu: setContextMenu,
+    onPlaceLight: (point) => {
+      const preset = LIGHT_PRESETS.find((entry) => entry.id === lightPreset) ?? LIGHT_PRESETS[0];
+      commands.addLight(point, preset);
+    }
   });
 
   useEffect(() => {
@@ -320,6 +357,12 @@ export function EncounterMap({
   // The drag's path and cost, as the server will charge it, and what that leaves of the mover's turn. Only the
   // combatant whose turn it is spends movement, so only that drag asks for the budget.
   const difficult = terrain?.difficult ?? [];
+  // The walls a move can't pass, as far as this view knows them (a player's: the ones the party has seen).
+  const moveWalls = gmVision?.enabled
+    ? movementWallsOf(gmVision.walls)
+    : playerVision
+      ? movementWallsOf(playerVision.walls)
+      : [];
   const draggedMode: MoveMode = dragging?.actorId === moverId ? moveMode : "walk";
   const draggedBudget = dragging?.actorId === moverId ? moverBudget : null;
   const liveMove =
@@ -336,7 +379,8 @@ export function EncounterMap({
           isAlly: sidesFrom(state),
           extraPerStep: extraPerStepFor(draggedBudget, draggedMode),
           carried: grappledBy(actors, dragging.actorId, role),
-          free: draggedMode === "teleport" || draggedMode === "forced"
+          free: draggedMode === "teleport" || draggedMode === "forced",
+          walls: moveWalls
         })
       : null;
   const liveLabel =
@@ -411,6 +455,26 @@ export function EncounterMap({
               terrainBusy={commands.terrainBusy}
               hasTerrain={difficult.length > 0}
               onClearTerrain={commands.clearAllTerrain}
+              visionEnabled={gmVision?.enabled ?? false}
+              visionBusy={commands.visionBusy}
+              onVisionEnabledChange={commands.setVisionEnabled}
+              ambient={gmVision?.ambient ?? "bright"}
+              onAmbientChange={commands.setAmbient}
+              lightPreset={lightPreset}
+              onLightPresetChange={setLightPreset}
+              hasWalls={(gmVision?.walls.length ?? 0) > 0}
+              onClearWalls={commands.clearWalls}
+              onForgetExplored={commands.forgetExplored}
+              lookThrough={moveSceneId ? null : lookThrough}
+              onLookThroughChange={setLookThrough}
+              lookThroughOptions={
+                moveSceneId
+                  ? []
+                  : tokens.flatMap((placed) => {
+                      const actor = placed.position ? actorsById.get(placed.actorId) : undefined;
+                      return actor ? [{ id: actor.id, name: actor.name }] : [];
+                    })
+              }
               {...(viewerPreview ? { viewerPreview } : {})}
               onZoom={view.zoomCenter}
               onResetView={view.resetView}
@@ -446,8 +510,22 @@ export function EncounterMap({
                 color={sessionColor}
               />
 
-              {/* GM fog: dimmed, above the map and shapes but below tokens; the GM always sees everything. */}
-              {fog && role === "gm" && <FogOverlay width={size.width} height={size.height} fog={fog} variant="gm" />}
+              {/* GM fog: dimmed, above the map and shapes but below tokens; the GM always sees everything. The GM's
+                look through a creature's eyes dims the rest the same way. */}
+              {role === "gm" && (fog?.enabled || lookedThrough) && (
+                <FogOverlay
+                  width={size.width}
+                  height={size.height}
+                  fog={fog}
+                  vision={lookedThrough ? { visible: lookedThrough.visible, explored: [] } : null}
+                  variant="gm"
+                />
+              )}
+              {/* A player's dynamic vision: dark where their characters can't see, below the tokens, since the server
+                sends only the creatures they perceive (one heard through a wall shows in the dark). */}
+              {playerVision && (
+                <FogOverlay width={size.width} height={size.height} vision={playerVision} variant="player" />
+              )}
 
               {visibleTokens.map((encounterToken) => {
                 const actor = actorsById.get(encounterToken.actorId);
@@ -473,6 +551,21 @@ export function EncounterMap({
                   />
                 );
               })}
+              {(gmVision || playerVision) && (
+                <VisionLayer
+                  role={role}
+                  walls={gmVision ? gmVision.walls : (playerVision?.walls ?? [])}
+                  lights={gmVision?.lights ?? []}
+                  tokenPositions={
+                    new Map(tokens.flatMap((placed) => (placed.position ? [[placed.actorId, placed.position]] : [])))
+                  }
+                  pixelsPerFoot={gmVision?.measure?.pixelsPerFoot ?? null}
+                  cellSizePx={calibration?.cellSizePx ?? 50}
+                  showWalls={role === "gm" && (gmVision?.enabled === true || isVisionTool(tool))}
+                  erasing={role === "gm" && tool === "vision-erase"}
+                  onToggleDoor={(wallId, open) => void commands.setDoorOpen(wallId, open)}
+                />
+              )}
               <MarkLayer annotations={annotations} preview={preview} sizes={sizes} color={sessionColor} />
               {liveMove && liveLabel && moveLabelPlacement && (
                 <g className={`encounter-move-guide${liveLabel.over ? " over" : ""}`}>
@@ -501,6 +594,16 @@ export function EncounterMap({
                   y={Math.min(gesture.origin.y, gesture.current.y)}
                   width={Math.abs(gesture.origin.x - gesture.current.x)}
                   height={Math.abs(gesture.origin.y - gesture.current.y)}
+                />
+              )}
+              {/* Live line of the wall being dragged (the server snaps its ends on commit). */}
+              {gesture?.kind === "wall" && (
+                <line
+                  className={`vision-wall-preview vision-wall-${gesture.wallKind}`}
+                  x1={gesture.origin.x}
+                  y1={gesture.origin.y}
+                  x2={gesture.current.x}
+                  y2={gesture.current.y}
                 />
               )}
               {/* Live outline of the terrain stroke being dragged (snapped to whole cells on commit). */}

@@ -51,12 +51,12 @@ export function requireGm(initiator: Initiator, denial: string) {
 }
 
 /**
- * Whether a player may target this combatant: public ones only. The server must not trust client target
- * ids, since resolving against a hidden actor would leak its name/AC/outcome through the resolve ack
- * (which bypasses the projection) and in direct mode damage it. Gates the acted-upon actor;
- * `canInitiateForActor` gates the acting one.
+ * Whether a player may target this combatant: public ones only, and none hidden from them by sight or the fog
+ * (`unseen`, from `playerSight`). The server must not trust client target ids, since resolving against a hidden actor
+ * would leak its name/AC/outcome through the resolve ack (which bypasses the projection) and in direct mode damage
+ * it. Gates the acted-upon actor; `canInitiateForActor` gates the acting one.
  */
-export function canPlayerTarget(state: GameState, targetId: string): boolean {
+export function canPlayerTarget(state: GameState, targetId: string, unseen: ReadonlySet<string> = new Set()): boolean {
   const target = state.actors.find((candidate) => candidate.id === targetId);
-  return target !== undefined && target.visibility === "public";
+  return target !== undefined && target.visibility === "public" && !unseen.has(targetId);
 }

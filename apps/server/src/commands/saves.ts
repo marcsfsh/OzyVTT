@@ -394,7 +394,8 @@ export const saveCommands = [
             now: () => new Date().toISOString(),
             sessionId: sessionIdOf(principal),
             role: initiator.role,
-            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB),
+            unseen: kit.unseenBy(initiator, draft)
           }
         );
       });

@@ -442,6 +442,18 @@ export const ActorMovementReplySchema = z.strictObject({
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;
 
+/** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
+ *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */
+export const VisionPreviewReplySchema = z.strictObject({
+  enabled: z.boolean(),
+  visible: z.array(z.array(z.number())),
+  actorIds: z.array(z.string())
+});
+export type VisionPreviewReply = Wire<z.infer<typeof VisionPreviewReplySchema>>;
+export type VisionPreviewResult = { ok: boolean; message?: string } & Partial<VisionPreviewReply>;
+export type WallAddResult = MutationResult & { wallIds?: readonly string[] };
+export type LightAddResult = MutationResult & { lightId?: string };
+
 /** What `character:draft` answers: the caller's parked build and when it was last saved, or null for none. */
 export const CharacterDraftReplySchema = z.strictObject({
   draft: z.strictObject({ draft: CharacterDraftSchema, updatedAt: z.iso.datetime() }).nullable()

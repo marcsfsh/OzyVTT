@@ -125,13 +125,17 @@ export function narrateTokenMove(
     mode?: MoveMode;
     /** It crawled, being Prone. */
     crawled?: boolean;
+    /** Creatures the table can't know of beyond the GM-only ones (dynamic vision: none of the party perceives them). */
+    hiddenFromTable?: (actorId: string) => boolean;
   }>
 ): MovementNarration | null {
   const { state, actorId, from, geometry } = input;
   const mover = state.actors.find((actor) => actor.id === actorId);
   if (!mover) return null;
   const to = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
-  const moverHidden = mover.visibility === "gm-only";
+  const hidden = (actor: GameState["actors"][number]) =>
+    actor.visibility === "gm-only" || input.hiddenFromTable?.(actor.id) === true;
+  const moverHidden = hidden(mover);
 
   if (to === null) {
     if (from === null) return null; // tray-to-tray: nothing happened
@@ -168,7 +172,7 @@ export function narrateTokenMove(
       before === null
         ? `${other.name} ${formatDistance(now)}`
         : `${other.name} ${formatDistance(before)} → ${formatDistance(now)}`;
-    ranges.push({ name: other.name, hidden: other.visibility === "gm-only", label });
+    ranges.push({ name: other.name, hidden: hidden(other), label });
   }
 
   const how = input.crawled ? "crawled" : MODE_VERBS[input.mode ?? "walk"];

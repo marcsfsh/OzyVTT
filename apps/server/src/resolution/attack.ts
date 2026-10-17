@@ -38,6 +38,7 @@ import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { VEXED_TAG } from "../weapon-mastery.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
+import { sceneSight } from "../vision/sight.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
@@ -103,9 +104,9 @@ function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
 }
 
 /** Conditions that by themselves give an attack advantage or disadvantage (SRD conditions appendix), in
- *  the order the roll card lists them. Frightened applies only while its source is in sight; with no
- *  vision system it applies whenever active, and the GM's explicit roll mode covers the rest. Invisible
- *  (Hide grants it as a linked effect) cuts both ways; seeing through it is GM adjudication. */
+ *  the order the roll card lists them. Frightened applies only while its source is in sight; it applies whenever
+ *  active, and the GM's explicit roll mode covers the rest. Invisible (Hide grants it as a linked effect) cuts both
+ *  ways; with dynamic vision on, who sees through it is decided by `sightClaims`, else by the GM. */
 const CONDITION_ROLL_MODES: ReadonlyArray<
   Readonly<{ side: "attacker" | "target"; condition: string; mode: "advantage" | "disadvantage" }>
 > = [
@@ -153,13 +154,45 @@ function riderClaims(ctx: ResolveContext, targetDerivation: EquipmentDerivation,
   rollModeClaims(targetDerivation, ["incoming-attack"], "on-attack-roll", {}, sources, "Target: ");
 }
 
+/** With dynamic vision on, who sees whom (SRD "Unseen Attackers and Targets"): an attack against a target you can't
+ *  see has Disadvantage, and one against a creature that can't see you has Advantage. This decides Invisible too,
+ *  since the condition gives nothing against a creature that can see you (Blindsight, Truesight). A Blinded side is
+ *  left to its own condition line. Returns whether it decided: false while vision is off or a token is off the map. */
+function sightClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeClaims): boolean {
+  const { attacker, state, deps } = ctx;
+  const placed = (actorId: string) =>
+    state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
+  if (!placed(attacker.id) || !placed(target.id)) return false;
+  const sight = sceneSight(state, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  if (!sight.enabled) return false;
+  const invisible = (actor: LiveActor) => has(actor, "invisible") && !outlined(actor);
+  if (!has(target, "blinded") && !sight.sees(target.id, attacker.id))
+    sources.advantage.push(
+      invisible(attacker)
+        ? { source: "attacker-invisible", label: "Attacker is Invisible" }
+        : { source: "attacker-unseen", label: "Target can't see the attacker" }
+    );
+  if (!has(attacker, "blinded") && !sight.sees(attacker.id, target.id))
+    sources.disadvantage.push(
+      invisible(target)
+        ? { source: "target-invisible", label: "Target is Invisible" }
+        : { source: "target-unseen", label: "Attacker can't see the target" }
+    );
+  return true;
+}
+
 /** Conditions on either side, including the two that depend on who or where: Grappled and a Prone target. */
 function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: number | null, sources: RollModeClaims) {
   const { attacker } = ctx;
+  // Dynamic vision decides Invisible by who actually sees whom; without it the condition applies as printed.
+  const sighted = sightClaims(ctx, target, sources);
   for (const entry of CONDITION_ROLL_MODES) {
     const side = entry.side === "attacker" ? attacker : target;
     if (!has(side, entry.condition)) continue;
-    if (entry.condition === "invisible" && outlined(side)) continue;
+    if (entry.condition === "invisible" && (outlined(side) || sighted)) continue;
     sources[entry.mode].push({
       source: `${entry.side}-${entry.condition}`,
       label: `${entry.side === "attacker" ? "Attacker" : "Target"} is ${conditionLabel(entry.condition)}`

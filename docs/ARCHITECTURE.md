@@ -132,10 +132,19 @@ audience. There are four:
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public.
 
+Sight is part of the boundary (ADR-0023). `vision/audience.ts` decides, per audience, which
+creatures it may know of. A player sees through their own placed characters; the table viewer, a
+spectator and a replay see through the whole party. A creature that isn't a player character is
+hidden from an audience, exactly like a `gm-only` one, when none of its characters perceive it
+(dynamic vision on), or when its whole space lies under the scene's manual fog (fog on). The same
+goes for one staged that way in a prepared scene. Every projection, the feed and toast gate, and a
+player's target check read that one answer (`AudienceSight`). Another player's character out of
+sight keeps its actor but loses its token. An audience's own characters are always sent, and so
+is a creature with any part of its space revealed.
+
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
-of a hidden thing. When in doubt, leave it out. Fog of war is presentation only (ADR-0022);
-hidden things are stripped by the projections regardless of what fog covers.
+of a hidden thing. When in doubt, leave it out.
 
 ## Maps, tokens and the grid
 
@@ -149,6 +158,16 @@ hidden things are stripped by the projections regardless of what fog covers.
   preview that mirrors the server.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
   reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
+- Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
+  image-pixel segments, placed and carried lights, and an ambient light level
+  (`vision/edit.ts`). The server builds each viewer's visibility polygon against the walls, cuts it
+  to the creature's senses and the lights (`vision/geometry.ts`, `vision/sight.ts`), and caches
+  polygons by walls, origin and radius. Senses come from stat blocks, species and features, and
+  light from equipped items (`vision/senses.ts`). After every command the server adds what the
+  party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
+  get only polygons and rectangles to paint. While vision is on, walls, closed doors and windows
+  also bar movement, and sight decides an attack's unseen Advantage and Disadvantage and whether
+  Hide is allowed.
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
@@ -157,7 +176,7 @@ hidden things are stripped by the projections regardless of what fog covers.
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. Players and the table screen get only the terrain the
-  fog reveals.
+  fog reveals, and with vision on only what the party has seen.
 
 ## Rules engine
 

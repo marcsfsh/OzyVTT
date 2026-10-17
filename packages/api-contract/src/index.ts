@@ -292,7 +292,19 @@ export const GAME_PATHS = {
   soundStop: `${API_NAMESPACE}/game/sound/stop`,
   soundNextTrack: `${API_NAMESPACE}/game/sound/next-track`,
   soundPause: `${API_NAMESPACE}/game/sound/pause`,
-  sceneSound: `${API_NAMESPACE}/game/scenes/{sceneId}/sound`
+  sceneSound: `${API_NAMESPACE}/game/scenes/{sceneId}/sound`,
+  visionEnabled: `${API_NAMESPACE}/game/vision/enabled`,
+  visionAmbient: `${API_NAMESPACE}/game/vision/ambient`,
+  visionExploredReset: `${API_NAMESPACE}/game/vision/explored/reset`,
+  visionPreview: `${API_NAMESPACE}/game/vision/preview`,
+  walls: `${API_NAMESPACE}/game/walls`,
+  wallsClear: `${API_NAMESPACE}/game/walls/clear`,
+  wallById: `${API_NAMESPACE}/game/walls/{wallId}`,
+  wallMove: `${API_NAMESPACE}/game/walls/{wallId}/move`,
+  doorOpen: `${API_NAMESPACE}/game/doors/{wallId}/open`,
+  lights: `${API_NAMESPACE}/game/lights`,
+  lightById: `${API_NAMESPACE}/game/lights/{lightId}`,
+  lightMove: `${API_NAMESPACE}/game/lights/{lightId}/move`
 } as const;
 
 /** Session issuance for headless/alternate player clients: the HTTP mirror of the socket's open join. */
@@ -663,7 +675,19 @@ export const GAME_COMMANDS = {
   "sound.stop": { scope: "scene:write", method: "post", path: GAME_PATHS.soundStop },
   "sound.next-track": { scope: "scene:write", method: "post", path: GAME_PATHS.soundNextTrack },
   "sound.pause": { scope: "scene:write", method: "post", path: GAME_PATHS.soundPause },
-  "sound.set-scene-preset": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneSound }
+  "sound.set-scene-preset": { scope: "scene:write", method: "post", path: GAME_PATHS.sceneSound },
+  "vision.set-enabled": { scope: "scene:write", method: "post", path: GAME_PATHS.visionEnabled },
+  "vision.set-ambient": { scope: "scene:write", method: "post", path: GAME_PATHS.visionAmbient },
+  "vision.reset-explored": { scope: "scene:write", method: "post", path: GAME_PATHS.visionExploredReset },
+  "wall.add": { scope: "scene:write", method: "post", path: GAME_PATHS.walls },
+  "wall.move": { scope: "scene:write", method: "post", path: GAME_PATHS.wallMove },
+  "wall.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.wallById },
+  "wall.clear": { scope: "scene:write", method: "post", path: GAME_PATHS.wallsClear },
+  // Players open doors beside their own character, so it is a combat command.
+  "door.set-open": { scope: "combat:write", method: "post", path: GAME_PATHS.doorOpen },
+  "light.add": { scope: "scene:write", method: "post", path: GAME_PATHS.lights },
+  "light.move": { scope: "scene:write", method: "post", path: GAME_PATHS.lightMove },
+  "light.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.lightById }
 } as const satisfies Record<
   string,
   Readonly<{ scope: z.infer<typeof IntegrationScopeSchema>; method: "post" | "delete"; path: string }>

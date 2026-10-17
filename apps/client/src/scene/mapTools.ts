@@ -12,7 +12,23 @@ export type MapTool =
   | "fog-hide"
   | "terrain-difficult"
   | "terrain-clear"
+  | VisionTool
   | AnnotationShapeKind;
+
+/** The GM's dynamic vision tools: drag a wall, door or window; tap to place a light; tap a wall or light to remove it. */
+export type VisionTool = "vision-wall" | "vision-door" | "vision-window" | "vision-light" | "vision-erase";
+export const isVisionTool = (tool: MapTool): tool is VisionTool => tool.startsWith("vision-");
+
+/** The lights a GM places, by what sheds them (SRD radii: Bright Light, then Dim Light beyond it). */
+export const LIGHT_PRESETS = [
+  { id: "torch", label: "Torch · 20 ft + 20 ft", brightFeet: 20, dimFeet: 20 },
+  { id: "lantern", label: "Lantern · 30 ft + 30 ft", brightFeet: 30, dimFeet: 30 },
+  { id: "candle", label: "Candle · 5 ft + 5 ft", brightFeet: 5, dimFeet: 5 },
+  { id: "light", label: "Light spell · 20 ft + 20 ft", brightFeet: 20, dimFeet: 20 },
+  { id: "daylight", label: "Daylight · 60 ft + 60 ft", brightFeet: 60, dimFeet: 60 },
+  { id: "glow", label: "Dim glow · 0 ft + 10 ft", brightFeet: 0, dimFeet: 10 }
+] as const;
+export type LightPresetId = (typeof LIGHT_PRESETS)[number]["id"];
 
 export type ClearScope = "mine" | "players" | "all";
 
@@ -74,6 +90,22 @@ export interface MapToolbarProps {
   /** Whether this map has any difficult terrain to clear. */
   hasTerrain: boolean;
   onClearTerrain: () => void;
+
+  /* Vision (GM only) */
+  visionEnabled: boolean;
+  visionBusy: boolean;
+  onVisionEnabledChange: (enabled: boolean) => void;
+  ambient: "bright" | "dim" | "dark";
+  onAmbientChange: (ambient: "bright" | "dim" | "dark") => void;
+  lightPreset: LightPresetId;
+  onLightPresetChange: (preset: LightPresetId) => void;
+  hasWalls: boolean;
+  onClearWalls: () => void;
+  onForgetExplored: () => void;
+  /** Whose eyes the GM looks through: nobody (null), the whole party, or one creature on the map. */
+  lookThrough: string | null;
+  onLookThroughChange: (choice: string | null) => void;
+  lookThroughOptions: ReadonlyArray<{ id: string; name: string }>;
 
   /**
    * The "Preview what players see" tool. No panel behind it: the preview is already a fixed,
