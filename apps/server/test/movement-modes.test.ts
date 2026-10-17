@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
-import type { ActorDefinition } from "@vtt/schemas";
+import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
+import { ContentLibrary } from "../src/content-library.js";
+import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import { addEffect, makeEffect, releaseGrapplesOutOfRange } from "../src/effects.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy, movementStatus } from "../src/movement-rules.js";
@@ -44,7 +46,19 @@ const DEFINITIONS: Record<string, ActorDefinition> = {
     token: { disposition: "friendly" },
     extensions: {},
     character: { features: [{ id: "roving", kind: "class", sourceId: "ranger" }] }
-  } as unknown as ActorDefinition
+  } as unknown as ActorDefinition,
+  ...Object.fromEntries(
+    ["Flyby", "Agile", "Abduct", "Swarm", "Air Form"].map((trait) => [
+      trait,
+      {
+        actions: [],
+        token: { disposition: "hostile" },
+        extensions: {
+          "open5e.srd-2024": { speeds: { walk: 30, fly: 60 }, traits: [{ name: trait, description: "." }] }
+        }
+      } as unknown as ActorDefinition
+    ])
+  )
 };
 
 function game(
@@ -168,6 +182,76 @@ describe("special speeds", () => {
   });
 });
 
+describe("speeds a spell or an item grants", () => {
+  const library = new ContentLibrary().forAudience("gm");
+  const catalog = equipmentCatalogOf(library);
+  /** The effect a cast leaves (its modifiers as the bundle authors them), on Borin. */
+  const cast = (state: GameState, spellId: string) => {
+    const grant = library.spellRecord(spellId)!.effect!.grant!;
+    addEffect(
+      state,
+      HERO,
+      makeEffect({
+        id: `cast-${spellId}`,
+        name: grant.name!,
+        tags: grant.tags,
+        duration: { type: "manual" },
+        modifiers: grant.modifiers
+      })
+    );
+  };
+
+  it("flies 60 feet under Fly, and hovers", () => {
+    const state = game({ [HERO]: cell(0, 0) });
+    cast(state, "fly");
+    expect(movementStatus(state, HERO, { resolveDefinition }).modes).toContainEqual({
+      mode: "fly",
+      budgetFeet: 60,
+      extraCost: false
+    });
+    move(state, HERO, cell(0, 0), cell(12, 0), { mode: "fly" });
+    expect(used(state)).toBe(60);
+  });
+
+  it("climbs at its Speed under Spider Climb, Longstrider's 10 feet included", () => {
+    const state = game({ [HERO]: cell(0, 0) });
+    cast(state, "spider-climb");
+    cast(state, "longstrider");
+    expect(movementStatus(state, HERO, { resolveDefinition }).modes).toContainEqual({
+      mode: "climb",
+      budgetFeet: 40,
+      extraCost: false
+    });
+    move(state, HERO, cell(0, 0), cell(8, 0), { mode: "climb" });
+    expect(used(state)).toBe(40);
+  });
+
+  it("swims 40 feet with a Ring of Swimming on, and not once it comes off", () => {
+    const state = game({ [HERO]: cell(0, 0) });
+    const hero = state.actors.find((actor) => actor.id === HERO)!;
+    const ring = InventoryItemSchema.parse({
+      id: "ring-of-swimming",
+      name: "Ring of Swimming",
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      category: library.equipmentRecord("ring-of-swimming")!.category
+    });
+    hero.inventory = [ring];
+    expect(movementStatus(state, HERO, { resolveDefinition, catalog }).modes).toContainEqual({
+      mode: "swim",
+      budgetFeet: 40,
+      extraCost: false
+    });
+    hero.inventory = [{ ...ring, equipped: false }];
+    expect(movementStatus(state, HERO, { resolveDefinition, catalog }).modes).toContainEqual({
+      mode: "swim",
+      budgetFeet: 30,
+      extraCost: true
+    });
+  });
+});
+
 describe("crawling", () => {
   it("costs an extra foot per foot while Prone", () => {
     const state = game({ [HERO]: cell(0, 0) });
@@ -239,7 +323,7 @@ describe("when and where a creature may move", () => {
         now: () => 0,
         commandId: "50000000-0000-4000-8000-000000000001"
       })
-    ).toThrowError("Borin can't get there - other creatures bar the way.");
+    ).toThrowError("Borin can't get there. Other creatures bar the way.");
   });
 });
 
@@ -303,5 +387,42 @@ describe("dragging a grappled creature", () => {
     grapple(state, HERO, RAT);
     expect(dragCostsExtra(state, HERO, [RAT])).toBe(false);
     expect(dragCostsExtra(state, HERO, [ORC])).toBe(true);
+  });
+});
+
+describe("stat-block traits that change how a creature moves", () => {
+  /** The orc, given a stat block with one trait, moves on its own turn. */
+  const withTrait = (trait: string, positions: Readonly<Record<string, { x: number; y: number }>>) => {
+    const state = game(positions, { turn: ORC });
+    state.actors.find((actor) => actor.id === ORC)!.definitionId = trait;
+    return state;
+  };
+
+  it("lets a Flyby creature fly out of an enemy's reach without provoking, but not walk out", () => {
+    const flying = withTrait("Flyby", { [HERO]: cell(0, 0), [ORC]: cell(1, 0) });
+    expect(move(flying, ORC, cell(1, 0), cell(4, 0), { mode: "fly" }).prompts).toEqual([]);
+    const walking = withTrait("Flyby", { [HERO]: cell(0, 0), [ORC]: cell(1, 0) });
+    expect(move(walking, ORC, cell(1, 0), cell(4, 0)).prompts.map((prompt) => prompt.actorId)).toEqual([HERO]);
+  });
+
+  it("lets an Agile creature move out of reach without provoking at all", () => {
+    const state = withTrait("Agile", { [HERO]: cell(0, 0), [ORC]: cell(1, 0) });
+    expect(move(state, ORC, cell(1, 0), cell(4, 0)).prompts).toEqual([]);
+  });
+
+  it("lets a bugbear move what it grapples at no extra cost (Abduct)", () => {
+    const state = withTrait("Abduct", { [HERO]: cell(0, 0), [ORC]: cell(1, 0) });
+    expect(dragCostsExtra(state, ORC, [HERO], resolveDefinition)).toBe(false);
+    expect(dragCostsExtra(state, ORC, [HERO])).toBe(true);
+  });
+
+  it("lets an air elemental stop in a creature's space, and anyone stop in a swarm's", () => {
+    const air = withTrait("Air Form", { [HERO]: cell(3, 0), [ORC]: cell(1, 0) });
+    expect(() => move(air, ORC, cell(1, 0), cell(3, 0))).not.toThrow();
+    const plain = game({ [HERO]: cell(3, 0), [ORC]: cell(1, 0) }, { turn: ORC });
+    expect(blockedBy(() => move(plain, ORC, cell(1, 0), cell(3, 0)))).toBe("movement.occupied");
+    const swarm = game({ [HERO]: cell(0, 0), [ORC]: cell(3, 0) });
+    swarm.actors.find((actor) => actor.id === ORC)!.definitionId = "Swarm";
+    expect(() => move(swarm, HERO, cell(0, 0), cell(3, 0))).not.toThrow();
   });
 });

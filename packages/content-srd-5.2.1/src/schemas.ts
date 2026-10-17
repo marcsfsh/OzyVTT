@@ -14,8 +14,8 @@ import {
   AmmunitionKindSchema,
   ActionReactionSchema,
   ActorDefinitionSchema,
+  DamageFormulaSchema,
   DamageTypeSchema,
-  DiceFormulaSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
   SaveFailureEffectSchema,
@@ -61,16 +61,42 @@ const SpellAttackRangeSchema = z
   .object({ kind: z.enum(["melee", "ranged"]), feet: z.number().int().min(5).max(5280) })
   .strict();
 
-/** Typed damage; `addsModifier` adds the caster's spellcasting ability modifier (Spiritual Weapon's 1d8 + it). */
+/** Typed damage, dice or a fixed amount (Guardian of Faith's 20); `addsModifier` adds the caster's spellcasting
+ *  ability modifier (Spiritual Weapon's 1d8 + it). */
 const SpellDamageSchema = z
   .array(
-    z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema, addsModifier: z.boolean().optional() }).strict()
+    z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema, addsModifier: z.boolean().optional() }).strict()
   )
   .max(4);
 
+/**
+ * Where and when what a spell leaves behind acts on a creature, so the server raises the save or deals the damage:
+ * a creature entering it (or the area moving onto the creature), starting or ending its turn there, or travelling in
+ * it (Spike Growth's damage for every 5 feet). The area is the one the cast places on the map, or within `feet` of
+ * the caster (an Emanation) or of the point the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A
+ * creature makes this save only once per turn" (entering counts once a turn anyway); `affects` "enemies" spares the
+ * caster's allies (Guardian of Faith; spirits that harm the creatures the caster chooses); `damageCap` ends it once
+ * it has dealt that much (Guardian of Faith's 60).
+ */
+export const SpellZoneSchema = z
+  .object({
+    on: z
+      .array(z.enum(["enter", "start-turn", "end-turn", "travel"]))
+      .min(1)
+      .max(3),
+    oncePerTurn: z.literal(true).optional(),
+    around: z.enum(["caster", "point"]).optional(),
+    feet: z.number().int().min(5).max(120).optional(),
+    affects: z.literal("enemies").optional(),
+    damageCap: z.number().int().min(1).max(1000).optional()
+  })
+  .strict();
+export type SpellZone = z.infer<typeof SpellZoneSchema>;
+
 /** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
  *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
- *  action, the trigger is the GM's to spot). It rolls at the spell's own level. */
+ *  action; with a `zone` the server watches for it, otherwise the GM spots it). It rolls at the level the spell was
+ *  cast at. */
 export const SpellLaterActionSchema = z
   .object({
     /** Its name on the sheet, after the spell's ("Spirit Guardians: save"). */
@@ -86,7 +112,9 @@ export const SpellLaterActionSchema = z
     damage: SpellDamageSchema,
     area: ActionAreaSchema.optional(),
     /** It moves the cast's `grant` from a creature at 0 Hit Points to its own target (Hunter's Mark, Hex). */
-    movesGrant: z.literal(true).optional()
+    movesGrant: z.literal(true).optional(),
+    /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
+    zone: SpellZoneSchema.optional()
   })
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
@@ -105,7 +133,7 @@ export const SpellEffectSchema = z
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),
-    laterActions: z.array(SpellLaterActionSchema).min(1).max(2).optional(),
+    laterActions: z.array(SpellLaterActionSchema).min(1).max(3).optional(),
     /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
     darts: z.number().int().min(2).max(20).optional(),
     /** How many creatures one cast targets (Bless: up to three), plus `perSlot` more for each slot level above the
@@ -337,6 +365,15 @@ const EquipmentWeaponStatsSchema = z.object({
     .optional()
 });
 
+/** The light a lit item sheds, as its description prints it: Bright Light out to `brightFeet` and Dim Light for
+ *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights a carried one while it is equipped (ADR-0023). */
+const ItemLightSchema = z
+  .object({
+    brightFeet: z.number().int().min(0).max(240),
+    dimFeet: z.number().int().min(0).max(240)
+  })
+  .strict();
+
 /**
  * The base weapons or armors a template item may bind to: the SRD's printed qualifier (`label`) and
  * its resolved ids, computed at build or authoring time so the server's bind check is a membership
@@ -381,6 +418,7 @@ export const EquipmentReferenceSchema = z
     /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Long enough for
      *  the longest SRD item with its tables (Mysterious Deck). */
     description: z.string().max(12000).nullable(),
+    light: ItemLightSchema.optional(),
     weapon: EquipmentWeaponStatsSchema.nullable().optional(),
     armor: z
       .object({

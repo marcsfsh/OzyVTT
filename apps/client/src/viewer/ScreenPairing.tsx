@@ -14,7 +14,7 @@ const BUSY_RETRY_MS = 60_000;
 export const spacedCode = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 
 /**
- * An unpaired table screen (ADR-0026). It shows a short code and waits; the GM types the code on their own device,
+ * An unpaired table screen (ADR-0027). It shows a short code and waits; the GM types the code on their own device,
  * so nothing has to be typed with a TV remote. The code renews itself when it runs out, and a reload shows the same
  * code until then, because the request's secret is in an HttpOnly cookie.
  */

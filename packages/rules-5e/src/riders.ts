@@ -122,6 +122,10 @@ export type RiderModifier = Readonly<{
   poolId?: string;
   threshold?: number;
   sense?: string;
+  /** `special-speed`: the way of moving it gives, at `feet` or equal to Speed, and whether a flier hovers. */
+  movement?: "fly" | "swim" | "climb" | "burrow";
+  equalToSpeed?: boolean;
+  hover?: boolean;
   /** `attack-bonus` / `save-bonus`: dice rolled on top of `amount` ("1d4"), or taken off ("-1d4"). */
   dice?: string;
   when?: readonly RiderTrigger[];

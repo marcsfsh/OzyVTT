@@ -45,7 +45,7 @@ function activeState() {
 }
 
 describe("authoritative annotation geometry", () => {
-  it("rejects measuring or placing without an active encounter or completed calibration", () => {
+  it("rejects measuring or placing without a live map or completed calibration", () => {
     const inactive = GameStateSchema.parse({ schemaVersion: 1 });
     expect(() =>
       addAnnotation(
@@ -61,7 +61,25 @@ describe("authoritative annotation geometry", () => {
         },
         geometry
       )
-    ).toThrow("Start an encounter");
+    ).toThrow("Make a scene live");
+    // A live scene's map takes a measurement before its fight starts.
+    const beforeFight = activeState();
+    beforeFight.combat = { ...beforeFight.combat, active: false, turnActorId: null };
+    expect(
+      addAnnotation(
+        beforeFight,
+        {
+          id: "a0000000-0000-4000-8000-000000000002",
+          kind: "measurement",
+          origin: { x: 25, y: 25 },
+          target: { x: 125, y: 25 },
+          visibility: "public",
+          actor: playerActor,
+          now: 0
+        },
+        geometry
+      ).geometry.sizeFeet
+    ).toBe(10);
     const state = activeState();
     expect(() =>
       addAnnotation(

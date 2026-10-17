@@ -92,7 +92,7 @@ export function describeFailure(error: unknown): GameFailure {
 
 /** A socket call made before `session:join`. */
 export const NOT_JOINED_REPLY: MutationResult = { ok: false, code: "not_joined", message: "Join a session first." };
-/** A socket whose session was revoked or ran out; the client signs in again (ADR-0025). */
+/** A socket whose session was revoked or ran out; the client signs in again (ADR-0026). */
 export const SESSION_ENDED_REPLY: MutationResult = {
   ok: false,
   code: "unauthenticated",

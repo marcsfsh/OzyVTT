@@ -56,17 +56,17 @@ export function oilIgnition<T extends Readonly<{ amount: number; type: string }>
 
 /**
  * Rolling on the ground puts out the fire on its bearer: a Burning effect of its own ends, and one riding conditions
- * only stops burning. The bearer drops Prone, which it gave itself. Returns the names of the fires put out.
+ * only stops burning. The bearer drops Prone, which it gave itself. Returns the fires put out, with their sources.
  */
 export function putOutFire(
   state: GameState,
   actor: Actor,
   options: Readonly<{ selfApplied: boolean; immunities?: ConditionImmunitySource }>
-): Readonly<{ ended: string[]; events: EffectNarration[] }> {
-  const ended: string[] = [];
+): Readonly<{ ended: Actor["effects"]; events: EffectNarration[] }> {
+  const ended: Actor["effects"] = [];
   const events: EffectNarration[] = [];
   for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(BURNING_TAG))) {
-    ended.push(effect.name);
+    ended.push(effect);
     if (effect.linkedConditionIds.length === 0) {
       events.push(...endEffect(state, actor.id, effect.id));
       continue;

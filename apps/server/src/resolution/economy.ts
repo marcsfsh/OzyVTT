@@ -5,7 +5,15 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
-import { HASTED_TAG, hasEffectTag, RAGING_TAG, READIED_TAG, RECKLESS_TAG, STEADY_AIM_TAG } from "../effects.js";
+import {
+  HASTED_TAG,
+  hasEffectTag,
+  NO_ACTIONS_TAG,
+  RAGING_TAG,
+  READIED_TAG,
+  RECKLESS_TAG,
+  STEADY_AIM_TAG
+} from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
 import { SCROLL_UNREADABLE, scrollOfAction, scrollReading } from "../scrolls.js";
 import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
@@ -20,11 +28,14 @@ import {
   rememberOverride,
   type RuleId
 } from "../rules-families.js";
-import { laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { laterRowOf, laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { hitRiderOf } from "./hit-riders.js";
+import { hiddenFrom } from "../vision/audience.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
@@ -165,6 +176,7 @@ export function evaluateActionEconomy(
   }
   checkTargeting(evaluation, distanceFeet);
   if (spell) checkMarkMove(evaluation, spell);
+  if (spell) checkSpellUp(evaluation, spell);
   if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
@@ -188,7 +200,10 @@ export function evaluateActionEconomy(
 
 /** SRD Hunter's Mark and Hex move "if the target drops to 0 Hit Points before this spell ends": the caster's
  *  Concentration on the spell holds a mark, and the marked creature is down. */
-function checkMarkMove({ state, attacker, action, violations }: Evaluation, spell: SpellReference): void {
+function checkMarkMove(
+  { state, attacker, action, resolveDefinition, violations }: Evaluation,
+  spell: SpellReference
+): void {
   if (!markMoveOf(spell, action.id)) return;
   const marks = castMarks(state, attacker, spell);
   if (marks.length === 0) {
@@ -199,11 +214,27 @@ function checkMarkMove({ state, attacker, action, violations }: Evaluation, spel
     return;
   }
   const standing = marks.find(({ bearer }) => bearer.hp.current > 0);
+  // A marked creature hidden from the table (the shared check) isn't named in the refusal.
   if (standing)
     violations.push({
       rule: "target.mark-still-standing",
-      message: `${spell.name} moves only once its creature drops to 0 Hit Points - ${standing.bearer.name} hasn't.`
+      message: hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(standing.bearer.id)
+        ? `${spell.name} moves only once its creature drops to 0 Hit Points.`
+        : `${spell.name} moves only once its creature drops to 0 Hit Points - ${standing.bearer.name} hasn't.`
     });
+}
+
+/** What a spell lets its caster do on later turns (Spiritual Weapon's attack, Call Lightning's bolt) is there "until the
+ *  spell ends": while its caster still has it up. */
+function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, spell: SpellReference): void {
+  const row = laterRowOf(spell, action.id);
+  if (!row || !takenWhileUp(row) || spellUpLevel(attacker, spell) !== null) return;
+  // A sheet built before the cast itself was an action (Produce Flame's) has no way to start it, so it isn't asked to.
+  if (!siblings.some((sibling) => sibling.spellId === spell.id && !laterRowOf(spell, sibling.id))) return;
+  violations.push({
+    rule: "feature.requires-effect",
+    message: `${attacker.name} doesn't have ${spell.name} up - cast it first.`
+  });
 }
 
 /** In wait mode the order is provisional until every player has rolled, and the turn economy resets when
@@ -215,6 +246,16 @@ function checkTurnsBegun({ state, violations }: Evaluation): void {
       rule: "initiative.gathering",
       message: "Players are still rolling initiative - turns begin once everyone has rolled."
     });
+}
+
+/** The spell a Readied creature holds for this action (SRD Ready), while the Readied effect lasts. */
+export function heldReadiedSpell(
+  attacker: Pick<LiveActor, "effects">,
+  actionId: string
+): Readonly<{ actionId: string; level: number }> | undefined {
+  return attacker.effects.find(
+    (effect) => effect.tags.includes(READIED_TAG) && effect.readiedSpell?.actionId === actionId
+  )?.readiedSpell;
 }
 
 /** A Readied creature's response to its trigger: an action it takes off its own turn, which the SRD makes a Reaction
@@ -235,18 +276,16 @@ export function isReadiedResponse(
 
 /** SRD: an action and a Bonus Action are taken on your own turn. Off it a creature acts only with a Reaction (a
  *  readied action is one), a legendary action, or a feature that answers an event. The current creature is named
- *  only when the table can see it. */
-function checkOwnTurn({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+ *  only when the table can see it (the shared hidden check). */
+function checkOwnTurn({ state, attacker, action, onOwnTurn, resolveDefinition, violations }: Evaluation): void {
   if (onOwnTurn || !state.combat.active || action.legendary !== undefined) return;
   if (action.activation !== "action" && action.activation !== "bonus-action") return;
   if (isReadiedResponse(state, attacker, action)) return;
   const current = state.actors.find((candidate) => candidate.id === state.combat.turnActorId);
+  const shown = current && !hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(current.id);
   violations.push({
     rule: "economy.not-your-turn",
-    message:
-      current && current.visibility === "public"
-        ? `Not your turn yet - ${current.name} is up.`
-        : "Not your turn yet - wait for your turn."
+    message: shown ? `Not your turn yet - ${current.name} is up.` : "Not your turn yet - wait for your turn."
   });
 }
 
@@ -328,7 +367,7 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
 /** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
-function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
+function checkAbleToAct({ state, attacker, action, resolveDefinition, violations }: Evaluation): void {
   if (action.activation !== "other" || !ANSWERS_A_ROLL.has(action.id)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
@@ -342,6 +381,19 @@ function checkAbleToAct({ attacker, action, violations }: Evaluation): void {
         rule: "condition.down",
         message: `${attacker.name} is down (0 HP) and can't take actions, bonus actions, or reactions.`
       });
+  }
+  // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
+  const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
+  if (reeling && (action.activation === "action" || action.activation === "bonus-action")) {
+    // Named as the creature's own sheet shows it: a caster hidden from the table is "A hidden threat".
+    const hiddenCaster =
+      reeling.sourceActorId !== null &&
+      hiddenFrom(state, resolveDefinition ? { definition: resolveDefinition } : {})(reeling.sourceActorId);
+    const name = hiddenCaster ? withoutSourceName(reeling.name, reeling.sourceName) : reeling.name;
+    violations.push({
+      rule: "condition.incapacitated",
+      message: `${attacker.name} is reeling from ${name} and can't take an action or a Bonus Action this turn.`
+    });
   }
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
@@ -637,6 +689,9 @@ function continuedSpellSlot({
 }: Pick<Evaluation, "state" | "attacker" | "action">): number | null {
   const open = state.combat.turn.actionInstance;
   const onOwnTurn = state.combat.turnActorId === attacker.id;
+  // A readied spell is released at the level its slot was spent at when it was readied (SRD Ready).
+  const held = onOwnTurn ? undefined : heldReadiedSpell(attacker, action.id);
+  if (action.spellSlot && held) return held.level;
   if (!action.spellSlot || !onOwnTurn || !state.combat.turn.actionUsed || open?.actorId !== attacker.id) return null;
   return (open.components[action.id] ?? 0) > 0 ? (open.slotLevel ?? action.spellSlot.level) : null;
 }

@@ -1,5 +1,5 @@
 /**
- * Where this browser keeps the GM's session token (ADR-0025). Every tab keeps it in sessionStorage, so a reload stays
+ * Where this browser keeps the GM's session token (ADR-0026). Every tab keeps it in sessionStorage, so a reload stays
  * signed in. "Keep me signed in on this computer" also keeps it in localStorage until the token's own expiry. A new
  * tab with neither asks the tabs already open over a BroadcastChannel, which stays inside this browser and origin.
  * Storage can throw (private mode, blocked site data), and then the token lives only in memory, as before.

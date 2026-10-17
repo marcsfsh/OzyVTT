@@ -279,6 +279,14 @@ export const isLongCastingTime = (castingTime: string): boolean => /\b\d+\s*(?:m
 export const laterSpellActionId = (spellId: string, name: string): string =>
   `spell-${spellId}-then-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
+/** The later action of a spell this action id names, if it is one. */
+export function laterRowOf(
+  spell: SpellReference,
+  actionId: string
+): NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number] | undefined {
+  return (spell.effect?.laterActions ?? []).find((row) => laterSpellActionId(spell.id, row.name) === actionId);
+}
+
 /** One of the things a spell lets its caster do after the cast (`SpellReference.effect.laterActions`), as an action
  *  with the caster's numbers: no slot, the spell's own level (a cantrip's tier through `scaled.roll`). */
 export function laterSpellAction(

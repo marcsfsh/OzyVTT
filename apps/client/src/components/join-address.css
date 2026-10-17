@@ -51,10 +51,8 @@
   padding-top: var(--space-5);
   border-top: 1px solid var(--line);
 }
-/* On a phone the box grows to hold the address; the frame scrolls if the screen is short. */
-@media (max-width: 979px) {
-  .table-layout .map-empty-hero.map-empty-hero--gm {
-    flex: 0 0 auto;
-    padding: var(--space-4);
-  }
+/* The GM's box scrolls inside a phone's map pane (`.scroll-y`); when it overflows it starts from the top. */
+.map-empty-hero.map-empty-hero--gm {
+  place-content: safe center;
+  padding: var(--space-4);
 }

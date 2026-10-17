@@ -639,6 +639,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].castsSpells.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spells a stat block's action casts (a Spellcasting list, a Misty Step), read from its text as the catalog is built and made cast actions on a stat block; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].reminder",
     types: ACTION_CARRIERS,
     reason: "what the engine leaves to the GM, read from a save's later-turn damage as the catalog is built",
@@ -916,6 +923,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "^light.**",
+    types: ["equipment"],
+    reason:
+      "the light an item sheds (a Torch's 20 feet bright, 20 dim), which dynamic vision reads; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "^uses.scaling.id",
     types: ["equipment"],
     reason:
@@ -953,6 +967,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "^extensions",
     types: ["monster"],
     reason: "the opaque bag itself — the census's structural blind spot, since the walk cannot see its keys",
+    status: "gap"
+  },
+  {
+    at: "traitMechanics[].**",
+    types: ["monster"],
+    reason:
+      "what a stat block's traits do (Regeneration, auras, Death Burst), read from the trait text as the catalog is built; no editor control yet",
     status: "gap"
   },
   {

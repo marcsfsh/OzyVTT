@@ -18,7 +18,7 @@ const reply = (status: number, data: unknown) =>
     { status }
   );
 
-describe("pairing a table screen (ADR-0026)", () => {
+describe("pairing a table screen (ADR-0027)", () => {
   it("reads six digits however they were typed, and shows them in two groups", () => {
     expect(codeDigits("482 913")).toBe("482913");
     expect(codeDigits(" 482-913 ")).toBe("482913");

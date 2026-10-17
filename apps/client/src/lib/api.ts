@@ -63,7 +63,7 @@ type SessionEndedListener = (token: string) => void;
 const sessionEndedListeners = new Set<SessionEndedListener>();
 
 /**
- * Hears every 401 answered to a request that carried a session token: that session is over (ADR-0025). The token
+ * Hears every 401 answered to a request that carried a session token: that session is over (ADR-0026). The token
  * is passed along, so a listener can ignore one it has already replaced.
  */
 export function onSessionEnded(listener: SessionEndedListener): () => void {

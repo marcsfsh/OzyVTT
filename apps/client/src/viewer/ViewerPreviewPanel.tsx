@@ -8,6 +8,24 @@ type DragGesture = Readonly<{ mode: "move" | "resize"; grabX: number; grabY: num
 
 const MIN_WIDTH = 300;
 const MIN_HEIGHT = 220;
+const GUTTER = 16;
+
+/** The top edge the panel keeps below: the app's tab bar, so every tab stays reachable while it is open. */
+function topLimit(): number {
+  const bar = document.querySelector(".frame-tabbar")?.getBoundingClientRect().bottom ?? 0;
+  return Math.round(bar) + 8;
+}
+
+/** Where the panel opens: the top right corner under the tab bar, no wider than the window allows. */
+function openingRect(): Rect {
+  const width = Math.min(460, window.innerWidth - GUTTER * 2);
+  return {
+    x: Math.max(GUTTER, window.innerWidth - width - GUTTER),
+    y: topLimit(),
+    width,
+    height: Math.min(340, Math.max(MIN_HEIGHT, window.innerHeight - topLimit() - GUTTER))
+  };
+}
 
 /**
  * The GM's in-tab preview of the shared screen: mints a short-lived read-only viewer cookie and
@@ -15,7 +33,7 @@ const MIN_HEIGHT = 220;
  * its own window.
  */
 export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: string; onClose: () => void }>) {
-  const [rect, setRect] = useState<Rect>({ x: 16, y: 16, width: 460, height: 340 });
+  const [rect, setRect] = useState<Rect>(openingRect);
   const [drag, setDrag] = useState<DragGesture | null>(null);
   const [session, setSession] = useState<"pending" | "ready" | "error">("pending");
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -47,11 +65,15 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
     const dx = event.clientX - drag.grabX,
       dy = event.clientY - drag.grabY;
     if (drag.mode === "move")
-      setRect({ ...drag.startRect, x: Math.max(0, drag.startRect.x + dx), y: Math.max(0, drag.startRect.y + dy) });
+      setRect({
+        ...drag.startRect,
+        x: Math.max(0, drag.startRect.x + dx),
+        y: Math.max(topLimit(), drag.startRect.y + dy)
+      });
     else
       setRect({
         ...drag.startRect,
-        width: Math.max(MIN_WIDTH, drag.startRect.width + dx),
+        width: Math.max(Math.min(MIN_WIDTH, window.innerWidth - GUTTER * 2), drag.startRect.width + dx),
         height: Math.max(MIN_HEIGHT, drag.startRect.height + dy)
       });
   };

@@ -3,7 +3,7 @@ import { VIEWER_SESSION_COOKIE, type IntegrationScope } from "@vtt/api-contract"
 import { bearerToken, cookie, sendFailure } from "./http-kit.js";
 
 /**
- * Who sent a request, and the one rule for refusing them (ADR-0025). Every HTTP router and the socket handshake
+ * Who sent a request, and the one rule for refusing them (ADR-0026). Every HTTP router and the socket handshake
  * read the caller here, so a credential gets the same answer everywhere:
  *
  * - 401 `unauthenticated` when there is no credential, or the one presented is malformed, expired or revoked. The

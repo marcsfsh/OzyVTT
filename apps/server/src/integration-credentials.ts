@@ -177,7 +177,7 @@ export class IntegrationCredentialStore {
    * Null when `token` is no live credential (unknown, wrong secret, revoked or expired). Otherwise the credential and
    * whether it reaches `requiredScope`; a null scope is a route that takes no integration credential, and `any` asks
    * only whether it is live (no use is recorded, as the route checks its real scope next). Keeping the two apart lets
-   * a route answer 401 for a dead credential and 403 for a live one without the scope (ADR-0025).
+   * a route answer 401 for a dead credential and 403 for a live one without the scope (ADR-0026).
    */
   check(
     token: string,

@@ -103,15 +103,20 @@ describe("a shared replay's battle map (D26 ride-along)", () => {
     };
     await record(shared.metadata.id);
     await record(secret.metadata.id);
+    // The table moves on to a third map, which stays its map after that fight ends.
+    const tavern = await server.mapAssets.import(png(902, 600), "tavern.png");
+    server.mapCatalog.register(tavern.metadata.id, "The tavern", "battlemap");
+    await record(tavern.metadata.id);
 
     const archives = (await (await fetch(`${base}/api/v1/encounters`, { headers: bearer(gmToken) })).json()).data
       .encounters as ReadonlyArray<{ id: number }>;
-    expect(archives).toHaveLength(2);
-    // Newest first, so the last fight recorded (the secret map) is index 0.
-    const sharedArchiveId = archives[1].id;
+    expect(archives).toHaveLength(3);
+    // Newest first, so the first fight recorded (the shared map) is index 2.
+    const sharedArchiveId = archives[2].id;
 
-    // No fight is running, so the live-map door is shut and neither image is reachable yet.
+    // The live-map door opens only the table's own map, so neither archived image is reachable yet.
     expect(server.store.snapshot.combat.active).toBe(false);
+    expect(await image(tavern.metadata.id, playerToken)).toBe(200);
     expect(await image(shared.metadata.id, playerToken)).toBe(403);
     expect(await image(secret.metadata.id, playerToken)).toBe(403);
 

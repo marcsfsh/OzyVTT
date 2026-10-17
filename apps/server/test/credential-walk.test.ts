@@ -9,7 +9,7 @@ import { openApiDocument } from "../src/openapi/document.js";
 
 /**
  * The session lifecycle's one rule, walked over every HTTP route the server mounts and the socket handshake
- * (ADR-0025): 401 for no credential or a dead one (garbage, or a GM session that was revoked), 403 only for a valid
+ * (ADR-0026): 401 for no credential or a dead one (garbage, or a GM session that was revoked), 403 only for a valid
  * credential without the role. The answers for every route are pinned in `__snapshots__/credential-answers.txt`, so
  * a new route, or a changed answer, shows up in review.
  */

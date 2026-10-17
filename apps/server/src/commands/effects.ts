@@ -5,6 +5,7 @@ import { CommandRejectedError } from "../game-store.js";
 import { EffectAddSchema, EffectEndSchema } from "@vtt/domain/commands";
 import type { GameState } from "@vtt/domain";
 import type { RulesOverride } from "../rules-families.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { initiatorOf, isGmGrade } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -22,7 +23,8 @@ function authorizeEnd(
   actorId: string,
   effectId: string,
   override: RulesOverride | null,
-  events: EffectNarration[]
+  events: EffectNarration[],
+  hidden: (actorId: string) => boolean
 ): void {
   if (initiator.role === "gm") return;
   const bearer = state.actors.find((candidate) => candidate.id === actorId);
@@ -35,11 +37,13 @@ function authorizeEnd(
     effect.escapeDc !== null
       ? `escape it (DC ${effect.escapeDc}) or ask the GM`
       : "it ends by its own rules, or ask the GM";
+  // Named as the player's own sheet shows it: a source hidden from them stays "A hidden threat" here too.
+  const name = sourceId !== null && hidden(sourceId) ? withoutSourceName(effect.name, effect.sourceName) : effect.name;
   policeConditionRule(
     state,
     bearer,
     "condition.imposed",
-    `${effect.name} wasn't ${bearer.name}'s own doing - ${how}.`,
+    `${name} wasn't ${bearer.name}'s own doing - ${how}.`,
     { override },
     events
   );
@@ -125,7 +129,16 @@ export const effectCommands = [
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         events = [];
-        authorizeEnd(state, initiatorOf(principal), actorId, effectId, request.override ?? null, events);
+        const initiator = initiatorOf(principal);
+        authorizeEnd(
+          state,
+          initiator,
+          actorId,
+          effectId,
+          request.override ?? null,
+          events,
+          kit.hiddenFor(initiator, state)
+        );
         // Ending fires onEnd and clears linked conditions.
         events.push(...endEffect(state, actorId, effectId));
       });

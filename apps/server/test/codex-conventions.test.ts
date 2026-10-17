@@ -100,7 +100,7 @@ describe("codex request correlation (X-Request-Id)", () => {
   });
 });
 
-// 401 means "no live credential: sign in"; 403 means "your valid credential does not reach this" (ADR-0025). An
+// 401 means "no live credential: sign in"; 403 means "your valid credential does not reach this" (ADR-0026). An
 // authenticated player must never be told to sign in, because a retrying client acts on that.
 describe("codex 401 vs 403", () => {
   it("answers 401 for a missing, unparseable or dead credential", async () => {

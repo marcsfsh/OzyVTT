@@ -236,7 +236,7 @@ const FEEDBACK = /\bset(?:Message|Feedback)\s*\(/g;
 
 /** Surfaces still to move to `useToast`, one row per call. */
 const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/encounter/GmEncounterPanel.tsx", 7],
+  ["apps/client/src/encounter/GmEncounterPanel.tsx", 6],
   ["apps/client/src/encounter/InitiativePrompt.tsx", 2],
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],

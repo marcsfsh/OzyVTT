@@ -77,3 +77,14 @@
 .now-playing .nh-slider-input {
   min-width: 4rem;
 }
+
+/* The header bar's chip: one row, the title cut to fit, the table screen's state as the leading icon. */
+.now-playing.is-compact {
+  flex-wrap: nowrap;
+  max-width: 14rem;
+  padding: 0 var(--space-1);
+}
+.now-playing.is-compact .now-playing-what {
+  flex: 1 1 auto;
+  padding: 0 var(--space-1) 0 0;
+}

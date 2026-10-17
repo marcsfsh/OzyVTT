@@ -116,7 +116,7 @@ describe("API v1 system router", () => {
     expect(missing.status).toBe(401);
     expect(ApiErrorEnvelopeSchema.parse(await missing.json()).error.code).toBe("unauthenticated");
 
-    // A token that is no live credential must sign in again: 401, like a missing one (ADR-0025).
+    // A token that is no live credential must sign in again: 401, like a missing one (ADR-0026).
     const dead = await fetch(base + SYSTEM_PATHS.capabilities, {
       headers: { authorization: "Bearer invalid-token" }
     });

@@ -27,8 +27,8 @@ type TokenRouterOptions = Readonly<{
   /** The server's credential checks. A joined player may browse the library and upload; the session id keys the
    *  upload cap. */
   verifiers: CredentialVerifiers;
-  /** Whether a joined player may load this image now. */
-  playerMayLoad: (assetId: string) => boolean;
+  /** Whether this joined player may load this image now: only one a creature in their own view wears. */
+  playerMayLoad: (assetId: string, sessionId: string) => boolean;
   /** Whether a paired table screen may load this image now. */
   viewerMayLoad: (assetId: string) => boolean;
   now?: () => number;
@@ -68,7 +68,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
     const caller = callerOf(request, response, options.verifiers, { viewer: true });
     const allowed =
       caller.kind === "gm" ||
-      (caller.kind === "player" && options.playerMayLoad(assetId)) ||
+      (caller.kind === "player" && options.playerMayLoad(assetId, caller.sessionId)) ||
       (caller.kind === "viewer" && options.viewerMayLoad(assetId));
     if (!allowed) refuse(response, caller, "That token image is not available to this table session.");
     return allowed;

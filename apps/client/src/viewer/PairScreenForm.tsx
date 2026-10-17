@@ -7,7 +7,7 @@ import { apiRequest } from "../lib/api";
 export const codeDigits = (typed: string) => typed.replace(/\D/g, "");
 
 /**
- * Pairing a table screen from the GM's side (ADR-0026): the screen shows a code, the GM types it here. A TV remote
+ * Pairing a table screen from the GM's side (ADR-0027): the screen shows a code, the GM types it here. A TV remote
  * never has to type anything.
  */
 export function PairScreenForm({ gmToken, onPaired }: Readonly<{ gmToken: string; onPaired: () => void }>) {

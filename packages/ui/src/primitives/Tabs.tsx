@@ -16,12 +16,22 @@ interface TabsProps {
   orientation?: "horizontal" | "vertical";
   ariaLabel?: string;
   className?: string;
+  /** Ties each tab to its panel: tab `${idBase}-tab-${id}` controls panel `${idBase}-panel-${id}`. */
+  idBase?: string;
 }
 
 /** The one tab bar: a sunken track whose chosen tab is raised and underlined in cyan (a left bar when vertical).
     Full keyboard control. An overflowing horizontal bar hides its scrollbar, keeps the active tab in view
     and fades whichever edge has more content (no fade when everything fits). */
-export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ariaLabel, className }: TabsProps) {
+export function Tabs({
+  tabs,
+  activeId,
+  onChange,
+  orientation = "horizontal",
+  ariaLabel,
+  className,
+  idBase
+}: TabsProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const barRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState({ scrollable: false, atStart: true, atEnd: true });
@@ -129,6 +139,7 @@ export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ari
             }}
             role="tab"
             type="button"
+            {...(idBase ? { id: `${idBase}-tab-${tab.id}`, "aria-controls": `${idBase}-panel-${tab.id}` } : {})}
             aria-selected={active}
             tabIndex={active ? 0 : -1}
             disabled={tab.disabled}

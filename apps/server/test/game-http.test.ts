@@ -332,7 +332,7 @@ describe("public game API over /api/v1", () => {
     // Revocation cuts access immediately.
     const revoked = await post(base, `/api/v1/gm/integration-credentials/${readOnly.id}/revoke`, gmToken);
     expect(revoked.status).toBe(200);
-    // A revoked credential must be replaced: 401, like no credential (ADR-0025).
+    // A revoked credential must be replaced: 401, like no credential (ADR-0026).
     const afterRevoke = await fetch(base + GAME_PATHS.snapshot, { headers: bearer(readOnly.token) });
     expect(afterRevoke.status).toBe(401);
   });
@@ -363,10 +363,10 @@ describe("public game API over /api/v1", () => {
     });
     expect(hiddenTarget.status).toBe(409);
     const hiddenBody = JSON.stringify(await hiddenTarget.json());
-    expect(hiddenBody).toContain("target combatants you can see");
+    expect(hiddenBody).toContain("Every target must be in this encounter.");
     expect(hiddenBody).not.toContain("Unrevealed Tyrant");
 
-    // GM-only resolve inputs are refused for a player: an area template and a strict-mode override.
+    // A player may aim an area for their own character, but an attack never takes one (and this map has no grid).
     expect(
       (
         await post(base, GAME_PATHS.actionResolve, playerToken, {
@@ -375,7 +375,8 @@ describe("public game API over /api/v1", () => {
           template: { shape: "circle", origin: { x: 10, y: 10 }, target: { x: 40, y: 40 } }
         })
       ).status
-    ).toBe(403);
+    ).toBe(409);
+    // A strict-mode override stays the GM's.
     expect(
       (
         await post(base, GAME_PATHS.actionResolve, playerToken, {

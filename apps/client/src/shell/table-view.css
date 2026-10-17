@@ -1,249 +1,103 @@
-/* The table's frame: the map column, the dock column and the rows around them. */
-
-.gm-session-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-top: var(--space-4);
-}
-.gm-session-controls button {
-  flex: 0 0 auto;
-  padding: 0.7rem 1.1rem;
-  text-align: center;
-}
-
-/* The table is a frame: it fills the pane exactly, the map takes the leftover, and anything that can
-   outgrow its share scrolls in its own region. `scrollbar-gutter: auto` overrides `.scroll-y`'s
-   `stable`: above 980px this box never scrolls, so a reserved gutter would only narrow the map. The
-   docked `.table-sidebar`, which does scroll, keeps the stable gutter. */
-.table-layout {
+/* The table's frame: a docked workbench. On a laptop (980px and up) the header bar and the map share the left
+   column and the panel takes the right; below 980px the header, the map pane and the panel stack, and the panel's
+   footer is the bar under the thumb. The frame fills the pane exactly and never scrolls: each region fits or
+   scrolls itself. */
+.table-bench {
   display: grid;
-  gap: var(--pane-gap);
+  grid-template-columns: minmax(0, 1fr) 24.5rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "head panel"
+    "map panel";
   height: 100%;
   min-height: 0;
-  align-items: stretch;
   overscroll-behavior: contain;
-  scrollbar-gutter: auto;
+  background: var(--void);
 }
-/* The table's sky goes behind the chrome, never behind the map: the dock, sheet and margins get the
-   horizon; the map stage stays an opaque dark plate (encounter-map.css).
-   Painted as background layers here rather than a `.pane-sky` child: `.table-layout` has fixed
-   descendants (enlarged map, viewer preview, drawer), so it can never take transform, filter,
-   perspective, contain: paint or will-change, which rules out the perspective grid floor. The
-   default `background-attachment: scroll` keeps the horizon at the frame's bottom while the content
-   scrolls (below 980px). */
-.table-layout {
-  background-image:
+.table-bench > .table-header {
+  grid-area: head;
+}
+/* On a laptop the split is no box of its own: the map and the panel are cells of the bench's grid. */
+.table-bench-split {
+  display: contents;
+}
+.table-bench-map {
+  grid-area: map;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* The panel is part of the shell: no shadow, its seam against the map in the role hue. The fill is 88% opaque so the
+   horizon shows through; reduced transparency makes it solid. */
+.table-bench-panel {
+  grid-area: panel;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: var(--rim-w) solid var(--role-hue);
+  background:
+    var(--material-lip),
     linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--sky-horizon-a) 22%,
-      var(--sky-horizon-b) 50%,
-      var(--sky-horizon-a) 78%,
-      transparent 100%
-    ),
-    var(--sky-horizon-glow), var(--sky-bloom), var(--sky-wash);
-  background-size:
-    100% 2px,
-    100% 100%,
-    100% 100%,
-    100% 100%;
-  background-position:
-    0 calc(100% - var(--sky-horizon-inset)),
-    0 0,
-    0 0,
-    0 0;
-  background-repeat: no-repeat;
+      180deg,
+      color-mix(in srgb, var(--surface-1) 88%, transparent) 0%,
+      color-mix(in srgb, var(--surface-2) 92%, transparent) 100%
+    );
 }
-/* `.scroll-y` on this element is a backstop for two cases: the docked arm at 980px+ renders the dice
-   and log panels bare, which cannot fit the column (`.table-sidebar` also scrolls there), and below
-   980px a pane shorter than the frame's floors (landscape, soft keyboard) cannot hold the rows.
-   Without it the page itself would scroll. */
-.table-layout .table,
-.table-layout .encounter-panel,
-.table-layout .dice-proof,
-.table-layout .gm-session-controls {
-  margin-top: 0;
+@media (prefers-reduced-transparency: reduce) {
+  .table-bench-panel {
+    background: var(--material-lip), linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  }
 }
-.table-layout > .table {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-.table-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--pane-gap);
-  min-width: 0;
-  min-height: 0;
-}
-/* The phone table (below 980px): two rows. `section.table` (top line, map band, status line) is
-   `flex: 0 0 auto` because each of its rows has a stated size. `.table-sheet` is `flex: 1 1 0` (a zero
-   basis grows into the leftover without taking shrink by content size) with an 8.25rem floor (tab
-   bar + two initiative rows). Below the floors the frame scrolls (`.scroll-y` in shell/TableView.tsx) rather
-   than clipping content out of reach. */
+
+/* On a phone the map pane takes its share of the height under the header (the divider sets it) and the panel the
+   rest, down to a floor that keeps the tabs and the bar under the thumb. */
 @media (max-width: 979px) {
-  /* `scrollbar-gutter: auto` matters most here: `stable` reserves ~10px of a phone's content box, enough
-     to wrap the top line and cost the sheet 38px. Phone scrollbars are overlays anyway. */
-  .table-layout {
+  .table-bench {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+  }
+  .table-bench-split {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
     min-height: 0;
   }
-  .table-layout > .table {
-    flex: 0 0 auto;
-    padding: var(--space-3);
-    border: 0;
-    border-radius: 0;
-    background: none;
-  }
-  .table-layout > .table-sheet {
-    flex: 1 1 0;
-    min-height: 8.25rem;
-    gap: var(--space-2);
-  }
-  /* One 44px top line from 375px up (at 320px it may wrap, which the frame's arithmetic accounts for).
-     `display: contents` above 980px keeps the laptop layout unchanged; `wrap` lets it break rather than
-     crush anything. */
-  .table-topline {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-  }
-  .table-topline > .party-strip,
-  .table-topline > .table-party-row {
-    flex: 1 1 5rem;
-    min-width: 0;
-    margin: 0;
-  }
-  .table-status {
-    margin: 0 0 var(--space-2);
-  }
-  /* The staging banner is a frame row while arranging a scene; tightened so its two sentences do not
-     take half the band. `.table-layout` on the selector because the base rule comes later in the file
-     and a media query adds no specificity. */
-  .table-layout .scene-preview-banner {
-    gap: 0.4rem;
-    margin-bottom: var(--space-2);
-    padding: 0.4rem 0.6rem;
-    font-size: 0.8rem;
-  }
-  /* The empty state stands in for the map, so it takes the band height. `.table-layout` for specificity
-     over the later base rule. */
-  .table-layout .map-empty-hero {
-    flex: 0 1 14rem;
+  .table-bench-map {
+    flex: 0 1 var(--map-share, 42%);
     min-height: 9rem;
-    margin-top: 0;
   }
-  /* Below 980px the claim picker is the sheet (shell/TableView.tsx renders it in this row). `flex: 1 1 0` so its
-     539px content basis does not take the whole shrink, and the sheet's floor so it never resolves to
-     0px when the replays shelf and "Leave table" share the row; the overflow goes to the frame's scroll.
-     The picker scrolls its own cards (`.scroll-y` in ClaimCharacter.tsx). */
-  .table-sheet > .claim-view {
+  .table-bench-panel {
     flex: 1 1 0;
-    min-height: 8.25rem;
-    margin: 0;
-  }
-}
-@media (min-width: 980px) {
-  .table-topline {
-    display: contents;
-  }
-}
-/* The GM's party strip with the rest button at its end; the strip scrolls, the button keeps its size. */
-.table-party-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  margin: 0 0 0.9rem;
-}
-.table-party-row > .party-strip {
-  flex: 1 1 auto;
-  margin: 0;
-}
-.table-topline:empty {
-  display: none;
-}
-@media (min-width: 980px) {
-  /* The dock is part of the shell: no column gap; the seam is the dock's own 2px left rim in the role hue. */
-  .table-layout {
-    grid-template-columns: minmax(0, 1.7fr) minmax(var(--dock-w), 27rem);
-    gap: 0;
-  }
-  /* The map column is a margin, not a panel (no slab or border), so the sky shows around the stage; the
-     padding keeps the stage off the pane's edges. */
-  .table-layout > .table {
-    border: 0;
-    background: none;
-  }
-}
-/* The dock is a panel with the chrome lip and no shadow (it is part of the shell, not floating). Its edge
-   is on the left only, the seam against the map, in the role hue. The fill is 88% translucent so the
-   horizon shows through; reduced transparency makes it solid. Only at 980px+, where the dock is a column;
-   below, it is a full-width row with no seam. */
-@media (min-width: 980px) {
-  .table-sidebar {
-    border-left: var(--rim-w) solid var(--role-hue);
-    background:
-      var(--material-lip),
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--surface-1) 88%, transparent) 0%,
-        color-mix(in srgb, var(--surface-2) 92%, transparent) 100%
-      );
-    box-shadow: none;
-  }
-  @media (prefers-reduced-transparency: reduce) {
-    .table-sidebar {
-      background: var(--material-lip), linear-gradient(180deg, var(--surface-1) 0%, var(--surface-2) 100%);
-    }
+    min-height: 9rem;
+    border-left: 0;
   }
 }
 
-.table-status {
-  margin: 0 0 0.8rem;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+/* A player who has claimed nobody while no map is live: the picker takes the whole table, no map pane. */
+.table-bench.is-claiming {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "head"
+    "panel";
+}
+.table-bench.is-claiming .table-bench-panel {
+  border-left: 0;
 }
 
-.scene-preview-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  margin-bottom: 0.8rem;
-  padding: 0.7rem var(--space-4);
-  border: 1px solid var(--violet);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  color: var(--violet-hi);
-  font-size: 0.9rem;
-}
-
-.empty-scene-prep {
-  margin-top: var(--space-4);
-  padding: 0.6rem 1.1rem;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  color: var(--text);
-  font-weight: 700;
-  text-align: center;
-  cursor: pointer;
-}
-
-/* The empty map state stands in for a loaded map, so it is sized like one: the frame's leftover with a
-   12rem floor (and the same 14rem band below 980px, encounter-map.css). */
+/* The empty map state stands in for a loaded map, so it takes the map's place. */
 .map-empty-hero {
   position: relative;
-  overflow: hidden;
   flex: 1;
   min-height: 12rem;
+  margin: var(--space-3);
+}
+/* The GM's box holds the scene button and the join address, more than a phone's map pane: it is a `.scroll-y`
+   region instead, with its decoration clipped to the box. */
+.map-empty-hero:not(.scroll-y),
+.map-empty-hero .empty-atmos {
+  overflow: clip;
 }
 .map-empty-hero > :not(.empty-atmos) {
   position: relative;
@@ -259,17 +113,16 @@
   height: 58%;
   opacity: 0.55;
 }
-
-.dock-log-door-standalone {
-  flex: none;
-  align-self: flex-start;
+.empty-scene-prep {
+  margin-top: var(--space-4);
 }
 
-@media (max-width: 560px) {
-  .gm-session-controls {
-    flex-direction: column;
-  }
-  .gm-session-controls button {
-    width: 100%;
-  }
+/* A player's own sheet ends with the shared replays. */
+.table-sheet-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
 }

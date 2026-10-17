@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GameStateSchema, type GameState, type GmActor } from "@vtt/domain";
 import { movementCost } from "../../../server/src/terrain";
 import type { TokenMapGeometry } from "../../../server/src/token-placement";
-import { moveLabel, previewMove } from "./movePreview";
+import { moveLabel, movementWallsOf, previewMove } from "./movePreview";
 
 // The drag preview and the server's charge must agree, so the preview runs the server's own scenarios.
 
@@ -21,9 +21,19 @@ const cells = (c0: number, r0: number, c1: number, r1: number) => ({
   height: 50 * (r1 - r0 + 1)
 });
 
+let wallCount = 0;
+const wall = (a: { x: number; y: number }, b: { x: number; y: number }, kind = "wall", open = false) => ({
+  id: `50000000-0000-4000-8000-${String(++wallCount).padStart(12, "0")}`,
+  kind,
+  a,
+  b,
+  ...(kind === "door" ? { open } : {})
+});
+
 function table(
   terrain: ReadonlyArray<ReturnType<typeof cells>>,
-  positions: Readonly<Record<string, { x: number; y: number }>>
+  positions: Readonly<Record<string, { x: number; y: number }>>,
+  walls: ReadonlyArray<ReturnType<typeof wall>> = []
 ): GameState {
   const actors = [
     { id: HERO, name: "Borin", kind: "player-character", visibility: "public" },
@@ -47,13 +57,19 @@ function table(
           sizePx: 40,
           sizeCells: actor.id === OGRE ? 2 : 1
         })),
-      terrain: { difficult: terrain }
+      terrain: { difficult: terrain },
+      vision: {
+        enabled: walls.length > 0,
+        walls,
+        measure: { width: 1000, height: 1000, pixelsPerFoot: 10 }
+      }
     }
   });
 }
 
 const preview = (state: GameState, from: { x: number; y: number }, to: { x: number; y: number }) =>
   previewMove({
+    walls: state.combat.vision.enabled ? movementWallsOf(state.combat.vision.walls) : [],
     calibration: CALIBRATION,
     size: { width: GRID.width, height: GRID.height },
     terrain: state.combat.terrain.difficult,
@@ -70,7 +86,28 @@ describe("the drag preview charges what the server charges", () => {
     ["a band of rubble", table([cells(3, 0, 3, 19)], {}), cell(0, 5), cell(6, 5)],
     ["a patch to walk round", table([cells(3, 4, 3, 6)], {}), cell(0, 5), cell(6, 5)],
     ["an ogre at the map's edge", table([], { [OGRE]: { x: 150, y: 50 } }), cell(0, 0), cell(4, 0)],
-    ["an ally in a corridor", table([cells(0, 1, 19, 19)], { [FRIEND]: cell(2, 0) }), cell(0, 0), cell(4, 0)]
+    ["an ally in a corridor", table([cells(0, 1, 19, 19)], { [FRIEND]: cell(2, 0) }), cell(0, 0), cell(4, 0)],
+    ["a wall to walk round", table([], {}, [wall({ x: 150, y: 100 }, { x: 150, y: 450 })]), cell(0, 5), cell(6, 5)],
+    [
+      "a closed door in a wall",
+      table([], {}, [
+        wall({ x: 150, y: 0 }, { x: 150, y: 250 }),
+        wall({ x: 150, y: 250 }, { x: 150, y: 300 }, "door"),
+        wall({ x: 150, y: 300 }, { x: 150, y: 1000 })
+      ]),
+      cell(0, 5),
+      cell(6, 5)
+    ],
+    [
+      "an open door in a wall",
+      table([], {}, [
+        wall({ x: 150, y: 0 }, { x: 150, y: 250 }),
+        wall({ x: 150, y: 250 }, { x: 150, y: 300 }, "door", true),
+        wall({ x: 150, y: 300 }, { x: 150, y: 1000 })
+      ]),
+      cell(0, 5),
+      cell(6, 5)
+    ]
   ];
 
   it.each(scenarios)("%s", (_label, state, from, to) => {

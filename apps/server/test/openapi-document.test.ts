@@ -189,7 +189,7 @@ describe("the OpenAPI document", () => {
     // Asset paths are walked too, so the upload route's 403 stays documented.
     for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
       for (const [method, op] of Object.entries(paths[path])) {
-        // 401 is "no live credential"; 403 is "a valid one without the role" (ADR-0025). Every route accepts a
+        // 401 is "no live credential"; 403 is "a valid one without the role" (ADR-0026). Every route accepts a
         // bearer token.
         expect(Object.keys(op.responses), `${method} ${path} must document 401`).toContain("401");
         expect(Object.keys(op.responses), `${method} ${path} must document 403`).toContain("403");

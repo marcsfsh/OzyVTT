@@ -61,6 +61,7 @@ export function buildHomebrewUsageIndex(state: GameState): HomebrewUsageIndex {
     }
     for (const spellId of actor.preparedSpellIds)
       record("spell", spellId, at("prepared-spell", `prepared by ${actor.name}`));
+    for (const entry of actor.spellbook) record("spell", entry.id, at("spellbook", `in ${actor.name}'s spellbook`));
 
     const definition = actor.definitionId ? definitionsById.get(actor.definitionId) : undefined;
     if (definition) recordDefinitionUsages(definition, record, at);

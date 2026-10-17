@@ -223,7 +223,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     const noauthBody = await body(noauth);
     expect(noauthBody.ok).toBe(false);
     expect(noauthBody.error.code).toBe("unauthenticated");
-    // A token that is no live credential is a 401 too: the caller has to sign in again (ADR-0025).
+    // A token that is no live credential is a 401 too: the caller has to sign in again (ADR-0026).
     const junk = await get(base, "/api/v1/codex/pages", {
       authorization: "Bearer nonsense",
       "content-type": "application/json"

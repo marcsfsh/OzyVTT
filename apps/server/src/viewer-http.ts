@@ -172,7 +172,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     }
   });
 
-  // A table screen asks to pair. It shows the code; the GM types it on their own device (ADR-0026).
+  // A table screen asks to pair. It shows the code; the GM types it on their own device (ADR-0027).
   router.post(VIEWER_PATHS.screenPairings, (_request, response) => {
     try {
       const { requestToken, code, expiresAt } = options.access.openScreenPairing();

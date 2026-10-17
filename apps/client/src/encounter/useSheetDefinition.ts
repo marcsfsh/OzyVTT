@@ -5,7 +5,8 @@ import type {
   ContentActionSummary,
   GmActor,
   PlayerActor,
-  Rechoice
+  Rechoice,
+  SpellChoices
 } from "@vtt/domain";
 import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
@@ -22,6 +23,8 @@ export type AvailabilityRow = Readonly<{
   name: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
   available: boolean;
+  /** Why it isn't available now, rule by rule. */
+  violations?: ReadonlyArray<{ rule: string; message: string }>;
   usesRemaining: number | null;
   builtin?: boolean;
   ridesAHit?: true;
@@ -42,11 +45,18 @@ export type AvailabilityRow = Readonly<{
   multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
   reaction?: ContentActionSummary["reaction"];
   healing?: Readonly<{ formula: string }> | null;
+  healTargets?: number | null;
   targeting?: "none" | "single" | "multi" | null;
   darts?: number | null;
   damageTypes?: ContentActionSummary["damageTypes"] | null;
   checkSkills?: ContentActionSummary["checkSkills"];
 }>;
+
+/** A spell's later action whose spell isn't up on its caster (Spiritual Weapon's attack before the cast), which
+ *  isn't offered until it is. */
+export const awaitsItsSpell = (row: AvailabilityRow) =>
+  /^spell-.+-then-/.test(row.id) &&
+  (row.violations ?? []).some((violation) => violation.rule === "feature.requires-effect");
 
 /** The wire row in the shape every action surface here already speaks. */
 export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
@@ -76,6 +86,7 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     grants: false,
     reaction: row.reaction ?? null,
     ...(row.healing ? { healing: row.healing } : {}),
+    ...(row.healTargets ? { healTargets: row.healTargets } : {}),
     ...(row.targeting ? { targeting: row.targeting } : {}),
     // A spell an item casts picks as the spell's own cast does (Magic Missile's darts, Chromatic Orb's type).
     ...(row.darts ? { darts: row.darts } : {}),
@@ -117,6 +128,8 @@ export function useSheetDefinition(
   const [derived, setDerived] = useState<ActorDerivedSheet | null>(null);
   /** The picks this character may re-make on a rest (a land after a Long Rest), from the same read. */
   const [rechoices, setRechoices] = useState<readonly Rechoice[]>([]);
+  /** What a prepared caster may swap in after a Long Rest, and a Wizard's spellbook, from the same read. */
+  const [spellChoices, setSpellChoices] = useState<SpellChoices | null>(null);
   const loadoutSignature = [
     (actor.inventory ?? [])
       .map(
@@ -135,13 +148,16 @@ export function useSheetDefinition(
         : actor.hp.kind
       : String(actor.hp.current),
     // A pick re-made into the ledger rebuilds the sheet: its actions and re-choices are read again.
-    (ownDefinition?.character?.choices ?? []).map((row) => `${row.kind}:${row.id}`).join(",")
+    (ownDefinition?.character?.choices ?? []).map((row) => `${row.kind}:${row.id}`).join(","),
+    // A spell added to a Wizard's spellbook changes what can be prepared from it.
+    (actor.spellbook ?? []).map((entry) => entry.id).join(",")
   ].join("|");
   useEffect(() => {
     if (!definitionId) {
       setServerActions([]);
       setDerived(null);
       setRechoices([]);
+      setSpellChoices(null);
       return;
     }
     let live = true;
@@ -153,6 +169,7 @@ export function useSheetDefinition(
       // Absent only from an older server; the fallback covers that.
       if (result.derived) setDerived(result.derived);
       setRechoices(result.rechoices ?? []);
+      setSpellChoices(result.spellChoices ?? null);
     });
     return () => {
       live = false;
@@ -175,5 +192,5 @@ export function useSheetDefinition(
     sheetCache.set(definitionId, next);
     setFetched(next);
   };
-  return { definitionId, definition, serverActions, derived, rechoices, showEdited };
+  return { definitionId, definition, serverActions, derived, rechoices, spellChoices, showEdited };
 }

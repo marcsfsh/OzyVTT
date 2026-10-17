@@ -3,7 +3,7 @@ import { conditionLabel } from "../condition-rules.js";
 import { addEffect, effectDurationOf, makeEffect, type EffectNarration } from "../effects.js";
 import { previewDamage } from "../hit-points.js";
 import { masteryHitEffects } from "../weapon-mastery.js";
-import { sizeAtMost, type ResolveContext } from "./context.js";
+import { sizeAtMost, tableLineOf, type ResolveContext } from "./context.js";
 import { damagePartsOf } from "./damage.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
@@ -50,7 +50,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
   action.onHit.forEach((rider, index) => {
     if (rider.maxTargetSize && !sizeAtMost(target.size, rider.maxTargetSize)) {
       warnings.push(
-        `${target.name} is too large for ${action.name}'s ${rider.conditions.map((condition) => conditionLabel(condition.id)).join("/")} rider.`
+        `${target.name} is too large for ${action.name}'s ${rider.name ?? rider.conditions.map((condition) => conditionLabel(condition.id)).join("/")} rider.`
       );
       return;
     }
@@ -60,8 +60,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       // A rider's Exhaustion levels each add one (SRD: cumulative).
       for (let extra = 1; condition.id === "exhaustion" && extra < (condition.level ?? 1); extra += 1)
         events.push(...setCondition(state, target.id, "exhaustion", true, undefined, { role: "gm" }, immunities));
-      for (const event of events)
-        ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+      for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
       if (!events.some((event) => event.immune))
         ctx.effectsApplied.push({
           targetId: target.id,
@@ -73,7 +72,13 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     const conditionIds = rider.conditions
       .map((condition) => condition.id)
       .filter((id) => id !== "prone" && id !== "exhaustion");
-    if (conditionIds.length === 0) return;
+    if (conditionIds.length === 0 && !rider.ongoingDamage) return;
+    // "The rug can give it the Grappled condition ... instead of dealing damage": the hit's damage goes.
+    if (rider.insteadOfDamage) {
+      ctx.damage.splice(0);
+      ctx.bonusDamage.splice(0);
+      warnings.push(`${action.name}: ${target.name} is held instead of taking the hit's damage.`);
+    }
     const grapple = conditionIds.includes("grappled");
     const gained: EffectNarration[] = [];
     const effect = addEffect(
@@ -81,7 +86,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       target.id,
       makeEffect({
         id: `${input.commandId}:hit:${target.id}:${index}`,
-        name: `${conditionLabel(conditionIds[0])} by ${attacker.name} (${action.name})`,
+        name: `${rider.name ?? conditionLabel(conditionIds[0]!)} by ${attacker.name} (${action.name})`,
         tags: grapple ? ["grapple"] : [],
         sourceActorId: attacker.id,
         sourceName: attacker.name,
@@ -91,13 +96,14 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
         endsWhenSourceDefeated: grapple,
         linkedConditionIds: conditionIds,
         escapeDc: rider.escapeDc ?? null,
-        ...(grapple ? { rangeFeet: action.attack?.reachFeet ?? 5 } : {})
+        ...(grapple ? { rangeFeet: action.attack?.reachFeet ?? 5 } : {}),
+        // A stirge attached, a rug smothering: what it deals each turn while it holds on, and it lets go as it dies.
+        ...(rider.ongoingDamage ? { ongoingDamage: rider.ongoingDamage, endsWhenSourceDefeated: true } : {})
       }),
       gained,
       deps
     );
-    for (const event of gained)
-      ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+    for (const event of gained) ctx.tableNarration.push(tableLineOf(ctx, event));
     ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds });
   });
 }

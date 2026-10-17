@@ -44,7 +44,7 @@ export function setSpellSlotRemaining(
 
 /** SRD Spell Preparation by Class: the classes that change their prepared spells when they finish a Long Rest, and
  *  how many (null: any). Bards, Sorcerers and Warlocks change theirs on gaining a level, through the level flow. */
-const LONG_REST_PREPARATION: Readonly<Record<string, number | null>> = {
+export const LONG_REST_PREPARATION: Readonly<Record<string, number | null>> = {
   cleric: null,
   druid: null,
   wizard: null,

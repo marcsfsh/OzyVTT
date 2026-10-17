@@ -1,0 +1,109 @@
+/* The header bar above the map: the scene, the status line, and the GM's fog, vision, TV and sound. One row; the
+   status gives way first when the row runs short. */
+.table-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 3.25rem;
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.table-header.is-staging {
+  border-bottom-color: var(--violet);
+}
+.table-status {
+  display: flex;
+  align-items: center;
+  flex: 1 1 8rem;
+  min-width: 0;
+  min-height: 1.5rem;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.table-header-scene {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 16rem;
+}
+.table-header-scene-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* "Live" is a chip: a tinted strip with a bar in its tone on the leading edge. */
+.table-header-live,
+.table-header-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 0.45rem;
+  border-left: 3px solid var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, var(--surface-2));
+  color: var(--cyan-hi);
+  font: 600 var(--fs-2xs) / 1 var(--font-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.table-header-chips {
+  display: inline-flex;
+  gap: var(--space-1);
+  flex: none;
+}
+.table-header-chips:empty {
+  display: none;
+}
+.table-header-staging {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.table-header-staged-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--violet-hi);
+  font-size: var(--fs-sm);
+}
+.tv-control-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.tv-control-trigger.is-live .tv-control-label {
+  color: var(--cyan-hi);
+}
+.table-header-me {
+  flex: none;
+}
+
+/* Below 980px the header keeps one row: the scenes as an icon, the status, the TV as an icon and the sound with a
+   short title. The fog and vision chips fold away and the player's Me moves to the tool row. */
+@media (max-width: 979px) {
+  .table-header {
+    min-height: var(--tap-min);
+    padding: 0 var(--space-2);
+    gap: var(--space-1);
+  }
+  .table-header-chips,
+  .table-header-me,
+  .tv-control-label,
+  .table-header-scene-name,
+  .table-header-live {
+    display: none;
+  }
+  .table-header .now-playing.is-compact {
+    max-width: 8.5rem;
+    padding: 0;
+  }
+}

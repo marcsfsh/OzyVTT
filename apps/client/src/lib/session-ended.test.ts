@@ -12,7 +12,7 @@ const answer = (status: number) =>
     )
   );
 
-describe("hearing that a session ended (ADR-0025)", () => {
+describe("hearing that a session ended (ADR-0026)", () => {
   it("reports a 401 for a request that carried a token, with that token", async () => {
     const heard = vi.fn();
     const stop = onSessionEnded(heard);

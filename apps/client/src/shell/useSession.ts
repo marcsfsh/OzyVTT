@@ -26,7 +26,7 @@ export type Session = Readonly<{ role: "gm" | "player"; token: string }>;
 export const GM_SESSION_ENDED = "Your GM session ended. Sign in again.";
 export const PLAYER_SESSION_ENDED = "Your seat at the table ended. Join again to choose your character.";
 
-/** Whether a join was refused because the token sent is dead (ADR-0025). */
+/** Whether a join was refused because the token sent is dead (ADR-0026). */
 const deadToken = (result: SessionJoinResult) => !result.ok && result.code === "unauthenticated";
 
 /**

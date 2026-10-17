@@ -202,7 +202,9 @@ export function moveEncounterToken(
   position: EncounterTokenPosition | null,
   geometry: TokenMapGeometry
 ) {
-  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before moving tokens.");
+  // A live scene's tokens can be placed before its fight starts (they wait in the tray until then).
+  if (!state.combat.active && !state.combat.mapAssetId)
+    throw new CommandRejectedError("Make a scene live before moving tokens.");
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token) throw new CommandRejectedError("That combatant does not have a token in this encounter.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))

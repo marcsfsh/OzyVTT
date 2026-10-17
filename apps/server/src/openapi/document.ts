@@ -207,7 +207,7 @@ export const openApiDocument = {
     version: API_VERSION,
     // Described per surface: only game writes accept an optional `commandId`; codex and homebrew bodies are strict.
     description:
-      "Versioned, recipient-safe integration contract for a self-hosted VTT. Game writes accept an optional `commandId` (UUID) executed exactly once - supply your own and resend it to retry safely, and the server replays the stored outcome with `duplicate: true`; codex JSON-body writes accept one too - a replay carries `x-idempotent-replay: true` - while codex body-less POSTs, codex DELETEs and every homebrew write carry none and rely on `expectedRev` plus their own conflict rules instead. Stale-revision writes are rejected with 409 + `error.currentRevision` (`expectedRevision` targets the global game revision; `expectedRev` targets one record's revision). A missing, malformed, expired or revoked credential is 401; a valid credential without the role or scope is 403 (ADR-0025); and the existence of a secret record always reads as 404."
+      "Versioned, recipient-safe integration contract for a self-hosted VTT. Game writes accept an optional `commandId` (UUID) executed exactly once - supply your own and resend it to retry safely, and the server replays the stored outcome with `duplicate: true`; codex JSON-body writes accept one too - a replay carries `x-idempotent-replay: true` - while codex body-less POSTs, codex DELETEs and every homebrew write carry none and rely on `expectedRev` plus their own conflict rules instead. Stale-revision writes are rejected with 409 + `error.currentRevision` (`expectedRevision` targets the global game revision; `expectedRev` targets one record's revision). A missing, malformed, expired or revoked credential is 401; a valid credential without the role or scope is 403 (ADR-0026); and the existence of a secret record always reads as 404."
   },
   servers: [{ url: API_NAMESPACE }],
   paths: {
@@ -1161,6 +1161,25 @@ export const openApiDocument = {
             description: "The combatant's movement this turn",
             content: { "application/json": { schema: { $ref: "#/components/schemas/ActorMovementResponse" } } }
           },
+          "401": apiError,
+          "403": apiError,
+          "404": apiError
+        }
+      }
+    },
+    [GAME_PATHS.visionPreview]: {
+      get: {
+        operationId: "previewVision",
+        security: gameSecurity("scene:read"),
+        description:
+          "What one creature sees on the live scene, or with no `actorId` the whole party (ADR-0023): the area as image-pixel polygons (`[x0, y0, x1, y1, ...]`) whose union is what it sees, and the creatures it perceives. The same computation that decides what each player and the table screen receive. GM-grade only; empty while the scene's dynamic vision is off.",
+        parameters: [{ name: "actorId", in: "query", required: false, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": {
+            description: "Where the creature or the party sees now",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/VisionPreviewResponse" } } }
+          },
+          "400": apiError,
           "401": apiError,
           "403": apiError,
           "404": apiError
@@ -2460,6 +2479,7 @@ export const openApiDocument = {
       },
       ActorAvailableActionsResponse: envelopeSchema("#/components/schemas/ActorAvailableActionsData"),
       ActorMovementResponse: envelopeSchema("#/components/schemas/ActorMovementData"),
+      VisionPreviewResponse: envelopeSchema("#/components/schemas/VisionPreviewData"),
       CharacterDraftResponse: envelopeSchema("#/components/schemas/CharacterDraftData"),
       BuilderOffersDraft: {
         type: "object",

@@ -365,7 +365,8 @@ describe("striking back at a creature that dealt damage", () => {
     expect(taken.events).toContainEqual({
       kind: "reaction",
       text: "Wren may use Hellish Rebuke against Brute.",
-      actorId: IDS.wizard
+      actorId: IDS.wizard,
+      source: { actorId: IDS.brute, name: "Brute" }
     });
     expect(game.combat.pendingReactions[0]).toMatchObject({
       kind: "damaged-by-creature",

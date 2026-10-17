@@ -70,6 +70,8 @@ import { SoundService } from "./sound-service.js";
 import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
+import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
+import type { SightContent } from "./vision/senses.js";
 
 export type CreateServerOptions = {
   authPath: string;
@@ -106,8 +108,24 @@ export function createServer(options: CreateServerOptions) {
     cors: options.clientOrigin ? { origin: options.clientOrigin } : undefined
   });
   const auth = new AuthService(options.authPath);
+  // Late-bound: the content library is built below, and the store only calls this from a command.
+  let sightContent: () => SightContent = () => ({});
   const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState(), {
-    timelineDirtied
+    timelineDirtied,
+    // What the party sees joins what it has seen, in the same transaction as the move or door that showed it. A
+    // failure here must not undo the command; the next one catches up.
+    afterMutate: (state, before) => {
+      try {
+        rememberExplored(state, sightContent());
+      } catch (error) {
+        console.error("remembering what the party saw failed:", error instanceof Error ? error.message : error);
+      }
+      try {
+        hideRollsOfHidden(state, before, sightContent());
+      } catch (error) {
+        console.error("hiding a hidden creature's rolls failed:", error instanceof Error ? error.message : error);
+      }
+    }
   });
   // Every read of the game state outside a command's own transaction goes through here.
   const committedState = createStateReader(store);
@@ -133,8 +151,12 @@ export function createServer(options: CreateServerOptions) {
   // `publishedFor(audience)` gives `ContentLibrary` only published (and, for players, player-visible)
   // records; drafts are in neither slice.
   const contentLibrary = new ContentLibrary(homebrewStore);
+  sightContent = () => ({
+    definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
+    catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+  });
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
-  /** Every credential the server accepts, checked one way for every HTTP route and the socket (ADR-0025). */
+  /** Every credential the server accepts, checked one way for every HTTP route and the socket (ADR-0026). */
   const verifiers = {
     gm: (token) => auth.verify(token),
     player: (token) => auth.verifyPlayer(token),
@@ -220,7 +242,10 @@ export function createServer(options: CreateServerOptions) {
         endSession(socket);
         continue;
       }
-      socket.emit("state:updated", gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor));
+      socket.emit(
+        "state:updated",
+        gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor, Date.now(), sightContent())
+      );
     }
   }
   /** A session that runs out ends with no state change to notice it, so every socket is re-checked on a timer. */
@@ -296,10 +321,10 @@ export function createServer(options: CreateServerOptions) {
       logged?: boolean;
     }>
   ) {
-    const { actors } = committedState.read();
     const actorIds = event.actorIds ?? [];
-    const publicToPlayers =
-      !event.gmOnly && actorIds.every((id) => actors.find((actor) => actor.id === id)?.visibility === "public");
+    // The shared check: GM-only, or out of every character's sight or under the fog (ADR-0023).
+    const hidden = hiddenFrom(committedState.read(), sightContent());
+    const publicToPlayers = !event.gmOnly && !actorIds.some(hidden);
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
@@ -310,8 +335,8 @@ export function createServer(options: CreateServerOptions) {
     // (`logged: false`). Call `appendLog` directly only for lines with no toast.
     if (event.logged !== false) appendLog({ kind: event.kind, text: event.text, actorIds, gmOnly: event.gmOnly });
   }
-  /** Appends a feed line and pushes it live, gated like toasts. `!== "public"` so an actor no longer on the
-   *  roster (or a future visibility) fails closed. */
+  /** Appends a feed line and pushes it live, gated like toasts. An actor no longer on the roster counts as hidden, so
+   *  the gate fails closed. */
   function appendLog(
     entry: Readonly<{
       kind: CombatLogEntry["kind"];
@@ -324,9 +349,7 @@ export function createServer(options: CreateServerOptions) {
   ) {
     const current = committedState.read();
     const actorIds = entry.actorIds ?? [];
-    const gmOnly =
-      entry.gmOnly === true ||
-      actorIds.some((id) => current.actors.find((actor) => actor.id === id)?.visibility !== "public");
+    const gmOnly = entry.gmOnly === true || actorIds.some(hiddenFrom(current, sightContent()));
     const row = combatLog.append({
       kind: entry.kind,
       text: entry.text,
@@ -359,7 +382,7 @@ export function createServer(options: CreateServerOptions) {
       text: `Round ${state.combat.round} - ${name}'s turn.`,
       actorIds: [state.combat.turnActorId]
     });
-    const reminder = turnReminder(state, state.combat.turnActorId);
+    const reminder = turnReminder(state, state.combat.turnActorId, hiddenFrom(state, sightContent()));
     if (reminder !== null) appendLog({ kind: "turn", text: reminder, actorIds: [state.combat.turnActorId] });
   }
   /** Turns a timeline navigation outcome into log lines: plain turns for forward play, GM-only notes for rewinds. */
@@ -404,7 +427,10 @@ export function createServer(options: CreateServerOptions) {
   }
   async function publishGameState(state: GameState) {
     try {
-      await viewerCoordinator.synchronizeEncounter(state.revision, projectViewerEncounter(state, Date.now()));
+      await viewerCoordinator.synchronizeEncounter(
+        state.revision,
+        projectViewerEncounter(state, Date.now(), sightContent())
+      );
     } catch {
       for (const socket of io.sockets.sockets.values())
         if (auth.verify(socket.handshake.auth?.token))
@@ -465,7 +491,7 @@ export function createServer(options: CreateServerOptions) {
     logTimelineOutcome,
     scheduleAnnotationExpiry,
     gmView: (state) => gmView(state),
-    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
+    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor, Date.now(), sightContent()),
     random: (sides) => randomInt(1, sides + 1),
     newId: randomUUID,
     // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
@@ -583,11 +609,10 @@ export function createServer(options: CreateServerOptions) {
       verifiers,
       playerMayLoad: (assetId) => {
         const { combat } = committedState.read();
-        // A player may load the active battle map, any revealed atlas map, or the map of a replay the GM shared.
+        // A player may load the live battle map (before its fight too, as their projection names it), any revealed
+        // atlas map, or the map of a replay the GM shared.
         return (
-          (combat.active && combat.mapAssetId === assetId) ||
-          codexStore.isAssetRevealedToPlayers(assetId) ||
-          sharedReplayMap(assetId)
+          combat.mapAssetId === assetId || codexStore.isAssetRevealedToPlayers(assetId) || sharedReplayMap(assetId)
         );
       },
       viewerMayLoad: (assetId) => {
@@ -602,11 +627,21 @@ export function createServer(options: CreateServerOptions) {
       catalog: tokenCatalog,
       // A joined player may browse the GM's token library and upload their own token image.
       verifiers,
-      playerMayLoad: (assetId) =>
-        committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
-      viewerMayLoad: (assetId) =>
-        viewerPresentation.project().enabled &&
-        committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
+      // Only a creature the reader may know of: an image worn by one hidden by sight or the fog would answer
+      // whether it is in play.
+      playerMayLoad: (assetId, sessionId) => {
+        const state = committedState.read();
+        const hidden = hiddenFrom(state, sightContent(), sessionId);
+        return state.actors.some((actor) => actor.tokenAssetId === assetId && !hidden(actor.id));
+      },
+      viewerMayLoad: (assetId) => {
+        const state = committedState.read();
+        const hidden = hiddenFrom(state, sightContent());
+        return (
+          viewerPresentation.project().enabled &&
+          state.actors.some((actor) => actor.tokenAssetId === assetId && !hidden(actor.id))
+        );
+      }
     })
   );
   app.use(
@@ -665,7 +700,8 @@ export function createServer(options: CreateServerOptions) {
       }
     },
     revision: () => store.revision,
-    newId: randomUUID
+    newId: randomUUID,
+    sightContent: () => sightContent()
   });
   const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",
@@ -701,7 +737,7 @@ export function createServer(options: CreateServerOptions) {
       const acknowledge: typeof ack = (result) => {
         if (typeof ack === "function") ack(result);
       };
-      // The handshake reads the caller like every HTTP route (ADR-0025). A token that no longer verifies is refused,
+      // The handshake reads the caller like every HTTP route (ADR-0026). A token that no longer verifies is refused,
       // never swapped for a fresh player seat: a GM whose session ended must hear so, and a player's client drops
       // the dead token and joins again without one.
       const caller = callerOfToken(token, verifiers);
@@ -799,7 +835,13 @@ export function createServer(options: CreateServerOptions) {
       );
     socket.emit(
       "state:updated",
-      projectPlayerView(committedState.read(), auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor)
+      projectPlayerView(
+        committedState.read(),
+        auth.verifyPlayer(socket.handshake.auth.token)?.sessionId,
+        presenceFor,
+        Date.now(),
+        sightContent()
+      )
     );
   });
 
@@ -827,7 +869,10 @@ export function createServer(options: CreateServerOptions) {
     // The store's startup seeds may change the state without a revision bump.
     committedState.reset();
     await reconcileContentDerived();
-    await viewerCoordinator.synchronizeEncounter(store.revision, projectViewerEncounter(committedState.read()));
+    await viewerCoordinator.synchronizeEncounter(
+      store.revision,
+      projectViewerEncounter(committedState.read(), Date.now(), sightContent())
+    );
   }
   function close() {
     clearInterval(sessionSweep);

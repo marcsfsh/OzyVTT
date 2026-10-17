@@ -16,7 +16,14 @@ import { useUpConsumable } from "./resolution/consumables.js";
 import { consumableRowFor } from "./consumables.js";
 import { rollAttack, spendDistraction, spendSteadyAim, spendUntilAttacked } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
-import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
+import type {
+  DefinitionAction,
+  EndedEffect,
+  ResolveContext,
+  ResolveDependencies,
+  ResolveInput
+} from "./resolution/context.js";
+import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
@@ -31,11 +38,14 @@ import {
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
-import { parkActionSave, parkForAcReaction, parkReaction } from "./resolution/pending.js";
-import { startConcentration } from "./resolution/concentration.js";
+import { strikeBackOnHit } from "./resolution/struck.js";
+import { parkActionSave, parkForAcReaction, parkHeldObjectSave, parkReaction } from "./resolution/pending.js";
+import { markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
+import { holdReadiedSpell } from "./resolution/ready.js";
+import { healLimit } from "./loose-healing.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -55,6 +65,12 @@ export function resolveDefinitionAction(
   const ctx = openResolve(state, action, input, deps);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
+  // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet.
+  if (input.ready === true) {
+    holdReadiedSpell(ctx);
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
   if (readScroll(ctx)) {
     commitEconomy(ctx);
@@ -98,8 +114,11 @@ export function resolveDefinitionAction(
   if (ctx.action.reminder) ctx.warnings.push(ctx.action.reminder);
 
   applyOnHitEffects(ctx);
+  strikeBackOnHit(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
+  markSpellUp(ctx);
+  openSpellZone(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
@@ -107,6 +126,7 @@ export function resolveDefinitionAction(
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  parkHeldObjectSave(ctx);
   applyRageRules(ctx);
 
   commitEconomy(ctx);
@@ -162,6 +182,13 @@ function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"]
   return ctx.targets.map((target) => ({ targetId: target.id, targetName: target.name, parts, total }));
 }
 
+/** An ended effect as the result tells it, to the initiator and in the table's toast: a source hidden from the
+ *  initiator is masked in its name, as the projection masks it, and the source itself isn't told. */
+function toldEnded(ctx: ResolveContext, { source, ...ended }: EndedEffect) {
+  const masked = source?.actorId != null && ctx.hiddenFromInitiator(source.actorId);
+  return masked ? { ...ended, name: withoutSourceName(ended.name, source.name) } : ended;
+}
+
 function resolutionOf(ctx: ResolveContext): ActionResolution {
   const { state, action, attacker, targets, damage, bonusDamage, warnings } = ctx;
   const instance = state.combat.turn.actionInstance;
@@ -194,7 +221,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     overridden: ctx.overridden,
     ...(ctx.reactionPrompts.length > 0 ? { reactionPrompts: ctx.reactionPrompts } : {}),
     ...(ctx.check ? { check: ctx.check } : {}),
-    ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded } : {}),
+    ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded.map((ended) => toldEnded(ctx, ended)) } : {}),
     ...(ctx.healing ? { healing: ctx.healing } : {}),
     ...(ctx.opens ? { opens: ctx.opens } : {}),
     ...(damageTargets ? { damageTargets } : {})
@@ -212,6 +239,8 @@ export function actionAvailability(
   catalog?: EquipmentCatalog
 ): ReadonlyArray<ActionAvailability> {
   return actions.map((action): ActionAvailability => {
+    // The spell an action casts, so a later action shows as waiting for it while the spell isn't up.
+    const spell = action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined;
     const evaluation = evaluateActionEconomy(
       state,
       attacker,
@@ -222,7 +251,8 @@ export function actionAvailability(
       siblings,
       undefined,
       false,
-      catalog
+      catalog,
+      spell
     );
     let usesRemaining: number | null = null;
     if (action.uses) {
@@ -281,6 +311,10 @@ export function actionAvailability(
         : null,
       reaction: action.reaction ?? null,
       healing: action.healing ? { formula: action.healing.formula } : null,
+      healTargets:
+        action.healing && !action.healing.self && healLimit(action, spell, undefined) > 1
+          ? healLimit(action, spell, undefined)
+          : null,
       // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
       targeting: builtin
         ? (BUILTIN_TARGETING[action.id] ?? "none")

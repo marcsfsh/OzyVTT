@@ -22,6 +22,7 @@ import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import { expressPath, issuesOf, pathParam, sendData, sendFailure } from "./http-kit.js";
 import { projectPlayerReplay } from "./replay-projection.js";
 import { callerOf, isUnauthenticated, refuse, type CredentialVerifiers } from "./request-auth.js";
+import type { SightContent } from "./vision/senses.js";
 
 /**
  * The public HTTP adapter over the game commands (ADR-0016): every write and read runs the same
@@ -54,6 +55,8 @@ export type GameApiRouterOptions = Readonly<{
   }>;
   revision: () => number;
   newId?: () => string;
+  /** What a replay's dynamic vision reads from the content (senses, lit items). */
+  sightContent?: () => SightContent;
 }>;
 
 export function createGameApiRouter(options: GameApiRouterOptions) {
@@ -247,7 +250,10 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       } catch {
         return sendFailure(res, 404, "not_found", "No such encounter archive.");
       }
-      return sendData(res, 200, { id, document: projectPlayerReplay(id, document) });
+      return sendData(res, 200, {
+        id,
+        document: projectPlayerReplay(id, document, Date.now(), options.sightContent?.() ?? {})
+      });
     }
     const document = options.archives.get(id);
     if (document === null) return sendFailure(res, 404, "not_found", "No such encounter archive.");

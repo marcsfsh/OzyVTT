@@ -95,7 +95,6 @@ export function GmShell({
   token,
   connection,
   busy,
-  onOpenLog,
   onSignOut,
   onRevokeAll,
   onChangePassword
@@ -104,7 +103,6 @@ export function GmShell({
   token: string;
   connection: Connection;
   busy: boolean;
-  onOpenLog: () => void;
   onSignOut: () => void;
   onRevokeAll: () => void;
   onChangePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
@@ -234,7 +232,6 @@ export function GmShell({
           role="gm"
           state={state}
           token={token}
-          onOpenLog={onOpenLog}
           gm={{
             selectedMap,
             mapLibrary,

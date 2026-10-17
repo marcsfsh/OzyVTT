@@ -194,11 +194,15 @@ export class ViewerCoordinator {
   }
 
   /** Presents a scene's map on the shared screen when the scene goes live (enables presentation and
-   *  switches map in one server-internal action). Skips when that map is already presented, to avoid
-   *  resetting the camera. */
+   *  switches map in one server-internal action), so the screen follows the live scene. Skips when that map is
+   *  already presented, to avoid resetting the camera, and while the GM has the screen paused. */
   async presentMap(sourceRevision: number, map: Readonly<{ assetId: string; altText: string; camera: ViewerCamera }>) {
     const current = this.presentation.snapshot;
-    if (current.enabled && current.activeMap?.assetId === map.assetId) return false;
+    if (current.pausedByGm === true) return false;
+    // The encounter sync can switch the screen to the new map first, under a placeholder name; the map's own name
+    // still has to reach it.
+    if (current.enabled && current.activeMap?.assetId === map.assetId && current.activeMap.altText === map.altText)
+      return false;
     const result = await this.presentation.execute(
       {
         id: `scene-present:${sourceRevision}:${current.revision}`,

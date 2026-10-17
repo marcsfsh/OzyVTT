@@ -54,7 +54,7 @@ This is the statement the ADR promised. It binds every `/api/v1` surface, the ta
    existence of a record the caller may not see is **never distinguishable** from its absence. 409 — a
    domain refusal or a stale revision. 413 — oversized body. One stated exception: binary asset-content
    routes answer 403 before any existence check, because a media URL must not become an existence oracle.
-   **Amended 2026-10-17 by [ADR-0025](0025-session-lifecycle.md):** 401 now also covers a token that is invalid,
+   **Amended 2026-10-17 by [ADR-0026](0026-session-lifecycle.md):** 401 now also covers a token that is invalid,
    expired or revoked, and 403 is only for a valid credential without the role or scope. Asset content still refuses
    before any existence check, so its answer still never depends on whether the file exists.
 6. **Change observation.** Socket.IO emits a content-light `codex:changed` / `homebrew:changed` ping when

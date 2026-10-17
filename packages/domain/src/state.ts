@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ActionAreaSchema,
   ActorDefinitionSchema,
   ActorSchema,
   EffectInstanceSchema,
@@ -172,6 +173,59 @@ export type Annotation = z.infer<typeof AnnotationSchema>;
 
 export const AbilityIdSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof AbilityIdSchema>;
+/** What a save's outcome leaves on its target, e.g. Grappled with its escape DC from an Unarmed Strike grapple. */
+const PendingSaveEffectSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    tags: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40)
+      )
+      .max(8)
+      .default([]),
+    linkedConditionIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .max(4)
+      .default([]),
+    escapeDc: z.number().int().min(1).max(40).nullable().default(null),
+    sourceActorId: z.uuid().nullable().default(null),
+    sourceName: z.string().max(120).nullable().default(null),
+    /** How long it lasts, as the text prints it; absent is until ended. */
+    duration: SaveFailureDurationSchema.optional(),
+    /** The save the target repeats at the end of each of its turns, a success ending the effect. */
+    repeatSave: EffectInstanceSchema.shape.repeatSave,
+    endsOnDamage: z.boolean().optional(),
+    speedZero: z.boolean().optional(),
+    /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
+    endsWhenSourceDefeated: z.boolean().optional(),
+    rangeFeet: EffectInstanceSchema.shape.rangeFeet,
+    /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
+     * once that has ended. */
+    castId: z.string().min(1).max(120).optional(),
+    /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
+    sourceActionId: z.string().max(120).optional(),
+    /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
+    ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
+    /** A spell's or a magic item's, so the save repeated against it is one Magic Resistance helps with. */
+    magical: EffectInstanceSchema.shape.magical,
+    /** It ends when a spell restores the bearer's hit points (an infernal wound). */
+    endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
+    /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
+    modifiers: EffectModifiersSchema.default([]),
+    /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
+     *  where "until the end of its next turn" would run a turn longer. */
+    currentTurn: z.literal(true).optional()
+  })
+  .strict();
+
 /** A saving throw a target still owes (GM answers for anyone, a player for their own character). The
  * answer auto-applies: fail = full damage + condition, success = half or none (ADR-0008 carve-out). */
 export const PendingSaveSchema = z
@@ -209,51 +263,17 @@ export const PendingSaveSchema = z
       .max(8)
       .optional(),
     /** Effect applied on a failed save, e.g. Grappled with its escape DC from an Unarmed Strike grapple. */
-    onFailEffect: z
-      .object({
-        name: z.string().min(1).max(120),
-        tags: z
-          .array(
-            z
-              .string()
-              .regex(/^[a-z0-9-]+$/)
-              .max(40)
-          )
-          .max(8)
-          .default([]),
-        linkedConditionIds: z
-          .array(
-            z
-              .string()
-              .regex(/^[a-z0-9-]+$/)
-              .max(60)
-          )
-          .max(4)
-          .default([]),
-        escapeDc: z.number().int().min(1).max(40).nullable().default(null),
-        sourceActorId: z.uuid().nullable().default(null),
-        sourceName: z.string().max(120).nullable().default(null),
-        /** How long it lasts, as the text prints it; absent is until ended. */
-        duration: SaveFailureDurationSchema.optional(),
-        /** The save the target repeats at the end of each of its turns, a success ending the effect. */
-        repeatSave: EffectInstanceSchema.shape.repeatSave,
-        endsOnDamage: z.boolean().optional(),
-        speedZero: z.boolean().optional(),
-        /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
-        endsWhenSourceDefeated: z.boolean().optional(),
-        rangeFeet: EffectInstanceSchema.shape.rangeFeet,
-        /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
-         * once that has ended. */
-        castId: z.string().min(1).max(120).optional(),
-        /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
-        sourceActionId: z.string().max(120).optional(),
-        /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
-        ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
-        /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
-        modifiers: EffectModifiersSchema.default([])
-      })
-      .strict()
-      .optional(),
+    onFailEffect: PendingSaveEffectSchema.optional(),
+    /** What a success leaves instead (Heat Metal: holding on to the red-hot object brings Disadvantage). The same shape
+     *  as `onFailEffect`. GM bookkeeping, never projected. */
+    onSuccessEffect: PendingSaveEffectSchema.optional(),
+    /** A line for the table when the save fails, for what the engine can't do (Heat Metal: it drops the object, if it
+     *  can). */
+    failureNote: z.string().min(1).max(300).optional(),
+    /** A failure also breaks the creature's Concentration (Sleet Storm). */
+    breaksConcentration: z.literal(true).optional(),
+    /** The spell area that raised it (`SpellZone`), which counts the damage it deals toward its cap. Never projected. */
+    zoneId: z.string().min(1).max(120).optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
     repeatOf: z
       .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
@@ -261,6 +281,11 @@ export const PendingSaveSchema = z
       .optional(),
     /** The GM's call for a roll this save answers; the outcome is written back to the call. */
     callId: z.uuid().optional(),
+    /** Against a spell or another magical effect (a magic item's): Magic Resistance gives Advantage on it. */
+    magical: z.literal(true).optional(),
+    /** A success makes the target immune to this source's trait for the rest of the fight ("immune to this ghast's
+     * Stench for 24 hours"). */
+    immuneOnSuccess: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -609,6 +634,117 @@ export const PendingRuleAskSchema = z
   .strict();
 export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
 
+/** A point on the battlemap, in image pixels. */
+const VisionPointSchema = z.object({ x: z.number().min(0).max(100000), y: z.number().min(0).max(100000) }).strict();
+
+/** A wall in image pixels (ADR-0023). A wall blocks sight, light and movement; a door does too while it is closed; a
+ * window blocks movement only. `open` is a door's alone. */
+export const VisionWallSchema = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(["wall", "door", "window"]),
+    a: VisionPointSchema,
+    b: VisionPointSchema,
+    open: z.boolean().optional()
+  })
+  .strict();
+export type VisionWall = z.infer<typeof VisionWallSchema>;
+
+/** A light: placed on the map (`position`) or carried by a token (`actorId`), never both. Radii are in feet as the SRD
+ * prints them: Bright Light out to `brightFeet`, and Dim Light for `dimFeet` more. */
+export const VisionLightSchema = z
+  .object({
+    id: z.uuid(),
+    position: VisionPointSchema.nullable().default(null),
+    actorId: z.uuid().nullable().default(null),
+    brightFeet: z.number().min(0).max(1000),
+    dimFeet: z.number().min(0).max(1000)
+  })
+  .strict()
+  .refine((light) => (light.position === null) !== (light.actorId === null), {
+    message: "A light is either placed on the map or carried by a token."
+  });
+export type VisionLight = z.infer<typeof VisionLightSchema>;
+
+/** The scene's dynamic vision (ADR-0023). Off by default, so a scene without it behaves as before. `measure` is the
+ * map's size and scale, written by the server whenever the GM edits it, so feet convert to pixels without the map
+ * catalog (a replay of the fight reads it too). `explored` is what the party has seen in this scene: a bitmap over the
+ * map in `cellPx` squares, row-major, base64. GM-only as stored; players get their own projection. */
+export const SceneVisionSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    ambient: z.enum(["bright", "dim", "dark"]).default("bright"),
+    walls: z.array(VisionWallSchema).max(1000).default([]),
+    lights: z.array(VisionLightSchema).max(100).default([]),
+    measure: z
+      .object({
+        width: z.number().positive().max(100000),
+        height: z.number().positive().max(100000),
+        pixelsPerFoot: z.number().positive().max(10000)
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    explored: z
+      .object({
+        cellPx: z.number().positive().max(100000),
+        columns: z.number().int().min(1).max(256),
+        rows: z.number().int().min(1).max(256),
+        bits: z.string().max(11000)
+      })
+      .strict()
+      .nullable()
+      .default(null)
+  })
+  .strict();
+export type SceneVision = z.infer<typeof SceneVisionSchema>;
+export const EMPTY_SCENE_VISION: SceneVision = {
+  enabled: false,
+  ambient: "bright",
+  walls: [],
+  lights: [],
+  measure: null,
+  explored: null
+};
+
+/**
+ * An area a spell left on the map that acts on creatures later (Spirit Guardians, Moonbeam, a wall of fire): the
+ * server raises its save or deals its damage when a creature enters it or starts or ends its turn there. When and how
+ * it acts is the spell's (`laterActionId` names the spell's later action with the zone); the numbers are the cast's.
+ * GM-only: it names the caster, which may be hidden.
+ */
+export const SpellZoneSchema = z
+  .object({
+    /** The cast's command id. */
+    id: z.string().min(1).max(120),
+    spellId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    name: z.string().min(1).max(120),
+    laterActionId: z.string().min(1).max(120),
+    casterId: z.uuid(),
+    /** The Concentration cast it ends with; null for a spell that lasts `rounds` from `startedRound`, or until ended. */
+    castId: z.string().min(1).max(120).nullable(),
+    rounds: z.number().int().min(1).max(100).nullable().default(null),
+    startedRound: z.number().int().positive(),
+    /** The slot level it was cast at, which its damage rolls at. */
+    level: z.number().int().min(0).max(9),
+    dc: z.number().int().min(1).max(40),
+    /** The area placed on the map (an annotation); null until the GM places one. An Emanation needs none. */
+    annotationId: z.string().min(1).max(120).nullable(),
+    /** The template the GM places it with: the spell's own area. Null for an Emanation, which is its caster's. */
+    area: ActionAreaSchema.nullable().default(null),
+    /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
+    damageDealt: z.number().int().nonnegative().max(100000).default(0),
+    /** This turn's marks: who has entered it, and who has made its save or taken its damage. Cleared as each turn
+     *  begins. */
+    entered: z.array(z.uuid()).max(200).default([]),
+    affected: z.array(z.uuid()).max(200).default([])
+  })
+  .strict();
+export type SpellZone = z.infer<typeof SpellZoneSchema>;
+
 /** Combat fields shared by the live combat and each parked scene: everything except the map and scene bookkeeping. */
 const sceneCombatShape = {
   active: z.boolean().default(false),
@@ -617,6 +753,8 @@ const sceneCombatShape = {
   initiative: z.array(InitiativeEntrySchema).max(200).default([]),
   tokens: z.array(EncounterTokenSchema).max(200).default([]),
   annotations: z.array(AnnotationSchema).max(300).default([]),
+  /** The spell areas that act on creatures later (see SpellZoneSchema). GM-only. */
+  spellZones: z.array(SpellZoneSchema).max(20).default([]),
   /** Action economy of the current turn's actor, reset on turn change. `actionInstance` holds remaining components
    * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound bonus action (Flurry of
    * Blows); `turnUses` is keyed `${actorId}:${actionId}`. */
@@ -721,8 +859,8 @@ const sceneCombatShape = {
   /** Legendary actions spent since each creature's last turn start (SRD refresh). Stripped from the player projection. */
   legendaryUsed: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** Manual fog of war (ADR-0022): an ordered list of reveal/hide rects applied over "all hidden"; enabled with
-   * no shapes means a fully hidden map. Rects are in image-pixel space. Fog is presentation, not the security
-   * boundary: hidden actors and annotations are stripped by their own projections, so players get this verbatim. */
+   * no shapes means a fully hidden map. Rects are in image-pixel space. Players get the shapes verbatim; a creature
+   * whose whole space lies under the fog is left out of their projections (ADR-0023). */
   fog: z
     .object({
       enabled: z.boolean().default(false),
@@ -766,6 +904,9 @@ const sceneCombatShape = {
     })
     .strict()
     .prefault({ difficult: [] }),
+  /** Walls, doors, lights and what the party has seen (ADR-0023). With `enabled`, the server sends each player only
+   * what their characters can see; scene dressing like fog, so a rewind keeps it. */
+  vision: SceneVisionSchema.prefault({}),
   pendingSaves: z.array(PendingSaveSchema).max(100).default([]),
   pendingReactions: z.array(PendingReactionSchema).max(20).default([]),
   /** GM-only (see PendingDamageSchema). */
@@ -846,11 +987,16 @@ export const CombatStateSchema = z
         active.combat.initiative.length > 0 ||
         active.combat.tokens.length > 0 ||
         active.combat.annotations.length > 0 ||
+        active.combat.spellZones.length > 0 ||
         active.combat.reactionsUsed.length > 0 ||
         Object.keys(active.combat.legendaryUsed).length > 0 ||
         active.combat.fog.enabled ||
         active.combat.fog.shapes.length > 0 ||
         active.combat.terrain.difficult.length > 0 ||
+        active.combat.vision.enabled ||
+        active.combat.vision.walls.length > 0 ||
+        active.combat.vision.lights.length > 0 ||
+        active.combat.vision.explored !== null ||
         active.combat.pendingSaves.length > 0 ||
         active.combat.pendingReactions.length > 0 ||
         active.combat.pendingDamage.length > 0 ||

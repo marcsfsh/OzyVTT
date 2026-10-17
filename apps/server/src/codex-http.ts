@@ -170,7 +170,7 @@ const NO_SCOPE = "This credential does not carry the Codex scope this route need
 export type CodexAuthOptions = Pick<CodexRouterOptions, "verifiers">;
 
 /**
- * Who is calling, read by the shared `callerOf` (ADR-0025): role comes only from the signed session token or a
+ * Who is calling, read by the shared `callerOf` (ADR-0026): role comes only from the signed session token or a
  * verified credential. `callerOf` memoizes per request, because checking a credential writes its audit rows.
  */
 function principalFor(

@@ -9,6 +9,8 @@ import {
   PARTY,
   battleMap,
   drag,
+  expectTokenUncovered,
+  expectUncovered,
   ensureGmPassword,
   expect,
   expectPageFits,
@@ -117,7 +119,7 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expect(gm.getByText("1 connected")).toBeVisible();
   await expectPageFits(gm);
 
-  // A scene on a new map. The map has no grid, which the picker and the staging banner say, with the way to set it.
+  // A scene on a new map. The map has no grid, which the picker and the staging header say, with the way to set it.
   await press(gm.getByRole("tab", { name: "Table" }));
   await press(gm.getByRole("button", { name: "Prepare a scene" }));
   const newScene = gm.getByRole("dialog", { name: "New scene" });
@@ -129,10 +131,10 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expect(newScene.getByText(/has no grid yet/)).toBeVisible();
   await expect(newScene.getByRole("button", { name: "Set the grid" })).toBeVisible();
   await press(newScene.getByRole("button", { name: "Prepare scene" }));
-  const banner = gm.getByRole("status").filter({ hasText: "Staging" });
-  await expect(banner).toContainText("This map has no grid yet");
+  const staging = gm.getByRole("group", { name: "Staged scene" });
+  await expect(staging.getByRole("button", { name: "Set the grid" })).toBeVisible();
   await expectPageFits(gm);
-  await press(banner.getByRole("button", { name: "Set the grid" }));
+  await press(staging.getByRole("button", { name: "Set the grid" }));
 
   // The grid: a printed square grid, a 3 x 3 drag from one intersection to the opposite one, then confirm.
   await expect(gm.getByRole("region", { name: `Calibrate ${MAP_NAME}` })).toBeVisible();
@@ -148,11 +150,9 @@ test("the first evening: the GM password, the join address, a player, the table 
 
   // Back to the staged scene, now with a grid, and live: the table screen shows it.
   await press(gm.getByRole("button", { name: "Back to the table" }));
-  await expect(banner).not.toContainText("no grid");
-  await press(gm.getByRole("button", { name: "Make live" }));
-  await expect(
-    gm.getByText("The scene is live. Choose who is in the fight under The fight, then start it.")
-  ).toBeVisible();
+  await expect(staging.getByRole("button", { name: "Set the grid" })).toBeHidden();
+  await press(staging.getByRole("button", { name: "Make live" }));
+  await expect(gm.getByLabel(`Scenes · ${MAP_NAME} is live`)).toBeVisible();
   await expect(screen.getByRole("img", { name: MAP_NAME })).toBeVisible();
   await expectPageFits(gm);
   await expectPageFits(screen);
@@ -195,10 +195,12 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await press(gm.getByRole("tab", { name: "Scenes" }));
   await press(gm.getByRole("button", { name: "New scene" }).first());
   const newScene = gm.getByRole("dialog", { name: "New scene" });
-  await press(newScene.getByRole("button", { name: "Pick a map" }));
+  // The live scene's map comes preselected; the new scene gets a map of its own.
+  await press(newScene.getByRole("button", { name: /^(Pick a map|Change)$/ }));
   const chooser = gm.waitForEvent("filechooser");
   await press(newScene.getByRole("button", { name: /Upload a map/ }));
-  await (await chooser).setFiles({ name: `${MAP_NAME}.png`, mimeType: "image/png", buffer: battleMap() });
+  // A different image from the first evening's, which the library would recognise and reuse with its grid.
+  await (await chooser).setFiles({ name: "Smoke crossing.png", mimeType: "image/png", buffer: battleMap(700, 504) });
   await expect(gm.getByText("Map uploaded.")).toBeVisible();
   await expectPageFits(gm);
   await press(newScene.getByRole("button", { name: "Prepare scene" }));
@@ -219,14 +221,27 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await expectPageFits(gm);
   await press(bestiary.getByRole("button", { name: "Close" }));
   await press(gm.getByRole("button", { name: "Start the fight" }));
-  await expect(gm.getByText("Round 1")).toBeVisible();
+  await expect(gm.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
   await expectPageFits(gm);
+  // The one primary sits in the panel's footer, inside the viewport and uncovered.
+  await expectUncovered(gm.getByRole("button", { name: "Next turn" }));
 
   // A move off the mover's turn goes to the GM, so if the goblin won initiative the GM ends its turn first.
-  await expect(player.getByText("Round 1")).toBeVisible();
-  const yourTurn = player.getByText("Your turn - act, then end it below");
+  await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  const yourTurn = player.getByRole("heading", { name: "Your turn" });
   if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
   await expect(yourTurn).toBeVisible();
+  await expectUncovered(player.getByRole("button", { name: "End turn" }));
+  if (hasTouch) {
+    // On a phone a divider splits the map pane from the panel; the keys move it as well as a finger.
+    const divider = player.getByRole("separator", { name: "Map and panel split" });
+    const before = Number(await divider.getAttribute("aria-valuenow"));
+    await divider.focus();
+    await player.keyboard.press("ArrowUp");
+    await expect(divider).toHaveAttribute("aria-valuenow", String(before - 5));
+    await player.keyboard.press("ArrowDown");
+    await expectPageFits(player);
+  }
 
   // The player places their own token from the tray, then drags it across the map.
   await press(player.getByLabel("Staging tray").getByRole("button", { name: hero }));
@@ -251,6 +266,9 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   // The GM sees the move the server accepted.
   const tokenId = await token.getAttribute("data-token-id");
   await expect(gm.locator(`g.encounter-token[data-token-id="${tokenId}"]`)).toHaveAttribute("transform", moved);
+  // Nothing covers the acting token, on either screen.
+  await expectTokenUncovered(player, tokenId!);
+  await expectTokenUncovered(gm, tokenId!);
 
   if (hasTouch) {
     // A second finger turns the drag into a pinch: the map zooms in and the drag commits nothing.
@@ -307,8 +325,11 @@ test("the GM presents a map on a paired table screen", async ({ open, request })
   await expect(gm.getByRole("heading", { name: "Table viewer" })).toBeVisible();
   await expect(gm.getByText("Den TV", { exact: false }).first()).toBeVisible();
 
-  await press(gm.getByRole("button", { name: `Present ${MAP_NAME}` }));
-  await expect(viewer.getByRole("img", { name: MAP_NAME })).toBeVisible();
+  // The Shared screen offers the GM's current map: the live scene's, when an earlier journey left one.
+  const present = gm.getByRole("button", { name: /^Present / });
+  const shown = (await present.textContent())!.replace(/^Present /, "");
+  await press(present);
+  await expect(viewer.getByRole("img", { name: shown })).toBeVisible();
   await expect(gm.getByRole("button", { name: "Pause presentation" })).toBeVisible();
   await expectPageFits(viewer);
   await expectPageFits(gm);

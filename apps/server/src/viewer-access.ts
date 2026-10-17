@@ -159,7 +159,7 @@ export class ViewerAccessStore {
   }
 
   /**
-   * A table screen asks to pair (ADR-0026). It gets a short code to show and a secret to keep in its cookie; the code
+   * A table screen asks to pair (ADR-0027). It gets a short code to show and a secret to keep in its cookie; the code
    * only names the request for the GM, and only the secret collects the viewer credential once the GM approves.
    */
   openScreenPairing(): ScreenPairing & Readonly<{ requestToken: string }> {

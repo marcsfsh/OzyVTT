@@ -10,7 +10,14 @@ import "./now-playing.css";
  * is on, and whether the table screen can be heard. The full board is one tap away. Renders nothing until the
  * board holds something to play.
  */
-export function NowPlaying({ token }: Readonly<{ token: string }>) {
+export function NowPlaying({
+  token,
+  compact = false
+}: Readonly<{
+  token: string;
+  /** The header bar's chip: play or pause and what is on, with the table screen's state as an icon. */
+  compact?: boolean;
+}>) {
   const view = useSoundBoard();
   const { sounds } = useSoundLibrary(token);
   const send = useSoundCommand();
@@ -34,6 +41,30 @@ export function NowPlaying({ token }: Readonly<{ token: string }>) {
         ? "Table screen sound on"
         : "Checking the table screen";
   const action = paused ? "Resume sound" : sounding ? "Pause sound" : "Play music";
+  if (compact)
+    return (
+      <section className={`now-playing is-compact${waiting ? " is-waiting" : ""}`} aria-label="Sound">
+        <IconButton
+          label={action}
+          disabled={!sounding && !paused && !board.music.tracks.length}
+          onClick={() => void playOrPause(board, send)}
+        >
+          {sounding && !paused ? <IconPause /> : <IconPlay />}
+        </IconButton>
+        <button
+          type="button"
+          className="now-playing-what"
+          title={`${screenLine} · open the sound board`}
+          onClick={() => navigate(SOUND_BOARD_PATH)}
+        >
+          <span className="now-playing-title">
+            {heard && !waiting ? <IconVolume /> : <IconVolumeOff />}
+            <span>{paused ? `Paused · ${on}` : on}</span>
+          </span>
+          <span className="nh-sr-only">{screenLine}. Open the sound board</span>
+        </button>
+      </section>
+    );
   return (
     <section className={`now-playing${waiting ? " is-waiting" : ""}`} aria-label="Sound">
       <IconButton

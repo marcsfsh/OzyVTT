@@ -99,7 +99,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Hide",
     activation: "action",
     description:
-      "Make a DC 15 Dexterity (Stealth) check while Heavily Obscured or behind Three-Quarters or Total Cover, out of any enemy's line of sight (the GM adjudicates eligibility - the engine can't see sight lines). On a success you have the Invisible condition while hidden; making an attack roll ends it. (SRD 5.2.1, Hide [Action])",
+      "Make a DC 15 Dexterity (Stealth) check while Heavily Obscured or behind Three-Quarters or Total Cover, out of any enemy's line of sight (with dynamic vision on, an enemy you can see that sees you stops it; otherwise the GM decides). On a success you have the Invisible condition while hidden; making an attack roll ends it. (SRD 5.2.1, Hide [Action])",
     damage: []
   },
   {
@@ -123,7 +123,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Ready",
     activation: "action",
     description:
-      "Choose a perceivable trigger and a response: the response is taken as a Reaction before the start of your next turn. Resolving any action off-turn while Readied spends your Reaction and releases the ready. (SRD 5.2.1, Ready [Action])",
+      "Choose a perceivable trigger and a response: the response is taken as a Reaction before the start of your next turn. Resolving any action off-turn while Readied spends your Reaction and releases the ready; a readied move goes up to your Speed. A spell is readied by casting it with Ready: its slot is spent now, and it is held with Concentration until the start of your next turn. (SRD 5.2.1, Ready [Action])",
     damage: [],
     grants: {
       name: "Readied",

@@ -1,4 +1,4 @@
-import { DEFAULT_RULE_EXCEPTIONS, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
+import { DEFAULT_RULE_EXCEPTIONS, EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
@@ -24,6 +24,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     initiative: combat.initiative,
     tokens: combat.tokens,
     annotations: combat.annotations,
+    spellZones: combat.spellZones,
     turn: combat.turn,
     rulesMode: combat.rulesMode,
     ruleExceptions: combat.ruleExceptions,
@@ -35,6 +36,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     legendaryUsed: combat.legendaryUsed,
     fog: combat.fog,
     terrain: combat.terrain,
+    vision: combat.vision,
     pendingSaves: combat.pendingSaves,
     pendingReactions: combat.pendingReactions,
     pendingDamage: combat.pendingDamage,
@@ -52,6 +54,7 @@ function emptySceneCombat(): SceneCombat {
     initiative: [],
     tokens: [],
     annotations: [],
+    spellZones: [],
     turn: {
       actionUsed: false,
       bonusActionUsed: false,
@@ -70,6 +73,7 @@ function emptySceneCombat(): SceneCombat {
     legendaryUsed: {},
     fog: { enabled: false, shapes: [] },
     terrain: { difficult: [] },
+    vision: { ...EMPTY_SCENE_VISION },
     pendingSaves: [],
     pendingReactions: [],
     pendingDamage: [],

@@ -91,7 +91,7 @@ so reconnects resume without a new join. A player's token is kept in `localStora
 tab's `sessionStorage` (a reload resumes), in `localStorage` only when the GM ticks "Keep me signed in
 on this computer", and a new tab asks the open ones over a `BroadcastChannel` (`lib/gm-token.ts`).
 A socket whose session is revoked or runs out gets `session:ended` and is dropped, and a join with a
-dead token is refused (ADR-0025). Presence holds a dropped session as "reconnecting" for about 8
+dead token is refused (ADR-0026). Presence holds a dropped session as "reconnecting" for about 8
 seconds before "offline".
 
 ## Identity and roles
@@ -109,14 +109,14 @@ seconds before "offline".
   told on their own devices (`claim:released`).
 - **Integration credential.** A GM-minted, scoped bearer token for the HTTP API (ADR-0016).
 - **Table viewer.** The screen shows a six-digit code and the GM types it; the screen's own secret,
-  in a cookie, then collects an HttpOnly viewer cookie (ADR-0026). It can only read the presentation
+  in a cookie, then collects an HttpOnly viewer cookie (ADR-0027). It can only read the presentation
   projection.
 
 Role comes from the signed token, never from network position. Archived characters cannot be
 claimed, staged or added to a fight.
 
 Every HTTP route and the socket handshake read the caller through one helper (`request-auth.ts`,
-ADR-0025): 401 for no credential or one that is malformed, expired or revoked, and 403 only for a
+ADR-0026): 401 for no credential or one that is malformed, expired or revoked, and 403 only for a
 valid credential without the role or scope. `credential-walk.test.ts` walks every mounted route with
 four credentials and pins the answers.
 
@@ -128,10 +128,14 @@ audience. There are four:
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
   get only `public` actors, a health band instead of exact HP, and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
-  owner identity, GM notes and hidden turns are removed. An unclaimed character carries its
-  species and class line for the claim picker, since any player could claim it and read its sheet.
+  owner identity, GM notes and hidden turns are removed. A live scene's map reaches players before
+  its fight, with the public tokens the GM has placed; the turn order and the tray wait for the
+  fight. A player's reply to an area they aimed names only the creatures they may see. An
+  unclaimed character carries its species and class line for the claim picker, since any player
+  could claim it and read its sheet.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
-  room that may hold non-players. Only public actors with a position become tokens; annotations
+  room that may hold non-players. It follows the live scene, before and during its fight, unless
+  the GM paused it. Only public actors with a position become tokens; annotations
   are public and unexpired; initiative appears only during combat; nothing is shown while
   paused. The fields that may cross are the `ViewerEncounterScene` and
   `ViewerPresentationProjection` types, plus `sound` (`ViewerSoundProjection`, added by
@@ -146,10 +150,23 @@ audience. There are four:
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public.
 
+Sight is part of the boundary (ADR-0023). `vision/audience.ts` decides, per audience, which
+creatures it may know of. A player sees through their own placed characters; the table viewer, a
+spectator and a replay see through the whole party. A creature that isn't a player character is
+hidden from an audience, exactly like a `gm-only` one, when none of its characters perceive it
+(dynamic vision on), or when its whole space lies under the scene's manual fog (fog on). The same
+goes for one staged that way in a prepared scene, and, with the fog on, for one in the fight but not
+yet on the map. Every projection, the feed and toast gate, and a player's target check read that one
+answer (`AudienceSight`). Rules, narration and refusals ask it through `hiddenFrom`, the shared hidden
+check: GM-only, or hidden by sight or the fog, for the table or for one player. A line that would
+name a hidden creature names "A hidden threat", a rule it would bend for a visible creature doesn't
+apply, and a public roll it makes is recorded GM-only. Another player's character out of
+sight keeps its actor but loses its token. An audience's own characters are always sent, and so
+is a creature with any part of its space revealed.
+
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
-of a hidden thing. When in doubt, leave it out. Fog of war is presentation only (ADR-0022);
-hidden things are stripped by the projections regardless of what fog covers.
+of a hidden thing. When in doubt, leave it out.
 
 ## Maps, tokens and the grid
 
@@ -163,6 +180,16 @@ hidden things are stripped by the projections regardless of what fog covers.
   preview that mirrors the server.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
   reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
+- Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
+  image-pixel segments, placed and carried lights, and an ambient light level
+  (`vision/edit.ts`). The server builds each viewer's visibility polygon against the walls, cuts it
+  to the creature's senses and the lights (`vision/geometry.ts`, `vision/sight.ts`), and caches
+  polygons by walls, origin and radius. Senses come from stat blocks, species and features, and
+  light from equipped items (`vision/senses.ts`). After every command the server adds what the
+  party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
+  get only polygons and rectangles to paint. While vision is on, walls, closed doors and windows
+  also bar movement, and sight decides an attack's unseen Advantage and Disadvantage and whether
+  Hide is allowed.
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
@@ -171,7 +198,7 @@ hidden things are stripped by the projections regardless of what fog covers.
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. Players and the table screen get only the terrain the
-  fog reveals.
+  fog reveals, and with vision on only what the party has seen.
 
 ## Rules engine
 
@@ -187,7 +214,14 @@ write goes through `applyCondition` in `effects.ts`, which honours innate and it
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
 Concentration and its grapples). Effects end by their duration at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
-(`turn-boundaries.ts`).
+(`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
+(`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
+Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A stat block's spells
+(`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`). A spell that leaves an area acting later (Moonbeam, Spirit Guardians, a
+wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
+runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
+such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
+(`lasting-spells.ts`).
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and
@@ -321,6 +355,13 @@ Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib
 (`command` adds the `commandId`, `read` does not, and a lost reply becomes a refusal) and `/api/v1`
 calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
 Rules checks on the client are hints only; the server decides.
+
+The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a header bar over the map with the scene and
+the status line (`table/TableHeader.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
+(`table/TablePanel.tsx`) with Needs you or the player's prompt slot above its tabs and the view's one primary in
+its footer. Nothing floats over the map but tokens and marks; notices land in the status line through
+`ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
+the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 homebrew, settings and the API reference, the character builder and level flow, replays, the map
