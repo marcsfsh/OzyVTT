@@ -3125,6 +3125,11 @@
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
+/* The game clock's hour beside the GM's date; the two are the table's one clock. */
+.codex-calendar-hour {
+  color: var(--text);
+  font: 700 var(--fs-sm) var(--font-numeric);
+}
 .codex-calendar-clockhint {
   margin: 0;
   padding: 0 var(--space-3);

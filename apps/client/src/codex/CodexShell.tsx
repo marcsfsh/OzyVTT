@@ -61,7 +61,8 @@ export function CodexShell({
   actors = [],
   activeSceneId = null,
   onActivateScene = () => {},
-  onOpenReplay
+  onOpenReplay,
+  gameHours = null
 }: Readonly<{
   gmToken: string;
   scenes?: readonly WorkspaceScene[];
@@ -69,6 +70,8 @@ export function CodexShell({
   activeSceneId?: string | null;
   onActivateScene?: (sceneId: string) => void;
   onOpenReplay?: (archiveId: number) => void;
+  /** The game clock (`rest.clockHours`), whose hour goes with the calendar's date. */
+  gameHours?: number | null;
 }>) {
   const route = useRoute();
   const section = codexSectionOf(route.segments);
@@ -454,6 +457,7 @@ export function CodexShell({
         <CalendarView
           gmToken={gmToken}
           calendar={campaign.calendar}
+          gameHours={gameHours}
           records={campaign.records}
           loading={campaignLoading}
           error={campaignError}

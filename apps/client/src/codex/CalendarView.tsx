@@ -13,6 +13,7 @@ import { CHRONICLE_KIND_META, chronicleRowSummary, sameInWorldDate } from "./chr
 import { CalendarEditor, CampaignDateEditor } from "./CalendarEditor";
 import { MonthBar, MonthGrid, useMonthView } from "./MonthGrid";
 import { RecordRow } from "./RecordRow";
+import { hourLabel } from "../rest/game-date";
 
 /**
  * The Calendar section: a lens over the chronicle. Records are placed by the server's `calendarInstant`;
@@ -25,6 +26,8 @@ import { RecordRow } from "./RecordRow";
 export type CalendarViewProps = Readonly<{
   gmToken: string;
   calendar: GmCodexCalendar | null;
+  /** The game clock, whose hour goes with "Your date": the table's one clock. Null outside the GM's table. */
+  gameHours?: number | null;
   records: readonly CodexChronicleRecord[];
   loading: boolean;
   error: string | null;
@@ -40,6 +43,7 @@ export type CalendarViewProps = Readonly<{
 export function CalendarView({
   gmToken,
   calendar,
+  gameHours = null,
   records,
   loading,
   error,
@@ -130,6 +134,7 @@ export function CalendarView({
           >
             {now ? formatWorldDate(calendar, now) : "Set your date"}
           </button>
+          {now && gameHours !== null && <span className="codex-calendar-hour">{hourLabel(gameHours)}</span>}
           <GmOnlyTag />
         </div>
         <div className="codex-calendar-clock">
@@ -147,7 +152,7 @@ export function CalendarView({
       {/* Three states: in sync, ahead of the players, or players have no date yet. */}
       <p className="codex-calendar-clockhint">
         {!now
-          ? "Your date is the campaign's now — every new record is dated by it. The party sees it only when you publish."
+          ? "Your date is the campaign's now, and every new record is dated by it. Rests and passing time at the table move it. The party sees it only when you publish."
           : !published
             ? "The party has no date yet. Publishing shares the date above with them; until then it is yours alone."
             : diverged

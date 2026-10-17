@@ -73,6 +73,14 @@ const renderCalendar = (over: Partial<React.ComponentProps<typeof CalendarView>>
   return { props, ...render(<CalendarView {...props} />) };
 };
 
+describe("The GM's date", () => {
+  it("shows the game clock's hour beside it: the date and the hour are the table's one clock", () => {
+    renderCalendar({ gameHours: 38 });
+    expect(screen.getByRole("button", { name: "Your date is Hammer 4, 1491 DR. Change it." })).toBeTruthy();
+    expect(screen.getByText("14:00")).toBeTruthy();
+  });
+});
+
 describe("The Calendar grid", () => {
   it("lays out the month the GM's clock is in, with the week's own lead blanks", () => {
     renderCalendar();

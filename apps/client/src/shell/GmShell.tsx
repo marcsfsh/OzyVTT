@@ -305,6 +305,7 @@ export function GmShell({
             kind: actor.kind
           }))}
           activeSceneId={state.combat.activeSceneId ?? null}
+          gameHours={state.rest?.clockHours ?? null}
           onActivateScene={(sceneId: string) => {
             makeSceneLive(sceneId);
             navigate(pathForGmTab("table"));
