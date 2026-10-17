@@ -182,3 +182,18 @@
     margin-block: var(--space-4) auto;
   }
 }
+
+/* Bottom-aligned dialog: a drawer resting on the bottom edge at full width, under the thumb on a phone. Its head and
+   body keep the dialog's own spacing; the foot clears the home indicator. */
+.nh-modal--bottom {
+  width: 100%;
+  max-width: 100vw;
+  margin: auto 0 0;
+}
+.nh-modal--bottom .nh-modal-surface {
+  max-height: min(88dvh, 48rem);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.nh-modal--bottom .nh-modal-body {
+  padding: var(--space-4);
+}

@@ -3,7 +3,7 @@ import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/MapManager";
 import { Button, Chip, Switch, IconArrow, IconChevronLeft, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
-import { CharacterSheet } from "./CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
 import { ScenePrepPanel } from "../scenes/ScenePrepPanel";
 import type { PickerMap } from "../maps/MapPicker";

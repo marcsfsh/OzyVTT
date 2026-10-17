@@ -1,17 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
-import { read } from "../lib/command";
+import { command, read } from "../lib/command";
+import { ActionList } from "../sheet/ActionList";
+import { CastDetail } from "../sheet/CastDetail";
+import { SheetDetail, type DetailPlace } from "../sheet/SheetDetail";
+import { TurnCard } from "../sheet/TurnCard";
+import { characterLevel, pinsOf, optionCountsOf, type SheetActor } from "../sheet/sheet-model";
+import { castOptions, preparedState, type CastOption } from "../sheet/spell-model";
+import { NO_FACTS, turnOptions, type TurnFacts, type TurnOption } from "../sheet/turn-options";
+import { useSpellReference } from "./spells";
 import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
-import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
-import { actionSummaryParts } from "./action-summary";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { CommonActionChips } from "./CommonActionChips";
 import { ReadyChooser, readyableSpells } from "./ReadyChooser";
 import { damageBreakdown } from "./format";
 import { modeWords } from "./roll-mode-notes";
 import { AskTheGmPrompt } from "./RuleAsk";
-import { awaitsItsSpell, summaryOfAvailability, type AvailabilityRow } from "./useSheetDefinition";
+import { awaitsItsSpell, factsOf, summaryOfAvailability, type AvailabilityRow } from "../sheet/useSheetDefinition";
 import {
   beginTargeting,
   clearTargeting,
@@ -70,17 +76,13 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
 }
 
 /** What the server lists for this character beyond its own rows: the generic actions it can take (with the Bonus
- *  Action forms its features give) and which of its rows are added to a hit and never taken alone. Read once per
- *  sheet; the server still decides each use. */
+ *  Action forms its features give), which of its rows are added to a hit, which wait for their spell, and why any
+ *  can't be used now. Read once per sheet; the server still decides each use. */
 function useServerActionFacts(actorId: string, definition: ActorDefinition, effectsKey: string) {
-  const [facts, setFacts] = useState<{
-    common: readonly ContentActionSummary[];
-    ridesAHit: ReadonlySet<string>;
-    /** A spell's later actions whose spell isn't up, which aren't offered until it is. */
-    awaiting: ReadonlySet<string>;
-    /** The damage the server rolls for a row, where it differs (a spell's later action at the level it was cast). */
-    damage: ReadonlyMap<string, ContentActionSummary["damage"]>;
-  }>({ common: [], ridesAHit: new Set(), awaiting: new Set(), damage: new Map() });
+  const [facts, setFacts] = useState<TurnFacts & { common: readonly ContentActionSummary[] }>({
+    ...NO_FACTS,
+    common: []
+  });
   useEffect(() => {
     let live = true;
     void read("actor:available-actions", { actorId }).then((result) => {
@@ -88,9 +90,17 @@ function useServerActionFacts(actorId: string, definition: ActorDefinition, effe
       const rows: readonly AvailabilityRow[] = result.actions ?? [];
       setFacts({
         common: rows.filter((row) => row.builtin).map(summaryOfAvailability),
+        rows: new Map(rows.filter((row) => !row.builtin).map((row) => [row.id, summaryOfAvailability(row)])),
         ridesAHit: new Set(rows.filter((row) => row.ridesAHit).map((row) => row.id)),
         awaiting: new Set(rows.filter(awaitsItsSpell).map((row) => row.id)),
-        damage: new Map(rows.flatMap((row) => (row.damage ? [[row.id, row.damage] as const] : [])))
+        reasons: new Map(
+          rows.flatMap((row) => {
+            const why = factsOf(row).reason;
+            return why ? [[row.id, why] as const] : [];
+          })
+        ),
+        passive: new Set(rows.filter((row) => row.passive !== undefined).map((row) => row.id)),
+        mastery: new Map(rows.flatMap((row) => (row.mastery ? [[row.id, row.mastery.name] as const] : [])))
       });
     });
     return () => {
@@ -118,7 +128,15 @@ export function PlayerActionRunner({
   effectTags = [],
   unavailable,
   targetRows,
-  insideNow
+  insideNow,
+  actor = null,
+  myTurn = true,
+  header,
+  pickOnly,
+  castPlace = { kind: "inline" },
+  look = "list",
+  round = null,
+  acting = null
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -136,6 +154,21 @@ export function PlayerActionRunner({
   effectTags?: readonly string[];
   /** Why no action can be taken now ("unavailable while Unconscious"): the list stays in view, disabled. */
   unavailable?: string;
+  /** The live character, for its spell slots, prepared spells and uses left. */
+  actor?: SheetActor | null;
+  /** The character acts now; off its turn the list stays in view and only reactions are live. */
+  myTurn?: boolean;
+  /** What sits above the list (the economy on the sheet's own Play tab). */
+  header?: ReactNode;
+  /** Only the aim and its result, for a use started from another tab of the sheet; Done closes it. */
+  pickOnly?: Readonly<{ onDone: () => void }>;
+  /** Where a spell's cast detail opens: in place of the list, or the sheet's right column on a laptop. */
+  castPlace?: DetailPlace;
+  /** "card": a phone's turn card with favourite tiles; "list": every option grouped by what it costs. */
+  look?: "list" | "card";
+  /** The fight's round, and who acts off this character's turn, for the turn card's heading. */
+  round?: number | null;
+  acting?: string | null;
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
@@ -145,43 +178,39 @@ export function PlayerActionRunner({
   const slotLevels = (definition.spellcasting?.slots ?? []).filter((slot) => slot.max > 0).map((slot) => slot.level);
   // Casting a spell, or its Concentration ending, changes which of its later actions are offered.
   const facts = useServerActionFacts(actorId, definition, effectTags.join(","));
-  // A limited use is a structured effect the server resolves, so Action Surge and the like get a
-  // targetless Use tap here too. Sneak Attack, a smite and the like are added to a hit instead, so they aren't
-  // offered as a tap that would be refused.
-  const actions = useMemo(
-    () => [
-      ...definition.actions
-        .filter(
-          (action) =>
-            !facts.ridesAHit.has(action.id) &&
-            !facts.awaiting.has(action.id) &&
-            // What a spell's area does later is the server's or the GM's to run; a player's tap doesn't.
-            !(action.activation === "other" && /^spell-.+-then-/.test(action.id)) &&
-            (action.attack ||
-              action.save ||
-              action.damage.length > 0 ||
-              action.uses !== undefined ||
-              // A feature's heal (Second Wind); a spell's heal is cast from the spell list.
-              (action.healing !== undefined && action.spellId === undefined))
-        )
-        .map(summaryOfOwnAction)
-        .map((action) => {
-          const rolled = facts.damage.get(action.id);
-          return rolled && rolled.length === action.damage.length ? { ...action, damage: rolled } : action;
-        }),
-      // Item-derived actions are appended: their `item-<inventory id>` keys cannot collide with
-      // stat-block ids. The server says which resolve (a potion, a scroll, a coat of poison).
-      ...extraActions.filter(
-        (action) =>
-          (action.targeting !== undefined && action.targeting !== null) ||
-          action.attackBonus !== null ||
-          action.saveAbility !== null ||
-          action.damage.length > 0 ||
-          action.usesLimit !== null
-      )
-    ],
-    [definition, extraActions, facts]
+  const spellReference = useSpellReference();
+  const spellIndex = useMemo(() => new Map(spellReference.map((entry) => [entry.id, entry])), [spellReference]);
+  const ownSummaries = useMemo(
+    () => new Map(definition.actions.map((action) => [action.id, summaryOfOwnAction(action)])),
+    [definition]
   );
+  // A limited use is a structured effect the server resolves, so Action Surge and the like get a targetless tap
+  // here too. Sneak Attack, a smite and the like are added to a hit instead, so they aren't offered as a tap that
+  // would be refused.
+  const options = useMemo(
+    () =>
+      turnOptions({
+        definition,
+        actor,
+        ownSummaries,
+        // The loadout's rows (a weapon's swing, a wand's charge) from the caller, else from the server's own read.
+        extraActions:
+          extraActions.length > 0
+            ? extraActions
+            : [...facts.rows.values()].filter((row) => !definition.actions.some((own) => own.id === row.id)),
+        facts,
+        spellReference: spellIndex,
+        characterLevel: characterLevel(definition) ?? 1
+      }),
+    [definition, actor, ownSummaries, extraActions, facts, spellIndex]
+  );
+  /** Every option the picker can be handed, the spells' later rows included. */
+  const actions = useMemo(
+    () => options.flatMap((option) => [option.summary, ...option.children.map((child) => child.summary)]),
+    [options]
+  );
+  /** A spell waiting for its slot to be chosen. */
+  const [casting, setCasting] = useState<TurnOption | null>(null);
   const hitExtras = definition.actions.filter(
     (action) => facts.ridesAHit.has(action.id) && action.spellId === undefined
   );
@@ -214,6 +243,15 @@ export function PlayerActionRunner({
     },
     []
   );
+  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn.
+  const wasMyTurn = useRef(myTurn);
+  useEffect(() => {
+    if (wasMyTurn.current && !myTurn) {
+      clearTargeting();
+      setTargetingResult(null);
+    }
+    wasMyTurn.current = myTurn;
+  }, [myTurn]);
   // The list gives way to the picker, the result or a refusal in place, and on a phone the list was scrolled down to
   // the tapped row, so the runner's top is brought back into view.
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -221,11 +259,94 @@ export function PlayerActionRunner({
   useEffect(() => {
     if (shown) revealInRegion(rootRef.current, "nearest");
   }, [shown]);
+  // A cast in place takes the card's place and Back gives the card back. The list may have been scrolled down to the
+  // tapped option, so the top of whichever shows comes back into view.
+  const castingId = casting?.id ?? null;
+  const castSeen = useRef(castingId);
+  useEffect(() => {
+    if (castSeen.current === castingId) return;
+    castSeen.current = castingId;
+    if (castPlace.kind === "inline") revealInRegion(rootRef.current, "nearest");
+  }, [castingId, castPlace.kind]);
 
   if (actions.length === 0 && facts.common.length === 0) return null;
   const onOutcome = (ok: boolean, message?: string) => {
     if (!ok && message) onFeedback(message);
   };
+  /** A tap on an option: one with nothing to aim resolves at once; the rest go to targeting. */
+  const take = (action: ContentActionSummary, slotLevel?: number, darts?: number) => {
+    if (isTargetlessOwn(action))
+      resolveActionDirect(actorId, action.id, revision, onOutcome, undefined, undefined, {
+        ...(slotLevel !== undefined ? { slotLevel } : {})
+      });
+    else beginTargeting(action, actorId, slotLevel, darts);
+  };
+  /** The ways a spell option can be cast now. The fight's own rules decide; the list only offers what it can. */
+  const castChoices = (option: TurnOption): CastOption[] =>
+    option.spell && actor
+      ? castOptions({
+          spell: option.spell,
+          definition,
+          actor,
+          content: spellIndex.get(option.spell.id),
+          policeSlots: false,
+          prepared: preparedState(option.spell, actor, definition) !== "unprepared"
+        })
+      : [];
+  /** Casts a spell option the chosen way: at a slot level (Magic Missile's darts grow with it), without a slot, or
+   *  as a Ritual. */
+  const castWith = (option: TurnOption, choice: CastOption) => {
+    const spell = option.spell!;
+    const variant =
+      choice.kind === "free" ? spell.freeActionId : choice.kind === "ritual" ? spell.ritualActionId : undefined;
+    if (variant) {
+      const summary = ownSummaries.get(variant);
+      if (summary) take(summary);
+      return;
+    }
+    const own = definition.actions.find((candidate) => candidate.id === option.id);
+    const darts =
+      own?.darts !== undefined && own.spellSlot && choice.kind === "slot"
+        ? own.darts + Math.max(0, choice.level - own.spellSlot.level)
+        : undefined;
+    take(option.summary, choice.kind === "slot" ? choice.level : undefined, darts);
+  };
+
+  /** The turn card's pins, stored on the character; the server checks each is one of its options now. */
+  const setPins = (ids: readonly string[]) =>
+    void command("character:set-favourites", { actorId, optionIds: [...ids] }).then((reply) => {
+      if (!reply.ok) onFeedback(reply.message ?? "The favourites could not be saved.");
+    });
+  /** A tap on an option: a spell with a choice of slot opens its cast detail, the rest go at once. */
+  const pickOption = (option: TurnOption) => {
+    setTargetingResult(null);
+    const choices = option.spell ? castChoices(option) : [];
+    if (option.spell && (choices.length > 1 || (choices.length === 1 && !choices[0]!.available))) {
+      setCasting(option);
+      return;
+    }
+    if (option.spell && choices.length === 1) {
+      castWith(option, choices[0]!);
+      return;
+    }
+    take(option.summary);
+  };
+  const castDetail =
+    casting && casting.spell ? (
+      <CastDetail
+        spell={casting.spell}
+        action={casting.summary}
+        content={spellIndex.get(casting.spell.id)}
+        options={castChoices(casting)}
+        aimed
+        busy={busy}
+        onBack={() => setCasting(null)}
+        onCast={(choice) => {
+          setCasting(null);
+          castWith(casting, choice);
+        }}
+      />
+    ) : null;
 
   return (
     <div className="action-runner player-actions" ref={rootRef}>
@@ -237,35 +358,49 @@ export function PlayerActionRunner({
           {feedback}
         </p>
       )}
-      {!picking && !result && (
+      {!pickOnly && !picking && !result && casting && casting.spell && castPlace.kind === "inline" && castDetail}
+      {!pickOnly && !picking && !result && (!casting || castPlace.kind !== "inline") && (
         <>
-          <p className="player-actions-label">Your actions{unavailable && <span> · {unavailable}</span>}</p>
-          <ul className="action-list">
-            {actions.map((action) => (
-              <li key={action.id}>
-                <ActionRow
-                  action={action}
-                  parts={actionSummaryParts(action, actions)}
-                  note={unavailable ? "Unavailable" : "Tap to use"}
-                  disabled={busy || unavailable !== undefined}
-                  onUse={() => {
-                    setTargetingResult(null);
-                    if (isTargetlessOwn(action)) resolveActionDirect(actorId, action.id, revision, onOutcome);
-                    else beginTargeting(action, actorId);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
+          {look === "card" ? (
+            <TurnCard
+              options={options}
+              myTurn={myTurn}
+              round={round}
+              acting={acting}
+              busy={busy}
+              {...(unavailable ? { unavailable } : {})}
+              header={header}
+              pins={pinsOf(actor)}
+              counts={optionCountsOf(actor)}
+              {...(actor ? { onSetPins: setPins } : {})}
+              onUse={pickOption}
+            />
+          ) : (
+            <>
+              {header}
+              <ActionList
+                options={options}
+                myTurn={myTurn}
+                busy={busy}
+                {...(unavailable ? { unavailable } : {})}
+                onUse={pickOption}
+              />
+            </>
+          )}
           {hitExtras.length > 0 && (
             <p className="action-result-hint">
               {hitExtras.map((action) => action.name).join(", ")}: add {hitExtras.length === 1 ? "it" : "them"} to a hit
               on the attack's result, before you confirm it.
             </p>
           )}
+          {casting && castDetail && castPlace.kind !== "inline" && (
+            <SheetDetail place={castPlace} title={`Cast ${casting.name}`} onClose={() => setCasting(null)}>
+              {castDetail}
+            </SheetDetail>
+          )}
           <CommonActionChips
             actions={facts.common}
-            busy={busy || unavailable !== undefined}
+            busy={busy || unavailable !== undefined || !myTurn}
             effectTags={effectTags}
             onUse={(action, targetless) => {
               setTargetingResult(null);
@@ -373,7 +508,7 @@ export function PlayerActionRunner({
                 <p className="action-damage">
                   Damage: <strong>{result.damageTotal}</strong>
                   {breakdown ? ` (${breakdown})` : ""}
-                  {result.crit ? " · crit dice doubled" : ""}
+                  {result.crit ? " · a Critical Hit, its dice doubled" : ""}
                 </p>
               );
             })()}
@@ -409,6 +544,11 @@ export function PlayerActionRunner({
               {playerDamageMode === "direct" ? "Applied to " : "Handed to the GM to apply to "}
               {result.damageTargets!.map((owed) => `${owed.targetName} (${owed.total})`).join(", ")}.
             </p>
+          )}
+          {pickOnly && !result.preview && (
+            <button type="button" className="action-again" onClick={pickOnly.onDone}>
+              Done
+            </button>
           )}
           {result.opens &&
             (() => {

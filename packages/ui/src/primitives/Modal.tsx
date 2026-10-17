@@ -15,8 +15,9 @@ interface ModalProps {
   accent?: PanelAccent;
   /** `full` is a roomy centred sheet on a laptop and edge-to-edge at ≤760px. Use it and leave max-height alone. */
   size?: "sm" | "md" | "lg" | "full";
-  /** `top` pins the dialog near the top of the viewport (the command-palette shape). */
-  align?: "center" | "top";
+  /** `top` pins the dialog near the top of the viewport (the command-palette shape); `bottom` rests it on the bottom
+      edge at full width, the drawer a phone opens under the thumb. */
+  align?: "center" | "top" | "bottom";
   /** Accessible label when there's no visible title; a visible title names the dialog otherwise. */
   ariaLabel?: string;
   className?: string;
@@ -80,7 +81,13 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={cx("nh-modal", `nh-modal--${size}`, align === "top" && "nh-modal--top", "anim-dialog", className)}
+      className={cx(
+        "nh-modal",
+        `nh-modal--${size}`,
+        align !== "center" && `nh-modal--${align}`,
+        align === "bottom" ? "anim-sheet" : "anim-dialog",
+        className
+      )}
       style={style}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabel === undefined && title != null ? titleId : undefined}

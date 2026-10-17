@@ -88,7 +88,7 @@ describe("a player's item actions in the fight", () => {
       />
     );
     expect(screen.queryByRole("button", { name: /Draw a Card/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /Drink Potion of Healing/ }).textContent).toContain("Heals 2d4 + 2");
+    expect(screen.getByRole("button", { name: /Drink Potion of Healing/ }).textContent).toContain("Regain 2d4 + 2 HP");
 
     const user = userEvent.setup();
     // Nothing to aim: it resolves on the tap.

@@ -65,6 +65,7 @@ function playerView(active: boolean, myTurn = true): PlayerView {
     revision: 5,
     rollCalls: [],
     rolls: [],
+    builderPolicy: { playerBuilder: "open", maxLevel: 20 },
     actors: [actor(LYRA, "Lyra", "player-character", true), actor(GOBLIN, "Goblin 1", "monster")],
     combat: {
       active,
@@ -199,7 +200,7 @@ describe("a player's panel", () => {
     );
     expect(screen.queryByText(/Goblin 1 is acting/)).toBeNull();
     expect(screen.getByText("HP 37/44")).toBeTruthy();
-    expect(screen.getByText("Your actions show here on your turn.")).toBeTruthy();
+    expect(screen.getByText("Your Reaction stays ready. The rest waits for your turn.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "End turn" })).toBeNull();
     expect(screen.getByRole("button", { name: "Reaction" })).toBeTruthy();
   });

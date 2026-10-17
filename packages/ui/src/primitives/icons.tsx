@@ -590,3 +590,110 @@ export function IconMore({ className }: Readonly<{ className?: string }>) {
     </Glyph>
   );
 }
+
+/* ---- Character sheet glyphs: its tabs, its menu and its live states. ---- */
+
+/** What a character can do now: the sheet's Play tab. */
+export function IconBolt({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M13.6 1.8 4.4 13.6h6.2l-1.4 8.6 9.4-12h-6.3z" />
+    </Glyph>
+  );
+}
+
+/** What a character carries: the sheet's Gear tab. */
+export function IconBag({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2" />
+    </Glyph>
+  );
+}
+
+/** Written notes: the sheet's Notes tab. */
+export function IconPage({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 3h8l4 4v14H6zM9 11h6M9 15h6" />
+    </Glyph>
+  );
+}
+
+/** A rest. */
+export function IconMoon({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M20.4 14.6A8.6 8.6 0 1 1 9.4 3.6a6.8 6.8 0 0 0 11 11z" />
+    </Glyph>
+  );
+}
+
+/** A level up. */
+export function IconLevelUp({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 20V5M6 11l6-6 6 6" />
+    </Glyph>
+  );
+}
+
+/** A person: a character's own image. */
+export function IconUser({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0" />
+    </Glyph>
+  );
+}
+
+/** Settings for this device. */
+export function IconCog({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 8.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+    </Glyph>
+  );
+}
+
+/** Pinned: kept where it is always found. */
+export function IconPin({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M8.6 2.6h6.8l-1.1 6 3.3 3.3H6.4l3.3-3.3z" />
+      <path d="M10.6 11.9h2.8v9.5h-2.8z" />
+    </Glyph>
+  );
+}
+
+/** The whole list. */
+export function IconList({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M9 6h11M9 12h11M9 18h11" />
+      <path d="M3 4.6h2.8v2.8H3zm0 6h2.8v2.8H3zm0 6h2.8v2.8H3z" />
+    </Glyph>
+  );
+}
+
+/** Dying. Always paired with the word. */
+export function IconSkull({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path
+        fillRule="evenodd"
+        d="M12 2.4a8.2 8.2 0 0 0-8.2 8.2v4.3l2.4 1.4v4.9h11.6v-4.9l2.4-1.4v-4.3A8.2 8.2 0 0 0 12 2.4zM8.6 9.3a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8zm6.8 0a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8zM10.6 17.4h1v2h-1zm1.8 0h1v2h-1z"
+      />
+    </Glyph>
+  );
+}
+
+/** Concentration on a spell: rings around a held point. */
+export function IconConcentration({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
+      <path d="M12 10.6a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8z" />
+    </Glyph>
+  );
+}

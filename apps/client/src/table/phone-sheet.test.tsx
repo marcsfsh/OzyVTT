@@ -25,22 +25,14 @@ import { clearTargeting } from "../encounter/targeting";
 
 const HERO = "10000000-0000-4000-8000-000000000001";
 const WOLF = "10000000-0000-4000-8000-000000000002";
-const MACE = {
-  id: "mace",
-  name: "Mace",
-  activation: "action",
-  description: "Melee Attack Roll: +5, reach 5 ft.",
-  attack: { bonus: 5, reachFeet: 5 },
-  damage: [{ formula: "1d6 + 3", type: "bludgeoning" }]
-};
 const MACE_ROW = {
-  id: "mace",
+  id: "item-mace",
   name: "Mace",
   activation: "action",
   available: true,
   violations: [],
   usesRemaining: null,
-  description: MACE.description,
+  description: "Melee Attack Roll: +5, reach 5 ft.",
   attackBonus: 5,
   damage: [{ formula: "1d6 + 3", type: "bludgeoning" }],
   usesLimit: null,
@@ -60,10 +52,28 @@ const hero = {
   hp: { kind: "exact", current: 30, maximum: 30, temporary: 0 },
   conditions: [],
   effects: [],
-  inventory: [],
+  inventory: [
+    {
+      id: "mace",
+      name: "Mace",
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      category: "weapon",
+      weapon: {
+        category: "simple",
+        damageDice: "1d6",
+        damageType: "bludgeoning",
+        rangeFeet: null,
+        longRangeFeet: null,
+        melee: true,
+        properties: []
+      }
+    }
+  ],
   currency: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
   definitionId: "srd:player-character",
-  definition: ActorDefinitionSchema.parse({ ...fixture, actions: [MACE] })
+  definition: ActorDefinitionSchema.parse({ ...fixture, actions: [] })
 } as unknown as PlayerActor;
 const wolf = {
   id: WOLF,
@@ -77,6 +87,7 @@ const wolf = {
 };
 const state = {
   revision: 3,
+  builderPolicy: { playerBuilder: "open", maxLevel: 20 },
   actors: [hero, wolf],
   rolls: [],
   rollCalls: [],
@@ -134,9 +145,15 @@ describe("the player's sheet in the table's panel", () => {
     const user = userEvent.setup();
     localStorage.setItem("vtt.table-tab.player.phone", "sheet");
     render(<EncounterPanel role="player" state={state} phone />, { wrapper: ToastProvider });
-    const sheet = screen.getByRole("tabpanel", { name: "Sheet" });
-    expect(within(sheet).queryByRole("group", { name: ATTACK_SETTING })).toBeNull();
-    await user.click(await within(sheet).findByRole("button", { name: "+5 to hit" }));
+    const sheet = within(screen.getByRole("tabpanel", { name: "Sheet" }));
+    await user.click(sheet.getByLabelText("Sheet menu for Mira"));
+    await user.click(screen.getByRole("menuitem", { name: "Roll settings" }));
+    expect(screen.queryByRole("group", { name: ATTACK_SETTING })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    // The mace's own action, from its detail on the Gear tab.
+    await user.click(sheet.getByRole("tab", { name: "Gear" }));
+    await user.click(await sheet.findByText("Mace"));
+    await user.click(await sheet.findByRole("button", { name: "Attack with the Mace" }));
     expect(screen.getByRole("tab", { name: "Turn", selected: true })).toBeTruthy();
     const picker = await within(screen.getByRole("tabpanel", { name: "Turn" })).findByRole("group", {
       name: "Targets for Mace"
@@ -146,8 +163,11 @@ describe("the player's sheet in the table's panel", () => {
 
   it("on a laptop, keeps the player's choice of where an attack tapped on the sheet resolves", async () => {
     localStorage.setItem("vtt.table-tab.player.laptop", "sheet");
+    const user = userEvent.setup();
     render(<EncounterPanel role="player" state={state} />, { wrapper: ToastProvider });
-    const sheet = screen.getByRole("tabpanel", { name: "Sheet" });
-    expect(await within(sheet).findByRole("group", { name: ATTACK_SETTING })).toBeTruthy();
+    const sheet = within(screen.getByRole("tabpanel", { name: "Sheet" }));
+    await user.click(sheet.getByLabelText("Sheet menu for Mira"));
+    await user.click(screen.getByRole("menuitem", { name: "Roll settings" }));
+    expect(await screen.findByRole("group", { name: ATTACK_SETTING })).toBeTruthy();
   });
 });

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ActorDefinition } from "@vtt/domain";
 import { Button, Modal } from "@vtt/ui";
-import "./character-sheet.css";
+import "./pickers.css";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { GmView } from "@vtt/domain";
-import { CharacterSheet } from "../encounter/CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 import { command } from "../lib/command";
 import { useSelectedToken } from "../scene/selectedToken";
 import { TokenControls } from "../scene/TokenContextMenu";

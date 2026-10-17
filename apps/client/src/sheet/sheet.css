@@ -1,0 +1,1968 @@
+/* The character sheet (ADR-0030): a pinned header, a strip of live states and six tabs. A phone keeps the tabs under
+   the thumb; a laptop gives the checks and the Hit Points columns of their own; the table's panel shows one compact
+   row and the tabs as a strip. Every region but the tab body is fixed; the body scrolls itself (`.scroll-y`). */
+
+/* ---- The frame ---- */
+.cs {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+.cs > * {
+  flex: none;
+}
+.cs > .cs-body,
+.cs > .cs-cols {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.cs-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  overscroll-behavior: contain;
+}
+.cs-body:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: -2px;
+}
+/* A page of its own: My character, `/characters/<id>` and `sheet.html`. */
+.cs-page,
+.my-character-sheet {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cs-standalone {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+.cs-standalone-msg {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-8);
+  color: var(--text-dim);
+  font-size: var(--fs-body);
+  text-align: center;
+}
+/* The dialog over the page it was opened from: the sheet fills the surface, which holds no padding of its own. */
+.cs-dialog > .nh-modal-surface {
+  height: min(92dvh, 56rem);
+}
+.cs-dialog > .nh-modal-surface > .nh-modal-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.cs-dialog.is-wide {
+  max-width: min(100vw - 2rem, 84rem);
+}
+.cs.is-gm {
+  border-top: 2px solid var(--rim-gm);
+}
+/* The sheet popped out of its dialog: a panel that moves and resizes over the page. */
+.cs-float {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 22.5rem;
+  min-height: 26rem;
+  border: var(--rim-w) solid var(--rim-color-hi);
+  background: var(--bg);
+  box-shadow: var(--shadow-2);
+}
+.cs-float > .cs {
+  flex: 1 1 0;
+}
+.cs-float-grip {
+  flex: none;
+  height: var(--space-3);
+  cursor: move;
+  touch-action: none;
+  background: var(--material-lip), var(--surface-2);
+}
+.cs-float-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1.2rem;
+  height: 1.2rem;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%);
+}
+
+/* ---- Inside the sheet's buttons ----
+   The app's base styles stack every span and strong in a button, dimmed, with a gap above it. The sheet's buttons
+   lay out their own words, so they take only their own rules. */
+:is(
+    .cs-action,
+    .cs-item,
+    .cs-cast-option,
+    .cs-feature-head,
+    .cs-tile-hp,
+    .cs-lastroll-open,
+    .cs-level,
+    .cs-tabbar-tab,
+    .cs-roll,
+    .cs-prep
+  )
+  :is(span, strong) {
+  margin-top: 0;
+}
+.cs-tabbar-tab span {
+  color: inherit;
+}
+.cs-action-name,
+.cs-item-name,
+.cs-feature-name,
+.cs-lastroll-label,
+.cs-level-v,
+.cs-cast-option strong,
+.cs-roll strong,
+.cs-action-verb {
+  color: var(--text);
+}
+.cs-item-qty,
+.cs-item-mastery,
+.cs-action-mastery {
+  display: inline;
+}
+
+/* ---- Shared words and atoms ---- */
+.cs-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font: 700 var(--fs-2xs) / 1.2 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cs-eyebrow.is-danger {
+  color: var(--danger-text);
+}
+.cs-sub {
+  margin: 0;
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.35 var(--font-body);
+}
+.cs-sub.is-caution {
+  color: var(--caution-hi);
+}
+.cs-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cs-grow {
+  flex: 1 1 auto;
+}
+.cs-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 2rem;
+}
+.cs-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cs-chiprow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cs-entry {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.cs-attribution {
+  margin: var(--space-4) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+}
+.cs-facts {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+.cs-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  border-bottom: 1px dashed var(--line);
+}
+.cs-facts dt {
+  flex: none;
+  font: 700 var(--fs-2xs) / 1.6 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cs-facts dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+/* A number read at a glance. */
+.cs-stat {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-width: 3.25rem;
+  min-height: 3.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  text-align: center;
+}
+.cs-stat-k {
+  font: 700 var(--fs-2xs) / 1.1 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cs-stat-v {
+  font: 400 1.2rem/1 var(--font-display);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.cs-stat-n {
+  font: 500 var(--fs-2xs) / 1.15 var(--font-body);
+  color: var(--text-dim);
+}
+.cs-stat.is-caution {
+  border-color: var(--caution);
+}
+.cs-stat.is-caution .cs-stat-n {
+  color: var(--caution-hi);
+}
+/* Boxes and pips: uses, Hit Point Dice, slots. Filled is what is left to spend. */
+.cs-boxes,
+.cs-pips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.cs-boxes i,
+.cs-pips i {
+  width: 0.8rem;
+  height: 0.8rem;
+  box-shadow: inset 0 0 0 2px var(--line-raised);
+}
+.cs-boxes i.is-on,
+.cs-pips i.is-on {
+  background: var(--grad-sun);
+  box-shadow: none;
+}
+.cs-boxes.is-caution i.is-on {
+  background: var(--caution);
+}
+.cs-count {
+  font: 700 var(--fs-sm) / 1 var(--font-numeric);
+  color: var(--text);
+  white-space: nowrap;
+}
+/* A tag on a name: C for Concentration, R for Ritual, a free cast. */
+.cs-tag {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  margin-left: var(--space-1);
+  padding: 0 3px;
+  border: 1px solid var(--indigo);
+  background: color-mix(in srgb, var(--indigo) 30%, var(--surface-2));
+  color: var(--indigo-text);
+  font: 800 var(--fs-2xs) / 1 var(--font-label);
+  vertical-align: middle;
+}
+.cs-tag.is-ritual {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 16%, var(--surface-2));
+  color: var(--cyan-hi);
+}
+.cs-tag.is-free {
+  border-color: var(--line-raised);
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+/* A raised toggle: a saving throw's proficiency, a pinned check. Selection takes the cyan edge. */
+.cs-toggle {
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.1 var(--font-label);
+  cursor: pointer;
+}
+.cs-toggle.is-on {
+  border-color: var(--cyan);
+  background: var(--tab-on);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+  color: var(--text);
+}
+.cs-toggle:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+/* GM-only controls are violet, and a GM only mark sits beside each group of them. */
+.nh-btn.cs-gm-control {
+  border-color: var(--rim-gm);
+  color: var(--violet-hi);
+}
+.nh-btn.cs-gm-control::before {
+  border-color: var(--rim-gm);
+  background: color-mix(in srgb, var(--rim-gm) 14%, var(--surface-2));
+}
+.cs-gm-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--violet-hi);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.cs-gmbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rim-gm);
+  border-left-width: 3px;
+  background: color-mix(in srgb, var(--rim-gm) 10%, var(--surface-1));
+}
+.cs-gmbox .cs-eyebrow {
+  color: var(--violet-hi);
+}
+.cs-gm-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rim-gm);
+  background: color-mix(in srgb, var(--rim-gm) 8%, var(--surface-1));
+}
+.cs-gm-notes-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--fs-sm);
+}
+.cs-gm-tab,
+.cs-notes,
+.cs-features,
+.cs-play,
+.cs-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ---- The phone's header ---- */
+.cs-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--material-lip), var(--surface-1);
+  border-bottom: 1px solid var(--line-strong);
+}
+.cs-id {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cs-id-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cs-name {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 1.15rem/1.1 var(--font-display);
+  color: var(--heading-ink);
+  text-shadow: var(--heading-shadow);
+}
+.cs-idline {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 var(--fs-xs) / 1.25 var(--font-label);
+  color: var(--cyan-hi);
+}
+.cs-tiles {
+  display: flex;
+  gap: var(--space-1);
+}
+.cs-tiles > .cs-stat {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.cs-tile-hp {
+  flex: 2.2 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-tile-hp-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+.cs-tile-hp.is-down {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface-2));
+}
+.cs-tile-hp.is-down .cs-stat-k {
+  color: var(--danger-text);
+}
+.cs-menu-trigger {
+  flex: none;
+}
+.cs-close {
+  flex: none;
+}
+
+/* ---- The laptop's band ---- */
+.cs-band {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--material-lip), var(--surface-1);
+  border-bottom: 1px solid var(--line-strong);
+}
+.cs-band > .cs-id-text {
+  flex: 0 1 16rem;
+}
+.cs-band .cs-name {
+  font-size: var(--fs-h3);
+}
+.cs-band-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* ---- The table's compact row ---- */
+.cs-compact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cs-compact > .cs-status-block {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cs-compact .cs-status {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+/* Every chip in the row stands the same height, the pressable ones and the plain ones. */
+.cs-compact .nh-chip {
+  min-height: 2rem;
+}
+
+/* ---- Live states ---- */
+.cs-status-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The chips wrap to a second line on a narrow screen, so every state is read whole. */
+.cs-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line-strong);
+}
+.cs-status > * {
+  flex: none;
+  max-width: 100%;
+}
+/* A chip longer than the row breaks its words; it never runs off the edge. */
+.cs-status > .nh-chip {
+  white-space: normal;
+}
+.cs-vitals .cs-status {
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.cs-chip-time {
+  margin-left: var(--space-1);
+  padding-left: var(--space-1);
+  border-left: 1px solid var(--line-raised);
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.nh-chip.cs-chip-caution {
+  --nh-chip-tone: var(--caution);
+  --nh-chip-ink: var(--caution-hi);
+  --nh-chip-mix: 16%;
+}
+.nh-chip.cs-chip-hp {
+  --nh-chip-tone: var(--cyan);
+  --nh-chip-ink: var(--text);
+  font-family: var(--font-numeric);
+}
+.cs-chip-static {
+  font-family: var(--font-numeric);
+}
+.cs-status-detail {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cs-toast {
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.cs-toast:empty {
+  display: none;
+}
+
+/* ---- The latest roll ---- */
+.cs-lastroll {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1));
+  border-bottom: 1px solid var(--line-strong);
+}
+.cs-lastroll-open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+button.cs-lastroll-open {
+  cursor: pointer;
+}
+.cs-lastroll-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cs-lastroll-label {
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+}
+.cs-lastroll-math {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.2 var(--font-numeric);
+}
+.cs-lastroll-total {
+  font: 400 1.35rem/1 var(--font-display);
+  color: var(--cyan-hi);
+}
+
+/* ---- Tabs ---- */
+.cs-tabbar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface-1);
+  border-top: 1px solid var(--line-strong);
+  box-shadow: 0 -8px 20px color-mix(in srgb, var(--void) 60%, transparent);
+}
+.cs-tabbar-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 3.6rem;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  cursor: pointer;
+}
+.cs-tabbar-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.cs-tabbar-tab.is-on {
+  background: var(--tab-on);
+  box-shadow: inset 0 3px 0 var(--cyan);
+  color: var(--text);
+}
+.cs-tabbar-tab.is-on .cs-tabbar-icon {
+  color: var(--cyan-hi);
+}
+.cs-tabbar-tab.is-gm,
+.cs-tabbar-tab.is-gm .cs-tabbar-icon {
+  color: var(--violet-hi);
+}
+.cs-tabbar-tab:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: -2px;
+}
+.cs-tabs {
+  flex: none;
+}
+/* The panel's strip: smaller and inset, so it reads apart from the panel's own tabs above it. */
+.nh-tabs.cs-strip {
+  flex: none;
+  margin: var(--space-2) var(--space-2) 0;
+  padding: 3px;
+}
+.nh-tabs.cs-strip .nh-tab {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  padding: 2px var(--space-2);
+  font-size: var(--fs-xs);
+}
+
+/* ---- The laptop's columns ---- */
+.cs-cols {
+  display: grid;
+  grid-template-columns: minmax(16rem, 21rem) minmax(0, 1fr) minmax(15rem, 19rem);
+}
+.cs-cols.has-dice {
+  grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr) minmax(14rem, 17rem) minmax(15rem, 19rem);
+}
+.cs-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-3);
+}
+.cs-col + .cs-col {
+  border-left: 1px solid var(--line-strong);
+}
+.cs-col-mid {
+  padding: var(--space-3) 0 0;
+}
+.cs-col-mid > .cs-tabs {
+  margin: 0 var(--space-3);
+}
+.cs-col-mid > .cs-body {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ---- Checks ---- */
+.cs-abilities {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.cs-ability {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cs-ability-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+.cs-ability-score {
+  font: 400 1.1rem/1 var(--font-display);
+}
+.cs-ability-rolls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+}
+/* A roll button: its bonus, and its label above it when stacked. */
+.cs-roll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  min-width: 3rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cs-roll strong {
+  font: 700 var(--fs-body) / 1 var(--font-numeric);
+}
+.cs-roll-label {
+  font: 700 var(--fs-2xs) / 1 var(--font-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.cs-roll.is-stacked {
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-1) 2px;
+}
+.cs-roll.is-proficient {
+  border-color: var(--cyan);
+}
+.cs-roll.is-proficient .cs-roll-label {
+  color: var(--cyan-hi);
+}
+.cs-roll.is-failing {
+  border-color: var(--danger);
+}
+.cs-roll.is-static {
+  color: var(--text-muted);
+  cursor: default;
+}
+.cs-roll:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+.cs-skills {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-skill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.cs-skill-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+}
+.cs-skill-name em {
+  margin-left: var(--space-1);
+  font-style: normal;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+}
+.cs-skill .cs-roll {
+  min-width: 2.75rem;
+  padding-inline: var(--space-1);
+}
+.cs-tier {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--line-raised);
+  font: 800 var(--fs-2xs) / 1 var(--font-label);
+  color: var(--text-on-neon);
+}
+.cs-tier.is-proficient {
+  border-color: var(--cyan);
+  background: var(--cyan);
+}
+.cs-tier.is-expertise {
+  border-color: var(--magenta);
+  background: var(--magenta);
+  color: var(--primary-ink);
+}
+.cs-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cs-skill-edit {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-skill-edit li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* ---- Hit Points and Hit Point Dice ---- */
+.cs-hp-readout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cs-hp-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.cs-hp-big {
+  font: 400 1.9rem/1 var(--font-display);
+  min-width: 2.5ch;
+}
+.cs-hp-of,
+.cs-hp-temp {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cs-hp-temp {
+  margin-left: auto;
+}
+.cs-hp-card.is-down {
+  border-color: var(--danger);
+}
+.cs-ac-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-ac-edit .nh-input {
+  width: 4.5rem;
+}
+.cs-hd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cs-hd-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+.cs-hd-line {
+  font: 700 var(--fs-sm) / 1.2 var(--font-numeric);
+}
+.cs-hd-dice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cs-hd-die {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-hd-die-name {
+  min-width: 2.2ch;
+  color: var(--text-dim);
+  font: 700 var(--fs-xs) / 1 var(--font-numeric);
+}
+.cs-hd-spend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---- Play ---- */
+.cs-rest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-rest > .nh-btn {
+  flex: 1 1 9rem;
+}
+.cs-slots-left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+.cs-slot-level {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.cs-slot-n {
+  color: var(--text-dim);
+  font: 700 var(--fs-xs) / 1 var(--font-numeric);
+}
+.cs-uses {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-use {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+.cs-use-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+.cs-use-name {
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+}
+.cs-use-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-death {
+  border-color: var(--danger);
+  box-shadow: var(--glow-danger);
+}
+.cs-death-title {
+  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+}
+.cs-death-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+.cs-death-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.cs-death-box {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--line-raised);
+  font-size: 0.95rem;
+}
+.cs-death-box.is-success.is-on {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 25%, transparent);
+  color: var(--cyan-hi);
+}
+.cs-death-box.is-failure.is-on {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 25%, transparent);
+  color: var(--danger-text);
+}
+.cs-econ-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.cs-econ {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2rem;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, var(--surface-2));
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.cs-econ.is-used {
+  border-color: var(--line-raised);
+  background: var(--surface-1);
+  color: var(--text-muted);
+}
+.cs-econ-state {
+  color: var(--text-dim);
+  font-family: var(--font-numeric);
+}
+
+/* ---- The phone's Vitals ---- */
+.cs-vitals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cs-vitals-grid {
+  display: grid;
+  grid-template-columns: 1.9fr 1fr 1fr;
+  gap: var(--space-1);
+}
+.cs-vitals-hp {
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+/* The Vitals' Hit Points: the number large with its maximum and Temp on one line, the bar, then the amount, Damage
+   and Heal in one row. */
+.cs-vitals-hp .cs-hp-big {
+  font-size: 1.6rem;
+}
+.cs-vitals-hp .cs-hp-of,
+.cs-vitals-hp .cs-hp-temp {
+  font-size: var(--fs-xs);
+}
+.cs-vitals-hp .hp-editor {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3px;
+}
+.cs-vitals-hp .hp-editor > input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.3rem 0;
+}
+.cs-vitals-hp .hp-editor > button {
+  min-width: 0;
+  padding-inline: 2px;
+  font-size: var(--fs-xs);
+}
+.cs-vitals-grid > .cs-stat {
+  min-height: 0;
+}
+.cs-vitals-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+}
+.cs-vital-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cs-held {
+  color: var(--cyan-hi);
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+}
+
+/* ---- What the character can do ---- */
+.cs-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cs-action-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cs-action-list,
+.cs-action-children {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-action-children {
+  margin: var(--space-1) 0 0 var(--space-4);
+}
+/* The list sits under headings that name the cost, so its leading edge says what kind each option is: magenta an
+   attack or a feature, indigo a spell, cyan an item. */
+.cs-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 3.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  border-left: 3px solid var(--magenta);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-action.is-spell {
+  border-left-color: var(--indigo);
+}
+.cs-action.is-item {
+  border-left-color: var(--cyan);
+}
+.cs-action:disabled {
+  background: var(--surface-1);
+  box-shadow: none;
+  cursor: default;
+}
+.cs-action:disabled .cs-action-name,
+.cs-action:disabled .cs-action-line {
+  color: var(--text-muted);
+}
+.cs-action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cs-action-name {
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+}
+.cs-action-line {
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.3 var(--font-body);
+}
+.cs-action-reason {
+  color: var(--caution-hi);
+  font: 600 var(--fs-xs) / 1.3 var(--font-body);
+}
+.cs-action-verb {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  white-space: nowrap;
+}
+
+/* ---- The cast ---- */
+.cs-cast {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-top: 2px solid transparent;
+  border-image: var(--grad-sun-x) 1;
+  border-width: 2px 1px 1px;
+  border-style: solid;
+  background: var(--material-lip), var(--material-plate);
+}
+.cs-cast-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-back {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: 1px solid var(--line-raised);
+  background: var(--raised);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.cs-cast-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cs-cast-name {
+  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+}
+.cs-cast-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.cs-cast-option {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  min-height: 3.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-cast-option strong {
+  font: 700 var(--fs-sm) / 1.1 var(--font-body);
+}
+.cs-cast-option span {
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.2 var(--font-body);
+}
+.cs-cast-option.is-on {
+  border-color: var(--cyan);
+  background: var(--tab-on);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+.cs-cast-option.is-off {
+  background: var(--surface-1);
+  box-shadow: none;
+  cursor: default;
+}
+.cs-cast-option.is-off strong {
+  color: var(--text-muted);
+}
+.cs-cast-option .cs-cast-reason {
+  color: var(--caution-hi);
+}
+
+/* ---- The level box ---- */
+.cs-level-wrap {
+  position: relative;
+  flex: none;
+}
+.cs-level {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-width: 3rem;
+  min-height: var(--tap-min);
+  padding: 2px var(--space-1);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+.cs-level.is-button {
+  border-color: var(--line-raised);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  cursor: pointer;
+}
+.cs-level.is-open {
+  border-color: var(--cyan);
+  background: var(--tab-on);
+}
+.cs-level-k {
+  font: 700 var(--fs-2xs) / 1 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cs-level-v {
+  font: 400 1.1rem/1 var(--font-display);
+}
+.cs-level-panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(16rem, 80vw);
+  padding: var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--material-lip), var(--surface-1);
+  box-shadow: var(--shadow-2);
+}
+
+/* ---- Dialog contents ---- */
+.cs-roll-settings,
+.cs-id-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cs-setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cs-id-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+}
+.cs-id-editor-level {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* A short phone keeps the tab bar's labels on one line. */
+@media (max-width: 560px) {
+  .cs-tabbar-tab {
+    font-size: var(--fs-2xs);
+  }
+  .cs-band-stats .cs-stat {
+    min-width: 2.75rem;
+  }
+}
+
+/* ---- The frame's variants ---- */
+.cs--panel {
+  background: var(--surface-1);
+}
+.cs--panel > .cs-body {
+  padding: var(--space-2);
+}
+.cs--wide .cs-band .nh-avatar {
+  flex: none;
+}
+.cs-col-left {
+  background: var(--surface-1);
+}
+.cs-col-right .cs-card {
+  flex: none;
+}
+.cs-col-dice {
+  background: var(--surface-1);
+}
+/* What a tab opens, in the right column on a laptop or in place on a phone. */
+.cs-detail-host:empty {
+  display: none;
+}
+.cs-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cs-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline dotted var(--line-raised);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.cs-link:hover {
+  text-decoration-color: var(--cyan);
+}
+.nh-btn.cs-danger {
+  align-self: flex-start;
+  color: var(--danger-text);
+}
+.cs-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cs-caution {
+  border-color: var(--caution);
+  border-left-width: 3px;
+  background: color-mix(in srgb, var(--caution) 8%, var(--surface-1));
+}
+.cs-gm-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cs-chip-add {
+  border-style: dashed;
+}
+.cs-action-mastery {
+  color: var(--cyan-hi);
+  font-weight: 600;
+}
+
+/* ---- Spells ---- */
+.cs-spells {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cs-caster {
+  font-family: var(--font-numeric);
+}
+.cs-spells-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cs-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-dim);
+  font: 600 var(--fs-2xs) / 1 var(--font-label);
+}
+.cs-legend .cs-tag {
+  margin-left: var(--space-2);
+}
+.cs-spell-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cs-spell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 2rem;
+  border-bottom: 1px solid var(--line-strong);
+}
+.cs-slotpips {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+/* A pip is small to see and full size to tap: its hit area grows to the tap floor. */
+.cs-pip {
+  position: relative;
+  width: 0.95rem;
+  height: 0.95rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: inset 0 0 0 2px var(--line-raised);
+  cursor: pointer;
+}
+.cs-pip::after {
+  content: "";
+  position: absolute;
+  inset: calc((0.95rem - var(--tap-min)) / 2) -1px;
+}
+.cs-pip.is-on {
+  background: var(--grad-sun);
+  box-shadow: none;
+}
+.cs-slotpips .cs-count {
+  margin-left: var(--space-1);
+}
+.cs-spell-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-spell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+.cs-spell-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cs-spell-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  font: 700 var(--fs-sm) / 1.25 var(--font-body);
+}
+.cs-spell-line {
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.3 var(--font-body);
+}
+.cs-spell-act {
+  flex: none;
+}
+.cs-spell-where {
+  color: var(--text-muted);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  white-space: nowrap;
+}
+.cs-spell.is-book .cs-spell-name,
+.cs-spell.is-unprepared .cs-spell-name {
+  color: var(--text-dim);
+}
+/* The phone's circle: cyan prepared, indigo kept by a feature or a cantrip, empty only in the book. */
+.cs-circle {
+  position: relative;
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: 2px solid var(--line-raised);
+  border-radius: var(--radius-pill);
+  background: none;
+}
+.cs-circle.is-prepared {
+  border-color: var(--cyan);
+  background: var(--cyan);
+}
+.cs-circle.is-kept {
+  border-color: var(--indigo);
+  background: var(--indigo);
+}
+.cs-legend .cs-circle {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+button.cs-circle {
+  cursor: pointer;
+}
+button.cs-circle::after {
+  content: "";
+  position: absolute;
+  inset: calc((1.1rem - var(--tap-min)) / 2);
+}
+/* The laptop's prepare toggle. */
+.cs-prep {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  cursor: pointer;
+}
+.cs-prep.is-on {
+  border-color: var(--cyan);
+  background: var(--tab-on);
+  color: var(--text);
+}
+.cs-prep.is-gm {
+  border-color: var(--rim-gm);
+}
+.cs-book .spell-choice-list {
+  max-height: none;
+}
+
+/* ---- Gear ---- */
+.cs-gear {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cs-count.is-over {
+  color: var(--danger-text);
+}
+.cs-coins {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.cs-coin {
+  min-width: 0;
+}
+.cs-coin .nh-numberfield,
+.cs-coin input {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+.cs-items {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-1);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-item:hover,
+.cs-item.is-open {
+  background: var(--surface-2);
+}
+.cs-item.is-open {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.cs-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cs-item-name {
+  font: 700 var(--fs-sm) / 1.25 var(--font-body);
+}
+.cs-item-mastery {
+  color: var(--cyan-hi);
+  font-weight: 600;
+}
+.cs-item-qty {
+  color: var(--text-dim);
+  font-family: var(--font-numeric);
+}
+.cs-item-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.3 var(--font-body);
+}
+.cs-item-desc {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  white-space: pre-line;
+}
+.cs-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cs-item-action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cs-give {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cs-give > .nh-select,
+.cs-gm-select {
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+.cs-add-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cs-add-item > .nh-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+/* ---- Features ---- */
+.cs-feature-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-feature {
+  border-bottom: 1px solid var(--line);
+}
+.cs-feature-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-feature-name {
+  font: 700 var(--fs-sm) / 1.25 var(--font-body);
+}
+.cs-feature-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.3 var(--font-body);
+}
+.cs-feature-text {
+  margin: 0 0 var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+.cs-next {
+  border-color: var(--cyan);
+}
+.cs-next-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  font-size: var(--fs-sm);
+}
+
+/* ---- The phone's turn card ---- */
+.cs-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-top: 2px solid var(--magenta);
+  background: var(--material-lip), var(--surface-1);
+}
+.cs-turn-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cs-turn-title {
+  margin: 0;
+  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  color: var(--heading-ink);
+  text-shadow: var(--heading-shadow);
+}
+.cs-turn-round {
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.cs-turntiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+/* A tile's leading edge says what it costs, and its first line says it in words. */
+.cs-turntile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  min-height: 4.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  border-left: 3px solid var(--magenta);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-turntile.is-spell {
+  border-left-color: var(--indigo);
+}
+.cs-turntile.is-bonus-action {
+  border-left-color: var(--cyan);
+}
+.cs-turntile.is-reaction {
+  border-left-color: var(--caution);
+}
+.cs-turntile.is-magic,
+.cs-turntile.is-other {
+  border-left-color: var(--line-raised);
+}
+.cs-turntile:disabled {
+  background: var(--surface-1);
+  box-shadow: none;
+  cursor: default;
+}
+.cs-turntile :is(span, strong) {
+  margin-top: 0;
+}
+.cs-turntile .cs-turntile-cost {
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.2 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cs-turntile-name {
+  max-width: 100%;
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+}
+.cs-turntile .cs-turntile-line {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.3 var(--font-body);
+}
+.cs-turntile .cs-turntile-slots {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-dim);
+  font: 600 var(--fs-2xs) / 1 var(--font-label);
+}
+.cs-turntile .cs-turntile-reason {
+  color: var(--caution-hi);
+  font: 600 var(--fs-2xs) / 1.3 var(--font-body);
+}
+.cs-turntile:disabled :is(.cs-turntile-name, .cs-turntile-line) {
+  color: var(--text-muted);
+}
+.cs-turn-foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+}
+.cs-turn-all,
+.cs-turn-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cs-turn-all > .nh-btn,
+.cs-turn-edit > .nh-btn {
+  align-self: flex-start;
+}
+.cs-pin-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-pin-list .cs-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  text-align: left;
+}
+.cs-pin-list .cs-toggle .cs-pin-cost {
+  margin: 0 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+}
+.cs-item-charges {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.cs-use-cost {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.cs-masteries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.cs-mastery {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-mastery.is-on {
+  border-color: var(--cyan);
+  background: var(--tab-on);
+}
+.cs-mastery :is(span, strong) {
+  margin-top: 0;
+}
+.cs-mastery-weapon {
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+}
+.cs-mastery .cs-mastery-name {
+  color: var(--cyan-hi);
+  font: 600 var(--fs-xs) / 1.2 var(--font-label);
+}

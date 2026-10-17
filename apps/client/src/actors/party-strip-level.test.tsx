@@ -22,6 +22,7 @@ import { PartyStrip } from "./PartyStrip";
 // The GM reaches a character's level page from the party strip: the sheet it opens offers it.
 
 const LYRA = "10000000-0000-4000-8000-0000000000c1";
+const SHEET = "20000000-0000-4000-8000-0000000000c1";
 const state = {
   revision: 1,
   actors: [
@@ -34,10 +35,23 @@ const state = {
       effects: [],
       conditions: [],
       presence: null,
-      ownerSessionId: null
+      ownerSessionId: null,
+      definitionId: SHEET
     } as unknown as GmActor
   ],
-  definitions: [],
+  definitions: [
+    {
+      id: SHEET,
+      definition: {
+        name: "Lyra",
+        abilityScores: { str: 8, dex: 14, con: 12, int: 16, wis: 12, cha: 10 },
+        proficiencyBonus: 2,
+        actions: [],
+        extensions: {},
+        character: { classes: [{ id: "wizard", name: "Wizard", level: 3, hitDie: "d6" }] }
+      }
+    }
+  ],
   rolls: [],
   combat: { active: false, initiative: [], pendingSaves: [] }
 } as unknown as GmView;
@@ -51,9 +65,10 @@ describe("the party strip's sheet", () => {
       </ToastProvider>
     );
     await user.click(screen.getByRole("button", { name: /^Lyra,.*Open sheet\.$/ }));
-    await user.click(await screen.findByRole("button", { name: "Level up or down…" }));
+    await user.click(await screen.findByLabelText("Sheet menu for Lyra"));
+    await user.click(screen.getByRole("menuitem", { name: "Level up to 4" }));
     expect(navigate).toHaveBeenCalledWith(`/characters/${LYRA}/level`);
     // The sheet closes behind it.
-    expect(screen.queryByRole("button", { name: "Level up or down…" })).toBeNull();
+    expect(screen.queryByLabelText("Sheet menu for Lyra")).toBeNull();
   });
 });

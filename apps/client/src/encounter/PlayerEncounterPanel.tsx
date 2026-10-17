@@ -6,18 +6,20 @@ import { useMovementBudget } from "../scene/useMovementBudget";
 import { MyPendingAsks } from "./RuleAsk";
 import { useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
-import { CharacterSheet } from "./CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 import { InitiativeRow } from "./InitiativeList";
 import { EffectChips } from "./EffectChips";
 import { DyingTracker } from "./DyingTracker";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "./StabilizeControl";
 import { PlayerActionRunner } from "./PlayerActionRunner";
+import { UnconsciousNote } from "../sheet/PlayFight";
 import { isDying, owesDeathSave } from "../table/playerPrompts";
 import { hasPlayerPrompt } from "../table/PromptSlot";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
 import { usePlayerTargetRows } from "../table/targetRows";
 import { useTargeting } from "./targeting";
 import { revealInRegion } from "../lib/reveal";
+import { navigate } from "../router";
 
 /**
  * A player's own prompts keep their outcome line beside them: answering one unmounts it, and the
@@ -260,7 +262,9 @@ export function PlayerEncounterPanel({
           actor={myActor}
           role="player"
           state={state}
-          embedded
+          presentation="panel"
+          phone={phone}
+          hidePlay={inCombat}
           /* A phone's sheet under the map has no room for a target picker, so its attacks are aimed on the Turn tab. */
           {...(phone ? { attackMode: "jump" as const } : {})}
           {...(inCombat
@@ -278,9 +282,12 @@ export function PlayerEncounterPanel({
             setTab("turn");
             setReturnToSheetAfterAttack(true);
           }}
+          {...(state.builderPolicy?.playerBuilder === "open"
+            ? { onLevel: () => navigate(`/characters/${myActor.id}/level`) }
+            : {})}
+          end={slots?.sheetFooter}
           onClose={() => setTab(inCombat ? "turn" : "me")}
         />
-        {slots?.sheetFooter}
       </>
     ) : (
       <>
@@ -289,36 +296,52 @@ export function PlayerEncounterPanel({
       </>
     );
 
+  const acting = combat.initiative.find((entry) => entry.active)?.name ?? null;
+  const dying = myActor !== null && isDying(myActor);
+  const runner =
+    inFight && myId !== null && myActor?.definition && !dying ? (
+      <PlayerActionRunner
+        actorId={myId}
+        definition={myActor.definition}
+        revision={state.revision}
+        inspired={myActor.heroicInspiration === true}
+        playerDamageMode={combat.playerDamageMode}
+        targets={targets}
+        actor={myActor}
+        myTurn={myTurn}
+        look={phone ? "card" : "list"}
+        round={combat.round}
+        acting={acting}
+        targetRows={targetHints.rows}
+        {...(targetHints.insideNow ? { insideNow: targetHints.insideNow } : {})}
+      />
+    ) : null;
   const turnBody = (
     <section className="player-turn" aria-label={myTurn ? "Your turn" : "The turn"}>
-      <div className="player-turn-head">
-        {myTurn ? (
-          <h2 className="player-turn-title">
-            <SunMark size="sm" />
-            Your turn
-          </h2>
-        ) : (
-          // Who acts is in the header's status line; this tab is about the player's own turn.
-          <p className="encounter-quiet-note">Your actions show here on your turn.</p>
-        )}
-        {combat.rewound && <p className="encounter-quiet-note">The GM is reviewing an earlier turn.</p>}
-      </div>
+      {/* On a phone the turn card carries its own heading; a laptop's list sits under this one. */}
+      {(!phone || !runner) && (
+        <div className="player-turn-head">
+          {myTurn ? (
+            <h2 className="player-turn-title">
+              <SunMark size="sm" />
+              Your turn
+            </h2>
+          ) : (
+            // Who acts is in the header's status line; this tab is about the player's own turn.
+            <p className="encounter-quiet-note">Your Reaction stays ready. The rest waits for your turn.</p>
+          )}
+          {combat.rewound && <p className="encounter-quiet-note">The GM is reviewing an earlier turn.</p>}
+        </div>
+      )}
+      {phone && runner && combat.rewound && (
+        <p className="encounter-quiet-note">The GM is reviewing an earlier turn.</p>
+      )}
       {/* Questions this player has waiting. */}
       <MyPendingAsks state={state} />
       {!inFight && myActor && <p className="table-panel-empty">{myActor.name} isn't in this fight.</p>}
-      {myTurn && myId !== null && myActor?.definition && (
-        <PlayerActionRunner
-          actorId={myId}
-          definition={myActor.definition}
-          revision={state.revision}
-          inspired={myActor.heroicInspiration === true}
-          playerDamageMode={combat.playerDamageMode}
-          targets={targets}
-          {...(isDying(myActor) ? { unavailable: "unavailable while Unconscious" } : {})}
-          targetRows={targetHints.rows}
-          {...(targetHints.insideNow ? { insideNow: targetHints.insideNow } : {})}
-        />
-      )}
+      {/* The death save waits in the prompt slot above the tabs; this tab says what Unconscious leaves. */}
+      {inFight && dying && myActor && <UnconsciousNote name={myActor.name} />}
+      {runner}
       {myActor && inFight && (
         <OwnFeedback className="own-effect-row" empty={myActor.effects.length === 0}>
           {(onFeedback) => (
@@ -422,12 +445,13 @@ export function PlayerEncounterPanel({
     ? [
         { id: "turn", label: "Turn", content: turnBody },
         { id: "order", label: "Order", content: orderBody },
-        { id: "sheet", label: "Sheet", content: sheet(true) },
+        // The sheet holds its own row and strip above the one region that scrolls.
+        { id: "sheet", label: "Sheet", content: sheet(true), scrolls: !myActor },
         { id: "dice", label: "Dice", content: slots?.dice },
         { id: "log", label: "Log", content: slots?.log, scrolls: false }
       ]
     : [
-        { id: "me", label: "Me", content: sheet(false) },
+        { id: "me", label: "Me", content: sheet(false), scrolls: !myActor },
         {
           id: "party",
           label: "Party",

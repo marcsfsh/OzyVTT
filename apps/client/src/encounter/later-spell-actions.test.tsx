@@ -101,7 +101,7 @@ describe("a spell's later actions on a player's turn", () => {
     ];
     mount(["concentrating"]);
     const attack = await screen.findByRole("button", { name: /Spiritual Weapon: attack/ });
-    await waitFor(() => expect(attack.textContent).toContain("2d8 + 4 force damage"));
+    await waitFor(() => expect(attack.textContent).toContain("2d8 + 4 force"));
     expect(screen.queryByRole("button", { name: /Spirit Guardians: save/ })).toBeNull();
   });
 });

@@ -124,6 +124,7 @@ describe("The play glossary", () => {
       "scene",
       "scenes",
       "settings",
+      "sheet",
       "tokens",
       "viewer"
     ]) {

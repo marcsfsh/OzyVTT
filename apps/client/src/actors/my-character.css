@@ -21,50 +21,6 @@
   gap: 0.6rem;
   margin-left: auto;
 }
-/* The identity card. `min-width: 0` on the facts column so a long name ellipsizes and the doors stay
-   in place. */
-.my-character-card {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin: var(--space-4) 0 0;
-  padding: var(--space-4);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-}
-.my-character-facts {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  flex: 1 1 8rem;
-  min-width: 0;
-}
-.my-character-name {
-  font: 400 1.35rem/1.2 var(--font-display);
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.my-character-line {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-.my-character-hp {
-  color: var(--cyan-hi);
-  font-family: var(--font-numeric);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-.my-character-doors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-left: auto;
-}
 .my-character-party {
   margin-top: var(--space-6);
 }

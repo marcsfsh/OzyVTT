@@ -24,7 +24,8 @@ export function DyingTracker({
   viewer,
   inspired = false,
   rollLabel,
-  aid
+  aid,
+  showPips = true
 }: Readonly<{
   actorId: string;
   name: string;
@@ -41,6 +42,8 @@ export function DyingTracker({
   rollLabel?: ReactNode;
   /** What someone else can do for the creature while it is dying (stabilize it). */
   aid?: ReactNode;
+  /** False where the boxes are drawn beside it already (the sheet's Death Saving Throws card). */
+  showPips?: boolean;
 }>) {
   const [busy, setBusy] = useState(false);
   // A rolled-but-unapplied preview; Confirm applies the pips.
@@ -91,18 +94,25 @@ export function DyingTracker({
   const total = rolled && rolled.total !== undefined && rolled.total !== rolled.naturalRoll ? rolled.total : null;
   return (
     <div className="dying-tracker" role="group" aria-label={`Death saves for ${name}`}>
-      <span className={`dying-label${dead ? " dead" : ""}`}>
-        {dead ? "Dead" : deathSaves.stable ? "Stable" : "Dying"}
-      </span>
-      <span className="dying-pips" aria-label={`${deathSaves.successes} successes, ${deathSaves.failures} failures`}>
-        {[0, 1, 2].map((index) => (
-          <span key={`s${index}`} className={`pip success${index < deathSaves.successes ? " filled" : ""}`} />
-        ))}
-        <span className="pip-divider" />
-        {[0, 1, 2].map((index) => (
-          <span key={`f${index}`} className={`pip failure${index < deathSaves.failures ? " filled" : ""}`} />
-        ))}
-      </span>
+      {showPips && (
+        <>
+          <span className={`dying-label${dead ? " dead" : ""}`}>
+            {dead ? "Dead" : deathSaves.stable ? "Stable" : "Dying"}
+          </span>
+          <span
+            className="dying-pips"
+            aria-label={`${deathSaves.successes} successes, ${deathSaves.failures} failures`}
+          >
+            {[0, 1, 2].map((index) => (
+              <span key={`s${index}`} className={`pip success${index < deathSaves.successes ? " filled" : ""}`} />
+            ))}
+            <span className="pip-divider" />
+            {[0, 1, 2].map((index) => (
+              <span key={`f${index}`} className={`pip failure${index < deathSaves.failures ? " filled" : ""}`} />
+            ))}
+          </span>
+        </>
+      )}
       {canRoll && !deathSaves.stable && !dead && (
         <RollControls
           rollMode={rollMode}

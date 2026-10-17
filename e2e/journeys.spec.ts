@@ -171,16 +171,19 @@ test("a player joins and claims a character", async ({ open }) => {
   await expect(player.getByText(`You're playing ${PARTY[0]}.`)).toBeVisible();
   await expectPageFits(player);
 
+  // My character is the character's sheet; Release is in its menu.
   await press(player.getByRole("tab", { name: "My character" }));
-  await expect(player.getByRole("img", { name: PARTY[0] })).toBeVisible();
-  await expect(player.getByRole("button", { name: "Release" })).toBeVisible();
+  await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
+  await press(player.getByLabel(`Sheet menu for ${PARTY[0]}`));
+  await expect(player.getByRole("menuitem", { name: `Release ${PARTY[0]}` })).toBeVisible();
+  await player.keyboard.press("Escape");
   await expectPageFits(player);
 
   // After a reload, joining again resumes the same session: their character, on the page they left.
   await player.reload();
   await press(player.getByRole("button", { name: "Join as Player" }));
   await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
-  await expect(player.getByRole("button", { name: "Release" })).toBeVisible();
+  await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
 });
 
 test("the GM runs a fight on a new scene and the player moves their token", async ({ open, hasTouch }) => {
@@ -349,6 +352,86 @@ test("a save on the player's own turn leaves the bar under the thumb on screen",
   // Answered, the prompt leaves the slot.
   await press(confirm);
   await expect(slot.getByRole("heading", { name: /Dexterity saving throw/ })).toBeHidden();
+});
+
+test("a player takes a turn on a phone: a tile, its cast, a target and the roll", async ({ open, hasTouch }) => {
+  test.skip(!hasTouch, "The turn card is a phone's.");
+  const hero = PARTY[1];
+  const player = await open("/");
+  await ensureGmPassword(player.request);
+  // The GM's setup is the API's: this journey is about the player's turn card.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const api = (path: string, data: Record<string, unknown> = {}) =>
+    player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
+  // An earlier journey's fight ends, and its player's hold on the character goes.
+  if (game.combat.active) expect((await api("/api/v1/game/encounter/end")).ok()).toBe(true);
+  const { id: actorId, ownerSessionId } = game.actors.find((actor: { name: string }) => actor.name === hero);
+  if (ownerSessionId) expect((await api(`/api/v1/game/claims/${actorId}/force-release`, { actorId })).ok()).toBe(true);
+  await joinAndClaim(player, hero);
+
+  // A fight with the hero and one monster, on a scene of its own.
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await openGmSection(gm, "Scenes");
+  await press(gm.getByRole("button", { name: "New scene" }).first());
+  const newScene = gm.getByRole("dialog", { name: "New scene" });
+  await press(newScene.getByRole("button", { name: /^(Pick a map|Change)$/ }));
+  const chooser = gm.waitForEvent("filechooser");
+  await press(newScene.getByRole("button", { name: /Upload a map/ }));
+  await (await chooser).setFiles({ name: "Smoke ford.png", mimeType: "image/png", buffer: battleMap(700, 490) });
+  await expect(gm.getByText("Map uploaded.")).toBeVisible();
+  await press(newScene.getByRole("button", { name: "Prepare scene" }));
+  await press(gm.getByRole("button", { name: "Make live" }));
+  await expect(gm.getByRole("heading", { name: "Start a fight" })).toBeVisible();
+  for (const other of PARTY.filter((name) => name !== hero)) {
+    const remove = gm.getByRole("button", { name: `Remove ${other} from this list` });
+    await press(remove);
+    await expect(remove).toBeHidden();
+  }
+  await press(gm.getByRole("button", { name: "Add monsters" }));
+  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the SRD bestiary" });
+  await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), "Goblin Minion");
+  await press(bestiary.getByRole("listitem").filter({ hasText: "Goblin Minion" }).getByRole("button", { name: "Add" }));
+  await expect(bestiary.getByText("Goblin Minion is in the staging tray.")).toBeVisible();
+  await press(bestiary.getByRole("button", { name: "Close" }));
+  await press(gm.getByRole("button", { name: "Start the fight" }));
+  await expect(player.getByRole("tablist", { name: "The fight · round 1" })).toBeVisible();
+  const yourTurn = player.getByRole("heading", { name: "Your turn" });
+  if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
+  await expect(yourTurn).toBeVisible();
+
+  // The Turn tab is the turn card alone: the favourite tiles, each saying what it costs.
+  const card = player.getByRole("region", { name: "Your turn" });
+  await expect(card.getByText("Action · cantrip").first()).toBeVisible();
+  await expectPageFits(player);
+  // Every option is a tap away. A levelled spell opens its cast card in place with its top in view, however far down
+  // the list was scrolled, and Back gives the card back the same way.
+  const allOptions = card.getByRole("button", { name: /^All \d+ options$/ });
+  await press(allOptions);
+  await press(card.getByRole("button", { name: /Guiding Bolt/ }).first());
+  const cast = player.getByRole("region", { name: "Cast Guiding Bolt" });
+  await expect(cast.getByRole("button", { name: "Back" })).toBeInViewport({ ratio: 1 });
+  await press(cast.getByRole("button", { name: "Back" }));
+  await expect(yourTurn).toBeInViewport({ ratio: 1 });
+  // A favourite tile opens the same cast card.
+  const tile = card.getByRole("button", { name: /Guiding Bolt/ }).first();
+  if (!(await tile.isVisible())) await press(allOptions);
+  await press(card.getByRole("button", { name: /Guiding Bolt/ }).first());
+  await expect(cast.getByRole("button", { name: /^Level 1/ })).toHaveAttribute("aria-pressed", "true");
+  await expectPageFits(player);
+  await press(cast.getByRole("button", { name: "Cast at level 1" }));
+
+  // Targeting, as the table builds it: one target, then the roll from the bar under the thumb.
+  const picker = player.getByRole("group", { name: "Targets for Guiding Bolt" });
+  await expect(picker).toBeVisible();
+  await press(picker.getByRole("radio").first());
+  await press(player.getByRole("button", { name: "Roll Guiding Bolt" }));
+  await expect(player.locator(".action-result").getByText("Guiding Bolt").first()).toBeVisible();
+  await expectPageFits(player);
 });
 
 test("a player answers the GM's call with a physical die, then rerolls it with Heroic Inspiration", async ({

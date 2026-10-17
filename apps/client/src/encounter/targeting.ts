@@ -385,11 +385,15 @@ export function resolveActionDirect(
   onResult: (ok: boolean, message?: string) => void,
   override?: { reason: string },
   /** A spell readied to cast later, at a chosen slot level. */
-  readied?: Readonly<{ slotLevel?: number }>
+  readied?: Readonly<{ slotLevel?: number }>,
+  /** A spell with nothing to aim, cast now at a chosen slot level. */
+  cast?: Readonly<{ slotLevel?: number }>
 ) {
   const extra = readied
     ? { ready: true, ...(readied.slotLevel !== undefined ? { slotLevel: readied.slotLevel } : {}) }
-    : {};
+    : cast?.slotLevel !== undefined
+      ? { slotLevel: cast.slotLevel }
+      : {};
   void command("action:resolve", {
     actorId: attackerId,
     actionId,
@@ -403,7 +407,7 @@ export function resolveActionDirect(
     } else if (response.blocked?.overridable)
       blockedPrompt = {
         blocked: response.blocked,
-        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed, readied),
+        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed, readied, cast),
         asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId, ...extra } }
       };
     emit();

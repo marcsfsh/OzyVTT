@@ -1,6 +1,7 @@
 # ADR-0021: Player character sheet: interactive play sheet now, builder-ready
 
-- **Status:** Accepted
+- **Status:** Accepted. How the sheet is laid out, and the weapon chips of the v6 amendment's part (b), are
+  superseded by [ADR-0030](0030-character-sheet-remaster.md) (2026-10-17). The rest of this decision stands.
 - **Date:** 2026-07-23
 - **Relates to:** refines the "not a character builder" scope boundary in `CLAUDE.md`;
   builds on ADR-0007 (additive canonical content), ADR-0008 (rules representation),
