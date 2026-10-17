@@ -78,85 +78,87 @@ export function RandomCharacterModal({
         </>
       }
     >
-      <p className="random-character-note">
-        A complete character, ready to play. It gets the standard array where its classes want it, and the dice choose
-        everything else: species, background, subclass, skills, feats, spells and gear.
-      </p>
-      {multiclass ? (
-        <ul className="random-character-classes" aria-label="Classes and levels">
-          {plan.map((row, index) => (
-            <li key={index} className="random-character-class">
-              <Select
-                value={row.classId}
-                aria-label={index === 0 ? "Starting class" : `Class ${index + 1}`}
-                onChange={(event) => change(index, { classId: event.target.value })}
-              >
-                {classes.items
-                  .filter((entry) => entry.id === row.classId || !plan.some((other) => other.classId === entry.id))
-                  .map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.name}
-                    </option>
-                  ))}
-              </Select>
-              <Stepper
-                value={row.level}
-                onChange={(level) => change(index, { level })}
-                min={1}
-                max={row.level + room}
-                aria-label={`${nameOf(row.classId)} levels`}
-              />
-              {index > 0 && (
-                <Button variant="ghost" size="sm" onClick={() => removeClass(index)}>
-                  Remove
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <>
-          <Field label="Level">
-            <Stepper
-              value={Math.min(plan[0].level, maxLevel)}
-              onChange={(level) => change(0, { level })}
-              min={1}
-              max={maxLevel}
-              aria-label="Level"
-              announceValue
-            />
-          </Field>
-          <Field label="Class" help="Leave it to the dice, or choose one.">
-            <Select
-              value={plan[0].classId}
-              aria-label="Class"
-              onChange={(event) => change(0, { classId: event.target.value })}
-            >
-              <option value="">Surprise me</option>
-              {classes.items.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </>
-      )}
-      {multiclass && (
+      <div className="random-character-body">
         <p className="random-character-note">
-          Level {total} in all. The character starts in the first class at level 1.
+          A complete character, ready to play. It gets the standard array where its classes want it, and the dice choose
+          everything else: species, background, subclass, skills, feats, spells and gear.
         </p>
-      )}
-      {/* A multiclass character starts from a chosen class, so the dice's choice can't take a second one. */}
-      {plan[0].classId && plan.length < MAX_CLASSES && room > 0 && unused.length > 0 ? (
-        <Button variant="secondary" onClick={addClass} disabled={busy}>
-          Add another class
-        </Button>
-      ) : (
-        !plan[0].classId && (
-          <p className="random-character-note">Choose a class first to add another for a multiclass character.</p>
-        )
-      )}
+        {multiclass ? (
+          <ul className="random-character-classes" aria-label="Classes and levels">
+            {plan.map((row, index) => (
+              <li key={index} className="random-character-class">
+                <Select
+                  value={row.classId}
+                  aria-label={index === 0 ? "Starting class" : `Class ${index + 1}`}
+                  onChange={(event) => change(index, { classId: event.target.value })}
+                >
+                  {classes.items
+                    .filter((entry) => entry.id === row.classId || !plan.some((other) => other.classId === entry.id))
+                    .map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))}
+                </Select>
+                <Stepper
+                  value={row.level}
+                  onChange={(level) => change(index, { level })}
+                  min={1}
+                  max={row.level + room}
+                  aria-label={`${nameOf(row.classId)} levels`}
+                />
+                {index > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => removeClass(index)}>
+                    Remove
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <>
+            <Field label="Level">
+              <Stepper
+                value={Math.min(plan[0].level, maxLevel)}
+                onChange={(level) => change(0, { level })}
+                min={1}
+                max={maxLevel}
+                aria-label="Level"
+                announceValue
+              />
+            </Field>
+            <Field label="Class" help="Leave it to the dice, or choose one.">
+              <Select
+                value={plan[0].classId}
+                aria-label="Class"
+                onChange={(event) => change(0, { classId: event.target.value })}
+              >
+                <option value="">Surprise me</option>
+                {classes.items.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </>
+        )}
+        {multiclass && (
+          <p className="random-character-note">
+            Level {total} in all. The character starts in the first class at level 1.
+          </p>
+        )}
+        {/* A multiclass character starts from a chosen class, so the dice's choice can't take a second one. */}
+        {plan[0].classId && plan.length < MAX_CLASSES && room > 0 && unused.length > 0 ? (
+          <Button variant="secondary" onClick={addClass} disabled={busy}>
+            Add another class
+          </Button>
+        ) : (
+          !plan[0].classId && (
+            <p className="random-character-note">Choose a class first to add another for a multiclass character.</p>
+          )
+        )}
+      </div>
     </Modal>
   );
 }

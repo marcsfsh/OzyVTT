@@ -319,6 +319,14 @@
 }
 
 /* The random character dialog: its notes, and a multiclass character's classes, each with its levels. */
+.random-character-body {
+  display: grid;
+  gap: var(--space-4);
+  justify-items: start;
+}
+.random-character-body > :is(.random-character-classes, .nh-field) {
+  justify-self: stretch;
+}
 .random-character-note {
   margin: 0;
   color: var(--text-dim);
