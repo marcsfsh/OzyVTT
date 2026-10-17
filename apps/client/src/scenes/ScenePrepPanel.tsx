@@ -35,6 +35,8 @@ export function ScenePrepPanel({
   mapToken,
   mapFallback,
   onMapUploaded,
+  onSetGrid,
+  mapNeedsGrid = false,
   stagingRevealed,
   combatActive,
   busy = false,
@@ -62,6 +64,10 @@ export function ScenePrepPanel({
   mapFallback?: readonly MapSelection[];
   /** A map was uploaded from the picker, so the caller's copy of the library is stale. */
   onMapUploaded?: (map: PickerMap) => void;
+  /** Opens a map's grid calibration; offered for a map with no grid. */
+  onSetGrid?: (mapId: string) => void;
+  /** The chosen map has no grid yet, so tokens on it won't snap. */
+  mapNeedsGrid?: boolean;
   /** `GameState.stagingDefaults.visibility === "public"`: the tray toggle's starting state. */
   stagingRevealed: boolean;
   combatActive: boolean;
@@ -154,6 +160,16 @@ export function ScenePrepPanel({
         )}
       </div>
       {mapNote && pickingMap && <p className="scene-prep-note">{mapNote}</p>}
+      {mapNeedsGrid && !pickingMap && selectedMapId && (
+        <p className="scene-prep-note scene-prep-grid">
+          This map has no grid yet. Tokens still go on it but won't snap to squares.
+          {onSetGrid && (
+            <Button variant="secondary" size="sm" onClick={() => onSetGrid(selectedMapId)}>
+              Set the grid
+            </Button>
+          )}
+        </p>
+      )}
       {pickingMap && !mapLocked && onSelectMap && (
         <MapPicker
           token={mapToken}
@@ -166,6 +182,7 @@ export function ScenePrepPanel({
             if (!meta?.fromUpload) setPickingMap(false);
           }}
           onUploaded={onMapUploaded}
+          {...(onSetGrid ? { onSetGrid } : {})}
         />
       )}
 

@@ -17,6 +17,8 @@ export type GmHeader = Readonly<{
   onViewAllScenes: () => void;
   onBackToLive: () => void;
   onMakeLive: (sceneId: string) => void;
+  /** Opens the staged map's grid calibration; null when the map has its grid. */
+  onSetGrid: ((mapId: string) => void) | null;
   viewerPreview: Readonly<{ on: boolean; onToggle: () => void }>;
 }>;
 
@@ -74,6 +76,12 @@ export function TableHeader(
             <Button variant="ghost" size="sm" onClick={gm.onBackToLive} title="Return to the scene players see">
               <IconChevronLeft />
               Back to live
+            </Button>
+          )}
+          {/* Before Make live: a map without its grid lets tokens sit anywhere, off the squares. */}
+          {gm.onSetGrid && (
+            <Button variant="secondary" size="sm" onClick={() => gm.onSetGrid?.(staged.mapAssetId)}>
+              Set the grid
             </Button>
           )}
           <Button variant="primary" size="sm" onClick={() => gm.onMakeLive(staged.id)}>

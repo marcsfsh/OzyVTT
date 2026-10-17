@@ -31,8 +31,8 @@ export function MapRail({
   );
 
   return (
-    <div className="map-rail">
-      <div className="map-rail-filters" role="group" aria-label="Filter maps">
+    <div className="map-library-rail">
+      <div className="map-library-rail-filters" role="group" aria-label="Filter maps">
         <Input
           type="search"
           value={search}
@@ -72,7 +72,7 @@ export function MapRail({
       {/* The scroll region is the wrapper, never the `<ul>`: a grid with a definite block size stops
               sizing its auto rows from its cards. The picker's own 21rem cap is lifted here so there is
               one scroller. */}
-      <div className="map-rail-list scroll-y">
+      <div className="map-library-rail-list scroll-y">
         {/* The same tile as the embedded picker. */}
         <ul className="map-picker-grid" aria-label="Uploaded maps">
           {filteredMaps.map((map) => (
@@ -97,7 +97,7 @@ export function MapRail({
         </ul>
         {filteredMaps.length === 0 && (
           <p className="map-list-empty">
-            {maps.length === 0 ? "No maps yet — add one above." : "No maps match this filter."}
+            {maps.length === 0 ? "No maps yet. Add one above." : "No maps match this filter."}
           </p>
         )}
       </div>

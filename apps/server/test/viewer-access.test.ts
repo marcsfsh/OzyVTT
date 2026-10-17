@@ -106,3 +106,77 @@ describe("ViewerAccessStore", () => {
     }
   });
 });
+
+describe("pairing from the screen's own code", () => {
+  async function store(now: () => number) {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-screen-pairing-"));
+    const access = new ViewerAccessStore(join(directory, "vtt.sqlite"), now);
+    await access.initialize();
+    return {
+      access,
+      close: async () => {
+        access.close();
+        await rm(directory, { recursive: true, force: true });
+      }
+    };
+  }
+
+  it("pairs a screen once the GM types its code, and only once", async () => {
+    const now = 1_000_000;
+    const { access, close } = await store(() => now);
+    try {
+      const opened = access.openScreenPairing();
+      expect(opened.code).toMatch(/^[0-9]{6}$/);
+      expect(opened.requestToken).toMatch(/^vtt_pairing_/);
+      expect(access.collectScreenPairing(opened.requestToken)).toMatchObject({ status: "waiting", code: opened.code });
+      // The code alone collects nothing: a stranger who reads it off the screen holds no request.
+      expect(access.collectScreenPairing(`vtt_pairing_${"A".repeat(43)}`)).toBeNull();
+
+      // Typed with a space, as the screen shows it.
+      expect(access.approveScreenPairing(`${opened.code.slice(0, 3)} ${opened.code.slice(3)}`, "Den TV")).toEqual({
+        name: "Den TV"
+      });
+      const paired = access.collectScreenPairing(opened.requestToken);
+      expect(paired).toMatchObject({ status: "paired", viewer: { name: "Den TV", expiresAt: null } });
+      // The same viewer credential the GM's code gives.
+      const token = (paired as { token: string }).token;
+      expect(access.verify(token).name).toBe("Den TV");
+      expect(access.collectScreenPairing(opened.requestToken)).toBeNull();
+      expect(() => access.approveScreenPairing(opened.code, "Again")).toThrow(ViewerAccessDeniedError);
+    } finally {
+      await close();
+    }
+  });
+
+  it("lets a code run out after ten minutes and keeps every open code unique", async () => {
+    let now = 1_000_000;
+    const { access, close } = await store(() => now);
+    try {
+      const codes = new Set(Array.from({ length: 20 }, () => access.openScreenPairing().code));
+      expect(codes.size).toBe(20);
+      const late = [...codes][0];
+      now += 10 * 60 * 1_000;
+      expect(() => access.approveScreenPairing(late, "Late TV")).toThrow(ViewerAccessDeniedError);
+    } finally {
+      await close();
+    }
+  });
+
+  it("caps open requests and wrong codes", async () => {
+    let now = 1_000_000;
+    const { access, close } = await store(() => now);
+    try {
+      for (let index = 0; index < 20; index++) access.openScreenPairing();
+      expect(() => access.openScreenPairing()).toThrow(ViewerPairingRateLimitError);
+      now += 10 * 60 * 1_000;
+      // The expired ones make room, but no more than 30 a minute open.
+      for (let index = 0; index < 10; index++) access.openScreenPairing();
+      now += 60_001;
+      for (let attempt = 0; attempt < 20; attempt++)
+        expect(() => access.approveScreenPairing("000000", "Guess")).toThrow();
+      expect(() => access.approveScreenPairing("000000", "Guess")).toThrow(ViewerPairingRateLimitError);
+    } finally {
+      await close();
+    }
+  });
+});

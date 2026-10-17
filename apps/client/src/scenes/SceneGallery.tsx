@@ -212,14 +212,18 @@ export function SceneGallery({
       {!hideHeading && (
         <div className={`scene-gallery-head${surface ? " neon-beam" : ""}`}>
           <h2 id="scene-gallery-heading">Scenes</h2>
-          <p>Prepare fights before the table.</p>
+          <p>A scene is a map and who is on it.</p>
         </div>
       )}
-      {scenes.length > 0 && (
+      {/* "Manage maps" is always here: the map library and its grids are reached from Scenes alone. With no scenes
+        yet, the one primary sits in the empty state below. */}
+      {(scenes.length > 0 || onManageMaps) && (
         <div className="scene-gallery-bar">
-          <Button variant="primary" arrow onClick={onNewScene}>
-            New scene
-          </Button>
+          {scenes.length > 0 && (
+            <Button variant="primary" arrow onClick={onNewScene}>
+              New scene
+            </Button>
+          )}
           {onManageMaps && (
             <Button variant="secondary" onClick={onManageMaps}>
               Manage maps
@@ -229,7 +233,7 @@ export function SceneGallery({
       )}
       {scenes.length === 0 ? (
         <div className="scene-empty">
-          <p>No scenes prepared yet. Pick a map, stage who’s in it, then go live.</p>
+          <p>No scenes yet. Prepare one: pick a map and who is on it, then make it live.</p>
           <Button variant="primary" arrow onClick={onNewScene}>
             New scene
           </Button>
@@ -255,8 +259,7 @@ export function SceneGallery({
                   <div className="nh-card-body">
                     <h3 className="nh-card-title">{scene.name}</h3>
                     <span className="nh-card-meta">
-                      {mapName(scene.mapAssetId)} · {count} character{count === 1 ? "" : "s"} &amp; monster
-                      {count === 1 ? "" : "s"}
+                      {mapName(scene.mapAssetId)} · {count === 0 ? "Nobody staged" : `${count} staged`}
                     </span>
                   </div>
                   {(live || staging) && (
@@ -323,7 +326,8 @@ export function SceneGallery({
                       <Button variant="secondary" onClick={() => prepare(scene)}>
                         Prepare
                       </Button>
-                      <Button variant="primary" onClick={() => void goLive(scene)}>
+                      {/* Secondary: each card has one, and the view's one primary is New scene. */}
+                      <Button variant="secondary" onClick={() => void goLive(scene)}>
                         Go live
                       </Button>
                     </div>

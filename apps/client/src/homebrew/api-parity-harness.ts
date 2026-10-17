@@ -1092,8 +1092,10 @@ export async function bootHomebrewApi(): Promise<ApiFixture> {
   app.use(
     createHomebrewRouter({
       store,
-      authorizeGm: (token) => token === "gm-token",
-      authorizePlayer: (token) => token === "player-token",
+      verifiers: {
+        gm: (token) => (token === "gm-token" ? { sessionId: "gm" } : null),
+        player: (token) => (token === "player-token" ? { sessionId: "player" } : null)
+      },
       notifyChanged: () => {},
       validate: createHomebrewValidator({
         forAudience: (audience) => contentLibrary.forAudience(audience),

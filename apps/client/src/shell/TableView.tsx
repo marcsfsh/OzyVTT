@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Button, IconScene } from "@vtt/ui";
 import { ClaimCharacter } from "../actors/ClaimCharacter";
+import { JoinAddress } from "../components/JoinAddress";
 import { partyVisibilityOf } from "../actors/MyCharacter";
 import { PartyStrip } from "../actors/PartyStrip";
 import { DicePanel } from "../dice/DicePanel";
@@ -37,13 +38,14 @@ export type GmTable = Readonly<{
   onViewAllScenes: () => void;
   onBackToLive: () => void;
   onMakeLive: (sceneId: string) => void;
+  /** Opens a map's grid calibration, from the staged scene's header when its map has none. */
+  onSetGrid: (mapId: string) => void;
   viewerPreview: Readonly<{ on: boolean; onToggle: () => void }>;
 }>;
 
+// Leave table is in Settings, confirmed, away from the fight's controls.
 type TableViewProps = Readonly<
-  { token: string } & (
-    { role: "gm"; state: GmView; gm: GmTable } | { role: "player"; state: PlayerView; onLeave: () => void }
-  )
+  { token: string } & ({ role: "gm"; state: GmView; gm: GmTable } | { role: "player"; state: PlayerView })
 >;
 
 /** The phone table, below 980px (the stylesheet's breakpoint): the map pane over the panel, a bar under the thumb. */
@@ -69,6 +71,11 @@ export function TableView(props: TableViewProps) {
     props.role === "player" &&
     props.state.actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
   const staged = gm?.stagedScene ?? null;
+  const stagedMap = staged ? gm?.mapLibrary.find((map) => map.id === staged.mapAssetId) : undefined;
+  const stagedNeedsGrid = stagedMap !== undefined && !stagedMap.calibration && !stagedMap.scale;
+  // A player who has claimed nobody while no map is live sees the picker across the whole table, not under an empty
+  // map box.
+  const claimingOnly = props.role === "player" && !playerHasClaimed && !state.combat.mapAssetId;
   // The phone's split between the map pane and the panel. Choosing a target lowers the divider so the map takes
   // most of the height; the person's own split comes back when the choice ends, unless they move it meanwhile.
   const splitRef = useRef<HTMLDivElement | null>(null);
@@ -97,6 +104,7 @@ export function TableView(props: TableViewProps) {
           onViewAllScenes: props.gm.onViewAllScenes,
           onBackToLive: props.gm.onBackToLive,
           onMakeLive: props.gm.onMakeLive,
+          onSetGrid: stagedNeedsGrid ? props.gm.onSetGrid : null,
           viewerPreview: props.gm.viewerPreview
         }}
       />
@@ -140,8 +148,9 @@ export function TableView(props: TableViewProps) {
       healthDisplay={props.role === "gm" ? props.state.combat.healthDisplay : undefined}
       state={state}
     />
-  ) : (
-    <div className="empty map-empty-hero scanlines">
+  ) : claimingOnly ? null : (
+    /* No map yet. The GM's box is the first evening's start: the scene, and the address players open. */
+    <div className={`empty map-empty-hero scanlines${gm ? " map-empty-hero--gm scroll-y" : ""}`}>
       <div className="empty-atmos" aria-hidden="true">
         <span className="home-hero-bloom" />
         <span className="home-hero-grid grid-floor" />
@@ -149,7 +158,7 @@ export function TableView(props: TableViewProps) {
       <strong>No map loaded yet</strong>
       <span>
         {role === "gm"
-          ? "Prepare a scene from the Scenes tab. Pick a map and who's in it, then make it live."
+          ? "Prepare a scene: pick a map and who is in it, then make it live."
           : "The map appears here when the GM makes a scene live."}
       </span>
       {gm && (
@@ -157,6 +166,7 @@ export function TableView(props: TableViewProps) {
           <IconScene /> Prepare a scene
         </Button>
       )}
+      {gm && <JoinAddress token={token} layout="hero" />}
     </div>
   );
 
@@ -197,9 +207,6 @@ export function TableView(props: TableViewProps) {
     panel = (
       <section className="table-panel table-panel-claim" aria-label="Choose your character">
         <ClaimCharacter state={props.state} />
-        <Button variant="secondary" className="table-leave" onClick={props.onLeave}>
-          Leave table
-        </Button>
       </section>
     );
   } else {
@@ -228,9 +235,6 @@ export function TableView(props: TableViewProps) {
               {!state.combat.active && (
                 <ReplayShelf token={token} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />
               )}
-              <Button variant="secondary" className="table-leave" onClick={props.onLeave}>
-                Leave table
-              </Button>
             </div>
           )
         }}
@@ -239,15 +243,15 @@ export function TableView(props: TableViewProps) {
   }
 
   return (
-    <div className={`table-bench anim-view ${role}${staged ? " is-staging" : ""}`}>
+    <div className={`table-bench anim-view ${role}${staged ? " is-staging" : ""}${claimingOnly ? " is-claiming" : ""}`}>
       {header}
       <div
         className="table-bench-split"
         ref={splitRef}
         style={phone ? ({ "--map-share": `${mapShare}%` } as React.CSSProperties) : undefined}
       >
-        <div className="table-bench-map">{map}</div>
-        {phone && (
+        {map && <div className="table-bench-map">{map}</div>}
+        {phone && map && (
           <PaneDivider
             value={mapShare}
             onChange={(next) => {

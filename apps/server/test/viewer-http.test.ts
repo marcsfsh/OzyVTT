@@ -9,6 +9,7 @@ import { ViewerCoordinator } from "../src/viewer-coordinator.js";
 import { requestConventions } from "../src/http-kit.js";
 import { createViewerRouter } from "../src/viewer-http.js";
 import { ViewerPresentationStore } from "../src/viewer-presentation-store.js";
+import { fixedVerifiers } from "./fixed-verifiers.js";
 
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -29,7 +30,18 @@ async function fixture() {
   // Mirrors server.ts, which stamps the request id once ahead of every /api/v1 router.
   app.use(requestConventions);
   app.use(express.json());
-  app.use(createViewerRouter({ access, presentation, coordinator, authorizeGm, now: () => now }));
+  const verifiers = fixedVerifiers({
+    gm: ["gm-secret"],
+    viewer: (token) => {
+      try {
+        access.verify(token);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  });
+  app.use(createViewerRouter({ access, presentation, coordinator, verifiers, now: () => now }));
   const server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -306,5 +318,53 @@ describe("viewer HTTP vertical slice", () => {
     expect(text).not.toContain("SQLITE");
     expect(logged).toHaveBeenCalled();
     logged.mockRestore();
+  });
+});
+
+describe("pairing a table screen from its own code", () => {
+  it("shows a code on the screen, lets the GM type it, and hands the screen its viewer cookie once", async () => {
+    const test = await fixture();
+    const opened = await fetch(`${test.base}/api/v1/viewer/screen-pairings`, { method: "POST" });
+    expect(opened.status).toBe(201);
+    const { code } = (await json(opened)).data.pairing as { code: string };
+    const pairingCookie = opened.headers.get("set-cookie")!;
+    expect(pairingCookie).toContain("HttpOnly");
+    expect(pairingCookie).toContain("SameSite=Strict");
+    expect(pairingCookie).toContain("Path=/api/v1/viewer/screen-pairings");
+    const held = pairingCookie.split(";", 1)[0];
+    const poll = () => fetch(`${test.base}/api/v1/viewer/screen-pairings/current`, { headers: { cookie: held } });
+
+    const waiting = await poll();
+    expect(waiting.status).toBe(200);
+    expect((await json(waiting)).data).toMatchObject({ status: "waiting", pairing: { code } });
+    expect((await fetch(`${test.base}/api/v1/viewer/screen-pairings/current`)).status).toBe(404);
+
+    const approve = (token: string | null, body: unknown) =>
+      fetch(`${test.base}/api/v1/viewer/screen-pairings/approve`, {
+        method: "POST",
+        headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+    expect((await approve(null, { code })).status).toBe(401);
+    // A code no screen shows is a 404: the GM's own session is fine, so it must never read as a 401.
+    const wrong = await approve("gm-secret", { code: "999999" === code ? "888888" : "999999" });
+    expect(wrong.status).toBe(404);
+    const approved = await approve("gm-secret", { code, name: "Living room TV" });
+    expect(approved.status).toBe(200);
+
+    const paired = await poll();
+    expect(paired.status).toBe(200);
+    expect((await json(paired)).data).toMatchObject({ status: "paired", viewer: { name: "Living room TV" } });
+    const cookies = paired.headers.getSetCookie();
+    const viewerCookie = cookies.find((line) => line.startsWith("vtt_viewer_session="))!;
+    expect(viewerCookie).toContain("HttpOnly");
+    // The request's secret is cleared, and the request is gone.
+    expect(cookies.find((line) => line.startsWith("vtt_viewer_pairing="))).toContain("Max-Age=0");
+    expect((await poll()).status).toBe(404);
+
+    const presentation = await fetch(`${test.base}/api/v1/viewer/presentation`, {
+      headers: { cookie: viewerCookie.split(";", 1)[0] }
+    });
+    expect(presentation.status).toBe(200);
   });
 });

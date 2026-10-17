@@ -59,9 +59,27 @@ function failureOf(response: Response, envelope: unknown, failure: string): ApiE
 
 const DEFAULT_FAILURE = "The request failed.";
 
+type SessionEndedListener = (token: string) => void;
+const sessionEndedListeners = new Set<SessionEndedListener>();
+
+/**
+ * Hears every 401 answered to a request that carried a session token: that session is over (ADR-0027). The token
+ * is passed along, so a listener can ignore one it has already replaced.
+ */
+export function onSessionEnded(listener: SessionEndedListener): () => void {
+  sessionEndedListeners.add(listener);
+  return () => sessionEndedListeners.delete(listener);
+}
+
+/** Tells the listeners when a token was refused as dead. */
+export function reportSessionEnded(response: Pick<Response, "status">, token: string | null | undefined) {
+  if (response.status === 401 && token) for (const listener of sessionEndedListeners) listener(token);
+}
+
 /** Calls `/api/v1` and returns the envelope's `data`, or throws an ApiError. */
 export async function apiRequest<T>(path: string, request: ApiRequest = {}): Promise<T> {
   const response = await send(path, request);
+  reportSessionEnded(response, request.token);
   const envelope = await response.json().catch(() => null);
   if (!response.ok || !envelope?.ok) throw failureOf(response, envelope, request.failure ?? DEFAULT_FAILURE);
   return envelope.data as T;
@@ -70,6 +88,7 @@ export async function apiRequest<T>(path: string, request: ApiRequest = {}): Pro
 /** Fetches binary content under `/api/v1` (an image), or throws an ApiError. */
 export async function apiBlob(path: string, request: Omit<ApiRequest, "body" | "method"> = {}): Promise<Blob> {
   const response = await send(path, request);
+  reportSessionEnded(response, request.token);
   if (!response.ok) {
     const envelope = await response.json().catch(() => null);
     throw failureOf(response, envelope, request.failure ?? DEFAULT_FAILURE);

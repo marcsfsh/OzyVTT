@@ -14,6 +14,7 @@ import {
   Button,
   Eyebrow,
   Input,
+  Modal,
   RevealSwitch,
   SegmentedControl,
   Select,
@@ -22,6 +23,9 @@ import {
   ThemeToggle,
   useToast
 } from "@vtt/ui";
+import { useForceRelease } from "../actors/useForceRelease";
+import { JoinAddress } from "../components/JoinAddress";
+import { useConfirm } from "../components/feedback";
 import { IntegrationsPanel } from "../integrations/IntegrationsPanel";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { useRollPreference } from "../dice/roll-preference";
@@ -191,16 +195,17 @@ function MineGroup() {
 function TableGroup({
   state,
   gmToken,
-  onSignOut,
   onRevokeAll,
+  onChangePassword,
   busy
 }: Readonly<{
   state: GmView;
   gmToken: string;
-  onSignOut: () => void;
   onRevokeAll: () => void;
+  onChangePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
   busy: boolean;
 }>) {
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const { toast } = useToast();
   const autoArrange = useAutoArrange();
   const policy = state.rulesPolicy;
@@ -470,16 +475,25 @@ function TableGroup({
 
       <div className="settings-subsection">
         <span className="settings-subhead">Access &amp; integrations</span>
+        <Row
+          title="GM password"
+          help="Changing it keeps you signed in here and signs out every other GM browser."
+          stacked
+        >
+          <div className="settings-session">
+            <Button variant="secondary" onClick={() => setPasswordOpen(true)} disabled={busy}>
+              Change GM password
+            </Button>
+            <Button variant="destructive" onClick={onRevokeAll} disabled={busy}>
+              Revoke all GM sessions
+            </Button>
+          </div>
+        </Row>
         <IntegrationsPanel gmToken={gmToken} />
-        <div className="settings-session">
-          <Button variant="secondary" onClick={onSignOut} disabled={busy}>
-            Sign out
-          </Button>
-          <Button variant="destructive" onClick={onRevokeAll} disabled={busy}>
-            Revoke all GM sessions
-          </Button>
-        </div>
       </div>
+      {passwordOpen && (
+        <ChangePasswordDialog onClose={() => setPasswordOpen(false)} onChangePassword={onChangePassword} />
+      )}
     </Group>
   );
 }
@@ -523,15 +537,11 @@ function PlayersGroup({
   const claimed = state.actors.filter(
     (actor) => actor.kind === "player-character" && !actor.archived && actor.ownerSessionId !== null
   );
-
-  const forceRelease = async (actorId: string, name: string) => {
-    const result = await command("character:force-release", { actorId });
-    if (result.ok) toast(`${name} is available to claim again.`, { tone: "success" });
-    else toast(result.message ?? "That claim could not be released.", { tone: "error" });
-  };
+  const forceRelease = useForceRelease();
 
   return (
     <Group id="players" label="Players" gmOnly>
+      <JoinAddress token={gmToken} />
       <Row title="Random characters" help="You can always roll one. This is about whether they can." stacked>
         <Switch
           checked={builder.playerRandom === "open"}
@@ -566,7 +576,7 @@ function PlayersGroup({
                 <Button variant="secondary" size="sm" onClick={onPreviewPlayers}>
                   See their view
                 </Button>
-                <Button variant="secondary" size="sm" onClick={() => forceRelease(actor.id, actor.name)}>
+                <Button variant="secondary" size="sm" onClick={() => void forceRelease.release(actor)}>
                   Force release
                 </Button>
                 <Button
@@ -599,7 +609,95 @@ function PlayersGroup({
           onClose={() => setTokenFor(null)}
         />
       )}
+      {forceRelease.dialog}
     </Group>
+  );
+}
+
+/** Changing the GM password: the current one, then the new one, each with Show. */
+function ChangePasswordDialog({
+  onClose,
+  onChangePassword
+}: Readonly<{
+  onClose: () => void;
+  onChangePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
+}>) {
+  const { toast } = useToast();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [shown, setShown] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const submit = async () => {
+    if (next.length < 12) {
+      setError("Use a new GM password of at least 12 characters.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const refusal = await onChangePassword(current, next);
+    setSaving(false);
+    if (refusal) {
+      setError(refusal);
+      return;
+    }
+    toast("GM password changed. Every other GM browser signs in again with the new one.", { tone: "success" });
+    onClose();
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="sm"
+      title="Change GM password"
+      ariaLabel="Change GM password"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={saving || !current || !next} onClick={() => void submit()}>
+            {saving ? "Changing…" : "Change password"}
+          </Button>
+        </>
+      }
+    >
+      <form
+        className="settings-password"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
+      >
+        <label>
+          Current password
+          <Input
+            type={shown ? "text" : "password"}
+            value={current}
+            autoComplete="current-password"
+            onChange={(event) => setCurrent(event.target.value)}
+          />
+        </label>
+        <label>
+          New password
+          <Input
+            type={shown ? "text" : "password"}
+            value={next}
+            autoComplete="new-password"
+            onChange={(event) => setNext(event.target.value)}
+          />
+        </label>
+        <Switch checked={shown} onChange={setShown} label="Show the passwords" />
+        <p className="settings-note">Use at least 12 characters.</p>
+        {error && (
+          <p className="settings-error" role="alert">
+            {error}
+          </p>
+        )}
+        {/* Enter submits from either field. */}
+        <button type="submit" hidden />
+      </form>
+    </Modal>
   );
 }
 
@@ -626,6 +724,8 @@ export function SettingsPage({
   onPreviewPlayers,
   onSignOut,
   onRevokeAll,
+  onChangePassword,
+  onLeave,
   busy = false
 }: Readonly<{
   role: "gm" | "player";
@@ -635,20 +735,50 @@ export function SettingsPage({
   onPreviewPlayers?: () => void;
   onSignOut?: () => void;
   onRevokeAll?: () => void;
+  /** Resolves with the refusal's message, or null once the password changed. */
+  onChangePassword?: (currentPassword: string, newPassword: string) => Promise<string | null>;
+  /** A player leaving the table on this device. */
+  onLeave?: () => void;
   busy?: boolean;
 }>) {
   const gm = role === "gm" && gmToken ? gmViewOrNull(state) : null;
-  /* The heading stays fixed; the groups are the one scroll region. */
+  const { confirm, dialog } = useConfirm();
+  const mine = (state?.actors ?? []).find(
+    (actor) => "claimStatus" in actor && actor.claimStatus === "mine" && actor.kind === "player-character"
+  );
+  const leave = async () => {
+    const ok = await confirm({
+      title: "Leave the table?",
+      body: mine
+        ? `${mine.name} stays yours. Join again on this device to pick up where you left off.`
+        : "Join again on this device whenever you are ready.",
+      confirmLabel: "Leave table"
+    });
+    if (ok) onLeave?.();
+  };
+  /* The heading stays fixed; the groups are the one scroll region. The way out (Sign out, Leave table) sits in it. */
   return (
     <div className="settings-page pane-frame pane-scene scanlines frame-col anim-view">
       <div className="pane-sky" aria-hidden="true" />
       <header className="settings-head neon-beam">
-        <h2>Settings</h2>
-        <p>
-          {role === "gm"
-            ? "Your device, this table, and the people at it."
-            : "Your device. The rest of the table is your GM's to set."}
-        </p>
+        <div className="settings-head-text">
+          <h2>Settings</h2>
+          <p>
+            {role === "gm"
+              ? "This device and the table you run."
+              : "Your device. The rest of the table is your GM's to set."}
+          </p>
+        </div>
+        {role === "gm" && onSignOut && (
+          <Button variant="secondary" onClick={onSignOut} disabled={busy}>
+            Sign out
+          </Button>
+        )}
+        {role === "player" && onLeave && (
+          <Button variant="secondary" onClick={() => void leave()}>
+            Leave table
+          </Button>
+        )}
       </header>
       <div className="settings-body scroll-y frame-fill">
         <MineGroup />
@@ -656,8 +786,8 @@ export function SettingsPage({
           <TableGroup
             state={gm}
             gmToken={gmToken}
-            onSignOut={onSignOut ?? (() => {})}
             onRevokeAll={onRevokeAll ?? (() => {})}
+            onChangePassword={onChangePassword ?? (async () => "Sign in as the GM first.")}
             busy={busy}
           />
         )}
@@ -665,6 +795,7 @@ export function SettingsPage({
           <PlayersGroup state={gm} gmToken={gmToken} onPreviewPlayers={onPreviewPlayers ?? (() => {})} />
         )}
       </div>
+      {dialog}
     </div>
   );
 }

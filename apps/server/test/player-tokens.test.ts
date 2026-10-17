@@ -126,7 +126,7 @@ describe("the three player gates", () => {
     // The GM's per-stat-block memory is prep, not a player's business.
     expect(playerList.data.rememberedAssetId).toBeNull();
 
-    // Every management route stays GM-only.
+    // Every management route stays GM-only: a player's valid session is refused with 403.
     expect(
       (
         await fetch(`${base}${TOKEN_COLLECTION}/${sharedId}`, {
@@ -135,13 +135,13 @@ describe("the three player gates", () => {
           body: JSON.stringify({ name: "Mine" })
         })
       ).status
-    ).toBe(401);
+    ).toBe(403);
     expect(
       (await fetch(`${base}${TOKEN_COLLECTION}/${sharedId}`, { method: "DELETE", headers: bearer(playerToken) })).status
-    ).toBe(401);
+    ).toBe(403);
     expect(
       (await post(base, `${TOKEN_COLLECTION}/folders/visibility`, playerToken, { folder: null, hidden: true })).status
-    ).toBe(401);
+    ).toBe(403);
   });
 
   it("lets a player upload their own image onto one curated shelf, bounded by a daily cap", async () => {

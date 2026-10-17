@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RulesButton } from "../reference/RulesReference";
 import type { GmView } from "@vtt/domain";
-import { Modal, Tabs, useToast, Wordmark } from "@vtt/ui";
+import { Modal, useToast, Wordmark } from "@vtt/ui";
 import { PartyRosterTab } from "../actors/PartyRosterTab";
 import { useConfirm } from "../components/feedback";
 import { lazySurface } from "../components/lazySurface";
@@ -24,6 +23,7 @@ import { SceneGallery } from "../scenes/SceneGallery";
 import { ScenePanel } from "../scenes/ScenePanel";
 import { setPreviewScene, usePreviewScene } from "../scenes/scenePreview";
 import { useAutoArrange } from "../settings/preferences";
+import { AppTabs, type TabFit } from "./AppTabs";
 import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
 import type { Connection } from "./useSession";
@@ -56,6 +56,9 @@ const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "settings", label: "Settings" }
 ];
 
+/** All eight tabs from 980px; then five, four, and three on a phone, the rest in the More menu. */
+const GM_TAB_FIT: TabFit = [GM_TABS.length, 5, 4, 3];
+
 /**
  * The GM's tab bar. The tab is read from the address, which names one; addresses that name none
  * (`/`, `/codex/pages/x`) resolve to "table". A tab returns you to where you were in it, and re-tapping
@@ -67,10 +70,11 @@ export function GmTabBar() {
   return (
     <div className="frame-tabbar rim-gm">
       <Wordmark variant="solid" sun className="app-logo" aria-hidden="true" />
-      <Tabs
+      <AppTabs
         className="gm-tabs"
         ariaLabel="GM sections"
-        tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+        tabs={GM_TABS.map((tab) => ({ id: tab.id, label: tab.label, name: tab.label }))}
+        fits={GM_TAB_FIT}
         activeId={gmTab}
         onChange={(id) => {
           const next = id as GmTab;
@@ -81,7 +85,6 @@ export function GmTabBar() {
           );
         }}
       />
-      <RulesButton />
     </div>
   );
 }
@@ -93,7 +96,8 @@ export function GmShell({
   connection,
   busy,
   onSignOut,
-  onRevokeAll
+  onRevokeAll,
+  onChangePassword
 }: Readonly<{
   state: GmView;
   token: string;
@@ -101,6 +105,7 @@ export function GmShell({
   busy: boolean;
   onSignOut: () => void;
   onRevokeAll: () => void;
+  onChangePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
 }>) {
   const route = useRoute();
   const gmTab: GmTab = litGmTab(route.path) ?? "table";
@@ -184,14 +189,23 @@ export function GmShell({
       setPendingStageSceneId(null);
     }
   }, [pendingStageSceneId, scenes, autoArrange]);
+  // Staging renders on the table map, so switch to it and close the pickers. Keyed on the id: once staging has
+  // started, the GM may still go and set the map's grid without being pulled back on the next update.
+  const previewSceneOpen = previewScene?.id ?? null;
   useEffect(() => {
-    // Staging renders on the table map, so switch to it and close the pickers.
-    if (previewScene) {
+    if (previewSceneOpen) {
       navigate(pathForGmTab("table"));
       setScenePrepOpen(false);
       setScenesModalOpen(false);
     }
-  }, [previewScene]);
+  }, [previewSceneOpen]);
+  /** "Set the grid" from the scene flow: the map's calibration in the library, with a way back. */
+  const setGridFor = (mapId: string) => {
+    setScenePrepOpen(false);
+    setScenesModalOpen(false);
+    navigate(`/scenes/maps?map=${encodeURIComponent(mapId)}&from=${gmTab === "table" ? "table" : "scenes"}`);
+  };
+  const gridFrom = route.query.get("from");
   const makeSceneLive = (sceneId: string) =>
     void command("scene:activate", { sceneId }).then(() => setPreviewScene(null));
   const revokeAll = async () => {
@@ -227,6 +241,7 @@ export function GmShell({
             onViewAllScenes: () => setScenesModalOpen(true),
             onBackToLive: () => setPreviewScene(null),
             onMakeLive: makeSceneLive,
+            onSetGrid: setGridFor,
             viewerPreview: { on: showViewerPreview, onToggle: () => setShowViewerPreview((current) => !current) }
           }}
         />
@@ -238,9 +253,15 @@ export function GmShell({
         (scenesView === "maps" ? (
           <MapManager
             gmToken={token}
-            preferredMapId={state.combat.mapAssetId}
+            preferredMapId={route.query.get("map") ?? state.combat.mapAssetId}
+            openOnPreferred={route.query.has("map")}
             onSelectionChange={setSelectedMap}
             onBack={() => navigate(pathForGmTab("scenes"))}
+            next={
+              gridFrom === "table"
+                ? { label: "Back to the table", go: () => navigate(pathForGmTab("table")) }
+                : { label: "Back to scenes", go: () => navigate(pathForGmTab("scenes")) }
+            }
           />
         ) : (
           <SceneGallery
@@ -286,7 +307,7 @@ export function GmShell({
       )}
 
       {/* The roster owns its frame. */}
-      {tab("roster") && <PartyRosterTab state={state} onCreateCharacter={() => navigate("/builder")} />}
+      {tab("roster") && <PartyRosterTab state={state} token={token} onCreateCharacter={() => navigate("/builder")} />}
       {tab("replay") && (
         <ReplayList role="gm" token={token} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />
       )}
@@ -338,6 +359,7 @@ export function GmShell({
               if (sceneId) setPendingStageSceneId(sceneId);
             }}
             onMapUploaded={() => void loadMaps()}
+            onSetGrid={setGridFor}
           />
         </Modal>
       )}
@@ -391,6 +413,7 @@ export function GmShell({
             }}
             onSignOut={onSignOut}
             onRevokeAll={() => void revokeAll()}
+            onChangePassword={onChangePassword}
           />
         ))}
       {dialog}

@@ -11,6 +11,7 @@ import { MapCatalogStore } from "../src/map-catalog.js";
 import { createMapRouter } from "../src/map-http.js";
 import { openApiDocument } from "../src/openapi/document.js";
 import { png } from "./image-fixtures.js";
+import { fixedVerifiers } from "./fixed-verifiers.js";
 
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -29,9 +30,9 @@ async function fixture() {
     createMapRouter({
       assets,
       catalog,
-      authorizeGm: (token) => token === "gm-token",
-      authorizePlayer: (token) => token === "player-token",
-      authorizeViewer: (token) => token === "viewer-token",
+      verifiers: fixedVerifiers({ gm: ["gm-token"], player: ["player-token"], viewer: ["viewer-token"] }),
+      playerMayLoad: () => true,
+      viewerMayLoad: () => true,
       now: () => Date.parse("2026-07-16T03:00:00.000Z")
     })
   );
@@ -81,7 +82,7 @@ describe("map asset HTTP workflow", () => {
     expect(list.data.assets).toHaveLength(1);
 
     const contentPath = `${test.base}/api/v1/map-assets/${id}/content`;
-    expect((await fetch(contentPath)).status).toBe(403);
+    expect((await fetch(contentPath)).status).toBe(401);
     const whole = await fetch(contentPath, { headers: { authorization: "Bearer player-token" } });
     expect(Buffer.from(await whole.arrayBuffer())).toEqual(test.input);
     expect(whole.headers.get("cache-control")).toBe("private, no-store");
@@ -139,7 +140,7 @@ describe("map asset HTTP workflow", () => {
     );
     const id = upload.data.asset.id;
     const gridPath = `${test.base}/api/v1/map-assets/${id}/grid`;
-    expect((await fetch(gridPath)).status).toBe(403);
+    expect((await fetch(gridPath)).status).toBe(401);
     expect(
       (await body(await fetch(gridPath, { headers: { authorization: "Bearer gm-token" } }))).data.calibration
     ).toBeNull();

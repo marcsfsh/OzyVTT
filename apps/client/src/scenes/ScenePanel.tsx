@@ -18,7 +18,8 @@ export function ScenePanel({
   mapLibrary,
   stagingDefaults,
   onCreated,
-  onMapUploaded
+  onMapUploaded,
+  onSetGrid
 }: Readonly<{
   actors: readonly GmActor[];
   selectedMap: MapSelection | null;
@@ -30,6 +31,8 @@ export function ScenePanel({
   onCreated?: (sceneId?: string) => void;
   /** A map was uploaded from this panel's picker. */
   onMapUploaded?: (map: PickerMap) => void;
+  /** Opens a map's grid calibration, for a map that has none. */
+  onSetGrid?: (mapId: string) => void;
 }>) {
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
@@ -43,9 +46,11 @@ export function ScenePanel({
   const sceneMap: MapSelection | PickerMap | null =
     picked ?? (selectedMap?.kind === "battlemap" ? selectedMap : null) ?? battlemaps[0] ?? null;
 
+  const needsGrid = sceneMap !== null && !sceneMap.calibration && !sceneMap.scale;
+
   const create = () => {
     if (!sceneMap) {
-      setMessage("Pick a battle map first - upload one right in the picker if the library is empty.");
+      setMessage("Pick a battle map first. Upload one in the picker if the library is empty.");
       return;
     }
     // The name is optional: an unnamed scene takes its map's name. SceneSchema caps names at 120 chars.
@@ -63,10 +68,11 @@ export function ScenePanel({
 
   return (
     <section className="scene-panel" aria-labelledby="scene-panel-heading">
+      {/* The dialog's title already says "New scene", so the panel only explains. */}
       <div className="scene-panel-heading">
-        <div>
-          <h2 id="scene-panel-heading">Prepare a scene</h2>
-        </div>
+        <h2 id="scene-panel-heading" className="nh-sr-only">
+          Prepare a scene
+        </h2>
         <p>A scene is a map plus who is on it. Arrange it privately, then make it live when the table is ready.</p>
       </div>
 
@@ -97,15 +103,20 @@ export function ScenePanel({
           onSelectMap={setPicked}
           mapFallback={mapLibrary}
           onMapUploaded={onMapUploaded}
+          {...(onSetGrid ? { onSetGrid } : {})}
+          mapNeedsGrid={needsGrid}
           stagingRevealed={(stagingDefaults?.visibility ?? "public") !== "gm-only"}
           combatActive={false}
           busy={busy}
           emptyNote="Nobody staged. Add characters or monsters below."
           placementHint={false}
           footer={
-            <Button variant="primary" type="submit" disabled={busy || !sceneMap}>
-              Prepare scene
-            </Button>
+            <>
+              <Button variant="primary" type="submit" disabled={busy || !sceneMap}>
+                Prepare scene
+              </Button>
+              {!sceneMap && <span className="scene-create-why">Pick a battle map to prepare the scene.</span>}
+            </>
           }
         />
       </form>

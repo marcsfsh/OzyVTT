@@ -32,6 +32,8 @@ export { SegmentedControl, type SegmentedOption } from "./primitives/SegmentedCo
 export { Steps, type StepItem } from "./primitives/Steps";
 export { Skeleton } from "./primitives/Skeleton";
 export { Kbd } from "./primitives/Kbd";
+export { QrCode } from "./primitives/QrCode";
+export { encodeQr, type QrMatrix } from "./primitives/qr-encode";
 
 /* Authoring primitives (Codex + homebrew editors, and any long typed-entity form) */
 export { FieldGrid } from "./primitives/FieldGrid";

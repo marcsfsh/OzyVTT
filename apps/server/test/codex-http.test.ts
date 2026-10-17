@@ -12,6 +12,7 @@ import { createCodexRouter } from "../src/codex-http.js";
 import { CODEX_ASSET_PATHS, CODEX_PATHS } from "@vtt/api-contract";
 import { openApiDocument } from "../src/openapi/document.js";
 import { png } from "./image-fixtures.js";
+import { credentialPerScope, fixedVerifiers } from "./fixed-verifiers.js";
 
 // HTTP-boundary tests for the codex router, which enforces viewer safety by choosing a GM or player
 // projection per role. These confirm the wiring: unrevealed = 404 not 403, gmBody never reaches a
@@ -37,12 +38,14 @@ async function fixture(pings?: unknown[][]) {
     createCodexRouter({
       store,
       assets,
-      authorizeGm: (token) => token === "gm-token",
       // The preview token is a real player principal, as `auth.issuePreviewPlayerSession()` mints one, so it
-      // authorizes as a player and gets the player projection.
-      authorizePlayer: (token) => token === "player-token" || token === PREVIEW_TOKEN,
-      // Two single-scope credentials, so a verifier that ignored the scope would fail.
-      verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
+      // authorizes as a player and gets the player projection. Two single-scope credentials, so a verifier that
+      // ignored the scope would fail.
+      verifiers: fixedVerifiers({
+        gm: ["gm-token"],
+        player: ["player-token", PREVIEW_TOKEN],
+        integration: credentialPerScope
+      }),
       // Records arguments, not just calls, so a content-free ping can be told from one carrying a scope word.
       notifyChanged: (...args: unknown[]) => {
         pings?.push(args);
@@ -220,13 +223,13 @@ describe("codex HTTP viewer-safety boundary", () => {
     const noauthBody = await body(noauth);
     expect(noauthBody.ok).toBe(false);
     expect(noauthBody.error.code).toBe("unauthenticated");
-    // A token that was presented and failed is 403 too, never 401.
+    // A token that is no live credential is a 401 too: the caller has to sign in again (ADR-0027).
     const junk = await get(base, "/api/v1/codex/pages", {
       authorization: "Bearer nonsense",
       "content-type": "application/json"
     });
-    expect(junk.status).toBe(403);
-    expect((await body(junk)).error.code).toBe("forbidden");
+    expect(junk.status).toBe(401);
+    expect((await body(junk)).error.code).toBe("unauthenticated");
   });
 
   it("returns a 409 conflict envelope on a stale expectedRev", async () => {
@@ -438,9 +441,9 @@ describe("codex HTTP viewer-safety boundary", () => {
       (await get(base, contentPath, INTEGRATION_WRITE)).status,
       "write is not read - the scope still decides"
     ).toBe(403);
-    // No token at all is 403 rather than 401: this route refuses before any lookup, so a media URL cannot
-    // become an existence oracle. That is the contract's one stated exception.
-    expect((await fetch(`${base}${contentPath}`)).status).toBe(403);
+    // No token at all is a 401. The route refuses before any lookup, so the answer never depends on whether the
+    // image exists and a media URL cannot become an existence oracle.
+    expect((await fetch(`${base}${contentPath}`)).status).toBe(401);
   });
 
   // An oversized page image is the documented 413, not a sanitized 500: the route-level `express.raw` parser
@@ -2063,9 +2066,7 @@ describe("Codex routes vs the published contract", () => {
     const router = createCodexRouter({
       store,
       assets,
-      authorizeGm: (token) => token === "gm-token",
-      authorizePlayer: () => false,
-      verifyIntegration: () => null,
+      verifiers: fixedVerifiers({ gm: ["gm-token"] }),
       notifyChanged: () => {},
       issuePreviewSession: () => PREVIEW_TOKEN
     }) as unknown as { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> };

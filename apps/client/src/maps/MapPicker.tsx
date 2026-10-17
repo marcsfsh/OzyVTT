@@ -117,7 +117,7 @@ export function MapPicker({
       setJustUploaded(picked);
       onSelect(picked, { fromUpload: true });
       onUploaded?.(picked);
-      toast(duplicate ? "That image was already here — the existing map is selected." : "Map uploaded.", {
+      toast(duplicate ? "That image was already here, so the existing map is selected." : "Map uploaded.", {
         tone: "success"
       });
     } catch (failure) {
@@ -162,7 +162,7 @@ export function MapPicker({
               <IconPlus />
             </span>
             <span className="map-tile-name">{busy ? "Uploading…" : "Upload a map"}</span>
-            <span className="map-tile-meta">Stays in this panel</span>
+            <span className="map-tile-meta">An image file</span>
           </button>
           <input
             ref={fileRef}
@@ -189,12 +189,12 @@ export function MapPicker({
       </ul>
       {shown.length === 0 && (
         <p className="map-picker-empty">
-          {needle || folder ? "No maps match that." : "No maps yet — upload one above."}
+          {needle || folder ? "No maps match that." : "No maps yet. Upload one above."}
         </p>
       )}
       {justUploaded && !justUploaded.calibration && !justUploaded.scale && (
         <p className="map-picker-note">
-          <strong>{justUploaded.name}</strong> has no grid yet — tokens still place, they just will not snap.
+          <strong>{justUploaded.name}</strong> has no grid yet. Tokens still go on it but won't snap to squares.
           {onSetGrid && (
             <>
               {" "}

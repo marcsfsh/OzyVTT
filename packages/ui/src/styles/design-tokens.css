@@ -88,6 +88,9 @@
   /* Raised to pass AA on all three surfaces in every theme. */
   --text-muted: #9d94cc;
   --text-on-neon: #04141c; /* dark ink on bright neon fills */
+  /* A QR code is dark ink on a light ground in every theme, because phone cameras look for that. */
+  --qr-ink: #04141c;
+  --qr-paper: #ffffff;
 
   /* Glows: bloom in dark/dusk. State only, never resting elevation.
      Glow switches on/off smoothly and never pulses. */

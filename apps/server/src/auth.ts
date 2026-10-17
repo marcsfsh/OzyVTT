@@ -16,6 +16,9 @@ export type GmSession = { role: "gm"; sessionId: string; issuedAt: number; expir
 export type PlayerSession = { role: "player"; sessionId: string; issuedAt: number; expiresAt: number };
 type Session = GmSession | PlayerSession;
 
+/** How long a GM sign-in lasts. */
+export const GM_SESSION_MS = 12 * 60 * 60 * 1000;
+
 // Cost 12 takes ~440 ms per hash; tests bootstrap a GM many times, so they use the minimum.
 const PASSWORD_HASH_COST = process.env.VITEST ? 4 : 12;
 
@@ -62,7 +65,28 @@ export class AuthService {
   async login(password: string) {
     if (!this.data || !(await bcrypt.compare(password, this.data.passwordHash))) return null;
     const now = Date.now();
-    return this.sign({ role: "gm", sessionId: randomUUID(), issuedAt: now, expiresAt: now + 12 * 60 * 60 * 1000 });
+    return this.sign({ role: "gm", sessionId: randomUUID(), issuedAt: now, expiresAt: now + GM_SESSION_MS });
+  }
+  /**
+   * Replaces the GM password after checking the current one, and ends every GM session issued before now. Returns a
+   * new token for the caller, issued after that cutoff so it survives it; null when `current` is wrong.
+   */
+  async changePassword(current: string, next: string): Promise<string | null> {
+    if (!this.data || !(await bcrypt.compare(current, this.data.passwordHash))) return null;
+    const now = Date.now();
+    this.data = {
+      ...this.data,
+      passwordHash: await bcrypt.hash(next, PASSWORD_HASH_COST),
+      gmSessionsRevokedBefore: now,
+      revokedGmSessionIds: {}
+    };
+    await this.persist();
+    return this.sign({
+      role: "gm",
+      sessionId: randomUUID(),
+      issuedAt: now + 1,
+      expiresAt: now + 1 + GM_SESSION_MS
+    });
   }
   issuePlayerSession() {
     if (!this.data) throw new Error("The host must complete GM setup before players join.");

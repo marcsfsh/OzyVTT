@@ -22,7 +22,9 @@ export const HOST_PATHS = {
   gmSignIn: `${HOST_NAMESPACE}/gm/sign-in`,
   gmSignOut: `${HOST_NAMESPACE}/gm/sign-out`,
   gmRevokeAll: `${HOST_NAMESPACE}/gm/revoke-all`,
-  viewerUrls: `${HOST_NAMESPACE}/gm/viewer-urls`
+  gmPassword: `${HOST_NAMESPACE}/gm/password`,
+  viewerUrls: `${HOST_NAMESPACE}/gm/viewer-urls`,
+  joinUrls: `${HOST_NAMESPACE}/gm/join-urls`
 } as const;
 
 export const INTEGRATION_CREDENTIAL_PATHS = {
@@ -54,6 +56,8 @@ export const SOUND_ASSET_PATHS = {
 
 /** The HttpOnly cookie a paired table viewer (or the GM's preview of it) authenticates with. */
 export const VIEWER_SESSION_COOKIE = "vtt_viewer_session";
+/** Holds a table screen's open pairing request until the GM lets it in; scoped to the screen-pairing routes. */
+export const VIEWER_PAIRING_COOKIE = "vtt_viewer_pairing";
 
 /** Documentation-only path constants for `viewer-http.ts`'s router. See the note on MAP_ASSET_PATHS. */
 export const VIEWER_PATHS = {
@@ -65,7 +69,11 @@ export const VIEWER_PATHS = {
   presentationCommands: `${API_NAMESPACE}/viewer/presentation/commands`,
   previewSession: `${API_NAMESPACE}/viewer/preview-session`,
   events: `${API_NAMESPACE}/viewer/events`,
-  soundStatus: `${API_NAMESPACE}/viewer/sound-status`
+  soundStatus: `${API_NAMESPACE}/viewer/sound-status`,
+  /** A table screen asks to pair and shows a short code; the GM types that code to let it in (ADR-0028). */
+  screenPairings: `${API_NAMESPACE}/viewer/screen-pairings`,
+  screenPairingsCurrent: `${API_NAMESPACE}/viewer/screen-pairings/current`,
+  screenPairingsApprove: `${API_NAMESPACE}/viewer/screen-pairings/approve`
 } as const;
 
 /**

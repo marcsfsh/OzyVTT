@@ -201,3 +201,16 @@
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
+
+/* A map with no grid: the note and its button on one wrapping line. */
+.scene-prep-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* Why the primary is disabled, beside it. */
+.scene-create-why {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}

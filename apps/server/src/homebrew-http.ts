@@ -16,7 +16,6 @@ import {
 } from "@vtt/api-contract";
 import {
   apiErrorHandler,
-  bearerToken,
   expressPath,
   issuesOf,
   pathParam,
@@ -45,6 +44,7 @@ import {
 } from "./homebrew-ids.js";
 import { rewriteForNewId, type HomebrewSourceRecord } from "./homebrew-srd-copy.js";
 import type { HomebrewValidationScenario } from "./homebrew-validate.js";
+import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 
 /**
  * Homebrew authoring REST (`/api/v1/homebrew/*`). Every route is GM-only: players see homebrew only through the
@@ -95,9 +95,8 @@ const NO_CATALOG: HomebrewCatalogLookup = () => undefined;
 
 export type HomebrewRouterOptions = Readonly<{
   store: HomebrewStore;
-  authorizeGm: (token: string | undefined) => boolean;
-  /** Used only to answer an authenticated player 403 instead of 401, never to grant access. */
-  authorizePlayer: (token: string | undefined) => boolean;
+  /** The server's credential checks; only a GM session reaches homebrew. */
+  verifiers: CredentialVerifiers;
   /** Emit the content-free `homebrew:changed` ping so every client refetches its own merged catalog. */
   notifyChanged: () => void;
   validate?: HomebrewValidator;
@@ -138,13 +137,11 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   const usagesOf = options.usagesOf ?? NO_USAGES;
   const catalogRecord = options.catalogRecord ?? NO_CATALOG;
 
-  /** 401 for an unauthenticated caller, 403 for an authenticated player (both declared in the contract). */
+  /** 401 without a live credential, 403 for any other valid one (both declared in the contract). */
   const requireGm = (request: Request, response: Response, next: NextFunction) => {
-    const token = bearerToken(request);
-    if (options.authorizeGm(token)) return next();
-    if (options.authorizePlayer(token))
-      return sendFailure(response, 403, "forbidden", "Homebrew authoring is the GM's.");
-    return sendFailure(response, 401, "unauthenticated", "A valid GM session is required.");
+    const caller = callerOf(request, response, options.verifiers);
+    if (caller.kind === "gm") return next();
+    return refuse(response, caller, "Homebrew authoring is the GM's.");
   };
 
   /** `type` lives on the row, not the body, but is put back here so pack records are self-describing. */

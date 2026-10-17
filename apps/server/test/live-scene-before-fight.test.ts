@@ -286,7 +286,10 @@ describe("the table screen and the live scene", () => {
 
     // A screen nobody has started yet comes on with the first live scene.
     await goLive("Crypt", mapIds[0]);
-    expect(server.viewerPresentation.snapshot).toMatchObject({ enabled: true, activeMap: { assetId: mapIds[0] } });
+    expect(server.viewerPresentation.snapshot).toMatchObject({
+      enabled: true,
+      activeMap: { assetId: mapIds[0], altText: "Crypt" }
+    });
 
     // Paused by the GM, it stays paused when the next scene goes live.
     await screen({ type: "viewer.enabled.set", enabled: false });
@@ -300,7 +303,11 @@ describe("the table screen and the live scene", () => {
       encounter: { mapAssetId: mapIds[1] },
       activeMap: { assetId: mapIds[1] }
     });
+    // A scene going live on another map names that map on the screen, never the placeholder "Battle map".
     await goLive("Crypt again", mapIds[0]);
-    expect(server.viewerPresentation.snapshot).toMatchObject({ enabled: true, activeMap: { assetId: mapIds[0] } });
+    expect(server.viewerPresentation.snapshot).toMatchObject({
+      enabled: true,
+      activeMap: { assetId: mapIds[0], altText: "Crypt" }
+    });
   });
 });

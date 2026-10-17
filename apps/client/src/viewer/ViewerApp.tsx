@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewerSoundProjection } from "@vtt/domain";
-import { Button, Input } from "@vtt/ui";
 import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
 import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
@@ -8,6 +7,7 @@ import { TerrainOverlay } from "../scene/TerrainOverlay";
 import { bandFraction, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
+import { ScreenPairing } from "./ScreenPairing";
 import { TableSound } from "./TableSound";
 import "./viewer.css";
 
@@ -89,57 +89,6 @@ const isUnpaired = (error: unknown) => error instanceof ApiError && error.status
 
 function imageUrl(assetId: string) {
   return `/api/v1/map-assets/${encodeURIComponent(assetId)}/content`;
-}
-
-function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("Table display");
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setMessage("");
-    try {
-      await apiRequest("/api/v1/viewer/pairings/exchange", { body: { code, name }, failure });
-      onPaired();
-    } catch (error) {
-      setMessage((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <main className="viewer-pairing">
-      <form onSubmit={submit} aria-labelledby="pair-title">
-        <span className="viewer-eyebrow">SHARED TABLE VIEWER</span>
-        <h1 id="pair-title">Pair this screen</h1>
-        <p>Ask the GM for the temporary pairing code. This screen receives only player-safe presentation data.</p>
-        <label>
-          Display name
-          <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} autoComplete="off" />
-        </label>
-        <label>
-          Pairing code
-          <Input
-            value={code}
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
-            placeholder="XXXX-XXXX-XXXX"
-            inputMode="text"
-            autoCapitalize="characters"
-            autoComplete="one-time-code"
-            autoFocus
-          />
-        </label>
-        <Button variant="primary" type="submit" disabled={busy}>
-          {busy ? "Pairing…" : "Pair viewer"}
-        </Button>
-        <p className="viewer-feedback" role="alert">
-          {message}
-        </p>
-      </form>
-    </main>
-  );
 }
 
 export function Initiative({
@@ -523,7 +472,7 @@ export function ViewerApp() {
     void connect();
     return () => sourceRef.current?.close();
   }, [connect]);
-  if (connection === "pairing") return <Pairing onPaired={() => void connect()} />;
+  if (connection === "pairing") return <ScreenPairing onPaired={() => void connect()} />;
   if (!presentation)
     return (
       <main className="viewer-waiting">
