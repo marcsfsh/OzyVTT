@@ -130,7 +130,7 @@ const codexOp = (
   responses: {
     [options.ok ?? "200"]: { description: "Success", ...codexJson(okRef) },
     ...(options.notModified
-      ? { "304": { description: "Not modified - the weak `ETag` you sent as `If-None-Match` is still current." } }
+      ? { "304": { description: "Not modified: the weak `ETag` you sent as `If-None-Match` is still current." } }
       : {}),
     ...(options.bad === false ? {} : { "400": apiError }),
     "401": apiError,
@@ -207,7 +207,7 @@ export const openApiDocument = {
     version: API_VERSION,
     // Described per surface: only game writes accept an optional `commandId`; codex and homebrew bodies are strict.
     description:
-      "Versioned, recipient-safe integration contract for a self-hosted VTT. Game writes accept an optional `commandId` (UUID) executed exactly once - supply your own and resend it to retry safely, and the server replays the stored outcome with `duplicate: true`; codex JSON-body writes accept one too - a replay carries `x-idempotent-replay: true` - while codex body-less POSTs, codex DELETEs and every homebrew write carry none and rely on `expectedRev` plus their own conflict rules instead. Stale-revision writes are rejected with 409 + `error.currentRevision` (`expectedRevision` targets the global game revision; `expectedRev` targets one record's revision). A missing, malformed, expired or revoked credential is 401; a valid credential without the role or scope is 403 (ADR-0027); and the existence of a secret record always reads as 404."
+      "Versioned, recipient-safe integration contract for a self-hosted VTT. Game writes accept an optional `commandId` (UUID) executed exactly once: supply your own and resend it to retry safely, and the server replays the stored outcome with `duplicate: true`; codex JSON-body writes accept one too (a replay carries `x-idempotent-replay: true`), while codex body-less POSTs, codex DELETEs and every homebrew write carry none and rely on `expectedRev` plus their own conflict rules instead. Stale-revision writes are rejected with 409 + `error.currentRevision` (`expectedRevision` targets the global game revision; `expectedRev` targets one record's revision). A missing, malformed, expired or revoked credential is 401; a valid credential without the role or scope is 403 (ADR-0027); and the existence of a secret record always reads as 404."
   },
   servers: [{ url: API_NAMESPACE }],
   paths: {
@@ -575,7 +575,7 @@ export const openApiDocument = {
       get: {
         operationId: "getMapAssetContent",
         description:
-          "Renderer-safe original image bytes. Authorized for the GM, a player in the active encounter on this map, or a paired viewer session (cookie) - any one is sufficient. Supports ETag/If-None-Match (304), byte-range requests (206/416), and is always sent with `Cache-Control: private, no-store` since access can be revoked at any time.",
+          "Renderer-safe original image bytes. Authorized for the GM, a player in the active encounter on this map, or a paired viewer session (cookie); any one is sufficient. Supports ETag/If-None-Match (304), byte-range requests (206/416), and is always sent with `Cache-Control: private, no-store` since access can be revoked at any time.",
         security: [{ gmAuth: [] }, { viewerCookieAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: {
@@ -1006,7 +1006,7 @@ export const openApiDocument = {
         operationId: "getGameSnapshot",
         security: gameSecurityWithPlayer("game:read"),
         description:
-          "The authoritative game state, projected for the caller: GM sessions and integration credentials get the full GM view (hidden combatants, notes, turn-history metadata) unless `view=player` asks for the player-safe projection; player session tokens always get the player-safe view. Sends a weak ETag derived from the revision - poll with If-None-Match for cheap 304s (presence and timed-annotation expiry do not bump the revision, so re-fetch when you need those fresh).",
+          "The authoritative game state, projected for the caller: GM sessions and integration credentials get the full GM view (hidden combatants, notes, turn-history metadata) unless `view=player` asks for the player-safe projection; player session tokens always get the player-safe view. Sends a weak ETag derived from the revision; poll with If-None-Match for cheap 304s (presence and timed-annotation expiry do not bump the revision, so re-fetch when you need those fresh).",
         parameters: [
           { name: "view", in: "query", required: false, schema: { type: "string", enum: ["gm", "player"] } }
         ],
@@ -1191,7 +1191,7 @@ export const openApiDocument = {
         operationId: "issuePlayerSession",
         security: [],
         description:
-          "Issues a player session token - the HTTP mirror of the socket's open join, for headless or custom player clients. LAN-trust by design: no credentials required, but the host must have completed GM setup. The token then authenticates player-limited calls across this API.",
+          "Issues a player session token: the HTTP mirror of the socket's open join, for headless or custom player clients. LAN-trust by design: no credentials required, but the host must have completed GM setup. The token then authenticates player-limited calls across this API.",
         responses: {
           "201": {
             description: "Player session issued",
@@ -1289,7 +1289,7 @@ export const openApiDocument = {
         operationId: "listContentGlossary",
         security: gameSecurityWithPlayer("game:read"),
         description:
-          "The SRD 5.2.1 Rules Glossary, one entry per term with its bracketed tag (public information - any GM, player, or integration session). Includes the CC BY 4.0 attribution line.",
+          "The SRD 5.2.1 Rules Glossary, one entry per term with its bracketed tag (public information: any GM, player, or integration session). Includes the CC BY 4.0 attribution line.",
         responses: {
           "200": {
             description: "Rules Glossary entries",
@@ -1305,7 +1305,7 @@ export const openApiDocument = {
         operationId: "listContentConditions",
         security: gameSecurityWithPlayer("game:read"),
         description:
-          "The bundled SRD condition reference (public information - any GM, player, or integration session). Includes the CC BY 4.0 attribution line.",
+          "The bundled SRD condition reference (public information: any GM, player, or integration session). Includes the CC BY 4.0 attribution line.",
         responses: {
           "200": {
             description: "Condition reference entries",
@@ -1319,14 +1319,14 @@ export const openApiDocument = {
     [CONTENT_PATHS.skills]: {
       get: contentCatalogOperation(
         "listContentSkills",
-        "The skill catalog: reference text plus the ability each check uses, as data - the source the builder and sheet read instead of a hardcoded client list, so a homebrew skill is one catalog row. Includes the CC BY 4.0 attribution line.",
+        "The skill catalog: reference text plus the ability each check uses, as data: the source the builder and sheet read instead of a hardcoded client list, so a homebrew skill is one catalog row. Includes the CC BY 4.0 attribution line.",
         "ContentSkillsResponse"
       )
     },
     [CONTENT_PATHS.languages]: {
       get: contentCatalogOperation(
         "listContentLanguages",
-        "The language catalog: the SRD's Standard and Rare language tables as data, each row tagged with the table it is printed in. The builder's \"Common plus two languages\" budget resolves against this - as prose it could not be offered at all. Includes the CC BY 4.0 attribution line.",
+        "The language catalog: the SRD's Standard and Rare language tables as data, each row tagged with the table it is printed in. The builder's \"Common plus two languages\" budget resolves against this; as prose it could not be offered at all. Includes the CC BY 4.0 attribution line.",
         "ContentLanguagesResponse"
       )
     },
@@ -1340,7 +1340,7 @@ export const openApiDocument = {
     [CONTENT_PATHS.equipment]: {
       get: contentCatalogOperation(
         "listContentEquipment",
-        "The bundled SRD equipment catalog - gear, weapons, and armor folded into one browse-and-add list, with the weapon/armor blocks populated for those categories. Includes the CC BY 4.0 attribution line.",
+        "The bundled SRD equipment catalog: gear, weapons, and armor folded into one browse-and-add list, with the weapon/armor blocks populated for those categories. Includes the CC BY 4.0 attribution line.",
         "ContentEquipmentResponse"
       )
     },
@@ -1407,7 +1407,7 @@ export const openApiDocument = {
         operationId: "getEncounterArchive",
         security: gameSecurity("combat:read"),
         description:
-          "One archive, projected for the caller. A GM receives the full machine-readable document (archiveSchemaVersion 3): per-turn full states, combat log, complete per-command journal, final state, the post-encounter aftermath state, all dice rolls, and the stat blocks used. A PLAYER session receives a computed player replay instead - per-turn player projections, public rolls only, no journal, no raw states, no stat blocks, no session ids - and only for an archive the GM has shared; an unshared or missing archive is 404 either way, never 403.",
+          "One archive, projected for the caller. A GM receives the full machine-readable document (archiveSchemaVersion 3): per-turn full states, combat log, complete per-command journal, final state, the post-encounter aftermath state, all dice rolls, and the stat blocks used. A PLAYER session receives a computed player replay instead (per-turn player projections, public rolls only, no journal, no raw states, no stat blocks, no session ids), and only for an archive the GM has shared; an unshared or missing archive is 404 either way, never 403.",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }],
         responses: {
           "200": {
@@ -1446,7 +1446,7 @@ export const openApiDocument = {
         operationId: "setEncounterArchiveVisibility",
         security: gameSecurity("combat:write"),
         description:
-          "Shares (or un-shares) one archived encounter with players (GM sessions and integration credentials only). Hidden by default - an ended fight is the GM's record until the GM says otherwise. Sharing makes the archive appear in a player's `GET /encounters` list and lets `GET /encounters/{id}` answer them with the computed player replay; un-sharing takes both away again.",
+          "Shares (or un-shares) one archived encounter with players (GM sessions and integration credentials only). Hidden by default: an ended fight is the GM's record until the GM says otherwise. Sharing makes the archive appear in a player's `GET /encounters` list and lets `GET /encounters/{id}` answer them with the computed player replay; un-sharing takes both away again.",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }],
         requestBody: {
           required: true,
@@ -1531,7 +1531,7 @@ export const openApiDocument = {
         notFound: true,
         params: [uuidParam("id")],
         description:
-          "One page with its connections - one list where backlinks and typed relationships used to be two, projected for the caller."
+          "One page with its connections: one list where backlinks and typed relationships used to be two, projected for the caller."
       }),
       patch: codexOp("updateCodexPage", codexWrite, "CodexPageResponse", {
         body: "CodexPageUpdateRequest",
@@ -1561,7 +1561,7 @@ export const openApiDocument = {
         params: [uuidParam("id")],
         notFound: true,
         description:
-          'Declares a connection from this page to another. Counts as an edit of BOTH pages for "recently updated" - but neither page\'s `rev` changes, so an open editor is not forced into a conflict. Idempotent on `(from, to, label)`, and on the reverse pair too for a symmetric label ("ally of", "enemy of", "rival of", "related to"), so declaring the same edge twice returns the existing one rather than doubling it.'
+          'Declares a connection from this page to another. Counts as an edit of BOTH pages for "recently updated", but neither page\'s `rev` changes, so an open editor is not forced into a conflict. Idempotent on `(from, to, label)`, and on the reverse pair too for a symmetric label ("ally of", "enemy of", "rival of", "related to"), so declaring the same edge twice returns the existing one rather than doubling it.'
       })
     },
     [CODEX_PATHS.pageMarkers]: {
@@ -1571,7 +1571,7 @@ export const openApiDocument = {
         notFound: true,
         params: [uuidParam("id")],
         description:
-          "The reverse of `/codex/maps/{id}/markers`: every atlas marker that links THIS page, so an open page can point back at the map. Role-scoped by exactly the forward route's predicate - a player must be able to see the page itself (an unrevealed page 404s), and then receives only revealed pins whose MAP is also revealed, with each pin's links filtered to the revealed subset and scene/actor ids stripped."
+          "The reverse of `/codex/maps/{id}/markers`: every atlas marker that links THIS page, so an open page can point back at the map. Role-scoped by exactly the forward route's predicate: a player must be able to see the page itself (an unrevealed page 404s), and then receives only revealed pins whose MAP is also revealed, with each pin's links filtered to the revealed subset and scene/actor ids stripped."
       })
     },
     [CODEX_PATHS.pageRevisions]: {
@@ -1598,7 +1598,7 @@ export const openApiDocument = {
         ok: "201",
         bad: false,
         description:
-          "Mints a short-lived PLAYER session token so the GM can preview the player Codex truthfully. Deliberately a real player principal rather than a role flag on the GM's session - every read then walks the same authorization and projection path a genuine player gets, so the preview can never show what a player could not see."
+          "Mints a short-lived PLAYER session token so the GM can preview the player Codex truthfully. Deliberately a real player principal rather than a role flag on the GM's session; every read then walks the same authorization and projection path a genuine player gets, so the preview can never show what a player could not see."
       })
     },
     [CODEX_PATHS.folders]: {
@@ -1622,7 +1622,7 @@ export const openApiDocument = {
     [CODEX_PATHS.foldersDelete]: {
       post: codexOp("deleteCodexFolder", codexWrite, "CodexDeletedResponse", {
         body: "CodexFolderPathRequest",
-        description: "Deletes a folder and its subfolders; every page under it drops to the top level - never deleted."
+        description: "Deletes a folder and its subfolders; every page under it drops to the top level and is kept."
       })
     },
     [CODEX_PATHS.connections]: {
@@ -1630,7 +1630,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "Every connection in the codex - ONE edge kind for the whole graph. A typed relationship and a `[[wiki link]]` are the same thing with a different `origin`; a connection may carry an optional `label`. Role-scoped by three gates, all of which must hold for a player: the target page is revealed, the SOURCE record is revealed by its own kind's player rule, and the connection sits on the `player` layer (a link written in a GM body is a GM note about a connection, not a connection the party has been shown)."
+          "Every connection in the codex: ONE edge kind for the whole graph. A typed relationship and a `[[wiki link]]` are the same thing with a different `origin`; a connection may carry an optional `label`. Role-scoped by three gates, all of which must hold for a player: the target page is revealed, the SOURCE record is revealed by its own kind's player rule, and the connection sits on the `player` layer (a link written in a GM body is a GM note about a connection, not a connection the party has been shown)."
       })
     },
     [CODEX_PATHS.connectionById]: {
@@ -1639,7 +1639,7 @@ export const openApiDocument = {
         params: [uuidParam("id")],
         notFound: true,
         description:
-          "Relabels a DECLARED connection or moves it between layers. A `mention` connection has no id - it is derived from a body's text - and is edited by editing that text."
+          "Relabels a DECLARED connection or moves it between layers. A `mention` connection has no id (it is derived from a body's text) and is edited by editing that text."
       }),
       delete: codexOp("deleteCodexConnection", codexWrite, "CodexDeletedResponse", {
         bad: false,
@@ -1713,7 +1713,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          'Where the party pin is, and the name of the map it sits on - one read for the dashboard\'s "party is here" card and the atlas jump, replacing a client-side scan of every map. `party` is null when no pin carries the flag. For a player it is ALSO null when the party pin fails the ordinary compound reveal gate (the pin revealed AND its map revealed) - null rather than 404, so a hidden party pin is indistinguishable from no party pin at all. `isParty` grants no visibility and never enters a reveal predicate.'
+          'Where the party pin is, and the name of the map it sits on: one read for the dashboard\'s "party is here" card and the atlas jump, replacing a client-side scan of every map. `party` is null when no pin carries the flag. For a player it is ALSO null when the party pin fails the ordinary compound reveal gate (the pin revealed AND its map revealed). The answer is then null with a 200, so a hidden party pin is indistinguishable from no party pin at all. `isParty` grants no visibility and never enters a reveal predicate.'
       })
     },
     [CODEX_PATHS.markerById]: {
@@ -1723,7 +1723,7 @@ export const openApiDocument = {
         notFound: true,
         params: [uuidParam("id")],
         description:
-          'One pin, projected for the caller. A player receives it only when the pin is revealed AND its map is revealed - the CD-6 compound gate, the same predicate `GET /codex/maps/{id}/markers` applies before it projects anything - with `pageIds` filtered to the revealed subset and scene/actor links stripped. Either half failing is a 404, never a 403: a pin id must not become a probe for "is there something here?". This is what lets a reader resolve a pin without walking every map.'
+          "One pin, projected for the caller. A player receives it only when the pin is revealed AND its map is revealed: the CD-6 compound gate, the same predicate `GET /codex/maps/{id}/markers` applies before it projects anything, with `pageIds` filtered to the revealed subset and scene/actor links stripped. Either half failing is a 404, never a 403: a pin id must not become a probe for whether something is there. This is what lets a reader resolve a pin without walking every map."
       }),
       patch: codexOp("updateCodexMarker", codexWrite, "CodexMarkerResponse", {
         body: "CodexMarkerUpdateRequest",
@@ -1759,7 +1759,7 @@ export const openApiDocument = {
         params: [uuidParam("id")],
         notFound: true,
         description:
-          'Marks this pin as where the party is, or clears the flag from it. **Exactly one marker in the whole atlas** carries it, so setting a new one clears the old in a single step - the party is in exactly one place, and one-pin-per-map would leave "which pin is real?" unanswerable. `isParty: false` clears the flag from THIS marker only and never disturbs a different party pin. The flag is the pin\'s ONLY party-specific surface: it is moved, relabelled, linked, revealed and deleted through the ordinary marker routes, because the party marker is an ordinary marker with a flag rather than a marker type of its own. It is player-facing - the party pin is for the players - but it grants no visibility: a hidden party pin, or one on a hidden map, stays hidden exactly like any other pin.'
+          "Marks this pin as where the party is, or clears the flag from it. **Exactly one marker in the whole atlas** carries it, so setting a new one clears the old in a single step: the party is in exactly one place, and one-pin-per-map would leave no way to tell which pin is real. `isParty: false` clears the flag from THIS marker only and never disturbs a different party pin. The flag is the pin's ONLY party-specific surface: it is moved, relabelled, linked, revealed and deleted through the ordinary marker routes, because the party marker is an ordinary marker with a flag rather than a marker type of its own. It is player-facing (the party pin is for the players), but it grants no visibility: a hidden party pin, or one on a hidden map, stays hidden exactly like any other pin."
       })
     },
     [CODEX_PATHS.timeline]: {
@@ -1767,7 +1767,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "The ONE chronicle: every journal entry and every dated `event` page, interleaved in one in-world chronological order and returned in one row shape (`kind` discriminates - `entry`, `combat`, `event`). The client's \"by session\" lens is a regrouping of these same records, never a second fetch. Role-scoped: a player receives only revealed entries and revealed event pages, with GM-only text (`gmText`, an event's GM body), the replay linkage and the raw sort key stripped - the projection delegates to the journal and page player projections rather than restating them, so this read can never be weaker than either."
+          "The ONE chronicle: every journal entry and every dated `event` page, interleaved in one in-world chronological order and returned in one row shape (`kind` discriminates: `entry`, `combat`, `event`). The client's \"by session\" lens is a regrouping of these same records, never a second fetch. Role-scoped: a player receives only revealed entries and revealed event pages, with GM-only text (`gmText`, an event's GM body), the replay linkage and the raw sort key stripped; the projection delegates to the journal and page player projections rather than restating them, so this read can never be weaker than either."
       })
     },
     [CODEX_PATHS.journal]: {
@@ -1787,7 +1787,7 @@ export const openApiDocument = {
         body: "CodexJournalCreateRequest",
         notFound: true,
         description:
-          "Adds a journal/timeline entry. A `sessionId` naming no session is a **404**, not a 400 - the body is well-formed and the record it points at is gone."
+          "Adds a journal/timeline entry. A `sessionId` naming no session is a **404**, not a 400, because the body is well-formed and the record it points at is gone."
       })
     },
     [CODEX_PATHS.journalDeadline]: {
@@ -1796,7 +1796,7 @@ export const openApiDocument = {
         body: "CodexDeadlineCreateRequest",
         notFound: true,
         description:
-          'Adds a DEADLINE - a thing that will happen at an in-world date, which the campaign clock can reach. Its own text is the "what" and its own `inWorldDate` is the "when", so a deadline stores no extra payload at all; `fired` is DERIVED from that date against the clock on every read and never stored, which is why rewinding the clock correctly un-fires one. `inWorldDate` is REQUIRED and may not be null - an undated deadline can never fire, so it is a note, not a deadline. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal`: there is no kind-specific reveal and no kind-based visibility rule anywhere.'
+          'Adds a DEADLINE: a thing that will happen at an in-world date, which the campaign clock can reach. Its own text is the "what" and its own `inWorldDate` is the "when", so a deadline stores no extra payload at all; `fired` is DERIVED from that date against the clock on every read and never stored, which is why rewinding the clock correctly un-fires one. `inWorldDate` is REQUIRED and may not be null; an undated deadline can never fire, so it is a note, not a deadline. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal`: there is no kind-specific reveal and no kind-based visibility rule anywhere.'
       })
     },
     [CODEX_PATHS.journalDowntime]: {
@@ -1805,7 +1805,7 @@ export const openApiDocument = {
         body: "CodexDowntimeCreateRequest",
         notFound: true,
         description:
-          "Records DOWNTIME - who spent how many days doing what between adventures. Creating it NEVER moves the campaign clock; it answers with `proposedDate`, the date the clock WOULD move to, so the GM's confirm affordance can state what it will do before it does it. `POST /codex/journal/{id}/apply-downtime` is the only thing that moves the clock. Dated at the GM's current campaign date when no `inWorldDate` is given, the same rule an auto-logged battle follows, so the record lands where it happened."
+          "Records DOWNTIME: who spent how many days doing what between adventures. Creating it NEVER moves the campaign clock; it answers with `proposedDate`, the date the clock WOULD move to, so the GM's confirm affordance can state what it will do before it does it. `POST /codex/journal/{id}/apply-downtime` is the only thing that moves the clock. Dated at the GM's current campaign date when no `inWorldDate` is given, the same rule an auto-logged battle follows, so the record lands where it happened."
       })
     },
     [CODEX_PATHS.journalMilestone]: {
@@ -1814,7 +1814,7 @@ export const openApiDocument = {
         body: "CodexMilestoneCreateRequest",
         notFound: true,
         description:
-          "Records a MILESTONE - the party reached a level, and why. `level` is the level REACHED, not a step, so a deleted record cannot silently change what level the party is on (a delta would make the current level a sum over the whole timeline). There is no XP: progression here is milestone-based by design and the record carries no arithmetic. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal` - there is no kind-specific reveal. Dated at the GM's current campaign date when no `inWorldDate` is given, the rule an auto-logged battle and a downtime record already follow."
+          "Records a MILESTONE: the party reached a level, and why. `level` is the level REACHED, not a step, so a deleted record cannot silently change what level the party is on (a delta would make the current level a sum over the whole timeline). There is no XP: progression here is milestone-based by design and the record carries no arithmetic. Created HIDDEN like any other entry and published by the ordinary `POST /codex/journal/{id}/reveal`; there is no kind-specific reveal. Dated at the GM's current campaign date when no `inWorldDate` is given, the rule an auto-logged battle and a downtime record already follow."
       })
     },
     [CODEX_PATHS.journalById]: {
@@ -1823,7 +1823,7 @@ export const openApiDocument = {
         params: [uuidParam("id")],
         notFound: true,
         description:
-          "Edits a journal entry; an omitted field is left alone. A `downtime` group edits a downtime record's own `who`/`activity`/`characterPageId` - **400** on any other kind of entry, and `days` is immutable (sending it is a 400, because it is what the campaign clock already moved by)."
+          "Edits a journal entry; an omitted field is left alone. A `downtime` group edits a downtime record's own `who`/`activity`/`characterPageId`; **400** on any other kind of entry, and `days` is immutable (sending it is a 400, because it is what the campaign clock already moved by)."
       }),
       delete: codexOp("deleteCodexJournalEntry", codexWrite, "CodexDeletedResponse", {
         bad: false,
@@ -1837,7 +1837,7 @@ export const openApiDocument = {
         params: [uuidParam("id")],
         notFound: true,
         description:
-          "Shows/hides a journal entry to players. Works on EVERY journal kind, deadlines and downtime included - there is deliberately no kind-specific reveal route, because a second gate is a second thing to keep in step with the first."
+          "Shows/hides a journal entry to players. Works on EVERY journal kind, deadlines and downtime included; there is deliberately no kind-specific reveal route, because a second gate is a second thing to keep in step with the first."
       })
     },
     [CODEX_PATHS.journalApplyDowntime]: {
@@ -1845,9 +1845,9 @@ export const openApiDocument = {
         params: [uuidParam("id")],
         notFound: true,
         conflict:
-          "The downtime was already applied. A state-machine refusal rather than a lost race, so it carries NO `error.currentRevision`. An entry that is not a downtime record at all is a **400**, not this - the request named the wrong kind of thing rather than losing a race.",
+          "The downtime was already applied. A state-machine refusal rather than a lost race, so it carries NO `error.currentRevision`. An entry that is not a downtime record at all is a **400**, not this, because the request named the wrong kind of thing rather than losing a race.",
         description:
-          "Confirms a downtime record's time cost and ADVANCES the campaign clock by its `days`. The GM's explicit yes - the owner asked to be asked rather than have the clock move itself. Entry and calendar move together in one transaction and are returned together, so a client cannot render a moved clock beside an unapplied record. Applying an already-applied downtime, or any entry that is not downtime, is refused and moves nothing. Advancing the clock does NOT publish it: players keep seeing the published date until `POST /codex/calendar/publish`."
+          "Confirms a downtime record's time cost and ADVANCES the campaign clock by its `days`. The GM's explicit yes: the owner asked to be asked rather than have the clock move itself. Entry and calendar move together in one transaction and are returned together, so a client cannot render a moved clock beside an unapplied record. Applying an already-applied downtime, or any entry that is not downtime, is refused and moves nothing. Advancing the clock does NOT publish it: players keep seeing the published date until `POST /codex/calendar/publish`."
       })
     },
     [CODEX_PATHS.sessions]: {
@@ -1855,13 +1855,13 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "Every play session - the GM's prep-and-recap record of one evening at the table. Numbered sessions first in number order, then the unnumbered ones oldest-first (the same tier-separator idiom the chronicle uses for undated records). Role-scoped: a GM receives the whole record for every session plus `activeSessionId`; a player receives only REVEALED sessions, reduced to the recap layer (`id`, `sessionNumber`, `realDate`, `recap`), and `activeSessionId` is always null for a player because it can name a session they cannot see."
+          "Every play session: the GM's prep-and-recap record of one evening at the table. Numbered sessions first in number order, then the unnumbered ones oldest-first (the same tier-separator idiom the chronicle uses for undated records). Role-scoped: a GM receives the whole record for every session plus `activeSessionId`; a player receives only REVEALED sessions, reduced to the recap layer (`id`, `sessionNumber`, `realDate`, `recap`), and `activeSessionId` is always null for a player because it can name a session they cannot see."
       }),
       post: codexOp("createCodexSession", codexWrite, "CodexSessionResponse", {
         ok: "201",
         body: "CodexSessionCreateRequest",
         description:
-          "Creates a session. Every field is optional - an empty POST opens a blank `planned` session to prep into. A `sessionNumber` another session already carries is refused with 400: the journal's by-session lens resolves a number to at most one session, so numbers are unique."
+          "Creates a session. Every field is optional; an empty POST opens a blank `planned` session to prep into. A `sessionNumber` another session already carries is refused with 400: the journal's by-session lens resolves a number to at most one session, so numbers are unique."
       })
     },
     [CODEX_PATHS.sessionById]: {
@@ -1871,7 +1871,7 @@ export const openApiDocument = {
         notFound: true,
         params: [uuidParam("id")],
         description:
-          'One session, projected for the caller. An unrevealed session is **404** to a player - the same 404 an absent session gets, and never 403, because a 403 would confirm the record exists and its very existence ("session 14 is being prepped") is GM information.'
+          'One session, projected for the caller. An unrevealed session is **404** to a player: the same 404 an absent session gets, and never 403, because a 403 would confirm the record exists and its very existence ("session 14 is being prepped") is GM information.'
       }),
       patch: codexOp("updateCodexSession", codexWrite, "CodexSessionResponse", {
         body: "CodexSessionUpdateRequest",
@@ -1879,13 +1879,13 @@ export const openApiDocument = {
         notFound: true,
         conflict: "A stale `expectedRev`; `error.currentRevision` carries the session's current revision.",
         description:
-          "Edits a session; an omitted field is left alone. `expectedRev` rejects a stale write with 409. A `sessionNumber` another session already carries is a 400, not a 409 - it is a bad value, not a lost race."
+          "Edits a session; an omitted field is left alone. `expectedRev` rejects a stale write with 409. A `sessionNumber` another session already carries is a 400, because it is a bad value."
       }),
       delete: codexOp("deleteCodexSession", codexWrite, "CodexDeletedResponse", {
         bad: false,
         params: [uuidParam("id")],
         description:
-          "Deletes a session; idempotent. If it was the active session the pointer is cleared in the same transaction, so `activeSessionId` can never name a record that is gone. Journal entries that carry its `sessionNumber` are NOT deleted or renumbered - the number on an entry is a label, not a foreign key."
+          "Deletes a session; idempotent. If it was the active session the pointer is cleared in the same transaction, so `activeSessionId` can never name a record that is gone. Journal entries that carry its `sessionNumber` are NOT deleted or renumbered, because the number on an entry is a label."
       })
     },
     [CODEX_PATHS.sessionReveal]: {
@@ -1902,7 +1902,7 @@ export const openApiDocument = {
         params: [uuidParam("id")],
         notFound: true,
         description:
-          'Marks this session the ACTIVE one - the single session new journal entries (including the ones combat writes automatically at `encounter.end`) are stamped with when the caller supplies no `sessionNumber` of its own. Exactly one session is active at a time: the pointer lives on the codex metadata row, not as a flag on each session, so "two active sessions" is unrepresentable. Answers with the POINTER alone, never the session: activating is a statement about the TABLE, not an edit of the record, and it moves neither `rev` nor `updatedAt` - returning the row would imply otherwise.'
+          'Marks this session the ACTIVE one: the single session new journal entries (including the ones combat writes automatically at `encounter.end`) are stamped with when the caller supplies no `sessionNumber` of its own. Exactly one session is active at a time: the pointer lives on the codex metadata row, not as a flag on each session, so "two active sessions" is unrepresentable. Answers with the POINTER alone, never the session: activating is a statement about the TABLE, not an edit of the record, and it moves neither `rev` nor `updatedAt`; returning the row would imply otherwise.'
       })
     },
     [CODEX_PATHS.quests]: {
@@ -1910,13 +1910,13 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "Every quest - what the party is chasing, and whether it is still open. Role-scoped: a GM receives the whole record for every quest; a player receives only REVEALED quests, reduced to the player layer (`id`, `title`, `status`, `body`, `objectives`, `entityIds`). `status` IS player-facing here, unlike a session's: \"what is still open\" is the point of the feature, and a revealed quest whose state the player cannot see is useless. `entityIds` is filtered to the revealed subset, exactly as a marker's `pageIds` is."
+          "Every quest: what the party is chasing, and whether it is still open. Role-scoped: a GM receives the whole record for every quest; a player receives only REVEALED quests, reduced to the player layer (`id`, `title`, `status`, `body`, `objectives`, `entityIds`). `status` IS player-facing here, unlike a session's: \"what is still open\" is the point of the feature, and a revealed quest whose state the player cannot see is useless. `entityIds` is filtered to the revealed subset, exactly as a marker's `pageIds` is."
       }),
       post: codexOp("createCodexQuest", codexWrite, "CodexQuestResponse", {
         ok: "201",
         body: "CodexQuestCreateRequest",
         description:
-          "Creates a quest, and appends its first history record in the SAME transaction - a quest starting is an event, so its initial status is recorded exactly as a later change would be. That record is a hidden `quest` journal entry with empty player text, dated at the GM's clock and filed under the active session; revealing it publishes nothing unless the quest itself is revealed. Only `title` is required - everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later."
+          "Creates a quest, and appends its first history record in the SAME transaction; a quest starting is an event, so its initial status is recorded exactly as a later change would be. That record is a hidden `quest` journal entry with empty player text, dated at the GM's clock and filed under the active session; revealing it publishes nothing unless the quest itself is revealed. Only `title` is required; everything else opens empty, so the GM can name a lead the moment it appears at the table and fill it in later."
       })
     },
     [CODEX_PATHS.questById]: {
@@ -1926,7 +1926,7 @@ export const openApiDocument = {
         notFound: true,
         params: [uuidParam("id")],
         description:
-          'One quest, projected for the caller. An unrevealed quest is **404** to a player - the same 404 an absent quest gets, and never 403, because a 403 would confirm the record exists and its very existence ("there is a quest about the duke") is GM information.'
+          'One quest, projected for the caller. An unrevealed quest is **404** to a player: the same 404 an absent quest gets, and never 403, because a 403 would confirm the record exists and its very existence ("there is a quest about the duke") is GM information.'
       }),
       patch: codexOp("updateCodexQuest", codexWrite, "CodexQuestResponse", {
         body: "CodexQuestUpdateRequest",
@@ -1934,13 +1934,13 @@ export const openApiDocument = {
         notFound: true,
         conflict: "A stale `expectedRev`; `error.currentRevision` carries the quest's current revision.",
         description:
-          "Edits a quest; an omitted field is left alone. **A status change also appends a hidden `quest` history record** in the same transaction - editing prose does not, because that is not something that happened in the world. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given - order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position."
+          "Edits a quest; an omitted field is left alone. **A status change also appends a hidden `quest` history record** in the same transaction; editing prose does not, because that is not something that happened in the world. `expectedRev` rejects a stale write with 409. `objectives` is REPLACED wholesale and stored in exactly the order given; order is content here, not incidental, so the array is never sorted, deduped, or re-keyed by position."
       }),
       delete: codexOp("deleteCodexQuest", codexWrite, "CodexDeletedResponse", {
         bad: false,
         params: [uuidParam("id")],
         description:
-          "Deletes a quest; idempotent. The pages named by `entityIds` are untouched - the link is a reference, not ownership."
+          "Deletes a quest; idempotent. The pages named by `entityIds` are untouched, because the link is only a reference."
       })
     },
     [CODEX_PATHS.questReveal]: {
@@ -1957,7 +1957,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "Where the party stands with each faction, ROLE-SCOPED. A GM receives every standing; a player receives only those that are BOTH revealed themselves AND whose faction page is itself revealed, reduced to `factionPageId` and `value`. The second gate is not belt-and-braces: a standing row carries no title of its own (the faction's live page is the one name, so a rename cannot go stale), so a reader NAMES it by resolving `factionPageId` - and a standing published for a secret faction would hand the party a page id they cannot open beside a bar they cannot label. `value` is SIGNED, -100 (hostile) to +100 (allied), because a faction can be actively against the party and an unsigned favour scale cannot say so; a reader shows the word beside the bar, never the bar alone."
+          "Where the party stands with each faction, ROLE-SCOPED. A GM receives every standing; a player receives only those that are BOTH revealed themselves AND whose faction page is itself revealed, reduced to `factionPageId` and `value`. The second gate is not belt-and-braces: a standing row carries no title of its own (the faction's live page is the one name, so a rename cannot go stale), so a reader NAMES it by resolving `factionPageId`, and a standing published for a secret faction would hand the party a page id they cannot open beside a bar they cannot label. `value` is SIGNED, -100 (hostile) to +100 (allied), because a faction can be actively against the party and an unsigned favour scale cannot say so; a reader shows the word beside the bar, never the bar alone."
       })
     },
     [CODEX_PATHS.standingByFaction]: {
@@ -1966,7 +1966,7 @@ export const openApiDocument = {
         params: [{ name: "factionPageId", in: "path", required: true, schema: codexUuid }],
         notFound: true,
         description:
-          "Sets where the party stands with one faction, and appends the `standing` chronicle record for the change - in ONE transaction, so the table (where things stand) and the timeline (what happened) can never disagree. Creates the standing on first use: `faction_page_id` is unique, so there is exactly one row per faction and nothing to create separately. `value` is the RESULTING value and is clamped to -100..100; the chronicle record carries the DELTA, because the record says what happened while the table says where things stand. 404 when no page with that id exists. **400** when the page exists but is not a `faction`: standing is tracked against factions, and the store enforces the entity type that the spec asks for as a foreign key (SQLite cannot express it - a CHECK may not subquery). The GM Codex only offers faction pages, so this is reachable mainly by a direct API caller, or by a page whose type was changed to something else after it had a standing row."
+          "Sets where the party stands with one faction, and appends the `standing` chronicle record for the change, in ONE transaction, so the table (where things stand) and the timeline (what happened) can never disagree. Creates the standing on first use: `faction_page_id` is unique, so there is exactly one row per faction and nothing to create separately. `value` is the RESULTING value and is clamped to -100..100; the chronicle record carries the DELTA, because the record says what happened while the table says where things stand. 404 when no page with that id exists. **400** when the page exists but is not a `faction`: standing is tracked against factions, and the store enforces the entity type that the spec asks for as a foreign key (SQLite cannot express it: a CHECK may not subquery). The GM Codex only offers faction pages, so this is reachable mainly by a direct API caller, or by a page whose type was changed to something else after it had a standing row."
       })
     },
     [CODEX_PATHS.standingReveal]: {
@@ -1983,7 +1983,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          'One GM view of everything the party can currently see, across every reveal surface in the Codex - the published campaign date, pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections, not a second opinion about visibility, so it lists exactly what the corresponding player-facing endpoints would return - a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind\'s EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope - that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.'
+          'One GM view of everything the party can currently see, across every reveal surface in the Codex: the published campaign date, pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections, not a second opinion about visibility, so it lists exactly what the corresponding player-facing endpoints would return: a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind\'s EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope; that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.'
       })
     },
     [CODEX_PATHS.calendar]: {
@@ -1996,13 +1996,13 @@ export const openApiDocument = {
       put: codexOp("setCodexCalendar", codexWrite, "CodexCalendarResponse", {
         body: "CodexCalendarRequest",
         description:
-          "Replaces the world calendar and reflows every dated record's sort instant and label from the raw dates. Moves the GM's clock only: advancing NEVER publishes, so the party's `currentDate` does not move until `POST /codex/calendar/publish`. `publishedDate` is deliberately not settable here - this body replaces the whole calendar, and a player-facing value inside a wholesale replacement is one careless PUT from being cleared."
+          "Replaces the world calendar and reflows every dated record's sort instant and label from the raw dates. Moves the GM's clock only: advancing NEVER publishes, so the party's `currentDate` does not move until `POST /codex/calendar/publish`. `publishedDate` is deliberately not settable here; this body replaces the whole calendar, and a player-facing value inside a wholesale replacement is one careless PUT from being cleared."
       })
     },
     [CODEX_PATHS.calendarPublish]: {
       post: codexOp("publishCodexCampaignDate", codexWrite, "CodexCalendarResponse", {
         description:
-          "Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body - \"publish\" means exactly \"the table now sees where I am\", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one. The 400 is not reachable through any input today - the handler routes every failure through the shared codex error mapper, and documenting only the statuses currently reachable would make the document wrong the moment that changes."
+          "Publishes the GM's clock: the party's `currentDate` becomes the GM's. Takes no body; \"publish\" means exactly \"the table now sees where I am\", and an arbitrary settable published date would be a third clock to keep in step. This is the ONLY thing that moves the players' date; neither editing the calendar nor applying downtime does it. Publishing while the GM has no current date clears the published one. The 400 is not reachable through any input today; the handler routes every failure through the shared codex error mapper, and documenting only the statuses currently reachable would make the document wrong the moment that changes."
       })
     },
     [CODEX_PATHS.calendarCheck]: {
@@ -2023,19 +2023,19 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "Every codex-WIDE setting, plus what the kept revision history COSTS (`versionCount` / `versionBytes`, both server-computed and read-only). GM-only on the read as well as the write, unlike the calendar: nothing here is player-facing - these values describe how the GM's own authoring history is kept, they gate no content, and they put nothing on a player's screen. An out-of-range or unrepresentable stored value reads back as the default rather than propagating, so this route always answers with a usable setting."
+          "Every codex-WIDE setting, plus what the kept revision history COSTS (`versionCount` / `versionBytes`, both server-computed and read-only). GM-only on the read as well as the write, unlike the calendar: nothing here is player-facing; these values describe how the GM's own authoring history is kept, they gate no content, and they put nothing on a player's screen. An out-of-range or unrepresentable stored value reads back as the default rather than propagating, so this route always answers with a usable setting."
       }),
       put: codexOp("setCodexSettings", codexWrite, "CodexSettingsResponse", {
         body: "CodexSettingsRequest",
         description:
-          "Replaces the codex-wide settings and answers with the full READ shape (usage figures included), never with what was sent - so a caller whose `windowMinutes` was clamped or truncated sees the real value rather than believing its own number took, and needs no second request to refresh the screen. The body carries the two SETTABLE fields only: `versionCount` / `versionBytes` are facts about a table the caller cannot see, so sending either is a **400** rather than a silently ignored key, and no path stores them. `windowMinutes` outside 0..10080 is likewise a **400** (the GM's control cannot produce one, so a caller that does is malformed, which is the router-rejects / store-clamps arrangement every bounded field in this surface uses); a fractional value INSIDE the range is truncated rather than rejected, because that is a slider artefact and not a mistake about what was meant. Changing these settings never deletes a revision: switching history off stops new checkpoints being written and nothing else, and the existing history stays listable and restorable."
+          "Replaces the codex-wide settings and answers with the full READ shape (usage figures included), never with what was sent, so a caller whose `windowMinutes` was clamped or truncated sees the real value rather than believing its own number took, and needs no second request to refresh the screen. The body carries the two SETTABLE fields only: `versionCount` / `versionBytes` are facts about a table the caller cannot see, so sending either is a **400** rather than a silently ignored key, and no path stores them. `windowMinutes` outside 0..10080 is likewise a **400** (the GM's control cannot produce one, so a caller that does is malformed, which is the router-rejects / store-clamps arrangement every bounded field in this surface uses); a fractional value INSIDE the range is truncated rather than rejected, because that is a slider artefact and not a mistake about what was meant. Changing these settings never deletes a revision: switching history off stops new checkpoints being written and nothing else, and the existing history stays listable and restorable."
       })
     },
     [CODEX_PATHS.pageRevisionsCollection]: {
       delete: codexOp("deleteCodexPageRevisions", codexWrite, "CodexRevisionsDeletedResponse", {
         body: "CodexRevisionsDeleteRequest",
         description:
-          'Deletes every page revision authored more than `olderThanDays` ago, and answers with how many rows really went. The ONE destructive route in the Codex surface, and deliberately unforgiving: `olderThanDays` must be a whole number from 0 to 36500, and a negative or fractional value is a **400** rather than a clamp - the exact opposite of `windowMinutes`, because that is a slider the GM drags while this destroys data, and a malformed destructive request must not be interpreted generously. **`0` deletes EVERY revision**, which is arithmetic rather than a magic value: nothing is younger than zero days old. "Old" is measured against `authoredAt` - when the checkpointed content was authored - which is the same clock the write-side throttle uses, so age means one thing in this store. It works regardless of the `enabled` setting, because a GM who switched history off is exactly the GM reclaiming the space. It touches the revision table and NOTHING else: no page, no body and no `rev` moves, because a page as it stands now is not a version of itself.'
+          'Deletes every page revision authored more than `olderThanDays` ago, and answers with how many rows really went. The ONE destructive route in the Codex surface, and deliberately unforgiving: `olderThanDays` must be a whole number from 0 to 36500, and a negative or fractional value is a **400** rather than a clamp: the exact opposite of `windowMinutes`, because that is a slider the GM drags while this destroys data, and a malformed destructive request must not be interpreted generously. **`0` deletes EVERY revision**, which is arithmetic rather than a magic value: nothing is younger than zero days old. "Old" is measured against `authoredAt` (when the checkpointed content was authored), which is the same clock the write-side throttle uses, so age means one thing in this store. It works regardless of the `enabled` setting, because a GM who switched history off is exactly the GM reclaiming the space. It touches the revision table and NOTHING else: no page, no body and no `rev` moves, because a page as it stands now is not a version of itself.'
       })
     },
     [CODEX_PATHS.export]: {
@@ -2043,7 +2043,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "A full codex backup bundle. Carries whatever revision rows exist, verbatim - the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds. Round-trips through `POST /codex/import`."
+          "A full codex backup bundle. Carries whatever revision rows exist, verbatim; the 2026-07-30 revision throttle bounds the WRITES, never this export, and nothing prunes the table, so a backup never lies about how much history it holds. Round-trips through `POST /codex/import`."
       })
     },
     [CODEX_PATHS.import]: {
@@ -2051,7 +2051,7 @@ export const openApiDocument = {
         body: "CodexImportRequest",
         tooLarge: true,
         description:
-          "Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex table is wiped and reloaded from the bundle inside ONE transaction, so a bad row aborts the lot with a 400 and nothing is written. Accepts the `data` of a `GET /codex/export` response verbatim - `exportedAt` is accepted and ignored, so a saved export file POSTs unchanged. `bundleVersion` is OPTIONAL: absent means a pre-versioning export of the same v1 shape (every backup taken before this feature existed lacks the key and MUST restore), and a value other than 1 is a 400. This is the one genuinely destructive route in the Codex - the guardrails are GM/`codex:write` authorization and the caller's own confirmation, and the honest advice is to export first."
+          "Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex table is wiped and reloaded from the bundle inside ONE transaction, so a bad row aborts the lot with a 400 and nothing is written. Accepts the `data` of a `GET /codex/export` response verbatim: `exportedAt` is accepted and ignored, so a saved export file POSTs unchanged. `bundleVersion` is OPTIONAL: absent means a pre-versioning export of the same v1 shape (every backup taken before this feature existed lacks the key and MUST restore), and a value other than 1 is a 400. This is the one genuinely destructive route in the Codex; the guardrails are GM/`codex:write` authorization and the caller's own confirmation, and the honest advice is to export first."
       })
     },
     [CODEX_ASSET_PATHS.collection]: {
@@ -2095,7 +2095,7 @@ export const openApiDocument = {
     [HOMEBREW_PATHS.content]: {
       get: homebrewOp("listHomebrewContent", "HomebrewContentListResponse", {
         description:
-          'The GM\'s homebrew library as flat summaries - the authored body stays out of the list, so a few-hundred-record library is a small payload. Filters compose; "all types" is simply `type` omitted. Soft-deleted rows are hidden from this listing too unless `includeDeleted` is set. Paging is keyset, not offset (the GM publishing mid-scroll must not skip or duplicate a row): `cursor` is OPAQUE - never construct or parse one - and `nextCursor: null` means this was the last page. `total` counts every row matching the filter, ignoring `limit`/`cursor`.',
+          'The GM\'s homebrew library as flat summaries: the authored body stays out of the list, so a few-hundred-record library is a small payload. Filters compose; "all types" is `type` omitted. Soft-deleted rows are hidden from this listing too unless `includeDeleted` is set. Paging is keyset, not offset (the GM publishing mid-scroll must not skip or duplicate a row): `cursor` is OPAQUE (never construct or parse one), and `nextCursor: null` means this was the last page. `total` counts every row matching the filter, ignoring `limit`/`cursor`.',
         params: [
           {
             name: "type",
@@ -2145,7 +2145,7 @@ export const openApiDocument = {
         notFound: true,
         conflict: "A stale `expectedRev`; `error.currentRevision` carries the row's revision",
         description:
-          "Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone - correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record. On a published record the edit is held as pending (`pendingChanges: true`): the live body stays in the catalogs, so an edit mid-session never pulls content from the players, until `/publish` validates the pending body and puts it live or `/discard` drops it."
+          "Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone: correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record. On a published record the edit is held as pending (`pendingChanges: true`): the live body stays in the catalogs, so an edit mid-session never pulls content from the players, until `/publish` validates the pending body and puts it live or `/discard` drops it."
       }),
       delete: homebrewOp("deleteHomebrewContent", "HomebrewDeletedResponse", {
         bad: false,
@@ -2160,7 +2160,7 @@ export const openApiDocument = {
         params: [homebrewIdParam],
         notFound: true,
         description:
-          "Clears `deletedAt`. Soft delete is a one-way state transition rather than an ordinary field, so this is its explicit inverse - never a PATCH of `deletedAt: null`."
+          "Clears `deletedAt`. Soft delete is a one-way state transition rather than an ordinary field, so this is its explicit inverse. A PATCH leaves `deletedAt` alone."
       })
     },
     [HOMEBREW_PATHS.contentDuplicate]: {
@@ -2183,7 +2183,7 @@ export const openApiDocument = {
         conflict:
           "The draft is not valid: `error.details.invalid.issues` lists every blocking issue with its machine-addressable `path`",
         description:
-          'Moves a record to `state: "published"`, which requires it to be valid. On a published record with `pendingChanges`, validates the pending body and puts it live; refused, the live body is unchanged. Publishing does NOT show it to players - that is `/visibility`, deliberately a separate endpoint. A publish REQUEST that is itself malformed is a 400; a well-formed request against a body the stored state refuses is a 409.'
+          'Moves a record to `state: "published"`, which requires it to be valid. On a published record with `pendingChanges`, validates the pending body and puts it live; refused, the live body is unchanged. Publishing does NOT show it to players; that is `/visibility`, deliberately a separate endpoint. A publish REQUEST that is itself malformed is a 400; a well-formed request against a body the stored state refuses is a 409.'
       })
     },
     [HOMEBREW_PATHS.contentDiscard]: {
@@ -2228,7 +2228,7 @@ export const openApiDocument = {
     [HOMEBREW_PATHS.packsExport]: {
       get: homebrewOp("exportHomebrewPack", "HomebrewPackExportResponse", {
         description:
-          "Exports published, non-deleted records as a shareable pack. Optional `type` and repeatable `id` narrow it to one class rather than the whole table. The pack carries authored bodies ONLY - no `state`, `visibleToPlayers`, `deletedAt`, or `rev` - so an importing table can never inherit this one's visibility policy.",
+          "Exports published, non-deleted records as a shareable pack. Optional `type` and repeatable `id` narrow it to one class rather than the whole table. The pack carries authored bodies ONLY (no `state`, `visibleToPlayers`, `deletedAt`, or `rev`), so an importing table can never inherit this one's visibility policy.",
         params: [
           { name: "type", in: "query", required: false, schema: homebrewContentType },
           {
@@ -2250,7 +2250,7 @@ export const openApiDocument = {
           "One or more records failed validation after id rewriting; `error.details.invalid.issues` carries each issue with its `recordId`, and nothing was written",
         tooLarge: true,
         description:
-          'Imports a pack. Everything lands as `state: "draft"`, `visibleToPlayers: false`, which makes importing an invalid pack harmless. Ids that collide with an SRD id are ALWAYS re-minted; ids colliding with existing homebrew follow `onIdCollision`. `dryRun` runs the whole collision + cross-reference-rewrite + re-validate pass and returns the identical report without writing - use it to see the plan before the only destructive path in the feature runs. This route mounts its own body parser above the server\'s 512kb default (about 4mb); a larger pack is a 413.'
+          'Imports a pack. Everything lands as `state: "draft"`, `visibleToPlayers: false`, which makes importing an invalid pack harmless. Ids that collide with an SRD id are ALWAYS re-minted; ids colliding with existing homebrew follow `onIdCollision`. `dryRun` runs the whole collision + cross-reference-rewrite + re-validate pass and returns the identical report without writing; use it to see the plan before the only destructive path in the feature runs. This route mounts its own body parser above the server\'s 512kb default (about 4mb); a larger pack is a 413.'
       })
     }
   },
@@ -2719,8 +2719,7 @@ export const openApiDocument = {
         properties: {
           party: {
             oneOf: [{ $ref: "#/components/schemas/CodexPartyLocation" }, { type: "null" }],
-            description:
-              "Null when there is no party pin - or, for a player, when the party pin is not visible to them."
+            description: "Null when there is no party pin, or, for a player, when the party pin is not visible to them."
           }
         }
       },
@@ -2757,7 +2756,7 @@ export const openApiDocument = {
           calendar: { $ref: "#/components/schemas/CodexCalendar" }
         },
         description:
-          "The confirmed downtime and the moved calendar, together - they changed in one transaction and are returned in one payload so a reader cannot hold one without the other. The calendar is the GM projection; the party's published date has NOT moved."
+          "The confirmed downtime and the moved calendar, together: they changed in one transaction and are returned in one payload so a reader cannot hold one without the other. The calendar is the GM projection; the party's published date has NOT moved."
       },
       CodexDowntimeAppliedResponse: envelopeSchema("#/components/schemas/CodexDowntimeAppliedData"),
       // Carries the active-session pointer beside the array, so it cannot use `codexDataObject`.
@@ -2809,7 +2808,8 @@ export const openApiDocument = {
       CodexRevisionsDeletedData: codexDataObject("deleted", {
         type: "integer",
         minimum: 0,
-        description: "How many revision rows were actually removed - the database's own count, not what was requested."
+        description:
+          "How many revision rows were actually removed: the database's own count, which can be fewer than requested."
       }),
       CodexRevisionsDeletedResponse: envelopeSchema("#/components/schemas/CodexRevisionsDeletedData"),
       CodexExportData: {
@@ -2826,7 +2826,7 @@ export const openApiDocument = {
           bundleVersion: {
             const: 1,
             description:
-              "The bundle FORMAT version - a fact about the file, not about the world, which is why it sits beside `codex` rather than inside it. `POST /codex/import` refuses anything else."
+              "The bundle FORMAT version: a fact about the file, which is why it sits beside `codex`. `POST /codex/import` refuses anything else."
           }
         }
       },
