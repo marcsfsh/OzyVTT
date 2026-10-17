@@ -341,7 +341,7 @@ export const characterCommands = [
           initiatorLabel: isGmGrade(principal) ? "GM" : "A player",
           label: ABILITY_ROLL_LABEL,
           actorId: null,
-          purpose: "manual",
+          purpose: "builder",
           visibility: "public",
           formula: `6 x ${formula}`,
           normalizedFormula: `6 x ${formula}`,

@@ -8,11 +8,11 @@ import {
   BuilderAbilityMethodSchema,
   EncounterTokenPositionSchema,
   PartyVisibilitySchema,
-  RollPurposeSchema,
   RollVisibilitySchema,
   RuleExceptionsSchema,
   RuleFamilySchema,
-  RuleModeSchema
+  RuleModeSchema,
+  TableRollPurposeSchema
 } from "./state.js";
 import {
   AbilitySchema,
@@ -1416,7 +1416,7 @@ export const DiceRollSchema = z
   .object({
     commandId: z.uuid(),
     formula: z.string().min(1).max(160),
-    purpose: RollPurposeSchema,
+    purpose: TableRollPurposeSchema,
     visibility: RollVisibilitySchema,
     label: z.string().min(1).max(80).optional(),
     actorId: z.uuid().optional(),
