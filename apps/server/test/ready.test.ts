@@ -32,6 +32,16 @@ const FIREBALL = {
   spellSlot: { level: 3 },
   spellId: "fireball"
 };
+const SCORCHING_RAY = {
+  id: "spell-scorching-ray",
+  name: "Scorching Ray",
+  activation: "action" as const,
+  description: "A test action.",
+  attack: { bonus: 7, rangeFeet: 120, count: 3 },
+  damage: [{ formula: "2d6", type: "fire" }],
+  spellSlot: { level: 2 },
+  spellId: "scorching-ray"
+};
 const WIZARD: ActorDefinition = ActorDefinitionSchema.parse({
   schemaId: "vtt.actor-monster",
   schemaVersion: 1,
@@ -43,7 +53,7 @@ const WIZARD: ActorDefinition = ActorDefinitionSchema.parse({
   armorClass: 12,
   hitPoints: { maximum: 30 },
   speedFeet: 30,
-  actions: [FIREBALL]
+  actions: [FIREBALL, SCORCHING_RAY]
 });
 
 function fight(): GameState {
@@ -137,6 +147,32 @@ describe("readying a spell", () => {
     expect(wren(state).spellSlots?.find((slot) => slot.level === 3)?.remaining).toBe(2);
     expect(state.combat.reactionsUsed).toContain(WREN);
     expect(names(state)).toEqual([]);
+  });
+
+  it("releases every ray of a readied Scorching Ray with the one Reaction", () => {
+    const state = fight();
+    const ray = (extra: Record<string, unknown> = {}, targetIds: string[] = []) =>
+      resolveDefinitionAction(
+        state,
+        SCORCHING_RAY,
+        { actorId: WREN, targetIds, commandId: nextId(), commit: true, ...extra },
+        {
+          random: () => 3,
+          newRollId: nextId,
+          gmSessionId: "30000000-0000-4000-8000-00000000000b",
+          now: () => "2026-10-17T00:00:00.000Z",
+          definition: WIZARD,
+          resolveDefinition: (id) => (id === "def-wren" ? WIZARD : undefined),
+          catalog
+        }
+      );
+    // Readied with a level 3 slot: four rays.
+    ray({ ready: true, slotLevel: 3 }, [BRUTE]);
+    brutesTurn(state);
+    for (let rays = 0; rays < 4; rays += 1) expect(ray({}, [BRUTE]).attack).not.toBeNull();
+    expect(state.combat.reactionsUsed).toEqual([WREN]);
+    expect(names(state)).toEqual([]);
+    expect(() => ray({}, [BRUTE])).toThrow(RulesBlockedError);
   });
 
   it("tells only its caster's player which spell is held, and at what level", () => {

@@ -261,7 +261,7 @@ function checkTurnsBegun({ state, violations }: Evaluation): void {
 export function heldReadiedSpell(
   attacker: Pick<LiveActor, "effects">,
   actionId: string
-): Readonly<{ actionId: string; level: number }> | undefined {
+): Readonly<{ actionId: string; level: number; raysLeft?: number }> | undefined {
   return attacker.effects.find(
     (effect) => effect.tags.includes(READIED_TAG) && effect.readiedSpell?.actionId === actionId
   )?.readiedSpell;
@@ -799,6 +799,8 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
   }
   if (onOwnTurn && action.activation === "action") return checkActionSlot(evaluation);
   const readied = isReadiedResponse(state, attacker, action);
+  // A released spell's later rays come with the Reaction its first ray took.
+  if (readied && heldReadiedSpell(attacker, action.id)?.raysLeft !== undefined) return unchanged;
   if (action.activation === "reaction" || readied) {
     if (state.combat.reactionsUsed.includes(attacker.id))
       violations.push({

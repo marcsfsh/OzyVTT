@@ -701,9 +701,14 @@ export const EffectInstanceSchema = z
     /** How many more times its damage riders may land before it ends (a coat of Basic Poison). */
     damageUses: z.number().int().min(1).max(10).optional(),
     /** A Ready action's held spell (SRD Ready): the action that casts it, released with the Reaction at the level its
-     *  slot was spent at when it was readied. */
+     *  slot was spent at when it was readied. `raysLeft`: the attacks a released spell still has to make with that
+     *  one Reaction (Scorching Ray's later rays). */
     readiedSpell: z
-      .object({ actionId: z.string().min(1).max(120), level: z.number().int().min(0).max(9) })
+      .object({
+        actionId: z.string().min(1).max(120),
+        level: z.number().int().min(0).max(9),
+        raysLeft: z.number().int().min(1).max(20).optional()
+      })
       .strict()
       .optional(),
     /** The spell this effect keeps up on its caster and the level it was cast at, so what the spell lets the caster do
