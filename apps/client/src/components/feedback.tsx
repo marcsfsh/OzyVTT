@@ -94,6 +94,8 @@ type PromptOptions = {
   body?: string;
   defaultValue?: string;
   placeholder?: string;
+  /** The keyboard a phone shows: "numeric" for a number such as a die's face. */
+  inputMode?: "numeric" | "text";
   confirmLabel?: string;
   cancelLabel?: string;
 };
@@ -149,6 +151,7 @@ export function usePrompt() {
             autoFocus
             value={value}
             placeholder={request.placeholder}
+            inputMode={request.inputMode}
             onChange={(event) => setValue(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {

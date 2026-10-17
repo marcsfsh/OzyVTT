@@ -1,7 +1,6 @@
 import type { RefObject } from "react";
 import type { ActorDefinition, ContentActionSummary, GmActor, PlayerActor } from "@vtt/domain";
 import { abilityModifier as modifierOf, weaponAbilityModifierFrom } from "@vtt/rules-5e";
-import { useRollPreference } from "../dice/roll-preference";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { RichText } from "./RichText";
 import { ordinal, signed } from "./format";
@@ -56,7 +55,6 @@ export function SheetActions({
   onLooseUse: ((actionId: string) => void) | null;
 }>) {
   const { rolling, rollD20, rollFlat } = rolls;
-  const { rollMode, bonusMode } = useRollPreference();
   const spellcasting = definition.spellcasting;
   const inventory = actor.inventory ?? [];
   // Equipped weapons become rollable attacks on the sheet: to-hit = ability mod + PB, damage = weapon
@@ -183,8 +181,7 @@ export function SheetActions({
                   definition={definition}
                   extraActions={derivedActions}
                   revision={inline.revision}
-                  rollMode={rollMode}
-                  bonusMode={bonusMode}
+                  inspired={"heroicInspiration" in actor && actor.heroicInspiration === true}
                   playerDamageMode={inline.playerDamageMode}
                   targets={inline.targets}
                 />

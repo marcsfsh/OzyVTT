@@ -471,6 +471,12 @@ export type ContentActionArea = Readonly<{
   sizeFeet: number;
   widthFeet: number | null;
 }>;
+/** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
+ *  ability checks made with it). */
+export const CHOSEN_ABILITY_TAG = "hexed";
+/** Whether an action asks its caster to choose an ability (`action.resolve`'s `ability`). */
+export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: readonly string[] }> }>): boolean =>
+  action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
 export type ContentActionSummary = Readonly<{
   id: string;
@@ -507,6 +513,11 @@ export type ContentActionSummary = Readonly<{
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);
+   *  `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
+    Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>
+  >;
+  /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
 }>;
 export type ContentActionsResult = {
   ok: boolean;

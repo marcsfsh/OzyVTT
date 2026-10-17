@@ -25,9 +25,11 @@ import type {
   ActorMovementResult,
   AnnotationAddResult,
   CharacterDraftResult,
+  CheckRollResult,
   DamageApplyResult,
   DeathSaveResult,
   DiceRollResult,
+  LooseSaveOutcome,
   MutationResult,
   ReactionAnswerResult,
   RulesBlocked,
@@ -51,6 +53,7 @@ import type {
   ActorReviveSchema,
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
+  ActorSetHeroicInspirationSchema,
   ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
@@ -81,6 +84,8 @@ import type {
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
+  CheckRerollSchema,
+  CheckRollSchema,
   CommandIdentitySchema,
   DamageResolveSchema,
   DeathSaveRollSchema,
@@ -103,6 +108,9 @@ import type {
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
+  RollCallAnswerSchema,
+  RollCallCloseSchema,
+  RollCallStartSchema,
   RestAnswerSchema,
   RestAskSchema,
   RestFinishSchema,
@@ -274,8 +282,43 @@ export interface ClientToServerEvents {
   "save:roll": (
     payload: CommandPayload<typeof SaveRollSchema>,
     acknowledgement: (
-      result: MutationResult & { route?: "answered" | "loose"; saveId?: string; rollId?: string }
+      result: MutationResult & {
+        route?: "answered" | "loose";
+        saveId?: string;
+        rollId?: string;
+        outcome?: NonNullable<SaveAnswerResult["outcome"]> | LooseSaveOutcome;
+      }
     ) => void
+  ) => void;
+  /** Roll an ability check on the server: an ability, a skill or a tool. */
+  "check:roll": (
+    payload: CommandPayload<typeof CheckRollSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** Reroll one die of a character's latest check: Heroic Inspiration for a player, free for the GM. */
+  "check:reroll": (
+    payload: CommandPayload<typeof CheckRerollSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** GM: call for a check or a save from one or several characters. */
+  "roll-call:start": (
+    payload: CommandPayload<typeof RollCallStartSchema>,
+    acknowledgement: (result: MutationResult & { callId?: string }) => void
+  ) => void;
+  /** Answer a check call for your character (the GM for anyone). */
+  "roll-call:answer": (
+    payload: CommandPayload<typeof RollCallAnswerSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** GM: close a call; its unanswered saves are dismissed. */
+  "roll-call:close": (
+    payload: CommandPayload<typeof RollCallCloseSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: give or take a character's Heroic Inspiration. */
+  "actor:set-heroic-inspiration": (
+    payload: CommandPayload<typeof ActorSetHeroicInspirationSchema>,
+    acknowledgement: (result: MutationResult) => void
   ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */
   "rules:ask": (

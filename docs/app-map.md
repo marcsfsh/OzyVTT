@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 12 GameState fields · 107 commands · 225 HTTP paths
+- 14 GameState fields · 113 commands · 231 HTTP paths
 
 ## GameState shape
 
@@ -17,10 +17,12 @@ single JSON blob the server persists and projects per role.
 - `builderPolicy`
 - `combat`
 - `definitions`
+- `heldRolls`
 - `partyVisibility`
 - `pendingImports`
 - `rest`
 - `revision`
+- `rollCalls`
 - `rolls`
 - `rulesPolicy`
 - `schemaVersion`
@@ -34,7 +36,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rest`, `rules`, `save`, `scene`, `table`, `terrain`, `time`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `table`, `terrain`, `time`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -53,6 +55,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `actor.set-armor-class` | `actor:write` |
 | `actor.set-condition` | `actor:write` |
 | `actor.set-health-display` | `actor:write` |
+| `actor.set-heroic-inspiration` | `actor:write` |
 | `actor.set-hp` | `actor:write` |
 | `actor.set-sheet-preview` | `actor:write` |
 | `actor.set-size` | `actor:write` |
@@ -92,6 +95,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `character.set-proficiencies` | `actor:write` |
 | `character.set-slot` | `actor:write` |
 | `character.submit-import` | `actor:write` |
+| `check.reroll` | `combat:write` |
+| `check.roll` | `combat:write` |
 | `damage.resolve` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
@@ -122,6 +127,9 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `rest.finish` | `actor:write` |
 | `rest.mark-done` | `actor:write` |
 | `rest.party` | `actor:write` |
+| `roll-call.answer` | `combat:write` |
+| `roll-call.close` | `combat:write` |
+| `roll-call.start` | `combat:write` |
 | `rules.answer` | `combat:write` |
 | `rules.ask` | `combat:write` |
 | `rules.set-policy` | `combat:write` |
@@ -231,6 +239,8 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/archived`
 - `POST /api/v1/game/actors/{actorId}/armor-class`
 - `GET /api/v1/game/actors/{actorId}/available-actions`
+- `POST /api/v1/game/actors/{actorId}/check`
+- `POST /api/v1/game/actors/{actorId}/check/reroll`
 - `POST /api/v1/game/actors/{actorId}/conditions`
 - `POST /api/v1/game/actors/{actorId}/currency`
 - `POST /api/v1/game/actors/{actorId}/damage`
@@ -240,6 +250,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/finish-preparing`
 - `POST /api/v1/game/actors/{actorId}/heal`
 - `POST /api/v1/game/actors/{actorId}/health-display`
+- `POST /api/v1/game/actors/{actorId}/heroic-inspiration`
 - `POST /api/v1/game/actors/{actorId}/hp`
 - `POST /api/v1/game/actors/{actorId}/identity`
 - `POST /api/v1/game/actors/{actorId}/inventory`
@@ -312,6 +323,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/rests/party`
 - `POST /api/v1/game/rests/party/{actorId}/done`
 - `POST /api/v1/game/rests/party/finish`
+- `POST /api/v1/game/roll-calls`
+- `POST /api/v1/game/roll-calls/{callId}/answer`
+- `POST /api/v1/game/roll-calls/{callId}/close`
 - `POST /api/v1/game/rolls`
 - `POST /api/v1/game/rules/answer`
 - `POST /api/v1/game/rules/ask`

@@ -32,8 +32,7 @@ describe("an attack roll with an effect's dice", () => {
       <AttackPreview
         attack={attack({ total: 14, outcome: "miss", bonusDice: [{ label: "Bless", dice: "1d4", total: null }] })}
         busy={false}
-        rollMode="auto"
-        bonusMode="auto"
+        viewer="player"
         onFeedback={() => {}}
         resolve={vi.fn()}
       />

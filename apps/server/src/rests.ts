@@ -2,6 +2,7 @@ import { isDead, longRestWait, makeHitDicePool, type GameState, type HitDiceEntr
 import type { Actor, ActorAction, ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier, collectRiders } from "@vtt/rules-5e";
 import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
+import { holdsFeature } from "./class-features.js";
 import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
@@ -232,6 +233,12 @@ export function applyRest(
   restorePactSlots(actor, longRestDefinition);
   // The prepared list stands; a caster that prepares after a Long Rest gets the step to change it.
   openPreparation(actor, longRestDefinition);
+  // SRD Human, Resourceful: "You gain Heroic Inspiration whenever you finish a Long Rest." One at most.
+  if (
+    holdsFeature(longRestDefinition, "human-resourceful", "Resourceful") ||
+    longRestDefinition?.character?.race?.id === "human"
+  )
+    actor.heroicInspiration = true;
   return events;
 }
 

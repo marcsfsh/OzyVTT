@@ -968,6 +968,9 @@ export const ActorSchema = z.object({
   deathSaves: DeathSavesSchema.nullable().default(null),
   /** Spent limited-use counts by action id. */
   actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
+  /** SRD Heroic Inspiration: held or not (never more than one). Spent to reroll one die; the GM gives it, and a Human
+   * gains it on finishing a Long Rest. */
+  heroicInspiration: z.boolean().default(false),
   /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest that clears the override,
    * after which the build's recorded answer applies again. */
   choiceOverrides: z

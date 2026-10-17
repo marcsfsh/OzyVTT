@@ -51,7 +51,8 @@ export const bard: ClassMechanicsModule = {
      */
     "magical-secrets": { extraSpellLists: ["cleric", "druid", "wizard"] }
 
-    // Not modeled: Jack of All Trades (half proficiency), Superior Inspiration and Countercharm.
+    // Jack of All Trades is applied by the server's check plan (`ability-checks.ts`), by its feature id.
+    // Not modeled: Superior Inspiration and Countercharm.
   },
 
   subclasses: {

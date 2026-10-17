@@ -213,9 +213,11 @@ export function builtinAction(actionId: string): BuiltinAction | undefined {
   return BUILTIN_ACTIONS.find((action) => action.id === actionId);
 }
 
-/** Builtins that resolve against exactly one chosen combatant; everything else is a single direct tap. */
+/** Builtins that resolve against exactly one chosen combatant; everything else is a single direct tap. Influence
+ *  targets the creature it would sway, whose Intelligence can raise its DC. */
 export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   help: "single",
+  influence: "single",
   "unarmed-strike": "single",
   "unarmed-grapple": "single",
   "unarmed-shove-prone": "single",

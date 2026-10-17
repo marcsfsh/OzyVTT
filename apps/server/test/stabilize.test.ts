@@ -104,6 +104,16 @@ describe("first aid: a DC 10 Wisdom (Medicine) check", () => {
     expect(outcome.events.at(-1)?.text).toBe("Ilse stabilized Bryn (Medicine 10 vs DC 10).");
   });
 
+  it("is made as every check is: Poisoned gives Disadvantage, and Exhaustion comes off once", () => {
+    const poisoned = game({ helper: { conditions: [{ id: "poisoned" }] } });
+    // Two d20s under Disadvantage: the lower one counts.
+    const low = stabilizeCreature(poisoned, aid("medicine"), { role: "gm" }, deps(poisoned, [18, 9 - MEDICINE]));
+    expect(low).toMatchObject({ stabilized: false, check: { natural: 9 - MEDICINE, total: 9 } });
+    const tired = game({ helper: { conditions: [{ id: "exhaustion", level: 1 }] } });
+    const outcome = stabilizeCreature(tired, aid("medicine"), { role: "gm" }, deps(tired, [12 - MEDICINE]));
+    expect(outcome.check).toMatchObject({ natural: 12 - MEDICINE, total: 10 });
+  });
+
   it("does nothing on a failure but say so", () => {
     const state = game();
     const outcome = stabilizeCreature(state, aid("medicine"), { role: "gm" }, deps(state, [9 - MEDICINE]));

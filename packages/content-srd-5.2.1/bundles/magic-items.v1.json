@@ -6788,9 +6788,9 @@
       "type": "on-ability-check"
      },
      {
-      "type": "ability-is",
-      "abilities": [
-       "wis"
+      "type": "skill-is",
+      "skills": [
+       "perception"
       ]
      }
     ]
@@ -7142,9 +7142,9 @@
       "type": "on-ability-check"
      },
      {
-      "type": "ability-is",
-      "abilities": [
-       "wis"
+      "type": "skill-is",
+      "skills": [
+       "perception"
       ]
      }
     ]

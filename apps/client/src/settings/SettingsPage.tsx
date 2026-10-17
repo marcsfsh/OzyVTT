@@ -145,14 +145,14 @@ function Row({
   help,
   children,
   stacked = false
-}: Readonly<{ title: string; help?: string; children: React.ReactNode; stacked?: boolean }>) {
+}: Readonly<{ title: string; help?: string; children?: React.ReactNode; stacked?: boolean }>) {
   return (
     <div className={`settings-row${stacked ? " stacked" : ""}`}>
       <div className="settings-row-text">
         <span className="settings-row-title">{title}</span>
         {help && <span className="settings-row-help">{help}</span>}
       </div>
-      <div className="settings-row-control">{children}</div>
+      {children !== undefined && <div className="settings-row-control">{children}</div>}
     </div>
   );
 }
@@ -160,23 +160,28 @@ function Row({
 // Mine (every role)
 
 function MineGroup() {
-  const { rollInput, setRollInput } = useRollPreference();
+  const { rollInput, mayType, setRollInput } = useRollPreference();
   return (
     <Group id="mine" label="Mine">
       <Row title="Theme" help="This device.">
         <ThemeToggle />
       </Row>
-      <Row title="How you roll" help="'I roll my dice' asks you to type what your physical dice show.">
-        <SegmentedControl
-          ariaLabel="How you roll"
-          value={rollInput}
-          onChange={(value) => setRollInput(value as "digital" | "manual")}
-          options={[
-            { value: "digital", label: "Auto-roll" },
-            { value: "manual", label: "I roll my dice" }
-          ]}
-        />
-      </Row>
+      {/* The GM's table setting outranks this device's choice, so the reason replaces the control. */}
+      {mayType ? (
+        <Row title="How you roll" help="'I roll my dice' asks you to type what your physical dice show.">
+          <SegmentedControl
+            ariaLabel="How you roll"
+            value={rollInput}
+            onChange={(value) => setRollInput(value as "digital" | "manual")}
+            options={[
+              { value: "digital", label: "Auto-roll" },
+              { value: "manual", label: "I roll my dice" }
+            ]}
+          />
+        </Row>
+      ) : (
+        <Row title="How you roll" help="At this table the server rolls players' dice. The GM can change that." />
+      )}
     </Group>
   );
 }
@@ -393,6 +398,17 @@ function TableGroup({
         />
       </Row>
 
+      <Row
+        title="Players' dice"
+        help="Checks, saves, attacks, damage, death saves, initiative, and rolled scores and hit points. When off, the server rolls them."
+      >
+        <Switch
+          checked={builder.typedRolls === "open"}
+          onChange={(open) => setBuilderPolicy({ typedRolls: open ? "open" : "gm-only" })}
+          label="Players may type what their dice show"
+        />
+      </Row>
+
       <Row title="Players' initiative" help="When players roll their own initiative at the start of a fight.">
         <SegmentedControl
           ariaLabel="When turns start"
@@ -427,11 +443,6 @@ function TableGroup({
             />
           ))}
         </div>
-        <Switch
-          checked={builder.typedRolls === "open"}
-          onChange={(open) => setBuilderPolicy({ typedRolls: open ? "open" : "gm-only" })}
-          label="Players can type their own dice for rolled scores and hit points"
-        />
         <Switch
           checked={builder.hitPointRollFloor === "average"}
           onChange={(raise) => setBuilderPolicy({ hitPointRollFloor: raise ? "average" : "none" })}

@@ -219,6 +219,7 @@ export function GmInitiativeRow({
           onFeedback={onFeedback}
           rollMode={rollMode}
           isActingTurn={state.combat.turnActorId === actor.id}
+          viewer="gm"
           aid={
             <StabilizeControl
               targetId={actor.id}
@@ -255,6 +256,7 @@ export function GmInitiativeRow({
               canDismiss
               onFeedback={onFeedback}
               rollMode={rollMode}
+              viewer="gm"
               legendaryResistanceLeft={
                 actor.legendary?.resistancesPerDay !== undefined
                   ? Math.max(0, actor.legendary.resistancesPerDay - (actor.actionUses["legendary-resistance"] ?? 0))
@@ -273,6 +275,7 @@ export function GmInitiativeRow({
               canDismiss
               onFeedback={onFeedback}
               rollMode={rollMode}
+              viewer="gm"
             />
           ))}
       {actor &&

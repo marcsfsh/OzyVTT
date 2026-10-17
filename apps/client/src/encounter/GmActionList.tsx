@@ -16,8 +16,9 @@ const isResolvable = (action: ContentActionSummary) =>
   action.multiattack !== null ||
   action.usesLimit !== null ||
   action.builtin === true;
-/** Rage/Reckless (grants), a Multiattack plan, a spent charge, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting. */
+/** Rage/Reckless (grants), a Multiattack plan, a spent charge, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting, as do check actions that ask for a skill (Search, Study). */
 const isTargetless = (action: ContentActionSummary) =>
+  action.checkSkills === undefined &&
   action.attackBonus === null &&
   action.saveAbility === null &&
   action.damage.length === 0 &&

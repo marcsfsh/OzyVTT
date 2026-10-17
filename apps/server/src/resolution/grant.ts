@@ -1,6 +1,7 @@
-import type { GameState } from "@vtt/domain";
+import { CHOSEN_ABILITY_TAG, type GameState } from "@vtt/domain";
 import { abilityModifier } from "@vtt/rules-5e";
 import type { Modifier } from "@vtt/schemas";
+import { ABILITY_NAMES } from "../ability-checks.js";
 import { addEffect, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
@@ -43,6 +44,21 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   // Haste doubles Speed: the creature's Speed now, added while it lasts.
   const speedNow = grant.tags.includes(HASTED_TAG) ? (currentSpeedFeet(recipient, derivation) ?? 0) : 0;
   const hasteSpeed: Modifier[] = speedNow > 0 ? [{ type: "speed", amount: Math.min(60, speedNow) }] : [];
+  // Hex: "choose one ability. The target has Disadvantage on ability checks made with the chosen ability."
+  const hexed = grant.tags.includes(CHOSEN_ABILITY_TAG);
+  const hexAbility = hexed ? (input.ability ?? null) : null;
+  if (hexed && hexAbility === null)
+    warnings.push(`Hex on ${recipient.name}: no ability was chosen, so its checks have no Disadvantage.`);
+  const hexDisadvantage: Modifier[] = hexAbility
+    ? [
+        {
+          type: "roll-mode",
+          roll: "check",
+          mode: "disadvantage",
+          when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: [hexAbility] }]
+        }
+      ]
+    : [];
   // Mage Armor: base AC 13 + Dexterity for a creature wearing no armor, a shield still adding to it.
   let armorClassBonus = grant.armorClassBonus;
   if (grant.tags.includes(MAGE_ARMOR_TAG)) {
@@ -60,7 +76,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     recipient.id,
     makeEffect({
       id: grant.target === "targets" ? `${input.commandId}:grant:${recipient.id}` : `${input.commandId}:grant`,
-      name: ctx.builtin?.grantName?.(ctx) ?? grant.name ?? action.name,
+      name:
+        ctx.builtin?.grantName?.(ctx) ??
+        (hexAbility ? `${grant.name ?? action.name} (${ABILITY_NAMES[hexAbility]})` : (grant.name ?? action.name)),
       tags: grant.tags,
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -74,7 +92,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
             : grant.duration,
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
-      modifiers: [...grant.modifiers, ...hasteSpeed],
+      modifiers: [...grant.modifiers, ...hasteSpeed, ...hexDisadvantage],
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
       concentration: grant.concentration,

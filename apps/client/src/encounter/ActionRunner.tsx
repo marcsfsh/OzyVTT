@@ -19,7 +19,6 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
-import { useRollPreference } from "../dice/roll-preference";
 import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 import "./action-runner.css";
@@ -47,8 +46,6 @@ export function ActionRunner({
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { prompt, dialog } = usePrompt();
-  // Manual vs auto follows the shared per-browser dice-input preference.
-  const { rollMode } = useRollPreference();
   // A strict-mode rejection awaiting the GM's call. Store state, so a resolve from the map's confirm
   // bar shows the same override dialog here (ADR-0020).
   const blockedPrompt = useTargetingBlocked();
@@ -214,7 +211,10 @@ export function ActionRunner({
             }))}
           onMap
           busy={resolveBusy}
-          onRoll={() => resolveTargeting(state.revision, onOutcome)}
+          onInvalidFace={onFeedback}
+          onRoll={(face) =>
+            resolveTargeting(state.revision, onOutcome, face !== undefined ? { attackNatural: face } : {})
+          }
         />
       )}
       {result && (
@@ -225,7 +225,6 @@ export function ActionRunner({
           actions={actions}
           busy={busy}
           resolveBusy={resolveBusy}
-          rollMode={rollMode}
           onFeedback={onFeedback}
           resolve={(options) => resolveTargeting(state.revision, onOutcome, options)}
           onAgain={(action) => beginTargeting(action, actor.id)}

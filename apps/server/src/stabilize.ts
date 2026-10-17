@@ -1,10 +1,10 @@
-import { isDead, type DeathSaves, type GameState, type RollRecord } from "@vtt/domain";
-import { d20TestFormula, parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
+import { isDead, type DeathSaves, type GameState } from "@vtt/domain";
+import type { RandomSource } from "@vtt/rules-5e";
 import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
-import { checkRollMode } from "./ability-checks.js";
-import { deriveActorSheet } from "./actor-derived.js";
+import { checkPlan } from "./ability-checks.js";
 import { canPlayerTarget, requireActorAccess, requireGm, type Initiator } from "./authorization.js";
-import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
+import { rollSettledCheck } from "./check-rolls.js";
+import { conditionLabel, incapacitatingCondition } from "./condition-rules.js";
 import { withOneUsedUp } from "./consumables.js";
 import { endKnockOut, KNOCKED_OUT_TAG, type EffectNarration } from "./effects.js";
 import { effectiveActions } from "./effective-actions.js";
@@ -13,7 +13,6 @@ import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { commitEconomy, planEconomy } from "./resolution/economy.js";
 import type { DefinitionAction, LiveActor } from "./resolution/context.js";
-import { recordRoll, rolledTerms } from "./roll-history.js";
 import {
   effectiveModeFor,
   overrideCovers,
@@ -114,8 +113,8 @@ function policeTargeting(
   return null;
 }
 
-/** The helper's Wisdom (Medicine) check, rolled on the server with the bonus its sheet shows, Exhaustion and the
- *  check riders' Advantage or Disadvantage (the builtin checks' path), recorded like any roll. */
+/** The helper's Wisdom (Medicine) check, made as every ability check is (`checkPlan`): the sheet's Medicine bonus,
+ *  Exhaustion, check riders, Poisoned and Frightened, Reliable Talent and Jack of All Trades. Recorded like any roll. */
 function rollFirstAid(
   state: GameState,
   helper: LiveActor,
@@ -125,37 +124,22 @@ function rollFirstAid(
   hidden: boolean
 ): { natural: number; total: number } {
   const derivation = deriveEquipment(helper, definition, deps.catalog);
-  const sheet = deriveActorSheet(
+  const plan = checkPlan(helper, definition, derivation, { ability: "wis", skill: "medicine" });
+  return rollSettledCheck(
+    state,
     helper,
-    definition,
-    derivation,
-    [{ id: "medicine", name: "Medicine", description: "", ability: "wis" }],
-    deps.catalog
+    plan,
+    {
+      id: deps.newRollId(),
+      commandId,
+      sessionId: deps.sessionId,
+      role: deps.role,
+      label: "Wisdom (Medicine)",
+      visibility: hidden ? "gm-only" : "public",
+      createdAt: deps.now()
+    },
+    deps.random
   );
-  const bonus = (sheet.skills[0]?.bonus ?? 0) + exhaustionPenalty(helper);
-  const mode = checkRollMode(derivation, { ability: "wis", skill: "medicine" });
-  const formula = d20TestFormula(mode.mode, bonus);
-  const resolution = resolveDice(parseDiceFormula(formula), deps.random);
-  const dice = resolution.terms.find((term) => term.kind === "dice");
-  const natural = dice ? (dice.dice.find((die) => die.kept) ?? dice.dice[0]).face : resolution.total;
-  const record: RollRecord = {
-    id: deps.newRollId(),
-    commandId,
-    initiatorSessionId: deps.sessionId,
-    initiatorRole: deps.role,
-    initiatorLabel: helper.name,
-    label: "Wisdom (Medicine)",
-    actorId: helper.id,
-    purpose: "check",
-    visibility: hidden ? "gm-only" : "public",
-    formula,
-    normalizedFormula: resolution.expression.normalized,
-    ...rolledTerms(resolution),
-    total: resolution.total,
-    createdAt: deps.now()
-  };
-  recordRoll(state, record);
-  return { natural, total: resolution.total };
 }
 
 /**

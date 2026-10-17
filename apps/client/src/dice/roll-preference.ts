@@ -1,22 +1,23 @@
 import { useSyncExternalStore } from "react";
+import type { GmView, PlayerView } from "@vtt/domain";
+import { socket } from "../socket";
 
 /**
  * One per-browser dice-input preference shared by every roll surface (sheet, saves, death saves,
- * attacks, the action runner, the dice panel). Presentation only: the server always rolls
- * (ADR-0012). It decides whether this browser auto-rolls or waits for a typed physical die, and
- * whether a typed d20 on the sheet gets its bonus added or is already the total.
+ * attacks, the action runner, the dice panel). Presentation only: the server always rolls or reads
+ * a typed face and adds the bonus itself (ADR-0012). It decides whether this browser has the server
+ * throw the dice or waits for the face a physical die shows.
  *
- * Stored in localStorage under the sheet's original keys, so the sheet and dice-panel toggles stay
- * in lockstep. Per person; the old table-wide `combat.rollMode` is inert.
+ * The table has the last word: while the GM keeps players' dice on the server (`typedRolls`), a
+ * player's browser throws digitally whatever it chose. Stored in localStorage under the sheet's
+ * original keys, so the sheet and dice-panel toggles stay in lockstep.
  */
 export type RollInput = "digital" | "manual";
-export type BonusMode = "auto" | "total";
 /** Where an attack from the open character sheet resolves in combat: "inline" renders the target
  * picker and result on the sheet; "jump" goes to the initiative view and back. */
 export type SheetAttackMode = "jump" | "inline";
 
 const INPUT_KEY = "vtt.sheet.rollInput";
-const BONUS_KEY = "vtt.sheet.bonusMode";
 const ATTACK_KEY = "vtt.sheet.attackMode";
 const read = (key: string): string | null => {
   try {
@@ -34,8 +35,9 @@ const write = (key: string, value: string) => {
 };
 
 let rollInput: RollInput = read(INPUT_KEY) === "manual" ? "manual" : "digital";
-let bonusMode: BonusMode = read(BONUS_KEY) === "total" ? "total" : "auto";
 let sheetAttackMode: SheetAttackMode = read(ATTACK_KEY) === "jump" ? "jump" : "inline";
+/** Whether this tab may type its dice: the GM always, a player while the table lets players type theirs. */
+let mayType = true;
 const listeners = new Set<() => void>();
 const emit = () => {
   for (const listener of listeners) listener();
@@ -54,13 +56,6 @@ export function setRollInput(mode: RollInput) {
     emit();
   }
 }
-export function setBonusMode(mode: BonusMode) {
-  if (mode !== bonusMode) {
-    bonusMode = mode;
-    write(BONUS_KEY, mode);
-    emit();
-  }
-}
 export function setSheetAttackMode(mode: SheetAttackMode) {
   if (mode !== sheetAttackMode) {
     sheetAttackMode = mode;
@@ -69,35 +64,47 @@ export function setSheetAttackMode(mode: SheetAttackMode) {
   }
 }
 
+/** Follows the table's setting for typed dice from a pushed view. Only the GM's view carries the stat blocks. */
+export function followTable(view: GmView | PlayerView) {
+  const next = "definitions" in view || view.builderPolicy?.typedRolls !== "gm-only";
+  if (next !== mayType) {
+    mayType = next;
+    emit();
+  }
+}
+socket.on("state:updated", followTable);
+
 /** The choice in the "auto"|"manual" shape the shared RollControls widget uses. */
 export function rollModeOf(input: RollInput): "auto" | "manual" {
   return input === "manual" ? "manual" : "auto";
 }
 
-/** Reactive access; re-renders when the shared preference changes anywhere. */
+/** Reactive access; re-renders when the shared preference or the table's setting changes. */
 export function useRollPreference() {
-  const input = useSyncExternalStore(
+  const chosen = useSyncExternalStore(
     subscribe,
     () => rollInput,
     () => rollInput
   );
-  const bonus = useSyncExternalStore(
+  const typing = useSyncExternalStore(
     subscribe,
-    () => bonusMode,
-    () => bonusMode
+    () => mayType,
+    () => mayType
   );
   const attack = useSyncExternalStore(
     subscribe,
     () => sheetAttackMode,
     () => sheetAttackMode
   );
+  const input: RollInput = typing ? chosen : "digital";
   return {
+    /** How this browser rolls now: its choice, unless the table keeps players' dice on the server. */
     rollInput: input,
-    bonusMode: bonus,
+    /** Whether this browser may type a die's face at all. */
+    mayType: typing,
     sheetAttackMode: attack,
     rollMode: rollModeOf(input),
     setRollInput,
-    setBonusMode,
     setSheetAttackMode
   };
 }

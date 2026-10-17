@@ -524,11 +524,12 @@ describe("save.answer takes a hand-entered damage total", () => {
     expect((await post(base, GAME_PATHS.claims, playerToken, { commandId: randomUUID(), actorId: BORIN })).status).toBe(
       200
     );
+    // A player types the face their die shows: a 2 fails the save.
     const allowed = await post(base, GAME_PATHS.saveAnswer.replace("{saveId}", save.id), playerToken, {
       commandId: randomUUID(),
       saveId: save.id,
-      method: "manual",
-      total: 5,
+      method: "roll",
+      face: 2,
       commit: true,
       damageOverride: 3
     });

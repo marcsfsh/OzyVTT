@@ -430,11 +430,19 @@ describe("save.roll over the API", () => {
     const heroSession = server.auth.issuePlayerSession();
     await post(base, GAME_PATHS.claims, heroSession, { actorId: HERO });
 
-    const answered = await post(base, GAME_PATHS.saveRoll, heroSession, {
+    // A player types the face their die shows, never a total.
+    const typedTotal = await post(base, GAME_PATHS.saveRoll, heroSession, {
       commandId: randomUUID(),
       actorId: HERO,
       ability: "dex",
       total: 20
+    });
+    expect(typedTotal.status).toBe(403);
+    const answered = await post(base, GAME_PATHS.saveRoll, heroSession, {
+      commandId: randomUUID(),
+      actorId: HERO,
+      ability: "dex",
+      face: 18
     });
     expect(answered.status).toBe(200);
     const body = (await answered.json()).data;

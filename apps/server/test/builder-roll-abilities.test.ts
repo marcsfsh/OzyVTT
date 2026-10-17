@@ -8,9 +8,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createServer } from "../src/server.js";
 
 // Ability-score rolls for the builder go through the server's dice and record one public roll in the
-// table feed. While the table keeps players' dice on the server (the default), a player's rolled scores
-// must be that roll's six totals and their hit points are thrown by the server; the GM, and players at a
-// table that opens typed rolls, may submit physical dice within the formula's bounds.
+// table feed. While the table keeps players' dice on the server, a player's rolled scores must be that
+// roll's six totals and their hit points are thrown by the server; the GM, and players at a table that
+// lets them type their dice (the default), may submit physical dice within the formula's bounds.
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -143,8 +143,13 @@ const assigned = (scores: readonly number[]) => ({
 });
 
 describe("a player's rolled dice are the table's", () => {
-  it("refuses typed scores from a player by default, and takes the six the server rolled", async () => {
+  it("refuses typed scores from a player at a server-rolled table, and takes the six the server rolled", async () => {
     const { base, server, gmToken, playerToken } = await boot();
+    await post(base, GAME_PATHS.builderPolicy, gmToken, {
+      commandId: randomUUID(),
+      allowedAbilityMethods: ALL_METHODS,
+      typedRolls: "gm-only"
+    });
     const typed = await post(base, GAME_PATHS.characters, playerToken, fighterCreate());
     expect(typed.status).toBe(409);
     expect((await typed.json()).error.message).toMatch(/roll them in the builder/);
@@ -291,11 +296,12 @@ describe("a player's rolled dice are the table's", () => {
     });
   });
 
-  it("refuses a player's typed hit points, and rolls them on the server instead", async () => {
+  it("refuses a player's typed hit points at a server-rolled table, and rolls them on the server instead", async () => {
     const { base, server, gmToken, playerToken } = await boot();
     await post(base, GAME_PATHS.builderPolicy, gmToken, {
       commandId: randomUUID(),
-      allowedAbilityMethods: ALL_METHODS
+      allowedAbilityMethods: ALL_METHODS,
+      typedRolls: "gm-only"
     });
     const standard = {
       abilityMethod: "standard-array",
@@ -327,8 +333,13 @@ describe("a player's rolled dice are the table's", () => {
     expect(rows.map((row) => row.payload?.roll)).toEqual(feed.dice.map((die) => die.face));
   });
 
-  it("lets players type their own dice when the GM opens it, and the GM always", async () => {
+  it("lets players type their own dice by default, and the GM always", async () => {
     const { base, gmToken, playerToken } = await boot();
+    await post(base, GAME_PATHS.builderPolicy, gmToken, {
+      commandId: randomUUID(),
+      allowedAbilityMethods: ALL_METHODS,
+      typedRolls: "gm-only"
+    });
     const byGm = await post(
       base,
       GAME_PATHS.characters,
@@ -336,15 +347,20 @@ describe("a player's rolled dice are the table's", () => {
       fighterCreate({ hp: { mode: "entries", entries: [9, 2] } })
     );
     expect(byGm.status).toBe(200);
-    await post(base, GAME_PATHS.builderPolicy, gmToken, {
-      commandId: randomUUID(),
-      allowedAbilityMethods: ALL_METHODS,
-      typedRolls: "open"
-    });
-    const byPlayer = await post(
+    const refused = await post(
       base,
       GAME_PATHS.characters,
       playerToken,
+      fighterCreate({ hp: { mode: "entries", entries: [9, 2] } })
+    );
+    expect(refused.status).toBe(409);
+
+    // A fresh table lets players type what their dice show.
+    const fresh = await boot();
+    const byPlayer = await post(
+      fresh.base,
+      GAME_PATHS.characters,
+      fresh.playerToken,
       fighterCreate({ hp: { mode: "entries", entries: [9, 2] } })
     );
     expect(byPlayer.status).toBe(200);

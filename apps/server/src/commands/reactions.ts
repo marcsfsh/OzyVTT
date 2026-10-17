@@ -1,8 +1,9 @@
 import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from "@vtt/domain/commands";
+import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
 import { pushTokenAway } from "../forced-movement.js";
-import { answerReaction, dismissReaction, type ReactionOutcome } from "../reactions.js";
+import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome } from "../reactions.js";
 import { initiatorOf, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -82,14 +83,21 @@ export const reactionCommands = [
         commit,
         rollMode,
         attackNatural,
+        reroll,
         pushFeet
       } = request;
+      const initiator = initiatorOf(principal);
+      // The rules count a player's Advantage and Disadvantage; only the GM may force a mode.
+      const forcedMode = initiator.role === "gm" ? rollMode : undefined;
       // The grid, fetched up front like `action.resolve`'s, so Push on an opportunity attack moves the token.
       const mapAssetId = kit.read().combat.mapAssetId;
       const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
       const distance = await kit.creatureDistance();
       let outcome: ReturnType<typeof answerReaction> | undefined;
       const { state, duplicate } = await execute((draft) => {
+        // A typed die must be one the table takes, and not one typed over the strike's thrown die.
+        if (attackNatural !== undefined && reroll !== true)
+          requireTypedDie(draft, initiator, heldRollFor(draft, reactionHoldKey(reactionId)), attackNatural);
         outcome = answerReaction(
           draft,
           commandId,
@@ -108,7 +116,13 @@ export const reactionCommands = [
               draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null,
             distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
           },
-          { commit, rollMode, attackNatural, ...(pushFeet !== undefined ? { pushFeet } : {}) }
+          {
+            commit,
+            ...(forcedMode !== undefined ? { rollMode: forcedMode } : {}),
+            ...(attackNatural !== undefined ? { attackNatural } : {}),
+            ...(reroll === true ? { reroll: true } : {}),
+            ...(pushFeet !== undefined ? { pushFeet } : {})
+          }
         );
       });
       if (duplicate || !outcome) return;

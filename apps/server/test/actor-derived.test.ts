@@ -218,7 +218,6 @@ describe("check-bonus rides into ability checks and skills", () => {
     const sheet = sheetFor(stateWith(worn), definition, catalog);
     const str = sheet.abilities.find((row) => row.ability === "str")!;
     expect(str.check).toBe(4); // +3 Str, +1 gloves
-    expect(str.checkWithProficiency).toBe(7); // and PB on top
     expect(sheet.skills.find((row) => row.id === "athletics")!.bonus).toBe(4);
     // A save is not an ability check; the gloves must not touch it.
     expect(str.save).toBe(3);
@@ -253,7 +252,7 @@ describe("viewer safety: the derived block never rides the broadcast projections
   // The block rides `actor:available-actions`, a request that authorizes its caller for one named actor,
   // never `PlayerView` or `GmView`. A per-actor field on the broadcast projection is how another
   // character's sheet leaks.
-  const DERIVED_KEYS = ["checkWithProficiency", "saveFromItems", "saveProficient", "proficiencyBonus"] as const;
+  const DERIVED_KEYS = ["passivePerception", "saveFromItems", "saveProficient", "proficiencyBonus"] as const;
 
   it("keeps every derived-block field out of the player projection, for own and other actors alike", () => {
     const state = stateWith([item(CIRCLET_ROW)]);

@@ -80,8 +80,6 @@ describe("a player's item actions in the fight", () => {
         definition={definition}
         extraActions={[POTION, SCROLL, PROSE]}
         revision={7}
-        rollMode="auto"
-        bonusMode="auto"
         playerDamageMode="proposal"
         targets={[
           { actorId: ME, name: "Aria" },

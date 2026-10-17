@@ -10,6 +10,7 @@ import type {
   PlayerEffect,
   PlayerHp,
   PlayerInitiativeEntry,
+  PlayerRollCall,
   PlayerRollRecord,
   PlayerView,
   PresenceStatus,
@@ -164,7 +165,9 @@ const PENDING_SAVE_FIELDS = {
   sourceActorId: "never",
   endsEffects: "never",
   // Names the effect a repeated save would end; the prompt's action name already says which.
-  repeatOf: "never"
+  repeatOf: "never",
+  // The call reaches the player through `rollCalls`, which carries only their own part of it.
+  callId: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -348,6 +351,37 @@ function playerEffect(
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }
 
+/** The GM's calls for a roll as one player sees them: only the calls naming their own characters, only those
+ *  characters' entries, and a blind call without its DC or results. */
+export function projectPlayerRollCalls(state: GameState, playerSessionId: string | undefined): PlayerRollCall[] {
+  if (playerSessionId === undefined) return [];
+  const mine = new Set(
+    state.actors
+      .filter((actor) => actor.ownerSessionId === playerSessionId && actor.visibility === "public" && !actor.archived)
+      .map((actor) => actor.id)
+  );
+  return state.rollCalls.flatMap((call) => {
+    const entries = call.entries.filter((entry) => mine.has(entry.actorId));
+    if (entries.length === 0) return [];
+    return [
+      {
+        id: call.id,
+        kind: call.kind,
+        subject: { ...call.subject },
+        dc: call.blind ? null : call.dc,
+        blind: call.blind,
+        entries: entries.map((entry) => ({
+          actorId: entry.actorId,
+          ...(entry.saveId !== undefined ? { saveId: entry.saveId } : {}),
+          answered: entry.result !== undefined,
+          ...(entry.result !== undefined && !call.blind ? { result: { ...entry.result } } : {})
+        })),
+        createdAt: call.createdAt
+      }
+    ];
+  });
+}
+
 /** Resting as one player sees it: their own characters' requests, and the party's Short Rest only when one of their
  *  characters is in it, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
 function playerRest(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["rest"] {
@@ -400,6 +434,7 @@ const PLAYER_ACTOR_FIELDS = {
   healthDisplay: "derived",
   replaySceneId: "derived",
   actionUses: "derived",
+  heroicInspiration: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
   lastLongRestAt: "never",
@@ -457,7 +492,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | claimStatus, presence, healthDisplay    |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | classLine                               |  -   |  -  |       Y        |     Y      |          Y          |
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
- * | actionUses, hitDice                     |  Y   |  -  |       -        |     -      |          Y          |
+ * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
@@ -506,6 +541,7 @@ export function projectPlayerView(
     archivedCharacters: state.actors
       .filter((actor) => actor.archived && actor.sheetPreview && actor.visibility === "public")
       .map((actor) => ({ id: actor.id, name: actor.name })),
+    rollCalls: projectPlayerRollCalls(state, playerSessionId),
     combat: projectPlayerCombat(state, playerSessionId, now),
     rest: playerRest(state, yourActorIds),
     // Tiers subtract fields, never entries; only gm-only visibility and archiving remove an actor.
@@ -515,6 +551,7 @@ export function projectPlayerView(
         const {
           ownerSessionId,
           actionUses,
+          heroicInspiration,
           choiceOverrides,
           hitDice,
           spellSlots,
@@ -555,7 +592,7 @@ export function projectPlayerView(
           ...(replaySceneId !== undefined ? { replaySceneId } : {}),
           ...(classLine !== null ? { classLine } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
-          ...(resourcesVisible ? { actionUses: { ...actionUses } } : {}),
+          ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
           // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
           ...(resourcesVisible
             ? {

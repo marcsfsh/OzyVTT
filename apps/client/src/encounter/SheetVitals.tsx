@@ -13,32 +13,40 @@ export function SheetVitals({
   role,
   definition,
   extension,
+  speedFeet = null,
   onFeedback
 }: Readonly<{
   actor: GmActor | PlayerActor;
   role: "gm" | "player";
   definition: ActorDefinition | null;
   extension: SrdExtension;
+  /** The walking Speed now, from the server (Exhaustion, Slow, Grappled and the like); null until it answers. */
+  speedFeet?: number | null;
   onFeedback: (text: string) => void;
 }>) {
   const [editingAc, setEditingAc] = useState(false);
   const hp = actor.hp;
   const exactHp = "kind" in hp ? (hp.kind === "exact" ? hp : null) : hp;
   const dead = isDeadOnSheet(actor);
+  const baseWalk =
+    ("speedFeet" in actor ? actor.speedFeet : undefined) ?? extension.speeds?.walk ?? definition?.speedFeet;
+  const walk = speedFeet ?? baseWalk;
+  // A walking Speed of 0 is still shown (Grappled); another mode at 0 is no mode at all.
   const speeds = extension.speeds
     ? (["walk", "swim", "fly", "climb", "burrow"] as const)
         .flatMap((mode) => {
-          const feet = extension.speeds?.[mode];
-          return feet
+          const feet = mode === "walk" ? walk : extension.speeds?.[mode];
+          return feet || (mode === "walk" && feet === 0)
             ? [
                 `${mode === "walk" ? "" : `${mode} `}${feet} ft.${mode === "fly" && extension.speeds?.hover ? " (hover)" : ""}`
               ]
             : [];
         })
         .join(", ")
-    : definition
-      ? `${definition.speedFeet} ft.`
+    : walk !== undefined
+      ? `${walk} ft.`
       : null;
+  const changed = speedFeet !== null && baseWalk !== undefined && speedFeet !== baseWalk;
   return (
     <div className="sheet-vitals">
       <div className="sheet-vital sheet-vital-hp">
@@ -95,6 +103,7 @@ export function SheetVitals({
         <div className="sheet-vital">
           <span>Speed</span>
           <strong>{speeds}</strong>
+          {changed && <small className="sheet-vital-note">Base {baseWalk} ft.</small>}
         </div>
       )}
       {role === "gm" && editingAc && (

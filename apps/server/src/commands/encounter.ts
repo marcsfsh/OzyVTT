@@ -28,6 +28,7 @@ import {
   TurnUseSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError, type JournalEntry } from "../game-store.js";
+import { requireTypedDie } from "../held-rolls.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
 import { initiatorOf, isGmGrade, principalTag } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -261,7 +262,7 @@ export const encounterCommands = [
     type: "initiative.roll-self",
     operationId: "rollOwnInitiative",
     description:
-      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied), adds its initiative modifier, sets its score, and clears its pending flag. The rules set the roll mode (Surprise, conditions, features) and Exhaustion's penalty; `rollMode` is honoured only from a GM-grade session. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
+      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; a player may type one only while the table's typedRolls is open), adds its initiative modifier, sets its score, and clears its pending flag. The rules set the roll mode (Surprise, conditions such as Poisoned, features, Dexterity check riders) and Exhaustion's penalty; `rollMode` is honoured only from a GM-grade session. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
     summary: "Roll your own claimed character's initiative (GM anyone); the server rolls unless a manual d20 is given.",
     schema: InitiativeRollSelfSchema,
     malformed: "The initiative roll is malformed.",
@@ -271,6 +272,8 @@ export const encounterCommands = [
       const { state, duplicate } = await execute((draft) => {
         // A player rolls only their own claimed character's initiative; the GM (integration) anyone's.
         requireActorAccess(initiatorOf(principal), draft, actorId, "check");
+        // A typed d20 only while the table lets players type their dice.
+        if (natural !== undefined) requireTypedDie(draft, initiatorOf(principal), undefined, natural);
         score = rollSelfInitiative(
           draft,
           actorId,

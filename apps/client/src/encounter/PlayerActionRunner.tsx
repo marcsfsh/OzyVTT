@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
 import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { damageBreakdown } from "./format";
+import { modeWords } from "./roll-mode-notes";
 import { AskTheGmPrompt } from "./RuleAsk";
 import {
   beginTargeting,
@@ -49,6 +50,7 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     reaction: action.reaction ?? null,
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
+    ...(choosesAbility(action) ? { choosesAbility: true } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
@@ -60,7 +62,8 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
 
 /**
  * A player's action console on their own turn, mirroring the GM's ActionRunner for their claimed
- * character: pick an action and targets, preview the d20 (Adv/Disadv or a typed die), and confirm.
+ * character: pick an action and targets, roll the d20 (or type the face a physical die shows), see why
+ * it has Advantage or Disadvantage, and confirm.
  * Per the table's player-damage policy the server either hands the damage to the GM (proposal) or
  * applies it (direct); the player never applies damage directly.
  */
@@ -69,8 +72,7 @@ export function PlayerActionRunner({
   definition,
   extraActions = [],
   revision,
-  rollMode,
-  bonusMode,
+  inspired = false,
   playerDamageMode,
   targets
 }: Readonly<{
@@ -78,8 +80,8 @@ export function PlayerActionRunner({
   definition: ActorDefinition;
   /** Actions the server derived from the equipped loadout (a wand's charge, an amulet's cast); they are never in `definition.actions`. Numbers include item riders; resolution goes by id. */ extraActions?: readonly ContentActionSummary[];
   revision: number;
-  rollMode: "auto" | "manual";
-  bonusMode: "auto" | "total";
+  /** The character holds Heroic Inspiration, which can reroll the attack's d20. */
+  inspired?: boolean;
   playerDamageMode: "proposal" | "direct";
   targets: readonly { actorId: string; name: string }[];
 }>) {
@@ -187,20 +189,24 @@ export function PlayerActionRunner({
             )
             .map((target) => ({ id: target.actorId, label: target.name }))}
           busy={busy}
-          onRoll={() => resolveTargeting(revision, onOutcome)}
+          onInvalidFace={onFeedback}
+          onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}
         />
       )}
       {result && (
         <div className="action-result" role="status">
           <ActionResultHead result={result} />
+          {/* Why the d20 had Advantage or Disadvantage, before the player confirms it. */}
+          {result.attack && result.rollMode && result.rollMode.mode !== "normal" && (
+            <p className="action-rollmode">{modeWords(result.rollMode).replace(/^ · /, "")}</p>
+          )}
           {result.attack && <AttackOutcome attack={result.attack} audience="player" />}
           {result.preview && result.attack && (
             <AttackPreview
               attack={result.attack}
-              mode={result.rollMode?.mode}
               busy={busy}
-              rollMode={rollMode}
-              bonusMode={bonusMode}
+              viewer="player"
+              inspired={inspired}
               onFeedback={onFeedback}
               push={result.push}
               {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}

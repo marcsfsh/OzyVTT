@@ -1,5 +1,5 @@
 import type { RollRecord } from "@vtt/domain";
-import { d20TestFormula, rollDice } from "@vtt/rules-5e";
+import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
@@ -9,6 +9,7 @@ import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
 import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domain/commands";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
+import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
@@ -30,10 +31,10 @@ import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
 import { leaveShortRest } from "../short-rest-interruptions.js";
 import { ammunitionLabel, shotFrom, spendPiece } from "../ammunition.js";
-import { checkRollMode } from "../ability-checks.js";
-import { exhaustionPenalty } from "../condition-rules.js";
-import { checkRiderBonus, deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
-import { SCROLL_UNREADABLE, scrollCheckRoll, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
+import { checkPlan } from "../ability-checks.js";
+import { rollSettledCheck } from "../check-rolls.js";
+import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
+import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { castSlotLevel } from "../resolution/economy.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
@@ -69,7 +70,8 @@ export const actionCommands = [
         commit,
         attackNatural,
         attackTotal,
-        critical
+        critical,
+        fumble
       } = request;
       // A player resolves only for their own claimed character (checked inside the mutation); GM-only
       // inputs (templates, overrides, cover, applied conditions/notes) are refused or stripped.
@@ -77,6 +79,9 @@ export const actionCommands = [
       const isPlayer = initiator.role === "player";
       if (isPlayer && template) throw new GameAccessDeniedError("Your GM places area templates.");
       if (isPlayer && override) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
+      // A player types the face their die shows, never a total: the server adds the bonus and reads a 1 or a 20.
+      if (isPlayer && (attackTotal !== undefined || critical !== undefined || fumble !== undefined))
+        throw new GameAccessDeniedError("Type the d20 your die shows; the server adds your bonus.");
       const effectiveConditionId = isPlayer ? null : (conditionId ?? null);
       const effectiveCover = isPlayer ? null : (request.cover ?? null);
       const effectiveNote = isPlayer ? null : (request.note ?? null);
@@ -141,6 +146,11 @@ export const actionCommands = [
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
           geometry ? (tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null) : null;
+        // The attack's d20 is held between a preview and its confirm, one per creature and turn (ADR-0012), so a
+        // second look at the attack shows the same die. A typed die must be one the table takes.
+        const holdKey = `attack:${actorId}`;
+        if (attackNatural !== undefined && request.reroll !== true)
+          requireTypedDie(draft, initiator, heldRollFor(draft, holdKey), attackNatural);
         // SRD forced movement (Push), snapped like a GM drag; takes no client input. Only `targets[0]` of a hit
         // is pushed, already restricted to public combatants for players. If the map changed since the grid
         // was fetched, degrade to null ("move the token") rather than throw.
@@ -154,7 +164,8 @@ export const actionCommands = [
             targetIds: resolvedTargetIds,
             commandId,
             conditionId: effectiveConditionId,
-            rollMode: rollMode ?? null,
+            // The rules count Advantage and Disadvantage; only the GM may force a mode.
+            rollMode: isPlayer ? null : (rollMode ?? null),
             override: isPlayer ? null : (override ?? null),
             builtin: statBlockAction === undefined,
             note: effectiveNote,
@@ -162,8 +173,14 @@ export const actionCommands = [
             cover: effectiveCover,
             commit,
             attackNatural,
+            ...(attackNatural !== undefined ? { typedFace: true } : {}),
+            holdKey,
+            ...(request.reroll === true ? { reroll: true } : {}),
             attackTotal,
             critical,
+            ...(fumble !== undefined ? { fumble } : {}),
+            ...(request.skill !== undefined ? { skill: request.skill } : {}),
+            ...(request.ability !== undefined ? { ability: request.ability } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
@@ -364,8 +381,13 @@ export const actionCommands = [
       }
 
       // Loose: the server rolls the action's dice, attributed to the character, and spends what the action
-      // costs (an item's charges), touching no combat state. HP only ever moves through the resolver.
-      const plan = looseRollPlan(action, { includeDamage: includeDamage === true, ...(rollMode ? { rollMode } : {}) });
+      // costs (an item's charges), touching no combat state. HP only ever moves through the resolver. Only the GM may
+      // force a roll mode.
+      const forcedMode = isGmGrade(principal) ? rollMode : undefined;
+      const plan = looseRollPlan(action, {
+        includeDamage: includeDamage === true,
+        ...(forcedMode ? { rollMode: forcedMode } : {})
+      });
       const initiator = initiatorOf(principal);
       const rollIds = plan.map(() => kit.context.newId());
       const scrollCheckId = kit.context.newId();
@@ -393,29 +415,26 @@ export const actionCommands = [
               throw new RulesBlockedError(SCROLL_UNREADABLE, reading.message);
             if (mode !== "freeform") rulesNote = reading.message;
           } else if (reading.check) {
-            const derivation = deriveEquipment(live, definition, catalog);
-            const check = scrollCheckRoll(definition, derivation, reading.check, scroll.spell.name);
-            const total = check.modifier + exhaustionPenalty(live) + checkRiderBonus(derivation, check.narrow);
-            const formula = d20TestFormula(checkRollMode(derivation, check.narrow).mode, total);
-            const resolution = rollDice(formula, (sides) => kit.context.random(sides));
-            recordRoll(draft, {
-              id: scrollCheckId,
-              commandId,
-              initiatorSessionId: sessionIdOf(principal),
-              initiatorRole: initiator.role,
-              initiatorLabel: live.name,
-              label: check.label,
-              actorId,
-              purpose: "check",
-              visibility: live.visibility === "gm-only" ? "gm-only" : "public",
-              formula,
-              normalizedFormula: resolution.expression.normalized,
-              ...rolledTerms(resolution),
-              total: resolution.total,
-              createdAt: new Date().toISOString()
-            });
+            // An ability check like any other (`checkPlan`), so Poisoned, Exhaustion and Reliable Talent count.
+            const check = scrollCheckOf(reading.check, scroll.spell.name);
+            const plan = checkPlan(live, definition, deriveEquipment(live, definition, catalog), check.subject);
+            const rolled = rollSettledCheck(
+              draft,
+              live,
+              plan,
+              {
+                id: scrollCheckId,
+                commandId,
+                sessionId: sessionIdOf(principal),
+                role: initiator.role,
+                label: check.label,
+                visibility: live.visibility === "gm-only" ? "gm-only" : "public",
+                createdAt: new Date().toISOString()
+              },
+              (sides) => kit.context.random(sides)
+            );
             scrollChecked = true;
-            if (resolution.total < reading.check.dc) {
+            if (rolled.total < reading.check.dc) {
               scrollLost = scrollLostLine(live.name, scroll.spell.name);
               live.inventory = withOneUsedUp(live.inventory, scroll.row.id);
               return;
@@ -559,7 +578,7 @@ export const actionCommands = [
     type: "dice.roll",
     operationId: "rollDice",
     description:
-      "Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it.",
+      "Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it. A formula with no dice is a number typed from physical dice: a player may send one only while the table's `typedRolls` is open, and its record is marked `typed`.",
     summary: "Roll dice into the shared, auditable roll history.",
     schema: DiceRollSchema,
     malformed: "The roll request is malformed.",
@@ -575,6 +594,13 @@ export const actionCommands = [
       } catch (error) {
         throw new CommandRejectedError(error instanceof Error ? error.message : "The roll failed.");
       }
+      // A formula with no dice is a number typed from physical dice (the sheet's manual entry): a player may send one
+      // only while the table lets players type their dice.
+      const typed = !resolution.terms.some((term) => term.kind === "dice");
+      if (typed && !gmGrade && kit.read().builderPolicy.typedRolls !== "open")
+        throw new CommandRejectedError(
+          "At this table the server rolls players' dice. Roll the dice instead of typing them."
+        );
       const rollId = kit.context.newId();
       const { state, duplicate } = await execute((draft) => {
         // A player's roll with no actorId is attributed to their single claimed character (ambiguous claims
@@ -614,6 +640,7 @@ export const actionCommands = [
           normalizedFormula: resolution.expression.normalized,
           ...rolledTerms(resolution),
           total: resolution.total,
+          ...(typed ? { typed: true as const } : {}),
           createdAt: new Date().toISOString()
         };
         recordRoll(draft, record);

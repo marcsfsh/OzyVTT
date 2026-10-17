@@ -111,11 +111,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // damage (resistance is by damage type, not source) and the redirect of nearby ranged attacks.
   "shield-of-missile-attraction": { cursed: true },
 
-  /**
-   * The Perception half is gated on `ability-is: ["wis"]`, not `skill-is`: the server's Search check
-   * carries no skill, so a skill gate would never fire. This also applies to Searches the SRD would
-   * call Insight, Medicine or Survival.
-   */
+  // Advantage on Initiative and on Wisdom (Perception) checks: a sheet roll, Search or the GM's call made with Perception.
   "sentinel-shield": {
     modifiers: [
       { type: "roll-mode", roll: "initiative", mode: "advantage" },
@@ -123,7 +119,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "check",
         mode: "advantage",
-        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
       }
     ]
   },
@@ -494,9 +490,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `rod-of-absorption` - needs per-copy storage and a spell slot refund.
 
   /**
-   * Initiative and Perception advantage, four at-will detection casts, and the Protective Aura's
-   * once-per-dawn counter (the ally buff is prose). The Perception half is gated on `ability-is:
-   * ["wis"]` because the server's Search check carries no skill, so `skill-is` would never fire.
+   * Initiative and Wisdom (Perception) advantage, four at-will detection casts, and the Protective Aura's
+   * once-per-dawn counter (the ally buff is prose).
    */
   "rod-of-alertness": {
     modifiers: [
@@ -505,7 +500,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "check",
         mode: "advantage",
-        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
       }
     ],
     casts: [

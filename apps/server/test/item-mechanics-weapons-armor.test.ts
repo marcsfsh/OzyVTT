@@ -404,13 +404,13 @@ describe("the authored riders are present in the shipped bundle", () => {
     expect(shipped("sentinel-shield").modifiers).toContainEqual(
       expect.objectContaining({ type: "roll-mode", roll: "initiative", mode: "advantage" })
     );
-    // Gated on the ability because `BUILTIN_CHECKS.search` passes no skill and `skill-is` fails closed
-    // without one. Driven to the die in `item-mechanics-shared.test.ts`.
+    // Perception only: Search rolls the skill the searcher picks, so an Insight or Survival search gets no
+    // Advantage. Driven to the die in `item-mechanics-shared.test.ts`.
     expect(shipped("sentinel-shield").modifiers).toContainEqual({
       type: "roll-mode",
       roll: "check",
       mode: "advantage",
-      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["wis"] }]
+      when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
     });
     expect(shipped("plate-armor-of-etherealness").casts).toContainEqual(
       expect.objectContaining({ spellId: "etherealness" })

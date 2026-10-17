@@ -3,6 +3,7 @@ import type { Actor, ActorDefinition, EffectInstance } from "@vtt/schemas";
 import type {
   Annotation,
   BuilderPolicy,
+  CheckSubject,
   CombatState,
   EncounterToken,
   GameState,
@@ -11,6 +12,7 @@ import type {
   PendingRuleAsk,
   PendingSave,
   PlayerRollRecord,
+  RollCall,
   RuleExceptions,
   RuleMode
 } from "./state.js";
@@ -52,6 +54,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
       string,
       number
     >;
+    /** Whether the character holds Heroic Inspiration. Same gate as `actionUses`. */ heroicInspiration?: boolean;
     /** Picks re-made on a rest, keyed by offer key (Circle of the Land's land type). Same gate as `actionUses`. */ choiceOverrides?: Record<
       string,
       { id: string; per: "short-rest" | "long-rest" }
@@ -85,8 +88,12 @@ export type PlayerInitiativeEntry = Readonly<{
   conditions: readonly string[];
 }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
-/** A player's own pending saves only; source actor ids and effect references never cross the wire, and a hidden source's name is masked server-side. */
-export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects" | "repeatOf" | "onFailEffect"> & {
+/** A player's own pending saves only; source actor ids, effect references and the call a save answers never cross the
+ *  wire (the call reaches the player through `rollCalls`), and a hidden source's name is masked server-side. */
+export type PlayerPendingSave = Omit<
+  PendingSave,
+  "sourceActorId" | "endsEffects" | "repeatOf" | "onFailEffect" | "callId"
+> & {
   onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "castId" | "sourceActionId" | "ongoingDamage">;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
@@ -129,6 +136,24 @@ export type PlayerCombatView = Readonly<{
 }>;
 /** An archived, public character the GM shared for preview: id and name only. */
 export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;
+/** One of the GM's calls for a roll as a player who must answer it sees it: only their own characters' entries, and a
+ *  blind call carries neither its DC nor its results. */
+export type PlayerRollCall = Readonly<{
+  id: string;
+  kind: RollCall["kind"];
+  subject: CheckSubject;
+  dc: number | null;
+  blind: boolean;
+  entries: ReadonlyArray<
+    Readonly<{
+      actorId: string;
+      saveId?: string;
+      answered: boolean;
+      result?: NonNullable<RollCall["entries"][number]["result"]>;
+    }>
+  >;
+  createdAt: number;
+}>;
 /** The player's own characters' part of resting: which of them asked for a Long Rest, and the party's Short Rest when
  *  one of them is in it, cut down to them. The game clock stays with the GM; a refused rest explains the wait. */
 export type PlayerRestView = Readonly<{
@@ -141,6 +166,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   rolls: PlayerRollRecord[];
   /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
   /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[];
+  /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;
   /** Long Rest requests and the party's Short Rest, for the player's own characters only. */ rest: PlayerRestView;
 };

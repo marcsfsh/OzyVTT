@@ -1,5 +1,5 @@
 import { cantripScalingOf, cantripTierAt, type EquipmentReference, type SpellReference } from "@vtt/content-srd-5.2.1";
-import { abilityModifier, skillBonus, type RiderAbility } from "@vtt/rules-5e";
+import { abilityModifier, type RiderAbility } from "@vtt/rules-5e";
 import {
   catalogIdOf,
   resolveSpellcasting,
@@ -8,7 +8,8 @@ import {
   type ActorDefinition,
   type InventoryItem
 } from "@vtt/schemas";
-import { effectiveSkillTier, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import type { CheckSubject } from "./ability-checks.js";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { itemActionId, spellCastMechanics } from "./item-actions.js";
 import { itemRowOfAction } from "./item-charges.js";
 
@@ -213,27 +214,19 @@ export function scrollCastAction(
   };
 }
 
-/** The check a spell above the reader's levels needs: the spellcasting ability's modifier, or the Arcana bonus for
- *  Use Magic Device, with its label and the ability and skill its riders narrow to. */
-export function scrollCheckRoll(
-  definition: ActorDefinition | undefined,
-  derivation: EquipmentDerivation,
+/** The check a spell above the reader's levels needs, as any ability check is made (`checkPlan`): the spellcasting
+ *  ability, or Intelligence (Arcana) for Use Magic Device, with the label its result is read under. */
+export function scrollCheckOf(
   check: ScrollCheck,
   spellName: string
-): Readonly<{ modifier: number; narrow: Readonly<{ ability: RiderAbility; skill?: string }>; label: string }> {
-  const score = definition?.abilityScores[check.ability] ?? 10;
+): Readonly<{ subject: CheckSubject; label: string }> {
   if (check.skill === null)
     return {
-      modifier: abilityModifier(score),
-      narrow: { ability: check.ability },
+      subject: { ability: check.ability },
       label: `${ABILITY_NAMES[check.ability]} check to cast ${spellName} from a scroll`
     };
-  const override = definition?.proficiencies?.skillOverrides?.[check.skill];
   return {
-    modifier:
-      override ??
-      skillBonus(score, definition?.proficiencyBonus ?? 0, effectiveSkillTier(definition, derivation, check.skill)),
-    narrow: { ability: check.ability, skill: check.skill },
+    subject: { ability: check.ability, skill: check.skill },
     label: `Intelligence (Arcana) check to cast ${spellName} from a scroll`
   };
 }

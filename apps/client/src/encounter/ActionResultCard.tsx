@@ -18,7 +18,6 @@ export function ActionResultCard({
   actions,
   busy,
   resolveBusy,
-  rollMode,
   onFeedback,
   resolve,
   onAgain,
@@ -33,7 +32,6 @@ export function ActionResultCard({
   actions: readonly ContentActionSummary[] | null;
   busy: boolean;
   resolveBusy: boolean;
-  rollMode: "auto" | "manual";
   onFeedback: (text: string) => void;
   resolve: (options: ResolveOptions) => void;
   onAgain: (action: ContentActionSummary) => void;
@@ -110,10 +108,8 @@ export function ActionResultCard({
       {result.preview && result.attack && (
         <AttackPreview
           attack={result.attack}
-          mode={result.rollMode?.mode}
           busy={resolveBusy}
-          rollMode={rollMode}
-          bonusMode="auto"
+          viewer="gm"
           onFeedback={onFeedback}
           push={result.push}
           {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}

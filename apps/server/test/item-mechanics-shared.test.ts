@@ -255,10 +255,10 @@ describe("the rider families held only by a bundle assertion, driven", () => {
     }
   });
 
-  // "Advantage on ... Wisdom (Perception) checks" is authored to the ability, because `BUILTIN_CHECKS.search`
-  // has no `skill` key and `skill-is` fails closed. The same rider must leave Hide and Study alone.
+  // "Advantage on ... Wisdom (Perception) checks" is gated on the Perception skill, which a Search made with it carries.
+  // The same rider must leave a Search made with Insight, Hide and Study alone.
   it("Wisdom (Perception) advantage reaches the SEARCH die on both its carriers, and no other check", () => {
-    const searchWith = (id: string, n: number, over: Record<string, unknown> = {}) => {
+    const searchWith = (id: string, n: number, over: Record<string, unknown> = {}, skill = "perception") => {
       const definition = definitionOf();
       const state = fight(stateWith([picked(id, over)]));
       const resolution = resolveDefinitionAction(
@@ -268,7 +268,8 @@ describe("the rider families held only by a bundle assertion, driven", () => {
           actorId: IDS.hero,
           targetIds: [],
           commandId: `50000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
-          builtin: true
+          builtin: true,
+          skill
         },
         deps([6, 19], definition)
       );
@@ -282,10 +283,12 @@ describe("the rider families held only by a bundle assertion, driven", () => {
     ] as const) {
       const worn = searchWith(id, n);
       expect(worn.resolution.check, `${id}: Search did not keep the higher die`).toMatchObject({
-        skill: "Wisdom (Search)",
+        skill: "Wisdom (Perception)",
         naturalRoll: 19,
         total: 19
       });
+      // A Search made with Insight is no Perception check.
+      expect(searchWith(id, n + 20, {}, "insight").resolution.rollMode).toBeUndefined();
       expect(worn.formula).toBe("2d20kh1+0");
       expect(worn.resolution.rollMode).toEqual({ mode: "advantage", advantage: [name], disadvantage: [] });
 

@@ -42,15 +42,27 @@ export type ResolveInput = Readonly<{
   effectId?: string | null;
   /** GM-adjudicated cover for the target (SRD Cover): half +2 / three-quarters +5 to AC and Dex saves; total blocks targeting. */
   cover?: "half" | "three-quarters" | "total" | null;
-  /** false previews the attack roll only (no damage, riders, prompts or economy); the client confirms with `attackNatural`. */
+  /** false previews the attack roll only (no damage, riders, prompts or economy); the confirm uses the held die. */
   commit?: boolean;
-  /** A confirmed or hand-rolled natural d20, used instead of rolling (preview confirm, manual dice). */
+  /** A natural d20 used instead of rolling: a typed physical die, or a parked attack's replay. */
   attackNatural?: number;
-  /** A hand-entered attack total, used verbatim vs AC. The natural die is unknown, so a crit is declared
-   * via `critical` and there is no fumble. */
+  /** `attackNatural` was typed from a physical die, so its record says so. */
+  typedFace?: boolean;
+  /** The key the attack's d20 is held under between a preview and its confirm (ADR-0012); absent, nothing is held. */
+  holdKey?: string;
+  /** Throw the held attack d20 again: a player's Heroic Inspiration rerolls one die, the GM throws afresh. */
+  reroll?: boolean;
+  /** GM only: a hand-entered attack total, used verbatim vs AC. The natural die is unknown, so a crit is declared
+   * via `critical` and a natural 1 via `fumble`. */
   attackTotal?: number;
   /** Explicit "this was a natural 20" (critical hit) for the hand-entered-total path. Ignored when a natural is supplied. */
   critical?: boolean;
+  /** Explicit "this was a natural 1" (a miss) for the hand-entered-total path. Ignored when a natural is supplied. */
+  fumble?: boolean;
+  /** The skill a builtin check is made with (Influence, Search, Study, Escape a Grapple). */
+  skill?: string | null;
+  /** The ability a cast chooses (Hex). */
+  ability?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];
@@ -169,13 +181,15 @@ export type ResolveContext = {
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die
- *  that is not the action's own (Bless's d4). */
+ *  that is not the action's own (Bless's d4). `total` stands in for the dice's own sum where a rule changes it
+ *  (Reliable Talent's 10), and `typed` marks a d20 typed from a physical die. Returns the record's id. */
 export function recordRoll(
   ctx: ResolveContext,
   resolution: DiceResolution,
   purpose: RollRecord["purpose"],
-  label?: string
-): void {
+  label?: string,
+  extra: Readonly<{ total?: number; typed?: boolean }> = {}
+): string {
   const record: RollRecord = {
     ...ctx.rollBase,
     ...(label !== undefined ? { label } : {}),
@@ -184,9 +198,11 @@ export function recordRoll(
     formula: resolution.expression.source,
     normalizedFormula: resolution.expression.normalized,
     ...rolledTerms(resolution),
-    total: resolution.total
+    total: extra.total ?? resolution.total,
+    ...(extra.typed ? { typed: true as const } : {})
   };
   recordRollInHistory(ctx.state, record);
+  return record.id;
 }
 
 /** The natural face of a d20 test: the kept die under advantage or disadvantage. */

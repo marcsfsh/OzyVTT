@@ -329,6 +329,7 @@ function instantiate(
     effects: [],
     deathSaves: null,
     actionUses: {},
+    heroicInspiration: false,
     choiceOverrides: {},
     conditionImmunities: definition.conditionImmunities ? [...definition.conditionImmunities] : [],
     speedFeet: definition.speedFeet,

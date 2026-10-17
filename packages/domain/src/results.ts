@@ -197,6 +197,8 @@ export type DamageApplyResult = MutationResult & { applied?: DamageApplication }
 export type DeathSaveResult = MutationResult & {
   deathSave?: Readonly<{
     naturalRoll: number;
+    /** The face with what the save adds (Exhaustion, Bless's d4, an aura). */
+    total?: number;
     outcome: "success" | "failure" | "critical-success" | "critical-failure";
     successes: number;
     failures: number;
@@ -204,10 +206,29 @@ export type DeathSaveResult = MutationResult & {
     dead: boolean;
     regainedConsciousness: boolean;
     /** false = previewed only (pips unchanged, awaiting confirmation); true = applied. */ committed: boolean;
-    /** The d20 mode when adv/disadv was chosen; absent for a plain roll. */ rollMode?:
+    /** The d20 mode when it had Advantage or Disadvantage; absent for a plain roll. */ rollMode?:
       "advantage" | "disadvantage" | "normal";
+    /** What gave the death save Advantage or Disadvantage. */ rollModeSources?: ActionRollMode;
   }>;
 };
+/** A check the server rolled. A blind roll's numbers stay with the GM: the roller gets `hiddenFromRoller` alone. */
+export type CheckRollOutcome = Readonly<{
+  /** "Dexterity (Stealth)", "Strength check", "Thieves' Tools (Dexterity)". */
+  label: string;
+  natural: number;
+  total: number;
+  dc: number | null;
+  /** Null when there was no DC to beat. */
+  success: boolean | null;
+  /** What gave the check Advantage or Disadvantage; absent for a plain d20. */
+  rollMode?: ActionRollMode;
+  /** Reliable Talent counted a d20 of 9 or lower as 10. */
+  reliableTalent?: true;
+  /** The d20 was typed from a physical die. */
+  typed?: true;
+  rollId: string;
+}>;
+export type CheckRollResult = MutationResult & { check?: CheckRollOutcome; hiddenFromRoller?: boolean };
 /** Outcome of giving aid to a creature at 0 hit points: stabilized, woken from a knock-out, or neither (a failed
  *  check). `check` is the Wisdom (Medicine) roll when first aid was the method. */
 export type StabilizeResult = MutationResult & {
@@ -223,6 +244,7 @@ export type SaveAnswerResult = MutationResult & {
     success: boolean;
     total: number;
     dc: number;
+    /** The d20 that counted; absent when no die was rolled. */ natural?: number;
     appliedDamage: number;
     conditionApplied: boolean;
     committed: boolean;
@@ -233,6 +255,13 @@ export type SaveAnswerResult = MutationResult & {
     /** Flat reduction taken off before Resistance. */ flatReduction?: number;
   };
 };
+/** A loose saving throw (none was owed): its total and d20, or the condition that failed it without a roll. */
+export type LooseSaveOutcome = Readonly<{
+  total: number;
+  natural?: number;
+  rollMode?: ActionRollMode;
+  autoFailed?: string;
+}>;
 /** Outcome of answering a reaction prompt; any damage it settles is already applied server-side. A strike (an
  *  opportunity attack, Hellish Rebuke) and a parked attack finished by the answer carry their full `resolution`. */
 export type ReactionAnswerResult = MutationResult & {
@@ -287,26 +316,49 @@ export const ActionAvailabilitySchema = z.strictObject({
   damageTypes: z.array(DamageTypeSchema).nullable().optional()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
-/** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. */
+/** A roll's mode as the rules count it, with what grants each side, so the sheet can say why before the roll. */
+const RollModeSummarySchema = z.strictObject({
+  mode: z.enum(["advantage", "disadvantage", "normal"]),
+  advantage: z.array(z.string()),
+  disadvantage: z.array(z.string())
+});
+/** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. Every
+ *  number is what the server would roll: Exhaustion, item riders and features included. */
 const DerivedAbilityRowSchema = z.strictObject({
   ability: AbilityIdSchema,
   check: z.number().int(),
-  checkWithProficiency: z.number().int(),
+  checkMode: RollModeSummarySchema,
   save: z.number().int(),
+  saveMode: RollModeSummarySchema,
   saveProficient: z.boolean(),
-  saveFromItems: z.number().int()
+  saveFromItems: z.number().int(),
+  /** The condition that makes a Strength or Dexterity save fail without a roll (Paralyzed); null otherwise. */
+  saveAutoFails: z.string().nullable()
 });
 export type DerivedAbilityRow = Wire<z.infer<typeof DerivedAbilityRowSchema>>;
-/** `tier` is the effective tier: the sheet's base raised by any item grant. `sources` names the items that raised it. */
+/** `tier` is the effective tier: the sheet's base raised by any item grant. `sources` names the items that raised it.
+ *  `reliableTalent`: a d20 of 9 or lower counts as 10 on this check. */
 const DerivedSkillRowSchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   ability: AbilityIdSchema.nullable(),
   tier: z.enum(["none", "proficient", "expertise"]),
   bonus: z.number().int().nullable(),
-  sources: z.array(z.string())
+  sources: z.array(z.string()),
+  mode: RollModeSummarySchema,
+  reliableTalent: z.boolean()
 });
 export type DerivedSkillRow = Wire<z.infer<typeof DerivedSkillRowSchema>>;
+/** A tool the character is proficient with, checked with the ability its SRD entry names. */
+const DerivedToolRowSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  ability: AbilityIdSchema,
+  bonus: z.number().int(),
+  mode: RollModeSummarySchema,
+  reliableTalent: z.boolean()
+});
+export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
 /** One damage type a defence covers, and what grants it (null for the stat block itself). */
 const DerivedDefenceSchema = z.strictObject({ type: z.string(), source: z.string().nullable() });
 export type DerivedDefence = Wire<z.infer<typeof DerivedDefenceSchema>>;
@@ -316,6 +368,12 @@ const ActorDerivedSheetSchema = z.strictObject({
   initiative: z.number().int(),
   abilities: z.array(DerivedAbilityRowSchema),
   skills: z.array(DerivedSkillRowSchema),
+  tools: z.array(DerivedToolRowSchema),
+  /** 10 plus the Wisdom (Perception) bonus, 5 more with Advantage on such checks or 5 less with Disadvantage. */
+  passivePerception: z.number().int(),
+  /** Speed now, before Dash: Exhaustion, Slow, armor too heavy for the wearer and Speed-0 conditions included; null
+   *  when the sheet records none. */
+  speedFeet: z.number().int().min(0).nullable(),
   /** The damage defences in force outside any one hit: the stat block's, chosen features', items' and
    *  effects', as the damage pipeline reads them. */
   defences: z.strictObject({

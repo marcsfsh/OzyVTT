@@ -145,7 +145,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
   // and combat context so its actions resolve as real attacks.
   const [view, setView] = useState<"initiative" | "sheet">("initiative");
   // The shared per-browser dice-input preference.
-  const { rollMode, bonusMode } = useRollPreference();
+  const { rollMode } = useRollPreference();
   // "Jump" sheet-attack mode: an attack tapped on the sheet comes here to pick and confirm, then
   // returns to the sheet once it commits.
   const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
@@ -157,6 +157,9 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
     }
   }, [returnToSheetAfterAttack, jumpAttackResult]);
   const myActor = state.actors.find((actor) => actor.id === myId) ?? null;
+  const calledSaveIds = new Set(
+    state.rollCalls.flatMap((call) => call.entries.flatMap((entry) => (entry.saveId ? [entry.saveId] : [])))
+  );
   if (!combat.active)
     return (
       <section className="encounter-panel compact" aria-labelledby="player-initiative-title">
@@ -234,7 +237,12 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
             {orderedInitiative.map((entry) => {
               const isMe = entry.actorId === myId;
               const rowActor = state.actors.find((actor) => actor.id === entry.actorId);
-              const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
+              // A save the GM called for is answered on the call's card, so it is not prompted twice.
+              const mySaves = isMe
+                ? combat.pendingSaves.filter(
+                    (save) => save.targetActorId === entry.actorId && !calledSaveIds.has(save.id)
+                  )
+                : [];
               const myReactions = isMe
                 ? combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)
                 : [];
@@ -256,8 +264,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                       actorId={myId}
                       definition={rowActor.definition}
                       revision={state.revision}
-                      rollMode={rollMode}
-                      bonusMode={bonusMode}
+                      inspired={rowActor.heroicInspiration === true}
                       playerDamageMode={combat.playerDamageMode}
                       targets={combat.initiative.map((initiativeEntry) => ({
                         actorId: initiativeEntry.actorId,
@@ -309,6 +316,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                             onFeedback={onFeedback}
                             rollMode={rollMode}
                             isActingTurn={false}
+                            viewer="player"
                             aid={
                               <StabilizeControl
                                 targetId={entry.actorId}
@@ -344,6 +352,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           onFeedback={onFeedback}
                           rollMode={rollMode}
                           isActingTurn={myTurn}
+                          viewer="player"
+                          inspired={rowActor.heroicInspiration === true}
                         />
                       )}
                     </OwnFeedback>
@@ -359,6 +369,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                             canDismiss={false}
                             onFeedback={onFeedback}
                             rollMode={rollMode}
+                            viewer="player"
+                            inspired={rowActor?.heroicInspiration === true}
                           />
                         ))
                       }
@@ -375,6 +387,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                             canDismiss={false}
                             onFeedback={onFeedback}
                             rollMode={rollMode}
+                            viewer="player"
+                            inspired={rowActor?.heroicInspiration === true}
                           />
                         ))
                       }
