@@ -207,7 +207,7 @@ export function PagesView({
     try {
       await codexApi.createFolder(gmToken, name);
     } catch {
-      /* best-effort — the move still files the page there */
+      /* best-effort: the move still files the page there */
     }
     await movePage(id, name);
   };

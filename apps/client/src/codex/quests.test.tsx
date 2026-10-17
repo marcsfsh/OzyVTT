@@ -174,7 +174,7 @@ beforeEach(() => {
 });
 
 describe("What counts as OPEN (the rule, below the components)", () => {
-  it("is NOT FINISHED — `not-started` and `active`, never one of the three terminal states", () => {
+  it("is NOT FINISHED: `not-started` and `active`, never one of the three terminal states", () => {
     // `failed` is what a looser "not completed" predicate would let through.
     expect(openQuests([OPEN, DONE, LOST]).map((quest) => quest.id)).toEqual(["q1"]);
     expect(openQuests([DONE, LOST, DROPPED])).toEqual([]);
@@ -204,7 +204,7 @@ describe("What counts as OPEN (the rule, below the components)", () => {
 });
 
 describe("The dashboard's open-quests card", () => {
-  it("shows the GM the open quests only, and lands ON one — writing nothing to get there", async () => {
+  it("shows the GM the open quests only, and lands ON one with no write to get there", async () => {
     gmDefaults();
     const user = userEvent.setup();
     await renderWorkspace();
@@ -217,7 +217,7 @@ describe("The dashboard's open-quests card", () => {
     expect(card.queryByText("The Missing Caravan")).not.toBeInTheDocument();
     expect(card.getByText("1 of 2 done")).toBeInTheDocument();
 
-    // The second open quest, so landing here proves the latch rather than the default selection.
+    // The second open quest, so landing here proves the latch; the default selection would pick the first.
     await user.click(card.getByText("The Amber Temple"));
 
     const log = within(await screen.findByRole("navigation", { name: "Quests" }));
@@ -313,7 +313,7 @@ describe("The GM can actually pick the new statuses (5d)", () => {
 });
 
 describe("The GM's objective checklist", () => {
-  it("adds a BLANK row and saves it in place — order is content and a blank line is a real state", async () => {
+  it("adds a BLANK row and saves it in place: order is content and a blank line is a real state", async () => {
     // Blank objective rows must survive the save; the server accepts them so "Add objective" works.
     gmDefaults([OPEN]);
     updateQuest.mockResolvedValue(QUEST());
@@ -341,7 +341,7 @@ describe("The GM's objective checklist", () => {
       { text: "Open the sarcophagus", done: false },
       { text: "", done: false }
     ]);
-    // A stale edit is a 409 rather than a silent overwrite.
+    // A stale edit is a 409, and nothing is silently overwritten.
     expect(input.expectedRev).toBe(3);
   });
 
@@ -440,7 +440,7 @@ describe("The player's copy of the card (viewer safety)", () => {
     playerDefaults();
   });
 
-  it("shows progress and never a tickable box — no checkbox, no field, nothing focusable", async () => {
+  it("shows progress and never a tickable box: no checkbox, no field, nothing focusable", async () => {
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
 
     const card = within(await screen.findByRole("navigation", { name: "Open quests" }));
@@ -450,7 +450,7 @@ describe("The player's copy of the card (viewer safety)", () => {
     expect(objectives.getByText("Open the sarcophagus")).toBeInTheDocument();
     expect(objectives.getByText(", done")).toBeInTheDocument();
     expect(objectives.getByText(", not done")).toBeInTheDocument();
-    // The read-only branch renders no control at all, not a disabled checkbox.
+    // The read-only branch renders no control at all, disabled checkbox included.
     expect(card.queryAllByRole("checkbox")).toHaveLength(0);
     expect(card.queryAllByRole("textbox")).toHaveLength(0);
     expect(card.getByRole("button", { name: /The Sunless Crown/ })).toBeInTheDocument();
@@ -495,7 +495,7 @@ describe("The player's quest reader", () => {
   const railOf = async () => within(await screen.findByRole("navigation", { name: "Quests" }));
   const readerOf = async () => within(await screen.findByRole("article"));
 
-  it("opens a quest from the dashboard and reads it — title, status, description, objectives", async () => {
+  it("opens a quest from the dashboard and reads it: title, status, description, objectives", async () => {
     playerDefaults();
     const user = userEvent.setup();
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
@@ -524,7 +524,7 @@ describe("The player's quest reader", () => {
     expect(screen.getAllByRole("textbox").map((box) => box.getAttribute("aria-label"))).toEqual(["Filter quests"]);
   });
 
-  it("is where the FINISHED quests live — the dashboard card stays open-only", async () => {
+  it("is where the FINISHED quests live: the dashboard card stays open-only", async () => {
     playerDefaults([PLAYER_QUEST, PLAYER_DONE, PLAYER_LOST]);
     const user = userEvent.setup();
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
@@ -545,7 +545,7 @@ describe("The player's quest reader", () => {
     expect(reader.getByText("The bell was hauled back up the hill.")).toBeInTheDocument();
   });
 
-  it("lands a search hit ON a completed quest — the jump that used to go nowhere", async () => {
+  it("lands a search hit ON a completed quest: the jump that used to go nowhere", async () => {
     /** Only finished quests, so the dashboard card doesn't render and the hit must land in the reader. */
     playerDefaults([PLAYER_DONE]);
     playerSearch.mockResolvedValue({
@@ -612,7 +612,7 @@ describe("The player's quest reader", () => {
   });
 });
 
-/** Rendered rather than string-asserted: the sentence combines the verb table, the player's quest feed and the row. */
+/** Rendered and never string-asserted: the sentence combines the verb table, the player's quest feed and the row. */
 describe("A quest-history row a player reads (5d)", () => {
   const questRecord = (id: string, questId: string, status: string) => ({
     id,
@@ -639,7 +639,7 @@ describe("A quest-history row a player reads (5d)", () => {
     expect(screen.getByText("The Amber Bargain was canceled")).toBeInTheDocument();
   });
 
-  it("falls back to “A quest” for a status whose quest the player cannot see, rather than inventing a name", async () => {
+  it('falls back to "A quest" for a status whose quest the player cannot see, and invents no name', async () => {
     // A `questId` that matches nothing in the player's feed must still read as a sentence.
     playerDefaults([]);
     playerChronicle.mockResolvedValue([questRecord("j1", "q-unknown", "canceled")]);
@@ -650,7 +650,7 @@ describe("A quest-history row a player reads (5d)", () => {
 });
 
 describe("A quest in suite-wide search", () => {
-  // q4, not q1: the log's fallback would land on q1 anyway, so a hit for it couldn't fail.
+  // q4 and never q1: the log's fallback would land on q1 anyway, so a hit for it couldn't fail.
   const HIT: CodexSearchHit = {
     kind: "quest",
     id: "q4",

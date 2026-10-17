@@ -5,7 +5,7 @@ import { splitEntityFields, entityDef, ENTITY_DEFS } from "./entities";
  * The client half of field secrecy: `splitEntityFields` routes secret fields into `gmFields` before every
  * save. The server re-seals only the keys it knows, so the two must agree.
  */
-describe("two-layer secrecy — client field split", () => {
+describe("two-layer secrecy: client field split", () => {
   it("routes a secret-schema field into gmFields and leaves public ones in fields", () => {
     const { fields, gmFields } = splitEntityFields("character", {
       race: "Human",

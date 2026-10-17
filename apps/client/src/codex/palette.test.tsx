@@ -90,7 +90,7 @@ import { PlayerCodex } from "./PlayerCodex";
 import type { CodexSearchHit } from "@vtt/domain";
 
 /**
- * The Codex command palette. It is Codex-scoped, not app-global; making it global is a separate decision.
+ * The Codex command palette. It is scoped to the Codex; making it global is a separate decision.
  * The player palette searches through `playerCodexApi` and offers no create verbs.
  */
 
@@ -191,7 +191,7 @@ describe("Opening and closing", () => {
   });
 });
 
-describe("The scope decision — Codex-only, deliberately", () => {
+describe("The scope decision: Codex-only, deliberately", () => {
   /** Fails if the key listener moves to `main.tsx` or module scope. */
   it("⌘K does nothing when the Codex is not on screen", async () => {
     /** A bare tree is the discriminating case: a global listener would fire regardless of what's rendered. */
@@ -233,7 +233,7 @@ describe("What it can do", () => {
     expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument();
   });
 
-  it("offers a GO TO verb for every sidebar destination — one list, never two", async () => {
+  it("offers a GO TO verb for every sidebar destination: one list, never two", async () => {
     const user = userEvent.setup();
     renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
@@ -257,7 +257,7 @@ describe("What it can do", () => {
     ]) {
       expect(box.getByText(`Go to ${label}`)).toBeInTheDocument();
     }
-    // An action, not an address.
+    // An action, and no address.
     expect(box.queryByText("Go to Preview as player")).not.toBeInTheDocument();
   });
 
@@ -283,7 +283,7 @@ describe("What it can do", () => {
     search.mockResolvedValue({ hits: [HIT], truncated: false });
     await user.clear(box.getByLabelText("Search the Codex"));
     await user.type(box.getByLabelText("Search the Codex"), "Strahd von Zarovich");
-    await waitFor(() => expect(box.queryByText(/New page “Strahd von Zarovich”/)).not.toBeInTheDocument());
+    await waitFor(() => expect(box.queryByText(/New page "Strahd von Zarovich"/)).not.toBeInTheDocument());
   });
 
   it("says when the result list is CLIPPED rather than letting it look complete", async () => {
@@ -312,7 +312,7 @@ describe("What it can do", () => {
   });
 
   /** Asserts the write and then the new record's address; landing on the list is not a create. */
-  it("New session creates a session and opens it — it does not just go to the list", async () => {
+  it("New session creates a session and opens it, beyond going to the list", async () => {
     const user = userEvent.setup();
     renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
@@ -368,11 +368,11 @@ describe("The player's palette", () => {
     await user.type(within(await palette()).getByLabelText("Search the Codex"), "strahd");
 
     await waitFor(() => expect(playerSearch).toHaveBeenCalledWith("player", "strahd"));
-    // The GM search is never called, not merely filtered.
+    // The GM search is never called at all, and nothing is filtered after.
     expect(search).not.toHaveBeenCalled();
   });
 
-  it("offers no create verbs — a player writes nothing", async () => {
+  it("offers no create verbs: a player writes nothing", async () => {
     const user = userEvent.setup();
     renderPlayer();
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
@@ -384,7 +384,7 @@ describe("The player's palette", () => {
     }
   });
 
-  it("offers no GM-only destination — the palette cannot route around the sidebar", async () => {
+  it("offers no GM-only destination: the palette cannot route around the sidebar", async () => {
     const user = userEvent.setup();
     renderPlayer();
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());

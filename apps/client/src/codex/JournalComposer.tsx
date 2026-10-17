@@ -48,7 +48,7 @@ const COMPOSER_COPY: Readonly<
     submit: "Record milestone"
   }
 };
-/** The server's bounds, so a slip is a disabled field rather than a 400. */
+/** The server's bounds, so a slip is a disabled field and never a 400. */
 const DOWNTIME_TEXT_MAX = 120;
 const DOWNTIME_DAYS_MAX = 3650;
 /** The 5e level range. No XP arithmetic. */
@@ -119,8 +119,8 @@ function readDraft(): Draft {
 }
 
 /**
- * The composer's draft. A new entry survives tab switches, and editing a record sets it aside rather than
- * losing it, so Edit never destroys it.
+ * The composer's draft. A new entry survives tab switches, and editing a record sets it aside and keeps
+ * it, so Edit never destroys it.
  */
 export function useJournalDraft() {
   const [draft, setDraft] = useState<Draft>(readDraft);
@@ -275,7 +275,7 @@ export function JournalComposer({
           }
         });
       } else if (draft.kind === "milestone") {
-        // Clamped to the 5e level range, matching the server.
+        // Clamped to the 5e level range, as the server clamps it.
         await journalApi.createMilestone(gmToken, {
           ...input,
           milestone: {
@@ -502,7 +502,7 @@ export function JournalComposer({
         </Button>
       </div>
 
-      {/* Filing details: the same panel as pages and quests, scoped to the composer rather than the viewport. */}
+      {/* Filing details: the same panel as pages and quests, scoped to the composer and never the viewport. */}
       {detailsOpen && (
         <aside
           id={DETAILS_ID}
@@ -558,7 +558,7 @@ export function JournalComposer({
               max={24}
               maxReachedReason="An entry may carry at most 24 tags."
               suggestions={tagSuggestions}
-              /* Keep the default slugify: it matches the server's tag rule, which rejects rather than sanitises. */
+              /* Keep the default slugify: it matches the server's tag rule, which rejects and never sanitises. */
             />
           </Field>
         </aside>

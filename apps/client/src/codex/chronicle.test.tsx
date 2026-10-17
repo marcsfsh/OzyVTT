@@ -41,7 +41,7 @@ import { groupChronicle } from "./chronicle";
 import type { CodexCalendar, CodexChronicleRecord, CodexPage } from "@vtt/domain";
 
 /**
- * One timeline of journal entries and dated `event` pages. Kinds read by icon and label, not colour; the
+ * One timeline of journal entries and dated `event` pages. Kinds read by icon and label as well as colour; the
  * lens toggle regroups without refetching or writing.
  */
 const CALENDAR: CodexCalendar = {
@@ -139,7 +139,7 @@ describe("The chronicle is ONE timeline", () => {
   });
 
   it("offers an event row its page, and never the entry composer's Edit/Delete", async () => {
-    // An event is a wiki page and is edited there, not from the row.
+    // An event is a wiki page and is edited there, never from the row.
     const onOpenPage = await renderJournal([EVENT]);
     const user = userEvent.setup();
     const event = within(rowOf("p9"));

@@ -63,7 +63,7 @@ const renderAtlas = () =>
     </ToastProvider>
   );
 
-describe("Atlas GM-only mark — an SVG glyph, never an emoji", () => {
+describe("Atlas GM-only mark: an SVG glyph, never an emoji", () => {
   beforeEach(() => {
     listMaps.mockResolvedValue(MAPS);
     listAssets.mockResolvedValue([]);

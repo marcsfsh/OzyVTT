@@ -15,11 +15,11 @@ import {
 } from "./chronicle";
 
 /**
- * The GM's dialog for moving a faction's standing, with an optional reason. Lives in the shell, not on the
+ * The GM's dialog for moving a faction's standing, with an optional reason. Lives in the shell, off the
  * dashboard card, because players render `CampaignHome` too; the card only takes `onAdjustStanding`. Each
  * save writes the value and its `kind='standing'` chronicle record in one server transaction.
  */
-/** The server's bound, so a long reason stops accepting characters instead of failing with a raw message. */
+/** The server's bound, so a long reason stops accepting characters and never fails with a raw message. */
 const STANDING_REASON_MAX = 120;
 
 export function StandingAdjuster({

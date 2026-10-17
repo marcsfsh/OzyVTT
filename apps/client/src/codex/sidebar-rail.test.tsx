@@ -138,7 +138,7 @@ afterEach(() => {
 /** The aside's nav; the drawer's always-expanded copy has the same name. */
 const asideNav = () => screen.getAllByRole("navigation", { name: "Codex sections" })[0];
 
-describe("The GM sidebar in the 761–849 band", () => {
+describe("The GM sidebar in the 761-849 band", () => {
   it("renders the rail even though the stored preference says open", async () => {
     setViewport(768);
     goTo("/codex");
@@ -187,7 +187,7 @@ describe("The GM sidebar in the 761–849 band", () => {
     expect(nav.getByRole("button", { name: "Collapse the sidebar" })).toBeInTheDocument();
   });
 
-  it("leaves the GM's stored preference alone — leaving the band restores what they chose", async () => {
+  it("leaves the GM's stored preference alone: leaving the band restores what they chose", async () => {
     setViewport(768);
     goTo("/codex");
     render(
@@ -200,7 +200,7 @@ describe("The GM sidebar in the 761–849 band", () => {
   });
 });
 
-describe("The player sidebar in the 761–849 band", () => {
+describe("The player sidebar in the 761-849 band", () => {
   /** Players have no collapse control here either. */
   it("renders the rail, with every icon named", async () => {
     setViewport(768);
@@ -307,7 +307,7 @@ describe("The player gets the same affordance, in the same words", () => {
   it("offers no collapse inside the GM's embedded preview", async () => {
     setViewport(1280);
     await renderPlayer({ embedded: true });
-    // The preview is a modal, not the viewport, so no collapse toggle.
+    // The preview is a modal inside the viewport, so no collapse toggle.
     expect(within(asideNav()).queryByRole("button", { name: /the sidebar/ })).not.toBeInTheDocument();
   });
 

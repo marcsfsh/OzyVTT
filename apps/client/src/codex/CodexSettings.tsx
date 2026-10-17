@@ -40,7 +40,7 @@ export function CodexSettingsView({
   const error = actionError ?? loadError;
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  /** Days of history to keep when trimming. Local to the action, not a stored setting. */
+  /** Days of history to keep when trimming. Local to the action; it is no stored setting. */
   const [trimDays, setTrimDays] = useState("30");
 
   /** Written through on change; the response carries the clamped value the server stored. */
@@ -61,7 +61,7 @@ export function CodexSettingsView({
     try {
       // The PUT is wholesale, so send both groups every time.
       const next = await codexApi.setSettings(gmToken, { revisionHistory, autosave });
-      // Keep the optimistic value if the answer is unusable, rather than blanking the screen.
+      // Keep the optimistic value if the answer is unusable, so the screen never blanks.
       if (next) setSettings(next);
       setActionError(null);
     } catch (saveError) {
@@ -290,7 +290,7 @@ function intervalLabel(seconds: number): string {
   return `${Math.round(seconds / 60)} minutes`;
 }
 
-/** Approximate on purpose: text length, not disk usage. */
+/** Approximate on purpose: text length, which is smaller than disk usage. */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${Math.max(0, Math.trunc(bytes))} bytes`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;

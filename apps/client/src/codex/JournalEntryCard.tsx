@@ -64,7 +64,7 @@ export function JournalEntryCard({
   const questEvent = questEventOf(record);
   // The server's proposed date, since the server decides where the clock lands.
   const proposed = downtime && !downtime.applied ? record.proposedDate : null;
-  // Counted against the whole chronicle, not this group. Zero says nothing.
+  // Counted against the whole chronicle, beyond this group. Zero says nothing.
   const passing = proposed ? deadlinesPassedBy(records, calendar, proposed) : 0;
   return (
     <article

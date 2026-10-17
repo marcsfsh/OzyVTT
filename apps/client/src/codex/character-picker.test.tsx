@@ -141,7 +141,7 @@ describe("the rule underneath both fields (characters.ts)", () => {
   });
 });
 
-describe("`5a` — Who played", () => {
+describe("`5a`: Who played", () => {
   it("offers the campaign's characters, archived last and marked", async () => {
     const user = userEvent.setup();
     renderSessions();
@@ -191,7 +191,7 @@ describe("`5a` — Who played", () => {
   });
 });
 
-describe("`5e.3` — downtime's Who", () => {
+describe("`5e.3`: downtime's Who", () => {
   it("offers the same list in the same order, with the same word for archived", async () => {
     const user = userEvent.setup();
     renderDowntime();
@@ -199,7 +199,7 @@ describe("`5e.3` — downtime's Who", () => {
     await user.click(screen.getByRole("combobox", { name: "Who spent the time" }));
     const options = await screen.findAllByRole("option");
     expect(options.map((option) => option.textContent)).toEqual(["Ozy", "Ismark", "IreenaArchived"]);
-    // A separate muted `meta` span, not part of the name.
+    // A separate muted `meta` span, outside the name.
     expect(within(options[2]).getByText("Archived")).toHaveClass("nh-combobox-optionmeta");
   });
 

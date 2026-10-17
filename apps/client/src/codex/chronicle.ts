@@ -103,7 +103,7 @@ export const STANDING_TIERS: ReadonlyArray<Readonly<{ id: StandingTier; label: s
 export const STANDING_MIN = -100;
 export const STANDING_MAX = 100;
 
-/** The stored value, bounded and integral. A non-finite value lands on 0 rather than propagating. */
+/** The stored value, bounded and integral. A non-finite value lands on 0 and stops there. */
 export function clampStanding(value: number): number {
   const whole = Math.trunc(value);
   if (!Number.isFinite(whole)) return 0;
@@ -317,7 +317,7 @@ export function revealAheadOfPlayers(
   return record.calendarInstant > dateToInstant(calendar, clampToCalendar(calendar, published));
 }
 
-/** One row's text on a summary surface. Standing, milestone and quest records carry their meaning in the payload, not prose. */
+/** One row's text on a summary surface. Standing, milestone and quest records carry their meaning in the payload, beyond the prose. */
 export function chronicleRowSummary(
   record: AnyPayloadRef & Readonly<{ text: string; gmText?: string | null }>
 ): string {

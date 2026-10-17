@@ -183,7 +183,7 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
             event.target.value = "";
           }}
         />
-        {/* `Modal` (focus trap, Escape, scrim) rather than `useConfirm`, whose single-string body can't hold the inventory. */}
+        {/* `Modal` (focus trap, Escape, scrim), because `useConfirm`'s single-string body can't hold the inventory. */}
         <Modal
           open={!!pending}
           onClose={() => setPending(null)}

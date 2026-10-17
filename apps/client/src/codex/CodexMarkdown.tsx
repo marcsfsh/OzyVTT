@@ -149,7 +149,7 @@ export function CodexMarkdown({
   audience?: "gm" | "player";
 }>) {
   const links: LinkOptions = { onNavigate, knownTitles, onCreate, audience };
-  const normalized = text.replace(/\s*—\s*/g, " - ");
+  const normalized = text.replace(/\s*\u2014\s*/g, " - ");
   const lines = normalized.split("\n");
   const blocks: ReactNode[] = [];
   /** Each block's heading level, or null for content, kept beside `blocks` to find empty headings. */

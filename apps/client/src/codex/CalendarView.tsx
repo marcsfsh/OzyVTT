@@ -125,7 +125,7 @@ export function CalendarView({
       <header className="codex-calendar-clocks">
         <div className="codex-calendar-clock">
           <span className="codex-calendar-clocklabel">Your date</span>
-          {/* Grows its own paint to 44px rather than overhanging the clock beside it. */}
+          {/* Grows its own paint to 44px and stays off the clock beside it. */}
           <button
             type="button"
             className="codex-calendar-clockset"

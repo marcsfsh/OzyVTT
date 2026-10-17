@@ -112,7 +112,7 @@ export function AtlasChildren<M extends TreeMap>({
   );
 }
 
-/** Pins that miss the filter dim rather than disappear; null while nothing filters. */
+/** Pins that miss the filter dim and stay on the map; null while nothing filters. */
 export function useDimmedPins(
   pins: readonly FilterPin[],
   text: string,

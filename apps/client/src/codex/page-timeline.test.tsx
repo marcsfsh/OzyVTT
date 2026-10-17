@@ -16,7 +16,7 @@ import { PageTimeline } from "./PageTimeline";
 import type { CodexJournalEntry } from "@vtt/domain";
 
 /**
- * The hidden-record cue keys on `revealedToPlayers`, not on empty player text, and says "Hidden from
+ * The hidden-record cue keys on `revealedToPlayers` (empty player text doesn't decide it), and says "Hidden from
  * players" ("GM only" is the content pill's wording).
  */
 const entry = (over: Partial<CodexJournalEntry>): CodexJournalEntry => ({
@@ -48,10 +48,10 @@ const renderTimeline = async (entries: CodexJournalEntry[]) => {
   await waitFor(() => expect(forPage).toHaveBeenCalled());
 };
 
-describe("PageTimeline — the hidden-record cue (CD-5)", () => {
+describe("PageTimeline: the hidden-record cue (CD-5)", () => {
   beforeEach(() => forPage.mockReset());
 
-  it("flags an unrevealed entry that HAS player text — the case the old check missed entirely", async () => {
+  it("flags an unrevealed entry that HAS player text: the case the old check missed entirely", async () => {
     await renderTimeline([entry({ playerText: "The party reached Barovia.", revealedToPlayers: false })]);
     expect(await screen.findByText("Hidden from players")).toBeInTheDocument();
   });

@@ -23,7 +23,7 @@ export const QUEST_STATUS_ORDER: readonly CodexQuestStatus[] = [
 
 /**
  * Decorative only; `QUEST_STATUS_LABEL` carries the meaning. Both quiet states are `neutral`: a canceled
- * quest was dropped, not lost, so it must not wear `danger`.
+ * quest was dropped and nothing was lost, so it must not wear `danger`.
  */
 export function questStatusTone(status: CodexQuestStatus): BadgeTone {
   return status === "completed" ? "success" : status === "failed" ? "danger" : status === "active" ? "info" : "neutral";

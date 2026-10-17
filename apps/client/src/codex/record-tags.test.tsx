@@ -293,7 +293,7 @@ describe("Marker tags", () => {
       expect(screen.getByRole("button", { name: "Save pin" })).toBeDisabled();
     });
 
-    it("keeps the discrete pickers immediate — choosing is an act, not an edit in progress", async () => {
+    it("keeps the discrete pickers immediate: choosing is an act, with no edit in progress", async () => {
       // Discrete acts like reveal stay immediate.
       revealMarker.mockResolvedValue(MARKER());
       renderOff(MARKER({ tags: [] }));

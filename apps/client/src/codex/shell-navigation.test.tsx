@@ -147,7 +147,7 @@ describe("Every sidebar destination is reachable, and says so", () => {
     expect(await screen.findByRole("heading", { name: "Downtime", level: 2 })).toBeInTheDocument();
   });
 
-  it("keeps Home dark on every other section — the lit-tab lie, specifically", async () => {
+  it("keeps Home dark on every other section: the lit-tab lie, specifically", async () => {
     const user = userEvent.setup();
     renderShell("/codex");
     await waitFor(() => expect(listPages).toHaveBeenCalled());
@@ -158,7 +158,7 @@ describe("Every sidebar destination is reachable, and says so", () => {
     await waitFor(() => expect(sidebar.getByRole("button", { name: "Home" })).not.toHaveAttribute("aria-current"));
   });
 
-  it("offers Preview as player as an ACTION, not an address — it is a modal, not a section", async () => {
+  it("offers Preview as player as an ACTION with no address: it is a modal and no section", async () => {
     const sidebar = () => within(screen.getByRole("navigation", { name: "Codex sections" }));
     renderShell("/codex");
     await waitFor(() => expect(listPages).toHaveBeenCalled());

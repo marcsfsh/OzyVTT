@@ -17,7 +17,7 @@ export type DashCardProps = Readonly<{
   error?: string | null;
   /**
    * The empty state. Prefer naming the next step ("Place one from any map's pin inspector"); a card with no
-   * real action gets the default no-action line rather than an invented one.
+   * real action gets the default no-action line, and nothing is invented.
    */
   empty?: ReactNode;
   children?: ReactNode;

@@ -6,7 +6,7 @@ import { SearchResultRow, searchHitKey, useCodexSearch } from "./SearchResults";
 import { GM_SIDEBAR, PLAYER_SIDEBAR, pathForSection } from "./routes";
 
 /**
- * The Codex command palette: jump to a record, go to a section, or create. Codex-scoped, not app-global;
+ * The Codex command palette: jump to a record, go to a section, or create. It belongs to the Codex alone;
  * a test locks that. Create verbs run the same creates as the rails and open the new record; the "Log ..."
  * verbs navigate to the form that composes the record.
  */
