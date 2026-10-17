@@ -2530,7 +2530,7 @@ const fighterInput = (level: 5 | 11): CharacterCreateRequestInput =>
 const WINDOW = {
   /** The SRD's exact-level pick: min and max both 6 over `warlock-spells`. */
   arcanumFeatureId: "mystic-arcanum-level-6-spell",
-  arcanumLabel: "Mystic Arcanum Level 6 Spell",
+  arcanumLabel: "Mystic Arcanum (level 6 spell)",
   belowFloor: "hex",
   aboveCeiling: "power-word-kill",
   inWindow: "true-seeing",

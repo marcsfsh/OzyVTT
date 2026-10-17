@@ -547,7 +547,7 @@ describe("Rogue - the flat grants and the pick", () => {
     resolve(built, "stroke-of-luck", [], []);
     expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
     expect(() => resolve(built, "stroke-of-luck", [], [])).toThrowError(
-      /Stroke Of Luck: no uses remaining \(1\/short rest\)/
+      /Stroke of Luck: no uses remaining \(1\/short rest\)/
     );
   });
 

@@ -1739,7 +1739,7 @@
    },
    {
     "id": "jack-of-all-trades",
-    "name": "Jack Of All Trades",
+    "name": "Jack of All Trades",
     "level": 2,
     "description": "You can add half your Proficiency Bonus (round down) to any ability check you make that uses a skill proficiency you lack and that doesn't otherwise use your Proficiency Bonus. For example, if you make a Strength (Athletics) check and lack Athletics proficiency, you can add half your Proficiency Bonus to the check."
    },
@@ -1768,7 +1768,7 @@
    },
    {
     "id": "font-of-inspiration",
-    "name": "Font Of Inspiration",
+    "name": "Font of Inspiration",
     "level": 5,
     "description": "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration.",
     "modifiers": [
@@ -1814,7 +1814,7 @@
    },
    {
     "id": "words-of-creation",
-    "name": "Words Of Creation",
+    "name": "Words of Creation",
     "level": 20,
     "description": "You have mastered two of the Words of Creation: the words of life and death. You therefore always have the Power Word Heal and Power Word Kill spells prepared. When you cast either spell, you can target a second creature with it if that creature is within 10 feet of the first target.",
     "grants": {
@@ -5354,7 +5354,7 @@
    },
    {
     "id": "monks-focus",
-    "name": "Monks Focus",
+    "name": "Monk's Focus",
     "level": 2,
     "description": "Your focus and martial training allow you to harness a well of extraordinary energy within yourself. This energy is represented by Focus Points. Your Monk level determines the number of points you have, as shown in the Focus Points column of the Monk Features table. You can expend these points to enhance or fuel certain Monk features. You start knowing three such features: Flurry of Blows, Patient Defense, and Step of the Wind, each of which is detailed below. When you expend a Focus Point, it is unavailable until you finish a Short or Long Rest, at the end of which you regain all your expended points. Some features that use Focus Points require your target to make a saving throw. The save DC equals 8 plus your Wisdom modifier and Proficiency Bonus. Flurry of Blows. You can expend 1 Focus Point to make two Unarmed Strikes as a Bonus Action. Patient Defense. You can take the Disengage action as a Bonus Action. Alternatively, you can expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Step of the Wind. You can take the Dash action as a Bonus Action. Alternatively, you can expend 1 Focus Point to take both the Disengage and Dash actions as a Bonus Action, and your jump distance is doubled for the turn.",
     "uses": {
@@ -5544,7 +5544,7 @@
    },
    {
     "id": "self-restoration",
-    "name": "Self Restoration",
+    "name": "Self-Restoration",
     "level": 10,
     "description": "Through sheer force of will, you can remove one of the following conditions from yourself at the end of each of your turns: Charmed, Frightened, or Poisoned. In addition, forgoing food and drink doesn't give you levels of Exhaustion."
    },
@@ -5642,7 +5642,7 @@
    },
    {
     "id": "body-and-mind",
-    "name": "Body And Mind",
+    "name": "Body and Mind",
     "level": 20,
     "description": "You have developed your body and mind to new heights. Your Dexterity and Wisdom scores increase by 4, to a maximum of 25.",
     "modifiers": [
@@ -6533,7 +6533,7 @@
    },
    {
     "id": "paladins-smite",
-    "name": "Paladins Smite",
+    "name": "Paladin's Smite",
     "level": 2,
     "description": "You always have the Divine Smite spell prepared. In addition, you can cast it without expending a spell slot, but you must finish a Long Rest before you can cast it in this way again.",
     "uses": {
@@ -6641,7 +6641,7 @@
    },
    {
     "id": "aura-of-protection",
-    "name": "Aura Of Protection",
+    "name": "Aura of Protection",
     "level": 6,
     "description": "You radiate a protective, unseeable aura in a 10-foot Emanation that originates from you. The aura is inactive while you have the Incapacitated condition. You and your allies in the aura gain a bonus to saving throws equal to your Charisma modifier (minimum bonus of +1). If another Paladin is present, a creature can benefit from only one Aura of Protection at a time; the creature chooses which aura while in them."
    },
@@ -6683,7 +6683,7 @@
    },
    {
     "id": "aura-of-courage",
-    "name": "Aura Of Courage",
+    "name": "Aura of Courage",
     "level": 10,
     "description": "You and your allies have Immunity to the Frightened condition while in your Aura of Protection. If a Frightened ally enters the aura, that condition has no effect on that ally while there.",
     "grants": {
@@ -7611,7 +7611,7 @@
    },
    {
     "id": "natures-veil",
-    "name": "Natures Veil",
+    "name": "Nature's Veil",
     "level": 14,
     "description": "You invoke spirits of nature to magically hide yourself. As a Bonus Action, you can give yourself the Invisible condition until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.",
     "uses": {
@@ -8202,7 +8202,7 @@
    },
    {
     "id": "thieves-cant",
-    "name": "Thieves Cant",
+    "name": "Thieves' Cant",
     "level": 1,
     "description": "You picked up various languages in the communities where you plied your roguish talents. You know Thieves' Cant and one other language of your choice, which you choose from the language tables in \"Character Creation.\"",
     "grants": {
@@ -8368,7 +8368,7 @@
    },
    {
     "id": "stroke-of-luck",
-    "name": "Stroke Of Luck",
+    "name": "Stroke of Luck",
     "level": 20,
     "description": "You have a marvelous knack for succeeding when you need to. If you fail a D20 Test, you can turn the roll into a 20. Once you use this feature, you can't use it again until you finish a Short or Long Rest.",
     "uses": {
@@ -9046,7 +9046,7 @@
    },
    {
     "id": "font-of-magic",
-    "name": "Font Of Magic",
+    "name": "Font of Magic",
     "level": 2,
     "description": "You can tap into the wellspring of magic within yourself. This wellspring is represented by Sorcery Points, which allow you to create a variety of magical effects. You have 2 Sorcery Points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer Features table. You can't have more Sorcery Points than the number shown in the table for your level. You regain all expended Sorcery Points when you finish a Long Rest. You can use your Sorcery Points to fuel the options below, along with other features, such as Metamagic, that use those points. Converting Spell Slots to Sorcery Points. You can expend a spell slot to gain a number of Sorcery Points equal to the slot's level (no action required). Creating Spell Slots. As a Bonus Action, you can transform unexpended Sorcery Points into one spell slot. The Creating Spell Slots table shows the cost of creating a spell slot of a given level, and it lists the minimum Sorcerer level you must be to create a slot. You can create a spell slot no higher than level 5. Any spell slot you create with this feature vanishes when you finish a Long Rest. Creating Spell Slots Spell Slot Level 1: Sorcery Point Cost 2, Min. Sorcerer Level 2; Spell Slot Level 2: Sorcery Point Cost 3, Min. Sorcerer Level 3; Spell Slot Level 3: Sorcery Point Cost 5, Min. Sorcerer Level 5; Spell Slot Level 4: Sorcery Point Cost 6, Min. Sorcerer Level 7; Spell Slot Level 5: Sorcery Point Cost 7, Min. Sorcerer Level 9.",
     "uses": {
@@ -10219,7 +10219,7 @@
    },
    {
     "id": "mystic-arcanum-level-6-spell",
-    "name": "Mystic Arcanum Level 6 Spell",
+    "name": "Mystic Arcanum (level 6 spell)",
     "level": 11,
     "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
@@ -10236,7 +10236,7 @@
    },
    {
     "id": "mystic-arcanum-level-7-spell",
-    "name": "Mystic Arcanum Level 7 Spell",
+    "name": "Mystic Arcanum (level 7 spell)",
     "level": 13,
     "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
@@ -10253,7 +10253,7 @@
    },
    {
     "id": "mystic-arcanum-level-8-spell",
-    "name": "Mystic Arcanum Level 8 Spell",
+    "name": "Mystic Arcanum (level 8 spell)",
     "level": 15,
     "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
@@ -10270,7 +10270,7 @@
    },
    {
     "id": "mystic-arcanum-level-9-spell",
-    "name": "Mystic Arcanum Level 9 Spell",
+    "name": "Mystic Arcanum (level 9 spell)",
     "level": 17,
     "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {

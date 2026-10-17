@@ -655,6 +655,8 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
   const entryId = entry.id;
   /** feature id -> the first level that grants it, for FeatureRecord.level. */
   const featureIds = new Map<string, number>();
+  /** feature id -> its name as the table prints it ("Monk's Focus"), which the id's slug loses. */
+  const featureNames = new Map<string, string>();
   const table: ClassLevelRow[] = rows.map((cells) => {
     const row: Record<string, unknown> = { features: [], classResources: [] };
     const slots = new Array(9).fill(0);
@@ -722,11 +724,14 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
       .filter(Boolean);
     row.features = named.map((label) => slug(label)).filter((id) => id && id !== "subclass-feature");
     for (const id of row.features as string[]) featureIds.set(id, (featureIds.get(id) ?? row.level) as number);
+    // A curly apostrophe in the source ("Nature’s Veil") is set straight, as the rest of the SRD prints it.
+    for (const label of named)
+      if (!featureNames.has(slug(label))) featureNames.set(slug(label), label.replace(/[‘’]/g, "'"));
     if (sawSlot && slots.some((count) => count > 0)) row.spellSlots = slots;
     if (pact) row.pactSlots = pact;
     return row as unknown as ClassLevelRow;
   });
-  return { table, featureIds };
+  return { table, featureIds, featureNames };
 }
 
 const built: unknown[] = [];
@@ -740,7 +745,7 @@ for (const [id, entry] of parsed) {
   const config = CONFIG[id];
   if (!config) throw new Error(`no CONFIG for class "${id}"`);
   const { traits } = entry;
-  const { table, featureIds } = levelTable(entry, config);
+  const { table, featureIds, featureNames } = levelTable(entry, config);
 
   const primary = abilitiesIn(traits["Primary Ability"] ?? "");
   const anyOf = /\bor\b/i.test(traits["Primary Ability"] ?? "");
@@ -764,10 +769,13 @@ for (const [id, entry] of parsed) {
       : configured;
     return {
       id: featureId,
-      name: featureId
-        .split("-")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" "),
+      // The table's own wording keeps the apostrophes and lowercase small words the id drops; the id stays the slug.
+      name:
+        featureNames.get(featureId) ??
+        featureId
+          .split("-")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" "),
       level,
       description: description.slice(0, 4000),
       ...(choice ? { choice } : {})

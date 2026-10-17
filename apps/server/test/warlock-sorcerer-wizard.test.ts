@@ -282,7 +282,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
         POLICY
       )
     );
-    expect(message).toMatch(/"Mystic Arcanum Level 6 Spell" needs 1 pick\(s\) of kind "spell"/);
+    expect(message).toMatch(/"Mystic Arcanum \(level 6 spell\)" needs 1 pick\(s\) of kind "spell"/);
   });
 
   it("offers all FOUR arcana by level 17, each with its own level and its own daily use", () => {

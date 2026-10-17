@@ -85,6 +85,19 @@ describe("character-builder content records", () => {
     }
   });
 
+  it("names class features as the level tables print them, apostrophes and small words included", () => {
+    const nameOf = (classId: string, featureId: string) =>
+      classes.find((entry) => entry.id === classId)?.features.find((feature) => feature.id === featureId)?.name;
+    expect(nameOf("monk", "monks-focus")).toBe("Monk's Focus");
+    expect(nameOf("paladin", "paladins-smite")).toBe("Paladin's Smite");
+    expect(nameOf("bard", "font-of-inspiration")).toBe("Font of Inspiration");
+    expect(nameOf("rogue", "thieves-cant")).toBe("Thieves' Cant");
+    // The source's one curly apostrophe is set straight.
+    expect(nameOf("ranger", "natures-veil")).toBe("Nature's Veil");
+    const curly = classes.flatMap((entry) => entry.features).filter((feature) => /[‘’“”]/.test(feature.name));
+    expect(curly.map((feature) => feature.id)).toEqual([]);
+  });
+
   it("agrees with the rules engine on hit dice, stat priority, ASI levels, and multiclass prerequisites", () => {
     // Full six-ability fixtures, so multi-ability prerequisites are actually exercised.
     const flatEight = { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } as const;

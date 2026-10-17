@@ -275,7 +275,7 @@ Notes on the curated rows:
 
 ## Bard features
 
-**Enforced (11):** Ability Score Improvement · Bard Subclass · Bonus Proficiencies (College of Lore) · Epic Boon · Expertise · Font Of Inspiration · Jack Of All Trades · Magical Discoveries (College of Lore) · Magical Secrets · Spellcasting · Words Of Creation
+**Enforced (11):** Ability Score Improvement · Bard Subclass · Bonus Proficiencies (College of Lore) · Epic Boon · Expertise · Font of Inspiration · Jack of All Trades · Magical Discoveries (College of Lore) · Magical Secrets · Spellcasting · Words of Creation
 
 **Guided (3):** Bardic Inspiration · Cutting Words (College of Lore) · Peerless Skill (College of Lore)
 
@@ -285,7 +285,7 @@ Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
-| Jack Of All Trades | enforced | ability-checks.ts adds half the Proficiency Bonus, rounded down, to a skill check the Bard isn't proficient in. |
+| Jack of All Trades | enforced | ability-checks.ts adds half the Proficiency Bonus, rounded down, to a skill check the Bard isn't proficient in. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. |
 
 ## Cleric features
@@ -337,11 +337,11 @@ Notes on the curated rows:
 
 ## Monk features
 
-**Enforced (18):** Ability Score Improvement · Body And Mind · Disciplined Survivor · Epic Boon · Evasion · Extra Attack · Martial Arts · Monk Subclass · Monks Focus · Quivering Palm (Warrior of the Open Hand) · Superior Defense · Unarmored Defense · Unarmored Movement (level 2) · Unarmored Movement (level 6) · Unarmored Movement (level 10) · Unarmored Movement (level 14) · Unarmored Movement (level 18) · Wholeness of Body (Warrior of the Open Hand)
+**Enforced (18):** Ability Score Improvement · Body and Mind · Disciplined Survivor · Epic Boon · Evasion · Extra Attack · Martial Arts · Monk Subclass · Monk's Focus · Quivering Palm (Warrior of the Open Hand) · Superior Defense · Unarmored Defense · Unarmored Movement (level 2) · Unarmored Movement (level 6) · Unarmored Movement (level 10) · Unarmored Movement (level 14) · Unarmored Movement (level 18) · Wholeness of Body (Warrior of the Open Hand)
 
 **Guided (3):** Heightened Focus · Stunning Strike · Uncanny Metabolism
 
-**Reference (9):** Acrobatic Movement · Deflect Attacks · Deflect Energy · Empowered Strikes · Fleet Step (Warrior of the Open Hand) · Open Hand Technique (Warrior of the Open Hand) · Perfect Focus · Self Restoration · Slow Fall
+**Reference (9):** Acrobatic Movement · Deflect Attacks · Deflect Energy · Empowered Strikes · Fleet Step (Warrior of the Open Hand) · Open Hand Technique (Warrior of the Open Hand) · Perfect Focus · Self-Restoration · Slow Fall
 
 Notes on the curated rows:
 
@@ -354,7 +354,7 @@ Notes on the curated rows:
 
 ## Paladin features
 
-**Enforced (22):** Ability Score Improvement · Aura Expansion · Aura Of Courage · Aura of Devotion (Oath of Devotion) · Aura Of Protection · Epic Boon · Extra Attack · Faithful Steed · Fighting Style · Holy Nimbus (Oath of Devotion) · Lay On Hands · Oath of Devotion Spells (Level 5) (Oath of Devotion) · Oath of Devotion Spells (Level 9) (Oath of Devotion) · Oath of Devotion Spells (Level 13) (Oath of Devotion) · Oath of Devotion Spells (Level 17) (Oath of Devotion) · Oath of Devotion Spells (Oath of Devotion) · Paladin Subclass · Paladins Smite · Radiant Strikes · Smite of Protection (Oath of Devotion) · Spellcasting · Weapon Mastery
+**Enforced (22):** Ability Score Improvement · Aura Expansion · Aura of Courage · Aura of Devotion (Oath of Devotion) · Aura of Protection · Epic Boon · Extra Attack · Faithful Steed · Fighting Style · Holy Nimbus (Oath of Devotion) · Lay On Hands · Oath of Devotion Spells (Level 5) (Oath of Devotion) · Oath of Devotion Spells (Level 9) (Oath of Devotion) · Oath of Devotion Spells (Level 13) (Oath of Devotion) · Oath of Devotion Spells (Level 17) (Oath of Devotion) · Oath of Devotion Spells (Oath of Devotion) · Paladin Subclass · Paladin's Smite · Radiant Strikes · Smite of Protection (Oath of Devotion) · Spellcasting · Weapon Mastery
 
 **Guided (3):** Abjure Foes · Channel Divinity · Sacred Weapon (Oath of Devotion)
 
@@ -366,9 +366,9 @@ Notes on the curated rows:
 | --- | --- | --- |
 | Abjure Foes | guided | The Wisdom save against the Paladin's spell save DC, its Frightened and the Channel Divinity use are applied. The number of targets and the frightened creature's limit of one thing a turn are the GM's. |
 | Aura Expansion | enforced | saving-throws.ts widens Aura of Protection to 30 feet. |
-| Aura Of Courage | enforced | paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Frightened while it isn't Incapacitated, and an ally already Frightened has no Disadvantage from it there (resolution/attack.ts, check-rolls.ts). |
+| Aura of Courage | enforced | paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Frightened while it isn't Incapacitated, and an ally already Frightened has no Disadvantage from it there (resolution/attack.ts, check-rolls.ts). |
 | Aura of Devotion (Oath of Devotion) | enforced | paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Charmed while it isn't Incapacitated, and an ally already Charmed may target its charmer while there (resolution/economy.ts). |
-| Aura Of Protection | enforced | saving-throws.ts adds the Paladin's Charisma modifier, at least 1, to its own saves and its allies' within 10 feet, while it isn't Incapacitated. A creature in two auras gets the better one. |
+| Aura of Protection | enforced | saving-throws.ts adds the Paladin's Charisma modifier, at least 1, to its own saves and its allies' within 10 feet, while it isn't Incapacitated. A creature in two auras gets the better one. |
 | Holy Nimbus (Oath of Devotion) | enforced | The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. The sunlight is the GM's, since the map has no light. |
 | Smite of Protection (Oath of Devotion) | enforced | resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts). |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. |
@@ -377,7 +377,7 @@ Notes on the curated rows:
 
 **Enforced (11):** Ability Score Improvement · Deft Explorer · Epic Boon · Expertise · Extra Attack · Favored Enemy · Fighting Style · Ranger Subclass · Roving · Spellcasting · Weapon Mastery
 
-**Guided (4):** Defensive Tactics (Hunter) · Hunter's Prey (Hunter) · Natures Veil · Tireless
+**Guided (4):** Defensive Tactics (Hunter) · Hunter's Prey (Hunter) · Nature's Veil · Tireless
 
 **Reference (7):** Feral Senses · Foe Slayer · Hunter's Lore (Hunter) · Precise Hunter · Relentless Hunter · Superior Hunter's Defense (Hunter) · Superior Hunter's Prey (Hunter)
 
@@ -389,9 +389,9 @@ Notes on the curated rows:
 
 ## Rogue features
 
-**Enforced (13):** Ability Score Improvement · Cunning Action · Epic Boon · Evasion · Expertise · Reliable Talent · Rogue Subclass · Slippery Mind · Sneak Attack · Steady Aim · Thieves Cant · Uncanny Dodge · Weapon Mastery
+**Enforced (13):** Ability Score Improvement · Cunning Action · Epic Boon · Evasion · Expertise · Reliable Talent · Rogue Subclass · Slippery Mind · Sneak Attack · Steady Aim · Thieves' Cant · Uncanny Dodge · Weapon Mastery
 
-**Guided (3):** Fast Hands (Thief) · Stroke Of Luck · Use Magic Device (Thief)
+**Guided (3):** Fast Hands (Thief) · Stroke of Luck · Use Magic Device (Thief)
 
 **Reference (7):** Cunning Strike · Devious Strikes · Elusive · Improved Cunning Strike · Second-Story Work (Thief) · Supreme Sneak (Thief) · Thief's Reflexes (Thief)
 
@@ -408,7 +408,7 @@ Notes on the curated rows:
 
 **Enforced (12):** Ability Score Improvement · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Companion (Draconic Sorcery) · Elemental Affinity (Draconic Sorcery) · Epic Boon · Innate Sorcery · Sorcerer Subclass · Spellcasting
 
-**Guided (4):** Dragon Wings (Draconic Sorcery) · Font Of Magic · Metamagic · Sorcerous Restoration
+**Guided (4):** Dragon Wings (Draconic Sorcery) · Font of Magic · Metamagic · Sorcerous Restoration
 
 **Reference (2):** Arcane Apotheosis · Sorcery Incarnate
 
@@ -420,7 +420,7 @@ Notes on the curated rows:
 
 ## Warlock features
 
-**Enforced (15):** Ability Score Improvement · Contact Patron · Epic Boon · Fiend Spells (Fiend Patron) · Fiend Spells (Level 5) (Fiend Patron) · Fiend Spells (Level 7) (Fiend Patron) · Fiend Spells (Level 9) (Fiend Patron) · Fiendish Resilience (Fiend Patron) · Hurl Through Hell (Fiend Patron) · Mystic Arcanum Level 6 Spell · Mystic Arcanum Level 7 Spell · Mystic Arcanum Level 8 Spell · Mystic Arcanum Level 9 Spell · Pact Magic · Warlock Subclass
+**Enforced (15):** Ability Score Improvement · Contact Patron · Epic Boon · Fiend Spells (Fiend Patron) · Fiend Spells (Level 5) (Fiend Patron) · Fiend Spells (Level 7) (Fiend Patron) · Fiend Spells (Level 9) (Fiend Patron) · Fiendish Resilience (Fiend Patron) · Hurl Through Hell (Fiend Patron) · Mystic Arcanum (level 6 spell) · Mystic Arcanum (level 7 spell) · Mystic Arcanum (level 8 spell) · Mystic Arcanum (level 9 spell) · Pact Magic · Warlock Subclass
 
 **Guided (3):** Dark One's Own Luck (Fiend Patron) · Eldritch Invocations · Magical Cunning
 
