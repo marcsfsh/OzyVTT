@@ -20,6 +20,19 @@ export function healingOfText(description: string): SpellEffect["healing"] {
 
 export type SpellRange = SpellReference["range"];
 
+/** "V, S, M (a pinch of soot)" from the structured components, or "None" for a spell with no components: the line a
+ *  spell card prints, for the catalog and the homebrew wizard's preview alike. */
+export function spellComponentsText(components: SpellReference["components"]): string {
+  const parts = [
+    components.verbal ? "V" : null,
+    components.somatic ? "S" : null,
+    components.material ? "M" : null
+  ].filter((part): part is string => part !== null);
+  const base = parts.join(", ");
+  const material = components.material && components.materialText ? ` (${components.materialText})` : "";
+  return base ? `${base}${material}` : "None";
+}
+
 /** A spell range in feet, or null for Touch, Self and the ranges a map can't measure. */
 export function spellRangeFeet(range: SpellRange): number | null {
   return range.unit === "feet" && range.distance !== null && range.distance >= 5 ? range.distance : null;

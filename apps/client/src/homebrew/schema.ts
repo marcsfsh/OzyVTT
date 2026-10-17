@@ -128,6 +128,12 @@ export type FieldDef = Readonly<{
   options?: readonly SelectOption[] | ((ctx: SchemaContext, draft: Draft) => readonly SelectOption[]);
   /** `kind: "select"` over a catalog too big for a `<select>`; renders a searchable picker. */
   searchable?: boolean;
+  /** `kind: "select"` over a handful of options: a row of chips, one pressed, so every answer is in view and one
+      tap away (the wizards' short closed sets: a hit die, a size, a school). */
+  chips?: boolean;
+  /** `kind: "text"` with common answers: chips that write their value, above the input for anything else (a
+      casting time of "Action", a duration of "1 minute"). The stored text is whatever was tapped or typed. */
+  presets?: readonly SelectOption[];
   /** With `searchable`: which catalog to pick from. */
   catalog?: "spells" | "equipment";
   /** `draft` is the whole record, so suggestions can derive from what is already authored

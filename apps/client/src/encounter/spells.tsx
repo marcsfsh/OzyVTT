@@ -144,9 +144,19 @@ export function SpellcastingText({ text }: Readonly<{ text: string }>) {
 
 /** In-tab spell rules window: header, the four reference lines, full description, and upcast note. */
 export function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSummary; onClose: () => void }>) {
-  const levelLine = spell.level === 0 ? `${capitalize(spell.school)} cantrip` : `Level ${spell.level} ${spell.school}`;
   return (
     <Modal open onClose={onClose} size="md" accent="violet" title={spell.name} ariaLabel={`${spell.name} spell rules`}>
+      <SpellCardContent spell={spell} />
+      <p className="spell-card-attribution">SRD 5.2.1, CC BY 4.0.</p>
+    </Modal>
+  );
+}
+
+/** The card's body, shared with the homebrew spell wizard's preview so a new spell is shown as the table shows it. */
+export function SpellCardContent({ spell }: Readonly<{ spell: ContentSpellSummary }>) {
+  const levelLine = spell.level === 0 ? `${capitalize(spell.school)} cantrip` : `Level ${spell.level} ${spell.school}`;
+  return (
+    <>
       <p className="spell-card-type">
         {levelLine}
         {spell.ritual ? " · ritual" : ""}
@@ -177,7 +187,6 @@ export function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSumm
           <RichText text={`**At Higher Levels.** ${spell.higherLevel}`} />
         </div>
       )}
-      <p className="spell-card-attribution">SRD 5.2.1, CC BY 4.0.</p>
-    </Modal>
+    </>
   );
 }

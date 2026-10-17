@@ -12,11 +12,12 @@ import { socket } from "../socket";
 import { CreateRecordModal, type CreateRequest } from "./CreateRecordModal";
 import { HomebrewRail, EMPTY_FILTERS, type RailFilters } from "./HomebrewRail";
 import { PackActions } from "./PackActions";
-import { RecordDetail } from "./RecordDetail";
+import { RecordDetail, type DetailMode } from "./RecordDetail";
 import { homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
 import { ApiError } from "../lib/api";
 import { blankDraft } from "./defaults";
 import { typeLabel } from "./types";
+import { WIZARDS } from "./wizard";
 import "./homebrew.css";
 
 type LoadState = "loading" | "ready" | "unavailable" | "error";
@@ -32,6 +33,8 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   const [selectError, setSelectError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  /** A record just made opens step by step; one picked from the list opens in the full editor. */
+  const [mode, setMode] = useState<DetailMode>("editor");
 
   const refresh = useCallback(async () => {
     try {
@@ -88,6 +91,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   const select = useCallback(
     async (id: string) => {
       setSelectedId(id);
+      setMode("editor");
       setSelected(null);
       setSelectError(null);
       try {
@@ -142,6 +146,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       setCreateOpen(false);
       await refresh();
       setSelectedId(created.id);
+      setMode("wizard");
       // Re-read after the companions land: the class's validity was computed before they existed.
       setSelected(companions.length > 0 ? await homebrewApi.get(gmToken, created.id) : created);
 
@@ -180,6 +185,8 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
 
   const usageCount = records.find((record) => record.id === selectedId)?.usageCount ?? 0;
   const hasSelection = selectedId !== null;
+  // The wizard is a focused flow: it takes the whole width, and "All homebrew" is the way back to the list.
+  const wizardOpen = mode === "wizard" && !!selected && !!WIZARDS[selected.type] && !selected.deletedAt;
 
   if (load === "loading") {
     return (
@@ -229,7 +236,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
   }
 
   return (
-    <div className="hb-root pane-frame pane-scene scanlines frame-col anim-view">
+    <div className={`hb-root pane-frame pane-scene scanlines frame-col anim-view${wizardOpen ? " is-wizard" : ""}`}>
       <div className="pane-sky" aria-hidden="true" />
       <div className="hb-modebar">
         <p className="hb-count">
@@ -255,7 +262,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         />
 
         <section className="hb-main">
-          {/* Single-pane layout only (≤760px): returns to the rail. */}
+          {/* Single-pane layout (≤760px) and the wizard: returns to the rail. */}
           {hasSelection && (
             <Button
               variant="ghost"
@@ -289,6 +296,8 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
                 patchRow(next);
               }}
               onSelect={(id) => void select(id)}
+              mode={mode}
+              onMode={setMode}
             />
           ) : hasSelection ? (
             <Skeleton variant="block" height="16rem" />

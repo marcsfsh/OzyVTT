@@ -1,6 +1,8 @@
 /**
  * The selected record's detail pane: the state cluster (draft/publish/visibility, remove and
- * restore, autosave) in the head, and `SchemaForm` with the bespoke components below.
+ * restore, autosave) in the head, and below it either the full editor (`SchemaForm` with the
+ * bespoke components) or the step-by-step wizard. Both views edit the one draft held here, with one
+ * autosave and one publish checklist, so switching between them is instant and loses nothing.
  *
  * Type is fixed at creation, with no type switcher: switching would drop field values the new
  * type's schema lacks. States are always shown as words, not colour.
@@ -30,6 +32,8 @@ import { useSchemaContext } from "./useSchemaContext";
 import { duplicateNameNote, issueReason, publishIssues, type BlockedReason } from "./validate";
 import type { CustomRenderer } from "./FieldRenderer";
 import { typeLabel, type HomebrewType } from "./types";
+import { WIZARDS } from "./wizard";
+import { REVIEW_STEP, WizardView } from "./wizard/WizardView";
 
 type Body = Readonly<Record<string, unknown>>;
 
@@ -69,13 +73,17 @@ function ChecklistLine({
   );
 }
 
+export type DetailMode = "wizard" | "editor";
+
 export function RecordDetail({
   gmToken,
   record: initial,
   records,
   usageCount,
   onChanged,
-  onSelect
+  onSelect,
+  mode = "editor",
+  onMode
 }: Readonly<{
   gmToken: string;
   record: HomebrewRecordDocument;
@@ -84,6 +92,9 @@ export function RecordDetail({
   onChanged: (record: HomebrewRecordDocument) => void;
   /** Opens another record, from the jump controls in the removal warning. */
   onSelect?: (id: string) => void;
+  /** Step by step, or every field at once. The panel owns it, so a new record opens in the wizard. */
+  mode?: DetailMode;
+  onMode?: (mode: DetailMode) => void;
 }>) {
   const { confirm, dialog } = useConfirm();
   const [doc, setDoc] = useState(initial);
@@ -97,6 +108,13 @@ export function RecordDetail({
   const titleRef = useRef<HTMLHeadingElement>(null);
   const { ctx, spells } = useSchemaContext(initial.id, initial.type, records);
   const schema = SCHEMAS[initial.type];
+  const wizard = WIZARDS[initial.type];
+  const inWizard = mode === "wizard" && !!wizard && !initial.deletedAt;
+  // Where the wizard is, kept here so a trip to the full editor and back returns to the same step.
+  const [wizardStep, setWizardStep] = useState(() => wizard?.steps[0]?.id ?? REVIEW_STEP);
+  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set());
+  /** The editor section to open at, when the wizard hands over to the full editor. */
+  const openAt = useRef<string | null>(null);
 
   // `docRef` shadows `doc` because publish/visibility read the revision right after
   // `await flush()`, before React re-renders.
@@ -179,6 +197,20 @@ export function RecordDetail({
   };
 
   const nameNote = duplicateNameNote(doc.type, nameOf(draft), ctx);
+
+  // Arriving in the full editor from a wizard step opens at that step's section.
+  useEffect(() => {
+    if (mode !== "editor" || !openAt.current) return;
+    const section = openAt.current;
+    openAt.current = null;
+    jumpToSection(section);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  const openEditor = (sectionId: string | null) => {
+    openAt.current = sectionId ?? wizard?.steps.find((step) => step.id === wizardStep)?.sections[0] ?? null;
+    onMode?.("editor");
+  };
 
   /* The bespoke components; everything else is schema data. */
   const custom: Readonly<Record<string, CustomRenderer>> = {
@@ -367,7 +399,7 @@ export function RecordDetail({
   const pending = published && doc.pendingChanges;
 
   return (
-    <article className="hb-detail scroll-y">
+    <article className={inWizard ? "hb-detail hb-detail--wizard" : "hb-detail scroll-y"}>
       <header className="hb-detail-head">
         <h2 className="hb-detail-title" tabIndex={-1} ref={titleRef}>
           {nameOf(draft).trim() || `Untitled ${typeLabel(doc.type)}`}
@@ -388,7 +420,18 @@ export function RecordDetail({
           <SaveState status={autosave.status} onReload={() => void reload()} onRetry={autosave.retry} />
 
           <div className="hb-state-actions">
-            {!removed && (!published || pending) && (
+            {/* The wizard's review step holds Publish, so a view never shows two primary buttons. */}
+            {inWizard && (
+              <Button variant="secondary" onClick={() => openEditor(null)}>
+                Full editor
+              </Button>
+            )}
+            {!inWizard && wizard && !removed && onMode && (
+              <Button variant="secondary" onClick={() => onMode("wizard")}>
+                Step by step
+              </Button>
+            )}
+            {!inWizard && !removed && (!published || pending) && (
               <Button
                 variant="primary"
                 onClick={() => void publish()}
@@ -428,12 +471,12 @@ export function RecordDetail({
         {/* One region shared by the checklist and an action's error. Each line's section control
             is the only place the section is named. A single requirement renders as a bare
             sentence; two or more become a capped list. */}
-        {actionError && !removed && (
+        {actionError && !removed && !inWizard && (
           <p className="hb-blocked" id={reasonId} role="alert">
             {actionError}
           </p>
         )}
-        {!actionError && checklist.length > 0 && !removed && (
+        {!actionError && checklist.length > 0 && !removed && !inWizard && (
           <div className="hb-blocked" id={reasonId}>
             {checklist.length === 1 ? (
               <p className="hb-blocked-line">
@@ -464,7 +507,7 @@ export function RecordDetail({
         )}
 
         {/* Never blocking: the server names an open slug the SRD does not know, which is legal but often a typo. */}
-        {doc.validity.warnings.length > 0 && !removed && (
+        {doc.validity.warnings.length > 0 && !removed && !inWizard && (
           <ul className="hb-warnings" aria-label="Worth checking">
             {doc.validity.warnings.map((warning, index) => (
               <li key={`${warning.path.join(".")}-${index}`}>{warning.message}</li>
@@ -522,26 +565,74 @@ export function RecordDetail({
         </Alert>
       )}
 
-      <div className="hb-detail-body">
-        {/* A duplicate name is annotated, never blocked. */}
-        {nameNote && <p className="hb-name-note">{nameNote}</p>}
+      {inWizard && wizard ? (
+        <>
+          {nameNote && <p className="hb-name-note">{nameNote}</p>}
+          <WizardView
+            def={wizard}
+            draft={draft}
+            onDraft={setDraft}
+            ctx={ctx}
+            recordId={doc.id}
+            spells={spells}
+            checklist={checklist}
+            warnings={doc.validity.warnings}
+            stepId={wizardStep}
+            onStep={setWizardStep}
+            visited={visited}
+            onVisited={(id) => setVisited((held) => (held.has(id) ? held : new Set([...held, id])))}
+            publishLabel={!published ? "Publish" : pending ? "Update" : null}
+            onPublish={() => void publish()}
+            busy={busy}
+            actionError={actionError}
+            published={
+              published && !pending ? (
+                <p className="hb-wiz-intro">
+                  Published. {WHERE_IT_APPEARS[doc.type]}{" "}
+                  {doc.visibleToPlayers
+                    ? "Players can see it."
+                    : "Players can't see it until you show it to them with the switch above."}
+                </p>
+              ) : null
+            }
+            onOpenEditor={openEditor}
+          />
+        </>
+      ) : (
+        <div className="hb-detail-body">
+          {/* A duplicate name is annotated, never blocked. */}
+          {nameNote && <p className="hb-name-note">{nameNote}</p>}
 
-        {schema ? (
-          <SchemaForm schema={schema} draft={draft} onDraft={setDraft} ctx={ctx} custom={custom} disabled={removed} />
-        ) : (
-          <Alert tone="warning" title="No editor for this kind yet">
-            <p>
-              Nothing here knows how to author a {typeLabel(doc.type)}. Your record is safe — it just can&rsquo;t be
-              edited from this screen.
-            </p>
-          </Alert>
-        )}
-      </div>
+          {schema ? (
+            <SchemaForm schema={schema} draft={draft} onDraft={setDraft} ctx={ctx} custom={custom} disabled={removed} />
+          ) : (
+            <Alert tone="warning" title="No editor for this kind yet">
+              <p>
+                Nothing here knows how to author a {typeLabel(doc.type)}. Your record is safe — it just can&rsquo;t be
+                edited from this screen.
+              </p>
+            </Alert>
+          )}
+        </div>
+      )}
 
       {dialog}
     </article>
   );
 }
+
+/** Where a published record turns up, for the wizard's last word. */
+const WHERE_IT_APPEARS: Readonly<Record<HomebrewType, string>> = {
+  class: "It is offered in the character builder.",
+  subclass: "It is offered when a character of its class reaches its level.",
+  species: "It is offered in the character builder.",
+  background: "It is offered in the character builder.",
+  feat: "It is offered wherever its category is.",
+  spell: "Casters whose spell lists include it can learn it.",
+  "spell-list": "Classes that name it draw their spells from it.",
+  equipment: "It is in the equipment picker for any character's inventory.",
+  monster: "It is in the bestiary, ready to add to the table."
+};
 
 /** "Hemomancy", "Hemomancy and Bloodline" or "Hemomancy, Bloodline and 2 more", quoted. */
 function dependentNames(dependents: readonly HomebrewDependent[]): string {

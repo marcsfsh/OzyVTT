@@ -54,6 +54,7 @@ import {
   type SpellReference,
   type SubclassReference
 } from "@vtt/content-srd-5.2.1";
+import { spellComponentsText } from "@vtt/content-srd-5.2.1/spell-effect";
 import { withTakenActions } from "./builtin-actions.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import type { CharacterFeatureRef } from "./equipment-derivation.js";
@@ -232,17 +233,6 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
   };
 }
 
-/** "V, S, M (a pinch of soot)" from the structured components, or "None" for a spell with no components. */
-function spellComponentsText(components: SpellReference["components"]): string {
-  const parts = [
-    components.verbal ? "V" : null,
-    components.somatic ? "S" : null,
-    components.material ? "M" : null
-  ].filter((part): part is string => part !== null);
-  const base = parts.join(", ");
-  const material = components.material && components.materialText ? ` (${components.materialText})` : "";
-  return base ? `${base}${material}` : "None";
-}
 /** SRD upcast rows are typed "slot_level_N"; keep only those (cantrip scaling is not a cast-at option) with the slot level. */
 function slotCastingOptions(options: SpellReference["castingOptions"]): ContentSpellSummary["castingOptions"] {
   return options.flatMap((option) => {

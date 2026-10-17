@@ -635,7 +635,8 @@ const SPELL_SCHEMA: HomebrewSchema = {
           label: "Damage",
           kind: "group",
           rows: [
-            { key: "damage.roll", label: "Formula", placeholder: "8d6", validate: diceValidate },
+            // Nullable: an emptied formula is no damage, not an unreadable "" the checklist would refuse.
+            { key: "damage.roll", label: "Formula", placeholder: "8d6", validate: diceValidate, emptyValue: "null" },
             // A spell can deal several types at once (Ice Knife), so this is a list.
             { key: "damage.types", label: "Types", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes }
           ]
