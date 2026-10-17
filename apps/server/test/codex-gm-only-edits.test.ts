@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
+import { PlayerCodexChanges } from "../src/codex/player-reads.js";
 import { fixedVerifiers } from "./fixed-verifiers.js";
 
 // A GM-only edit must leave every byte a player can read where it was: the bodies, the lists, the search hits
@@ -51,9 +52,14 @@ async function fixture() {
   return { base: `http://127.0.0.1:${port}/api/v1/codex`, store };
 }
 
+/** A fixed request id, so a 404's body is the same bytes on every read. */
+const REQUEST_ID = "8d0f3c1e-7a42-4b6d-9e15-2c4a6f8b0d13";
+
 /** One read as a player receives it: the status, the ETag and the exact bytes. */
 async function read(base: string, path: string, token: string) {
-  const response = await fetch(`${base}${path}`, { headers: { authorization: `Bearer ${token}` } });
+  const response = await fetch(`${base}${path}`, {
+    headers: { authorization: `Bearer ${token}`, "x-request-id": REQUEST_ID }
+  });
   return { path, status: response.status, etag: response.headers.get("etag"), body: await response.text() };
 }
 
@@ -236,5 +242,278 @@ describe("Codex journal: a hidden session never places a player's entry", () => 
     await expectUnmoved(base, ["/journal", "/timeline"], () =>
       store.updateSession(hidden.id, { sessionNumber: 9 }, undefined)
     );
+  });
+});
+
+/** A Codex with something of every kind shown to players and something of every kind kept back. */
+function seedCampaign(store: CodexStore) {
+  store.setCalendar({
+    yearName: "DR",
+    months: [
+      { name: "Hammer", days: 30 },
+      { name: "Alturiak", days: 30 }
+    ],
+    weekdays: ["First", "Second"],
+    currentDate: { year: 1492, month: 0, day: 10 }
+  });
+  store.publishCampaignDate();
+  const order = store.createPage({
+    title: "Lantern Order",
+    entityType: "faction",
+    fields: { leader: "Maelis" },
+    gmFields: { goals: "Seize the capital" },
+    playerBody: "A guild of lamplighters in [[Vallaki]].",
+    gmBody: "A front for the cult.",
+    folder: "Villains",
+    tags: ["lantern"],
+    revealedToPlayers: true
+  });
+  const town = store.createPage({
+    title: "Vallaki",
+    entityType: "location",
+    playerBody: "A walled town. The [[Lantern Order]] keeps its lamps.",
+    revealedToPlayers: true
+  });
+  const night = store.createPage({
+    title: "Night of Lanterns",
+    entityType: "event",
+    playerBody: "The lamps went out.",
+    inWorldDate: { year: 1492, month: 0, day: 5 },
+    revealedToPlayers: true
+  });
+  const cult = store.createPage({ title: "The Cult", entityType: "faction", playerBody: "Lantern bearers." });
+  store.createConnection(town.id, { toPageId: order.id, label: "hosts" });
+
+  const map = store.createMap({
+    assetId: crypto.randomUUID(),
+    name: "Barovia",
+    kind: "regional",
+    revealedToPlayers: true
+  });
+  const secretMap = store.createMap({ assetId: crypto.randomUUID(), name: "Under Vallaki", kind: "battlemap" });
+  const pin = store.createMarker(map.id, {
+    x: 0.5,
+    y: 0.5,
+    iconId: "pin",
+    iconColor: "#ff8800",
+    label: "Lantern hall",
+    pageIds: [order.id, cult.id],
+    revealedToPlayers: true
+  });
+  store.setPartyMarker(pin.id);
+  const hiddenPin = store.createMarker(map.id, { x: 0.2, y: 0.2, iconId: "pin", iconColor: "#ff8800", label: "Lair" });
+
+  const shownSession = store.createSession({ sessionNumber: 1, recapBody: "We met the Lantern Order." });
+  store.setSessionRevealed(shownSession.id, true);
+  const hiddenSession = store.createSession({ sessionNumber: 2, prepBody: "The ambush." });
+  const note = store.createEntry({
+    playerText: "The lamps of the Lantern Order burn blue.",
+    gmText: "Blue means the cult is near.",
+    attachMarkerId: pin.id,
+    attachPageId: order.id,
+    sessionId: shownSession.id,
+    revealedToPlayers: true
+  });
+  store.createDeadline({
+    playerText: "The festival.",
+    inWorldDate: { year: 1492, month: 1, day: 1 },
+    sessionId: null,
+    revealedToPlayers: true
+  });
+  const downtime = store.createDowntime({
+    playerText: "A tenday at the lamp works.",
+    sessionId: null,
+    downtime: { who: "Ireena", activity: "Crafting", days: 10, characterPageId: town.id },
+    revealedToPlayers: true
+  });
+  store.createMilestone({
+    playerText: "Level 3.",
+    sessionId: null,
+    milestone: { level: 3, reason: "The hall" },
+    revealedToPlayers: true
+  });
+  const quest = store.createQuest({
+    title: "Light the lanterns",
+    playerBody: "Find the lamp oil.",
+    gmBody: "The oil is poisoned.",
+    objectives: [{ text: "Find oil", done: false }],
+    entityIds: [order.id, cult.id],
+    revealedToPlayers: true
+  });
+  const hiddenQuest = store.createQuest({ title: "Unmask the cult", gmBody: "Act two." });
+  store.setStanding(order.id, 20, "Helped the guild");
+  store.setStandingRevealed(order.id, true);
+
+  const paths = [
+    "/pages",
+    ...[order, town, night, cult].flatMap((page) => [`/pages/${page.id}`, `/pages/${page.id}/markers`]),
+    "/connections",
+    "/maps",
+    `/maps/${map.id}/markers`,
+    `/maps/${secretMap.id}/markers`,
+    `/markers/${pin.id}`,
+    `/markers/${hiddenPin.id}`,
+    "/party",
+    "/journal",
+    `/journal?pageId=${order.id}`,
+    `/journal?markerId=${pin.id}`,
+    "/timeline",
+    "/sessions",
+    `/sessions/${shownSession.id}`,
+    `/sessions/${hiddenSession.id}`,
+    "/quests",
+    `/quests/${quest.id}`,
+    `/quests/${hiddenQuest.id}`,
+    "/standing",
+    "/calendar",
+    "/search?q=lantern",
+    "/search?q=vallaki",
+    "/search?q=session"
+  ];
+  return {
+    order,
+    town,
+    cult,
+    map,
+    secretMap,
+    pin,
+    hiddenPin,
+    shownSession,
+    hiddenSession,
+    note,
+    downtime,
+    quest,
+    hiddenQuest,
+    paths
+  };
+}
+
+describe("Codex: a GM-only edit to any record kind leaves every player read as it was", () => {
+  it("keeps every player read, ETag and the players' change count through a run of GM-only edits", async () => {
+    const { base, store } = await fixture();
+    const seeded = seedCampaign(store);
+    const { order, town, cult, map, secretMap, pin, hiddenPin, shownSession, hiddenSession, note, downtime } = seeded;
+    const { quest, hiddenQuest } = seeded;
+    const changes = new PlayerCodexChanges(store);
+
+    const edits: ReadonlyArray<readonly [string, () => unknown]> = [
+      [
+        "page GM notes",
+        () => store.updatePage(order.id, { gmBody: "Maelis has asked for soldiers." }, undefined, "gm")
+      ],
+      ["page GM fields", () => store.updatePage(order.id, { gmFields: { goals: "The throne" } }, undefined, "gm")],
+      ["page folder", () => store.updatePage(order.id, { folder: "Villains/Cults" }, undefined, "gm")],
+      ["folder move", () => store.moveFolder("Villains", "Foes")],
+      ["folder create", () => store.createFolder("Foes/Later")],
+      ["folder delete", () => store.deleteFolder("Foes")],
+      ["page revision restore", () => store.restoreRevision(order.id, store.listRevisions(order.id)[0]!.id, "gm")],
+      ["hidden page text", () => store.updatePage(cult.id, { playerBody: "Lantern bearers, all." }, undefined, "gm")],
+      ["hidden page, same title", () => store.createPage({ title: "Vallaki", playerBody: "lantern lantern" })],
+      ["GM-layer connection", () => store.createConnection(order.id, { toPageId: town.id, layer: "gm" })],
+      ["hidden map", () => store.updateMap(secretMap.id, { name: "Under Vallaki, lantern vault", tags: ["lantern"] })],
+      ["hidden map parent", () => store.setMapParent(secretMap.id, map.id)],
+      [
+        "pin scenes",
+        () => store.updateMarker(pin.id, { sceneIds: [crypto.randomUUID()], actorId: crypto.randomUUID() })
+      ],
+      ["hidden pin", () => store.updateMarker(hiddenPin.id, { label: "Lantern lair", pageIds: [order.id] })],
+      ["hidden pin move", () => store.moveMarker(hiddenPin.id, 0.3, 0.3)],
+      [
+        "pin on a hidden map",
+        () =>
+          store.createMarker(secretMap.id, {
+            x: 0.1,
+            y: 0.1,
+            iconId: "pin",
+            iconColor: "#ff8800",
+            label: "Lantern",
+            revealedToPlayers: true
+          })
+      ],
+      ["entry GM text", () => store.updateEntry(note.id, { gmText: "Blue means the cult is here." })],
+      [
+        "hidden entry",
+        () => store.createEntry({ playerText: "Lantern prep.", attachMarkerId: pin.id, attachPageId: order.id })
+      ],
+      [
+        "hidden combat",
+        () => store.appendCombatEntry({ sourceEncounterId: 7, attachMarkerId: pin.id, playerText: "A fight." })
+      ],
+      ["downtime applied", () => store.applyDowntime(downtime.id)],
+      [
+        "session prep",
+        () =>
+          store.updateSession(
+            shownSession.id,
+            { prepBody: "Next: the ambush.", attendees: ["Sam"], status: "played", sceneIds: [crypto.randomUUID()] },
+            undefined
+          )
+      ],
+      [
+        "hidden session",
+        () => store.updateSession(hiddenSession.id, { sessionNumber: 5, recapBody: "Lantern recap." }, undefined)
+      ],
+      ["active session", () => store.setActiveSession(hiddenSession.id)],
+      ["quest GM notes", () => store.updateQuest(quest.id, { gmBody: "The oil is cursed." }, undefined)],
+      [
+        "hidden quest",
+        () => store.updateQuest(hiddenQuest.id, { status: "active", playerBody: "Lantern." }, undefined)
+      ],
+      ["hidden standing", () => store.setStanding(cult.id, -40, "Burned a shrine")],
+      ["GM clock", () => store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 1, day: 20 } })],
+      [
+        "settings",
+        () =>
+          store.setSettings({
+            revisionHistory: { enabled: true, windowMinutes: 5 },
+            autosave: { enabled: true, intervalSeconds: 10 }
+          })
+      ],
+      ["history prune", () => store.deleteRevisionsOlderThan(0)]
+    ];
+
+    const before = await readAll(base, seeded.paths);
+    for (const [name, edit] of edits) {
+      edit();
+      expect(await readAll(base, seeded.paths), name).toEqual(before);
+      expect(changes.next(), `${name} would ping players`).toBeNull();
+    }
+
+    // And a change players can read still reaches them.
+    store.updatePage(order.id, { playerBody: "A guild of lamplighters, armed." }, undefined, "gm");
+    expect(changes.next()).toBe(1);
+    expect(await readAll(base, seeded.paths)).not.toEqual(before);
+    // Some two thousand reads: every path, as the player and as the preview session, after every edit.
+  }, 30_000);
+
+  it("counts a change for each kind of record a player can read", async () => {
+    const { store } = await fixture();
+    const seeded = seedCampaign(store);
+    const changes = new PlayerCodexChanges(store);
+    const visible: ReadonlyArray<readonly [string, () => unknown]> = [
+      ["page title", () => store.updatePage(seeded.town.id, { title: "Vallaki town" }, undefined, "gm")],
+      ["page reveal", () => store.setPageRevealed(seeded.cult.id, true)],
+      ["map name", () => store.updateMap(seeded.map.id, { name: "Barovia valley" })],
+      ["pin label", () => store.updateMarker(seeded.pin.id, { label: "The lantern hall" })],
+      ["pin attachment", () => store.updateEntry(seeded.note.id, { attachMarkerId: null })],
+      ["entry text", () => store.updateEntry(seeded.note.id, { playerText: "The lamps burn green." })],
+      ["recap", () => store.updateSession(seeded.shownSession.id, { recapBody: "We met them." }, undefined)],
+      [
+        "quest objective",
+        () => store.updateQuest(seeded.quest.id, { objectives: [{ text: "Find oil", done: true }] }, undefined)
+      ],
+      ["standing", () => store.setStanding(seeded.order.id, 30, "Saved a lamplighter")],
+      [
+        "published date",
+        () => {
+          store.setCalendar({ ...store.getCalendar(), currentDate: { year: 1492, month: 0, day: 12 } });
+          store.publishCampaignDate();
+        }
+      ]
+    ];
+    visible.forEach(([name, edit], index) => {
+      edit();
+      expect(changes.next(), name).toBe(index + 1);
+    });
   });
 });

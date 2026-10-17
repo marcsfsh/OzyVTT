@@ -393,7 +393,7 @@ describe("realtime presence, reconnect, and convergence", () => {
   });
 });
 
-// The `codex:changed` payload sent to every socket, players included, must be a bare revision counter.
+// The `codex:changed` payload, whoever it is sent to, must be a bare revision counter.
 // A scope word would tell the table which part of the codex the GM is editing, so this pins the whole
 // key set. Observed on a player's socket, the recipient the rule protects.
 describe("codex:changed on the wire (socket half)", () => {
@@ -408,10 +408,11 @@ describe("codex:changed on the wire (socket half)", () => {
         pings.push(event);
       });
 
+      // Revealed, so players have something new to read and are pinged.
       const created = await fetch(`${server.url}/api/v1/codex/pages`, {
         method: "POST",
         headers: { authorization: `Bearer ${gmToken}`, "content-type": "application/json" },
-        body: JSON.stringify({ title: "Vallaki" })
+        body: JSON.stringify({ title: "Vallaki", revealedToPlayers: true })
       });
       expect(created.status).toBe(201);
 
@@ -426,6 +427,71 @@ describe("codex:changed on the wire (socket half)", () => {
         ).toEqual(["codexRevision"]);
         expect(typeof (event as { codexRevision: unknown }).codexRevision).toBe("number");
       }
+    } finally {
+      await server.close();
+    }
+  });
+
+  // A ping on a GM-only write would tell the table when the GM is writing secrets, and its counter how much. A
+  // player socket, the preview session's included, hears only of writes that change something it can read.
+  it("pings a player only for a change the player can read, and the GM for every write", async () => {
+    const server = await startTestServer();
+    try {
+      await bootstrapGm(server.url);
+      const gmToken = await loginGm(server.url);
+      const codex = async (method: string, path: string, body?: unknown) => {
+        const response = await fetch(`${server.url}/api/v1/codex${path}`, {
+          method,
+          headers: { authorization: `Bearer ${gmToken}`, "content-type": "application/json" },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) })
+        });
+        expect(response.ok, `${method} ${path}`).toBe(true);
+        return ((await response.json()) as { data: Record<string, any> }).data;
+      };
+      const listen = (socket: Socket) => {
+        const heard: number[] = [];
+        socket.on("codex:changed", (event: { codexRevision: number }) => heard.push(event.codexRevision));
+        return heard;
+      };
+      const gm = await connectAndJoin(server.url, gmToken);
+      const player = await connectAndJoin(server.url);
+      const preview = await connectAndJoin(server.url, (await codex("POST", "/preview-session")).token);
+      const gmPings = listen(gm.socket);
+      const playerPings = listen(player.socket);
+      const previewPings = listen(preview.socket);
+
+      const page = (await codex("POST", "/pages", { title: "Lantern Order", revealedToPlayers: true })).page;
+      await waitFor(
+        () => playerPings,
+        (heard) => heard.length === 1
+      );
+
+      // Four writes no player can see.
+      await codex("PATCH", `/pages/${page.id}`, { gmBody: "A front for the cult." });
+      await codex("PATCH", `/pages/${page.id}`, { folder: "Villains" });
+      await codex("POST", "/pages", { title: "The real Lantern Order" });
+      await codex("POST", "/journal", { playerText: "Prep.", revealedToPlayers: false });
+      await waitFor(
+        () => gmPings,
+        (heard) => heard.length === 5
+      );
+
+      // Then one they can. Socket.IO keeps order, so a ping from the writes above would have arrived first.
+      await codex("PATCH", `/pages/${page.id}`, { title: "The Lantern Order" });
+      await waitFor(
+        () => playerPings,
+        (heard) => heard.length >= 2
+      );
+      await waitFor(
+        () => previewPings,
+        (heard) => heard.length >= 2
+      );
+      expect(playerPings, "one ping per change a player can read, counted only by those").toEqual([1, 2]);
+      expect(previewPings).toEqual([1, 2]);
+      await waitFor(
+        () => gmPings,
+        (heard) => heard.length === 6
+      );
     } finally {
       await server.close();
     }

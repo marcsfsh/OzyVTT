@@ -84,7 +84,11 @@ Socket.IO over the same origin as HTTP. Server-to-client events come in two kind
   belongs to exactly one player; `projectFeedRow` in `combat-log.ts` makes that decision.
 - **Ping channels** carry only a revision: `codex:changed` and `homebrew:changed`. Naming what
   changed would tell players which part of the world the GM is editing, so clients refetch
-  their own projected view instead.
+  their own projected view instead. The GM's devices get `codex:changed` with the Codex store's
+  revision on every write. A player's device gets it only when something players can read
+  changed, with a count of those changes alone: after each write the server hashes every player
+  read (`playerCodexFingerprint` in `codex/player-reads.ts`), so a GM-only write sends players
+  nothing.
 - **GM-only channels** go to GM sockets alone: `sound:changed` carries the sound board and the table
   screens' sound state. A player's socket is never sent it.
 
@@ -346,9 +350,11 @@ aggregate in `apps/server/src/codex/`), router (`codex-http.ts`) and projection 
 not go through the game command pipeline. Every record has a player half, a GM half and a
 reveal flag. Its HTTP shapes are defined once in `packages/domain/src/codex-wire.ts`: a record's GM
 shape is the stored row, its player shape is a separate allow-list type, and the projections and
-the client's reads are typed against both. The GM can preview the player view through
-`POST /api/v1/codex/preview-session`, which mints a real player session. The player calendar and
-the GM calendar are separate dates; a date reaches players only when it is published.
+the client's reads are typed against both. Every read a player can make is built in one place,
+`PlayerCodexReads` in `codex/player-reads.ts`, which the router serves and the players' ping hashes.
+The GM can preview the player view through `POST /api/v1/codex/preview-session`, which mints a real
+player session. The player calendar and the GM calendar are separate dates; a date reaches players
+only when it is published.
 
 The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
 (`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that

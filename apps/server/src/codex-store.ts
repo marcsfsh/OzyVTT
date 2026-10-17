@@ -29,7 +29,7 @@ import { openDatabase } from "./database.js";
 
 /**
  * The worldbuilding Codex's persistence, one module per aggregate under `codex/`. Every write bumps the coarse
- * `revision`, which pings clients and keys the GM's ETags. Rows hold both layers; only `codex-projections.ts`
+ * `revision`, which pings the GM's devices and keys the GM's ETags. Rows hold both layers; only `codex-projections.ts`
  * strips GM data for players. Writes that reach across aggregates (deletes, mostly) are composed here.
  */
 export class CodexStore {
@@ -101,6 +101,10 @@ export class CodexStore {
   }
   listPages(filter?: Readonly<{ folder?: string | null; tag?: string }>) {
     return pages.listPages(this.#db, filter);
+  }
+  /** Every page with both bodies. */
+  listFullPages() {
+    return pages.listFullPages(this.#db);
   }
   listFolders() {
     return pages.listFolders(this.#db);

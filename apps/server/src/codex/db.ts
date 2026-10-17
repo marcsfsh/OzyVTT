@@ -13,7 +13,7 @@ export function freshId(): string {
   return randomUUID();
 }
 
-/** The coarse counter every write bumps: it drives the `codex:changed` ping and keys the GM's ETags. */
+/** The coarse counter every write bumps: it is the GM's `codex:changed` ping and keys the GM's ETags. */
 export function readRevision(db: CodexDb): number {
   const row = db.database.prepare("SELECT codex_revision FROM codex_meta WHERE id = 1").get() as {
     codex_revision: number;
