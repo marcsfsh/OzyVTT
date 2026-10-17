@@ -104,8 +104,16 @@ export function CharacterSheet({
           };
         })()
       : undefined);
+  // A save the GM called for is answered on the player's call card, so their sheet does not prompt it twice.
+  const calledSaveIds = new Set(
+    role === "player"
+      ? (state?.rollCalls ?? []).flatMap((call) =>
+          call.entries.flatMap((entry) => (entry.saveId ? [entry.saveId] : []))
+        )
+      : []
+  );
   const savesOwed: ReadonlyArray<PendingSave | PlayerPendingSave> = (state?.combat.pendingSaves ?? []).filter(
-    (save) => save.targetActorId === actor.id
+    (save) => save.targetActorId === actor.id && !calledSaveIds.has(save.id)
   );
   const structuredAttacks =
     liveCombat?.active === true &&

@@ -156,6 +156,9 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
     }
   }, [returnToSheetAfterAttack, jumpAttackResult]);
   const myActor = state.actors.find((actor) => actor.id === myId) ?? null;
+  const calledSaveIds = new Set(
+    state.rollCalls.flatMap((call) => call.entries.flatMap((entry) => (entry.saveId ? [entry.saveId] : [])))
+  );
   if (!combat.active)
     return (
       <section className="encounter-panel compact" aria-labelledby="player-initiative-title">
@@ -233,7 +236,12 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
             {orderedInitiative.map((entry) => {
               const isMe = entry.actorId === myId;
               const rowActor = state.actors.find((actor) => actor.id === entry.actorId);
-              const mySaves = isMe ? combat.pendingSaves.filter((save) => save.targetActorId === entry.actorId) : [];
+              // A save the GM called for is answered on the call's card, so it is not prompted twice.
+              const mySaves = isMe
+                ? combat.pendingSaves.filter(
+                    (save) => save.targetActorId === entry.actorId && !calledSaveIds.has(save.id)
+                  )
+                : [];
               const myReactions = isMe
                 ? combat.pendingReactions.filter((reaction) => reaction.actorId === entry.actorId)
                 : [];

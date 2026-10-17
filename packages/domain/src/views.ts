@@ -88,8 +88,12 @@ export type PlayerInitiativeEntry = Readonly<{
   conditions: readonly string[];
 }>;
 export type PlayerAnnotation = Omit<Annotation, "ownerSessionId"> & { mine: boolean };
-/** A player's own pending saves only; source actor ids and effect references never cross the wire, and a hidden source's name is masked server-side. */
-export type PlayerPendingSave = Omit<PendingSave, "sourceActorId" | "endsEffects" | "repeatOf" | "onFailEffect"> & {
+/** A player's own pending saves only; source actor ids, effect references and the call a save answers never cross the
+ *  wire (the call reaches the player through `rollCalls`), and a hidden source's name is masked server-side. */
+export type PlayerPendingSave = Omit<
+  PendingSave,
+  "sourceActorId" | "endsEffects" | "repeatOf" | "onFailEffect" | "callId"
+> & {
   onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "castId" | "sourceActionId" | "ongoingDamage">;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names

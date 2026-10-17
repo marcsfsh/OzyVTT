@@ -3,6 +3,7 @@ import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domai
 import { Button, Input, SegmentedControl, Select, Stepper, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "./roll-preference";
+import { RollCallPanel } from "./RollCallPanel";
 import "./dice-panel.css";
 
 const PURPOSE_LABELS: Record<RollPurpose, string> = {
@@ -240,6 +241,8 @@ export function DicePanel({
         </div>
         <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
       </details>
+      {/* The GM's own panel calls for rolls; a character's dice pane does not. */}
+      {role === "gm" && !mineActorId && "definitions" in state && <RollCallPanel state={state} />}
       {(() => {
         const rolls =
           mineActorId && rollFilter === "mine"

@@ -259,6 +259,54 @@ describe("the sheet's saving throws", () => {
   });
 });
 
+describe("saves owed on a player's sheet", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("leaves a save the GM called for to the call's card", () => {
+    serve(derivedSheet());
+    const save = (id: string, actionName: string) => ({
+      id,
+      targetActorId: HERO,
+      ability: "dex",
+      dc: 13,
+      sourceName: "The GM",
+      actionName,
+      proposedDamage: 0,
+      halfOnSuccess: false,
+      conditionIds: [],
+      saveBonus: 0,
+      createdAt: 0
+    });
+    const actor = hero();
+    const state = {
+      actors: [actor],
+      combat: {
+        active: false,
+        initiative: [],
+        pendingSaves: [
+          save("60000000-0000-4000-8000-000000000001", "Called"),
+          save("60000000-0000-4000-8000-000000000002", "Trap")
+        ]
+      },
+      rolls: [],
+      rollCalls: [
+        {
+          id: "70000000-0000-4000-8000-000000000001",
+          kind: "save",
+          subject: { ability: "dex" },
+          dc: 13,
+          blind: false,
+          entries: [{ actorId: HERO, saveId: "60000000-0000-4000-8000-000000000001", answered: false }],
+          createdAt: 0
+        }
+      ]
+    } as unknown as GmView;
+    render(<CharacterSheet actor={actor} role="player" state={state} onClose={() => {}} />, { wrapper: ToastProvider });
+    expect(screen.getAllByRole("group", { name: "Saving throw for Aria" })).toHaveLength(1);
+    expect(screen.getByText(/vs Trap/)).toBeTruthy();
+  });
+});
+
 describe("a monster's sheet", () => {
   beforeEach(() => vi.clearAllMocks());
 
