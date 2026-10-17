@@ -14,6 +14,7 @@ import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { rechoicesOf } from "../ledger-rechoice.js";
 import { spellChoicesOf } from "../spell-choices.js";
+import { withMasteries } from "../weapon-masteries.js";
 import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
@@ -166,21 +167,20 @@ export const gameReads = [
       const builtins = builtinActionsFor(definition).filter(
         (candidate) => !available.some((declared) => declared.id === candidate.id)
       );
+      const derivation = deriveEquipment(actor, definition, catalog);
       return {
         rulesMode: state.combat.rulesMode,
-        actions: [
-          ...actionAvailability(state, actor, available, definition, false, available, catalog),
-          ...actionAvailability(state, actor, builtins, definition, true, available, catalog)
-        ],
+        // Each mastered swing names its property, from the same derivation the resolver reads it from.
+        actions: withMasteries(
+          [
+            ...actionAvailability(state, actor, available, definition, false, available, catalog),
+            ...actionAvailability(state, actor, builtins, definition, true, available, catalog)
+          ],
+          derivation
+        ),
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
         // request rather than the broadcast projection (see `actor-derived.ts`).
-        derived: deriveActorSheet(
-          actor,
-          definition,
-          deriveEquipment(actor, definition, catalog),
-          kit.catalogFor(principal).skillSummaries(),
-          catalog
-        ),
+        derived: deriveActorSheet(actor, definition, derivation, kit.catalogFor(principal).skillSummaries(), catalog),
         // Read against the GM's content, as `actor.rechoose` checks them.
         rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm")),
         // Read against the GM's content and the table's builder policy, as the swap and the spellbook check them.

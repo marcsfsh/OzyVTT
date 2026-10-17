@@ -21,6 +21,7 @@ import { autoFailsPhysicalSaves } from "./condition-rules.js";
 import { standingDefences } from "./hit-points.js";
 import { auraBonusOf, saveRollSources, saveTotalFor } from "./saving-throws.js";
 import { currentSpeedFeet } from "./speed.js";
+import { weaponMasteriesOf } from "./weapon-masteries.js";
 
 /**
  * The numbers a character sheet shows next to its roll buttons, derived server-side with the same
@@ -127,7 +128,8 @@ export function deriveActorSheet(
       "spell-save-dc"
     ),
     // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
-    attunementSlots: 3 + derivation.attunementSlots
+    attunementSlots: 3 + derivation.attunementSlots,
+    weaponMasteries: weaponMasteriesOf(definition, catalog?.equipmentRecord)
   };
 }
 
