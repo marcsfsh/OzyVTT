@@ -595,7 +595,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "feature:aura-expansion": enforced("saving-throws.ts widens Aura of Protection to 30 feet."),
   "feature:jack-of-all-trades": enforced(
-    "ability-checks.ts adds half the Proficiency Bonus, rounded down, to any check without proficiency."
+    "ability-checks.ts adds half the Proficiency Bonus, rounded down, to a skill check the Bard isn't proficient in."
   ),
   "feature:reliable-talent": enforced(
     "ability-checks.ts treats a d20 of 9 or lower as a 10 on a check with a skill or tool the Rogue is proficient in."

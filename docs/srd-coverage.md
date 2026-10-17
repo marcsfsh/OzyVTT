@@ -284,7 +284,7 @@ Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
-| Jack Of All Trades | enforced | ability-checks.ts adds half the Proficiency Bonus, rounded down, to any check without proficiency. |
+| Jack Of All Trades | enforced | ability-checks.ts adds half the Proficiency Bonus, rounded down, to a skill check the Bard isn't proficient in. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. |
 
 ## Cleric features
