@@ -1239,7 +1239,7 @@ export const openApiDocument = {
         operationId: "getContentMonster",
         security: gameSecurity("game:read"),
         description:
-          "One full stat block (GM-grade only). Imported definitions shadow bundled ids, matching the live server's resolution.",
+          "One full stat block (GM-grade only). Imported definitions shadow bundled ids, as they do when the live server resolves an id.",
         parameters: [
           {
             name: "definitionId",
@@ -1713,7 +1713,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          'Where the party pin is, and the name of the map it sits on: one read for the dashboard\'s "party is here" card and the atlas jump, replacing a client-side scan of every map. `party` is null when no pin carries the flag. For a player it is ALSO null when the party pin fails the ordinary compound reveal gate (the pin revealed AND its map revealed). The answer is then null with a 200, so a hidden party pin is indistinguishable from no party pin at all. `isParty` grants no visibility and never enters a reveal predicate.'
+          'Where the party pin is, and the name of the map it sits on: one read for the dashboard\'s "party is here" card and the atlas jump. It replaces a client-side scan of every map. `party` is null when no pin carries the flag. For a player it is ALSO null when the party pin fails the ordinary compound reveal gate (the pin revealed AND its map revealed). The answer is then null with a 200, so a hidden party pin is indistinguishable from no party pin at all. `isParty` grants no visibility and never enters a reveal predicate.'
       })
     },
     [CODEX_PATHS.markerById]: {
@@ -2095,7 +2095,7 @@ export const openApiDocument = {
     [HOMEBREW_PATHS.content]: {
       get: homebrewOp("listHomebrewContent", "HomebrewContentListResponse", {
         description:
-          'The GM\'s homebrew library as flat summaries: the authored body stays out of the list, so a few-hundred-record library is a small payload. Filters compose; "all types" is `type` omitted. Soft-deleted rows are hidden from this listing too unless `includeDeleted` is set. Paging is keyset (the GM publishing mid-scroll must not skip or duplicate a row): `cursor` is OPAQUE (never construct or parse one), and `nextCursor: null` means this was the last page. `total` counts every row matching the filter, ignoring `limit`/`cursor`.',
+          'The GM\'s homebrew library as flat summaries: the authored body stays out of the list, so a few-hundred-record library is a small payload. Filters compose; "all types" is `type` omitted. Soft-deleted rows are hidden from this listing too unless `includeDeleted` is set. Paging is keyset (the GM publishing mid-scroll must not skip or duplicate a row): `cursor` is OPAQUE (never construct or parse one), and `nextCursor: null` means this was the last page. `total` counts every row that matches the filter, whatever `limit` and `cursor` say.',
         params: [
           {
             name: "type",
@@ -2193,7 +2193,7 @@ export const openApiDocument = {
         params: [homebrewIdParam],
         notFound: true,
         description:
-          "Drops a published record's pending edits, leaving the live body as it is. A no-op when nothing is pending."
+          "Drops a published record's pending edits. The live body stays as it is. A no-op when nothing is pending."
       })
     },
     [HOMEBREW_PATHS.contentUnpublish]: {

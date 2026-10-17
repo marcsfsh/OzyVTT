@@ -230,7 +230,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": 'A spell an item can cast. Needs no new machinery: an item cast is one more synthesised action whose limited uses collapse into the same live uses namespace a feature\'s do, and rests already re-arm it. "Once per day" is `uses: {"limit": 1, "per": "long-rest"}`; there is deliberately no "day" in the `per` vocabulary, because this app already treats a Long Rest as the day.',
     atLevel: "Cast at this slot level; absent = the spell's own level",
     ability: "Which ability powers it; absent = the wielder's own spellcasting ability",
-    saveDc: 'A flat printed DC ("save DC 15"), overriding any derivation',
+    saveDc: 'A flat printed DC ("save DC 15"). It overrides any derivation',
     uses: "Charges. Share one pool across several casts with `uses.pool`",
     consumesSpellSlot: "Whether casting it also spends one of the bearer's own spell slots"
   },
@@ -427,7 +427,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     reaction:
       'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"',
     legendary:
-      'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
+      'SRD Legendary Action: taken on OTHER creatures\' turns. Each use spends `cost` from the per-round pool. Pairs with activation "other"',
     replacesAttack:
       'Taken in place of ONE attack of the Attack action (Breath Weapon, a thrown flask of Acid): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
@@ -435,9 +435,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     spellId:
       'WHICH spell this action is a casting of. Identity only (every number the action rolls is already on the action itself), so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed',
     damageByLevel:
-      "Damage that grows with level, replacing `damage` at the highest matching level (Sneak Attack, Divine Smite)",
+      "Damage that grows with level (Sneak Attack, Divine Smite). The highest matching level replaces `damage`",
     healingByLevel:
-      "Healing that grows with level, replacing `healing.formula` at the highest matching level (Divine Spark's heal, Wholeness of Body's Martial Arts die)",
+      "Healing that grows with level (Divine Spark's heal, Wholeness of Body's Martial Arts die). The highest matching level replaces `healing.formula`",
     adds: 'Read off the character when it is built and added to the first damage part and to the healing: `classLevel` times its level ("1d10 plus your Fighter level", "five times your Cleric level") and `abilityModifier` ("add your Wisdom modifier")',
     grantScaling:
       "The granted effect's `damage-bonus` amounts become the named printed class column at the character's level (Rage Damage), and the action's text says the number",
@@ -462,7 +462,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     reaction:
       'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"',
     legendary:
-      'SRD Legendary Action: taken on OTHER creatures\' turns, spending `cost` from the per-round pool. Pairs with activation "other"',
+      'SRD Legendary Action: taken on OTHER creatures\' turns. Each use spends `cost` from the per-round pool. Pairs with activation "other"',
     replacesAttack:
       'Taken in place of ONE attack of the Attack action (Breath Weapon, a thrown flask of Acid): it opens the Attack action, leaving the rest of its attacks for weapon swings, or spends one attack the action has left. Pairs with activation "action"',
     spellSlot:
@@ -531,7 +531,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "Flat things a feature hands the character. All open slugs, so a homebrew language, tool, or armor group needs no schema change.",
     spells:
       "Spells the feature always has ready (domain spells, racial spells). `alwaysPrepared` spells do not count against a prepared list. `id` is one of the seven derived-id fields a pack import rewrites. This is the ONE list `when` cannot gate. See `when` below",
-    when: 'The condition the TEN LIST FIELDS above apply under: every one except `spells`, which cannot be gated: a granted spell is baked into the sheet\'s spell list, its prepared count and its cantrip action when the character is BUILT, so nothing would re-read the gate. A block carrying both `when` and `spells` is refused, naming the spells that would have been lost. Omitted = unconditional, which is what every record written before this field meant. Only the two trigger kinds a derivation can answer are allowed: static gates (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with) and dynamic gates (while-effect-tag, while-hp-at-or-below, while-condition). A moment or a filter is refused: a grant is collected before any roll starts, so a gate it cannot evaluate would silently mean "always"'
+    when: 'The condition the TEN LIST FIELDS above apply under: every one except `spells`, which cannot be gated: a granted spell is baked into the sheet\'s spell list, its prepared count and its cantrip action when the character is BUILT, so nothing would re-read the gate. A block carrying both `when` and `spells` is refused, and the refusal names the spells that would have been lost. Omitted = unconditional, which is what every record written before this field meant. Only the two trigger kinds a derivation can answer are allowed: static gates (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with) and dynamic gates (while-effect-tag, while-hp-at-or-below, while-condition). A moment or a filter is refused: a grant is collected before any roll starts, so a gate it cannot evaluate would silently mean "always"'
   },
   Modifier: {
     "": "THE rider vocabulary: what a feature, a feat, a chosen option, a magic ITEM and a live EFFECT contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a SIGNED integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an ITEM refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an EFFECT refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `darkvision`, `sense`, `spell-slot`), which an effect that ends could never give back."
@@ -810,7 +810,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   HomebrewContentList: {
     nextCursor: "Opaque keyset cursor. Never construct or parse one. null means this was the last page",
-    total: "Rows matching the filter, ignoring limit/cursor"
+    total: "How many rows match the filter. `limit` and `cursor` do not change it"
   },
   HomebrewUsages: {
     safeToDelete:
