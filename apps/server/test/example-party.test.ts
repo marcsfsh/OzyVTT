@@ -1,11 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { BuilderPolicySchema } from "@vtt/domain";
+import { randomUUID } from "node:crypto";
+import { afterEach, describe, expect, it } from "vitest";
+import { GAME_PATHS } from "@vtt/api-contract";
+import { BuilderPolicySchema, type GameState } from "@vtt/domain";
 import { createInitialGameState, PLACEHOLDER_ACTOR_IDS } from "../src/initial-game-state.js";
-import { rebuildActorDefinition, removeActor, storedDefinition } from "../src/actor-roster.js";
+import { rebuildActorDefinition, removeActor, removeSampleCharacters, storedDefinition } from "../src/actor-roster.js";
 import { builderOffers } from "../src/builder-offers.js";
 import { buildCharacterDefinition, storedAbilityScores, storedHitPointRolls } from "../src/character-build.js";
 import { setCharacterIdentity } from "../src/character-edit.js";
 import { ContentLibrary } from "../src/content-library.js";
+import { bootServer } from "./boot-server.js";
 
 // The sample party is built by the character builder, so it levels like any character built here. The edit and
 // delete gates read the `import-` prefix as "this sheet belongs to one character", so its sheets are keyed that way.
@@ -89,5 +92,55 @@ describe("the sample party", () => {
     expect(game.actors.map((actor) => actor.id)).not.toContain(borin);
     // The sheet goes with the character; nothing references it any more.
     expect(game.definitions.map((entry) => entry.id)).not.toContain(`import-${borin}`);
+  });
+});
+
+describe("removing the sample characters", () => {
+  const cleanups: Array<() => Promise<void>> = [];
+  afterEach(async () => {
+    for (const cleanup of cleanups.splice(0)) await cleanup();
+  });
+  const { fighter: borin, cleric: mirena, wizard: lyra } = PLACEHOLDER_ACTOR_IDS;
+  /** A fresh table where a player holds Lyra and Borin fights, beside a character the GM made. */
+  function busyTable(): GameState {
+    const state = createInitialGameState();
+    state.actors.find((actor) => actor.id === lyra)!.ownerSessionId = "30000000-0000-4000-8000-0000000000a1";
+    const { sample: _sample, ...made } = structuredClone(state.actors[0]!);
+    state.actors.push({ ...made, id: randomUUID(), name: "Tamsin" });
+    state.combat = {
+      ...state.combat,
+      active: true,
+      initiative: [{ actorId: borin, score: 12, tieBreaker: 0 } as GameState["combat"]["initiative"][number]]
+    };
+    return state;
+  }
+
+  it("takes every sample it may, and names each one kept with the reason", () => {
+    const state = busyTable();
+    expect(removeSampleCharacters(state)).toEqual({
+      removed: ["Mirena Dawnbright"],
+      kept: [
+        { name: "Borin Stoneguard", reason: "End the encounter before removing a combatant who is in it." },
+        { name: "Lyra Emberwise", reason: "Release that character's claim before removing it." }
+      ]
+    });
+    expect(state.actors.map((actor) => actor.name)).toEqual(["Borin Stoneguard", "Lyra Emberwise", "Tamsin"]);
+    expect(state.definitions.map((entry) => entry.id)).not.toContain(`import-${mirena}`);
+    // A refused sample is left exactly as it was: Lyra's player still holds Lyra.
+    expect(state.actors.find((actor) => actor.id === lyra)!.ownerSessionId).not.toBeNull();
+  });
+
+  it("is one GM command over the API, with the same answer", async () => {
+    const booted = await bootServer(busyTable());
+    cleanups.push(booted.close);
+    const reply = await booted.post(GAME_PATHS.sampleCharactersRemove, booted.gmToken, { commandId: randomUUID() });
+    expect(reply.status).toBe(200);
+    const { data } = await reply.json();
+    expect(data.removed).toEqual(["Mirena Dawnbright"]);
+    expect(data.kept.map((entry: { name: string }) => entry.name)).toEqual(["Borin Stoneguard", "Lyra Emberwise"]);
+    const player = booted.server.auth.issuePlayerSession();
+    expect((await booted.post(GAME_PATHS.sampleCharactersRemove, player, { commandId: randomUUID() })).status).toBe(
+      403
+    );
   });
 });

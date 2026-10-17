@@ -3,13 +3,16 @@ import {
   addActorFromDefinition,
   importActorDefinition,
   removeActor,
+  removeSampleCharacters,
   storedArmorClass,
-  withDerivedSlots
+  withDerivedSlots,
+  type SampleRemoval
 } from "../actor-roster.js";
 import { requireActorAccess } from "../authorization.js";
 import { forceReleaseCharacter } from "../character-claims.js";
 import { addCombatant } from "../encounter.js";
 import {
+  CommandIdentitySchema,
   ActorAddFromDefinitionSchema,
   ActorImportDefinitionSchema,
   ActorRemoveSchema,
@@ -116,6 +119,24 @@ export const actorCommands = [
     gmOnly: "Only the GM can remove combatants.",
     async run({ request, execute }) {
       await execute((state) => removeActor(state, request.actorId));
+    }
+  }),
+
+  defineCommand({
+    type: "actor.remove-samples",
+    operationId: "removeSampleCharacters",
+    description:
+      "Removes the sample characters a fresh table starts with (GM-grade only), in one command. Each goes unless the roster's rules keep it: a player holds it, or a running or paused fight uses it. The reply names the ones removed (`removed`) and each one kept with the reason (`kept`). Characters the GM made are untouched.",
+    summary: "Remove the sample characters no player holds and no fight uses (GM).",
+    schema: CommandIdentitySchema,
+    malformed: "The remove-samples command is malformed.",
+    gmOnly: "Only the GM can remove the sample characters.",
+    async run({ execute }) {
+      let outcome: SampleRemoval = { removed: [], kept: [] };
+      await execute((state) => {
+        outcome = removeSampleCharacters(state);
+      });
+      return { removed: outcome.removed, kept: outcome.kept };
     }
   }),
 

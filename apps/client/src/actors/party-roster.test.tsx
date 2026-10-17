@@ -77,9 +77,25 @@ describe("the Roster", () => {
 
     await user.click(screen.getByRole("button", { name: "Remove sample characters" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove samples" }));
-    await vi.waitFor(() => expect(command).toHaveBeenCalledTimes(2));
-    expect(command).toHaveBeenCalledWith("actor:remove", { actorId: "s1" });
-    expect(command).toHaveBeenCalledWith("actor:remove", { actorId: "s2" });
+    // One command: the server decides which samples may go.
+    await vi.waitFor(() => expect(command).toHaveBeenCalledTimes(1));
+    expect(command).toHaveBeenCalledWith("actor:remove-samples", {});
+    expect(await screen.findByText("The sample characters are gone.")).toBeInTheDocument();
+  });
+
+  it("names each sample the server kept, with its reason", async () => {
+    const user = userEvent.setup();
+    command.mockResolvedValueOnce({
+      ok: true,
+      removed: ["Borin"],
+      kept: [{ name: "Lyra", reason: "Release that character's claim before removing it." }]
+    } as never);
+    roster([pc({ id: "s1", name: "Borin", sample: true }), pc({ id: "s2", name: "Lyra", sample: true })]);
+    await user.click(screen.getByRole("button", { name: "Remove sample characters" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove samples" }));
+    expect(
+      await screen.findByText("Some samples stayed. Lyra: Release that character's claim before removing it.")
+    ).toBeInTheDocument();
   });
 
   it("asks again before releasing a character mid-fight", async () => {

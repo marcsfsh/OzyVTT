@@ -303,7 +303,8 @@ names no family is the GM's own ruling on the whole command.
   imported as an actor definition.
 - A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
   same builder from a fixed seed, so they level like any built character. Each is marked `sample`
-  (GM-only) and the Roster can remove the set.
+  (GM-only), and one command (`actor.remove-samples`) removes every sample the roster rules let go and
+  names any a player holds or a fight uses.
 
 ## Sound
 

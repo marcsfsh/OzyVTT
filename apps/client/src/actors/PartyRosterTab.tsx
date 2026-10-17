@@ -95,7 +95,7 @@ export function PartyRosterTab({
     });
   };
 
-  /** Each sample the server lets go; one a player holds, or one in a fight, stays and is named. */
+  /** One command: the server removes each sample it may, and names any a player holds or a fight uses. */
   const removeSamples = async () => {
     const ok = await confirm({
       title: "Remove the sample characters?",
@@ -105,15 +105,15 @@ export function PartyRosterTab({
     });
     if (!ok) return;
     setBusy(true);
-    const kept: string[] = [];
-    for (const actor of samples) {
-      const result = await command("actor:remove", { actorId: actor.id });
-      if (!result.ok) kept.push(`${actor.name}: ${result.message ?? "refused"}`);
-    }
+    const result = await command("actor:remove-samples", {});
     setBusy(false);
-    toast(kept.length === 0 ? "The sample characters are gone." : `Some samples stayed. ${kept.join(" ")}`, {
-      tone: kept.length === 0 ? "success" : "error"
-    });
+    const kept = result.kept ?? [];
+    if (!result.ok) toast(result.message ?? "The sample characters could not be removed.", { tone: "error" });
+    else if (kept.length === 0) toast("The sample characters are gone.", { tone: "success" });
+    else
+      toast(`Some samples stayed. ${kept.map((entry) => `${entry.name}: ${entry.reason}`).join(" ")}`, {
+        tone: "error"
+      });
   };
 
   const resolveImport = async (pending: PendingImport, approve: boolean) => {
