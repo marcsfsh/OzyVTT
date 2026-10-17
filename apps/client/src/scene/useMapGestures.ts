@@ -12,7 +12,15 @@ import type { GridCalibration } from "./gridPreview";
 import { imagePointFromClient } from "./mapImage";
 import { isVisionTool, type MapTool } from "./mapTools";
 import type { MapCommands } from "./useMapCommands";
-import { anchoredCamera, clampZoom, imageAtFraction, MAP_OVERLAYS, type MapView, type Point } from "./useMapView";
+import {
+  anchoredCamera,
+  clampZoom,
+  imageAtFraction,
+  MAP_OVERLAYS,
+  viewSize,
+  type MapView,
+  type Point
+} from "./useMapView";
 
 type AnyAnnotation = Annotation | PlayerAnnotation;
 
@@ -396,12 +404,13 @@ export function useMapGestures({
     event.preventDefault();
     capturePointer(event);
     const rect = svg.getBoundingClientRect();
+    const shown = viewSize(size, view.box, camera.zoom);
     setGesture({
       kind: "pan",
       startClient: { x: event.clientX, y: event.clientY },
       startCenter: camera.center,
-      scaleX: size.width / camera.zoom / rect.width,
-      scaleY: size.height / camera.zoom / rect.height
+      scaleX: shown.width / rect.width,
+      scaleY: shown.height / rect.height
     });
   };
   const continueGesture = (event: PointerEvent<HTMLDivElement>) => {
@@ -415,16 +424,21 @@ export function useMapGestures({
       if (!first || !second || gesture.startDist <= 0) return;
       const focus = boxFraction((first.x + second.x) / 2, (first.y + second.y) / 2);
       if (!focus || !size) return;
-      const anchor = imageAtFraction(size, gesture.startFocus, {
+      const anchor = imageAtFraction(size, view.box, gesture.startFocus, {
         center: gesture.startCenter,
         zoom: gesture.startZoom
       });
       setCamera(
         anchoredCamera(
           size,
+          view.box,
           anchor,
           focus,
-          clampZoom(gesture.startZoom * (Math.hypot(first.x - second.x, first.y - second.y) / gesture.startDist))
+          clampZoom(
+            gesture.startZoom * (Math.hypot(first.x - second.x, first.y - second.y) / gesture.startDist),
+            size,
+            view.box
+          )
         )
       );
       return;

@@ -48,6 +48,13 @@ Option 3. The table (`shell/TableView.tsx`) is a frame of docked regions:
   on the device. Choosing a target lowers it so the map takes most of the height, and the target picker's Cancel
   and Roll move into the bar (`table/footerSlot.tsx`) while the bar's own controls step aside.
 
+- **The map's camera** (`scene/useMapView.ts`, `scene/cameraFollow.ts`) fills the map pane edge to edge, so the
+  map has no bands round it. It opens close enough that a one-cell token is about 32 pixels on a phone and 40 on
+  a laptop, and it follows the play: the attacker and the chosen targets (or the nearest foe before one is
+  chosen), a reaction and the creature it answers, whoever is acting, or a player's own token between turns. Only
+  tokens in that viewer's projection count. It moves when the focus changes and otherwise pans only to keep a
+  focused token in view. A person's own gestures still move it freely, and View's Fit map shows the whole map.
+
 The docked tracker, the dock picker, the accordion, Enlarge map, the floating toolbar and its phone Tools rail, the
 scene controls over the map, the GM's target bar and the combat log drawer are gone. The staging tray is a row of
 the map column, shown only while tokens wait in it.
@@ -65,8 +72,10 @@ the map column, shown only while tokens wait in it.
 ## Mobile, security, and visibility impact
 
 Phones get the same features in the same build: the tool row scrolls sideways, every control keeps a 44px target,
-and the footer pads itself by the device's safe area. No projection changed for this layout. The Token tab shows
-the GM's own state; the player's panel reads only the player projection.
+and the footer pads itself by the device's safe area. The layout changed no projection. The Token tab shows
+the GM's own state; the player's panel reads only the player projection, and the camera follows only tokens in
+it. The reaction prompt's copy added two fields to a player's own pending reaction: whether their reaction lasts
+until their next turn, and the attack total, sent only when the attack's roll is in that player's dice log.
 
 ## Migration / reversibility
 
@@ -79,5 +88,7 @@ tab choice is stored under `vtt.table-tab.<role>.<width>`. Reverting is a client
   footer's primary.
 - `table/pane-divider.test.tsx`: the separator's value, keys, drag and memory.
 - `table/needs-you.test.tsx`, `table/prompt-slot.test.tsx`, `table/tap-to-target.test.tsx`.
+- `scene/camera.test.ts`: the view's shape, the readable opening zoom, framing and what the camera follows.
+- `apps/server/test/reaction-prompt-roll.test.ts`: the prompt's attack total reaches a player only with its roll.
 - `e2e/journeys.spec.ts`: the fight journey on the new layout at 390 by 844 with touch and at 1280 by 800, with
   the uncovered-token and uncovered-primary checks.

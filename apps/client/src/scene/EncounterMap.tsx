@@ -35,6 +35,7 @@ import { TokenContextMenu } from "./TokenContextMenu";
 import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
+import { cameraFocus, useCameraFollow } from "./cameraFollow";
 import { VisionLayer } from "./VisionLayer";
 import { publishTableGeometry, useTokenFocusRequests } from "./tableGeometry";
 import { selectToken } from "./selectedToken";
@@ -220,7 +221,7 @@ export function EncounterMap({
   // While GM ink is on, new drawings are GM only whatever the audience control says.
   const effectiveVisibility: AnnotationVisibility = role === "gm" && gmLayer ? "gm-only" : defaultVisibility;
 
-  const view = useMapView({ assetId, size, svgRef, stageRef });
+  const view = useMapView({ size, cellSizePx: calibration?.cellSizePx ?? null, svgRef, stageRef });
   // How the mover's next drag travels: the acting creature's for the GM, the player's own character's for a player,
   // on the live table only. Each turn starts on foot.
   const ownActorId =
@@ -239,6 +240,55 @@ export function EncounterMap({
     targetingSession && !moveSceneId && (role === "gm" || targetingSession.attackerId === ownActorId)
       ? targetingSession
       : null;
+  // The camera follows the play: who is choosing targets and whom, a reaction and what it answers, whose turn it
+  // is, or a player's own token. A staged scene only opens close enough to read.
+  const waitingReaction = (() => {
+    const pending = state?.combat.pendingReactions ?? [];
+    const mine = role === "player" ? pending.find((reaction) => reaction.actorId === ownActorId) : pending[0];
+    if (!mine) return null;
+    return "sourceActorId" in mine
+      ? { actorId: mine.actorId, sourceActorId: mine.sourceActorId }
+      : { actorId: mine.actorId };
+  })();
+  const placedAt = (actorId: string) => tokensById.get(actorId)?.position ?? null;
+  // Before a target is chosen, the nearest creature on the other side stands in for it, so the map shows whom the
+  // action is likely for. A heal has no such stand-in.
+  const likelyTarget = (() => {
+    if (!activeTargeting || activeTargeting.selected.length > 0 || activeTargeting.action.healing != null) return null;
+    if (activeTargeting.mode === "template" || activeTargeting.mode === "none") return null;
+    const attacker = actorsById.get(activeTargeting.attackerId);
+    const from = placedAt(activeTargeting.attackerId);
+    if (!attacker || !from) return null;
+    const isAlly = sidesFrom(state);
+    let nearest: { id: string; distance: number } | null = null;
+    for (const placed of tokens) {
+      const other = actorsById.get(placed.actorId);
+      if (!other || !placed.position || other.id === attacker.id || isAlly(attacker, other)) continue;
+      const distance = Math.hypot(placed.position.x - from.x, placed.position.y - from.y);
+      if (!nearest || distance < nearest.distance) nearest = { id: other.id, distance };
+    }
+    return nearest?.id ?? null;
+  })();
+  useCameraFollow({
+    view,
+    focus: moveSceneId
+      ? null
+      : cameraFocus({
+          role,
+          ownActorId,
+          turnActorId: activeActorId,
+          targeting: activeTargeting && {
+            attackerId: activeTargeting.attackerId,
+            selected: likelyTarget ? [likelyTarget] : activeTargeting.selected
+          },
+          reaction: waitingReaction,
+          placed: (actorId) => placedAt(actorId) !== null
+        }),
+    positionOf: placedAt,
+    openKey: `${assetId}|${moveSceneId ?? "live"}`,
+    pad: calibration?.cellSizePx ?? 50,
+    settled: grid.status !== "loading"
+  });
   // Who a placed area covers, of the creatures this view can see: the same hint the panel lists. The server decides.
   const placedArea = activeTargeting?.mode === "template" ? activeTargeting.template : null;
   const areaCatches = new Set(
@@ -493,7 +543,7 @@ export function EncounterMap({
             })
       }
       onZoom={view.zoomCenter}
-      onResetView={view.resetView}
+      onResetView={view.fitMap}
       fullscreen={view.fullscreen}
       onToggleFullscreen={view.toggleFullscreen}
       notificationsMuted={notificationsMuted}
