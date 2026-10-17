@@ -182,3 +182,38 @@ describe("the ability step for a multiclass draft", () => {
     expect(reason(withClassAdded(fighterAt(4), "wizard"))).toBeNull();
   });
 });
+
+describe("a pick the step still waits on", () => {
+  const mastery: BuilderOffer = {
+    key: "feature:weapon-mastery@4",
+    step: "features",
+    featureId: "weapon-mastery",
+    kind: "weapon-mastery",
+    label: "Weapon Mastery",
+    help: null,
+    capacity: 4,
+    options: ["club", "dagger", "flail", "glaive", "greataxe"].map((id) => ({ id, name: id })),
+    maxSpellLevel: null,
+    maximum: null,
+    level: 4,
+    classId: "fighter",
+    unresolvable: null,
+    unavailable: null
+  } as unknown as BuilderOffer;
+  const reason = (picked: string[]) =>
+    stepBlockedReason(
+      "features",
+      { ...fighterAt(4), subclassId: "champion", picks: { [mastery.key]: picked } },
+      catalogs,
+      [mastery],
+      policy
+    );
+
+  it("counts what is left in sentences of their own", () => {
+    expect(reason([])).toBe("Choose 4 for Weapon Mastery to continue.");
+    expect(reason(["club", "dagger", "flail"])).toBe(
+      "Choose 1 more for Weapon Mastery to continue. 3 of 4 are chosen."
+    );
+    expect(reason(["club", "dagger", "flail", "glaive"])).toBeNull();
+  });
+});
