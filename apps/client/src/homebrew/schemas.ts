@@ -1,4 +1,4 @@
-/** The per-type field schemas: data, not forms; `FieldRenderer` draws them. A field that is stored
+/** The per-type field schemas: data that `FieldRenderer` draws as forms. A field that is stored
     but not yet read by anything carries a `note` so the GM isn't misled. */
 
 import { RARITY_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/content-srd-5.2.1/schemas";
@@ -24,7 +24,7 @@ import { ABILITIES, DAMAGE_TYPES, SIZES } from "./vocabulary";
 
 const LEVEL_CHIPS = Array.from({ length: 20 }, (_, index) => opt(String(index + 1), String(index + 1)));
 
-/** Level chips store numbers, not the chip's string value. */
+/** Level chips store numbers, where the chip's value is a string. */
 const numberChips = (key: string, label: string, help?: string): FieldDef => ({
   key,
   label,
@@ -312,7 +312,7 @@ const CLASS_SCHEMA: HomebrewSchema = {
           rowKey: (row, index) => `${String(row)}-${index}`,
           newRow: () => "str",
           rowLabel: (row) => ABILITIES.find((entry) => entry.value === row)?.label ?? String(row),
-          // Each row is the ability id itself, not an object.
+          // Each row is the ability id itself, with no object around it.
           rows: [
             {
               key: "",
@@ -683,7 +683,7 @@ const SPELL_SCHEMA: HomebrewSchema = {
           label: "Damage",
           kind: "group",
           rows: [
-            // Nullable: an emptied formula is no damage, not an unreadable "" the checklist would refuse.
+            // Nullable: an emptied formula is no damage, and never an unreadable "" the checklist would refuse.
             { key: "damage.roll", label: "Formula", placeholder: "8d6", validate: diceValidate, emptyValue: "null" },
             // A spell can deal several types at once (Ice Knife), so this is a list.
             { key: "damage.types", label: "Types", kind: "tags", pick: true, suggestions: (ctx) => ctx.damageTypes }
@@ -890,7 +890,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Used up when used",
           kind: "switch",
           help: "A potion, a flask or a scroll: each use of its actions takes one from the stack, and it works from the pack.",
-          // A scroll is only ever read once, so turning this off unmakes it rather than leaving a record publish refuses.
+          // A scroll is only ever read once, so turning this off unmakes it and leaves no record publish refuses.
           write: (next, draft) => {
             if (next === true) return { ...draft, consumedOnUse: true };
             const { spellScroll: _scroll, ...rest } = draft;
@@ -963,7 +963,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             return cleared;
           }
         },
-        // Open slug ("unique" must stay writable), so a visible `pick` list rather than a closed
+        // Open slug ("unique" must stay writable), so a visible `pick` list and no closed
         // select. See `FieldDef.pick`.
         {
           key: "rarity",
@@ -1211,7 +1211,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             emptyValue: "null"
           },
           /**
-           * Weapon properties are mechanics, not labels: `finesse` (better of Str/Dex), `reach`,
+           * Weapon properties are mechanics as well as labels: `finesse` (better of Str/Dex), `reach`,
            * `thrown`, and `weapon-property-is` riders all read this column. Uses
            * `WEAPON_PROPERTY_IDS`, not `ctx.weaponProperties` (which also includes masteries). Open
            * like other SRD vocabularies, so homebrew properties stay typeable.

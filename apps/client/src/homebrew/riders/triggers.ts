@@ -129,7 +129,7 @@ export const slugValidate = (value: unknown): string | null => {
   }, in lowercase with no spaces.`;
 };
 
-/** A collapsed row's label, e.g. "Only for: A damage type — fire, cold". */
+/** A collapsed row's label, e.g. "Only for: A damage type: fire, cold". */
 function triggerRowLabel(row: Draft): string {
   const name = triggerLabelOf(row.type);
   const values = [

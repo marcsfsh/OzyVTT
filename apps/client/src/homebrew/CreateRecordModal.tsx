@@ -1,6 +1,6 @@
 /** New homebrew: pick a type, then start blank or duplicate an existing record. Both starting
     points get equal weight (for a class, duplicating is the practical route), and picking
-    Duplicate reveals its catalog inline rather than adding a wizard step. */
+    Duplicate reveals its catalog inline, with no extra wizard step. */
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { Badge, Button, ChoiceCard, ChoiceGrid, Field, FieldGrid, Modal, Select, type ChoiceOption } from "@vtt/ui";

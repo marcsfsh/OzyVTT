@@ -166,7 +166,7 @@ export const usesField = (label: string, scope: RiderScope): FieldDef => ({
 /**
  * The to-hit half of an attack, the one place the carriers disagree. Features and items name an
  * `ability` (`FeatureAttackSchema`) and the builder resolves the number; a stat block has a required
- * flat `bonus` (`ActionSchema.attack`) and no `ability`. Offered instead of, not alongside, since
+ * flat `bonus` (`ActionSchema.attack`) and no `ability`. Offered in place of the ability and never beside it, since
  * the other key would be stripped.
  */
 const toHitFields = (scope: RiderScope): readonly FieldDef[] =>
@@ -378,7 +378,7 @@ export const actionsField = (scope: RiderScope): FieldDef => ({
   ]
 });
 
-/** Built here rather than inline so `riderFieldsForTest` can list the complete rider surface. */
+/** Built here, outside the inline literal, so `riderFieldsForTest` can list the complete rider surface. */
 export const tagsField = (label: string): FieldDef => ({
   key: "tags",
   label,

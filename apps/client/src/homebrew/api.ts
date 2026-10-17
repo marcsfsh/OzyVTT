@@ -1,9 +1,9 @@
 /**
  * Bearer-authorized fetch helpers for the GM-only homebrew API (`/api/v1/homebrew/*`), typed
  * against `HOMEBREW_PATHS` and the `Homebrew*Schema` shapes in `@vtt/api-contract`. Players see
- * homebrew only through the merged `/api/v1/content/*` catalogs (published, visible, not deleted).
- * A 404 on the collection means the surface is not mounted; the panel says so rather than
- * showing an empty library.
+ * homebrew only through the merged `/api/v1/content/*` catalogs (published, visible and undeleted).
+ * A 404 on the collection means the surface is not mounted; the panel says so, and shows no
+ * empty library.
  */
 
 import { apiRequest, type ApiError, type ApiRequest } from "../lib/api";
@@ -132,24 +132,24 @@ function query(params: HomebrewListQuery): string {
 const withRev = (expectedRev?: number) => (expectedRev === undefined ? {} : { expectedRev });
 
 export const homebrewApi = {
-  /** GET /content — flat summaries. Keyset paging: pass back `nextCursor` verbatim. */
+  /** GET /content: flat summaries. Keyset paging: pass back `nextCursor` verbatim. */
   list: (token: string, params: HomebrewListQuery = {}) =>
     request<HomebrewContentList>(token, `/content${query(params)}`),
 
-  /** POST /content — always lands as `state: "draft"`, `visibleToPlayers: false`. */
+  /** POST /content: always lands as `state: "draft"`, `visibleToPlayers: false`. */
   create: (token: string, record: Readonly<Record<string, unknown>>) =>
     request<{ record: HomebrewRecordDocument }>(token, "/content", {
       method: "POST",
       body: { record }
     }).then((data) => data.record),
 
-  /** GET /content/{id} — the record plus its full validity report. */
+  /** GET /content/{id}: the record plus its full validity report. */
   get: (token: string, id: string) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}`).then(
       (data) => data.record
     ),
 
-  /** PATCH /content/{id} — replaces the whole authored body (no partial merge); leaves state,
+  /** PATCH /content/{id}: replaces the whole authored body (no partial merge); leaves state,
       visibility and deletedAt alone. */
   update: (token: string, id: string, record: Readonly<Record<string, unknown>>, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}`, {
@@ -157,57 +157,57 @@ export const homebrewApi = {
       body: { record, ...withRev(expectedRev) }
     }).then((data) => data.record),
 
-  /** DELETE /content/{id} — soft delete, idempotent. Restorable; nothing is destroyed. */
+  /** DELETE /content/{id}: soft delete, idempotent. Restorable; nothing is destroyed. */
   remove: (token: string, id: string) =>
     request<{ id: string; deleted: true; deletedAt: string }>(token, `/content/${encodeURIComponent(id)}`, {
       method: "DELETE"
     }),
 
-  /** POST /content/{id}/restore — the explicit inverse of soft delete, never a PATCH of `deletedAt: null`. */
+  /** POST /content/{id}/restore: the explicit inverse of soft delete. A PATCH leaves `deletedAt` alone. */
   restore: (token: string, id: string) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/restore`, {
       method: "POST"
     }).then((data) => data.record),
 
-  /** POST /content/{id}/duplicate — `{id}` may be an SRD id. The copy lands as a draft hidden from players. */
+  /** POST /content/{id}/duplicate: `{id}` may be an SRD id. The copy lands as a draft hidden from players. */
   duplicate: (token: string, id: string, name?: string) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/duplicate`, {
       method: "POST",
       body: name === undefined ? {} : { name }
     }).then((data) => data.record),
 
-  /** POST /content/{id}/publish — requires validity. Publishing does not show it to players. */
+  /** POST /content/{id}/publish: requires validity. Publishing does not show it to players. */
   publish: (token: string, id: string, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/publish`, {
       method: "POST",
       body: withRev(expectedRev)
     }).then((data) => data.record),
 
-  /** POST /content/{id}/discard — drops a published record's pending edits; the live body stays. */
+  /** POST /content/{id}/discard: drops a published record's pending edits; the live body stays. */
   discard: (token: string, id: string, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/discard`, {
       method: "POST",
       body: withRev(expectedRev)
     }).then((data) => data.record),
 
-  /** POST /content/{id}/unpublish — back to draft; it leaves the merged catalogs at once. */
+  /** POST /content/{id}/unpublish: back to draft; it leaves the merged catalogs at once. */
   unpublish: (token: string, id: string, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/unpublish`, {
       method: "POST",
       body: withRev(expectedRev)
     }).then((data) => data.record),
 
-  /** POST /content/{id}/visibility — orthogonal to `state`; asking for it on a draft is a loud 409. */
+  /** POST /content/{id}/visibility: orthogonal to `state`; asking for it on a draft is a loud 409. */
   setVisibility: (token: string, id: string, visibleToPlayers: boolean, expectedRev?: number) =>
     request<{ record: HomebrewRecordDocument }>(token, `/content/${encodeURIComponent(id)}/visibility`, {
       method: "POST",
       body: { visibleToPlayers, ...withRev(expectedRev) }
     }).then((data) => data.record),
 
-  /** GET /content/{id}/usages — which characters took this, and which published records depend on it. */
+  /** GET /content/{id}/usages: which characters took this, and which published records depend on it. */
   usages: (token: string, id: string) => request<HomebrewUsages>(token, `/content/${encodeURIComponent(id)}/usages`),
 
-  /** GET /packs/export — published, non-deleted records as a shareable pack. */
+  /** GET /packs/export: published, non-deleted records as a shareable pack. */
   exportPack: (token: string, params: Readonly<{ type?: HomebrewType; ids?: readonly string[] }> = {}) => {
     const search = new URLSearchParams();
     if (params.type) search.set("type", params.type);
@@ -216,7 +216,7 @@ export const homebrewApi = {
     return request<{ pack: HomebrewPack }>(token, `/packs/export${text ? `?${text}` : ""}`).then((data) => data.pack);
   },
 
-  /** POST /packs/import — everything lands as a hidden draft. `dryRun` returns the same report
+  /** POST /packs/import: everything lands as a hidden draft. `dryRun` returns the same report
       without writing, so the plan can be shown before an overwrite runs. */
   importPack: (
     token: string,

@@ -39,7 +39,7 @@ export function applyFilters(
   });
 }
 
-/** Each state is a word, not just a hue, because colour alone cannot carry the meaning. */
+/** Each state is a word as well as a hue, because colour alone cannot carry the meaning. */
 function StateBadge({ record }: Readonly<{ record: HomebrewRecordSummary }>) {
   if (record.deletedAt) return <Badge tone="neutral">Archived</Badge>;
   if (record.state === "draft") return <Badge tone="caution">Draft</Badge>;

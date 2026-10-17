@@ -34,7 +34,7 @@ const CHOICE_KINDS = [
   "weapon-mastery"
 ];
 
-/** How a choice states its list. Held in React state, not the draft; see `featureFields`. */
+/** How a choice states its list. Held in React state, outside the draft; see `featureFields`. */
 export type SourceMode = "catalog" | "list" | "options" | "picks";
 
 export type CatalogFamily = "" | "subclasses" | "feats" | "spells" | "lineages" | "skills" | "weapons";
@@ -74,7 +74,7 @@ const NEW_CHOICE: Readonly<Record<string, unknown>> = { kind: "feat", choose: 1,
 /** `FeatureChoiceSchema.kind` is a `ContentIdSchema` slug: lowercase, other runs become one hyphen. */
 const asChoiceSlug = (text: string): string => text.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
 
-/** One choice block — one pick the feature asks for, however the record spells it. */
+/** One choice block: one pick the feature asks for, however the record spells it. */
 export type ChoiceBlock = Readonly<Record<string, unknown>>;
 
 /** Every pick this feature asks for, via the server's own `featurePicks` accessor. */
@@ -92,7 +92,7 @@ export function writeChoiceBlocks(feature: Draft, blocks: readonly ChoiceBlock[]
   return next;
 }
 
-/** Merges changes into one block, seeding the list if empty so the shape matches what the switch mints. */
+/** Merges changes into one block and seeds the list if empty, so the shape matches what the switch mints. */
 export function writeChoiceAt(feature: Draft, index: number, changes: Readonly<Record<string, unknown>>): Draft {
   const held = choiceBlocksOf(feature);
   const blocks: ChoiceBlock[] = held.length === 0 ? [{ ...NEW_CHOICE }] : [...held];
@@ -155,7 +155,7 @@ const featuresOf = (draft: Draft): readonly Draft[] => [
     : [])
 ];
 
-/** Every feature id this record declares — the targets a `feature:<id>` offer may name. */
+/** Every feature id this record declares: the targets a `feature:<id>` offer may name. */
 const featureIdsOf = (draft: Draft): readonly string[] =>
   featuresOf(draft)
     .map((feature) => String((feature as { id?: unknown })?.id ?? ""))
@@ -240,7 +240,7 @@ const featureLabelOf = (draft: Draft, id: string): string => {
 };
 
 /**
- * `extraPicks`: raises a pick budget instead of granting an outcome (e.g.
+ * `extraPicks`: raises a pick budget and grants no outcome (e.g.
  * `{offer: "class-cantrips", amount: 1}`). The offer box is open text suggesting the named budgets
  * (`NAMED_PICK_BUDGET_KEYS`) plus `feature:<id>` for each feature on the record. `amount` and
  * `scaling` are mutually exclusive, swapped by the mode select. The column id is seeded empty, since
@@ -386,7 +386,7 @@ const replacesFeatureIdField = (): FieldDef => ({
     { value: "", label: "Nothing · this is a feature of its own" },
     ...featureIdsOf(draft).map((id) => ({ value: id, label: featureLabelOf(draft, id) }))
   ],
-  // `options` receives the record, not the row, so self-reference is caught here instead.
+  // `options` receives the record and never the row, so self-reference is caught here.
   validate: (value, feature) =>
     value && value === feature.id ? "A feature cannot supersede itself. Pick the earlier one it replaces." : null
 });
@@ -502,7 +502,7 @@ function choiceBlockFields(): readonly FieldDef[] {
     },
     {
       /** Inline options. The `RowEditor` is rendered by hand because an option mounts `RiderEditor`,
-          and the renderer's `rows` branch gives a custom field the record, not the row. The row's
+          and the renderer's `rows` branch gives a custom field the record, and never the row. The row's
           shape (`newRow`, `rowKey`, `rowLabel`, controls) still lives here. */
       key: "options",
       label: "Options",

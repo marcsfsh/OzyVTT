@@ -1,12 +1,12 @@
 /**
- * The class level table. Most cells are derived rather than typed:
+ * The class level table. Most cells are derived from settings, and few are typed:
  * - Proficiency bonus is always `2 + floor((level - 1) / 4)` and is never an input.
  * - The features column projects each feature's "Granted at levels" (`FeatureEditor`).
  * - Spell and pact slots come from one progression pick via `spellSlotsForClass` /
  *   `pactSlotsForLevel`.
  * Free-form columns: `cantripsKnown`, `preparedCount`, `classResources`.
  *
- * Slot overrides are per row and derived, not stored (`ClassLevelRowSchema` is `.strict()`):
+ * Slot overrides are per row and derived, and never stored (`ClassLevelRowSchema` is `.strict()`):
  * a row is overridden iff its slots differ from what the current settings generate. On a
  * progression change, rows that matched the previous settings are regenerated and overridden
  * rows are left alone.
@@ -323,7 +323,7 @@ export function LevelTableEditor({
                 first.
               </p>
             ) : progression === "pact" ? (
-              /* Each half falls back to the generated value, not zero, so clearing one field
+              /* Each half falls back to the generated value (zero would be wrong), so clearing one field
                  never silently zeroes the row. */
               <FieldGrid min="8rem">
                 <label className="nh-field">

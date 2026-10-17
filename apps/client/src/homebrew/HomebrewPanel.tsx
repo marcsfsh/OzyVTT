@@ -1,6 +1,6 @@
 /**
  * The Homebrew tab: one master-detail library over all content types, with library-wide
- * status in a modebar rather than a second tab bar. The panel is conditionally mounted, so a
+ * status in a modebar, with no second tab bar. The panel is conditionally mounted, so a
  * tab switch destroys its state; edits are parked on the server as they are made (`useAutosave`).
  * A failed load shows a named condition with Retry, never an empty library.
  */
@@ -65,7 +65,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     };
   }, [refresh]);
 
-  // Patch a summary row in place rather than reloading the list under an open editor.
+  // Patch a summary row in place, so the list never reloads under an open editor.
   const patchRow = useCallback((next: HomebrewRecordDocument) => {
     setRecords((rows) => {
       const name = typeof next.record.name === "string" ? next.record.name : "";

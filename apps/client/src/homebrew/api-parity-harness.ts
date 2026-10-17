@@ -4,12 +4,12 @@
  * GM can author each, and checks the uncovered set against a reasoned exemption table in both
  * directions. Vitest-free, like `authoring-harness.ts`.
  *
- * The walk sees keys, not values (a missing enum option is invisible here; the round trip in the
+ * The walk sees keys and no values (a missing enum option is invisible here; the round trip in the
  * test catches that). A `z.record(...)` is opaque, so nothing inside
  * `ActorDefinitionSchema.extensions` is addressed.
  *
  * Every canonicalising rewrite is validated: a rider restart whose container `fieldsWithin` cannot
- * resolve throws rather than silently widening the uncovered set.
+ * resolve throws, so the uncovered set never widens silently.
  */
 
 import { createServer, type Server } from "node:http";
@@ -72,7 +72,7 @@ function unwrap(schema: unknown): unknown {
         return cursor;
     }
   }
-  throw new Error("Schema wrapper nesting exceeded 32 levels — a cycle, not a schema.");
+  throw new Error("Schema wrapper nesting exceeded 32 levels: a cycle, and no schema.");
 }
 
 const shapeOf = (schema: unknown): Record<string, unknown> => defOf(schema).shape as Record<string, unknown>;
@@ -128,7 +128,7 @@ export function walkBodySchemas(): { addresses: readonly ParityAddress[]; stats:
         } else if (objectOptions(child).length > 0) {
           descend(type, child, within, [...prefix, key]);
         } else {
-          // Scalars, enums, records (opaque bags — the structural blind spot), tuples.
+          // Scalars, enums, records (opaque bags: the structural blind spot), tuples.
           addresses.push({ type, within, key: dotted });
         }
       }
@@ -240,7 +240,7 @@ const controlAt = (type: HomebrewBodyType, key: string, within: readonly string[
 
 /** Keys a control authors under a different key (e.g. the "Uses are" `mode` select writes
     `uses.scaling.type`). Each claim is proved at probe time by running the real write, so a renamed
-    writer leaves the address open instead of falsely covered. */
+    writer leaves the address open, and never falsely covered. */
 const SIDE_EFFECT_WRITERS: ReadonlyArray<{
   key: string;
   writer: string;
@@ -370,7 +370,7 @@ export type ExemptionRow = Readonly<{
   status: string;
 }>;
 
-/** The path half of an addressId — what `ExemptionRow.at` is matched against. */
+/** The path half of an addressId: what `ExemptionRow.at` is matched against. */
 export const pathOf = (address: ParityAddress): string =>
   `${address.within.map((segment) => `${segment}[].`).join("")}${address.key}`;
 
@@ -455,7 +455,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "actions[].onHit[].**",
     types: ACTION_CARRIERS,
-    reason: "a hit that lands a condition — no rows control on the action row",
+    reason: "a hit that lands a condition: no rows control on the action row",
     status: "gap"
   },
   {
@@ -503,7 +503,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "actions[].legendary.cost",
     types: ACTION_CARRIERS,
-    reason: "the per-round pool cost — the record has actionsPerRound, the action has no cost",
+    reason: "the per-round pool cost: the record has actionsPerRound, the action has no cost",
     status: "gap"
   },
   {
@@ -517,7 +517,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "actions[].damageByLevel[].**",
     types: FEATURE_CARRIERS,
     reason:
-      "damage that grows with level — feature-carrier actions only (a statblock ActionSchema has no such key, which is why monster is absent)",
+      "damage that grows with level: feature-carrier actions only (a statblock ActionSchema has no such key, which is why monster is absent)",
     status: "gap"
   },
   {
@@ -531,28 +531,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "actions[].attack.count",
     types: ACTION_CARRIERS,
     reason:
-      "attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review)",
+      "attack keys the action rows do not enumerate: surfaced when the bare-group false credit was removed (this batch's adversarial review)",
     status: "gap"
   },
   {
     at: "actions[].attack.criticalBonusDice",
     types: ACTION_CARRIERS,
     reason:
-      "attack keys the action rows do not enumerate — surfaced when the bare-group false credit was removed (this batch's adversarial review)",
+      "attack keys the action rows do not enumerate: surfaced when the bare-group false credit was removed (this batch's adversarial review)",
     status: "gap"
   },
   {
     at: "actions[].attack.proficient",
     types: FEATURE_CARRIERS,
-    reason:
-      "the feature attack shape's proficiency flag — no row enumerates it (the statblock shape does not carry it)",
+    reason: "the feature attack shape's proficiency flag: no row enumerates it (the statblock shape does not carry it)",
     status: "gap"
   },
   {
     at: "actions[].save.dc.**",
     types: FEATURE_CARRIERS,
     reason:
-      "the feature save's DERIVED dc object (ability/base/proficiencyBonus) — the rows author the statblock's flat number only",
+      "the feature save's DERIVED dc object (ability/base/proficiencyBonus): the rows author the statblock's flat number only",
     status: "gap"
   },
   ...SAVE_LIFETIME_KEYS.map((key): ExemptionRow => ({
@@ -743,25 +742,25 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "effects[].onEnd[].**",
     types: FEATURE_CARRIERS,
-    reason: "what happens when an effect ends — no program unit authors it",
+    reason: "what happens when an effect ends: no program unit authors it",
     status: "gap"
   },
   {
     at: "effects[].endsWithTag",
     types: FEATURE_CARRIERS,
-    reason: "effect linkage vocabulary with no control — no program unit authors it",
+    reason: "effect linkage vocabulary with no control: no program unit authors it",
     status: "gap"
   },
   {
     at: "effects[].target",
     types: FEATURE_CARRIERS,
-    reason: "effect linkage vocabulary with no control — no program unit authors it",
+    reason: "effect linkage vocabulary with no control: no program unit authors it",
     status: "gap"
   },
   {
     at: "effects[].voidWhileIncapacitated",
     types: FEATURE_CARRIERS,
-    reason: "effect linkage vocabulary with no control — no program unit authors it",
+    reason: "effect linkage vocabulary with no control: no program unit authors it",
     status: "gap"
   },
   {
@@ -775,7 +774,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "modifiers[].**",
     types: FEATURE_CARRIERS,
     reason:
-      "the modifier rows beyond the editor's offered subset — a type the form does not offer has no field for its keys",
+      "the modifier rows beyond the editor's offered subset: a type the form does not offer has no field for its keys",
     status: "gap"
   },
 
@@ -784,13 +783,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "choice.options[].**",
     types: "*",
     reason:
-      "an option's own payload (nested choice, grants, uses, extraPicks) — the choice panel authors one level and no deeper",
+      "an option's own payload (nested choice, grants, uses, extraPicks): the choice panel authors one level and no deeper",
     status: "gap"
   },
   {
     at: "choices[].**",
     types: "*",
-    reason: "the plural choices list — the panel writes the singular choice; the list shape has no control at all",
+    reason: "the plural choices list: the panel writes the singular choice; the list shape has no control at all",
     status: "gap"
   },
   {
@@ -812,66 +811,66 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "features[].grants.**",
     types: "*",
     reason:
-      "bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe",
+      "bespoke GrantsEditor JSX with no FieldDef: authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe",
     status: "gap"
   },
   {
     at: "traits[].grants.**",
     types: "*",
     reason:
-      "bespoke GrantsEditor JSX with no FieldDef — authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe",
+      "bespoke GrantsEditor JSX with no FieldDef: authored today through grantsFromRows and driven in pick-fields.test.tsx, invisible to the probe",
     status: "gap"
   },
   {
     at: "^feature.grants.**",
     types: ["feat"],
     reason:
-      "bespoke GrantsEditor JSX at the feat's singular-feature scope — open now that the bare-group credit is gone",
+      "bespoke GrantsEditor JSX at the feat's singular-feature scope: open now that the bare-group credit is gone",
     status: "gap"
   },
   {
     at: "^grants.**",
     types: "*",
-    reason: "bespoke GrantsEditor JSX at record scope — same probe-blind mount",
+    reason: "bespoke GrantsEditor JSX at record scope: same probe-blind mount",
     status: "gap"
   },
   {
     at: "uses.scaling.table[].**",
     types: "*",
     reason:
-      "the by-level table at the three mounts the canonicaliser cannot reach — lineage depth, the feat's dotted singular feature, a cast's row scope (instrumented: exactly those six). The plain feature mounts author the table and probe covered",
+      "the by-level table at the three mounts the canonicaliser cannot reach: lineage depth, the feat's dotted singular feature, a cast's row scope (instrumented: exactly those six). The plain feature mounts author the table and probe covered",
     status: "gap"
   },
   {
     at: "casts[].uses.scaling.**",
     types: ["equipment"],
-    reason: "an item cast's scaling — zero SRD authors until the magic-item bundle lands",
+    reason: "an item cast's scaling: zero SRD authors until the magic-item bundle lands",
     status: "gap"
   },
   {
     at: "extraPicks[].**",
     types: "*",
-    reason: "extra-pick rows beyond what the resolver reads — no rows control at feature scope",
+    reason: "extra-pick rows beyond what the resolver reads: no rows control at feature scope",
     status: "gap"
   },
   {
     at: "replaces[].**",
     types: "*",
     reason:
-      "the replacement clause's rows — written whole by the replacement control, per-key fields invisible to the probe",
+      "the replacement clause's rows: written whole by the replacement control, per-key fields invisible to the probe",
     status: "gap"
   },
   {
     at: "replacesFeatureId",
     types: ["species"],
-    reason: "supersession at species-trait scope — the control exists on class features, not here",
+    reason: "supersession at species-trait scope: the control exists on class features and is missing here",
     status: "gap"
   },
   {
     at: "extraSpellLists",
     types: "*",
     reason:
-      "spell lists a feature adds to the class's own picks (Magical Secrets) — no list control at feature scope yet",
+      "spell lists a feature adds to the class's own picks (Magical Secrets): no list control at feature scope yet",
     status: "gap"
   },
 
@@ -879,13 +878,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "^lineages[].**",
     types: ["species"],
-    reason: "a lineage's own traits — today a lineage row is name + description only",
+    reason: "a lineage's own traits: today a lineage row is name + description only",
     status: "gap"
   },
   {
     at: "languageChoices.**",
     types: ["species"],
-    reason: "9 of 9 SRD species author languageChoices — the builder's language offer has no authoring end",
+    reason: "9 of 9 SRD species author languageChoices: the builder's language offer has no authoring end",
     status: "gap"
   },
   {
@@ -922,7 +921,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "skillChoices.fromCatalog",
     types: ["class"],
     reason:
-      "zero of 12 SRD classes author it — every class uses the from list, which has a control (\u00a74); the group's rows never offered it",
+      "zero of 12 SRD classes author it: every class uses the from list, which has a control (\u00a74); the group's rows never offered it",
     status: "permanent: zero SRD authors"
   },
   {
@@ -949,7 +948,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "levelTable[].**",
     types: ["class", "subclass"],
     reason:
-      "bespoke LevelTableEditor JSX with no FieldDef — authored today, invisible to the probe until it uses FieldDefs",
+      "bespoke LevelTableEditor JSX with no FieldDef: authored today, invisible to the probe until it uses FieldDefs",
     status: "gap"
   },
   {
@@ -963,7 +962,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "^uses.scaling.id",
     types: ["equipment"],
     reason:
-      "the class-resource id at ITEM scope — the dedicated field exists on feature mounts only; the item's uses rows omit it",
+      "the class-resource id at ITEM scope: the dedicated field exists on feature mounts only; the item's uses rows omit it",
     status: "gap"
   },
   {
@@ -976,19 +975,19 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "castingOptions[].**",
     types: ["spell"],
-    reason: "a spell's casting options — the spell form has no rows control for them",
+    reason: "a spell's casting options: the spell form has no rows control for them",
     status: "gap"
   },
   {
     at: "^add",
     types: ["spell-list"],
-    reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see",
+    reason: "written whole by the bespoke SpellListContents editor: no FieldDef the probe can see",
     status: "permanent: bespoke editor, probe-blind"
   },
   {
     at: "^remove",
     types: ["spell-list"],
-    reason: "written whole by the bespoke SpellListContents editor — no FieldDef the probe can see",
+    reason: "written whole by the bespoke SpellListContents editor: no FieldDef the probe can see",
     status: "permanent: bespoke editor, probe-blind"
   },
 
@@ -996,7 +995,7 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "^extensions",
     types: ["monster"],
-    reason: "the opaque bag itself — the census's structural blind spot, since the walk cannot see its keys",
+    reason: "the opaque bag itself: the census's structural blind spot, since the walk cannot see its keys",
     status: "gap"
   },
   {
@@ -1015,25 +1014,25 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
   {
     at: "spellcasting.**",
     types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it",
+    reason: "a built-character field on the shared ActorDefinition: 0 of 330 SRD monster rows author it",
     status: "permanent: built-character field"
   },
   {
     at: "character.**",
     types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it",
+    reason: "a built-character field on the shared ActorDefinition: 0 of 330 SRD monster rows author it",
     status: "permanent: built-character field"
   },
   {
     at: "startingInventory[].**",
     types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it",
+    reason: "a built-character field on the shared ActorDefinition: 0 of 330 SRD monster rows author it",
     status: "permanent: built-character field"
   },
   {
     at: "startingCurrency.**",
     types: ["monster"],
-    reason: "a built-character field on the shared ActorDefinition — 0 of 330 SRD monster rows author it",
+    reason: "a built-character field on the shared ActorDefinition: 0 of 330 SRD monster rows author it",
     status: "permanent: built-character field"
   }
 ];
@@ -1083,7 +1082,7 @@ export function firstDifference(
   return null;
 }
 
-/** Keys the system stamps and no GM authors, subtracted structurally rather than as exemption rows. */
+/** Keys the system stamps and no GM authors, subtracted structurally with no exemption rows. */
 export const SYSTEM_FORCED = Object.freeze({
   /** Record identity and provenance, forced by `normalizeBody` or the row. */
   recordKeys: [
@@ -1096,7 +1095,7 @@ export const SYSTEM_FORCED = Object.freeze({
   ] as readonly string[],
   /** The provenance bag (`source.externalId` is forced to the row id). */
   recordPrefixes: ["source."] as readonly string[],
-  reason: "system-forced: stamped by the store, the row, or a rows editor's newRow — never authored by hand"
+  reason: "system-forced: stamped by the store, the row, or a rows editor's newRow: never authored by hand"
 });
 
 export const isSystemForced = (address: ParityAddress): boolean => {

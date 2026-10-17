@@ -136,7 +136,7 @@ export function GrantsEditor({
         ariaLabel="Grants"
         rowLabel={(row) => {
           const label = GRANT_KINDS.find((kind) => kind.key === row.kind)?.label ?? "Grant";
-          // A collapsed spells row shows names, not ids.
+          // A collapsed spells row shows names in place of ids.
           const shown =
             row.kind === "spells"
               ? row.values.map((id) => ctx.spells.find((entry) => entry.id === id)?.name ?? id)
@@ -226,7 +226,7 @@ export function GrantsEditor({
                     values={row.values}
                     onChange={(values) => replace({ values })}
                     suggestions={grantSuggestions(row.kind, ctx)}
-                    /* Set for the control rather than per kind; `TagInput` falls back to a plain input
+                    /* Set for the control and never per kind; `TagInput` falls back to a plain input
                        for kinds with no list (tools, languages). */
                     pick
                     optionLabel={suggestionLabel}

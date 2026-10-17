@@ -143,7 +143,7 @@ const draftPicksOf = (entry: Record<string, unknown> | undefined): ReadonlyArray
     this record, and its answer arrives in `doc.validity`. */
 function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): BlockedReason | null {
   for (const entry of featuresOf(draft)) {
-    // Every pick, not just the first.
+    // Every pick, the first and the rest.
     for (const choice of draftPicksOf(entry)) {
       const slug = typeof choice?.fromCatalog === "string" ? choice.fromCatalog : "";
       if (!slug || namesOwnRecord(slug, ctx.recordId)) continue;
@@ -404,7 +404,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
 
 /** One validity issue (server or shared schema) in the standard sentence shape. The label and
     section come from the form schema via the issue's `path`. `missing` marks a value the body does
-    not have at all, which reads as "Fill in" rather than as the schema's wording. */
+    not have at all, which reads as "Fill in" in place of the schema's wording. */
 export function issueReason(
   type: HomebrewType,
   issue: { path: ReadonlyArray<string | number>; message: string; missing?: boolean } | undefined,

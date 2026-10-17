@@ -7,7 +7,7 @@
  * A `.mirror.test.ts` so it runs in the node project that may import server modules.
  *
  * The `unauthorable` census lists every key a later change needs that the editor cannot author yet,
- * as an exact set. It sees keys, not values: a select missing an option is caught by the row tests.
+ * as an exact set. It sees keys and no values: a select missing an option is caught by the row tests.
  */
 
 import { describe, expect, it } from "vitest";
@@ -125,7 +125,7 @@ function authoredMonster(): Draft {
 /** The same shape read from the shipped bundle through the server's content view. */
 const srdMonster = (): ActorDefinition => {
   const definition = new ContentLibrary().forAudience("gm").monster("aboleth");
-  if (!definition) throw new Error("The SRD bundle no longer ships an Aboleth — this fixture needs a new carrier.");
+  if (!definition) throw new Error("The SRD bundle no longer ships an Aboleth: this fixture needs a new carrier.");
   return definition;
 };
 
@@ -197,7 +197,7 @@ function resolveTheFixture(definition: ActorDefinition) {
 
 /* ---------------------------------------------------------------- the tests ------ */
 
-describe("a saving-throw action that rolls typed damage — through both paths", () => {
+describe("a saving-throw action that rolls typed damage: through both paths", () => {
   it("1. the editor can author it: every key goes through a real control, and the body publishes", () => {
     const draft = authoredMonster();
     const verdict = publishVerdict("monster", draft, RECORD_ID);
@@ -216,7 +216,7 @@ describe("a saving-throw action that rolls typed damage — through both paths",
     });
   });
 
-  it("2. SRD content authors the same shape — and it is not a lone record", () => {
+  it("2. SRD content authors the same shape: and it is not a lone record", () => {
     const definition = srdMonster();
     const action = definition.actions.find((entry) => entry.id === FIXTURE.actionId);
     expect(action).toMatchObject({
@@ -323,7 +323,7 @@ function authoredBandit(): Draft {
 
 const srdBandit = (): ActorDefinition => {
   const definition = new ContentLibrary().forAudience("gm").monster(BANDIT.monsterId);
-  if (!definition) throw new Error("The SRD bundle no longer ships a Bandit — this fixture needs a new carrier.");
+  if (!definition) throw new Error("The SRD bundle no longer ships a Bandit: this fixture needs a new carrier.");
   return definition;
 };
 
@@ -386,7 +386,7 @@ function swing(definition: ActorDefinition) {
   );
 }
 
-describe("a monster's to-hit bonus — through both paths", () => {
+describe("a monster's to-hit bonus: through both paths", () => {
   it("1. the editor can author it: `attack.bonus` goes through a real control, and the body publishes", () => {
     const draft = authoredBandit();
     const verdict = publishVerdict("monster", draft, RECORD_ID);
@@ -404,7 +404,7 @@ describe("a monster's to-hit bonus — through both paths", () => {
     expect(hasControl("equipment", "attack.ability", ["actions"])).toBe(true);
   });
 
-  it("2. SRD content authors the same shape — and it is not a lone record", () => {
+  it("2. SRD content authors the same shape: and it is not a lone record", () => {
     expect(srdBandit().actions.find((entry) => entry.id === BANDIT.actionId)).toMatchObject({
       attack: { bonus: BANDIT.bonus, reachFeet: BANDIT.reachFeet },
       damage: [{ formula: BANDIT.formula, type: BANDIT.damageType }]
@@ -566,7 +566,7 @@ function shoot(definition: ActorDefinition, feet: number, faces: readonly number
   );
 }
 
-describe("a two-band range — through both paths", () => {
+describe("a two-band range: through both paths", () => {
   it("1. the editor can author it: `attack.rangeNormalFeet` goes through a real control, and the body publishes", () => {
     const draft = authoredCrossbow();
     const verdict = publishVerdict("monster", draft, RECORD_ID);
@@ -583,7 +583,7 @@ describe("a two-band range — through both paths", () => {
     }
   });
 
-  it("2. SRD content authors the same shape — and it is not a lone record", () => {
+  it("2. SRD content authors the same shape: and it is not a lone record", () => {
     expect(srdBandit().actions.find((entry) => entry.id === CROSSBOW.actionId)).toMatchObject({
       attack: { bonus: CROSSBOW.bonus, rangeFeet: CROSSBOW.rangeFeet, rangeNormalFeet: CROSSBOW.rangeNormalFeet }
     });
@@ -806,11 +806,11 @@ function barbarianWearingBracers(): Table {
 const srdRecklessAttack = () => {
   const record = new ContentLibrary().forAudience("gm").classRecord(RECKLESS.classId);
   const feature = record?.features.find((entry) => entry.id === RECKLESS.featureId);
-  if (!feature) throw new Error("The SRD bundle no longer ships Reckless Attack — this fixture needs a new carrier.");
+  if (!feature) throw new Error("The SRD bundle no longer ships Reckless Attack: this fixture needs a new carrier.");
   return feature;
 };
 
-describe("what an effect DOES — through both paths, across two carriers", () => {
+describe("what an effect DOES: through both paths, across two carriers", () => {
   it("1. the editor can author it: an effect's `modifiers` goes through a real control, and the body publishes", () => {
     const draft = authoredBracers();
     const verdict = publishVerdict("equipment", draft, RECKLESS.itemId);
@@ -836,7 +836,7 @@ describe("what an effect DOES — through both paths, across two carriers", () =
     expect(() => applyField("equipment", {}, "armor-class", 1, ["effects", "modifiers"])).toThrow();
   });
 
-  it("2. SRD content authors the same shape — and both carriers of it are FEATURES", () => {
+  it("2. SRD content authors the same shape: and both carriers of it are FEATURES", () => {
     const feature = srdRecklessAttack();
     expect(feature.effects[0]).toMatchObject({
       tags: ["reckless-attack"],
@@ -973,7 +973,7 @@ function paladinSheet({ withGrant }: { withGrant: boolean }): ActorDefinition {
 const preparedSpell = (definition: ActorDefinition, id: string) =>
   (definition.spellcasting?.spells ?? []).find((spell) => spell.id === id);
 
-describe("an always-prepared spell grant — through both paths", () => {
+describe("an always-prepared spell grant: through both paths", () => {
   it("1. the editor can author it: the picked spell becomes `{id, alwaysPrepared}` and the feat publishes", () => {
     const draft = authoredFeat();
     const verdict = publishVerdict("feat", draft, GRANTED.featId);
@@ -993,7 +993,7 @@ describe("an always-prepared spell grant — through both paths", () => {
     expect(hasControl("feat", "grants")).toBe(false);
   });
 
-  it("2. SRD content authors the same shape — and it is 41 records, not a lone one", () => {
+  it("2. SRD content authors the same shape: and it is 41 records, not a lone one", () => {
     const library = new ContentLibrary().forAudience("gm");
     const carriers: string[] = [];
     const walk = (node: unknown) => {
@@ -1027,7 +1027,7 @@ describe("an always-prepared spell grant — through both paths", () => {
       const spell = preparedSpell(definition, spellId);
       // A row on the character's own spell list, castable without preparing it.
       expect(spell, label).toMatchObject({ id: spellId, prepared: true, alwaysPrepared: true });
-      // The name is resolved from the catalog, not the grant.
+      // The name is resolved from the catalog; the grant carries only the id.
       expect(spell?.name, label).not.toBe(spellId);
     }
 
@@ -1140,7 +1140,7 @@ function barbarianSheet(level: 1 | 3, feat?: Draft): ActorDefinition {
 const limitOf = (definition: ActorDefinition, actionId: string) =>
   definition.actions.find((entry) => entry.id === actionId)?.uses?.limit;
 
-describe("uses read off the class table's own column — through both paths", () => {
+describe("uses read off the class table's own column: through both paths", () => {
   it("1. the editor can author it: the fifth mode and its column id go through real controls, and the feat publishes", () => {
     const draft = authoredFuryFeat(RAGES.resourceId);
     const verdict = publishVerdict("feat", draft, RAGES.featId);
@@ -1162,7 +1162,7 @@ describe("uses read off the class table's own column — through both paths", ()
     );
   });
 
-  it("2. SRD content authors the same shape — and it is 19 records, not a lone one", () => {
+  it("2. SRD content authors the same shape: and it is 19 records, not a lone one", () => {
     const library = new ContentLibrary().forAudience("gm");
     const rage = library.classRecord(RAGES.classId)?.features.find((entry) => entry.id === RAGES.featureId);
     expect(rage?.uses).toEqual({ scaling: { type: "class-resource", id: RAGES.resourceId }, per: "long-rest" });
@@ -1215,11 +1215,11 @@ describe("uses read off the class table's own column — through both paths", ()
 /* ---------------- `recharge`: the d6 at the start of the creature's turn ------ */
 
 /**
- * `ActionUsesSchema.per: "recharge"` with its threshold, the "(Recharge 5–6)" on breath weapons.
+ * `ActionUsesSchema.per: "recharge"` with its threshold, the "(Recharge 5-6)" on breath weapons.
  * `encounter.ts` rolls a d6 at the start of the owner's turn, re-arms on a roll at or above the
  * threshold and narrates both outcomes; `rests.ts` clears recharge pools on a short rest.
  *
- * The control is on the action's `uses`, not the record-level `FeatureUsesSchema`: an item's record
+ * The control is on the action's `uses`, outside the record-level `FeatureUsesSchema`: an item's record
  * uses are not read, and a feature's are folded into actions without a threshold, which would make
  * the bearer unbuildable.
  *
@@ -1278,7 +1278,7 @@ function authoredDrake(): Draft {
 
 const srdAnkheg = (): ActorDefinition => {
   const definition = new ContentLibrary().forAudience("gm").monster(RECHARGE.monsterId);
-  if (!definition) throw new Error("The SRD bundle no longer ships an Ankheg — this fixture needs a new carrier.");
+  if (!definition) throw new Error("The SRD bundle no longer ships an Ankheg: this fixture needs a new carrier.");
   return definition;
 };
 
@@ -1362,7 +1362,7 @@ function spendThenRecharge(definition: ActorDefinition, actionId: string) {
   return { actionName: action.name, spent, short, stillSpent, hit, armed };
 }
 
-describe("a recharging action — through both paths", () => {
+describe("a recharging action: through both paths", () => {
   it("1. the editor can author it: `per: recharge` and its threshold go through real controls, and the body publishes", () => {
     const draft = authoredDrake();
     const verdict = publishVerdict("monster", draft, RECORD_ID);
@@ -1375,11 +1375,11 @@ describe("a recharging action — through both paths", () => {
       uses: { limit: 1, per: "recharge", recharge: RECHARGE.threshold }
     });
 
-    // An action's control on every carrier, not the record-level `uses` (no `recharge` key there).
+    // An action's control on every carrier, outside the record-level `uses` (no `recharge` key there).
     for (const type of ["monster", "equipment", "class"] as const) {
       expect(hasControl(type, "uses.recharge", ["actions"]), type).toBe(true);
     }
-    expect(hasControl("equipment", "uses.recharge")).toBe(true); // reachable — inside an action row
+    expect(hasControl("equipment", "uses.recharge")).toBe(true); // reachable: inside an action row
     expect(fieldsWithin("equipment", ["uses"]).some((field) => field.key === "uses.recharge")).toBe(false);
   });
 
@@ -1411,7 +1411,7 @@ describe("a recharging action — through both paths", () => {
     expect(verdict.why).toContain("Recharge uses need the d6 threshold");
   });
 
-  it("2. SRD content authors the same shape — and it is 86 records, not a lone one", () => {
+  it("2. SRD content authors the same shape: and it is 86 records, not a lone one", () => {
     const spray = srdAnkheg().actions.find((entry) => entry.id === RECHARGE.srdActionId);
     expect(spray?.uses).toEqual({ limit: 1, per: "recharge", recharge: RECHARGE.threshold });
 
@@ -1585,7 +1585,7 @@ function initiateSheet(
   );
 }
 
-describe("several picks on one record (`choices`) — through both paths", () => {
+describe("several picks on one record (`choices`): through both paths", () => {
   it("1. the editor can author it: two blocks through the block's own controls, spelled canonically", () => {
     const draft = authoredTwinFeat();
     const verdict = publishVerdict("feat", draft, SEVERAL.hbFeatId);
@@ -1623,7 +1623,7 @@ describe("several picks on one record (`choices`) — through both paths", () =>
     expect("choices" in off).toBe(false);
   });
 
-  it("2. SRD content authors the same shape — three records, every one a Magic Initiate", () => {
+  it("2. SRD content authors the same shape: three records, every one a Magic Initiate", () => {
     const library = new ContentLibrary().forAudience("gm");
     const carriers = library
       .featSummaries()
@@ -1647,7 +1647,7 @@ describe("several picks on one record (`choices`) — through both paths", () =>
     });
   });
 
-  it("3. one assertion body over both: every pick — the second included — is a spell on the sheet", () => {
+  it("3. one assertion body over both: every pick: the second included: is a spell on the sheet", () => {
     const paths: ReadonlyArray<readonly [string, ActorDefinition, ReadonlyArray<{ kind: string; id: string }>]> = [
       [
         "SRD content",
@@ -1825,7 +1825,7 @@ const capacityOf = (
     (offer) => offer.key === key
   )?.capacity;
 
-describe("a budget raised past the printed row (`extraPicks`) — through both paths", () => {
+describe("a budget raised past the printed row (`extraPicks`): through both paths", () => {
   it("1. the editor can author it: offer, amount and the column rule go through real controls, exactly one of the pair stored", () => {
     const draft = authoredLoreFeat();
     const verdict = publishVerdict("feat", draft, RAISED.featId);
@@ -1894,7 +1894,7 @@ describe("a budget raised past the printed row (`extraPicks`) — through both p
     expect(option).toMatchObject({ name: "Thaumaturge", extraPicks: [{ offer: "class-cantrips", amount: 1 }] });
   });
 
-  it("2. SRD content authors the same shape — 8 grants, 6 on features and 2 on inline options", () => {
+  it("2. SRD content authors the same shape: 8 grants, 6 on features and 2 on inline options", () => {
     const library = new ContentLibrary().forAudience("gm");
     const carriers: Array<{ id: string; grant: Record<string, unknown> }> = [];
     const walk = (node: unknown) => {
@@ -2188,7 +2188,7 @@ function reopen(
   return { built: definition.damageResistances, offers, after };
 }
 
-describe("a settled pick the character may re-make (`replaces`) — through both paths", () => {
+describe("a settled pick the character may re-make (`replaces`): through both paths", () => {
   it("1. the editor can author it: the clause goes through real controls, and the record publishes", () => {
     const draft = authoredEmberkin();
     const verdict = publishVerdict("species", draft, REOPENED.speciesId);
@@ -2198,7 +2198,7 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     const body = storedBody("species", draft, REOPENED.speciesId) as { traits: Array<Record<string, unknown>> };
     // Fiendish Resilience's shape: `when` seeded by the row, `offer` typed.
     expect(body.traits[0].replaces).toEqual([{ offer: REOPENED.offer, when: "short-rest", amount: 1 }]);
-    // No rows means no key; an empty list is dropped rather than shipped as `[]`.
+    // No rows means no key; an empty list is dropped and never shipped as `[]`.
     const noRows = storedBody("species", authoredEmberkin(false), REOPENED.speciesId) as {
       traits: Array<Record<string, unknown>>;
     };
@@ -2231,14 +2231,14 @@ describe("a settled pick the character may re-make (`replaces`) — through both
     ] as const) {
       expect(gate(type, within)?.visibleWhen?.({}, blankDraft(type)), `${type} shows "Supersedes"`).toBe(false);
     }
-    // A feature naming itself would delete itself; `options` gets the record, not the row, so
+    // A feature naming itself would delete itself; `options` gets the record and never the row, so
     // `validate` names it.
     const field = gate("class", ["features"])!;
     expect(field.validate?.("f1", { id: "f1" }, EMPTY_CONTEXT)).toContain("cannot supersede itself");
     expect(field.validate?.("f1", { id: "f2" }, EMPTY_CONTEXT)).toBeNull();
   });
 
-  it("2. SRD content authors the same shape — 2 replaceable picks and 7 superseding features", () => {
+  it("2. SRD content authors the same shape: 2 replaceable picks and 7 superseding features", () => {
     const library = new ContentLibrary().forAudience("gm");
     const clauses: Array<{ id: string; clause: Record<string, unknown> }> = [];
     const supersedes: Array<{ id: string; replaced: string }> = [];
@@ -2666,8 +2666,8 @@ const arcanumWarlock = (arcanum: string): CharacterCreateRequestInput =>
     ]
   }) as CharacterCreateRequestInput;
 
-describe("the spell window and the ASI ceiling — through both paths", () => {
-  it("1. the editor can author all three numbers, and on any block — not only the first", () => {
+describe("the spell window and the ASI ceiling: through both paths", () => {
+  it("1. the editor can author all three numbers, and on any block: not only the first", () => {
     const draft = authoredMystery({ min: WINDOW.authoredFloor });
     expect(publishVerdict("feat", draft, WINDOW.featId).why).toBe("");
     const body = storedBody("feat", draft, WINDOW.featId) as { feature: { choice?: Record<string, unknown> } };
@@ -2681,7 +2681,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
       expect(hasControl("feat", `choice.${key}`, ["feature"]), `feat: feature > choice.${key}`).toBe(true);
     }
 
-    // Every block, not just block 0 (Magic Initiate's shape: cantrips at 0, the spell at 1).
+    // Every block, beyond block 0 (Magic Initiate's shape: cantrips at 0, the spell at 1).
     const initiate = ((): Draft => {
       const cantrips = authoredRow(
         "feat",
@@ -2745,7 +2745,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
     expect(upsideDown.why).toContain("minSpellLevel 6 is above maxSpellLevel 2");
   });
 
-  it("2. SRD content authors the same shapes — 17 ceilings, 11 floors, 7 epic boons", () => {
+  it("2. SRD content authors the same shapes: 17 ceilings, 11 floors, 7 epic boons", () => {
     const library = new ContentLibrary().forAudience("gm");
     const found: Array<{
       id: string;
@@ -2888,7 +2888,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
       expect(definition.abilityScores[WINDOW.raised], label).toBe(WINDOW.withCeiling);
     }
 
-    // Negative control: no ceiling, so 20 holds and the pick past it is refused rather than lost.
+    // Negative control: no ceiling, so 20 holds and the pick past it is refused and kept.
     expect(() =>
       buildCharacterDefinition(
         boonMonk(WINDOW.boonFeatId, WINDOW.boonFeatureId),
@@ -2907,7 +2907,7 @@ describe("the spell window and the ASI ceiling — through both paths", () => {
  * `resolvePickChoice`.
  *
  * Proved by contrast: one ledger answers the three predicates three ways, and Sacred Flame (a
- * damaging cantrip from Magic Initiate, not a Warlock cantrip) is in none of them. `resolvePickChoice`
+ * damaging cantrip from Magic Initiate, where the class gives Warlock cantrips) is in none of them. `resolvePickChoice`
  * also looks up spell levels, so an authored floor over `fromPicks` really refuses.
  */
 const LEDGER = {
@@ -2917,7 +2917,7 @@ const LEDGER = {
   dealsDamage: ["chill-touch", "eldritch-blast", "true-strike"],
   attackRoll: ["chill-touch", "eldritch-blast"],
   ranged: ["eldritch-blast"],
-  /** A damaging cantrip from Magic Initiate, not the class, so no invocation may target it. */
+  /** A damaging cantrip from Magic Initiate, outside the class, so no invocation may target it. */
   otherSource: "sacred-flame",
   /** The three SRD invocations and the predicate each asks. */
   srdOffers: [
@@ -3040,14 +3040,14 @@ const blastWarlock = (featId?: string, cantrips: readonly string[] = LEDGER.cant
 /** One offer's option ids from the server's computation, sorted (membership is what matters). */
 function offeredIds(survey: ReturnType<typeof computeServerOffers>, key: string): readonly string[] {
   const offer = survey.offers.find((candidate) => candidate.key === key);
-  if (!offer) throw new Error(`No offer "${key}" in this build — the fixture no longer asks that question.`);
+  if (!offer) throw new Error(`No offer "${key}" in this build: the fixture no longer asks that question.`);
   return [...offer.options].sort();
 }
 
 const surveyOf = (input: CharacterCreateRequestInput, view: ReturnType<ContentLibrary["forAudience"]>) =>
   computeServerOffers(input, view, BuilderPolicySchema.parse({}));
 
-describe("a pick over the character's own earlier answers (`fromPicks`) — through both paths", () => {
+describe("a pick over the character's own earlier answers (`fromPicks`): through both paths", () => {
   it("1. the editor can author it: the budget and the predicate go through real controls, and it excludes the other three sources", () => {
     const draft = authoredBorrowedBlast({ where: "attack-roll" });
     const verdict = publishVerdict("feat", draft, LEDGER.featId);
@@ -3079,11 +3079,11 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     for (const key of ["choice.fromPicks", "choice.fromPicks.offer", "choice.fromPicks.where"]) {
       expect(hasControl("feat", key, ["feature"]), `feat: feature > ${key}`).toBe(true);
     }
-    // Group children are re-aliased, not leaked: `fromPicks.offer` at feature scope would write a key
+    // Group children are re-aliased and never leaked: `fromPicks.offer` at feature scope would write a key
     // no reader reads.
     expect(hasControl("feat", "fromPicks.offer", ["feature"])).toBe(false);
 
-    // Every block, not just block 0.
+    // Every block, beyond block 0.
     const twinned = ((): Draft => {
       const first = authoredRow(
         "feat",
@@ -3139,7 +3139,7 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     expect(optionValues(whereField)).toEqual(["deals-damage", "attack-roll", "ranged", "ranged-damage"]);
   });
 
-  it("2. SRD content authors the same shape — three invocations, three predicates, one budget", () => {
+  it("2. SRD content authors the same shape: three invocations, three predicates, one budget", () => {
     const library = new ContentLibrary().forAudience("gm");
     const found: Array<{ id: string; source: Record<string, unknown> }> = [];
     const walk = (node: unknown, owner: string) => {
@@ -3211,7 +3211,7 @@ describe("a pick over the character's own earlier answers (`fromPicks`) — thro
     expect(offeredIds(typed, `feature:${LEDGER.featureId}`)).toEqual(["guidance", "light"]);
   });
 
-  it("4. the editor end can finally prove a SPELL LEVEL — the hole the census measured and left open", () => {
+  it("4. the editor end can finally prove a SPELL LEVEL: the hole the census measured and left open", () => {
     /** Spell bounds compare against `optionLevels`. A typed `from` list has none, but
         `resolvePickChoice` looks every answer up in the spell catalog, so a window over `fromPicks`
         really applies from the editor end. */
@@ -3455,7 +3455,7 @@ const survivorsOf = (survey: ReturnType<typeof computeServerOffers>, parentId: s
     .map((entry) => entry.record.id)
     .sort();
 
-describe("an option gated on an earlier answer (`requires`) — through both paths", () => {
+describe("an option gated on an earlier answer (`requires`): through both paths", () => {
   it("1. the editor can author it: the gate goes through real controls on the OPTION row", () => {
     const draft = authoredEchokin();
     const verdict = publishVerdict("species", draft, GATED.speciesId);
@@ -3498,7 +3498,7 @@ describe("an option gated on an earlier answer (`requires`) — through both pat
     expect([...suggested].sort()).toEqual(["ember-ward", "emberborn", "frost-ward", "frostborn"]);
   });
 
-  it("2. SRD content authors the same shape — 26 gated options over 7 features", () => {
+  it("2. SRD content authors the same shape: 26 gated options over 7 features", () => {
     const library = new ContentLibrary().forAudience("gm");
     const gates: Array<{ owner: string; option: string; offer: string; id: string }> = [];
     // Track the owner explicitly: the last non-option object with an id (choice blocks have none).
@@ -3735,13 +3735,13 @@ describe("the guard itself refuses what the editor cannot author", () => {
     expect(hasControl("feat", "requires", ["feature", "choice.options"])).toBe(true);
   });
 
-  it("a row scope is looked up in the ROW's own fields, not the whole form's", () => {
+  it("a row scope is looked up in the ROW's own fields alone", () => {
     // An action row has no `modifiers` of its own; a flat lookup would resolve it against the
     // record's `modifiersField` and falsely pass.
     expect(hasControl("equipment", "modifiers")).toBe(true);
     expect(hasControl("equipment", "modifiers", ["actions"])).toBe(false);
     expect(() => applyField("equipment", {}, "modifiers", [], ["actions"])).toThrow(
-      'No field "modifiers" in the equipment form (actions row) — the test is addressing a field that does not exist.'
+      'No field "modifiers" in the equipment form (actions row). The test is addressing a field that does not exist.'
     );
   });
 
@@ -3787,7 +3787,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
       ["monster", "damageVulnerabilities"]
     ];
     for (const [type, key] of recordSites) {
-      expect(hasControl(type, key), `${type}.${key} — the GM has no way to say it`).toBe(true);
+      expect(hasControl(type, key), `${type}.${key}: the GM has no way to say it`).toBe(true);
     }
 
     const carriers = (Object.keys(SCHEMAS) as HomebrewType[]).filter((type) => riderScopeOf(type) !== null);
@@ -3796,9 +3796,9 @@ describe("the guard itself refuses what the editor cannot author", () => {
       expect(hasControl(type, "type", ["actions", "damage"]), `${type}: actions > damage > type`).toBe(true);
     }
 
-    // A stat block has no record-level `modifiersField`, so this is six carriers, not seven.
+    // A stat block has no record-level `modifiersField`, so this is six carriers, one short of seven.
     const riderSites: ReadonlyArray<readonly [string, readonly string[]]> = [
-      ["damageType", ["modifiers"]], // the `extra-damage` rider — the mace's +1d6 lightning
+      ["damageType", ["modifiers"]], // the `extra-damage` rider: the mace's +1d6 lightning
       ["damageTypes", ["modifiers", "when"]] // the `damage-type-is` gate
     ];
     for (const type of carriers.filter((entry) => entry !== "monster")) {

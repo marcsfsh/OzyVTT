@@ -1,6 +1,6 @@
 /**
  * The feature panel's offer boxes (`choice.kind`, `extraPicks[].offer`, `replaces[].offer`,
- * `fromPicks.offer`) are visible choosers, not datalists; the `requires` pair is in
+ * `fromPicks.offer`) are visible choosers, with no datalists; the `requires` pair is in
  * `option-row.test.tsx`. Also checks the `<namespace>:<slug>` round trip: the list reads
  * "Feature: Echoed Ward" and the body stores `feature:echoed-ward`, whether tapped or typed.
  *
@@ -101,7 +101,7 @@ function mount(seed: Draft = WARD_FEAT) {
   };
 }
 
-describe("choice.kind — the reserved kinds are on screen, and a homebrew kind still lands", () => {
+describe("choice.kind: the reserved kinds are on screen, and a homebrew kind still lands", () => {
   /** The seeded block already holds a kind, so changing it starts by clearing the chip, which runs
       the field's own `write` via `setEmpty`. */
   const emptied = async () => {
@@ -131,7 +131,7 @@ describe("choice.kind — the reserved kinds are on screen, and a homebrew kind 
     ]);
   });
 
-  it("picking “Fighting Style” writes the slug the engine matches on", async () => {
+  it('picking "Fighting Style" writes the slug the engine matches on', async () => {
     const form = await emptied();
     await form.user.click(form.box("What kind of choice"));
     await form.user.click(screen.getByRole("option", { name: "Fighting Style" }));
@@ -140,15 +140,15 @@ describe("choice.kind — the reserved kinds are on screen, and a homebrew kind 
     expect(screen.getByText("Fighting Style")).toBeInTheDocument();
   });
 
-  it("typing “echo ward” writes “echo-ward” — `FeatureChoiceSchema.kind` is an OPEN slug", async () => {
+  it('typing "echo ward" writes "echo-ward": `FeatureChoiceSchema.kind` is an OPEN slug', async () => {
     const form = await emptied();
-    // A homebrew kind must still be typeable: `pick` on text, not a closed select.
+    // A homebrew kind must still be typeable: `pick` on text, and no closed select.
     await form.user.type(form.box("What kind of choice"), "echo ward{Enter}");
     expect(form.choice().kind).toBe("echo-ward");
   });
 });
 
-describe("the three offer boxes — one namespace, opened rather than spelled", () => {
+describe("the three offer boxes: one namespace, opened as a list and never spelled", () => {
   it("extraPicks: a budget is TAPPED, and the colon survives the round trip", async () => {
     const form = mount();
     await form.user.click(screen.getByRole("button", { name: "Add an extra pick" }));
@@ -180,7 +180,7 @@ describe("the three offer boxes — one namespace, opened rather than spelled", 
     await form.user.type(form.box("Which pick"), "feature: my ward{Enter}");
     expect(form.feature().replaces).toEqual([{ offer: "feature:my-ward", when: "long-rest", amount: 1 }]);
     expect(
-      screen.queryByText("Write it as an offer key — lowercase-with-dashes, or feature:<a-feature-id>.")
+      screen.queryByText("Write it as an offer key: lowercase-with-dashes, or feature:<a-feature-id>.")
     ).toBeNull();
   });
 
