@@ -1453,6 +1453,51 @@ describe("Barbarian: Rage lasts while it is fed, and stops spells and Concentrat
     expect(raging(built)).toBeUndefined();
   });
 
+  it("is extended for 10 minutes at most, a re-declared Rage keeping the round it began", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    use(built, "rage");
+    const began = raging(built)!.startedRound;
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state);
+    use(built, "rage"); // a Bonus Action re-declaring it
+    expect(raging(built)!.startedRound).toBe(began);
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state);
+    // Ninety-nine rounds after it began, an attack no longer carries it on.
+    built.state.combat = { ...built.state.combat, round: began + 99 };
+    const swung = use(built, "item-greataxe", [IDS.foe], [3, 8]);
+    expect(swung.warnings).toContain("Ozar's Rage has lasted 10 minutes, so it isn't extended.");
+    nextInitiativeTurn(built.state);
+    expect(raging(built)).toBeUndefined();
+  });
+
+  it("lasts 10 minutes outright under Persistent Rage, and only Unconscious ends it early", () => {
+    const built = onTheTable(build(barbarianInput(20)));
+    use(built, "rage");
+    expect(raging(built)).toMatchObject({
+      duration: { type: "rounds", remaining: 100 },
+      tags: ["raging", "persistent-rage"]
+    });
+    // A round with no attack: it holds.
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state);
+    expect(raging(built)).toBeDefined();
+    setCondition(built.state, IDS.hero, "stunned", true, undefined, { role: "gm" });
+    expect(raging(built)).toBeDefined();
+    setCondition(built.state, IDS.hero, "unconscious", true, undefined, { role: "gm" });
+    expect(raging(built)).toBeUndefined();
+  });
+
+  it("regains every expended Rage with Persistent Rage", () => {
+    const built = onTheTable(build(barbarianInput(20)));
+    built.hero.actionUses = { rage: 4 };
+    const used = use(built, "persistent-rage");
+    expect(built.hero.actionUses.rage).toBeUndefined();
+    expect(used.warnings).toContain("Ozar regains every expended use of Rage.");
+    expect(built.hero.actionUses["persistent-rage"]).toBe(1);
+  });
+
   it("ends the Barbarian's Concentration, and refuses a spell while it lasts", () => {
     const built = onTheTable(build(barbarianInput(5)));
     addEffect(

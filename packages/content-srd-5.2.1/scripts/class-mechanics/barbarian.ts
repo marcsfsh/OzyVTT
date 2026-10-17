@@ -8,7 +8,7 @@ export const barbarian: ClassMechanicsModule = {
      * Rage's gate read, and what the engine's Rage rules key on: it lasts until the end of the Barbarian's next
      * turn, each attack roll or forced save extends it (so does re-declaring it as a Bonus Action, for no use),
      * and Incapacitation or Heavy armor ends it. Rage Damage reads the second column at build (`grantScaling`) onto
-     * the damage bonus of attacks using Strength. The 10-minute cap and Persistent Rage's longer form stay prose.
+     * the damage bonus of attacks using Strength. The engine holds the 10-minute cap, and Persistent Rage's form.
      */
     rage: {
       uses: { scaling: { type: "class-resource", id: "rage" }, per: "long-rest" },
@@ -116,7 +116,8 @@ export const barbarian: ClassMechanicsModule = {
     "feral-instinct": {
       modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }]
     },
-    // The once-per-Long-Rest permission only; refilling Rage uses is done by hand.
+    // Once per Long Rest; using it regains every expended Rage. The engine reads the feature by its id for the Rage
+    // that lasts 10 minutes outright and ends early only on Unconscious.
     "persistent-rage": {
       uses: { limit: 1, per: "long-rest" }
     },

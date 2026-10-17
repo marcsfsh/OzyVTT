@@ -27,6 +27,10 @@ const MAX_EFFECTS = 20;
 export const CONCENTRATING_TAG = "concentrating";
 /** The Barbarian's Rage: it ends early on Incapacitated or in Heavy armor, and blocks spells and Concentration. */
 export const RAGING_TAG = "raging";
+/** A Rage under Persistent Rage: 10 minutes with nothing to extend it, ended early by Unconscious alone. */
+export const PERSISTENT_RAGE_TAG = "persistent-rage";
+/** SRD Rage: "You can maintain a Rage for up to 10 minutes", in rounds. */
+export const RAGE_ROUNDS = 100;
 /** A creature knocked out at 1 HP; it wakes when it regains any hit points. */
 export const KNOCKED_OUT_TAG = "knocked-out";
 /** The Ready action's held response, taken with the Reaction when its trigger comes. */
@@ -180,8 +184,10 @@ export function conditionGained(
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
+    // Persistent Rage ends early only on Unconscious.
     for (const rage of actor.effects.filter((effect) => effect.tags.includes(RAGING_TAG)))
-      endEffectInternal(state, actor, rage.id, events);
+      if (!rage.tags.includes(PERSISTENT_RAGE_TAG) || conditionId === "unconscious")
+        endEffectInternal(state, actor, rage.id, events);
   }
   if (conditionId === "exhaustion" && previousExhaustion < 6 && exhaustionLevel(actor) >= 6)
     events.push(...applyExhaustionDeath(state, actor));
