@@ -34,6 +34,7 @@ import { zoneRowOf } from "../spell-zones.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
 import { applyLooseHealing, looseHealTargets } from "../loose-healing.js";
+import { countOptionUse } from "../option-uses.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -236,6 +237,8 @@ export const actionCommands = [
             pushToken
           }
         );
+        // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
+        if (!resolution.preview) countOptionUse(draft, actorId, actionId);
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
@@ -408,6 +411,8 @@ export const actionCommands = [
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
+        // A use outside a fight counts toward the sheet's most-used options too; a refusal below undoes it.
+        countOptionUse(draft, actorId, actionId);
         // A heal lands on whoever it is given to, checked before anything is spent.
         const healTargets = action.healing
           ? looseHealTargets(draft, live, action, targetIds, initiator, spell, castLevel)

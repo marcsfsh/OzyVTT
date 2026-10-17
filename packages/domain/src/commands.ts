@@ -22,6 +22,8 @@ import {
   DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
+  MAX_FAVOURITE_OPTIONS,
+  OptionIdSchema,
   ProficienciesSchema
 } from "@vtt/schemas";
 import { MAX_SOUND_EFFECTS, MAX_SOUND_LAYERS, MAX_SOUND_TRACKS, SoundVolumeSchema } from "./sound.js";
@@ -1200,6 +1202,18 @@ export const CharacterGiveItemSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The options a character pins to the sheet's turn card, in order. An empty list clears them. */
+export const CharacterSetFavouritesSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    optionIds: z
+      .array(OptionIdSchema)
+      .max(MAX_FAVOURITE_OPTIONS, `Pin at most ${MAX_FAVOURITE_OPTIONS} options.`)
+      .refine((ids) => new Set(ids).size === ids.length, "Each option may be pinned once."),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

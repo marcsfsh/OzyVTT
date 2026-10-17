@@ -87,6 +87,7 @@ import type {
   CharacterRebuildSchema,
   CharacterResolveImportSchema,
   CharacterSetCurrencySchema,
+  CharacterSetFavouritesSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
@@ -620,6 +621,11 @@ export interface ClientToServerEvents {
   ) => void;
   "character:set-currency": (
     payload: CommandPayload<typeof CharacterSetCurrencySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Pin options to the sheet's turn card. The GM for anyone; a player for their own claimed character. */
+  "character:set-favourites": (
+    payload: CommandPayload<typeof CharacterSetFavouritesSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   // `classes[].hitDie` lets an identity edit rebuild the multiclass hit-dice pool (Fighter 3 / Wizard 2 is 3d10 + 2d6).
