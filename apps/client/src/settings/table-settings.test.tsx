@@ -65,6 +65,13 @@ describe("the rules assistant's checks", () => {
       screen.getByText("The rules assistant is Off, so it checks nothing. Choose Enforce or Advise.")
     ).toBeTruthy();
   });
+
+  it("explains each setting of the dial in a sentence", () => {
+    renderSettings(gmView());
+    expect(screen.getByText("Enforce blocks an illegal move until you allow it.")).toBeTruthy();
+    expect(screen.getByText("Advise allows every move and leaves a note on an illegal one.")).toBeTruthy();
+    expect(screen.getByText("Off checks nothing and shows no prompts.")).toBeTruthy();
+  });
 });
 
 describe("one name for one setting", () => {

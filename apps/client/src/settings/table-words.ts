@@ -7,13 +7,13 @@ import type { RuleMode } from "@vtt/domain";
  * API speak it, so renaming it would be a breaking change.
  */
 export const DIAL_COPY: ReadonlyArray<Readonly<{ value: RuleMode; label: string; help: string }>> = [
-  { value: "strict", label: "Enforce", help: "blocks illegal moves, which you can allow" },
-  { value: "assisted", label: "Advise", help: "allows everything and leaves notes" },
-  { value: "freeform", label: "Off", help: "no checks and no prompts" }
+  { value: "strict", label: "Enforce", help: "Enforce blocks an illegal move until you allow it." },
+  { value: "assisted", label: "Advise", help: "Advise allows every move and leaves a note on an illegal one." },
+  { value: "freeform", label: "Off", help: "Off checks nothing and shows no prompts." }
 ];
 export const dialLabel = (mode: RuleMode) => DIAL_COPY.find((entry) => entry.value === mode)?.label ?? mode;
-/** "Enforce · blocks illegal moves, which you can allow", for a list of the three. */
-export const dialLine = (entry: (typeof DIAL_COPY)[number]) => `${entry.label} · ${entry.help}`;
+/** One setting's help, a sentence that starts with its name, for a list of the three. */
+export const dialLine = (entry: (typeof DIAL_COPY)[number]) => entry.help;
 
 /** Whether a player's hit waits for the GM's Apply. */
 export const PLAYER_HITS = {
