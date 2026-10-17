@@ -34,7 +34,7 @@ import { sliceReplacing, type HomebrewAuthoredIndex, type HomebrewBody, type Hom
  */
 
 export type HomebrewValidationContext = Readonly<{
-  /** The merged GM catalog - already spell-list-overlaid, so `spellSummaries()` carries real membership. */
+  /** The merged GM catalog: already spell-list-overlaid, so `spellSummaries()` carries real membership. */
   catalog: ContentView;
   /** Published spell-list overlays, so a list under validation resolves in the graph it will join. */
   spellLists: readonly SpellListReference[];
@@ -369,7 +369,7 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
       `This creature's content id ("${definition.source.externalId ?? "missing"}") disagrees with its record id ("${id}"); its live tokens would resolve to nothing.`
     );
   }
-  // Uses the bestiary's own `statblockFacts`, so the guard cannot pass what the list would show as "CR 0 - unknown".
+  // Uses the bestiary's own `statblockFacts`, so the guard cannot pass what the list would show as "CR 0 unknown".
   const facts = statblockFacts(definition);
   if (facts.challengeRating === null)
     checks.add(

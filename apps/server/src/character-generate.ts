@@ -30,7 +30,7 @@ import { CommandRejectedError } from "./game-store.js";
  *  drawn through the injected `random` (server dice; a seed reproduces a character). Picks come from
  *  `computeServerOffers`, recomputed after every answer since answers can create new picks. */
 
-/** A die roll, 1..sides - the shape of `CommandContext.random`. */
+/** A die roll, 1..sides: the shape of `CommandContext.random`. */
 export type DiceRandom = (sides: number) => number;
 
 export type GenerateCharacterInput = Readonly<{

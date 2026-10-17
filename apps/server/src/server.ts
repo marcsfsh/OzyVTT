@@ -374,7 +374,7 @@ export function createServer(options: CreateServerOptions) {
       if (projected) socket.emit("log:entry", projected);
     }
   }
-  /** "Round 3 - Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
+  /** "Round 3 · Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
    *  GM-only (its name would otherwise leak). */
   function logTurnBegin(state: GameState) {
     if (state.combat.turnActorId === null) return;

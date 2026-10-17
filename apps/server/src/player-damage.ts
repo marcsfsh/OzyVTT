@@ -178,7 +178,7 @@ export function resolvePendingDamage(
   deps: PlayerDamageDeps
 ): AppliedDamage | null {
   const proposal = state.combat.pendingDamage.find((entry) => entry.id === proposalId);
-  if (!proposal) return null; // already resolved or dismissed - idempotent retry
+  if (!proposal) return null; // already resolved or dismissed: idempotent retry
   let applied: AppliedDamage | null = null;
   if (apply) {
     const label = `${proposal.sourceName}'s ${proposal.actionName}`;

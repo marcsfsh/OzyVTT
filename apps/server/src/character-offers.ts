@@ -291,7 +291,7 @@ export function levelGatesFit(
   return true;
 }
 
-/** The level a pick at index `index` of this offer belongs to - see `ChoiceOffer.levels`. */
+/** The level a pick at index `index` of this offer belongs to: see `ChoiceOffer.levels`. */
 export function levelOfPick(offer: Pick<ChoiceOffer, "levels" | "capacity">, index: number): number {
   const perGrant = Math.max(1, Math.ceil(offer.capacity / Math.max(1, offer.levels.length)));
   return offer.levels[Math.min(offer.levels.length - 1, Math.floor(index / perGrant))] ?? 1;
@@ -713,7 +713,7 @@ function placeChoices(
     ? (library.featRecord(background.originFeatId) ??
       reject(`${background.name} grants unknown feat "${background.originFeatId}".`))
     : null;
-  // Every feat this character already holds, granted or chosen - the cross-offer duplicate guard in pass A.
+  // Every feat this character already holds, granted or chosen: the cross-offer duplicate guard in pass A.
   const heldFeatIds = new Set<string>(originFeat ? [originFeat.id] : []);
   // `origin` becomes `definition.character.features` (how roll-time riders reach the table); null means
   // already on `character.feats`. `site` is where the feature's picks sit in the wizard; a class feature's sits at

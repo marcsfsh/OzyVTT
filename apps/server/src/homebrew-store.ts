@@ -96,7 +96,7 @@ export type HomebrewRevisionRow = Readonly<{
   authorTag: string;
 }>;
 
-/** Thrown when a write's `expectedRev` does not match the stored row - the editor's copy is stale. */
+/** Thrown when a write's `expectedRev` does not match the stored row: the editor's copy is stale. */
 export class HomebrewRevisionConflictError extends Error {
   constructor(
     message: string,
@@ -222,7 +222,7 @@ export class HomebrewStore implements HomebrewContentSource {
     this.authored = undefined;
   }
 
-  /** The coarse counter bumped inside every write transaction - drives `homebrew:changed` and the view cache. */
+  /** The coarse counter bumped inside every write transaction: drives `homebrew:changed` and the view cache. */
   get revision(): number {
     return this.revisionValue;
   }
@@ -776,7 +776,7 @@ function withActionProseFacts(node: unknown): unknown {
   return isAction ? withProseFacts(filled as unknown as ActorAction) : filled;
 }
 
-/** The slice under construction - the same nine keys as `HomebrewCatalogSlice`, mutable while filling. */
+/** The slice under construction: the same nine keys as `HomebrewCatalogSlice`, mutable while filling. */
 type DraftSlice = {
   classes: ClassReference[];
   subclasses: SubclassReference[];

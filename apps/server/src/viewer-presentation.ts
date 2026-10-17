@@ -25,7 +25,7 @@ export type ViewerInitiativeEntry = Readonly<{
   name: string;
   initiative: number;
   active: boolean;
-  /** Coarse band only - exact hit points never reach the shared screen. */
+  /** Coarse band only: exact hit points never reach the shared screen. */
   health: "healthy" | "bloodied" | "down";
   /** Display labels ("Prone", "Exhaustion 3") for public combatants. */
   conditions: readonly string[];

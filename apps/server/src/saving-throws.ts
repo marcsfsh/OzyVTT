@@ -920,7 +920,7 @@ export function answerSave(
   };
 }
 
-/** Drop a pending save without resolving it (GM housekeeping - e.g. the effect ended). */
+/** Drop a pending save without resolving it (GM housekeeping, e.g. the effect ended). */
 export function dismissSave(state: GameState, saveId: string, scope: Initiator) {
   requireGm(scope, "Only the GM can dismiss a saving throw.");
   if (!state.combat.pendingSaves.some((entry) => entry.id === saveId))

@@ -67,7 +67,7 @@ export function assertMintable(id: string, type: HomebrewContentType): string {
   return id;
 }
 
-/** `hb-m-<12hex>` exactly - the opaque shape a monster id must have. */
+/** `hb-m-<12hex>` exactly: the opaque shape a monster id must have. */
 function isOpaqueMonsterId(id: string): boolean {
   if (!id.startsWith(MONSTER_PREFIX)) return false;
   const rest = id.slice(MONSTER_PREFIX.length);

@@ -306,7 +306,7 @@ export function startEncounter(
 
 /**
  * The GM takes a combatant out of a running fight (it fled, was dismissed, or lies dead and is in the way): its
- * initiative entry, token and prompts go, and what it sustains ends - its grapples and Concentration, what lasts only
+ * initiative entry, token and prompts go, and what it sustains ends: its grapples and Concentration, what lasts only
  * until its next turn, and a creature it swallowed climbs out. The caller advances the turn first when it is this
  * combatant's (so the history records the boundary).
  */

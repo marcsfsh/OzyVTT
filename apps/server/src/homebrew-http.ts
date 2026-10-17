@@ -177,7 +177,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     return sendData(response, status, { record: documentOf(row) });
   };
 
-  /** The `type` discriminator is read off the submitted record - the same place the pack format keeps it. */
+  /** The `type` discriminator is read off the submitted record: the same place the pack format keeps it. */
   function typeOf(record: Record<string, unknown>): HomebrewContentType {
     const parsed = HomebrewContentTypeSchema.safeParse(record.type);
     if (!parsed.success)

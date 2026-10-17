@@ -543,7 +543,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
   };
 }
 
-/** Drop a reaction prompt without applying its damage (GM housekeeping - e.g. the damage was applied manually). */
+/** Drop a reaction prompt without applying its damage (GM housekeeping, e.g. the damage was applied manually). */
 export function dismissReaction(state: GameState, reactionId: string, scope: Initiator) {
   requireGm(scope, "Only the GM can dismiss a reaction prompt.");
   if (!state.combat.pendingReactions.some((entry) => entry.id === reactionId))

@@ -255,7 +255,7 @@ function successEffectFor(ctx: MagicalSource & Pick<ResolveContext, "castId">): 
   };
 }
 
-/** SRD Power Word Stun: a target over its hit-point gate isn't Stunned - "Otherwise, its Speed is 0 until the start
+/** SRD Power Word Stun: a target over its hit-point gate isn't Stunned. Instead, "Otherwise, its Speed is 0 until the start
  *  of your next turn". */
 const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"]);
 

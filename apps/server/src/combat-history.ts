@@ -59,7 +59,7 @@ export function timelineDirtied(before: GameState, after: GameState): boolean {
   return restorableSlice(before) !== restorableSlice(after);
 }
 
-/** "Round 3 - Borin" (the current actor at capture; labels are GM-only downstream). */
+/** "Round 3 · Borin" (the current actor at capture; labels are GM-only downstream). */
 export function turnLabel(state: GameState): string {
   const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "Unknown";
   return `Round ${state.combat.round} · ${name}`;

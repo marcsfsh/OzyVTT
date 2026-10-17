@@ -263,7 +263,7 @@ export function addEffect(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
   if (existing) return existing;
-  // SRD Concentration: one at a time - starting a new one ends the source's others. Effects of one cast share a
+  // SRD Concentration: one at a time, starting a new one ends the source's others. Effects of one cast share a
   // `castId` and are one Concentration.
   if (effect.concentration && effect.sourceActorId !== null) {
     const ended = endConcentrationSustainedBy(state, effect.sourceActorId, effect.castId);
@@ -598,7 +598,7 @@ export function expireEffectsAtTurnStart(state: GameState, incomingActorId: stri
 }
 
 /** Turn-boundary expiry when `outgoingActorId`'s turn ends: "until the end of its next turn" effects borne by it,
- *  and "until the end of your next turn" effects it is the source of, end - unless they began during this very turn,
+ *  and "until the end of your next turn" effects it is the source of, end, unless they began during this very turn,
  *  in which case the next one is theirs. Only actors in the current initiative. */
 export function expireEffectsAtTurnEnd(state: GameState, outgoingActorId: string): EffectNarration[] {
   const events: EffectNarration[] = [];

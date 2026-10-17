@@ -341,7 +341,7 @@ export const actorHealthCommands = [
         // The build reads this answer (the land's spells and Nature's Ward), so it goes into the ledger.
         if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
           throw new CommandRejectedError(`${match.label} is chosen after a rest. End the fight first.`);
-        // SRD: "Whenever you finish a Long Rest, choose" - a player makes it in the step that rest opens.
+        // SRD: "Whenever you finish a Long Rest, choose", a player makes it in the step that rest opens.
         if (initiator.role !== "gm" && match.per === "long-rest" && actor.preparation === null)
           throw new CommandRejectedError(`${actor.name} chooses ${match.label} again after finishing a Long Rest.`);
         rechooseInLedger(state, actorId, offer, id, {

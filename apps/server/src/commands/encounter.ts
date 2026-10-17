@@ -194,7 +194,7 @@ export const encounterCommands = [
           });
           endedTurnCount = document.turnCount;
         }
-        timeline.truncateAll(); // the fight is over - its live turn snapshots go with it
+        timeline.truncateAll(); // the fight is over: its live turn snapshots go with it
         timeline.clearJournal();
       });
       if (duplicate) return;
