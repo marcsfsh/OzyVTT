@@ -408,6 +408,10 @@
             "perUse": {
               "type": "boolean",
               "const": true
+            },
+            "toMaximum": {
+              "type": "boolean",
+              "const": true
             }
           },
           "required": [
@@ -430,11 +434,15 @@
         },
         "endsConditions": {
           "minItems": 1,
-          "maxItems": 4,
+          "maxItems": 6,
           "type": "array",
           "items": {
             "$ref": "#/$defs/__schema50"
           }
+        },
+        "endsOneCondition": {
+          "type": "boolean",
+          "const": true
         },
         "darts": {
           "type": "integer",
@@ -483,6 +491,36 @@
         "missDamage": {
           "type": "string",
           "const": "half"
+        },
+        "drain": {
+          "type": "object",
+          "properties": {
+            "damageType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "reducesMaximum": {
+              "type": "boolean",
+              "const": true
+            },
+            "keepsOneMaximum": {
+              "type": "boolean",
+              "const": true
+            },
+            "heals": {
+              "type": "string",
+              "enum": [
+                "all",
+                "half"
+              ]
+            },
+            "failedSaveOnly": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "additionalProperties": false
         },
         "targetRules": {
           "maxItems": 2,

@@ -113,3 +113,23 @@ describe("the condition Blindness/Deafness imposes", () => {
     expect(await lastResolve()).toMatchObject({ targetIds: [GOBLIN], conditionId: "deafened" });
   });
 });
+
+describe("the condition Lesser Restoration ends", () => {
+  it("asks which condition to end, and sends the one picked", async () => {
+    const cure = {
+      ...MISSILE,
+      id: "spell-lesser-restoration",
+      name: "Lesser Restoration",
+      darts: undefined,
+      damage: [],
+      conditionChoices: ["blinded", "deafened", "paralyzed", "poisoned"]
+    };
+    beginTargeting(cure as unknown as ContentActionSummary, CASTER, 2);
+    render(<Picker />);
+    expect(screen.getByText("Condition to end")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "poisoned" } });
+    act(() => toggleTarget(GOBLIN));
+    resolveTargeting(undefined, () => {});
+    expect(await lastResolve()).toMatchObject({ targetIds: [GOBLIN], conditionId: "poisoned" });
+  });
+});

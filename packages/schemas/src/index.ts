@@ -659,6 +659,8 @@ export const EffectInstanceSchema = z
      * effect lasts; a penalty is negative (Slow's -2). Kept apart from `modifiers`, whose `armor-class` is written onto
      * the sheet and would outlast it. */
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
+    /** Hit points this effect took off the bearer's Hit Point maximum (a Life Drain), given back when it ends. */
+    hitPointMaximumLoss: z.number().int().min(1).max(10000).optional(),
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
@@ -1301,6 +1303,24 @@ export const SaveFailureEffectSchema = z
   })
   .strict();
 
+/** What damage takes besides hit points as it lands (SRD Life Drain, Vampiric Touch, Harm): the target's Hit Point
+ *  maximum decreases by the damage it took, and the creature that dealt it regains hit points from it. With a
+ *  `damageType`, that type's damage alone counts ("equal to the Necrotic damage taken"). */
+export const DamageDrainSchema = z
+  .object({
+    damageType: z.string().min(1).max(40).optional(),
+    /** The Hit Point maximum decreases by the damage taken, until a Long Rest; at 0 the creature dies. */
+    reducesMaximum: z.literal(true).optional(),
+    /** It can't take the Hit Point maximum below 1 (Harm). */
+    keepsOneMaximum: z.literal(true).optional(),
+    /** How much of the damage taken the dealer regains as hit points. */
+    heals: z.enum(["all", "half"]).optional(),
+    /** Only a failed save drains (Harm, a wight's Life Drain). */
+    failedSaveOnly: z.literal(true).optional()
+  })
+  .strict();
+export type DamageDrain = z.infer<typeof DamageDrainSchema>;
+
 /** Conditions a hit lands on its target as one source-linked effect (a crocodile's Bite: Grappled and Restrained, escape
  *  DC 15; Ray of Sickness: Poisoned until the end of the caster's next turn). */
 export const OnHitRiderSchema = z
@@ -1422,7 +1442,9 @@ export const ActionSchema = z.object({
       /** No target is healed past this fraction of its maximum (Preserve Life: half). */
       upToFractionOfMaximum: z.number().min(0.1).max(1).optional(),
       /** The formula is regained once for each use spent (Lay on Hands: 1 hit point per point of its pool). */
-      perUse: z.literal(true).optional()
+      perUse: z.literal(true).optional(),
+      /** Each target regains all its hit points, whatever the formula says (Power Word Heal). */
+      toMaximum: z.literal(true).optional()
     })
     .strict()
     .optional(),
@@ -1430,7 +1452,9 @@ export const ActionSchema = z.object({
    *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
   useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
   /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
-  endsConditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
+  endsConditions: z.array(ConditionIdSchema).min(1).max(6).optional(),
+  /** It ends one of `endsConditions`, the one its user picks (Lesser Restoration); absent, it ends each one present. */
+  endsOneCondition: z.literal(true).optional(),
   /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
    *  The resolve's targets assign them in order, a target named twice taking two. */
   darts: z.number().int().min(2).max(20).optional(),
@@ -1470,6 +1494,8 @@ export const ActionSchema = z.object({
   onHit: z.array(OnHitRiderSchema).max(2).optional(),
   /** A miss still deals half the hit's damage, rounded down (Acid Arrow: "half as much of the initial damage only"). */
   missDamage: z.literal("half").optional(),
+  /** What its damage drains as it lands (a wraith's Life Drain, Vampiric Touch). */
+  drain: DamageDrainSchema.optional(),
   /** Targeting restrictions the engine enforces (Tail can't target the creature this crocodile grapples). */
   targetRules: z
     .array(z.enum(["not-grappled-by-source"]))

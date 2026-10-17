@@ -215,7 +215,20 @@ export function spellCastMechanics(
   scaled: Readonly<{ roll?: string | null; attacks?: number }> = {}
 ): Pick<ActorAction, "damage"> &
   Partial<
-    Pick<ActorAction, "attack" | "save" | "healing" | "darts" | "damageTypes" | "grants" | "onHit" | "missDamage">
+    Pick<
+      ActorAction,
+      | "attack"
+      | "save"
+      | "healing"
+      | "darts"
+      | "damageTypes"
+      | "grants"
+      | "onHit"
+      | "missDamage"
+      | "drain"
+      | "endsConditions"
+      | "endsOneCondition"
+    >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
   const effect = spell.effect ?? { attacks: 0, damage: [], healing: null };
@@ -226,6 +239,8 @@ export function spellCastMechanics(
   const damage = spellDamage(effect.damage, scale, numbers.modifier);
   return {
     damage,
+    // What its damage drains as it lands (Vampiric Touch's healing, Harm's lower Hit Point maximum).
+    ...(effect.drain ? { drain: { ...effect.drain } } : {}),
     ...(effect.darts ? { darts: effect.darts } : {}),
     ...(effect.damageTypes && damage.length > 0 ? { damageTypes: [...effect.damageTypes] } : {}),
     ...(attacks > 0
@@ -254,8 +269,17 @@ export function spellCastMechanics(
     ...(effect.healing
       ? {
           healing: {
-            formula: formulaPlus(scale(effect.healing.formula), effect.healing.addsModifier ? numbers.modifier : 0)
+            formula: formulaPlus(scale(effect.healing.formula), effect.healing.addsModifier ? numbers.modifier : 0),
+            ...(effect.healing.divided ? { divided: true as const } : {}),
+            ...(effect.healing.toMaximum ? { toMaximum: true as const } : {})
           }
+        }
+      : {}),
+    // Conditions the cast ends (Heal's Blinded, Deafened and Poisoned; Lesser Restoration's pick).
+    ...(effect.endsConditions
+      ? {
+          endsConditions: [...effect.endsConditions],
+          ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
         }
       : {})
   };
@@ -323,6 +347,7 @@ export function laterSpellAction(
         : {}),
     ...(spell.effect?.damageTypes && damage.length > 0 ? { damageTypes: [...spell.effect.damageTypes] } : {}),
     ...(later.area ? { area: later.area } : {}),
+    ...(later.drain ? { drain: { ...later.drain } } : {}),
     // Moving a mark lands the cast's grant on the new creature (`moveMark`).
     ...(later.movesGrant && spell.effect?.grant ? { grants: structuredClone(spell.effect.grant) } : {}),
     spellId: spell.id
@@ -363,9 +388,11 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
   if (!spell || !effect || action.spellId !== spell.id) return action;
   const later = (effect.laterActions ?? []).find((row) => laterSpellActionId(spell.id, row.name) === action.id);
   if (later)
-    return action.attack && action.onHit === undefined && later.onHit
-      ? { ...action, onHit: structuredClone(later.onHit) }
-      : action;
+    return {
+      ...action,
+      ...(action.attack && action.onHit === undefined && later.onHit ? { onHit: structuredClone(later.onHit) } : {}),
+      ...(action.drain === undefined && later.drain ? { drain: { ...later.drain } } : {})
+    };
   const hitRiders =
     action.attack !== undefined
       ? {
@@ -373,7 +400,17 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
           ...(action.missDamage === undefined && effect.missDamage ? { missDamage: effect.missDamage } : {})
         }
       : {};
-  action = { ...action, ...hitRiders };
+  action = {
+    ...action,
+    ...hitRiders,
+    ...(action.drain === undefined && effect.drain ? { drain: { ...effect.drain } } : {}),
+    ...(action.endsConditions === undefined && effect.endsConditions
+      ? {
+          endsConditions: [...effect.endsConditions],
+          ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
+        }
+      : {})
+  };
   const grants = action.grants === undefined && effect.grant ? structuredClone(effect.grant) : undefined;
   const failureEffect =
     action.save && !action.save.failureEffect && effect.failureEffect
@@ -389,11 +426,14 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
 }
 
 /** The conditions a caster picks one of for this action's failed save (Blindness/Deafness), read from the spell too
- *  for a sheet built before its cast carried them; empty when the action offers no choice. */
+ *  for a sheet built before its cast carried them, or the ones a cure ends one of; empty when the action offers no
+ *  choice. */
 export function conditionChoicesOf(
-  action: Pick<ActorAction, "save" | "spellId">,
+  action: Pick<ActorAction, "save" | "spellId" | "endsConditions" | "endsOneCondition">,
   spell: SpellReference | undefined
 ): readonly string[] {
+  // The one condition a cure ends (Lesser Restoration).
+  if (action.endsOneCondition && action.endsConditions) return action.endsConditions;
   if (!action.save) return [];
   return action.save.conditionChoices ?? (spell?.id === action.spellId ? (spell?.save?.conditionChoices ?? []) : []);
 }

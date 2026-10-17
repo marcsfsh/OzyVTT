@@ -194,6 +194,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
   const instance = state.combat.turn.actionInstance;
   const damageTargets = damageTargetsOf(ctx);
   return {
+    actionId: action.id,
     actionName: action.name,
     activation: action.activation,
     attack: ctx.attack,

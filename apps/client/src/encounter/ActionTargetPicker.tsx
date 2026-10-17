@@ -158,7 +158,7 @@ export function ActionTargetPicker({
       )}
       {picking.action.conditionChoices && picking.action.conditionChoices.length > 1 && (
         <label className="action-damage-type">
-          <span>Condition on a failed save</span>
+          <span>{picking.action.saveAbility ? "Condition on a failed save" : "Condition to end"}</span>
           <Select
             value={picking.conditionId ?? picking.action.conditionChoices[0]}
             onChange={(event) => setConditionChoice(event.target.value)}

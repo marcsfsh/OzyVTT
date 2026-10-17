@@ -346,7 +346,8 @@ function answerStrike(
         pending.kind === "leaves-reach"
           ? `${reactor.name}'s ${chosen.name} (opportunity attack)`
           : `${reactor.name}'s ${chosen.name}`,
-      sourceActorId: reactor.id
+      sourceActorId: reactor.id,
+      ...(chosen.drain ? { drain: chosen.drain } : {})
     });
     appliedDamage = outcome.application.totalApplied;
     application = outcome.application;
@@ -512,7 +513,8 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       parts: damagePartsOf(resolution),
       critical: resolution.crit,
       sourceName: `${attacker.name}'s ${resolution.actionName}`,
-      sourceActorId: attacker.id
+      sourceActorId: attacker.id,
+      ...(action.drain ? { drain: action.drain } : {})
     });
     appliedDamage = outcome.application.totalApplied;
     application = outcome.application;

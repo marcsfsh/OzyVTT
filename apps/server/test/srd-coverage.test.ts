@@ -24,7 +24,7 @@ import { deriveEquipment } from "../src/equipment-derivation.js";
 import { hasEvasion, magicResistanceOf, saveRollSources } from "../src/saving-throws.js";
 import { currentSpeedFeet, speedZeroed } from "../src/speed.js";
 import { wardingAura } from "../src/paladin-auras.js";
-import { healActor } from "../src/hit-points.js";
+import { applyDamageDetailed, healActor } from "../src/hit-points.js";
 import { monsterTraitKinds, renderSrdCoverage, spellState, srdCoverageRows, traitKind } from "../src/srd-coverage.js";
 import {
   CONDITION_COVERAGE,
@@ -251,6 +251,20 @@ describe("the curated claims hold in the engine", () => {
       effects: [{ id: "slow", name: "Slow", tags: slow.effect!.failureEffect!.tags, duration: { type: "manual" } }]
     });
     expect(currentSpeedFeet(slowed, deriveEquipment(slowed, undefined, undefined))).toBe(15);
+  });
+
+  it("a drain: a wraith's Life Drain lowers the Hit Point maximum by the damage taken", () => {
+    const wraith = loadMonsterDefinitions().find((entry) => entry.source.externalId === "wraith")!;
+    const drain = wraith.actions.find((action) => action.id === "life-drain")!.drain;
+    const game = GameStateSchema.parse({ schemaVersion: 1, actors: [creature()] });
+    applyDamageDetailed(game, HERO, { amount: 7, parts: [{ amount: 7, type: "necrotic" }], drain }, { role: "gm" });
+    expect(game.actors[0]!.hp).toMatchObject({ current: 13, maximum: 13 });
+  });
+
+  it("a cure: Heal ends Blinded on the creature it heals", () => {
+    const heal = loadSpells().find((spell) => spell.id === "heal")!;
+    expect(spellState(heal)).toBe("enforced");
+    expect(heal.effect!.endsConditions).toContain("blinded");
   });
 
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {

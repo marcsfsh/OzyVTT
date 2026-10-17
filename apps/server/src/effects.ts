@@ -365,6 +365,9 @@ function endEffectInternal(
     actorId: actor.id,
     ...sourceOf(effect)
   });
+  // A drained Hit Point maximum returns to normal; the hit points lost with it stay lost.
+  if (effect.hitPointMaximumLoss !== undefined)
+    actor.hp = { ...actor.hp, maximum: actor.hp.maximum + effect.hitPointMaximumLoss };
   for (const conditionId of effect.linkedConditionIds) {
     if (linkedByAnEffect(actor, conditionId)) continue;
     const entry = actor.conditions.find((condition) => condition.id === conditionId);
@@ -625,8 +628,10 @@ export function endEffectsAtLongRest(state: GameState, actorId: string): EffectN
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
+  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal."
   for (const effect of [...actor.effects])
-    if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events, true);
+    if (ENDS_WITH_THE_FIGHT.has(effect.duration.type) || effect.hitPointMaximumLoss !== undefined)
+      endEffectInternal(state, actor, effect.id, events, true);
   // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
   events.push(...endKnockOut(state, actor));
   return events;

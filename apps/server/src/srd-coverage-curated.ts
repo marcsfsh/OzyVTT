@@ -869,10 +869,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:freedom-of-movement": guided(
     "speed.ts gives the target a Swim Speed equal to its Speed. Ignoring Difficult Terrain, the immunity to magical Paralyzed and Restrained, and slipping free of restraints are the GM's."
   ),
-  "spell:harm": guided(
-    "The save and its 14d6 Necrotic damage are applied. Lowering the Hit Point maximum is the GM's."
-  ),
-  "spell:heal": guided("The 70 Hit Points are applied. Ending Blinded, Deafened and Poisoned is the GM's."),
   "spell:hideous-laughter": guided(
     "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns. The save with Advantage each time it takes damage is the GM's."
   ),
@@ -882,17 +878,26 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:irresistible-dance": guided(
     "A failed save imposes Charmed. The dance's Disadvantage, the Advantage against the dancer and its save to collect itself are the GM's."
   ),
+  "spell:mass-heal": enforced(
+    "resolution/heal.ts divides the 700 Hit Points evenly among the creatures the caster picks, none past its maximum, and ends Blinded, Deafened and Poisoned on each. A different split is the caster's to make by hand."
+  ),
   "spell:phantasmal-killer": guided(
     "The save and its 4d10 Psychic damage are applied. The Disadvantage it leaves, and the save with damage at the end of each of its turns, are the GM's."
   ),
-  "spell:power-word-stun": guided(
-    "A target with 150 Hit Points or fewer is Stunned and repeats the save at the end of each of its turns. A tougher target's Speed 0 is the GM's."
+  "spell:power-word-heal": enforced(
+    "resolution/heal.ts restores all the target's Hit Points and ends Charmed, Frightened, Paralyzed, Poisoned and Stunned. Standing up from Prone with its Reaction is the creature's choice."
+  ),
+  "spell:power-word-stun": enforced(
+    "A target with 150 Hit Points or fewer is Stunned and repeats the save at the end of each of its turns; a tougher one's Speed is 0 until the start of the caster's next turn (resolution/pending.ts)."
   ),
   "spell:prayer-of-healing": guided(
     "The 2d8 Hit Points are applied. The Short Rest's benefits, and the limit of once per Long Rest, are the GM's."
   ),
   "spell:prismatic-wall": guided(
     "The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's."
+  ),
+  "spell:protection-from-poison": enforced(
+    "The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned. The GM ends the effect when the hour is up."
   ),
   "spell:regenerate": guided(
     "The 4d8 + 15 Hit Points are applied. The 1 Hit Point at the start of each of the target's turns is the GM's."
@@ -917,9 +922,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:tsunami": guided(
     "The wall's first save and damage are applied. Its movement and the damage on later turns are the GM's."
-  ),
-  "spell:vampiric-touch": guided(
-    "The touch's Necrotic damage is applied, on the cast and as a later Magic action. Regaining half the damage dealt is the GM's."
   ),
   "spell:vitriolic-sphere": guided(
     "The save and its 10d4 Acid damage are applied. The 5d4 Acid damage at the end of the target's next turn is the GM's."

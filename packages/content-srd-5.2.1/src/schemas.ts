@@ -13,7 +13,9 @@ import {
   ActionGrantSchema,
   AmmunitionKindSchema,
   ActionReactionSchema,
+  ActionSchema,
   ActorDefinitionSchema,
+  DamageDrainSchema,
   DamageFormulaSchema,
   DamageTypeSchema,
   HealingFormulaSchema,
@@ -118,6 +120,8 @@ export const SpellLaterActionSchema = z
     area: ActionAreaSchema.optional(),
     /** It moves the cast's `grant` from a creature at 0 Hit Points to its own target (Hunter's Mark, Hex). */
     movesGrant: z.literal(true).optional(),
+    /** What its damage drains as it lands (Vampiric Touch's later touches). */
+    drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
     zone: SpellZoneSchema.optional()
   })
@@ -135,6 +139,8 @@ export const SpellEffectSchema = z
     onHit: z.array(OnHitRiderSchema).max(2).optional(),
     /** A miss still deals half the hit's damage (Acid Arrow). */
     missDamage: z.literal("half").optional(),
+    /** What its damage drains as it lands (Vampiric Touch's healing, Harm's lower Hit Point maximum). */
+    drain: DamageDrainSchema.optional(),
     /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
     damage: SpellDamageSchema,
     /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
@@ -151,8 +157,21 @@ export const SpellEffectSchema = z
       .object({ count: z.number().int().min(1).max(20), perSlot: z.number().int().min(1).max(2).optional() })
       .strict()
       .optional(),
-    /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier. */
-    healing: z.object({ formula: HealingFormulaSchema, addsModifier: z.boolean() }).strict().nullable(),
+    /** Hit points each target regains; `addsModifier` adds the caster's spellcasting ability modifier, `divided`
+     *  makes it one pool shared among the targets (Mass Heal), and `toMaximum` restores all of them (Power Word Heal). */
+    healing: z
+      .object({
+        formula: HealingFormulaSchema,
+        addsModifier: z.boolean(),
+        divided: z.literal(true).optional(),
+        toMaximum: z.literal(true).optional()
+      })
+      .strict()
+      .nullable(),
+    /** Conditions the cast ends on its targets (Heal: Blinded, Deafened and Poisoned); with `endsOneCondition`, the one
+     *  the caster picks (Lesser Restoration). */
+    endsConditions: ActionSchema.shape.endsConditions,
+    endsOneCondition: ActionSchema.shape.endsOneCondition,
     /** What the cast leaves on the creatures it targets, or the one its attack hits, while it lasts (Bless's d4,
      *  Hunter's Mark's extra damage). */
     grant: ActionGrantSchema.optional(),

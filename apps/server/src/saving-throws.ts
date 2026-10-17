@@ -16,7 +16,7 @@ import {
   type DiceResolution,
   type RandomSource
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, DamageDrain } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
@@ -332,6 +332,8 @@ export function createPendingSaves(
     magical?: boolean;
     /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
     immuneOnSuccess?: boolean;
+    /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). */
+    drain?: DamageDrain;
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -362,6 +364,7 @@ export function createPendingSaves(
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
+    ...(input.drain ? { drain: { ...input.drain } } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -743,7 +746,9 @@ export function answerSave(
       {
         amount: outcomeDamage,
         ...(outcomeParts !== null ? { parts: outcomeParts } : {}),
-        sourceActorId: pending.sourceActorId
+        sourceActorId: pending.sourceActorId,
+        // Harm drains only on a failed save; a Life Drain whose save halves the damage drains either way.
+        ...(pending.drain && (!success || pending.drain.failedSaveOnly !== true) ? { drain: pending.drain } : {})
       },
       { role: "gm" },
       {

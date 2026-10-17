@@ -11255,6 +11255,12 @@
   "area": null,
   "effect": {
    "attacks": 0,
+   "drain": {
+    "damageType": "necrotic",
+    "reducesMaximum": true,
+    "keepsOneMaximum": true,
+    "failedSaveOnly": true
+   },
    "damage": [
     {
      "formula": "14d6",
@@ -11398,7 +11404,12 @@
    "healing": {
     "formula": "70",
     "addsModifier": false
-   }
+   },
+   "endsConditions": [
+    "blinded",
+    "deafened",
+    "poisoned"
+   ]
   },
   "classes": [
    "cleric",
@@ -13699,7 +13710,14 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "endsConditions": [
+    "blinded",
+    "deafened",
+    "paralyzed",
+    "poisoned"
+   ],
+   "endsOneCondition": true
   },
   "classes": [
    "bard",
@@ -14960,7 +14978,16 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": {
+    "formula": "700",
+    "addsModifier": false,
+    "divided": true
+   },
+   "endsConditions": [
+    "blinded",
+    "deafened",
+    "poisoned"
+   ]
   },
   "classes": [
    "cleric"
@@ -16800,7 +16827,18 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": {
+    "formula": "1",
+    "addsModifier": false,
+    "toMaximum": true
+   },
+   "endsConditions": [
+    "charmed",
+    "frightened",
+    "paralyzed",
+    "poisoned",
+    "stunned"
+   ]
   },
   "classes": [
    "bard",
@@ -17600,7 +17638,47 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "endsConditions": [
+    "poisoned"
+   ],
+   "grant": {
+    "modifiers": [
+     {
+      "type": "damage-resistance",
+      "damageTypes": [
+       "poison"
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "versus-condition",
+        "conditionIds": [
+         "poisoned"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Protection from Poison",
+    "tags": [
+     "protection-from-poison"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -22375,6 +22453,10 @@
     "kind": "melee",
     "feet": 5
    },
+   "drain": {
+    "damageType": "necrotic",
+    "heals": "half"
+   },
    "damage": [
     {
      "formula": "3d6",
@@ -22395,7 +22477,11 @@
        "formula": "3d6",
        "type": "necrotic"
       }
-     ]
+     ],
+     "drain": {
+      "damageType": "necrotic",
+      "heals": "half"
+     }
     }
    ],
    "healing": null

@@ -513,7 +513,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "action",
       when: "Until the spell ends, a Magic action makes the attack again; you regain Hit Points equal to half the Necrotic damage dealt.",
       attackRange: melee(5),
-      damage: [{ formula: "3d6", type: "necrotic" }]
+      damage: [{ formula: "3d6", type: "necrotic" }],
+      drain: { damageType: "necrotic", heals: "half" }
     }
   ],
   "wall-of-fire": [
@@ -583,6 +584,32 @@ const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
 
 /** A miss still deals this share of the hit's damage (Acid Arrow: "half as much of the initial damage only"). */
 const CAST_MISS_DAMAGE: Readonly<Record<string, "half">> = { "acid-arrow": "half" };
+
+/** Conditions a cast ends on its targets (SRD 5.2.1 text); `one` ends the one the caster picks. */
+const CAST_CURES: Readonly<Record<string, Readonly<{ conditions: readonly string[]; one?: true }>>> = {
+  heal: { conditions: ["blinded", "deafened", "poisoned"] },
+  // "Creatures healed by this spell also have the Blinded, Deafened, and Poisoned conditions removed from them."
+  "mass-heal": { conditions: ["blinded", "deafened", "poisoned"] },
+  "power-word-heal": { conditions: ["charmed", "frightened", "paralyzed", "poisoned", "stunned"] },
+  "lesser-restoration": { conditions: ["blinded", "deafened", "paralyzed", "poisoned"], one: true },
+  "protection-from-poison": { conditions: ["poisoned"] }
+};
+
+/** Healing the text gives as no single roll: Mass Heal's 700 divided among its targets, Power Word Heal's "regains all
+ *  its Hit Points". */
+const CAST_HEALING: Readonly<Record<string, NonNullable<SpellEffect["healing"]>>> = {
+  "mass-heal": { formula: "700", addsModifier: false, divided: true },
+  "power-word-heal": { formula: "1", addsModifier: false, toMaximum: true }
+};
+
+/** What the cast's damage drains as it lands (SRD 5.2.1 text). */
+const CAST_DRAINS: Readonly<Record<string, NonNullable<SpellEffect["drain"]>>> = {
+  // "Its Hit Point maximum is reduced by an amount equal to the Necrotic damage it took" on a failed save; "This spell
+  // can't reduce a target's Hit Point maximum below 1."
+  harm: { damageType: "necrotic", reducesMaximum: true, keepsOneMaximum: true, failedSaveOnly: true },
+  // "You regain Hit Points equal to half the amount of Necrotic damage dealt", on the cast and each later touch.
+  "vampiric-touch": { damageType: "necrotic", heals: "half" }
+};
 
 type Grant = NonNullable<SpellEffect["grant"]>;
 type FailureEffect = NonNullable<SpellEffect["failureEffect"]>;
@@ -697,6 +724,23 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [markDamage("necrotic")]
   }),
+  // "Advantage on saving throws to avoid or end the Poisoned condition, and it has Resistance to Poison damage", for
+  // the hour the GM ends it after.
+  "protection-from-poison": spellGrant({
+    name: "Protection from Poison",
+    tags: ["protection-from-poison"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [
+      { type: "damage-resistance", damageTypes: ["poison"] },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-condition", conditionIds: ["poisoned"] }]
+      }
+    ]
+  }),
   "mage-armor": spellGrant({
     name: "Mage Armor",
     tags: ["mage-armor"],
@@ -805,7 +849,7 @@ export function spellEffectFor(
   types: readonly string[],
   range: SpellRange
 ): SpellEffect {
-  const healing = healingOfText(description);
+  const healing = CAST_HEALING[id] ?? healingOfText(description);
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
   const attackRange = attacks > 0 ? spellAttackRangeOf(description, range) : null;
   const reaction = CAST_REACTIONS[id];
@@ -817,18 +861,24 @@ export function spellEffectFor(
   const failureEffect = SAVE_FAILURE_EFFECTS[id];
   const onHit = CAST_ON_HIT[id];
   const missDamage = CAST_MISS_DAMAGE[id];
+  const drain = CAST_DRAINS[id];
+  const cures = CAST_CURES[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
     ...(onHit ? { onHit: structuredClone(onHit) as OnHitRider[] } : {}),
     ...(missDamage ? { missDamage } : {}),
+    ...(drain ? { drain: { ...drain } } : {}),
     damage: castDamage(id, roll, types, healing !== null),
     ...(choices ? { damageTypes: [...choices] } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),
     ...(targets ? { targets: { ...targets } } : {}),
-    healing,
+    healing: healing ? { ...healing } : null,
+    ...(cures
+      ? { endsConditions: [...cures.conditions], ...(cures.one ? { endsOneCondition: true as const } : {}) }
+      : {}),
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
     ...(reaction ? { reaction } : {})
@@ -904,6 +954,9 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_GRANTS),
   ...Object.keys(CAST_ON_HIT),
   ...Object.keys(CAST_MISS_DAMAGE),
+  ...Object.keys(CAST_DRAINS),
+  ...Object.keys(CAST_CURES),
+  ...Object.keys(CAST_HEALING),
   ...Object.keys(SAVE_FAILURE_EFFECTS),
   ...Object.keys(SPELL_AREAS)
 ];

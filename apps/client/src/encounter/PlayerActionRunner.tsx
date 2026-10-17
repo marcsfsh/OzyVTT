@@ -55,6 +55,8 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
     ...(action.save?.conditionChoices ? { conditionChoices: [...action.save.conditionChoices] } : {}),
+    // A cure that ends one condition of several asks which (Lesser Restoration).
+    ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self

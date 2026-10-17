@@ -471,6 +471,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].endsOneCondition",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cure that ends the one condition its user picks (Lesser Restoration) - copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].drain.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action's damage drains (a Life Drain) - read from the action's description as the catalog is built, or copied from a spell's cast model; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].legendary.cost",
     types: ACTION_CARRIERS,
     reason: "the per-round pool cost — the record has actionsPerRound, the action has no cost",

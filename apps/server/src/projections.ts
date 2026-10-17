@@ -186,7 +186,9 @@ const PENDING_SAVE_FIELDS = {
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
   magical: "never",
   // What a success earns is the stat block's text, the GM's knowledge.
-  immuneOnSuccess: "never"
+  immuneOnSuccess: "never",
+  // What the damage drains is narrated when it lands.
+  drain: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -374,6 +376,8 @@ function playerEffect(
     spell: _spell,
     readiedSpell,
     magical: _magical,
+    // A monster's lower Hit Point maximum is the GM's to know; a character's shows on its own sheet.
+    hitPointMaximumLoss: _hitPointMaximumLoss,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

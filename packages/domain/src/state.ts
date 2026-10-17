@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ActionAreaSchema,
   ActorDefinitionSchema,
+  DamageDrainSchema,
   ActorSchema,
   EffectInstanceSchema,
   EffectModifiersSchema,
@@ -288,6 +289,8 @@ export const PendingSaveSchema = z
     /** A success makes the target immune to this source's trait for the rest of the fight ("immune to this ghast's
      * Stench for 24 hours"). */
     immuneOnSuccess: z.literal(true).optional(),
+    /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). GM bookkeeping, never projected. */
+    drain: DamageDrainSchema.optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -522,6 +525,8 @@ export const PendingDamageSchema = z
     proposedTotal: z.number().int().nonnegative().max(10000).default(0),
     /** The hit was a critical (drives death-save failure ticks when the damage lands). */
     critical: z.boolean().default(false),
+    /** What the damage drains as it lands (Vampiric Touch's healing). */
+    drain: DamageDrainSchema.optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

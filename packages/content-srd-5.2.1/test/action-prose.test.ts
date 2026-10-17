@@ -2,13 +2,38 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ActorAction } from "@vtt/schemas";
-import { areaOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import { areaOfProse, drainOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { loadSpells } from "../src/index.js";
 
 const action = (fields: Partial<ActorAction>): ActorAction =>
   ({ id: "x", name: "X", activation: "action", description: "", damage: [], ...fields }) as ActorAction;
 
 describe("reading an action's prose facts", () => {
+  it("reads what damage drains: the Hit Point maximum, that type alone, and the healing the dealer regains", () => {
+    expect(
+      drainOfProse(
+        "If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken."
+      )
+    ).toEqual({ reducesMaximum: true });
+    expect(
+      drainOfProse(
+        "The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount."
+      )
+    ).toEqual({ damageType: "necrotic", reducesMaximum: true, heals: "all" });
+    // A fixed amount stays the GM's.
+    expect(
+      drainOfProse("Subsequent Failures: The Poisoned target's Hit Point maximum decreases by 5 (1d10).")
+    ).toBeNull();
+    expect(
+      withProseFacts(
+        action({
+          description: "its Hit Point maximum decreases by an amount equal to the damage taken.",
+          damage: [{ formula: "4d8", type: "necrotic" }]
+        })
+      ).drain
+    ).toEqual({ reducesMaximum: true });
+  });
+
   it("reads the SRD area phrasings, and nothing else", () => {
     expect(areaOfProse("each creature in a 60-foot Cone")).toEqual({ shape: "cone", sizeFeet: 60, widthFeet: null });
     expect(areaOfProse("a 60-foot-long, 5-foot-wide Line")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });

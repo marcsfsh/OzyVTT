@@ -352,6 +352,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
       ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),
+      ...(action.drain ? { drain: action.drain } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())

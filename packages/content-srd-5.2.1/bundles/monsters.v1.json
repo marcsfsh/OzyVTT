@@ -12319,7 +12319,11 @@
       "formula": "1d12",
       "type": "acid"
      }
-    ]
+    ],
+    "drain": {
+     "damageType": "acid",
+     "reducesMaximum": true
+    }
    }
   ],
   "token": {
@@ -39275,7 +39279,10 @@
       "formula": "2d6",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "reducesMaximum": true
+    }
    }
   ],
   "token": {
@@ -41508,7 +41515,10 @@
       "formula": "3d8",
       "type": "psychic"
      }
-    ]
+    ],
+    "drain": {
+     "reducesMaximum": true
+    }
    }
   ],
   "token": {
@@ -44120,7 +44130,12 @@
       "formula": "3d8",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "damageType": "necrotic",
+     "reducesMaximum": true,
+     "heals": "all"
+    }
    }
   ],
   "token": {
@@ -44424,7 +44439,12 @@
       "formula": "3d6",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "damageType": "necrotic",
+     "reducesMaximum": true,
+     "heals": "all"
+    }
    }
   ],
   "token": {
@@ -46792,7 +46812,10 @@
       "formula": "1d8 + 2",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "reducesMaximum": true
+    }
    }
   ],
   "token": {
@@ -47385,7 +47408,10 @@
       "formula": "4d8 + 3",
       "type": "necrotic"
      }
-    ]
+    ],
+    "drain": {
+     "reducesMaximum": true
+    }
    },
    {
     "id": "create-specter",

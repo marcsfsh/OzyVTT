@@ -2,7 +2,7 @@
  * What an action's prose says that play needs as data. Read where an action enters the system (the content
  * build, a homebrew save, an import), so the engine never reads prose while a fight runs.
  */
-import type { ActionArea, ActionReaction, ActorAction } from "@vtt/schemas";
+import type { ActionArea, ActionReaction, ActorAction, DamageDrain } from "@vtt/schemas";
 
 /**
  * The area of effect a description names. SRD 2024 phrasing is consistent enough to pattern-match ("60-foot
@@ -189,17 +189,40 @@ export function multiattackOfProse(
   return { plan, alternatives, replacements };
 }
 
+/**
+ * What a stat block's damage drains, from its SRD 2024 text: "its Hit Point maximum decreases by an amount equal to the
+ * damage taken" (a wraith's Life Drain), "... equal to the Necrotic damage taken" (that type alone), and "the vampire
+ * regains Hit Points equal to that amount". Null when the text says neither, or names a fixed amount ("decreases by 5
+ * (1d10)"), which stays the GM's.
+ */
+export function drainOfProse(description: string): DamageDrain | null {
+  const lowered =
+    /\bHit Point maximum decreases by an amount equal to the (?:([A-Z][a-z]+) )?damage (?:taken|dealt)\b/.exec(
+      description
+    );
+  const heals = /\bregains Hit Points equal to (half )?(?:that amount|the damage (?:taken|dealt))\b/.exec(description);
+  if (!lowered && !heals) return null;
+  const type = lowered?.[1]?.toLowerCase();
+  return {
+    ...(type ? { damageType: type } : {}),
+    ...(lowered ? { reducesMaximum: true as const } : {}),
+    ...(heals ? { heals: heals[1] ? ("half" as const) : ("all" as const) } : {})
+  };
+}
+
 /** The action with its prose facts filled: the area (an authored one wins), whether it is a Multiattack whose
- *  attacks nothing structured names, and a Parry's AC reaction (an authored reaction wins). The same object when
- *  nothing changes. */
+ *  attacks nothing structured names, a Parry's AC reaction (an authored reaction wins), and what its damage drains
+ *  (an authored drain wins). The same object when nothing changes. */
 export function withProseFacts<Action extends ActorAction>(action: Action): Action {
   const area = action.area ?? areaOfProse(action.description);
   const untracked = /multiattack/i.test(action.name) && !action.multiattack;
   const reaction = action.reaction ?? (action.activation === "reaction" ? acReactionOfProse(action.description) : null);
+  const drain = action.drain ?? (action.damage.length > 0 ? drainOfProse(action.description) : null);
   if (
     area === (action.area ?? null) &&
     untracked === (action.untrackedMultiattack === true) &&
-    reaction === (action.reaction ?? null)
+    reaction === (action.reaction ?? null) &&
+    drain === (action.drain ?? null)
   )
     return action;
   const { untrackedMultiattack: _previous, ...rest } = action;
@@ -207,6 +230,7 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     ...rest,
     ...(area ? { area } : {}),
     ...(untracked ? { untrackedMultiattack: true as const } : {}),
-    ...(reaction ? { reaction } : {})
+    ...(reaction ? { reaction } : {}),
+    ...(drain ? { drain } : {})
   } as Action;
 }

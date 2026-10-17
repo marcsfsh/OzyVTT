@@ -112,6 +112,8 @@ export type DamageTarget = Readonly<{
   total: number;
 }>;
 export type ActionResolution = Readonly<{
+  /** The action resolved, so the GM's apply can name it (`sourceActionId`) and what its damage drains lands. */
+  actionId?: string;
   actionName: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
   attack: ActionResolutionAttack | null;

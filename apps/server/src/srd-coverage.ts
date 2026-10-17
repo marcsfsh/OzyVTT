@@ -72,6 +72,7 @@ export function spellState(spell: SpellReference): CoverageState {
       effect.healing !== null ||
       effect.grant !== undefined ||
       effect.failureEffect !== undefined ||
+      effect.endsConditions !== undefined ||
       effect.reaction !== undefined ||
       effect.darts !== undefined ||
       (effect.laterActions ?? []).some(laterApplies));

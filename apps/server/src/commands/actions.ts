@@ -228,7 +228,8 @@ export const actionCommands = [
               catalog: kit.equipmentCatalog(),
               distanceFeet,
               rollDie: (sides) => kit.context.random(sides)
-            }
+            },
+            action.drain
           );
         // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
         if (template)
