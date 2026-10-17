@@ -160,6 +160,33 @@ describe("random character generator - the far end", () => {
     }
   });
 
+  it("spends no prepared spell on one its subclass already keeps prepared", () => {
+    // SRD Life Domain: Aid, Bless, Cure Wounds and Lesser Restoration are always prepared from Cleric level 3, and
+    // Mass Healing Word and Revivify from level 5; a pick of one would leave the character a spell short.
+    const domain = new Set(["aid", "bless", "cure-wounds", "lesser-restoration", "mass-healing-word", "revivify"]);
+    for (const seed of [2, 3, 4, 6, 8, 10]) {
+      const { request } = generateCharacterRequest(
+        { classes: [{ classId: "cleric", level: 5 }], level: 5 },
+        library,
+        defaultPolicy,
+        seeded(seed)
+      );
+      expect(request.choices.find((row) => row.kind === "subclass")?.id).toBe("life-domain");
+      // The Cleric list's own picks; a feat's spell (Magic Initiate) is a pick of its own.
+      const picked = request.choices
+        .filter((row) => row.kind === "spell" && row.payload?.featureId === undefined)
+        .map((row) => row.id);
+      expect(
+        picked.filter((id) => domain.has(id)),
+        `seed ${seed}`
+      ).toEqual([]);
+      // Every pick the Cleric list made is one of the nine it prepares, none spent on a domain spell.
+      expect(
+        request.choices.filter((row) => row.kind === "spell" && row.payload?.featureId === undefined)
+      ).toHaveLength(9);
+    }
+  });
+
   it("is deterministic in its injected random, and only in that", () => {
     const once = generateCharacterRequest({ classId: "wizard", level: 11 }, library, defaultPolicy, seeded(2026));
     const twice = generateCharacterRequest({ classId: "wizard", level: 11 }, library, defaultPolicy, seeded(2026));

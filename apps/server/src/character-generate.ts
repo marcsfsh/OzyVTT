@@ -471,15 +471,31 @@ function drawWithinLevelGates(
 
 type SpellOption = Readonly<{ id: string; name: string; level?: number }>;
 
+/** The spells a held feature already grants as always prepared (a Life Domain's Bless), baked the way the build bakes
+ *  them: ungated grants only. A class pick of one would be spent for nothing. */
+function alwaysPreparedGrants(survey: ServerOfferSurvey): Set<string> {
+  return new Set(
+    survey.granted.flatMap(({ record }) =>
+      record.grants && (record.grants.when?.length ?? 0) === 0
+        ? record.grants.spells.filter((spell) => spell.alwaysPrepared).map((spell) => spell.id)
+        : []
+    )
+  );
+}
+
 /** Fills each casting class's cantrip and prepared-spell budgets to step 9's caps (printed column plus `extraPicks`),
- *  from its own list up to its own highest slot level. A spell sits on the sheet once, so no class repeats another's. */
+ *  from its own list up to its own highest slot level. A spell sits on the sheet once, so no class repeats another's,
+ *  and none repeats one a feature already keeps prepared. */
 function fillSpellBudgets(
   survey: ServerOfferSurvey,
   choices: readonly CharacterChoice[],
   random: DiceRandom,
   favour?: ReadonlySet<string>
 ): CharacterChoice[] {
-  const claimed = new Set(choices.filter((row) => row.kind === "spell" || row.kind === "cantrip").map((row) => row.id));
+  const claimed = new Set([
+    ...choices.filter((row) => row.kind === "spell" || row.kind === "cantrip").map((row) => row.id),
+    ...alwaysPreparedGrants(survey)
+  ]);
   const rows: CharacterChoice[] = [];
   for (const budget of survey.classSpells) {
     const list = classSpellOptions(budget, survey.catalogs);
