@@ -1,7 +1,7 @@
-import type { RollRecord } from "@vtt/domain";
+import type { AnnotationPoint, AnnotationShapeKind, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
-import { addAnnotation, shapeGeometry } from "../annotations.js";
+import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
 import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builtinActionFor } from "../builtin-actions.js";
@@ -122,6 +122,9 @@ export const actionCommands = [
               ? requestedConditionId
               : null;
         let resolvedTargetIds: readonly string[];
+        // The template as the action's area makes it, which the table's drawn shape records.
+        let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
+          null;
         if (template) {
           if (action.attack)
             throw new CommandRejectedError(
@@ -130,15 +133,17 @@ export const actionCommands = [
           if (draft.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try again.");
           const calibration = geometry!.calibration!;
+          // The action's own area decides the shape and the size; the drag only places and points it.
+          placed = action.area ? templateOfArea(calibration, template, action.area) : template;
           // Snap the template the same way the drawn annotation will, then find who is under it.
-          const snapped = shapeGeometry(calibration, template.shape, template.origin, template.target);
+          const snapped = shapeGeometry(calibration, placed.shape, placed.origin, placed.target);
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
             snapped,
-            template.shape,
+            placed.shape,
             action.area?.widthFeet ?? null
           ).filter(
             (id) => (id !== actorId || !casterOutside) && draft.combat.initiative.some((entry) => entry.actorId === id)
@@ -232,15 +237,15 @@ export const actionCommands = [
             action.drain
           );
         // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
-        if (template)
+        if (placed)
           addAnnotation(
             draft,
             {
               id: commandId,
               kind: "shape",
-              shape: template.shape,
-              origin: template.origin,
-              target: template.target,
+              shape: placed.shape,
+              origin: placed.origin,
+              target: placed.target,
               visibility: "public",
               actor: { sessionId: gmSessionId, role: "gm" },
               now: Date.now()

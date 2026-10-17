@@ -359,7 +359,9 @@ export function EncounterMap({
       y: above - fontSize > 0 ? above : dragSnappedPoint.y + fontSize * 2
     };
   })();
-  const preview = gesturePreview(calibration, gesture, annotationAt);
+  // Placing an area template, the drag places and points the area; its size is the action's own.
+  const templateFeet = activeTargeting?.mode === "template" ? activeTargeting.template?.sizeFeet : undefined;
+  const preview = gesturePreview(calibration, gesture, annotationAt, templateFeet);
   const selected = selectedId ? annotationAt(selectedId) : null;
 
   return (

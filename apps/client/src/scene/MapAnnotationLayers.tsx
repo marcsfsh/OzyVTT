@@ -1,7 +1,7 @@
 import type { Annotation, PlayerAnnotation } from "@vtt/domain";
 import type { TargetingSession } from "../encounter/targeting";
 import { AnnotationGlyph, PingGlyph, type AnnotationGlyphData } from "./annotationGlyph";
-import { snapShapePreview, type GridCalibration, type SnappedGeometry } from "./gridPreview";
+import { sizedShapePreview, type GridCalibration, type SnappedGeometry } from "./gridPreview";
 import type { Gesture } from "./useMapGestures";
 
 type AnyAnnotation = Annotation | PlayerAnnotation;
@@ -96,11 +96,13 @@ export function ShapeLayer({
         calibration &&
         !preview &&
         (() => {
-          const snap = snapShapePreview(
+          // The area's own size, wherever the drag placed and pointed it (the server sizes it the same way).
+          const snap = sizedShapePreview(
             calibration,
             activeTargeting.template.shape,
             activeTargeting.template.placed.origin,
-            activeTargeting.template.placed.target
+            activeTargeting.template.placed.target,
+            activeTargeting.template.sizeFeet
           );
           return (
             <g className="annotation-shape live">
