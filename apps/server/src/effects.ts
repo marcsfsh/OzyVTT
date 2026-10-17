@@ -27,8 +27,20 @@ const MAX_EFFECTS = 20;
 export const CONCENTRATING_TAG = "concentrating";
 /** The Barbarian's Rage: it ends early on Incapacitated or in Heavy armor, and blocks spells and Concentration. */
 export const RAGING_TAG = "raging";
+/** A Rage under Persistent Rage: 10 minutes with nothing to extend it, ended early by Unconscious alone. */
+export const PERSISTENT_RAGE_TAG = "persistent-rage";
+/** SRD Rage: "You can maintain a Rage for up to 10 minutes", in rounds. */
+export const RAGE_ROUNDS = 100;
 /** A creature knocked out at 1 HP; it wakes when it regains any hit points. */
 export const KNOCKED_OUT_TAG = "knocked-out";
+/** The Ready action's held response, taken with the Reaction when its trigger comes. */
+export const READIED_TAG = "readied";
+/** Haste on its target: doubled Speed, an additional action each turn, and lethargy when it ends. */
+export const HASTED_TAG = "hasted";
+/** Reckless Attack: decided with the Barbarian's first attack roll on its turn. */
+export const RECKLESS_TAG = "reckless-attack";
+/** Steady Aim: taken before moving, Advantage on the next attack roll this turn, Speed 0 until the turn ends. */
+export const STEADY_AIM_TAG = "steady-aim";
 
 /** What an effect must name; every other field takes `EffectInstanceSchema`'s default. */
 export type EffectSpec = Pick<EffectInstance, "id" | "name" | "duration"> & Partial<EffectInstance>;
@@ -183,8 +195,10 @@ export function conditionGained(
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
+    // Persistent Rage ends early only on Unconscious.
     for (const rage of actor.effects.filter((effect) => effect.tags.includes(RAGING_TAG)))
-      endEffectInternal(state, actor, rage.id, events);
+      if (!rage.tags.includes(PERSISTENT_RAGE_TAG) || conditionId === "unconscious")
+        endEffectInternal(state, actor, rage.id, events);
   }
   if (conditionId === "exhaustion" && previousExhaustion < 6 && exhaustionLevel(actor) >= 6)
     events.push(...applyExhaustionDeath(state, actor));
@@ -216,8 +230,11 @@ export function addEffect(
   // What some effect already held (the one a refresh replaces included), so only a condition set on its own is
   // marked as outliving this effect.
   const heldBefore = new Set(actor.effects.flatMap((candidate) => candidate.linkedConditionIds));
+  // Extra movement adds up (SRD Dash: each one gains "extra movement for the current turn"), so a second Dash stands
+  // beside the first rather than refreshing it.
+  const stacks = effect.movementGrantFeet !== undefined;
   const replaced =
-    effect.sourceActionId !== null
+    effect.sourceActionId !== null && !stacks
       ? actor.effects.find(
           (candidate) =>
             candidate.sourceActorId === effect.sourceActorId && candidate.sourceActionId === effect.sourceActionId
@@ -270,8 +287,44 @@ export function applyExhaustionDeath(state: GameState, actor: Actor): EffectNarr
 export const sourceOf = (effect: Pick<EffectInstance, "sourceActorId" | "sourceName">) =>
   effect.sourceActorId !== null ? { source: { actorId: effect.sourceActorId, name: effect.sourceName } } : {};
 
-/** Tolerant single-effect removal used by every sweep; returns false when the effect is already gone. */
-function endEffectInternal(state: GameState, actor: Actor, effectId: string, events: EffectNarration[]): boolean {
+/** SRD Haste: "When the spell ends, the target is Incapacitated and has a Speed of 0 until the end of its next turn,
+ *  as a wave of lethargy washes over it." Only in a fight: outside one there is no next turn to wait out. */
+function addLethargy(state: GameState, actor: Actor, haste: EffectInstance, events: EffectNarration[]): void {
+  if (!state.combat.active || !state.combat.initiative.some((entry) => entry.actorId === actor.id)) return;
+  if (actor.effects.length >= MAX_EFFECTS) return;
+  addEffect(
+    state,
+    actor.id,
+    makeEffect({
+      id: `${haste.id}:lethargy`,
+      name: "Lethargy",
+      tags: ["lethargic"],
+      sourceActorId: haste.sourceActorId,
+      sourceName: haste.sourceName,
+      startedRound: state.combat.round,
+      duration: turnEndDuration(state, "until-bearer-turn-end", actor.id),
+      linkedConditionIds: ["incapacitated"],
+      speedZero: true
+    }),
+    events
+  );
+  events.push({
+    kind: "effect",
+    text: `${actor.name} is overcome by lethargy as ${haste.name} ends: Incapacitated and Speed 0 until the end of its next turn.`,
+    actorId: actor.id,
+    ...sourceOf(haste)
+  });
+}
+
+/** Tolerant single-effect removal used by every sweep; returns false when the effect is already gone. A fight's end
+ *  or a long rest (`sweeping`) starts nothing that would outlast it, such as Haste's lethargy. */
+function endEffectInternal(
+  state: GameState,
+  actor: Actor,
+  effectId: string,
+  events: EffectNarration[],
+  sweeping = false
+): boolean {
   const effect = actor.effects.find((candidate) => candidate.id === effectId);
   if (!effect) return false;
   actor.effects = actor.effects.filter((candidate) => candidate.id !== effectId);
@@ -310,11 +363,12 @@ function endEffectInternal(state: GameState, actor: Actor, effectId: string, eve
     if (applied && grant.conditionId === "exhaustion" && before < 6 && (level ?? 0) >= 6)
       events.push(...applyExhaustionDeath(state, actor));
   }
+  if (effect.tags.includes(HASTED_TAG) && !sweeping) addLethargy(state, actor, effect, events);
   // The caster's "Concentrating on X" ending ends everything that cast made, on every creature.
   if (effect.tags.includes(CONCENTRATING_TAG) && effect.castId !== undefined) {
     for (const bearer of state.actors) {
       for (const sustained of [...bearer.effects]) {
-        if (sustained.castId === effect.castId) endEffectInternal(state, bearer, sustained.id, events);
+        if (sustained.castId === effect.castId) endEffectInternal(state, bearer, sustained.id, events, sweeping);
       }
     }
   }
@@ -326,7 +380,7 @@ function endEffectInternal(state: GameState, actor: Actor, effectId: string, eve
         (candidate) => candidate.id !== dependent.id && candidate.tags.includes(dependent.endsWithTag!)
       )
     ) {
-      endEffectInternal(state, actor, dependent.id, events);
+      endEffectInternal(state, actor, dependent.id, events, sweeping);
     }
   }
   return true;
@@ -508,7 +562,7 @@ export function endEncounterEffects(state: GameState, combatantIds: readonly str
   for (const actor of state.actors) {
     if (!inFight.has(actor.id)) continue;
     for (const effect of [...actor.effects])
-      if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events);
+      if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events, true);
   }
   return events;
 }
@@ -520,7 +574,7 @@ export function endEffectsAtLongRest(state: GameState, actorId: string): EffectN
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
   for (const effect of [...actor.effects])
-    if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events);
+    if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events, true);
   // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
   events.push(...endKnockOut(state, actor));
   return events;

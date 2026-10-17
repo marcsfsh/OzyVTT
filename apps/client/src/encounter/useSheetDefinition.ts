@@ -17,13 +17,14 @@ registerContentCache(() => sheetCache.clear());
 
 /** One row of `actor:available-actions`. The display fields are additive-optional on the wire
     (ADR-0007), so every one is read defensively. */
-type AvailabilityRow = Readonly<{
+export type AvailabilityRow = Readonly<{
   id: string;
   name: string;
   activation: "action" | "bonus-action" | "reaction" | "other";
   available: boolean;
   usesRemaining: number | null;
   builtin?: boolean;
+  ridesAHit?: true;
   description?: string;
   attackBonus?: number | null;
   reachFeet?: number | null;
@@ -44,11 +45,14 @@ type AvailabilityRow = Readonly<{
   targeting?: "none" | "single" | "multi" | null;
   darts?: number | null;
   damageTypes?: ContentActionSummary["damageTypes"] | null;
+  checkSkills?: ContentActionSummary["checkSkills"];
 }>;
 
 /** The wire row in the shape every action surface here already speaks. */
-function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
+export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
   return {
+    ...(row.builtin ? { builtin: true, targeting: row.targeting ?? "none" } : {}),
+    ...(row.ridesAHit ? { ridesAHit: true as const } : {}),
     id: row.id,
     name: row.name,
     activation: row.activation,
@@ -75,7 +79,9 @@ function summaryOfAvailability(row: AvailabilityRow): ContentActionSummary {
     ...(row.targeting ? { targeting: row.targeting } : {}),
     // A spell an item casts picks as the spell's own cast does (Magic Missile's darts, Chromatic Orb's type).
     ...(row.darts ? { darts: row.darts } : {}),
-    ...(row.damageTypes ? { damageTypes: row.damageTypes } : {})
+    ...(row.damageTypes ? { damageTypes: row.damageTypes } : {}),
+    // Search, Study and the like pick the skill they are made with.
+    ...(row.checkSkills ? { checkSkills: row.checkSkills } : {})
   };
 }
 

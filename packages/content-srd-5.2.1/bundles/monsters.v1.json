@@ -32,10 +32,30 @@
     "name": "Lash",
     "activation": "other",
     "description": "Legendary Action. The aboleth makes one Tentacle attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 5",
+      "type": "bludgeoning"
+     }
+    ],
     "legendary": {
      "cost": 1
-    }
+    },
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 15
+    },
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
+     }
+    ]
    },
    {
     "id": "multiattack",
@@ -47,6 +67,13 @@
      {
       "actionId": "tentacle",
       "count": 2
+     },
+     {
+      "actionId": "consume-memories",
+      "count": 1,
+      "or": [
+       "dominate-mind"
+      ]
      }
     ]
    },
@@ -55,9 +82,20 @@
     "name": "Psychic Drain",
     "activation": "other",
     "description": "Legendary Action. If the aboleth has at least one creature Charmed or Grappled, it uses Consume Memories and regains 5 (1d10) Hit Points.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "psychic"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "save": {
+     "ability": "int",
+     "dc": 16,
+     "successDamage": "half",
+     "failureConditions": []
     }
    },
    {
@@ -245,7 +283,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -259,6 +298,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -268,7 +315,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -324,9 +372,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon can move up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -438,7 +499,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -451,6 +513,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -481,7 +551,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Shatter. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -517,9 +588,22 @@
     "name": "Tail Swipe",
     "activation": "other",
     "description": "Legendary Action. The dragon makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 7",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 10
     }
    },
    {
@@ -641,6 +725,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "sleep-breath",
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -648,9 +741,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -719,7 +825,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -866,6 +973,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "repulsion-breath",
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -873,9 +989,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 7",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 10
     }
    },
    {
@@ -1098,7 +1227,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1112,6 +1242,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "slowing-breath",
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -1121,7 +1260,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 4 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1177,9 +1317,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -1322,7 +1475,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1335,6 +1489,15 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting",
+       "weakening-breath"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -1401,9 +1564,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 10
     }
    },
    {
@@ -1549,6 +1725,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -1569,7 +1753,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -1630,9 +1815,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -1749,7 +1947,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1763,6 +1962,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -1772,7 +1979,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1828,9 +2036,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d4",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 10
     }
    },
    {
@@ -1938,7 +2159,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -1951,6 +2173,15 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "paralyzing-breath",
+       "spellcasting"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -1972,7 +2203,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "line",
@@ -2033,9 +2265,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 13,
+     "reachFeet": 10
     }
    },
    {
@@ -2178,7 +2423,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -2204,9 +2450,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 6",
+      "type": "slashing"
+     },
+     {
+      "formula": "1d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 11,
+     "reachFeet": 10
     }
    },
    {
@@ -2264,7 +2523,8 @@
     "description": "Legendary Action. The dragon casts Fear, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 14). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    }
   ],
@@ -2638,7 +2898,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2652,6 +2913,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -2661,7 +2930,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Fear. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2717,9 +2987,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -2831,7 +3114,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Invisibility on itself, and it can fly up to half its Fly Speed. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2844,6 +3128,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -2874,7 +3166,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Shatter (level 3 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -2910,9 +3203,22 @@
     "name": "Tail Swipe",
     "activation": "other",
     "description": "Legendary Action. The dragon makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 9",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 16,
+     "reachFeet": 15
     }
    },
    {
@@ -3034,6 +3340,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "sleep-breath",
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -3041,9 +3356,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 15
     }
    },
    {
@@ -3112,7 +3440,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3259,6 +3588,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "repulsion-breath",
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -3266,9 +3604,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 9",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 16,
+     "reachFeet": 15
     }
    },
    {
@@ -3491,7 +3842,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3505,6 +3857,15 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "slowing-breath",
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -3514,7 +3875,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Mind Spike (level 5 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3570,9 +3932,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "acid"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -3715,7 +4090,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -3728,6 +4104,15 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting",
+       "weakening-breath"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -3794,9 +4179,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -3942,6 +4340,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -3962,7 +4368,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -4023,9 +4430,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "poison"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 15,
+     "reachFeet": 15
     }
    },
    {
@@ -4142,7 +4562,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Command (level 2 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -4156,6 +4577,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -4165,7 +4594,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Scorching Ray (level 3 version). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -4221,9 +4651,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "3d6",
+      "type": "fire"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -4331,7 +4774,8 @@
     "description": "Legendary Action. The dragon uses Spellcasting to cast Hold Monster. The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -4344,6 +4788,15 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "paralyzing-breath",
+       "spellcasting"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -4365,7 +4818,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "line",
@@ -4426,9 +4880,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 10",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d8",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 17,
+     "reachFeet": 15
     }
    },
    {
@@ -4571,7 +5038,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "sphere",
@@ -4597,9 +5065,22 @@
     "name": "Pounce",
     "activation": "other",
     "description": "Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d8 + 8",
+      "type": "slashing"
+     },
+     {
+      "formula": "2d6",
+      "type": "cold"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 14,
+     "reachFeet": 15
     }
    },
    {
@@ -4657,7 +5138,8 @@
     "description": "Legendary Action. The dragon casts Fear, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 18). The dragon can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    }
   ],
@@ -5734,7 +6216,15 @@
     "activation": "action",
     "description": "The assassin makes three attacks, using Shortsword or Light Crossbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "shortsword",
+      "count": 3,
+      "or": [
+       "light-crossbow"
+      ]
+     }
+    ]
    },
    {
     "id": "shortsword",
@@ -6726,7 +7216,15 @@
     "activation": "action",
     "description": "The bandit makes two attacks, using Scimitar and Pistol in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scimitar",
+      "count": 2,
+      "or": [
+       "pistol"
+      ]
+     }
+    ]
    },
    {
     "id": "parry",
@@ -6865,6 +7363,14 @@
       "actionId": "tail",
       "count": 1
      }
+    ],
+    "multiattackAlternatives": [
+     [
+      {
+       "actionId": "hurl-flame",
+       "count": 2
+      }
+     ]
     ]
    },
    {
@@ -7403,7 +7909,16 @@
     "activation": "action",
     "description": "The behir makes one Bite attack and uses Constrict.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "constrict",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "swallow",
@@ -8534,6 +9049,10 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "infernal-sting",
+      "count": 1
      }
     ]
    },
@@ -9137,7 +9656,15 @@
     "activation": "action",
     "description": "The bugbear makes two Javelin or Morningstar attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "javelin",
+      "count": 2,
+      "or": [
+       "morningstar"
+      ]
+     }
+    ]
    },
    {
     "id": "quick-grapple",
@@ -9731,7 +10258,15 @@
     "activation": "action",
     "description": "The centaur makes two attacks, using Pike or Longbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "pike",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ]
    },
    {
     "id": "trampling-charge-recharge-5-6",
@@ -9877,6 +10412,10 @@
      {
       "actionId": "chain",
       "count": 2
+     },
+     {
+      "actionId": "conjure-infernal-chain",
+      "count": 1
      }
     ]
    },
@@ -10040,7 +10579,29 @@
     "activation": "action",
     "description": "The chimera makes one Ram attack, one Bite attack, and one Claw attack. It can replace the Claw attack with a use of Fire Breath if available.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "ram",
+      "count": 1
+     },
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "claw",
+      "count": 1
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "fire-breath"
+      ],
+      "attacks": 1,
+      "of": "claw"
+     }
+    ]
    },
    {
     "id": "bite",
@@ -10227,6 +10788,10 @@
      {
       "actionId": "pincer",
       "count": 2
+     },
+     {
+      "actionId": "paralyzing-tentacles",
+      "count": 1
      }
     ]
    },
@@ -10393,6 +10958,14 @@
       "actionId": "slam",
       "count": 2
      }
+    ],
+    "multiattackAlternatives": [
+     [
+      {
+       "actionId": "slam",
+       "count": 3
+      }
+     ]
     ]
    },
    {
@@ -10549,7 +11122,16 @@
     "activation": "action",
     "description": "The cloaker makes one Attach attack and two Tail attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "attach",
+      "count": 1
+     },
+     {
+      "actionId": "tail",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "attach",
@@ -10689,7 +11271,23 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Thunderous Mace or Thundercloud in any combination. It can replace one attack with a use of Spellcasting to cast Fog Cloud.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "thunderous-mace",
+      "count": 2,
+      "or": [
+       "thundercloud"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "thunderous-mace",
@@ -12425,7 +13023,15 @@
     "activation": "action",
     "description": "The djinni makes three attacks, using Storm Blade or Storm Bolt in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "storm-blade",
+      "count": 3,
+      "or": [
+       "storm-bolt"
+      ]
+     }
+    ]
    },
    {
     "id": "storm-blade",
@@ -12604,6 +13210,10 @@
      {
       "actionId": "slam",
       "count": 2
+     },
+     {
+      "actionId": "unsettling-visage",
+      "count": 1
      }
     ]
    },
@@ -12844,6 +13454,14 @@
      {
       "actionId": "bite",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "tail"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -13151,7 +13769,15 @@
     "activation": "action",
     "description": "The drider makes three attacks, using Foreleg or Poison Burst in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "foreleg",
+      "count": 3,
+      "or": [
+       "poison-burst"
+      ]
+     }
+    ]
    },
    {
     "id": "foreleg",
@@ -13282,7 +13908,15 @@
     "activation": "action",
     "description": "The druid makes two attacks, using Vine Staff or Verdant Wisp in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "vine-staff",
+      "count": 2,
+      "or": [
+       "verdant-wisp"
+      ]
+     }
+    ]
    },
    {
     "id": "vine-staff",
@@ -13410,7 +14044,19 @@
     "activation": "action",
     "description": "The dryad makes one Vine Lash or Thorn Burst attack, and it can use Spellcasting to cast Charm Monster.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "vine-lash",
+      "count": 1,
+      "or": [
+       "thorn-burst"
+      ]
+     },
+     {
+      "actionId": "spellcasting",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "tree-stride",
@@ -13787,7 +14433,15 @@
     "activation": "action",
     "description": "The elemental makes two attacks, using Slam or Rock Launch in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2,
+      "or": [
+       "rock-launch"
+      ]
+     }
+    ]
    },
    {
     "id": "slam",
@@ -13932,7 +14586,15 @@
     "activation": "action",
     "description": "The efreeti makes three attacks, using Heated Blade or Hurl Flame in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "heated-blade",
+      "count": 3,
+      "or": [
+       "hurl-flame"
+      ]
+     }
+    ]
    },
    {
     "id": "heated-blade",
@@ -14308,6 +14970,10 @@
      {
       "actionId": "withering-sword",
       "count": 3
+     },
+     {
+      "actionId": "entangling-rope",
+      "count": 1
      }
     ]
    },
@@ -14922,7 +15588,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Flame Sword or Hammer Throw in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "flame-sword",
+      "count": 2,
+      "or": [
+       "hammer-throw"
+      ]
+     }
+    ]
    },
    {
     "id": "flame-sword",
@@ -15394,7 +16068,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Frost Axe or Great Bow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "frost-axe",
+      "count": 2,
+      "or": [
+       "great-bow"
+      ]
+     }
+    ]
    },
    {
     "id": "war-cry-recharge-5-6",
@@ -16809,7 +17491,16 @@
     "activation": "action",
     "description": "The snake makes one Bite attack and uses Constrict.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "constrict",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "bite",
@@ -18298,6 +18989,10 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "sting",
+      "count": 1
      }
     ]
    },
@@ -19557,6 +20252,13 @@
      {
       "actionId": "pincer",
       "count": 2
+     },
+     {
+      "actionId": "pummel",
+      "count": 1,
+      "or": [
+       "spellcasting"
+      ]
      }
     ]
    },
@@ -19720,6 +20422,14 @@
      {
       "actionId": "spear",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "shield-bash"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -20081,7 +20791,15 @@
     "activation": "action",
     "description": "The goblin makes two attacks, using Scimitar or Shortbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scimitar",
+      "count": 2,
+      "or": [
+       "shortbow"
+      ]
+     }
+    ]
    },
    {
     "id": "nimble-escape",
@@ -21611,7 +22329,15 @@
     "activation": "action",
     "description": "The guard makes two attacks, using Javelin or Longsword in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "javelin",
+      "count": 2,
+      "or": [
+       "longsword"
+      ]
+     }
+    ]
    },
    {
     "id": "javelin",
@@ -21733,6 +22459,15 @@
      {
       "actionId": "bite",
       "count": 2
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "poisonous-spittle"
+      ],
+      "attacks": 1,
+      "any": true
      }
     ]
    },
@@ -22516,7 +23251,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Tree Club or Trash Lob in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "tree-club",
+      "count": 2,
+      "or": [
+       "trash-lob"
+      ]
+     }
+    ]
    },
    {
     "id": "tree-club",
@@ -22872,7 +23615,15 @@
     "activation": "action",
     "description": "The hobgoblin makes two attacks, using Greatsword or Longbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "greatsword",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ]
    },
    {
     "id": "greatsword",
@@ -23232,7 +23983,23 @@
     "activation": "action",
     "description": "The devil makes three attacks, using Searing Fork or Hurl Flame in any combination. It can replace one attack with a use of Infernal Tail.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "searing-fork",
+      "count": 3,
+      "or": [
+       "hurl-flame"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "infernal-tail"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "searing-fork",
@@ -23699,6 +24466,14 @@
      {
       "actionId": "ice-spear",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "tail"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -24288,6 +25063,14 @@
       "actionId": "wind-swipe",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "vortex"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -24443,7 +25226,15 @@
     "activation": "action",
     "description": "The golem makes two attacks, using Bladed Arm or Fiery Bolt in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bladed-arm",
+      "count": 2,
+      "or": [
+       "fiery-bolt"
+      ]
+     }
+    ]
    },
    {
     "id": "bladed-arm",
@@ -24809,7 +25600,15 @@
     "activation": "action",
     "description": "The knight makes two attacks, using Greatsword or Heavy Crossbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "greatsword",
+      "count": 2,
+      "or": [
+       "heavy-crossbow"
+      ]
+     }
+    ]
    },
    {
     "id": "parry",
@@ -25050,6 +25849,14 @@
      {
       "actionId": "tentacle",
       "count": 2
+     },
+     {
+      "actionId": "fling",
+      "count": 1,
+      "or": [
+       "lightning-strike",
+       "swallow"
+      ]
      }
     ]
    },
@@ -25058,9 +25865,20 @@
     "name": "Storm Bolt",
     "activation": "other",
     "description": "Legendary Action. The kraken uses Lightning Strike.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d10",
+      "type": "lightning"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 23,
+     "successDamage": "half",
+     "failureConditions": []
     }
    },
    {
@@ -25111,7 +25929,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -25309,6 +26128,14 @@
      {
       "actionId": "claw",
       "count": 2
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "corrupting-touch"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -25563,7 +26390,15 @@
     "activation": "action",
     "description": "The lich makes three attacks, using Eldritch Burst or Paralyzing Touch in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "eldritch-burst",
+      "count": 3,
+      "or": [
+       "paralyzing-touch"
+      ]
+     }
+    ]
    },
    {
     "id": "protective-magic",
@@ -25596,7 +26431,8 @@
      }
     ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -25628,7 +26464,8 @@
     "description": "Legendary Action. The lich casts Fear, using the same spellcasting ability as Spellcasting. The lich can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -25784,6 +26621,14 @@
      {
       "actionId": "rend",
       "count": 2
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "roar"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -26516,7 +27361,15 @@
     "activation": "action",
     "description": "The manticore makes three attacks, using Rend or Tail Spike in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "rend",
+      "count": 3,
+      "or": [
+       "tail-spike"
+      ]
+     }
+    ]
    },
    {
     "id": "rend",
@@ -26632,7 +27485,16 @@
     "activation": "action",
     "description": "The marilith makes six Pact Blade attacks and uses Constrict.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "pact-blade",
+      "count": 6
+     },
+     {
+      "actionId": "constrict",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "parry",
@@ -26916,7 +27778,19 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "snake-hair",
+      "count": 1
      }
+    ],
+    "multiattackAlternatives": [
+     [
+      {
+       "actionId": "poison-ray",
+       "count": 3
+      }
+     ]
     ]
    },
    {
@@ -27181,7 +28055,16 @@
     "activation": "action",
     "description": "The merrow makes two attacks, using Bite, Claw, or Harpoon in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 2,
+      "or": [
+       "claw",
+       "harpoon"
+      ]
+     }
+    ]
    },
    {
     "id": "bite",
@@ -27854,6 +28737,10 @@
      {
       "actionId": "rotting-fist",
       "count": 2
+     },
+     {
+      "actionId": "dreadful-glare",
+      "count": 1
      }
     ]
    },
@@ -27986,9 +28873,26 @@
     "name": "Glare",
     "activation": "other",
     "description": "Legendary Action. The mummy uses Dreadful Glare. The mummy can't take this action again until the start of its next turn.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "6d6 + 4",
+      "type": "psychic"
+     }
+    ],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 17,
+     "successDamage": "none",
+     "failureConditions": [
+      "paralyzed"
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     }
    },
    {
@@ -27997,7 +28901,19 @@
     "activation": "action",
     "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack, and it uses Dreadful Glare.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "rotting-fist",
+      "count": 1,
+      "or": [
+       "channel-negative-energy"
+      ]
+     },
+     {
+      "actionId": "dreadful-glare",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "whirlwind-of-sand",
@@ -28064,7 +28980,8 @@
     "description": "Legendary Action. The mummy casts Command (level 2 version), using the same spellcasting ability as Spellcasting. The mummy can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -29213,7 +30130,23 @@
     "activation": "action",
     "description": "The oni makes two Claw or Nightmare Ray attacks. It can replace one attack with a use of Spellcasting.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "claw",
+      "count": 2,
+      "or": [
+       "nightmare-ray"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "spellcasting"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "claw",
@@ -29370,7 +30303,16 @@
     "activation": "action",
     "description": "The otyugh makes one Bite attack and two Tentacle attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "tentacle",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "bite",
@@ -30161,6 +31103,14 @@
       "actionId": "dagger",
       "count": 2
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "enthralling-panache"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -30296,7 +31246,15 @@
     "activation": "action",
     "description": "The pirate makes three attacks, using Rapier or Pistol in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "rapier",
+      "count": 3,
+      "or": [
+       "pistol"
+      ]
+     }
+    ]
    },
    {
     "id": "riposte",
@@ -30426,7 +31384,20 @@
     "activation": "action",
     "description": "The pit fiend makes one Bite attack, two Devilish Claw attacks, and one Fiery Mace attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "devilish-claw",
+      "count": 2
+     },
+     {
+      "actionId": "fiery-mace",
+      "count": 1
+     }
+    ]
    },
    {
     "id": "bite",
@@ -30645,6 +31616,14 @@
       "actionId": "radiant-sword",
       "count": 3
      }
+    ],
+    "multiattackAlternatives": [
+     [
+      {
+       "actionId": "holy-burst",
+       "count": 2
+      }
+     ]
     ]
    },
    {
@@ -31103,7 +32082,15 @@
     "activation": "action",
     "description": "The priest makes two attacks, using Mace or Radiant Flame in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "mace",
+      "count": 2,
+      "or": [
+       "radiant-flame"
+      ]
+     }
+    ]
    },
    {
     "id": "mace",
@@ -32873,6 +33860,14 @@
       "actionId": "beak",
       "count": 2
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "talons"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -33018,6 +34013,14 @@
      {
       "actionId": "tentacle",
       "count": 2
+     },
+     {
+      "actionId": "reel",
+      "count": 1
+     },
+     {
+      "actionId": "bite",
+      "count": 2
      }
     ]
    },
@@ -33157,7 +34160,16 @@
     "activation": "action",
     "description": "The rust monster makes one Bite attack and uses Antennae twice.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "antennae",
+      "count": 2
+     }
+    ]
    },
    {
     "id": "reflexive-antennae",
@@ -33547,6 +34559,14 @@
       "actionId": "flame-spear",
       "count": 2
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "constrict"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -33898,7 +34918,15 @@
     "activation": "action",
     "description": "The scout makes two attacks, using Shortsword and Longbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "shortsword",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ]
    },
    {
     "id": "shortsword",
@@ -34366,6 +35394,14 @@
      {
       "actionId": "charged-tendril",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "engulf"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -35029,7 +36065,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -35053,6 +36090,14 @@
      {
       "actionId": "flying-sword",
       "count": 2
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "slaying-bow"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -35359,9 +36404,18 @@
     "name": "Arcane Prowl",
     "activation": "other",
     "description": "Legendary Action. The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "3d6 + 4",
+      "type": "slashing"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 8,
+     "reachFeet": 5
     }
    },
    {
@@ -35406,7 +36460,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -35558,9 +36613,18 @@
     "name": "Arcane Prowl",
     "activation": "other",
     "description": "Legendary Action. The sphinx can teleport up to 30 feet to an unoccupied space it can see, and it makes one Claw attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "4d6 + 6",
+      "type": "slashing"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 12,
+     "reachFeet": 5
     }
    },
    {
@@ -35573,6 +36637,10 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "roar",
+      "count": 1
      }
     ]
    },
@@ -35605,7 +36673,8 @@
     },
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -35979,7 +37048,15 @@
     "activation": "action",
     "description": "The naga makes three attacks, using Bite or Necrotic Ray in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 3,
+      "or": [
+       "necrotic-ray"
+      ]
+     }
+    ]
    },
    {
     "id": "bite",
@@ -36631,7 +37708,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Stone Club or Boulder in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "stone-club",
+      "count": 2,
+      "or": [
+       "boulder"
+      ]
+     }
+    ]
    },
    {
     "id": "stone-club",
@@ -36761,7 +37846,15 @@
     "activation": "action",
     "description": "The golem makes two attacks, using Slam or Force Bolt in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "slam",
+      "count": 2,
+      "or": [
+       "force-bolt"
+      ]
+     }
+    ]
    },
    {
     "id": "slow-recharge-5-6",
@@ -36913,7 +38006,15 @@
     "activation": "action",
     "description": "The giant makes two attacks, using Storm Sword or Thunderbolt in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "storm-sword",
+      "count": 2,
+      "or": [
+       "thunderbolt"
+      ]
+     }
+    ]
    },
    {
     "id": "storm-sword",
@@ -37100,7 +38201,19 @@
     "activation": "action",
     "description": "The succubus makes one Fiendish Touch attack and uses Charm or Draining Kiss.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "fiendish-touch",
+      "count": 1
+     },
+     {
+      "actionId": "charm",
+      "count": 1,
+      "or": [
+       "draining-kiss"
+      ]
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -38066,7 +39179,19 @@
     "activation": "action",
     "description": "The tarrasque makes one Bite attack and three other attacks, using Claw or Tail in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "claw",
+      "count": 3,
+      "or": [
+       "tail"
+      ]
+     }
+    ]
    },
    {
     "id": "onslaught",
@@ -38140,7 +39265,8 @@
     "description": "Legendary Action. The tarrasque moves up to its Speed. At the end of this movement, the tarrasque creates an instantaneous shock wave in a 60-foot Emanation originating from itself. Creatures in that area lose Concentration and, if Medium or smaller, have the Prone condition. The tarrasque can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     },
     "area": {
      "shape": "emanation",
@@ -38561,7 +39687,15 @@
     "activation": "action",
     "description": "The tough makes two attacks, using Warhammer or Heavy Crossbow in any combination.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "warhammer",
+      "count": 2,
+      "or": [
+       "heavy-crossbow"
+      ]
+     }
+    ]
    },
    {
     "id": "warhammer",
@@ -39220,6 +40354,9 @@
       ],
       "maxTargetSize": "huge"
      }
+    ],
+    "targetRules": [
+     "not-grappled-by-source"
     ]
    }
   ],
@@ -39302,9 +40439,18 @@
     "name": "Charging Horn",
     "activation": "other",
     "description": "Legendary Action. The unicorn moves up to half its Speed without provoking Opportunity Attacks, and it makes one Radiant Horn attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d10 + 4",
+      "type": "radiant"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "attack": {
+     "bonus": 7,
+     "reachFeet": 5
     }
    },
    {
@@ -39358,7 +40504,8 @@
     "description": "Legendary Action. The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary Hit Points, and its AC increases by 2 until the end of the unicorn's next turn. The unicorn can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -39485,10 +40632,34 @@
     "name": "Deathless Strike",
     "activation": "other",
     "description": "Legendary Action. The vampire moves up to half its Speed, and it makes one Grave Strike attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d8 + 4",
+      "type": "bludgeoning"
+     },
+     {
+      "formula": "2d6",
+      "type": "necrotic"
+     }
+    ],
     "legendary": {
      "cost": 1
-    }
+    },
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 5
+    },
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       }
+      ],
+      "escapeDc": 14,
+      "maxTargetSize": "large"
+     }
+    ]
    },
    {
     "id": "multiattack",
@@ -39500,6 +40671,10 @@
      {
       "actionId": "grave-strike",
       "count": 2
+     },
+     {
+      "actionId": "bite-bat-or-vampire-form-only",
+      "count": 1
      }
     ]
    },
@@ -39517,7 +40692,8 @@
     "description": "Legendary Action. The vampire casts Command, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 17). The vampire can't take this action again until the start of its next turn.",
     "damage": [],
     "legendary": {
-     "cost": 1
+     "cost": 1,
+     "oncePerRound": true
     }
    },
    {
@@ -39833,6 +41009,10 @@
      {
       "actionId": "claw",
       "count": 2
+     },
+     {
+      "actionId": "bite",
+      "count": 1
      }
     ]
    },
@@ -40771,7 +41951,15 @@
     "activation": "action",
     "description": "The warrior makes two Greatsword or Heavy Crossbow attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "greatsword",
+      "count": 2,
+      "or": [
+       "heavy-crossbow"
+      ]
+     }
+    ]
    },
    {
     "id": "parry",
@@ -41173,7 +42361,23 @@
     "activation": "action",
     "description": "The werebear makes two attacks, using Handaxe or Rend in any combination. It can replace one attack with a Bite attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "handaxe",
+      "count": 2,
+      "or": [
+       "rend"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "bite"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -41321,7 +42525,23 @@
     "activation": "action",
     "description": "The wereboar makes two attacks, using Javelin or Tusk in any combination. It can replace one attack with a Gore attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "javelin",
+      "count": 2,
+      "or": [
+       "tusk"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "gore"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -41484,7 +42704,23 @@
     "activation": "action",
     "description": "The wererat makes two attacks, using Scratch or Hand Crossbow in any combination. It can replace one attack with a Bite attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scratch",
+      "count": 2,
+      "or": [
+       "hand-crossbow"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "bite"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -41632,7 +42868,23 @@
     "activation": "action",
     "description": "The weretiger makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scratch",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "bite"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "prowl-tiger-or-hybrid-form-only",
@@ -41787,7 +43039,23 @@
     "activation": "action",
     "description": "The werewolf makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "scratch",
+      "count": 2,
+      "or": [
+       "longbow"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "bite"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "shape-shift",
@@ -42088,7 +43356,23 @@
     "activation": "action",
     "description": "The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. It can replace one attack with a use of Life Drain.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "necrotic-sword",
+      "count": 2,
+      "or": [
+       "necrotic-bow"
+      ]
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "life-drain"
+      ],
+      "attacks": 1
+     }
+    ]
    },
    {
     "id": "necrotic-sword",
@@ -43008,7 +44292,16 @@
     "activation": "action",
     "description": "The xorn makes one Bite attack and three Claw attacks.",
     "damage": [],
-    "untrackedMultiattack": true
+    "multiattack": [
+     {
+      "actionId": "bite",
+      "count": 1
+     },
+     {
+      "actionId": "claw",
+      "count": 3
+     }
+    ]
    },
    {
     "id": "bite",
@@ -43440,6 +44733,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "sleep-breath"
+      ],
+      "attacks": 2
+     }
     ]
    },
    {
@@ -43602,6 +44903,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "repulsion-breath"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -43768,6 +45077,14 @@
       "actionId": "rend",
       "count": 3
      }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "slowing-breath"
+      ],
+      "attacks": 1
+     }
     ]
    },
    {
@@ -43925,6 +45242,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "weakening-breath"
+      ],
+      "attacks": 1
      }
     ]
    },
@@ -44384,6 +45709,14 @@
      {
       "actionId": "rend",
       "count": 3
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "paralyzing-breath"
+      ],
+      "attacks": 1
      }
     ]
    },

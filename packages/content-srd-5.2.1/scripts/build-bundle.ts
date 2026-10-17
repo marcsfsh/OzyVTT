@@ -37,7 +37,7 @@ import {
   statBlockSaveOutcome,
   withoutOngoingDamage
 } from "./save-outcomes.js";
-import { areaOfProse, withProseFacts } from "../src/action-prose.js";
+import { areaOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-effects.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
@@ -301,40 +301,6 @@ const primaryDamageType = (attack: AttackFields, desc: string): string => {
  * ADR-0020 structured mechanics, extracted only from the SRD 2024 statblock house style -
  * confident patterns only, everything else stays prose (fail-open per ADR-0008).
  */
-const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 };
-
-/**
- * Multiattack composition. Two stock phrasings: "The X makes one Bite attack and one Tail attack."
- * and "The X makes three Rend attacks." (a trailing "It can replace…" sentence leaves the main plan
- * structured; the replacement option stays prose). Names must resolve to sibling action ids.
- */
-const parseMultiattack = (
-  desc: string,
-  siblingIdByName: ReadonlyMap<string, string>
-): Array<{ actionId: string; count: number }> | null => {
-  const resolve = (name: string) => siblingIdByName.get(name.trim().toLowerCase());
-  const pair = desc.match(/makes one ([A-Za-z' -]+?) attack and one ([A-Za-z' -]+?) attack/i);
-  if (pair) {
-    const first = resolve(pair[1]);
-    const second = resolve(pair[2]);
-    if (first && second)
-      return first === second
-        ? [{ actionId: first, count: 2 }]
-        : [
-            { actionId: first, count: 1 },
-            { actionId: second, count: 1 }
-          ];
-    return null;
-  }
-  const repeated = desc.match(/makes (one|two|three|four|\d) ([A-Za-z' -]+?) attacks\b/i);
-  if (repeated) {
-    const count = NUMBER_WORDS[repeated[1].toLowerCase()] ?? Number.parseInt(repeated[1], 10);
-    const actionId = resolve(repeated[2]);
-    if (actionId && Number.isInteger(count) && count >= 1 && count <= 4) return [{ actionId, count }];
-  }
-  return null;
-};
-
 /**
  * On-hit condition riders from the stock phrasing: "If the target is a Large or smaller creature,
  * it has the Grappled condition (escape DC 15). While Grappled, the target has the Restrained
@@ -412,11 +378,57 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * - protective-magic: its Shield, offered when an attack would hit.
  */
 const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction">> = {
-  "giant-crocodile/tail": { targetRules: ["not-grappled-by-source"] },
   "archmage/protective-magic": PROTECTIVE_MAGIC,
   "lich/protective-magic": PROTECTIVE_MAGIC,
   "mage/protective-magic": PROTECTIVE_MAGIC
 };
+
+const PRINTED_NAME = "[A-Z][A-Za-z'’-]*(?: [A-Z][A-Za-z'’-]*)*";
+
+/**
+ * What one action says about another, read across the stat block: a grapple that keeps an attack off its target
+ * ("While Grappled, ... can't be targeted by the tyrannosaurus's Tail"), and a legendary action that makes one attack
+ * or uses another action ("it makes one Rend attack", "The kraken uses Lightning Strike"), which resolves as that
+ * action, so the swing spends the pool. "One Claw or Tail attack" stays the GM's pick.
+ */
+function linkedActions(actions: ActorAction[], idOf: (name: string) => string | undefined): ActorAction[] {
+  const byId = new Map(actions.map((action) => [action.id, action]));
+  const keptOffGrappled = new Set<string>();
+  for (const action of actions) {
+    const match = new RegExp(
+      `While Grappled\\b[^.]*can[’']t be targeted by the [^.]*?[’']s? (${PRINTED_NAME})\\.`
+    ).exec(action.description);
+    const id = match ? idOf(match[1]) : undefined;
+    if (id) keptOffGrappled.add(id);
+  }
+  return actions.map((action) => {
+    let next = action;
+    if (keptOffGrappled.has(next.id) && !next.targetRules?.includes("not-grappled-by-source"))
+      next = { ...next, targetRules: [...(next.targetRules ?? []), "not-grappled-by-source"] };
+    if (next.legendary && !next.attack && !next.save && next.damage.length === 0) {
+      const body = next.description.replace(/^Legendary Action[^.]*\.\s*/, "");
+      const named =
+        new RegExp(`\\bmakes one (${PRINTED_NAME}) attack\\b`).exec(body) ??
+        new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body);
+      const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
+      if (source && (source.attack || source.save || source.damage.length > 0)) {
+        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules } = source;
+        next = {
+          ...next,
+          ...(attack ? { attack } : {}),
+          ...(save ? { save } : {}),
+          damage,
+          ...(onHit ? { onHit } : {}),
+          ...(conditionalDamage ? { conditionalDamage } : {}),
+          ...(reminder ? { reminder } : {}),
+          ...(area && !next.area ? { area } : {}),
+          ...(targetRules ? { targetRules } : {})
+        };
+      }
+    }
+    return next;
+  });
+}
 
 const usesSuffix = (action: ActionFields): string => {
   if (/\(Recharge /i.test(action.name)) return ""; // upstream already printed the recharge note in the name (basilisk, blink dog, cloaker)
@@ -736,6 +748,13 @@ const monsters: ActorDefinition[] = creatures
         idSafe(slugOf(sibling.pk).replace(`${slug}_`, ""))
       ])
     );
+    // A printed name, matched with or without a parenthesised suffix ("Bite (Bat or Vampire Form Only)").
+    const siblingIdOf = (name: string) => {
+      const key = name.trim().toLowerCase();
+      if (siblingIdByName.has(key)) return siblingIdByName.get(key);
+      for (const [full, id] of siblingIdByName) if (full.replace(/\s*\([^)]*\)\s*$/, "") === key) return id;
+      return undefined;
+    };
     const creatureActions = sortedActions.map((action) => {
       const row = attackByAction.get(action.pk)?.fields;
       const prose = row ? null : parseProseAttack(action.fields.desc);
@@ -808,9 +827,11 @@ const monsters: ActorDefinition[] = creatures
           : null;
       const actionId = idSafe(slugOf(action.pk).replace(`${slug}_`, ""));
       // ADR-0020 structured mechanics, all confident-pattern-only with prose fallback.
+      // A Multiattack's plan, the plans it can be instead and what can replace its attacks, read from its text against
+      // the stat block's other actions.
       const multiattack =
         !legendary && action.fields.action_type === "ACTION" && /multiattack/i.test(action.fields.name)
-          ? parseMultiattack(action.fields.desc, siblingIdByName)
+          ? multiattackOfProse(action.fields.desc, siblingIdOf)
           : null;
       const onHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
       const uses = usesOf(action.fields);
@@ -851,13 +872,30 @@ const monsters: ActorDefinition[] = creatures
         damage,
         ...(printed && printed.conditionalDamage.length > 0 ? { conditionalDamage: printed.conditionalDamage } : {}),
         ...(reminder ? { reminder: reminder.slice(0, 600) } : {}),
-        ...(multiattack ? { multiattack } : {}),
+        ...(multiattack ? { multiattack: multiattack.plan } : {}),
+        ...(multiattack && multiattack.alternatives.length > 0
+          ? { multiattackAlternatives: multiattack.alternatives }
+          : {}),
+        ...(multiattack && multiattack.replacements.length > 0
+          ? { multiattackReplacements: multiattack.replacements }
+          : {}),
         ...(onHit ? { onHit } : {}),
         ...(uses ? { uses } : {}),
-        ...(legendary ? { legendary: { cost: action.fields.legendary_action_cost ?? 1 } } : {}),
+        ...(legendary
+          ? {
+              legendary: {
+                cost: action.fields.legendary_action_cost ?? 1,
+                // "The dragon can't take this action again until the start of its next turn."
+                ...(/can[’']t take this action again until the start of its next turn/i.test(action.fields.desc)
+                  ? { oncePerRound: true as const }
+                  : {})
+              }
+            }
+          : {}),
         ...(enrichment ?? {})
       });
     });
+    const actions = linkedActions(creatureActions, siblingIdOf);
     const senses = [
       fields.darkvision_range ? `darkvision ${fields.darkvision_range} ft.` : null,
       fields.blindsight_range ? `blindsight ${fields.blindsight_range} ft.` : null,
@@ -915,7 +953,7 @@ const monsters: ActorDefinition[] = creatures
       },
       initiativeBonus: fields.initiative_bonus,
       speedFeet: fields.walk ?? 0,
-      actions: creatureActions,
+      actions,
       token: { disposition: "hostile" as const, footprint: { width: footprint, height: footprint } },
       ...(damageResistances.length > 0 ? { damageResistances } : {}),
       ...(damageImmunities.length > 0 ? { damageImmunities } : {}),

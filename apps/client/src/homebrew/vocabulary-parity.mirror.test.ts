@@ -3831,7 +3831,7 @@ describe("the guard itself refuses what the editor cannot author", () => {
         reachable key is caught by the row tests above. */
     const owed: ReadonlyArray<readonly [HomebrewType, string, readonly string[], string]> = [
       // [type, key, container path, the unit that closes it]
-      ["monster", "multiattack", ["actions"], "126 SRD records author it"],
+      ["monster", "multiattack", ["actions"], "177 SRD records author it"],
       ["class", "widensPicks", [], "Bard row 55, Magical Secrets"]
     ];
     const stillOwed = owed.filter(([type, key, within]) => !hasControl(type, key, within));

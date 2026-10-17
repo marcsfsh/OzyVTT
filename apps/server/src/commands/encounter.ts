@@ -7,6 +7,7 @@ import {
   addCombatant,
   endEncounter,
   nextInitiativeTurn,
+  removeCombatant,
   rollRemainingInitiative,
   rollSelfInitiative,
   setInitiativeScore,
@@ -23,6 +24,7 @@ import {
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
   InitiativeSwapSchema,
+  RemoveCombatantSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema
@@ -224,6 +226,56 @@ export const encounterCommands = [
   }),
 
   defineCommand({
+    type: "encounter.remove-combatant",
+    operationId: "removeEncounterCombatant",
+    description:
+      "Takes a combatant out of the running fight (GM-grade only): its initiative entry, token and prompts go, the turn moves on first when it was its turn, and what it sustains ends - its grapples and Concentration, what lasts until its next turn, and a creature it swallowed climbs out of the corpse with the movement the stat block names, landing Prone. It stays on the roster.",
+    summary: "Take a combatant out of the running fight, ending what it holds (GM).",
+    schema: RemoveCombatantSchema,
+    malformed: "The remove-combatant command is malformed.",
+    gmOnly: "Only the GM can take a combatant out of the fight.",
+    async run({ request, executeTimeline }, kit) {
+      const { actorId } = request;
+      let outcome: TimelineOutcome | undefined;
+      const effectEvents: EffectNarration[] = [];
+      const { state, duplicate } = await executeTimeline((draft, timeline) => {
+        if (draft.combat.historyCursor !== null)
+          throw new CommandRejectedError(
+            "Finish reviewing the combat history before taking a combatant out of the fight."
+          );
+        const gathering = draft.combat.playerInitiativeMode === "wait" && draft.combat.pendingInitiative.length > 0;
+        // Its turn ends first, recorded like any other, so Previous can bring it back.
+        if (draft.combat.turnActorId === actorId && draft.combat.initiative.length > 1 && !gathering)
+          outcome = planNextTurn(draft, timeline, false, (advancing) =>
+            nextInitiativeTurn(advancing, effectEvents, {
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
+              catalog: kit.equipmentCatalog(),
+              rollDie: (sides) => kit.context.random(sides),
+              newId: kit.context.newId,
+              now: () => new Date().toISOString()
+            })
+          );
+        else if (draft.combat.turnActorId === actorId && gathering) {
+          const order = draft.combat.initiative.filter((entry) => entry.actorId !== actorId);
+          if (order[0]) draft.combat = { ...draft.combat, turnActorId: order[0].actorId };
+        }
+        effectEvents.push(
+          ...removeCombatant(draft, actorId, (definitionId) => kit.resolveDefinitionIn(draft, definitionId))
+        );
+      });
+      if (duplicate) return;
+      if (outcome) kit.context.logTimelineOutcome(outcome, state);
+      kit.publishNarrations(effectEvents);
+      kit.context.appendLog({
+        kind: "encounter",
+        text: `${kit.actorName(actorId)} left the fight.`,
+        actorIds: [actorId],
+        gmOnly: kit.actorHidden(actorId)
+      });
+    }
+  }),
+
+  defineCommand({
     type: "initiative.set",
     operationId: "setInitiativeScore",
     description:
@@ -404,14 +456,18 @@ export const encounterCommands = [
     type: "turn.use",
     operationId: "useTurnSlot",
     description:
-      "Marks the current turn's action or bonus action used/unused. A free manual toggle (never blocks); structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance.",
+      "Marks the current turn's action or bonus action used/unused. A manual toggle: structured action resolution validates against this state per the encounter's rules mode, and un-marking the action slot also clears any open compound-action instance. Only the GM gives back a spent slot: a player's un-marking is the `economy.spent-slot` rules block (a GM note under advise).",
     summary: "Mark the current turn's action or bonus action used/unused.",
     schema: TurnUseSchema,
     malformed: "The turn command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { slot, used } = request;
-      const { state, duplicate } = await execute((draft) => setTurnSlot(draft, slot, used, initiatorOf(principal)));
+      const notes: string[] = [];
+      const { state, duplicate } = await execute((draft) =>
+        setTurnSlot(draft, slot, used, initiatorOf(principal), notes)
+      );
       if (duplicate) return;
+      kit.logRulesNotes(notes, state.combat.turnActorId);
       // Marking a slot spent is narrated like reactions; un-marking (a correction) stays silent.
       const turnActorId = state.combat.turnActorId;
       if (used && turnActorId)
@@ -427,13 +483,18 @@ export const encounterCommands = [
   defineCommand({
     type: "turn.use-reaction",
     operationId: "useReaction",
-    description: "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn.",
+    description:
+      "Marks a combatant's reaction used/unused; reactions refresh at the start of their own turn. Only the GM gives back a spent reaction: a player's un-marking is the `economy.spent-slot` rules block (a GM note under advise).",
     summary: "Mark a combatant's reaction used/unused.",
     schema: TurnReactionSchema,
     malformed: "The reaction command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, used } = request;
-      const { duplicate } = await execute((state) => setReactionUsed(state, actorId, used, initiatorOf(principal)));
+      const notes: string[] = [];
+      const { duplicate } = await execute((state) =>
+        setReactionUsed(state, actorId, used, initiatorOf(principal), notes)
+      );
+      if (!duplicate) kit.logRulesNotes(notes, actorId);
       if (!duplicate && used)
         kit.context.broadcastTableEvent({
           kind: "reaction",

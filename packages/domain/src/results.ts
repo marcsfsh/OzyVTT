@@ -288,6 +288,8 @@ export const ActionAvailabilitySchema = z.strictObject({
   componentsRemaining: z.number().int().min(0).nullable(),
   /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) - not on the stat block. */
   builtin: z.boolean().optional(),
+  /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */
+  ridesAHit: z.literal(true).optional(),
   // Display values only (ADR-0007); resolution recomputes from the id.
   description: z.string(),
   attackBonus: z.number().int().nullable(),
@@ -299,12 +301,14 @@ export const ActionAvailabilitySchema = z.strictObject({
   saveDc: z.number().int().nullable(),
   damage: z.array(z.strictObject({ formula: z.string(), type: z.string() })),
   usesLimit: z.number().int().nullable(),
-  usesPer: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
+  usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
   usesPool: z.string().nullable(),
   /** How many uses one activation spends when it is more than one, or `chosen` when the user picks it each time. */
   useCost: z.union([z.number().int(), z.literal("chosen")]).nullable(),
   requiresEffectTag: z.string().nullable(),
-  multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
+  multiattack: z
+    .array(z.strictObject({ actionId: z.string(), count: z.number().int(), or: z.array(z.string()).optional() }))
+    .nullable(),
   reaction: ActionReactionSchema.nullable(),
   /** The hit points it restores (a potion's 2d4 + 2), for display. */
   healing: z.strictObject({ formula: z.string() }).nullable().optional(),
@@ -313,7 +317,9 @@ export const ActionAvailabilitySchema = z.strictObject({
   /** Darts it makes, each assigned to a target (Magic Missile read from a scroll or cast from a wand). */
   darts: z.number().int().nullable().optional(),
   /** The damage types its caster picks from (Chromatic Orb). */
-  damageTypes: z.array(DamageTypeSchema).nullable().optional()
+  damageTypes: z.array(DamageTypeSchema).nullable().optional(),
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
+  checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
 /** A roll's mode as the rules count it, with what grants each side, so the sheet can say why before the roll. */
@@ -416,7 +422,22 @@ export const ActorMovementReplySchema = z.strictObject({
   speedFeet: z.number().min(0).nullable(),
   usedFeet: z.number().min(0),
   /** What going over does: `strict` refuses the move, `assisted` lets it through with a warning. */
-  enforcement: RuleModeSchema
+  enforcement: RuleModeSchema,
+  /** The ways it can move this turn and each one's budget: walking always, a special speed when it has one, and
+   *  climbing or swimming with Speed when it hasn't (`extraCost`: each foot costs an extra foot). */
+  modes: z
+    .array(
+      z.strictObject({
+        mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]),
+        budgetFeet: z.number().min(0),
+        extraCost: z.boolean()
+      })
+    )
+    .optional(),
+  /** Prone: it can only crawl, each foot costing an extra foot (two in Difficult Terrain). */
+  crawling: z.boolean().optional(),
+  /** It drags a creature it grapples that isn't Tiny or two sizes smaller, each foot costing an extra foot. */
+  dragging: z.boolean().optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;

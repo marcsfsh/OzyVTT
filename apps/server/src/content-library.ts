@@ -54,6 +54,8 @@ import {
   type SpellReference,
   type SubclassReference
 } from "@vtt/content-srd-5.2.1";
+import { withTakenActions } from "./builtin-actions.js";
+import { hitRiderOf } from "./resolution/hit-riders.js";
 import type { CharacterFeatureRef } from "./equipment-derivation.js";
 import { statblockFacts } from "./statblock-facts.js";
 
@@ -211,9 +213,13 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     ...(action.useCost !== undefined ? { useCost: action.useCost } : {}),
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack ?? null,
-    grants: action.grants !== undefined,
+    // A row taking two generic actions at once (Step of the Wind) grants their effects when it resolves.
+    grants: withTakenActions(action).grants !== undefined,
     reaction: action.reaction ?? null,
     ...(action.legendary ? { legendaryCost: action.legendary.cost } : {}),
+    ...(action.legendary?.oncePerRound ? { legendaryOncePerRound: true as const } : {}),
+    ...(action.replacesAttack ? { replacesAttack: true as const } : {}),
+    ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),

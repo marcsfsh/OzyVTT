@@ -60,6 +60,14 @@ export function recordLoadingShot(ctx: ResolveContext): void {
   };
 }
 
+/** An attack roll made on the attacker's own turn, so Reckless Attack, decided with the first, can't come after it. */
+export function recordAttackRoll(ctx: ResolveContext): void {
+  const { state, attacker, attack, input } = ctx;
+  if (attack === null || input.economyPaid === true || state.combat.turnActorId !== attacker.id) return;
+  if (state.combat.turn.attackRolled) return;
+  state.combat = { ...state.combat, turn: { ...state.combat.turn, attackRolled: true } };
+}
+
 /** A melee hit with a Cleave weapon opens its swing at a second creature, which the result card offers. */
 export function recordCleaveOpening(ctx: ResolveContext): void {
   const { state, action, attacker, attack, riderItemId } = ctx;

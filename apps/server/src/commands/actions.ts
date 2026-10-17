@@ -4,7 +4,7 @@ import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
 import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
-import { builtinAction } from "../builtin-actions.js";
+import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
 import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domain/commands";
@@ -14,15 +14,8 @@ import { damageAdjustmentDetail } from "../hit-points.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
-import { effectiveModeFor, overrideReason, overrideWaives, rememberOverride } from "../rules-families.js";
-import {
-  looseRollPlan,
-  NOT_YOUR_TURN,
-  offTurnVerdict,
-  routeForTap,
-  slotsModeFor,
-  spendLooseUses
-} from "../tap-routing.js";
+import { effectiveModeFor, overrideWaives } from "../rules-families.js";
+import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
 import { isItemActionId, upcastAction } from "../item-actions.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
 import type { EffectNarration } from "../effects.js";
@@ -38,7 +31,7 @@ import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrol
 import { castSlotLevel } from "../resolution/economy.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
-import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
+import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Stat-block actions, the server-routed "use this action" tap, and free dice rolls.
@@ -51,7 +44,7 @@ export const actionCommands = [
     type: "action.resolve",
     operationId: "resolveAction",
     description:
-      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`.",
+      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`. An action or Bonus Action off the creature's own turn meets the `economy.not-your-turn` block, except a Readied creature's response, which spends its Reaction.",
     summary:
       "Run a stat-block action: attack vs AC or save-DC with typed damage (GM anyone; a player their own claimed character).",
     schema: ActionResolveSchema,
@@ -74,7 +67,8 @@ export const actionCommands = [
         fumble
       } = request;
       // A player resolves only for their own claimed character (checked inside the mutation); GM-only
-      // inputs (templates, overrides, cover, applied conditions/notes) are refused or stripped.
+      // inputs (templates, overrides, cover, applied conditions) are refused or stripped. The note is the Ready
+      // action's trigger, which the table reads in the effect's name, so a player's is kept.
       const initiator = initiatorOf(principal);
       const isPlayer = initiator.role === "player";
       if (isPlayer && template) throw new GameAccessDeniedError("Your GM places area templates.");
@@ -84,7 +78,7 @@ export const actionCommands = [
         throw new GameAccessDeniedError("Type the d20 your die shows; the server adds your bonus.");
       const effectiveConditionId = isPlayer ? null : (conditionId ?? null);
       const effectiveCover = isPlayer ? null : (request.cover ?? null);
-      const effectiveNote = isPlayer ? null : (request.note ?? null);
+      const effectiveNote = request.note ?? null;
       if (effectiveConditionId !== null && !kit.catalogFor(principal).hasCondition(effectiveConditionId))
         throw new CommandRejectedError("That condition is not in the bundled reference.");
       // The grid is fetched up front (async) so template containment and token-distance rules can run
@@ -109,7 +103,7 @@ export const actionCommands = [
         const statBlockAction = effectiveActions(definition, attacker, kit.equipmentCatalog()).find(
           (candidate) => candidate.id === actionId
         );
-        const listed = statBlockAction ?? builtinAction(actionId);
+        const listed = statBlockAction ?? builtinActionFor(definition, actionId);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
         const action = withChosenCost(listed, request.spend);
@@ -323,10 +317,14 @@ export const actionCommands = [
 
       // On this creature's turn in combat: delegate to the structured path unchanged.
       if (route === "resolved") return { ...(await resolve(false)), route: "resolved" };
+      // Off turn in combat: the structured resolution's own economy refuses an action or Bonus Action with the
+      // overridable, askable `economy.not-your-turn` block (advised, a GM note; off, nothing) and lets a reaction,
+      // a readied response and a legendary action through. A GM override waives it, audited by the resolve.
+      if (route === "blocked") return { ...(await resolve(true)), route: "resolved" };
 
       const definition = actor.definitionId ? kit.resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
       const available = effectiveActions(definition, actor, kit.equipmentCatalog());
-      const found = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
+      const found = available.find((candidate) => candidate.id === actionId) ?? builtinActionFor(definition, actionId);
       if (!found) throw new CommandRejectedError("That action is not on the stat block.");
       const listed = withChosenCost(found, chosenSpend);
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
@@ -338,47 +336,6 @@ export const actionCommands = [
           : listed,
         damageType ?? null
       );
-
-      // Off turn in combat: a real rules block, so the GM can override and the player can ask. Advise
-      // resolves with a warning; Off just resolves.
-      if (route === "blocked") {
-        const currentName =
-          snapshot.combat.turnActorId === null ? "Someone else" : kit.actorName(snapshot.combat.turnActorId);
-        // A GM Allow waves the refusal through and remembers the family so the rest of this creature's
-        // off-turn actions stop re-prompting. The memory write is its own small mutation.
-        const waived = overrideWaives(override, NOT_YOUR_TURN);
-        const verdict = waived ? { warning: null } : offTurnVerdict(snapshot, action, currentName);
-        if (waived) {
-          await kit.store.execute(
-            {
-              id: kit.context.newId(),
-              type: "action.use",
-              actorId,
-              payload: { commandId, override },
-              principal: principalTag(principal)
-            },
-            (state) => {
-              rememberOverride(state, NOT_YOUR_TURN, override);
-            }
-          );
-          kit.context.appendLog({
-            kind: "override",
-            text: `OVERRIDE (${NOT_YOUR_TURN}): ${kit.actorName(actorId)} acted off turn - ${overrideReason(override)}`,
-            actorId,
-            actorIds: [actorId]
-          });
-        }
-        const resolved = await resolve(true);
-        if (verdict.warning !== null)
-          kit.context.appendLog({
-            kind: "action",
-            text: `Rules note: ${verdict.warning}`,
-            actorId,
-            actorIds: [actorId],
-            gmOnly: true
-          });
-        return { ...resolved, route: "resolved", ...(verdict.warning === null ? {} : { warning: verdict.warning }) };
-      }
 
       // Loose: the server rolls the action's dice, attributed to the character, and spends what the action
       // costs (an item's charges), touching no combat state. HP only ever moves through the resolver. Only the GM may

@@ -7,7 +7,7 @@ import { storedDefinition } from "../actor-roster.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builderOffers } from "../builder-offers.js";
 import { draftOwnerOf } from "../character-drafts.js";
-import { BUILTIN_ACTIONS, BUILTIN_TARGETING } from "../builtin-actions.js";
+import { BUILTIN_TARGETING, builtinActionsFor } from "../builtin-actions.js";
 import { builtinCheckSkills } from "../resolution/builtins.js";
 import { actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -86,18 +86,18 @@ export const gameReads = [
       const actions = imported ? imported.actions.map(actionSummaryOf) : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
-      const builtins = BUILTIN_ACTIONS.filter(
-        (candidate) => !definition?.actions.some((declared) => declared.id === candidate.id)
-      ).map((candidate) => {
-        // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
-        const checkSkills = builtinCheckSkills(candidate.id);
-        return {
-          ...actionSummaryOf(candidate),
-          builtin: true,
-          targeting: BUILTIN_TARGETING[candidate.id] ?? ("none" as const),
-          ...(checkSkills.length > 0 ? { checkSkills } : {})
-        };
-      });
+      const builtins = builtinActionsFor(definition)
+        .filter((candidate) => !definition?.actions.some((declared) => declared.id === candidate.id))
+        .map((candidate) => {
+          // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
+          const checkSkills = builtinCheckSkills(candidate.id);
+          return {
+            ...actionSummaryOf(candidate),
+            builtin: true,
+            targeting: BUILTIN_TARGETING[candidate.id] ?? ("none" as const),
+            ...(checkSkills.length > 0 ? { checkSkills } : {})
+          };
+        });
       return {
         actions: [...actions, ...builtins],
         ...(definition?.legendary ? { legendary: definition.legendary } : {})
@@ -146,7 +146,7 @@ export const gameReads = [
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
       const catalog = kit.equipmentCatalog();
       const available = effectiveActions(definition, actor, catalog);
-      const builtins = BUILTIN_ACTIONS.filter(
+      const builtins = builtinActionsFor(definition).filter(
         (candidate) => !available.some((declared) => declared.id === candidate.id)
       );
       return {

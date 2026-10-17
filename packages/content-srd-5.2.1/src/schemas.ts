@@ -84,7 +84,9 @@ export const SpellLaterActionSchema = z
       .strict()
       .optional(),
     damage: SpellDamageSchema,
-    area: ActionAreaSchema.optional()
+    area: ActionAreaSchema.optional(),
+    /** It moves the cast's `grant` from a creature at 0 Hit Points to its own target (Hunter's Mark, Hex). */
+    movesGrant: z.literal(true).optional()
   })
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { ContentActionSummary, GmActor, GmView } from "@vtt/domain";
-import { IconChevron, IconSparkle } from "@vtt/ui";
+import { IconSparkle } from "@vtt/ui";
 import { ActionRow } from "./ActionRow";
+import { CommonActionChips } from "./CommonActionChips";
 import { actionSummaryParts, tagLabel } from "./action-summary";
 import { RichText } from "./RichText";
 import { SpellcastingText } from "./spells";
@@ -15,8 +16,11 @@ const isResolvable = (action: ContentActionSummary) =>
   action.grants ||
   action.multiattack !== null ||
   action.usesLimit !== null ||
+  action.legendaryCost !== undefined ||
   action.builtin === true;
-/** Rage/Reckless (grants), a Multiattack plan, a spent charge, and no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go through targeting, as do check actions that ask for a skill (Search, Study). */
+/** Rage/Reckless (grants), a Multiattack plan, a spent charge, a legendary action that only spends the pool, and
+ *  no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go
+ *  through targeting, as do check actions that ask for a skill (Search, Study). */
 const isTargetless = (action: ContentActionSummary) =>
   action.checkSkills === undefined &&
   action.attackBonus === null &&
@@ -24,7 +28,18 @@ const isTargetless = (action: ContentActionSummary) =>
   action.damage.length === 0 &&
   action.targeting !== "single" &&
   action.targeting !== "multi" &&
-  (action.grants || action.multiattack !== null || action.usesLimit !== null || action.builtin === true);
+  (action.grants ||
+    action.multiattack !== null ||
+    action.usesLimit !== null ||
+    action.legendaryCost !== undefined ||
+    action.builtin === true);
+
+/** How many places an open action has left for this action: its own, and those it shares ("Claw or Tail"). */
+const placesLeft = (components: Readonly<Record<string, number>>, actionId: string) =>
+  Object.entries(components).reduce(
+    (sum, [key, count]) => (key === actionId || key.split("|").includes(actionId) ? sum + count : sum),
+    0
+  );
 
 /**
  * Client-side availability hint (ADR-0020). The server decides: rows stay tappable and a
@@ -38,6 +53,8 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
     const perRound = actor.legendary?.actionsPerRound ?? 3;
     if ((state.combat.legendaryUsed[actor.id] ?? 0) + action.legendaryCost > perRound)
       return "No legendary actions left this round";
+    if (action.legendaryOncePerRound && (state.combat.legendaryUsed[`${actor.id}:${action.id}`] ?? 0) > 0)
+      return "Not again until its next turn";
   }
   if (action.usesLimit !== null && action.usesPer !== null) {
     const key = action.usesPool ?? action.id;
@@ -48,7 +65,9 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
     if (spent >= action.usesLimit)
       return action.usesPer === "recharge"
         ? `Spent - recharges on ${action.usesRecharge}+ at its turn start`
-        : "No uses left";
+        : action.usesPer === "own-turn"
+          ? "Spent - back at its next turn"
+          : "No uses left";
   }
   const myTurn = state.combat.turnActorId === actor.id;
   if (!myTurn) return null;
@@ -62,22 +81,29 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
   if (fromBonus > 0) return `${fromBonus} left from the bonus action`;
   if (action.activation === "bonus-action" && turn.bonusActionUsed) return "Bonus action used";
   if (action.activation === "action" && turn.actionUsed) {
-    const instance = turn.actionInstance?.actorId === actor.id ? turn.actionInstance.components : null;
+    // Action Surge or Haste left another action; the server says which actions it can take.
+    const extra = turn.extraActions?.actorId === actor.id ? turn.extraActions : undefined;
+    const hasted = actor.effects.some((effect) => effect.tags.includes("hasted")) && extra?.hasteUsed !== true;
+    if ((extra?.surges ?? 0) > 0 || hasted) return null;
+    const open = turn.actionInstance?.actorId === actor.id ? turn.actionInstance : null;
+    const instance = open?.components ?? null;
     // The Multiattack plan row stays a live "continue" while any component remains.
     if (action.multiattack && instance && Object.values(instance).some((count) => count > 0))
       return "In progress - pick the next attack";
-    const remaining = instance
-      ? (instance[action.id] ?? 0) + (action.attackBonus !== null ? (instance["attack"] ?? 0) : 0)
-      : 0;
+    // A weapon attack or an Unarmed Strike spends one of the Attack action's attacks.
+    const attackMember = action.attackBonus !== null || action.replacesAttack === true;
+    const remaining = instance ? placesLeft(instance, action.id) + (attackMember ? (instance["attack"] ?? 0) : 0) : 0;
     if (remaining > 0) return `${remaining} attack${remaining === 1 ? "" : "s"} left`;
+    // "It can replace one attack with a use of Roar": the server takes it in an attack's place.
+    if (
+      Object.entries(open?.replacements ?? {}).some(([key, count]) => count > 0 && key.split("|").includes(action.id))
+    )
+      return null;
     return "Action used";
   }
   if (action.activation === "reaction" && state.combat.reactionsUsed.includes(actor.id)) return "Reaction used";
   return null;
 }
-
-/** The generic actions a table reaches for mid-fight; the rest sit behind "More". */
-const PRIMARY_BUILTINS = ["dodge", "dash", "disengage", "help", "hide"] as const;
 
 /**
  * A stat block's actions in three tiers: its own rollable actions as full rows, the shared builtins
@@ -99,7 +125,6 @@ export function GmActionList({
   onUse: (action: ContentActionSummary, targetless: boolean) => void;
 }>) {
   const [openReference, setOpenReference] = useState<string | null>(null);
-  const [moreBuiltins, setMoreBuiltins] = useState(false);
   const own = actions.filter((action) => isResolvable(action) && action.builtin !== true);
   const builtins = actions.filter((action) => isResolvable(action) && action.builtin === true);
   const reference = actions.filter((action) => !isResolvable(action));
@@ -116,7 +141,7 @@ export function GmActionList({
               <ActionRow
                 action={action}
                 parts={actionSummaryParts(action, actions)}
-                note={action.grants ? "Grants an effect" : "Tap to use"}
+                note={action.ridesAHit ? "Add it on a hit's result" : action.grants ? "Grants an effect" : "Tap to use"}
                 hint={hint}
                 disabled={busy}
                 onUse={() => onUse(action, isTargetless(action))}
@@ -125,52 +150,13 @@ export function GmActionList({
           );
         })}
       </ul>
-      {builtins.length > 0 &&
-        (() => {
-          // A builtin whose required effect this creature has (Put Out the Fire while burning) joins the common ones.
-          const called = builtins.filter(
-            (action) =>
-              !(PRIMARY_BUILTINS as readonly string[]).includes(action.id) &&
-              action.requiresEffectTag !== null &&
-              actor.effects.some((effect) => effect.tags.includes(action.requiresEffectTag!))
-          );
-          const primary = [
-            ...called,
-            ...PRIMARY_BUILTINS.flatMap((id) => builtins.filter((action) => action.id === id))
-          ];
-          const rest = builtins.filter((action) => !primary.includes(action));
-          const shown = moreBuiltins ? [...primary, ...rest] : primary.length > 0 ? primary : builtins;
-          return (
-            <div className="builtin-actions" role="group" aria-label="Common actions">
-              <span className="builtin-actions-label">Common</span>
-              {shown.map((action) => {
-                const hint = availabilityHint(state, actor, action);
-                return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    className={`builtin-chip${hint ? " hinted" : ""}`}
-                    disabled={busy}
-                    title={`${action.description}${hint ? `\n\n${hint}` : ""}`}
-                    onClick={() => onUse(action, isTargetless(action))}
-                  >
-                    {action.name}
-                  </button>
-                );
-              })}
-              {rest.length > 0 && primary.length > 0 && (
-                <button
-                  type="button"
-                  className="builtin-chip builtin-more"
-                  aria-expanded={moreBuiltins}
-                  onClick={() => setMoreBuiltins((current) => !current)}
-                >
-                  {moreBuiltins ? "Less" : "More"} <IconChevron className="builtin-more-caret" />
-                </button>
-              )}
-            </div>
-          );
-        })()}
+      <CommonActionChips
+        actions={builtins}
+        busy={busy}
+        effectTags={actor.effects.flatMap((effect) => effect.tags)}
+        hintFor={(action) => availabilityHint(state, actor, action)}
+        onUse={onUse}
+      />
       {spellcasting && (
         <div className="action-spellcasting" role="group" aria-label="Spellcasting">
           <div className="action-spellcasting-head">

@@ -33,7 +33,7 @@ import {
 import { rechooseInLedger } from "../ledger-rechoice.js";
 import { applyRest, hitDieSizesToSpend, spendHitDice } from "../rests.js";
 import { restoreUses, spendUses } from "../use-pools.js";
-import { builtinAction } from "../builtin-actions.js";
+import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -58,7 +58,7 @@ function requireMeleeKnockOut(
   const definition = source.definitionId ? kit.resolveDefinition(source.definitionId) : undefined;
   const action =
     effectiveActions(definition, source, kit.equipmentCatalog()).find((candidate) => candidate.id === sourceActionId) ??
-    builtinAction(sourceActionId);
+    builtinActionFor(definition, sourceActionId);
   if (!action) return;
   // A ranged attack, or a save or spell with no attack roll; an action that doesn't say stays the GM's call.
   const ranged =

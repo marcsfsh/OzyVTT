@@ -11696,6 +11696,15 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "move",
+     "activation": "bonus-action",
+     "when": "If the cursed creature drops to 0 Hit Points before the spell ends, a Bonus Action on a later turn curses a new creature.",
+     "damage": [],
+     "movesGrant": true
+    }
+   ],
    "healing": null,
    "grant": {
     "modifiers": [
@@ -12171,6 +12180,15 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "move",
+     "activation": "bonus-action",
+     "when": "If the marked creature drops to 0 Hit Points before the spell ends, a Bonus Action moves the mark to a new creature you can see within range.",
+     "damage": [],
+     "movesGrant": true
+    }
+   ],
    "healing": null,
    "grant": {
     "modifiers": [

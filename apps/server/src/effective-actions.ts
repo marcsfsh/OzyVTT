@@ -1,6 +1,7 @@
 import type { Actor } from "@vtt/domain";
 import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
+import { withTakenActions } from "./builtin-actions.js";
 import {
   deriveEquipment,
   sourceItemOf,
@@ -10,14 +11,17 @@ import {
 
 /** The action list every actor-scoped consumer must read instead of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
- *  reads. Nothing is written back. Moment-gated riders are collected on the roll path instead (the two sets
- *  are disjoint). */
+ *  reads, and the effects of a row that takes two generic actions at once (`withTakenActions`). Nothing is written
+ *  back. Moment-gated riders are collected on the roll path instead (the two sets are disjoint). */
 export function effectiveActions(
   definition: ActorDefinition | undefined,
   actor: Actor | undefined,
   catalog: EquipmentCatalog | undefined
 ): readonly ActorAction[] {
-  const base = definition?.actions ?? [];
+  const declared = definition?.actions ?? [];
+  const taken = declared.map(withTakenActions);
+  // The definition's own list when nothing changed, so a caller holding it sees the same array.
+  const base = taken.every((action, index) => action === declared[index]) ? declared : taken;
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;

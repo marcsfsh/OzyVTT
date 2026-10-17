@@ -1088,12 +1088,13 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
 export const MAX_ACTION_USES = 100;
 
-/** Limited uses. "turn"/"encounter"/rests reset as named; "recharge" on a start-of-turn d6 >= `recharge`.
+/** Limited uses. "turn"/"encounter"/rests reset as named; "own-turn" at the start of the bearer's next turn ("you
+ * can't use it again until the start of your next turn"); "recharge" on a start-of-turn d6 >= `recharge`.
  * `pool` shares one counter across actions (Sneak Attack once per turn regardless of weapon). */
 export const ActionUsesSchema = z
   .object({
     limit: z.number().int().min(1).max(MAX_ACTION_USES),
-    per: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]),
+    per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
     pool: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -1235,6 +1236,19 @@ export const SaveFailureEffectSchema = z
   })
   .strict();
 
+/** One place in a Multiattack's plan: an action taken `count` times, or any of `or` in its place. */
+export const MultiattackComponentSchema = z
+  .object({
+    actionId: z.string().regex(/^[a-z0-9-]+$/),
+    count: z.number().int().min(1).max(6),
+    or: z
+      .array(z.string().regex(/^[a-z0-9-]+$/))
+      .min(1)
+      .max(3)
+      .optional()
+  })
+  .strict();
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -1296,11 +1310,34 @@ export const ActionSchema = z.object({
   /** The damage types the caster picks from on each use (Chromatic Orb); the resolve names one, and every damage
    *  part takes it. Absent: the damage's own types. */
   damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
-  /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). */
-  multiattack: z
-    .array(z.object({ actionId: z.string().regex(/^[a-z0-9-]+$/), count: z.number().int().min(1).max(4) }).strict())
+  /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). A
+   *  component's `or` names other actions that can fill its place ("using Scimitar or Shortbow in any combination"). */
+  multiattack: z.array(MultiattackComponentSchema).min(1).max(6).optional(),
+  /** Plans a Multiattack can be instead of `multiattack` ("or it makes two Hurl Flame attacks"), chosen by the first
+   *  attack taken. */
+  multiattackAlternatives: z.array(z.array(MultiattackComponentSchema).min(1).max(6)).min(1).max(2).optional(),
+  /** What can take the place of a Multiattack's attacks ("It can replace one attack with a use of Roar"): one of
+   *  `actionIds` replaces `attacks` of them, once, or for any attack (`any`), or only the one `of` names ("the Claw
+   *  attack"). */
+  multiattackReplacements: z
+    .array(
+      z
+        .object({
+          actionIds: z
+            .array(z.string().regex(/^[a-z0-9-]+$/))
+            .min(1)
+            .max(3),
+          attacks: z.number().int().min(1).max(3),
+          any: z.literal(true).optional(),
+          of: z
+            .string()
+            .regex(/^[a-z0-9-]+$/)
+            .optional()
+        })
+        .strict()
+    )
     .min(1)
-    .max(4)
+    .max(3)
     .optional(),
   /** On-hit conditions applied to the target as one source-linked effect (Bite: Grappled + Restrained, escape DC 15). */
   onHit: z
@@ -1362,9 +1399,9 @@ export const ActionSchema = z.object({
   /** Taken in place of one attack of the Attack action (Breath Weapon: "replace one of your attacks"): it opens the
    *  Attack action, or spends one attack the action has left. Pairs with activation "action". */
   replacesAttack: z.boolean().optional(),
-  /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". */
+  /** SRD Legendary Action: taken on other creatures' turns, spending `cost` from the per-round pool that refills on the creature's own turn. Pairs with activation "other". `oncePerRound`: "can't take this action again until the start of its next turn". */
   legendary: z
-    .object({ cost: z.number().int().min(1).max(5) })
+    .object({ cost: z.number().int().min(1).max(5), oncePerRound: z.literal(true).optional() })
     .strict()
     .optional(),
   /** The area it covers, for the map template. Filled from the description where the action enters the system

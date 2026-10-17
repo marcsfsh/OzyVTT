@@ -25,7 +25,7 @@ import {
 } from "../held-rolls.js";
 import { GM_CHOICE } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
-import { endEffect } from "../effects.js";
+import { endEffect, STEADY_AIM_TAG } from "../effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
@@ -33,9 +33,10 @@ import {
   type EquipmentDerivation,
   type RollModeClaims
 } from "../equipment-derivation.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { VEXED_TAG } from "../weapon-mastery.js";
-import { areEnemies } from "../creature-sides.js";
+import { areAllies, areEnemies } from "../creature-sides.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -57,8 +58,8 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
   const { action, input, attacker } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
-  // Matched by id so a Monk's own strike (which shadows the builtin) still counts as unarmed.
-  const unarmed = action.id === UNARMED_STRIKE_ACTION_ID;
+  // Matched by id so a Monk's own strike (which shadows the builtin) and a Bonus Action strike count as unarmed.
+  const unarmed = builtinBaseId(action.id) === UNARMED_STRIKE_ACTION_ID;
   if (attack) {
     const melee = attack.reachFeet !== undefined;
     const ranged = attack.rangeFeet !== undefined;
@@ -95,7 +96,7 @@ function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
   const str = scoreModifier(scores.str);
   const dex = scoreModifier(scores.dex);
   // Martial Arts lets a Monk's strike use Dexterity; the builtin strike is Strength.
-  if (ctx.action.id === UNARMED_STRIKE_ACTION_ID)
+  if (builtinBaseId(ctx.action.id) === UNARMED_STRIKE_ACTION_ID)
     return ctx.deps.definition?.character?.martialArts && dex > str ? "dex" : "str";
   const weapon = ctx.attacker.inventory.find((item) => item.id === ctx.riderItemId)?.weapon;
   return weapon ? weaponAbilityFrom(weapon.properties ?? [], weapon.rangeFeet, str, dex) : undefined;
@@ -129,6 +130,19 @@ const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) 
 export const OUTLINED_TAG = "outlined";
 /** An effect that lasts until the next attack roll against its bearer, whoever makes it (Guiding Bolt's light). */
 export const UNTIL_ATTACKED_TAG = "until-attacked";
+/** The Help action's mark on the distracted enemy: the next attack roll against it by an ally of the helper. */
+export const DISTRACTED_TAG = "distracted";
+
+/** The Help the attacker's side put on this target, if any: one of its allies distracted it (SRD Help: "giving
+ *  Advantage to the next attack roll by one of your allies against that enemy"). The helper gets nothing from it. */
+function distractionOf(ctx: ResolveContext, target: LiveActor) {
+  return target.effects.find((effect) => {
+    if (!effect.tags.includes(DISTRACTED_TAG) || effect.sourceActorId === null) return false;
+    if (effect.sourceActorId === ctx.attacker.id) return false;
+    const helper = ctx.state.actors.find((actor) => actor.id === effect.sourceActorId);
+    return helper !== undefined && areAllies(ctx.attacker, helper, ctx.deps.resolveDefinition);
+  });
+}
 const outlined = (actor: LiveActor) => actor.effects.some((effect) => effect.tags.includes(OUTLINED_TAG));
 
 /** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
@@ -167,6 +181,16 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
   // Vex: the attacker's earlier hit marked this creature for their next attack roll (spent by it, `spendVex`).
   if (target.effects.some((effect) => effect.tags.includes(VEXED_TAG) && effect.sourceActorId === attacker.id))
     sources.advantage.push({ source: "vex", label: `Vex (${attacker.name}'s earlier hit)` });
+  // Help: an ally distracted it, for this attack roll alone (spent by it, `spendDistraction`). A helper the table
+  // can't see isn't named.
+  const distraction = distractionOf(ctx, target);
+  if (distraction) {
+    const helper = ctx.state.actors.find((actor) => actor.id === distraction.sourceActorId);
+    sources.advantage.push({
+      source: "help",
+      label: helper?.visibility === "public" ? `Help (${helper.name})` : "Help"
+    });
+  }
   // 2024 rule: advantage within 5 feet, disadvantage beyond. Unknown distance contributes nothing.
   if (has(target, "prone") && distance !== null) {
     if (distance <= 5) sources.advantage.push({ source: "target-prone", label: "Target is Prone (within 5 ft)" });
@@ -435,6 +459,30 @@ export function rollAttack(ctx: ResolveContext): void {
     ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {}),
     ...(bonusDice.length > 0 ? { bonusDice } : {})
   };
+}
+
+/** The attack roll spends the Help it had, hit or miss: Help gives Advantage to one attack roll. */
+export function spendDistraction(ctx: ResolveContext): void {
+  const { state, attack, targets, effectsEnded } = ctx;
+  if (attack === null) return;
+  const target = targets[0];
+  const distraction = distractionOf(ctx, target);
+  if (!distraction) return;
+  endEffect(state, target.id, distraction.id);
+  effectsEnded.push({ actorId: target.id, actorName: target.name, name: distraction.name });
+}
+
+/** Steady Aim gives Advantage on the next attack roll this turn: the roll spends it, hit or miss, while the Speed 0 it
+ *  holds lasts until the turn ends. */
+export function spendSteadyAim(ctx: ResolveContext): void {
+  const { attacker, attack } = ctx;
+  if (attack === null) return;
+  const aiming = (effect: LiveActor["effects"][number]) =>
+    effect.tags.includes(STEADY_AIM_TAG) && effect.modifiers.length > 0;
+  if (!attacker.effects.some(aiming)) return;
+  attacker.effects = attacker.effects.map((effect) =>
+    aiming(effect) ? { ...effect, name: `${effect.name} (Speed 0)`, modifiers: [] } : effect
+  );
 }
 
 /** The attack roll spends what lasts only until the next attack roll against its bearer (Guiding Bolt's light), hit

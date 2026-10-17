@@ -316,12 +316,34 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "2d6", type: "fire" }]
     }
   ],
+  // "If the target drops to 0 Hit Points before this spell ends, you can take a Bonus Action on a later turn to curse a
+  // new creature."
+  hex: [
+    {
+      name: "move",
+      activation: "bonus-action",
+      when: "If the cursed creature drops to 0 Hit Points before the spell ends, a Bonus Action on a later turn curses a new creature.",
+      damage: [],
+      movesGrant: true
+    }
+  ],
   "heat-metal": [
     {
       name: "heat again",
       activation: "bonus-action",
       when: "On your later turns, a Bonus Action deals the damage again if the object is within range; a creature holding or wearing it makes a Constitution save or drops it.",
       damage: [{ formula: "2d8", type: "fire" }]
+    }
+  ],
+  // "If the target drops to 0 Hit Points before this spell ends, you can take a Bonus Action to move the mark to a new
+  // creature you can see within range."
+  "hunters-mark": [
+    {
+      name: "move",
+      activation: "bonus-action",
+      when: "If the marked creature drops to 0 Hit Points before the spell ends, a Bonus Action moves the mark to a new creature you can see within range.",
+      damage: [],
+      movesGrant: true
     }
   ],
   "incendiary-cloud": [

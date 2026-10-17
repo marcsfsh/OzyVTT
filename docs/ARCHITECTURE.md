@@ -144,10 +144,14 @@ hidden things are stripped by the projections regardless of what fog covers.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
   reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
-  A move is charged along the cheapest grid path, where terrain and enemies' spaces cost double
-  (`movementPath` in `@vtt/rules-5e`). The map's drag preview runs the same function, and a
-  mirror test checks the two agree. Players and the table screen get only the terrain the fog
-  reveals.
+  A move is charged along the cheapest grid path, where terrain costs double, other creatures'
+  spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
+  dragging a grappled creature, add a foot per foot (`movementPath` and `spacePassage` in
+  `@vtt/rules-5e`). How a token travels (walking, a special speed, teleporting, moved by force)
+  rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
+  read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
+  and a mirror test checks the two agree. Players and the table screen get only the terrain the
+  fog reveals.
 
 ## Rules engine
 

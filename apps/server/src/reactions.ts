@@ -7,10 +7,10 @@ import { releaseHeldRoll } from "./held-rolls.js";
 import { adjustableActor, applyDamageDetailed, halvedDamageParts, type DamageInput } from "./hit-points.js";
 import { addEffect, makeEffect, type EffectNarration } from "./effects.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "./action-resolution.js";
-import { builtinAction } from "./builtin-actions.js";
+import { builtinAction, builtinActionFor } from "./builtin-actions.js";
 import { effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import type { LiveActor } from "./resolution/context.js";
+import type { DefinitionAction, LiveActor, ResolveInput } from "./resolution/context.js";
 import { damagePartsOf } from "./resolution/damage.js";
 import { commitEconomy, planEconomy } from "./resolution/economy.js";
 
@@ -65,6 +65,8 @@ export type OpportunityAttackOptions = Readonly<{
   reroll?: boolean;
   /** Push mastery's chosen distance on a hit (0 declines). */
   pushFeet?: number;
+  /** The extras chosen for the hit on its preview (Sneak Attack). */
+  hitOptions?: ResolveInput["hitOptions"];
 }>;
 
 /** The key a reaction's strike holds its d20 under. */
@@ -207,9 +209,31 @@ function answerParkedDamage(answer: Answer): ReactionOutcome {
   return { ...base, used: use, appliedDamage, events, ...detailOf(application) };
 }
 
+/** The Unarmed Strike's options: each is one melee attack an opportunity attack can be. */
+const UNARMED_OPTIONS: readonly string[] = [
+  "unarmed-strike",
+  "unarmed-grapple",
+  "unarmed-shove-prone",
+  "unarmed-shove-push"
+];
+
+/** SRD Opportunity Attacks (and Retaliation): "one melee attack with a weapon or an Unarmed Strike". A spell attack,
+ *  a ranged shot, a Multiattack plan, a legendary action or an extra attack that rides the Attack action isn't. */
+function meleeSwing(candidate: DefinitionAction): boolean {
+  if (UNARMED_OPTIONS.includes(candidate.id)) return true;
+  return (
+    candidate.attack?.reachFeet !== undefined &&
+    candidate.spellId === undefined &&
+    candidate.multiattack === undefined &&
+    candidate.legendary === undefined &&
+    candidate.extraAttack === undefined
+  );
+}
+
 /** An opportunity attack or a strike back: one action against the creature the prompt names. A melee attack is the
  *  chosen one, else the first melee attack, else Unarmed Strike; Hellish Rebuke strikes with itself. An attack can be
- *  previewed (commit:false) before it lands. */
+ *  previewed (commit:false) before it lands, and the extras its hit can carry (Sneak Attack) are chosen with the
+ *  confirm. */
 function answerStrike(
   answer: Answer,
   actionId: string | undefined,
@@ -240,13 +264,20 @@ function answerStrike(
   let chosen = declared;
   let isBuiltin = false;
   if (!strikesWithItself) {
-    const picked = actionId ? available.find((candidate) => candidate.id === actionId) : undefined;
-    const fallbackMelee = available.find(
-      (candidate) => candidate.attack !== undefined && candidate.attack.reachFeet !== undefined
-    );
+    // An Unarmed Strike's options (Grapple, Shove) are the generic ones unless the sheet has its own strike.
+    const unarmedOption = actionId !== undefined && UNARMED_OPTIONS.includes(actionId);
+    const picked = actionId
+      ? (available.find((candidate) => candidate.id === actionId) ??
+        (unarmedOption ? builtinAction(actionId) : undefined))
+      : undefined;
+    if (picked && !meleeSwing(picked))
+      throw new CommandRejectedError(
+        `${pending.kind === "leaves-reach" ? "An opportunity attack" : pending.actionName} is one melee attack with a weapon or an Unarmed Strike - ${picked.name} isn't one.`
+      );
+    const fallbackMelee = available.find(meleeSwing);
     // The swing is the reaction, so it spends the reaction slot even on the reactor's own turn.
     chosen = { ...(picked ?? fallbackMelee ?? builtinAction("unarmed-strike")!), activation: "reaction" };
-    isBuiltin = picked === undefined && fallbackMelee === undefined;
+    isBuiltin = picked ? !available.includes(picked) : fallbackMelee === undefined;
   }
   if (!chosen) throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
   const commit = chosen.attack === undefined ? true : (options.commit ?? true);
@@ -270,7 +301,8 @@ function answerStrike(
       ...(options.reroll === true ? { reroll: true } : {}),
       // The resolver can't infer how the attack was made from the action, so announce it for `attack-kind-is` riders.
       attackKinds: pending.kind === "leaves-reach" ? ["reaction", "opportunity"] : ["reaction"],
-      ...(options.pushFeet !== undefined ? { pushFeet: options.pushFeet } : {})
+      ...(options.pushFeet !== undefined ? { pushFeet: options.pushFeet } : {}),
+      ...(options.hitOptions ? { hitOptions: options.hitOptions } : {})
     },
     {
       random: deps.random,
@@ -338,7 +370,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
   const action =
     attacker && parked
       ? parked.builtin
-        ? builtinAction(parked.actionId)
+        ? builtinActionFor(attackerDefinition, parked.actionId)
         : effectiveActions(attackerDefinition, attacker, deps.catalog).find(
             (candidate) => candidate.id === parked.actionId
           )

@@ -22,7 +22,6 @@ import {
   type RuleId,
   type RulesOverride
 } from "./rules-families.js";
-import { NOT_YOUR_TURN, offTurnVerdict } from "./tap-routing.js";
 
 /**
  * SRD Stabilizing a Character: three ways to stop a creature at 0 Hit Points dying, each an action of the creature
@@ -207,17 +206,7 @@ export function stabilizeCreature(
       damage: [],
       ...(aid.spellId ? { spellId: aid.spellId } : {})
     };
-    // Off its turn a creature has no action to spend.
-    if (state.combat.turnActorId !== helper.id) {
-      if (overrideWaives(input.override, NOT_YOUR_TURN)) {
-        rememberOverride(state, NOT_YOUR_TURN, input.override);
-        overridden = { rule: NOT_YOUR_TURN, reason: overrideReason(input.override) };
-      } else {
-        const current = state.actors.find((candidate) => candidate.id === state.combat.turnActorId)?.name ?? "Someone";
-        const verdict = offTurnVerdict(state, action, current);
-        if (verdict.warning) warnings.push(verdict.warning);
-      }
-    }
+    // Off its turn a creature has no action to spend: the economy's `economy.not-your-turn`, as for any action.
     const resolveInput = {
       actorId: helper.id,
       targetIds: [target.id],

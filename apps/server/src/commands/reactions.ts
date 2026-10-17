@@ -70,7 +70,7 @@ export const reactionCommands = [
     type: "reaction.answer",
     operationId: "answerReaction",
     description:
-      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge): the hit's parked damage applies either way, each typed part halved first on use. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature, a melee attack previewable with `commit: false`, and damage that lands applies. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
+      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge): the hit's parked damage applies either way, each typed part halved first on use. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature with one melee attack with a weapon or an Unarmed Strike (another action is refused), previewable with `commit: false`, the confirm carrying the `hitOptions` its preview offered (Sneak Attack), and damage that lands applies. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
     summary: "Answer a pending reaction prompt: use it (spend the reaction) or decline it.",
     schema: ReactionAnswerSchema,
     malformed: "The reaction answer is malformed.",
@@ -84,7 +84,8 @@ export const reactionCommands = [
         rollMode,
         attackNatural,
         reroll,
-        pushFeet
+        pushFeet,
+        hitOptions
       } = request;
       const initiator = initiatorOf(principal);
       // The rules count a player's Advantage and Disadvantage; only the GM may force a mode.
@@ -121,7 +122,8 @@ export const reactionCommands = [
             ...(forcedMode !== undefined ? { rollMode: forcedMode } : {}),
             ...(attackNatural !== undefined ? { attackNatural } : {}),
             ...(reroll === true ? { reroll: true } : {}),
-            ...(pushFeet !== undefined ? { pushFeet } : {})
+            ...(pushFeet !== undefined ? { pushFeet } : {}),
+            ...(hitOptions ? { hitOptions } : {})
           }
         );
       });

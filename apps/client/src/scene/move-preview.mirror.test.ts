@@ -101,3 +101,67 @@ describe("the drag preview charges what the server charges", () => {
     );
   });
 });
+
+describe("the drag preview follows the server through other creatures and slow movement", () => {
+  const withOptions = (state: GameState, extraPerStep: number, size = { width: GRID.width, height: GRID.height }) =>
+    previewMove({
+      calibration: CALIBRATION,
+      size,
+      terrain: state.combat.terrain.difficult,
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId: HERO,
+      from: cell(0, 0),
+      to: cell(4, 0),
+      extraPerStep
+    });
+
+  it("crawls at an extra foot per foot, as the server charges", () => {
+    const state = table([cells(2, 0, 2, 19)], {});
+    const charged = movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0), { extraPerStep: 1 });
+    expect(withOptions(state, 1)?.feet).toBe(charged?.feet);
+    expect(charged?.feet).toBe(45);
+  });
+
+  it("goes round an ogre it can't pass, through a Stunned one, and finds no way along a held corridor", () => {
+    const state = table([cells(0, 2, 19, 19)], { [OGRE]: { x: 150, y: 50 } });
+    expect(withOptions(state, 0)?.feet).toBe(movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0))?.feet);
+    state.actors.find((actor) => actor.id === OGRE)!.conditions = [{ id: "stunned" }];
+    expect(withOptions(state, 0)?.feet).toBe(movementCost(state, GRID, HERO, cell(0, 0), cell(4, 0))?.feet);
+    const corridor = table([], { [OGRE]: { x: 150, y: 50 } });
+    const narrow = { ...GRID, height: 100 };
+    expect(movementCost(corridor, narrow, HERO, cell(0, 0), cell(4, 0))?.blocked).toBe(true);
+    const previewed = withOptions(corridor, 0, { width: GRID.width, height: 100 });
+    expect(previewed?.blocked).toBe(true);
+    expect(moveLabel(previewed!, null)).toEqual({ text: "No way through", over: true });
+  });
+
+  it("measures a teleport straight, and counts a flight against the Fly budget", () => {
+    const state = table([cells(2, 0, 2, 19)], {});
+    const teleport = previewMove({
+      calibration: CALIBRATION,
+      size: { width: GRID.width, height: GRID.height },
+      terrain: state.combat.terrain.difficult,
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId: HERO,
+      from: cell(0, 0),
+      to: cell(6, 0),
+      free: true
+    })!;
+    expect(moveLabel(teleport, null, "teleport")).toEqual({ text: "Teleport 30 ft", over: false });
+    const flight = preview(table([], {}), cell(0, 0), cell(10, 0))!;
+    const budget = {
+      counted: true,
+      speedFeet: 40,
+      usedFeet: 0,
+      enforcement: "strict" as const,
+      modes: [
+        { mode: "walk" as const, budgetFeet: 40, extraCost: false },
+        { mode: "fly" as const, budgetFeet: 80, extraCost: false }
+      ]
+    };
+    expect(moveLabel(flight, budget, "fly")).toEqual({ text: "50 ft · 30 ft left", over: false });
+    expect(moveLabel(flight, budget, "walk")).toEqual({ text: "50 ft · 10 ft too far", over: true });
+  });
+});

@@ -40,10 +40,20 @@ describe("rule families", () => {
       ["movement.stand-up-cost", "movement"],
       // Standing spends movement, which only your own turn has.
       ["movement.stand-up-off-turn", "movement"],
+      // Steady Aim, only before moving: what the turn's movement has done.
+      ["movement.already-moved", "movement"],
+      // Where and when a creature may move, and how: the GM's to waive with the rest of movement.
+      ["movement.off-turn", "movement"],
+      ["movement.teleport", "movement"],
+      ["movement.occupied", "movement"],
+      ["movement.no-speed", "movement"],
+      ["movement.blocked-path", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],
+      // Giving back a spent action, Bonus Action or Reaction lets a creature act twice.
+      ["economy.spent-slot", "economy"],
       // No one acts while a wait-mode fight gathers initiative: the turn economy hasn't begun.
       ["initiative.gathering", "economy"],
       // Being incapacitated or down is "you have no actions" - economy, not a targeting rule.
@@ -56,6 +66,8 @@ describe("rule families", () => {
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
+      // Reckless Attack after the turn's first attack roll: what this turn has done.
+      ["attack.after-first-roll", "economy"],
       // A Loading weapon fires once per action: what this action has already done.
       ["attack.loading", "economy"],
       // Running out of ammunition: what the character carries, like the hands rule.
@@ -70,12 +82,20 @@ describe("rule families", () => {
       ["attack.rides-a-hit", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
+      // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.
+      ["feature.once-per-turn", "resources"],
       ["legendary.no-actions-remaining", "resources"],
+      // "Can't take this action again until the start of its next turn": spent for the round.
+      ["legendary.once-per-round", "resources"],
       ["range.out-of-range", "targeting"],
       ["range.out-of-reach", "targeting"],
       ["range.underwater", "targeting"],
       ["target.grappled-by-source", "targeting"],
       ["target.too-large-to-grapple", "targeting"],
+      // Help distracts an enemy: not the helper, not an ally.
+      ["target.not-an-enemy", "targeting"],
+      // Hunter's Mark and Hex move from a creature at 0 Hit Points only: whom the action may target.
+      ["target.mark-still-standing", "targeting"],
       ["cover.total", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],

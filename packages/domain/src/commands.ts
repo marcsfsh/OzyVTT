@@ -138,6 +138,14 @@ export const AddCombatantSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Takes a combatant out of the running fight (GM): its initiative entry and token go, and what it sustains ends. */
+export const RemoveCombatantSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** `joinEncounter` lands the new combatant in the running fight (roster + initiative + tray token) in one command; ignored when no fight is running. */
 export const ActorAddFromDefinitionSchema = z
   .object({
@@ -461,6 +469,8 @@ export const ReactionAnswerSchema = z
     reroll: z.boolean().optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
+    /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
+    hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1268,11 +1278,18 @@ export const DiceRollSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** How a token move travels (SRD Movement): on foot or by one of the special speeds, spending movement; by
+ *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
+export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
+export type MoveMode = z.infer<typeof MoveModeSchema>;
+
 export const TokenMoveSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     position: EncounterTokenPositionSchema.nullable(),
+    /** Absent: walking. A player may teleport only with the GM's go-ahead, and only the GM moves a creature by force. */
+    mode: MoveModeSchema.optional(),
     sceneId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
     override: RulesOverrideSchema.optional(),

@@ -1,6 +1,7 @@
 import { d20FacesFor } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { addEffect, endEffect, makeEffect } from "../effects.js";
 import { putOutFire } from "../hazards.js";
 import { CommandRejectedError } from "../game-store.js";
@@ -26,6 +27,8 @@ export type BuiltinHandler = Readonly<{
   /** Targets at most one size larger than the actor (SRD Unarmed Strike). A target rule, so it is checked
    *  by id wherever the action's economy is evaluated. */
   atMostOneSizeLarger?: boolean;
+  /** Targets an enemy within 5 feet (SRD Help); checked by id like the size rule. */
+  distractsAnEnemy?: boolean;
 }>;
 
 /**
@@ -218,16 +221,21 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "escape-grapple": { check: escapeGrapple },
   "extinguish-fire": { apply: rollOnTheGround },
 
-  /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. */
+  /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
+   *  as a Bonus Action brings its own numbers, which stand. */
   "unarmed-strike": {
-    prepare: ({ action, deps }) => ({
-      ...action,
-      attack: {
-        bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0),
-        reachFeet: 5
-      }
-    }),
+    prepare: ({ action, deps }) =>
+      action.attack !== undefined
+        ? action
+        : {
+            ...action,
+            attack: {
+              bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0),
+              reachFeet: 5
+            }
+          },
     hitDamage: (ctx) => {
+      if (ctx.action.damage.length > 0) return;
       if (ctx.attack === null || (ctx.attack.outcome !== "crit" && ctx.attack.outcome !== "hit")) return;
       ctx.bonusDamage.push({
         amount: Math.max(0, 1 + abilityModifier(ctx.deps.definition, "str")),
@@ -241,10 +249,14 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "unarmed-shove-push": { forcedSave: unarmedSave("pushed"), atMostOneSizeLarger: true },
 
   /** The free-text trigger travels in the Readied effect's name so the table sees it. */
-  ready: { grantName: ({ input }) => (input.note ? `Readied: ${input.note.slice(0, 100)}` : null) }
+  ready: { grantName: ({ input }) => (input.note ? `Readied: ${input.note.slice(0, 100)}` : null) },
+  /** The distracted enemy carries the effect, named for the helper whose allies it favours. */
+  help: { grantName: ({ attacker }) => `Distracted by ${attacker.name}`, distractsAnEnemy: true }
 };
 
-/** The special cases for a builtin action id, or undefined when it has none. */
+/** The special cases for a builtin action id, or undefined when it has none. A Bonus Action form ("hide-bonus") has
+ *  its generic action's. */
 export function builtinHandlerFor(actionId: string): BuiltinHandler | undefined {
-  return Object.hasOwn(BUILTIN_HANDLERS, actionId) ? BUILTIN_HANDLERS[actionId] : undefined;
+  const id = builtinBaseId(actionId);
+  return Object.hasOwn(BUILTIN_HANDLERS, id) ? BUILTIN_HANDLERS[id] : undefined;
 }

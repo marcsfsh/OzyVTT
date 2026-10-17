@@ -80,7 +80,7 @@ export const monk: ClassMechanicsModule = {
     /**
      * DC is 8 + Wisdom + Proficiency Bonus; the Focus Point comes off the shared pool. A failed save is
      * Stunned until the start of the Monk's next turn; the success rider (halved Speed, Advantage) stays prose.
-     * "Once per turn" is not expressible alongside the pool, so the scarcer Focus Point is what is tracked.
+     * The engine holds "once per turn" beside the Focus Point, keyed by the action's id.
      */
     "stunning-strike": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },

@@ -117,6 +117,8 @@ export type PlayerCombatView = Readonly<{
     bonusActionInstance: { actorId: string; components: Record<string, number> } | null;
     turnUses: Record<string, number>;
     movementUsedFeet: number;
+    /** The creature has an action beyond its one ready (Action Surge, Haste). */
+    extraActionReady?: true;
   };
   rulesMode: RuleMode;
   /** Per-family overrides of `rulesMode`; no secrets, and the player's sheet needs it to anticipate blocks. */ ruleExceptions: RuleExceptions;

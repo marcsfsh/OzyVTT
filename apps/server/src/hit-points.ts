@@ -40,6 +40,7 @@ import {
 } from "./effects.js";
 import { reconcileEquipment } from "./inventory.js";
 import { offerDamageReaction } from "./damage-reactions.js";
+import { releaseSwallowedBy } from "./swallow.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
@@ -419,6 +420,9 @@ export function applyDamageDetailed(
       });
     } else {
       defeated = true;
+      // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
+      const definition = actor.definitionId ? deps?.resolveDefinition?.(actor.definitionId) : undefined;
+      events.push(...releaseSwallowedBy(state, actor.id, definition));
     }
     // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
     // concentration (SRD Concentration).

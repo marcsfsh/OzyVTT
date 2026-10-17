@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ActorAction } from "@vtt/schemas";
-import { areaOfProse, withProseFacts } from "../src/action-prose.js";
+import { areaOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { loadSpells } from "../src/index.js";
 
 const action = (fields: Partial<ActorAction>): ActorAction =>
@@ -97,6 +97,98 @@ function bundledActions(): Array<{ bundle: string; action: ActorAction }> {
     walk(file, JSON.parse(readFileSync(join(directory, file), "utf8")));
   return found;
 }
+
+describe("reading a Multiattack", () => {
+  /** A stat block's other actions by their printed names. */
+  const sheet = (...names: string[]) => {
+    const ids = new Map(names.map((name) => [name.toLowerCase(), name.toLowerCase().replace(/ /g, "-")]));
+    return (name: string) => ids.get(name.toLowerCase());
+  };
+
+  it("reads every listed attack, not only the first group", () => {
+    expect(
+      multiattackOfProse(
+        "The devil makes two Claw attacks and one Infernal Sting attack.",
+        sheet("Claw", "Infernal Sting")
+      )?.plan
+    ).toEqual([
+      { actionId: "claw", count: 2 },
+      { actionId: "infernal-sting", count: 1 }
+    ]);
+    expect(
+      multiattackOfProse(
+        "The pit fiend makes one Bite attack, two Devilish Claw attacks, and one Fiery Mace attack.",
+        sheet("Bite", "Devilish Claw", "Fiery Mace")
+      )?.plan
+    ).toEqual([
+      { actionId: "bite", count: 1 },
+      { actionId: "devilish-claw", count: 2 },
+      { actionId: "fiery-mace", count: 1 }
+    ]);
+  });
+
+  it("reads the actions it uses, and the places any of several actions can fill", () => {
+    expect(
+      multiattackOfProse("The behir makes one Bite attack and uses Constrict.", sheet("Bite", "Constrict"))?.plan
+    ).toEqual([
+      { actionId: "bite", count: 1 },
+      { actionId: "constrict", count: 1 }
+    ]);
+    expect(
+      multiattackOfProse(
+        "The kraken makes two Tentacle attacks and uses Fling, Lightning Strike, or Swallow.",
+        sheet("Tentacle", "Fling", "Lightning Strike", "Swallow")
+      )?.plan
+    ).toEqual([
+      { actionId: "tentacle", count: 2 },
+      { actionId: "fling", count: 1, or: ["lightning-strike", "swallow"] }
+    ]);
+    expect(
+      multiattackOfProse(
+        "The goblin makes two attacks, using Scimitar or Shortbow in any combination.",
+        sheet("Scimitar", "Shortbow")
+      )?.plan
+    ).toEqual([{ actionId: "scimitar", count: 2, or: ["shortbow"] }]);
+    expect(
+      multiattackOfProse("The rust monster makes one Bite attack and uses Antennae twice.", sheet("Bite", "Antennae"))
+        ?.plan
+    ).toEqual([
+      { actionId: "bite", count: 1 },
+      { actionId: "antennae", count: 2 }
+    ]);
+  });
+
+  it("reads the plan it can be instead, and its replacements", () => {
+    const barbed = multiattackOfProse(
+      "The devil makes one Claws attack and one Tail attack, or it makes two Hurl Flame attacks.",
+      sheet("Claws", "Tail", "Hurl Flame")
+    );
+    expect(barbed?.alternatives).toEqual([[{ actionId: "hurl-flame", count: 2 }]]);
+    expect(
+      multiattackOfProse(
+        "The lion makes two Rend attacks. It can replace one attack with a use of Roar.",
+        sheet("Rend", "Roar")
+      )?.replacements
+    ).toEqual([{ actionIds: ["roar"], attacks: 1 }]);
+    expect(
+      multiattackOfProse(
+        "The dragon makes three Rend attacks. It can replace one attack with a use of (A) Sleep Breath or (B) Spellcasting to cast Scorching Ray.",
+        sheet("Rend", "Sleep Breath", "Spellcasting")
+      )?.replacements
+    ).toEqual([{ actionIds: ["sleep-breath", "spellcasting"], attacks: 1 }]);
+    expect(
+      multiattackOfProse(
+        "The chimera makes one Ram attack, one Bite attack, and one Claw attack. It can replace the Claw attack with a use of Fire Breath if available.",
+        sheet("Ram", "Bite", "Claw", "Fire Breath")
+      )?.replacements
+    ).toEqual([{ actionIds: ["fire-breath"], attacks: 1, of: "claw" }]);
+  });
+
+  it("leaves prose a plan it can't say for sure, or one naming an action the stat block lacks", () => {
+    expect(multiattackOfProse("The hydra makes as many Bite attacks as it has heads.", sheet("Bite"))).toBeNull();
+    expect(multiattackOfProse("The ogre makes two Club attacks.", sheet("Greatclub"))).toBeNull();
+  });
+});
 
 describe("the bundles carry what their prose says, so play never reads it", () => {
   it("gives every action whose text names an area that area", () => {

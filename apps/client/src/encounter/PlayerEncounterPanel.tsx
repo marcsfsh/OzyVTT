@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type MutationResult, type PlayerView } from "@vtt/domain";
 import { Button, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
+import { useMovementBudget } from "../scene/useMovementBudget";
 import { MyPendingAsks } from "./RuleAsk";
 import { useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
@@ -39,14 +40,25 @@ function OwnFeedback({
   );
 }
 
-/** A player's own economy: Action/Bonus only on their turn; the reaction is markable any time. Pressed = spent. */
-function PlayerTurnEconomy({
+/** A player's own economy: Action/Bonus only on their turn; the reaction is markable any time. Pressed = spent. Only
+ *  the GM gives a spent one back while the table polices the action economy, so a pressed slot is locked then. */
+export function PlayerTurnEconomy({
   combat,
   myId,
   myTurn,
-  mySpeedFeet
-}: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean; mySpeedFeet?: number }>) {
+  mySpeedFeet,
+  revision
+}: Readonly<{
+  combat: PlayerView["combat"];
+  myId: string;
+  myTurn: boolean;
+  mySpeedFeet?: number;
+  /** The game's revision: this turn's movement budget (Dash and Slow included) is asked again as it changes. */
+  revision?: number;
+}>) {
   const [busy, setBusy] = useState(false);
+  const budget = useMovementBudget(myTurn && revision !== undefined ? myId : null, revision ?? 0);
+  const moveBudget = budget?.speedFeet ?? mySpeedFeet;
   const [feedback, setFeedback] = useState("");
   const emit = (run: () => Promise<MutationResult>, failure: string) => {
     setBusy(true);
@@ -56,6 +68,8 @@ function PlayerTurnEconomy({
     });
   };
   const reactionUsed = combat.reactionsUsed.includes(myId);
+  const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
+  const lockedTitle = "Spent - only the GM can give it back";
   return (
     <div className="turn-economy" role="group" aria-label="Your turn resources">
       {myTurn && (
@@ -64,7 +78,8 @@ function PlayerTurnEconomy({
             type="button"
             className="economy-slot"
             aria-pressed={combat.turn.actionUsed}
-            disabled={busy}
+            disabled={busy || (combat.turn.actionUsed && giveBackLocked)}
+            title={combat.turn.actionUsed && giveBackLocked ? lockedTitle : undefined}
             onClick={() =>
               emit(
                 () => command("turn:use", { slot: "action", used: !combat.turn.actionUsed }),
@@ -78,7 +93,8 @@ function PlayerTurnEconomy({
             type="button"
             className="economy-slot"
             aria-pressed={combat.turn.bonusActionUsed}
-            disabled={busy}
+            disabled={busy || (combat.turn.bonusActionUsed && giveBackLocked)}
+            title={combat.turn.bonusActionUsed && giveBackLocked ? lockedTitle : undefined}
             onClick={() =>
               emit(
                 () =>
@@ -92,14 +108,19 @@ function PlayerTurnEconomy({
           >
             Bonus
           </button>
+          {combat.turn.extraActionReady && (
+            <span className="economy-movement" title="Action Surge or Haste gives you another action this turn">
+              +1 action
+            </span>
+          )}
         </>
       )}
       <button
         type="button"
         className="economy-slot"
         aria-pressed={reactionUsed}
-        disabled={busy}
-        title="Reactions refresh when your turn starts"
+        disabled={busy || (reactionUsed && giveBackLocked)}
+        title={reactionUsed && giveBackLocked ? lockedTitle : "Reactions refresh when your turn starts"}
         onClick={() =>
           emit(
             () => command("turn:use-reaction", { actorId: myId, used: !reactionUsed }),
@@ -109,9 +130,9 @@ function PlayerTurnEconomy({
       >
         Reaction
       </button>
-      {myTurn && mySpeedFeet !== undefined && (
-        <span className="economy-movement" title="Movement spent this turn / base walking speed">
-          Move {Math.round(combat.turn.movementUsedFeet)}/{mySpeedFeet} ft
+      {myTurn && moveBudget !== undefined && moveBudget !== null && (
+        <span className="economy-movement" title="Movement spent this turn / this turn's movement">
+          Move {Math.round(combat.turn.movementUsedFeet)}/{moveBudget} ft
         </span>
       )}
       {myTurn && (
@@ -256,7 +277,13 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                   {/* The row shared with the shared-screen viewer, so the two lists never drift. */}
                   <InitiativeRow entry={entry} self={isMe} />
                   {isMe && myId !== null && (
-                    <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />
+                    <PlayerTurnEconomy
+                      combat={combat}
+                      myId={myId}
+                      myTurn={myTurn}
+                      mySpeedFeet={rowActor?.speedFeet}
+                      revision={state.revision}
+                    />
                   )}
                   {/* On your turn, the interactive action console. */}
                   {isMe && myTurn && myId !== null && rowActor?.definition && (

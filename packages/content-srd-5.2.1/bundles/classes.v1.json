@@ -805,7 +805,18 @@
        {
         "type": "roll-mode",
         "roll": "attack",
-        "mode": "advantage"
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
        },
        {
         "type": "roll-mode",
@@ -872,6 +883,18 @@
      {
       "type": "speed",
       "amount": 10
+     },
+     {
+      "type": "speed",
+      "amount": -10,
+      "when": [
+       {
+        "type": "while-armored",
+        "weights": [
+         "heavy"
+        ]
+       }
+      ]
      }
     ]
    },
@@ -7531,6 +7554,18 @@
      {
       "type": "speed",
       "amount": 10
+     },
+     {
+      "type": "speed",
+      "amount": -10,
+      "when": [
+       {
+        "type": "while-armored",
+        "weights": [
+         "heavy"
+        ]
+       }
+      ]
      }
     ]
    },

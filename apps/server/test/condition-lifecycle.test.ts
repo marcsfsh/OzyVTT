@@ -440,6 +440,38 @@ describe("save-imposed conditions end per their text", () => {
     advance(state); // the foe's turn ends: its CON save opens
     expect(state.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.foe, ability: "con", dc: 18 }]);
   });
+
+  it("Power Word Stun leaves a target over 150 HP its Speed 0 until the start of the caster's next turn", () => {
+    const state = game();
+    actor(state, IDS.foe).hp = { current: 200, maximum: 200, temporary: 0 };
+    const stun = loadSpells().find((spell) => spell.id === "power-word-stun")!;
+    const resolution = resolveDefinitionAction(
+      state,
+      {
+        id: "spell-power-word-stun",
+        name: "Power Word Stun",
+        activation: "action",
+        description: "",
+        damage: [],
+        save: { ...stun.save!, dc: 18 },
+        spellId: "power-word-stun"
+      },
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextId() },
+      resolveDeps([])
+    );
+    const speed = () =>
+      currentSpeedFeet(actor(state, IDS.foe), deriveEquipment(actor(state, IDS.foe), definition, undefined));
+    expect(conditionIds(state, IDS.foe)).toEqual([]);
+    expect(speed()).toBe(0);
+    expect(
+      resolution.tableNarration?.some((line) => /Foe's Speed is 0 until the start of Hero's next turn/.test(line.text))
+    ).toBe(true);
+    advance(state); // the foe's turn: it can't move
+    expect(speed()).toBe(0);
+    advance(state); // the ally's
+    advance(state); // the hero's turn starts: the foe can move again
+    expect(speed()).toBe(30);
+  });
 });
 
 describe("conditions that bring others, and what they do", () => {

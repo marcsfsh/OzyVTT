@@ -17,10 +17,20 @@ import type {
   RollRecord
 } from "@vtt/domain";
 import { actionPools } from "./effective-actions.js";
+import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
 import { visibleTerrain } from "./terrain.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
+
+/** The turn's creature has an action beyond its one ready: an Action Surge not yet used, or Haste's this turn. */
+export function extraActionReady(state: GameState): boolean {
+  const actorId = state.combat.turnActorId;
+  const extra = state.combat.turn.extraActions?.actorId === actorId ? state.combat.turn.extraActions : undefined;
+  if ((extra?.surges ?? 0) > 0) return true;
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  return extra?.hasteUsed !== true && actor?.effects.some((effect) => effect.tags.includes(HASTED_TAG)) === true;
+}
 
 /** Party members stay exact for each other; monster/NPC HP reaches players only as a band. Shared with
  *  the replay projection so there is one rule. */
@@ -268,7 +278,9 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
               }
             : null,
           turnUses: { ...state.combat.turn.turnUses },
-          movementUsedFeet: state.combat.turn.movementUsedFeet
+          movementUsedFeet: state.combat.turn.movementUsedFeet,
+          // Whether Action Surge or Haste left the creature another action: the table sees both taken.
+          ...(extraActionReady(state) ? { extraActionReady: true as const } : {})
         }
       : {
           actionUsed: false,

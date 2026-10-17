@@ -624,12 +624,16 @@ const sceneCombatShape = {
     .object({
       actionUsed: z.boolean().default(false),
       bonusActionUsed: z.boolean().default(false),
-      /** `slotLevel`: the slot a multi-attack spell (Scorching Ray) was cast with, which its later rays roll at. */
+      /** `slotLevel`: the slot a multi-attack spell (Scorching Ray) was cast with, which its later rays roll at. A
+       *  component keyed "a|b" is filled by either action. A Multiattack's instance names it (`parentId`) and the
+       *  replacements it has left, keyed by their actions ("roar": 1); neither is projected. */
       actionInstance: z
         .object({
           actorId: z.uuid(),
           components: z.record(z.string(), z.number().int().nonnegative()),
-          slotLevel: z.number().int().min(1).max(9).optional()
+          slotLevel: z.number().int().min(1).max(9).optional(),
+          parentId: z.string().max(120).optional(),
+          replacements: z.record(z.string(), z.number().int().nonnegative()).optional()
         })
         .strict()
         .nullable()
@@ -649,6 +653,9 @@ const sceneCombatShape = {
       spellSlotCasters: z.array(z.uuid()).max(200).optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
+      /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
+       *  bookkeeping, never projected. */
+      attackRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
        *  fire again in it. Engine bookkeeping, never projected. */
@@ -669,6 +676,19 @@ const sceneCombatShape = {
             .strict()
             .nullable()
             .default(null)
+        })
+        .strict()
+        .optional(),
+      /** The turn's actor's actions beyond its one (SRD Action Surge, Haste): Action Surges taken and not yet used,
+       *  whether Haste's limited action is used, and the Magic actions taken (Action Surge's isn't a second one).
+       *  Engine bookkeeping, never projected. */
+      extraActions: z
+        .object({
+          actorId: z.uuid(),
+          surges: z.number().int().min(0).max(4).default(0),
+          surgedThisTurn: z.boolean().default(false),
+          hasteUsed: z.boolean().default(false),
+          magicActions: z.number().int().min(0).max(10).default(0)
         })
         .strict()
         .optional()

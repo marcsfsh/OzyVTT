@@ -1,12 +1,17 @@
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
+import type { MoveMode } from "@vtt/domain/commands";
 import type { ActorDefinition } from "@vtt/schemas";
+import { footprintOrigin } from "@vtt/rules-5e";
 import { RulesBlockedError } from "./game-store.js";
 import { isIncapacitated } from "./condition-rules.js";
+import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
-import { effectiveSpeedFeet } from "./speed.js";
+import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
+import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
-import type { MovementCost } from "./terrain.js";
+import type { MovementCost, MovementCostOptions } from "./terrain.js";
+import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -14,6 +19,7 @@ import {
   overrideReason,
   overrideWaives,
   rememberOverride,
+  type RuleId,
   type RulesOverride
 } from "./rules-families.js";
 
@@ -25,12 +31,21 @@ export type MovementRulesInput = Readonly<{
   from: EncounterTokenPosition | null;
   /** Snapped position after the move; null when returning to the tray (free). */
   to: EncounterTokenPosition | null;
+  /** How the move travels; walking when absent. */
+  mode?: MoveMode;
+  /** A player moved the token (not the GM): off its turn, or by teleportation, that needs the GM's go-ahead. */
+  byPlayer?: boolean;
   /** Map distance in feet between two image points; null when unmeasurable. */
   distance: (a: Point, b: Point) => number | null;
-  /** What the move costs the mover, difficult terrain included (`movementCost`); `distance` when absent. */
-  cost?: (from: Point, to: Point) => MovementCost | null;
+  /** What the move costs the mover, difficult terrain, creatures and extra costs included (`movementCost`);
+   *  `distance` when absent. */
+  cost?: (from: Point, to: Point, options: MovementCostOptions) => MovementCost | null;
   /** Footprint-aware feet between an enemy and the mover at `point` (SRD: nearest point of each space); center-to-center when absent. Used for reach. */
   creatureDistance?: (enemy: Readonly<{ actorId: string; position: Point }>, moverPoint: Point) => number | null;
+  /** The map's grid, so a move can't end in another creature's space; no check without one. */
+  calibration?: SquareGridCalibration | null;
+  /** Creatures the mover drags along (it grapples them), and whether that costs it an extra foot per foot. */
+  dragging?: Readonly<{ actorIds: readonly string[]; costsExtra: boolean }>;
   override: RulesOverride | null;
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so a reach-granting item widens the opportunity-attack trigger. */
@@ -41,12 +56,14 @@ export type MovementRulesInput = Readonly<{
 }>;
 
 export type MovementRulesOutcome = Readonly<{
-  /** Assisted-mode overrun allowed through (GM log note). */
+  /** Assisted-mode rules notes let through (GM log). */
   warning: string | null;
-  /** Strict overrun bypassed with the given reason (audited OVERRIDE line). */
+  /** Strict blocks bypassed with the given reason (audited OVERRIDE line). */
   overridden: string | null;
   /** Leaves-reach reaction prompts opened by this move (already pushed into state). */
   prompts: ReadonlyArray<{ actorId: string; name: string }>;
+  /** It crawled (Prone), for the narration. */
+  crawled: boolean;
 }>;
 
 /**
@@ -55,28 +72,42 @@ export type MovementRulesOutcome = Readonly<{
  * whole draft.
  *
  * Budget: only the current combatant's own move with known speed on a measurable map; GM off-turn
- * repositioning, tray moves and unknown speeds are free. Speed comes from `effectiveSpeedFeet`
- * (exhaustion, effect modifiers, Speed-0 conditions, Dash).
+ * repositioning, tray moves and unknown speeds are free. Each way of moving has its budget (`travelBudgetFeet`), the
+ * movement already spent this turn coming off whichever is used (SRD "Special Speeds": switching subtracts the
+ * distance already moved). Crawling, and climbing or swimming without the speed, cost an extra foot per foot, and so
+ * does dragging a grappled creature. Teleportation and forced movement spend none and provoke nothing.
  *
- * Opportunity attacks: leaving an enemy's melee reach opens a leaves-reach prompt answered as a real
- * melee attack; the move completes first (arrival-timing approximation). Disengage suppresses; a hidden
- * mover prompts no one (a player must not learn a hidden token's retreat), and neither does a mover the enemy
- * can't see (Invisible, or the enemy Blinded) unless its Blindsight or Truesight reaches. Sides use the
- * player-character vs monster heuristic; NPCs are GM-adjudicated.
+ * Opportunity attacks: leaving an enemy's melee reach anywhere along the path opens a leaves-reach prompt answered as
+ * a real melee attack; the move completes first (arrival-timing approximation). Disengage suppresses; a hidden mover
+ * prompts no one (a player must not learn a hidden token's retreat), and neither does a mover the enemy can't see
+ * (Invisible, or the enemy Blinded) unless its Blindsight or Truesight reaches. Sides are `areEnemies`', as attacks'.
  */
 /** A move spends movement only on the mover's own turn in combat, with movement rules on. While a wait-mode
  *  fight gathers initiative no turn has begun, so tokens are still being positioned. */
 function movementCounts(state: GameState, actorId: string): boolean {
-  const gathering = state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0;
   return (
-    state.combat.active &&
-    !gathering &&
+    turnsRunning(state) &&
     state.combat.turnActorId === actorId &&
     familyModeFor(state.combat, "movement") !== "freeform"
   );
 }
 
-/** What `actor:movement` reports: the same budget `applyMovementRules` charges against. */
+/** A fight whose turns have begun: not a wait-mode fight still gathering initiative. */
+function turnsRunning(state: GameState): boolean {
+  const gathering = state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0;
+  return state.combat.active && !gathering;
+}
+
+const TRAVEL_MODES: readonly TravelMode[] = ["walk", "fly", "swim", "climb", "burrow"];
+const MODE_NAMES: Readonly<Record<TravelMode, string>> = {
+  walk: "walking",
+  fly: "Fly",
+  swim: "Swim",
+  climb: "Climb",
+  burrow: "Burrow"
+};
+
+/** What `actor:movement` reports: the same budgets `applyMovementRules` charges against. */
 export function movementStatus(
   state: GameState,
   actorId: string,
@@ -85,12 +116,66 @@ export function movementStatus(
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
   const counted = actor !== undefined && movementCounts(state, actorId);
+  const derivation = actor ? deriveEquipment(actor, definition, input.catalog) : null;
+  const modes =
+    actor && derivation
+      ? TRAVEL_MODES.flatMap((mode) => {
+          const budget = travelBudgetFeet(actor, derivation, definition, mode);
+          return budget === null
+            ? []
+            : [{ mode, budgetFeet: budget, extraCost: travelCostsExtra(actor, definition, mode) }];
+        })
+      : [];
   return {
     counted,
-    speedFeet: actor ? effectiveSpeedFeet(actor, deriveEquipment(actor, definition, input.catalog)) : null,
+    speedFeet: actor && derivation ? travelBudgetFeet(actor, derivation, definition, "walk") : null,
     usedFeet: counted ? state.combat.turn.movementUsedFeet : 0,
-    enforcement: effectiveModeFor(state.combat, "movement.exceeds-speed")
+    enforcement: effectiveModeFor(state.combat, "movement.exceeds-speed"),
+    ...(modes.length > 0 ? { modes } : {}),
+    ...(actor?.conditions.some((condition) => condition.id === "prone") ? { crawling: true } : {}),
+    ...(actor && dragCostsExtra(state, actor.id, grappledBy(state, actor.id)) ? { dragging: true } : {})
   };
+}
+
+/** The creatures a grappler holds (its `grapple` effects on them). */
+export function grappledBy(state: GameState, grapplerId: string): readonly string[] {
+  return state.actors
+    .filter((actor) =>
+      actor.effects.some((effect) => effect.tags.includes("grapple") && effect.sourceActorId === grapplerId)
+    )
+    .map((actor) => actor.id);
+}
+
+const SIZE_RANK: Readonly<Record<string, number>> = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gargantuan: 5 };
+
+/** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
+ *  unless you are Tiny or two or more sizes smaller than it." */
+export function dragCostsExtra(state: GameState, grapplerId: string, grappledIds: readonly string[]): boolean {
+  const rank = (actorId: string) =>
+    SIZE_RANK[state.actors.find((actor) => actor.id === actorId)?.size ?? "medium"] ?? SIZE_RANK.medium!;
+  return grappledIds.some((actorId) => {
+    const size = state.actors.find((actor) => actor.id === actorId)?.size ?? "medium";
+    return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2;
+  });
+}
+
+/** The creatures a grappler drags come along, moved the same way it went, and snapped (SRD Grappled: "Movable").
+ *  Returns those moved. */
+export function dragAlong(
+  state: GameState,
+  heldIds: readonly string[],
+  from: Point,
+  to: Point,
+  geometry: TokenMapGeometry
+): string[] {
+  const moved: string[] = [];
+  for (const heldId of heldIds) {
+    const held = state.combat.tokens.find((token) => token.actorId === heldId)?.position;
+    if (!held) continue;
+    moveEncounterToken(state, heldId, { x: held.x + to.x - from.x, y: held.y + to.y - from.y }, geometry);
+    moved.push(heldId);
+  }
+  return moved;
 }
 
 /** A sense a stat block prints ("blindsight 60 ft."), in feet; 0 when it has none. Characters record no senses. */
@@ -120,115 +205,229 @@ function seesMover(
   return true;
 }
 
+/** One rule a move breaks, through the strict/assisted/override ladder: strict throws (unless the GM's override
+ *  waives it, or one earlier this turn covers it), assisted lets it through as a note. */
+type Policing = { warnings: string[]; overridden: string | null };
+function police(
+  state: GameState,
+  input: Pick<MovementRulesInput, "override">,
+  rule: RuleId,
+  message: string,
+  outcome: Policing,
+  remember = false
+): void {
+  if (effectiveModeFor(state.combat, rule) === "freeform") return;
+  if (overrideWaives(input.override, rule)) {
+    outcome.overridden = overrideReason(input.override);
+    if (remember) rememberOverride(state, rule, input.override);
+    return;
+  }
+  if (effectiveModeFor(state.combat, rule) === "strict" && !overrideCovers(state.combat.turn, rule))
+    throw new RulesBlockedError(rule, message);
+  outcome.warnings.push(message);
+}
+
+/** The grid cells a token covers at a position. */
+function cellsAt(calibration: SquareGridCalibration, position: Point, sizeCells: number): Set<string> {
+  const origin = footprintOrigin(imageToGrid(calibration, position), sizeCells);
+  const cells = new Set<string>();
+  for (let column = 0; column < sizeCells; column++)
+    for (let row = 0; row < sizeCells; row++) cells.add(`${origin.column + column},${origin.row + row}`);
+  return cells;
+}
+
+/** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
+ *  the refusal can't give one away; neither do the creatures the mover drags. */
+function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point): boolean {
+  if (!input.calibration) return false;
+  const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
+  const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
+  return state.combat.tokens.some((token) => {
+    if (token.actorId === input.actorId || !token.position || input.dragging?.actorIds.includes(token.actorId))
+      return false;
+    if (state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
+    for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
+      if (mine.has(cell)) return true;
+    return false;
+  });
+}
+
 export function applyMovementRules(state: GameState, input: MovementRulesInput): MovementRulesOutcome {
   const { actorId, from, to } = input;
+  const mode = input.mode ?? "walk";
   const mover = state.actors.find((candidate) => candidate.id === actorId);
   const prompts: Array<{ actorId: string; name: string }> = [];
-  let warning: string | null = null;
-  let overridden: string | null = null;
-  // The movement family owns both the speed budget and the opportunity-attack prompts.
-  if (!mover || !movementCounts(state, actorId) || from === null || to === null) {
-    return { warning, overridden, prompts };
-  }
+  const outcome: Policing = { warnings: [], overridden: null };
+  const done = (crawled = false): MovementRulesOutcome => ({
+    warning: outcome.warnings.length > 0 ? outcome.warnings.join(" ") : null,
+    overridden: outcome.overridden,
+    prompts,
+    crawled
+  });
+  // Forced movement is the GM's (the command refuses a player's), and spends nothing.
+  if (!mover || from === null || to === null || mode === "forced") return done();
+  const counted = movementCounts(state, actorId);
+  // SRD: you move on your own turn. A player's move off it (a readied move, a reaction that moves) is the GM's call.
+  if (input.byPlayer && turnsRunning(state) && state.combat.turnActorId !== actorId)
+    police(
+      state,
+      input,
+      "movement.off-turn",
+      `It isn't ${mover.name}'s turn - moving now needs the GM's go-ahead.`,
+      outcome
+    );
+  // Teleportation spends no movement and provokes nothing, and a player's needs the GM's go-ahead (the spell or
+  // feature that grants it is theirs to rule on).
+  if (mode === "teleport" && input.byPlayer)
+    police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
+  if ((counted || input.byPlayer) && endsInOccupiedSpace(state, input, to))
+    police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
+  if (mode === "teleport" || !counted) return done();
 
-  const charge = input.cost
-    ? input.cost(from, to)
-    : ((distance) => (distance === null ? null : { feet: distance, difficultFeet: 0 }))(input.distance(from, to));
+  // The budget for this way of moving; Prone, the only way is to crawl (SRD Prone: "Your only movement options are
+  // to crawl or to spend an amount of movement equal to half your Speed ... to right yourself").
+  const crawling = mover.conditions.some((condition) => condition.id === "prone");
+  const travel: TravelMode = crawling ? "walk" : mode;
+  const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
+  const derivation = deriveEquipment(mover, moverDefinition, input.catalog);
+  let budget = travelBudgetFeet(mover, derivation, moverDefinition, travel);
+  if (budget === null && travel !== "walk") {
+    police(state, input, "movement.no-speed", `${mover.name} has no ${MODE_NAMES[travel]} Speed.`, outcome);
+    budget = travelBudgetFeet(mover, derivation, moverDefinition, "walk");
+  }
+  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel);
+  const extraPerStep = (slowed ? 1 : 0) + (input.dragging?.costsExtra ? 1 : 0);
+  const options: MovementCostOptions = {
+    extraPerStep,
+    carried: input.dragging?.actorIds ?? [],
+    resolveDefinition: input.resolveDefinition
+  };
+  const straight = (): MovementCost | null => {
+    const distance = input.distance(from, to);
+    return distance === null ? null : { feet: distance * (1 + extraPerStep), difficultFeet: 0 };
+  };
+  let charge = input.cost ? input.cost(from, to, options) : straight();
+  if (charge?.blocked) {
+    police(
+      state,
+      input,
+      "movement.blocked-path",
+      `${mover.name} can't get there - other creatures bar the way.`,
+      outcome
+    );
+    charge = straight();
+  }
   const moved = charge?.feet ?? null;
   const difficultFeet = charge?.difficultFeet ?? 0;
-  const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
-  const effective = effectiveSpeedFeet(mover, deriveEquipment(mover, moverDefinition, input.catalog));
-  if (moved !== null && effective !== null && moved > 0.05) {
+  if (moved !== null && budget !== null && moved > 0.05) {
     const used = state.combat.turn.movementUsedFeet;
-    const overrun = used + moved > effective + 1e-6;
-    const rule = effective === 0 ? "movement.no-movement-remaining" : "movement.exceeds-speed";
-    const waived = overrideWaives(input.override, rule);
-    if (overrun && !waived) {
+    const overrun = used + moved > budget + 1e-6;
+    if (overrun) {
+      const how = [
+        difficultFeet > 0 ? `${Math.round(difficultFeet * 10) / 10} ft of it for difficult terrain` : null,
+        crawling ? "crawling" : slowed ? `${travel === "climb" ? "climbing" : "swimming"} without the speed` : null,
+        input.dragging?.costsExtra ? "dragging" : null
+      ].filter((part): part is string => part !== null);
       const message =
-        effective === 0
+        budget === 0
           ? `${mover.name} can't move - its Speed is 0.`
-          : `${mover.name} has ${Math.max(0, Math.round((effective - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft${difficultFeet > 0 ? `, ${Math.round(difficultFeet * 10) / 10} ft of it for difficult terrain` : ""}).`;
-      // A GM Allow earlier this turn already covers the movement family.
-      if (effectiveModeFor(state.combat, rule) === "strict" && !overrideCovers(state.combat.turn, rule))
-        throw new RulesBlockedError(rule, message);
-      warning = message;
-    }
-    if (overrun && waived) {
-      overridden = overrideReason(input.override);
-      rememberOverride(state, rule, input.override);
+          : `${mover.name} has ${Math.max(0, Math.round((budget - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft${how.length > 0 ? `, ${how.join(", ")}` : ""}).`;
+      // A GM Allow covers the movement family for the rest of the turn, as before.
+      police(
+        state,
+        input,
+        budget === 0 ? "movement.no-movement-remaining" : "movement.exceeds-speed",
+        message,
+        outcome,
+        true
+      );
     }
     state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + moved } };
   }
+  openOpportunityAttacks(state, input, mover, charge?.path ?? [from, to], prompts);
+  return done(crawling);
+}
 
-  if (
-    mover.visibility !== "gm-only" &&
-    mover.kind !== "npc" &&
-    !mover.effects.some((effect) => effect.tags.includes("disengaged"))
-  ) {
-    const enemyKind = mover.kind === "player-character" ? "monster" : "player-character";
-    for (const entry of state.combat.initiative) {
-      if (entry.actorId === actorId || state.combat.pendingReactions.length >= 20) continue;
-      const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
-      if (!enemy || enemy.kind !== enemyKind || state.combat.reactionsUsed.includes(enemy.id) || isIncapacitated(enemy))
-        continue;
-      const enemyPosition = state.combat.tokens.find((token) => token.actorId === enemy.id)?.position ?? null;
-      if (!enemyPosition) continue;
-      const enemyDefinition = enemy.definitionId ? input.resolveDefinition(enemy.definitionId) : undefined;
-      // The enemy's effective actions, so a reach-granting item widens the trigger.
-      const reach = Math.max(
-        5,
-        ...effectiveActions(enemyDefinition, enemy, input.catalog).flatMap((candidate) =>
-          candidate.attack?.reachFeet !== undefined ? [candidate.attack.reachFeet] : []
-        )
-      );
-      const measure =
-        input.creatureDistance ??
-        ((target: Readonly<{ actorId: string; position: Point }>, point: Point) =>
-          input.distance(target.position, point));
-      const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, from);
-      const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, to);
-      // Tolerance both ways: "was in reach" forgives noise at exactly reach, and "now out" needs a real step past it.
-      if (
-        wasIn === null ||
-        nowOut === null ||
-        wasIn > reach + DISTANCE_TOLERANCE_FEET ||
-        nowOut <= reach + DISTANCE_TOLERANCE_FEET
+/** Leaves-reach prompts for every enemy whose reach the mover leaves anywhere along its path (SRD "If you move
+ *  heedlessly past your foes, you put yourself in danger"). */
+function openOpportunityAttacks(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  path: readonly Point[],
+  prompts: Array<{ actorId: string; name: string }>
+): void {
+  const { actorId } = input;
+  if (mover.visibility === "gm-only" || mover.effects.some((effect) => effect.tags.includes("disengaged"))) return;
+  for (const entry of state.combat.initiative) {
+    if (entry.actorId === actorId || state.combat.pendingReactions.length >= 20) continue;
+    const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
+    if (
+      !enemy ||
+      !areEnemies(mover, enemy, input.resolveDefinition) ||
+      state.combat.reactionsUsed.includes(enemy.id) ||
+      isIncapacitated(enemy)
+    )
+      continue;
+    const enemyPosition = state.combat.tokens.find((token) => token.actorId === enemy.id)?.position ?? null;
+    if (!enemyPosition) continue;
+    const enemyDefinition = enemy.definitionId ? input.resolveDefinition(enemy.definitionId) : undefined;
+    // The enemy's effective actions, so a reach-granting item widens the trigger.
+    const reach = Math.max(
+      5,
+      ...effectiveActions(enemyDefinition, enemy, input.catalog).flatMap((candidate) =>
+        candidate.attack?.reachFeet !== undefined ? [candidate.attack.reachFeet] : []
       )
-        continue;
-      if (!seesMover(enemy, enemyDefinition, mover, wasIn)) continue;
+    );
+    const measure =
+      input.creatureDistance ??
+      ((target: Readonly<{ actorId: string; position: Point }>, point: Point) =>
+        input.distance(target.position, point));
+    // Tolerance both ways: "was in reach" forgives noise at exactly reach, and "now out" needs a real step past it.
+    let left: number | null = null;
+    for (let index = 1; index < path.length && left === null; index++) {
+      const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, path[index - 1]!);
+      const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, path[index]!);
       if (
-        state.combat.pendingReactions.some(
-          (prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId
-        )
+        wasIn !== null &&
+        nowOut !== null &&
+        wasIn <= reach + DISTANCE_TOLERANCE_FEET &&
+        nowOut > reach + DISTANCE_TOLERANCE_FEET
       )
-        continue;
-      state.combat = {
-        ...state.combat,
-        pendingReactions: [
-          ...state.combat.pendingReactions,
-          {
-            id: input.newPromptId(),
-            kind: "leaves-reach" as const,
-            actorId: enemy.id,
-            actionId: "opportunity-attack",
-            actionName: "Opportunity Attack",
-            sourceActorId: actorId,
-            sourceName: mover.name,
-            targetActorId: actorId,
-            triggerCommandId: input.commandId,
-            proposedDamage: 0,
-            proposedDamageParts: [],
-            critical: false,
-            weighed: null,
-            acBonus: null,
-            rollsAttack: true,
-            parkedAttack: null,
-            createdAt: input.now()
-          }
-        ]
-      };
-      prompts.push({ actorId: enemy.id, name: enemy.name });
+        left = wasIn;
     }
+    if (left === null || !seesMover(enemy, enemyDefinition, mover, left)) continue;
+    if (
+      state.combat.pendingReactions.some(
+        (prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId
+      )
+    )
+      continue;
+    state.combat = {
+      ...state.combat,
+      pendingReactions: [
+        ...state.combat.pendingReactions,
+        {
+          id: input.newPromptId(),
+          kind: "leaves-reach" as const,
+          actorId: enemy.id,
+          actionId: "opportunity-attack",
+          actionName: "Opportunity Attack",
+          sourceActorId: actorId,
+          sourceName: mover.name,
+          targetActorId: actorId,
+          triggerCommandId: input.commandId,
+          proposedDamage: 0,
+          proposedDamageParts: [],
+          critical: false,
+          weighed: null,
+          acBonus: null,
+          rollsAttack: true,
+          parkedAttack: null,
+          createdAt: input.now()
+        }
+      ]
+    };
+    prompts.push({ actorId: enemy.id, name: enemy.name });
   }
-  return { warning, overridden, prompts };
 }

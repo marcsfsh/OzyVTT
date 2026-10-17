@@ -198,7 +198,7 @@ const actionOf = (definition: ReturnType<typeof build>, id: string) =>
 const spellOf = (definition: ReturnType<typeof build>, id: string) =>
   (definition.spellcasting?.spells ?? []).find((spell) => spell.id === id);
 
-/** An encounter where the foe holds the turn, so the action-economy slot never masks a use gate. */
+/** An encounter with the action economy off, so neither the turn nor the action slot masks a use gate. */
 function encounterWith(definition: ReturnType<typeof build>): GameState {
   const state = GameStateSchema.parse({ schemaVersion: 1 });
   importActorDefinition(state, definition, HERO, "public");
@@ -222,6 +222,7 @@ function encounterWith(definition: ReturnType<typeof build>): GameState {
     () => 1,
     { width: 900, height: 600, calibration: null }
   );
+  state.combat = { ...state.combat, ruleExceptions: { economy: "freeform" } };
   return state;
 }
 let commandSeq = 0;

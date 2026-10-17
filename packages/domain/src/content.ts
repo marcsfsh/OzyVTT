@@ -494,14 +494,15 @@ export type ContentActionSummary = Readonly<{
   area: ContentActionArea | null;
   attackCount: number | null;
   usesLimit: number | null;
-  usesPer: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
+  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
   /** d6 threshold for usesPer "recharge" ("Recharge 5-6" → 5); rolled automatically at the start of the owner's turn. */ usesRecharge:
     number | null;
   usesPool: string | null;
   /** Uses one activation spends when it is more than one, or `chosen` when the user picks it (Lay on Hands). */ useCost?:
     number | "chosen";
   requiresEffectTag: string | null;
-  multiattack: ReadonlyArray<{ actionId: string; count: number }> | null;
+  /** A Multiattack's plan; `or` names the actions that can fill a place instead ("using Scimitar or Shortbow"). */
+  multiattack: ReadonlyArray<{ actionId: string; count: number; or?: readonly string[] }> | null;
   grants: boolean;
   reaction: Wire<ActionReaction> | null;
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
@@ -511,6 +512,9 @@ export type ContentActionSummary = Readonly<{
     formula: string;
   }> | null;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
+  /** "Can't take this action again until the start of its next turn." */ legendaryOncePerRound?: true;
+  /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
+  /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);

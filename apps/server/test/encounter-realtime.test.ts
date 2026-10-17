@@ -562,8 +562,17 @@ describe("live authoritative encounter workflow", () => {
       });
       expect(stale).toMatchObject({ ok: false });
       expect(stale.message).toContain("outdated");
+      // Off the map and back would move a player's token anywhere for free; only the GM takes it off mid-fight.
       expect(
         await emitCommand(ownerSocket, "token:move", {
+          commandId: "61000000-0000-4000-8000-000000000009",
+          actorId: HERO_ID,
+          position: null,
+          expectedRevision: 4
+        })
+      ).toMatchObject({ ok: false, message: "Only the GM takes a token off the map during a fight." });
+      expect(
+        await emitCommand(gmSocket, "token:move", {
           commandId: "61000000-0000-4000-8000-000000000007",
           actorId: HERO_ID,
           position: null,

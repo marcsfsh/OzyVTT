@@ -1,6 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { EffectInstance } from "@vtt/domain";
 import { addEffect, CONCENTRATING_TAG, makeEffect, type EffectNarration } from "../effects.js";
+import { laterSpellActionId } from "../item-actions.js";
 import type { ResolveContext } from "./context.js";
 
 /** A spell's printed duration as an effect duration: up to ten minutes counts rounds; longer ones last until
@@ -27,6 +28,9 @@ export function spellOf(ctx: Pick<ResolveContext, "action" | "deps">): SpellRefe
 export function startConcentration(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
   if (!spell?.concentration) return;
+  // What the spell lets its caster do once it is up (Spirit Guardians' save, moving Hex) is no new cast.
+  if ((spell.effect?.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === ctx.action.id))
+    return;
   ctx.castId = ctx.input.commandId;
   beginConcentration(ctx, spell, ctx.castId);
 }

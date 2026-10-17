@@ -45,12 +45,13 @@ function combatantsOf(
     throw new CommandRejectedError("Choose exactly one target for this action.");
   if (action.grants?.target === "targets" && targets.length === 0)
     throw new CommandRejectedError("Choose the creatures this action targets.");
-  // A limited use or spell slot is itself the mechanic (Action Surge, Arcane Recovery, ...), so an
-  // action that only spends one resolves without a roll or a target; so does one that uses up an item (a scroll of
-  // Detect Magic read in the fight).
+  // A limited use, a spell slot or the legendary pool is itself the mechanic (Action Surge, Arcane Recovery, a dragon's
+  // Commanding Presence), so an action that only spends one resolves without a roll or a target; so does one that uses
+  // up an item (a scroll of Detect Magic read in the fight).
   const spendsALimitedUse =
     action.uses !== undefined ||
     action.spellSlot !== undefined ||
+    action.legendary !== undefined ||
     consumableRowFor(action, attacker.inventory, catalog) !== null;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
@@ -118,7 +119,8 @@ export function openResolve(
         siblings,
         false,
         deps.catalog,
-        spell
+        spell,
+        deps.resolveDefinition
       );
   let overridden = economy.overridden;
 
@@ -240,6 +242,9 @@ function paidPlan(state: GameState): EconomyPlan {
     spendUse: null,
     spendLegendary: null,
     spendSpellSlot: null,
-    castLevel: null
+    castLevel: null,
+    extraAction: null,
+    magicAction: false,
+    surge: false
   };
 }

@@ -7,12 +7,14 @@ import {
 } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
+import { builtinCheckSkills } from "./resolution/builtins.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { hitRiderOf } from "./resolution/hit-riders.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
 import { consumableRowFor } from "./consumables.js";
-import { rollAttack, spendUntilAttacked } from "./resolution/attack.js";
+import { rollAttack, spendDistraction, spendSteadyAim, spendUntilAttacked } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
@@ -20,7 +22,12 @@ import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/
 import { applyGrant } from "./resolution/grant.js";
 import { readScroll } from "./resolution/scroll.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
-import { recordCleaveOpening, recordLightAttack, recordLoadingShot } from "./resolution/extra-attacks.js";
+import {
+  recordAttackRoll,
+  recordCleaveOpening,
+  recordLightAttack,
+  recordLoadingShot
+} from "./resolution/extra-attacks.js";
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
@@ -63,7 +70,9 @@ export function resolveDefinitionAction(
   if (input.economyPaid !== true) {
     spendVex(ctx);
     spendSap(ctx);
+    spendDistraction(ctx);
     spendUntilAttacked(ctx);
+    spendSteadyAim(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
@@ -73,6 +82,7 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     recordLightAttack(ctx);
     recordLoadingShot(ctx);
+    recordAttackRoll(ctx);
     releaseHideAndReady(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
@@ -107,6 +117,7 @@ export function resolveDefinitionAction(
   useUpConsumable(ctx);
   recordLightAttack(ctx);
   recordLoadingShot(ctx);
+  recordAttackRoll(ctx);
   recordCleaveOpening(ctx);
   releaseHideAndReady(ctx);
   return resolutionOf(ctx);
@@ -233,7 +244,7 @@ export function actionAvailability(
       !action.multiattack
     ) {
       if (instance.components[action.id] !== undefined) componentsRemaining = instance.components[action.id];
-      else if (action.attack && instance.components["attack"] !== undefined)
+      else if ((action.attack || action.replacesAttack) && instance.components["attack"] !== undefined)
         componentsRemaining = instance.components["attack"];
     }
     return {
@@ -245,6 +256,7 @@ export function actionAvailability(
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),
+      ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
       // Display values only (ADR-0007), from the effective list; resolution recomputes from the id.
       description: action.description,
       attackBonus: action.attack?.bonus ?? null,
@@ -261,7 +273,11 @@ export function actionAvailability(
       useCost: action.useCost ?? null,
       requiresEffectTag: action.requiresEffectTag ?? null,
       multiattack: action.multiattack
-        ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count }))
+        ? action.multiattack.map((component) => ({
+            actionId: component.actionId,
+            count: component.count,
+            ...(component.or ? { or: [...component.or] } : {})
+          }))
         : null,
       reaction: action.reaction ?? null,
       healing: action.healing ? { formula: action.healing.formula } : null,
@@ -271,7 +287,9 @@ export function actionAvailability(
         : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null),
       // A spell cast from an item picks as the spell's own cast does: darts by target, the type to deal.
       darts: action.darts ?? null,
-      damageTypes: action.damageTypes ? [...action.damageTypes] : null
+      damageTypes: action.damageTypes ? [...action.damageTypes] : null,
+      // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
+      ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
     };
   });
 }

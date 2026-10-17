@@ -23,12 +23,15 @@ export const ranger: ClassMechanicsModule = {
     },
 
     /**
-     * "Speed increases by 10 feet while you aren't wearing Heavy armor", authored flat: "not Heavy" needs
-     * an OR, which the rider gate does not have, and `speed` is baked without consulting `when`. Rangers are not
-     * proficient with Heavy armor anyway. Climb and Swim Speeds stay prose.
+     * "Speed increases by 10 feet while you aren't wearing Heavy armor": the +10 is in the sheet's Speed, and a live
+     * -10 takes it back while Heavy armor is worn, so sheets built with the +10 stay right. The Climb and Swim
+     * Speeds equal to Speed are read from this feature by the movement rules (`specialSpeedsOf`).
      */
     roving: {
-      modifiers: [{ type: "speed", amount: 10 }]
+      modifiers: [
+        { type: "speed", amount: 10 },
+        { type: "speed", amount: -10, when: [{ type: "while-armored", weights: ["heavy"] }] }
+      ]
     },
 
     // Uses equal the Wisdom modifier (minimum 1). The temporary HP and the Exhaustion decrease stay prose.
