@@ -293,7 +293,11 @@ export function CharacterSheet({
       action.darts !== undefined && slotLevel !== undefined && action.spellSlot
         ? action.darts + Math.max(0, slotLevel - action.spellSlot.level)
         : undefined;
-    beginTargeting(summaryOfOwnAction(action), actor.id, slotLevel, darts);
+    // A cast with nothing to aim at (Spirit Guardians' Emanation around its caster) picks no targets, as the server says.
+    const own = summaryOfOwnAction(action);
+    const aimless =
+      own.targeting === undefined && serverActions.some((row) => row.id === action.id && row.targeting === "none");
+    beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts);
     if (effectiveAttackMode === "jump") onJumpToInitiative?.();
   };
   // A smite is added to a hit in a fight, so its Cast tap says where to find it rather than starting a refused cast.
