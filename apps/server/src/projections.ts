@@ -289,7 +289,9 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
           turnUses: { ...state.combat.turn.turnUses },
           movementUsedFeet: state.combat.turn.movementUsedFeet,
           // Whether Action Surge or Haste left the creature another action: the table sees both taken.
-          ...(extraActionReady(state) ? { extraActionReady: true as const } : {})
+          ...(extraActionReady(state) ? { extraActionReady: true as const } : {}),
+          // A dying character's save for this turn is made, so its player is not offered a second.
+          ...(state.combat.turn.deathSaveRolled === true ? { deathSaveRolled: true as const } : {})
         }
       : {
           actionUsed: false,
@@ -382,7 +384,8 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
       .map((actor) => actor.id)
   );
   return state.rollCalls.flatMap((call) => {
-    const entries = call.entries.filter((entry) => mine.has(entry.actorId));
+    // An answered entry is done for its player: the call ends for them, and stays open only for the GM to close.
+    const entries = call.entries.filter((entry) => mine.has(entry.actorId) && entry.result === undefined);
     if (entries.length === 0) return [];
     return [
       {

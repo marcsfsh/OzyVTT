@@ -119,6 +119,8 @@ export type PlayerCombatView = Readonly<{
     movementUsedFeet: number;
     /** The creature has an action beyond its one ready (Action Surge, Haste). */
     extraActionReady?: true;
+    /** The dying character whose turn it is has made this turn's death save. */
+    deathSaveRolled?: true;
   };
   rulesMode: RuleMode;
   /** Per-family overrides of `rulesMode`; no secrets, and the player's sheet needs it to anticipate blocks. */ ruleExceptions: RuleExceptions;
