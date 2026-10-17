@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, IconScene } from "@vtt/ui";
+import { Button, IconScene, ToastOutlet } from "@vtt/ui";
 import { ClaimCharacter } from "../actors/ClaimCharacter";
 import { partyVisibilityOf } from "../actors/MyCharacter";
 import { PartyStrip } from "../actors/PartyStrip";
@@ -16,6 +16,9 @@ import { SceneBuilder } from "../scenes/SceneBuilder";
 import { navigate, pathForGmTab } from "../router";
 import { PartyRest } from "../rest/PartyRest";
 import { ShortRestPrompt } from "../rest/ShortRestPrompt";
+import { NeedsYou } from "../table/NeedsYou";
+import { PromptSlot } from "../table/PromptSlot";
+import { tableStatus } from "../table/status";
 import "./table-view.css";
 
 type StagedScene = GmView["combat"]["scenes"][number];
@@ -94,8 +97,6 @@ export function TableView(props: TableViewProps) {
    * preference is untouched, so a wider screen still finds the dock where the GM left it.
    */
   const showDocked = combatMapActive && !phoneTable && dock.position !== "sidebar";
-  const encounterDock =
-    combatMapActive && !phoneTable ? { position: dock.position, onChange: dock.setPosition } : undefined;
   const encounterPanel =
     props.role === "gm" ? (
       <EncounterPanel
@@ -104,10 +105,9 @@ export function TableView(props: TableViewProps) {
         selectedMap={props.gm.selectedMap}
         mapLibrary={props.gm.mapLibrary}
         onSelectMap={props.gm.onSelectMap}
-        dock={encounterDock}
       />
     ) : (
-      <EncounterPanel role="player" state={props.state} dock={encounterDock} />
+      <EncounterPanel role="player" state={props.state} />
     );
   // The map dock exists whenever combat runs (even in sidebar mode), so its in-map control is
   // reachable from the enlarged map; `node` is the panel only when actually docked.
@@ -157,8 +157,8 @@ export function TableView(props: TableViewProps) {
         {staged ? (
           <>
             <div className="scene-preview-banner" role="status">
-              Staging <strong>{staged.name}</strong> — GM only. Drag tokens from the tray to place them, then use the
-              map buttons to go back or make it live.
+              Staging <strong>{staged.name}</strong> · GM only. Drag tokens from the tray to place them. The map buttons
+              take you back to the live scene or make this one live.
             </div>
             <EncounterMap
               assetId={staged.mapAssetId}
@@ -185,22 +185,12 @@ export function TableView(props: TableViewProps) {
           </>
         ) : (
           <>
-            {!state.combat.active && state.combat.mapAssetId && (
-              <p className="table-status">
-                {role === "gm"
-                  ? "Scene is live — add who's in it and start the fight from the panel below."
-                  : "Waiting for the GM to start the fight."}
-              </p>
-            )}
-            {!state.combat.active && !state.combat.mapAssetId && (
-              <p className="table-status">
-                {role === "gm"
-                  ? "No fight running yet. Start one from the panel below."
-                  : "No fight running yet. The GM will start one when everyone's ready."}
-              </p>
-            )}
-            {/* Render the map once a scene is live, even before combat. Players still only get it once
-              combat is active (their projection nulls mapAssetId until then). */}
+            {/* The table's status line, which also carries the newest notice in its own row, so a toast never
+              floats over the map or a prompt. */}
+            <p className="table-status">
+              <ToastOutlet fallback={tableStatus(props)} />
+            </p>
+            {/* The map, once a scene is live: before its fight too, for players as for the GM. */}
             {state.combat.mapAssetId ? (
               <EncounterMap
                 assetId={state.combat.mapAssetId}
@@ -238,7 +228,7 @@ export function TableView(props: TableViewProps) {
                 <span>
                   {role === "gm"
                     ? "Prepare a scene from the Scenes tab - pick a map and who's in it, then go live."
-                    : "The GM will load the battle map when combat begins."}
+                    : "The map appears here when the GM makes a scene live."}
                 </span>
                 {gm && (
                   <Button variant="secondary" className="empty-scene-prep" onClick={gm.onPrepareScene}>
@@ -255,6 +245,9 @@ export function TableView(props: TableViewProps) {
         scrolls, except the docked arm: with the tracker docked into the map, the dice panel renders bare
         and cannot fit, so the column declares a scroll. */}
       <div className={`table-sidebar table-sheet${showDocked ? " scroll-y" : ""}`}>
+        {/* The decisions the GM owes, and the prompt a player must answer, above everything else in the column. */}
+        {props.role === "gm" && <NeedsYou state={props.state} token={token} />}
+        {props.role === "player" && playerHasClaimed && <PromptSlot state={props.state} />}
         {/* The table's sound, mid-fight: play or pause, volume, what is on. Nothing until the board holds sound. */}
         {props.role === "gm" && <NowPlaying token={token} />}
         {props.role === "gm" && staged ? (

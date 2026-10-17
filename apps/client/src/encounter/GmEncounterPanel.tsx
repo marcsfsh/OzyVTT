@@ -16,6 +16,12 @@ import { useTargeting, useTargetingResult } from "./targeting";
 import { holdsTheTurn } from "../table/NeedsYou";
 import { isDefeatedMonster } from "../table/needs";
 
+/** A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back. */
+function stillStanding(actors: GmView["actors"], actorId: string) {
+  const actor = actors.find((candidate) => candidate.id === actorId);
+  return actor !== undefined && !isDefeatedMonster(actor);
+}
+
 /** How long a turn button ignores taps after a turn command settles: longer than a double tap. */
 const TURN_SETTLE_MS = 500;
 
@@ -30,14 +36,9 @@ export function GmEncounterPanel({
   mapLibrary?: readonly MapSelection[];
   onSelectMap?: (map: MapSelection | null) => void;
 }>) {
-  // A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back.
-  const stillStanding = (actorId: string) => {
-    const actor = state.actors.find((candidate) => candidate.id === actorId);
-    return actor !== undefined && !isDefeatedMonster(actor);
-  };
   const [selectedActors, setSelectedActors] = useState<ReadonlySet<string>>(() =>
     state.combat.initiative.length > 0
-      ? new Set(state.combat.initiative.map((entry) => entry.actorId).filter(stillStanding))
+      ? new Set(state.combat.initiative.map((entry) => entry.actorId).filter((id) => stillStanding(state.actors, id)))
       : new Set(
           rosterActors(state.actors)
             .filter((actor) => actor.kind === "player-character" && !actor.archived)
@@ -84,9 +85,11 @@ export function GmEncounterPanel({
     if (state.combat.mapAssetId !== liveMapRef.current) {
       liveMapRef.current = state.combat.mapAssetId;
       if (!state.combat.active && state.combat.initiative.length > 0)
-        setSelectedActors(new Set(state.combat.initiative.map((entry) => entry.actorId).filter(stillStanding)));
+        setSelectedActors(
+          new Set(state.combat.initiative.map((entry) => entry.actorId).filter((id) => stillStanding(state.actors, id)))
+        );
     }
-  }, [state.combat.mapAssetId, state.combat.active, state.combat.initiative]);
+  }, [state.combat.mapAssetId, state.combat.active, state.combat.initiative, state.actors]);
   useEffect(() => {
     if (state.combat.active) return;
     setSelectedActors((current) => {

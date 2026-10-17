@@ -14,6 +14,7 @@ import { aidGiverOf, isKnockedOut, StabilizeControl } from "./StabilizeControl";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { isDying, owesDeathSave } from "../table/playerPrompts";
 import { hasPlayerPrompt } from "../table/PromptSlot";
+import { usePlayerTargetRows } from "../table/targetRows";
 import { useTargeting } from "./targeting";
 
 /**
@@ -180,6 +181,7 @@ export function PlayerEncounterPanel({ state }: Readonly<{ state: PlayerView }>)
   // One primary at a time: End turn steps down while a roll waits to be made or answered.
   const targeting = useTargeting();
   const rollPending = targeting !== null || jumpAttackResult?.preview === true || hasPlayerPrompt(state);
+  const targetHints = usePlayerTargetRows(state, myId);
   useEffect(() => {
     if (returnToSheetAfterAttack && jumpAttackResult && !jumpAttackResult.preview) {
       setView("sheet");
@@ -278,9 +280,7 @@ export function PlayerEncounterPanel({ state }: Readonly<{ state: PlayerView }>)
                       mySpeedFeet={rowActor?.speedFeet}
                       revision={state.revision}
                       quiet={rollPending}
-                      {...(myActor && owesDeathSave(state, myActor)
-                        ? { endWaits: "Roll your death save first." }
-                        : {})}
+                      {...(myActor && owesDeathSave(state, myActor) ? { endWaits: "Roll your death save first." } : {})}
                     />
                   )}
                   {/* On your turn, the interactive action console. */}
@@ -296,6 +296,8 @@ export function PlayerEncounterPanel({ state }: Readonly<{ state: PlayerView }>)
                         name: initiativeEntry.name
                       }))}
                       {...(myActor && isDying(myActor) ? { unavailable: "unavailable while Unconscious" } : {})}
+                      targetRows={targetHints.rows}
+                      {...(targetHints.insideNow ? { insideNow: targetHints.insideNow } : {})}
                     />
                   )}
                   {isMe && rowActor && (

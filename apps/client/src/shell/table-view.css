@@ -204,10 +204,16 @@
   }
 }
 
+/* One line, always the same height: the status, or the newest notice in its place. */
 .table-status {
+  display: flex;
+  align-items: center;
+  min-height: 1.5rem;
   margin: 0 0 0.8rem;
+  overflow: hidden;
   color: var(--text-muted);
   font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .scene-preview-banner {

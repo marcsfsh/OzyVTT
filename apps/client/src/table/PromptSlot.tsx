@@ -124,7 +124,8 @@ export function PromptSlot({
   useLayoutEffect(() => {
     const key = first?.key ?? null;
     if (key === shownKey.current) return;
-    const hadFocus = slot.current?.contains(document.activeElement) === true || document.activeElement === document.body;
+    const hadFocus =
+      slot.current?.contains(document.activeElement) === true || document.activeElement === document.body;
     shownKey.current = key;
     if (first) {
       setAnnouncement(`Answer now: ${titleOf(first)}.`);
@@ -223,7 +224,11 @@ export function PromptSlot({
       }
       case "initiative":
         card = (
-          <PromptCard eyebrow="The fight starts" title={`Roll initiative for ${first.actor.name}`} headingRef={headingRef}>
+          <PromptCard
+            eyebrow="The fight starts"
+            title={`Roll initiative for ${first.actor.name}`}
+            headingRef={headingRef}
+          >
             <InitiativePrompt actorId={first.actor.id} />
           </PromptCard>
         );

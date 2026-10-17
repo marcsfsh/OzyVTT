@@ -28,17 +28,19 @@ import { MapTokenTray } from "./MapTokenTray";
 import { MapToolbar } from "./MapToolbar";
 import { isVisionTool, LIGHT_PRESETS, type LightPresetId, type MapTool } from "./mapTools";
 import { alliesByKind, extraPerStepFor, moveLabel, movementWallsOf, previewMove, type MoveMode } from "./movePreview";
-import { MoveModeBar } from "./MoveModeBar";
+import { MOVE_MODE_KEYS, MOVE_MODE_NAMES, MoveModeChoice } from "./MoveModeChoice";
 import { useMovementBudget } from "./useMovementBudget";
 import { SceneControls } from "./SceneControls";
 import { ShapeEditor } from "./ShapeEditor";
-import { TargetBar } from "./TargetBar";
 import { TerrainOverlay } from "./TerrainOverlay";
 import { TokenContextMenu } from "./TokenContextMenu";
 import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
 import { VisionLayer } from "./VisionLayer";
+import { publishTableGeometry } from "./tableGeometry";
+import { creatureNumbers, tokenLabel } from "../table/numbering";
+import { caughtByArea } from "../table/targetHints";
 import "./encounter-map.css";
 
 type Actor = GmActor | PlayerActor;
@@ -178,9 +180,9 @@ export function EncounterMap({
   const [defaultVisibility, setDefaultVisibility] = useState<AnnotationVisibility>("public");
   const [defaultActorId, setDefaultActorId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
-  // Click-to-target: only the GM resolves actions here, so the targeting session is inert for players.
+  // Tap-to-target: the GM's for any creature, a player's for their own character's action. Both send the same
+  // `action:resolve`, and the server decides range and who may be targeted.
   const targetingSession = useTargeting();
-  const activeTargeting = role === "gm" ? targetingSession : null;
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Measured height of the floating token tray, so the toolbar can clear it (0 when absent). */
@@ -210,8 +212,17 @@ export function EncounterMap({
     [tokens]
   );
   const characters = useMemo(() => actors.filter((actor) => actor.kind === "player-character"), [actors]);
+  // Monsters of one kind carry their number on the token, as in every list.
+  const numbers = useMemo(
+    () => creatureNumbers(tokens.flatMap((placed) => actorsById.get(placed.actorId) ?? [])),
+    [tokens, actorsById]
+  );
   const size = image.status === "ready" ? { width: image.width, height: image.height } : null;
   const calibration = grid.calibration;
+  // The panel beside the map measures targets' range with the same grid.
+  useEffect(() => {
+    if (!moveSceneId && grid.status === "ready") publishTableGeometry(assetId, calibration);
+  }, [assetId, calibration, grid.status, moveSceneId]);
   const sizes = {
     handleRadius: Math.max(9, calibration ? calibration.cellSizePx * 0.16 : 9),
     arrowSize: calibration ? calibration.cellSizePx * 0.35 : 12,
@@ -238,7 +249,27 @@ export function EncounterMap({
     role === "player"
       ? (actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null)
       : null;
-  const moverId = moveSceneId ? null : role === "gm" ? activeActorId : ownActorId;
+  const activeTargeting =
+    targetingSession && !moveSceneId && (role === "gm" || targetingSession.attackerId === ownActorId)
+      ? targetingSession
+      : null;
+  // Who a placed area covers, of the creatures this view can see: the same hint the panel lists. The server decides.
+  const placedArea = activeTargeting?.mode === "template" ? activeTargeting.template : null;
+  const areaCatches = new Set(
+    placedArea?.placed && calibration
+      ? caughtByArea(
+          calibration,
+          placedArea.shape,
+          placedArea.placed,
+          placedArea.widthFeet,
+          tokens.filter((placed) => placed.actorId !== activeTargeting?.attackerId)
+        )
+      : []
+  );
+  // A player moves their own character once it is in the fight; nobody's move is counted before it.
+  const ownInFight =
+    ownActorId !== null && state !== undefined && state.combat.initiative.some((entry) => entry.actorId === ownActorId);
+  const moverId = moveSceneId ? null : role === "gm" ? activeActorId : ownInFight ? ownActorId : null;
   const moverPlaced = moverId !== null && (tokensById.get(moverId)?.position ?? null) !== null;
   const [modeChoice, setModeChoice] = useState<{ actorId: string; mode: MoveMode } | null>(null);
   useEffect(() => {
@@ -307,6 +338,20 @@ export function EncounterMap({
   useEffect(() => {
     if (tool !== "select") setSelectedId(null);
   }, [tool]);
+  // While the mover is dragged, a letter switches how it travels (W walk, F fly, S swim, C climb, B burrow,
+  // T teleport, and for the GM M moved by force); the label shows the choice. On a phone the long-press menu has it.
+  const onModeKey = useEffectEvent((event: KeyboardEvent) => {
+    if (gesture?.kind !== "token" || gesture.actorId !== moverId || moverId === null) return;
+    const mode = MOVE_MODE_KEYS[event.key.toLowerCase()];
+    if (!mode || (mode === "forced" && role !== "gm")) return;
+    event.preventDefault();
+    setModeChoice({ actorId: moverId, mode });
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => onModeKey(event);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   // Delete/Backspace removes the selected shape (unless typing in a field).
   const onDeleteKey = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== "Delete" && event.key !== "Backspace") return;
@@ -329,7 +374,9 @@ export function EncounterMap({
     (encounterToken) => encounterToken.position === null && canMove(encounterToken.actorId)
   );
   const dragging = gesture?.kind === "token" ? gesture : null;
-  const trayShown = unplaced.length > 0 || dragging !== null;
+  // The tray shows only while tokens wait in it; a token goes back to it from its menu, so a drag never pulls the tray
+  // over the map.
+  const trayShown = unplaced.length > 0;
   // The tray floats over the stage's top edge while tokens are unplaced; publish its measured height
   // so the toolbar starts below it (the tray reflows at 650px and grows per token).
   useEffect(() => {
@@ -383,8 +430,14 @@ export function EncounterMap({
           walls: moveWalls
         })
       : null;
-  const liveLabel =
-    liveMove && (liveMove.feet > 0 || liveMove.blocked) ? moveLabel(liveMove, draggedBudget, draggedMode) : null;
+  // The drag's label says how the creature travels when it isn't walking: the way to move lives in the drag itself.
+  const liveLabel = (() => {
+    if (!liveMove || !(liveMove.feet > 0 || liveMove.blocked)) return null;
+    const label = moveLabel(liveMove, draggedBudget, draggedMode);
+    return draggedMode === "walk" || draggedMode === "teleport"
+      ? label
+      : { ...label, text: `${MOVE_MODE_NAMES[draggedMode]} · ${label.text}` };
+  })();
   const labelSize = sizes.labelSize;
   // The label must stay readable on a phone, where the whole map is drawn small: at least 14 screen pixels, and
   // kept inside the map so a drag near an edge doesn't cut it off.
@@ -533,6 +586,7 @@ export function EncounterMap({
                 const targetable =
                   activeTargeting !== null &&
                   activeTargeting.mode !== "template" &&
+                  activeTargeting.mode !== "none" &&
                   actor.id !== activeTargeting.attackerId;
                 return (
                   <MapToken
@@ -545,8 +599,10 @@ export function EncounterMap({
                     active={activeActorId === actor.id}
                     dragging={dragging?.actorId === actor.id}
                     targetable={targetable}
-                    targeted={targetable && activeTargeting.selected.includes(actor.id)}
+                    targeted={(targetable && activeTargeting.selected.includes(actor.id)) || areaCatches.has(actor.id)}
                     tableHealthDisplay={healthDisplay}
+                    label={tokenLabel(actor, numbers.get(actor.id))}
+                    {...(numbers.has(actor.id) ? { number: numbers.get(actor.id) } : {})}
                     onKeyDown={(event) => keyboardMove(event, encounterToken)}
                   />
                 );
@@ -648,15 +704,6 @@ export function EncounterMap({
               </>
             )}
 
-            {activeTargeting && (
-              <TargetBar
-                activeTargeting={activeTargeting}
-                actorsById={actorsById}
-                revision={revision}
-                onFeedback={commands.setMessage}
-              />
-            )}
-
             {(staging || onScenePrep) && (
               <SceneControls
                 staging={staging}
@@ -675,15 +722,6 @@ export function EncounterMap({
         <p className="encounter-map-saving" role="status">
           Saving move…
         </p>
-      )}
-      {moverId && image.status === "ready" && (
-        <MoveModeBar
-          name={actorsById.get(moverId)?.name ?? "token"}
-          budget={moverBudget}
-          mode={moveMode}
-          onChange={(mode) => setModeChoice({ actorId: moverId, mode })}
-          gm={role === "gm"}
-        />
       )}
       {image.status === "ready" && (
         <p className="encounter-map-feedback" role="status" aria-live="polite">
@@ -723,6 +761,19 @@ export function EncounterMap({
               y={contextMenu.y}
               reactionUsed={reactionsUsed.includes(actor.id)}
               placed={tokensById.get(actor.id)?.position != null}
+              {...(actor.id === moverId && moverPlaced && state?.combat.active
+                ? {
+                    moveModes: (
+                      <MoveModeChoice
+                        name={actor.name}
+                        budget={moverBudget}
+                        mode={moveMode}
+                        onChange={(mode) => setModeChoice({ actorId: actor.id, mode })}
+                        gm={role === "gm"}
+                      />
+                    )
+                  }
+                : {})}
               onOpenSheet={() => setSheetActorId(actor.id)}
               onReturnToTray={() => void commands.submitMove(actor.id, null)}
               onClose={() => setContextMenu(null)}

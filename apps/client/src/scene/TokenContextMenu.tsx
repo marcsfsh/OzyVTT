@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
 import { IconButton, IconX, Select } from "@vtt/ui";
@@ -28,6 +28,7 @@ export function TokenContextMenu({
   y,
   reactionUsed,
   placed,
+  moveModes,
   onOpenSheet,
   onReturnToTray,
   onClose
@@ -39,6 +40,8 @@ export function TokenContextMenu({
   y: number;
   reactionUsed: boolean;
   placed: boolean;
+  /** How the creature whose move counts now travels on its next drag. */
+  moveModes?: ReactNode;
   onOpenSheet: () => void;
   onReturnToTray: () => void;
   onClose: () => void;
@@ -182,6 +185,7 @@ export function TokenContextMenu({
           <IconX />
         </IconButton>
       </div>
+      {moveModes}
       {role === "gm" && <HpAdjust actor={actor} controls={["damage", "heal"]} onFeedback={setFeedback} />}
       {role === "gm" && (
         <label className="token-context-size">

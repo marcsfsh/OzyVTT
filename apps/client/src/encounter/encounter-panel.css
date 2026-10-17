@@ -981,3 +981,22 @@
   background: var(--surface-2);
   box-shadow: none;
 }
+
+/* What a row owes, marked on its name line: a hit waiting to be applied, the dying tally. */
+.initiative-flag {
+  flex: none;
+  padding: 0 var(--space-1);
+  border-left: 3px solid var(--caution);
+  background: color-mix(in srgb, var(--caution) 12%, var(--surface-2));
+  color: var(--caution-hi);
+  font: 600 var(--fs-2xs) / 1.6 var(--font-label);
+  white-space: nowrap;
+}
+.initiative-flag--danger {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-2));
+  color: var(--danger-text);
+}
+.encounter-topbar .encounter-end {
+  flex: none;
+}

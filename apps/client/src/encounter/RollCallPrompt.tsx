@@ -66,7 +66,7 @@ export function RollCallPrompts({ state }: Readonly<{ state: PlayerView }>) {
   const { cards, named, keep, putAway } = useRollCallCards(state);
   if (cards.length === 0) return null;
   return (
-    <aside className="roll-call-dock" aria-label="Rolls the GM calls for">
+    <aside className="roll-call-dock scroll-y" aria-label="Rolls the GM calls for">
       {cards.map((card) => (
         <RollCallCard
           key={card.key}

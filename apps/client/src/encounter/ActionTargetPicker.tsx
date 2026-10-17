@@ -78,7 +78,7 @@ export function ActionTargetPicker({
                   </li>
                 ))}
               </ul>
-              <p className="action-targeting-hint">This list shows only the creatures you can see.</p>
+              <p className="action-targeting-hint">Only those you can see are listed.</p>
             </>
           )}
         </>

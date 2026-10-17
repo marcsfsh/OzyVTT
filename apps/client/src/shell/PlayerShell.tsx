@@ -26,6 +26,9 @@ const viewOf = (route: Route): PlayerTab =>
         ? "settings"
         : "table";
 
+/** Whether the address is the player's table itself (not the shared replays listed under it). */
+export const onPlayerTable = (route: Route) => viewOf(route) === "table" && route.segments[0] !== "replays";
+
 /**
  * The player's views are tabs at real addresses (`/table`, `/codex/*`), so Back walks between them and
  * pages can be linked. The recap count is part of the tab's accessible name ("Codex, 2 new"), not just

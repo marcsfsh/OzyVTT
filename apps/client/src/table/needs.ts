@@ -43,8 +43,7 @@ export function needsItems(state: GmView): NeedsItem[] {
     if (actor && save.callId === undefined)
       items.push({ kind: "save", key: save.id, save, actor, waiting: answeredByPlayer(actor) });
   }
-  for (const proposal of state.combat.pendingDamage ?? [])
-    items.push({ kind: "damage", key: proposal.id, proposal });
+  for (const proposal of state.combat.pendingDamage ?? []) items.push({ kind: "damage", key: proposal.id, proposal });
   if (state.combat.active)
     for (const actor of state.actors)
       if (inFight.has(actor.id) && isDying(actor))

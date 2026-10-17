@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmActor, GmView } from "@vtt/domain";
-import { Button, IconBell } from "@vtt/ui";
+import { Button, IconBell, useToast } from "@vtt/ui";
 import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { DyingTracker } from "../encounter/DyingTracker";
@@ -271,7 +271,7 @@ function NeedsCard({
 export function NeedsYou({ state, token }: Readonly<{ state: GmView; token: string | null }>) {
   const items = needsItems(state);
   const { rollMode } = useRollPreference();
-  const [feedback, setFeedback] = useState("");
+  const { toast } = useToast();
   const [announcement, setAnnouncement] = useState("");
   const grid = useMapCalibration(state.combat.mapAssetId, token);
   const tokens = new Map(state.combat.tokens.map((entry) => [entry.actorId, entry]));
@@ -290,9 +290,6 @@ export function NeedsYou({ state, token }: Readonly<{ state: GmView; token: stri
     // Only a change in which items wait announces anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys]);
-  useEffect(() => {
-    if (items.length === 0) setFeedback("");
-  }, [items.length]);
   return (
     <>
       <p className="nh-sr-only" aria-live="polite">
@@ -312,15 +309,10 @@ export function NeedsYou({ state, token }: Readonly<{ state: GmView; token: stri
                 state={state}
                 rollMode={rollMode}
                 distance={distance}
-                onFeedback={setFeedback}
+                onFeedback={(text) => toast(text)}
               />
             ))}
           </ul>
-          {feedback && (
-            <p className="needs-you-feedback" role="status">
-              {feedback}
-            </p>
-          )}
         </section>
       )}
     </>
@@ -329,7 +321,5 @@ export function NeedsYou({ state, token }: Readonly<{ state: GmView; token: stri
 
 /** Whether an item blocks the turn moving on: something rolled that waits for an answer or an Apply. */
 export function holdsTheTurn(state: GmView): boolean {
-  return needsItems(state).some(
-    (item) => item.kind === "reaction" || item.kind === "save" || item.kind === "damage"
-  );
+  return needsItems(state).some((item) => item.kind === "reaction" || item.kind === "save" || item.kind === "damage");
 }

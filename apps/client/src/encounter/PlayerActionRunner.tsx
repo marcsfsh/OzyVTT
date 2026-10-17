@@ -21,6 +21,7 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
+import type { TargetRow } from "../table/targetRows";
 import "./action-runner.css";
 
 /** Maps a player's own stat-block action onto the ContentActionSummary the targeting store uses. An area spell keeps
@@ -104,7 +105,9 @@ export function PlayerActionRunner({
   playerDamageMode,
   targets,
   effectTags = [],
-  unavailable
+  unavailable,
+  targetRows,
+  insideNow
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -114,6 +117,10 @@ export function PlayerActionRunner({
   inspired?: boolean;
   playerDamageMode: "proposal" | "direct";
   targets: readonly { actorId: string; name: string }[];
+  /** Each target as its token shows it, with its distance and the AC the player knows. */
+  targetRows?: ReadonlyMap<string, TargetRow>;
+  /** For an area: who it covers where it is placed now, of the creatures the player can see. */
+  insideNow?: readonly TargetRow[];
   /** The tags of the character's effects, which bring forward a generic action that needs one (Put Out the Fire). */
   effectTags?: readonly string[];
   /** Why no action can be taken now ("unavailable while Unconscious"): the list stays in view, disabled. */
@@ -243,7 +250,9 @@ export function PlayerActionRunner({
               (target) =>
                 target.actorId !== actorId || picking.action.healing != null || healingOf(picking.action) !== undefined
             )
-            .map((target) => ({ id: target.actorId, label: target.name }))}
+            .map((target) => targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name })}
+          onMap
+          {...(insideNow ? { insideNow } : {})}
           busy={busy}
           onInvalidFace={onFeedback}
           onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}
@@ -280,8 +289,8 @@ export function PlayerActionRunner({
               <strong>
                 {result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId)
                   ?.actionName ?? "reaction"}
-              </strong>{" "}
-              - it may turn the hit into a miss. The attack finishes in the turn order.
+              </strong>
+              . It may turn the hit into a miss, and the attack finishes when it is answered.
             </p>
           )}
           {result.damage.length > 0 &&
@@ -310,8 +319,8 @@ export function PlayerActionRunner({
               if (reactionPrompt)
                 return (
                   <p className="action-save-note">
-                    Waiting on {result.attack!.targetName}'s <strong>{reactionPrompt.actionName}</strong> - it resolves
-                    in the turn order.
+                    Waiting on {result.attack!.targetName}'s <strong>{reactionPrompt.actionName}</strong>. The damage
+                    lands when it is answered.
                   </p>
                 );
               return (

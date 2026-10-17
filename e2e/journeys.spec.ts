@@ -104,11 +104,11 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   await expectPageFits(gm);
   await press(bestiary.getByRole("button", { name: "Close" }));
   await press(gm.getByRole("button", { name: "Start the fight" }));
-  await expect(gm.getByText("Round 1")).toBeVisible();
+  await expect(gm.getByText("Round 1", { exact: true })).toBeVisible();
   await expectPageFits(gm);
 
   // A move off the mover's turn goes to the GM, so if the goblin won initiative the GM ends its turn first.
-  await expect(player.getByText("Round 1")).toBeVisible();
+  await expect(player.getByText("Round 1", { exact: true })).toBeVisible();
   const yourTurn = player.getByText("Your turn - act, then end it below");
   if (!(await yourTurn.isVisible())) await press(gm.getByRole("button", { name: "Next turn" }));
   await expect(yourTurn).toBeVisible();

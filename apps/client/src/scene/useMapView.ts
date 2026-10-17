@@ -12,7 +12,7 @@ const MAX_ZOOM = 6;
 
 /** Panels laid over the stage. A press or a wheel over one belongs to the panel, never to the map. */
 export const MAP_OVERLAYS =
-  ".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize, .encounter-target-bar";
+  ".encounter-map-overlay, .encounter-map-zoom, .encounter-shape-editor, .encounter-map-dock, .encounter-map-dock-resize";
 
 /* Zoom-to-a-point in three pieces shared by wheel and pinch, so they cannot drift. The pinch reads
    its anchor from the camera it started in. */

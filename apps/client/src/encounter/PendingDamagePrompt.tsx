@@ -43,7 +43,12 @@ export function PendingDamagePrompt({
           onChange={(event) => setAmount(event.target.value.replace(/[^0-9]/g, ""))}
         />
       )}
-      <Button size="sm" variant="primary" disabled={busy || (editing && amount.trim() === "")} onClick={() => emit(true)}>
+      <Button
+        size="sm"
+        variant="primary"
+        disabled={busy || (editing && amount.trim() === "")}
+        onClick={() => emit(true)}
+      >
         Apply {total}
       </Button>
       {!editing && (

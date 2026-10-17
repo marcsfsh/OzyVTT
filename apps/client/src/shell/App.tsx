@@ -14,7 +14,7 @@ import {
 import { TableEventToasts } from "../scene/toasts";
 import { GmShell, GmTabBar } from "./GmShell";
 import { Landing, useEntryAnimation } from "./Landing";
-import { PlayerShell, PlayerTabBar } from "./PlayerShell";
+import { onPlayerTable, PlayerShell, PlayerTabBar } from "./PlayerShell";
 import { useSession } from "./useSession";
 
 /**
@@ -104,6 +104,11 @@ export function App() {
       {/* Row 3: the pane. Each surface is its one child, a `.frame-col` with chrome rows above a
         `.scroll-y` region; the pane gives out the height and the surface divides it. */}
       <div className="app-pane">
+        {/* The GM's calls for a roll follow the player to every page as a row that pushes the page down; on the
+          table they wait in its prompt slot instead. */}
+        {shell?.role === "player" && entry.phase !== "drive" && !onPlayerTable(route) && (
+          <RollCallPrompts state={shell.state as PlayerView} />
+        )}
         {(!signedIn || entry.phase === "drive") && (
           <Landing
             driving={entry.phase === "drive"}
@@ -140,8 +145,6 @@ export function App() {
       {/* The combat log drawer lives outside the pane because it is `position: fixed` and the pane is
         where transforms happen. Non-modal, so the table stays live behind it. */}
       {shell && <CombatLogDrawer open={logOpen} onClose={() => setLogOpen(false)} />}
-      {/* The GM's calls for a roll follow the player to every tab, so they take no frame row either. */}
-      {shell?.role === "player" && <RollCallPrompts state={shell.state as PlayerView} />}
     </main>
   );
 }

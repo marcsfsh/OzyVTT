@@ -96,12 +96,12 @@ export function ActionResultCard({
           );
           return waiting ? (
             <p className="action-save-note">
-              Waiting on {result.attack.targetName}'s <strong>{prompt?.actionName ?? "reaction"}</strong> - answer it in
-              the turn order; the attack finishes there.
+              Waiting on {result.attack.targetName}'s <strong>{prompt?.actionName ?? "reaction"}</strong>. Answer it in
+              Needs you, and the attack finishes there.
             </p>
           ) : (
             <p className="action-applied">
-              {prompt?.actionName ?? "The reaction"} answered - the attack finished in the turn order.
+              {prompt?.actionName ?? "The reaction"} answered. The attack finished in Needs you.
             </p>
           );
         })()}
@@ -160,11 +160,11 @@ export function ActionResultCard({
             );
             return waiting ? (
               <p className="action-save-note">
-                Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong> - answer it in the turn
-                order; the damage applies there.
+                Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong>. Answer it in Needs you,
+                and the damage applies there.
               </p>
             ) : (
-              <p className="action-applied">{prompt.actionName} answered - damage handled in the turn order.</p>
+              <p className="action-applied">{prompt.actionName} answered. The damage was handled in Needs you.</p>
             );
           }
           return applied.has(result.attack.targetId) ? (
@@ -242,9 +242,8 @@ export function ActionResultCard({
           ).length;
           return waiting > 0 ? (
             <p className="action-save-note">
-              Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting}{" "}
-              {waiting === 1 ? "target" : "targets"} in the turn order - roll or enter each result there, then confirm
-              to apply.
+              {waiting === 1 ? "A saving throw waits" : `${waiting} saving throws wait`} in Needs you. Roll or enter
+              each result there, then confirm it.
             </p>
           ) : (
             <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>
