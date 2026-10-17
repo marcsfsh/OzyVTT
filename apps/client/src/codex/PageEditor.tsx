@@ -94,7 +94,7 @@ export function PageEditor({
     try {
       localStorage.setItem(DETAILS_KEY, open ? "open" : "closed");
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, []);
   // Focus the summoned panel itself, so keyboard users land on its heading.

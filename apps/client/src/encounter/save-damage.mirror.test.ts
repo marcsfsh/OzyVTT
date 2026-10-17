@@ -234,7 +234,7 @@ describe("the save prompt's damage field", () => {
     expect(40 - table.hp()).toBe(4);
   });
 
-  it("answers the recheck with ZERO on a success that does not halve - the case the old line got most wrong", () => {
+  it("answers the recheck with ZERO on a success that does not halve: the case the old line got most wrong", () => {
     const table = tableWith({ resistant: false, halfOnSuccess: false });
     const { outcome } = answerFromThePrompt(table, "12", 18, { role: "gm", sessionId: IDS.gm }, false);
     expect(outcome.success).toBe(true);

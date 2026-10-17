@@ -254,7 +254,7 @@ export function fieldRows(schema: Schema, components: Components): FieldRow[] {
   return rows;
 }
 
-/** A synthetic example value for a schema - enum/const first, then format-aware placeholders. Depth- and cycle-guarded. */
+/** A synthetic example value for a schema: enum/const first, then format-aware placeholders. Depth- and cycle-guarded. */
 function exampleValue(
   schema: Schema | undefined,
   components: Components,

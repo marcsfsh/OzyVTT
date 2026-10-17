@@ -263,7 +263,7 @@ function QuestEditor({
     try {
       localStorage.setItem(QUEST_DETAILS_KEY, open ? "open" : "closed");
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, []);
   useEffect(() => {

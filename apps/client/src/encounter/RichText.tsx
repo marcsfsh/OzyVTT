@@ -85,7 +85,7 @@ function ProseBlock({ text, keyBase }: Readonly<{ text: string; keyBase: string 
 }
 
 export function RichText({ text }: Readonly<{ text: string }>) {
-  // Em-dashes become " - " at render (house style: none on screen); stored content is untouched.
+  // Em dashes become spaced hyphens at render (house style: none on screen); stored content is untouched.
   const normalized = text.replace(/\s*\u2014\s*/g, " - ");
   const blocks = parseBlocks(normalized);
   return (

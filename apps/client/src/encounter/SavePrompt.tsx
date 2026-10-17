@@ -50,7 +50,7 @@ export function SavePrompt({
   viewer: "gm" | "player";
   /** The saving character holds Heroic Inspiration. */
   inspired?: boolean;
-  /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number;
+  /** Remaining Legendary Resistance uses (GM view of a legendary target only), which offer "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number;
 }>) {
   const [busy, setBusy] = useState(false);
   // A player's typed damage stands in for dice, so it follows the table's setting for typed dice.

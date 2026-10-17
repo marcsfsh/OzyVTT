@@ -97,7 +97,7 @@ export function CodexShell({
     try {
       localStorage.setItem(CONSOLE_KEY, consoleOpen ? "open" : "closed");
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, [consoleOpen]);
 

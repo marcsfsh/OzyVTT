@@ -87,7 +87,7 @@ export function CodexFrame({
     try {
       localStorage.setItem(sidebarKey, sidebarMode);
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, [sidebarKey, sidebarMode, embedded]);
   const collapsed = railBand || (!embedded && sidebarMode === "rail");

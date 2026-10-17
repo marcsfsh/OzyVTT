@@ -19,7 +19,7 @@ const write = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
   } catch {
-    /* private mode - the choice stays in-session */
+    /* private mode: the choice stays in-session */
   }
 };
 

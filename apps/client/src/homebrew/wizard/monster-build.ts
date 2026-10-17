@@ -174,7 +174,7 @@ function rebuiltHitPoints(before: Draft, after: Draft): Draft {
 
 /* ------------------------------------------------- the answers that move others ---- */
 
-/** The bestiary line the SRD gives each stat block: "Small fey, chaotic neutral - CR 1". */
+/** The bestiary line the SRD gives each stat block: "Small fey, chaotic neutral · CR 1". */
 export function summaryLineOf(draft: Draft): string {
   const bag = statblockOf(draft);
   const size = sizeOf(draft);

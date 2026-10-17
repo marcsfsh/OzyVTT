@@ -284,7 +284,7 @@ describe("the base chooser", () => {
   });
 });
 
-describe("the wire seam - the real sheet ships the pick", () => {
+describe("the wire seam: the real sheet ships the pick", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

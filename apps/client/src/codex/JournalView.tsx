@@ -40,7 +40,7 @@ const writeRevealWarn = (on: boolean) => {
   try {
     localStorage.setItem(REVEAL_WARN_KEY, on ? "on" : "off");
   } catch {
-    /* private mode - the preference stays in-session */
+    /* private mode: the preference stays in-session */
   }
 };
 
@@ -124,7 +124,7 @@ export function JournalView({
     try {
       sessionStorage.setItem(LENS_KEY, lens);
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, [lens]);
 

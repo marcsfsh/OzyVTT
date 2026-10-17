@@ -134,7 +134,7 @@ export function useJournalDraft() {
       if (pending && hasContent(pending)) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(pending));
       else sessionStorage.removeItem(DRAFT_KEY);
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, [draft, editing, stashed]);
 
@@ -231,7 +231,7 @@ export function JournalComposer({
     try {
       localStorage.setItem(DETAILS_KEY, open ? "open" : "closed");
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, []);
   useEffect(() => {

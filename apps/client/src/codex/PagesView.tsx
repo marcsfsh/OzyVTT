@@ -136,7 +136,7 @@ export function PagesView({
       try {
         localStorage.setItem("codex-notebook-collapsed", JSON.stringify([...next]));
       } catch {
-        /* private mode - fine */
+        /* private mode: fine */
       }
       return next;
     });

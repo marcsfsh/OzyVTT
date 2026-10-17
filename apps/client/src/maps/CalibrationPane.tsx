@@ -37,7 +37,7 @@ type WizardReply = Readonly<{
  * The UI's four steps are not the server's (`grid-calibration-wizard.ts`: measure -> refine ->
  * verify -> complete). The UI step is `Math.min(rawStep, maxStep)` from local state only:
  *   UI 0 (mode)   - no server state yet.
- *   UI 1 (canvas) - ends with `POST .../calibration/wizards`, which jumps the server to refine.
+ *   UI 1 (canvas): ends with `POST .../calibration/wizards`, which jumps the server to refine.
  *   UI 2 (fields) - `POST .../actions {adjust|undo|redo}`; the server stays at refine.
  *   UI 3 (verify) - `POST .../actions {verify}` then `.../complete`.
  * The server computes every number (cell size, origin, rotation locked at 0, overlay lines,

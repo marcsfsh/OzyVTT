@@ -106,7 +106,7 @@ describe("the manual damage entry's type chooser", () => {
     expect(result.hpLost).toBe(5);
   });
 
-  it("carries a homebrew type through to a homebrew defence - the list is a suggestion, not a gate", () => {
+  it("carries a homebrew type through to a homebrew defence: the list is a suggestion, not a gate", () => {
     expect(isSrdDamageType("ooze"), "the premise: this word is not one of the SRD thirteen").toBe(false);
     // Typed as two words, as a GM writes it; the defence stores the slug.
     const resistant = applyFromTheDoor(tableWith(["primordial-ooze"]), 10, "Primordial Ooze");

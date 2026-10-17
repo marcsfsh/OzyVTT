@@ -4,7 +4,7 @@ import { CodexImage } from "./CodexImage";
 /**
  * The codex page renderer: a display-only, injection-safe markdown subset (headings, emphasis, strike,
  * `code`, lists, quotes, rules, paragraphs and [[wiki-links]]). Never uses dangerouslySetInnerHTML.
- * Normalizes em-dashes to " - " per house style. `[[Title]]`/`[[Title#Section]]` call `onNavigate` with
+ * Turns em dashes into spaced hyphens, per house style. `[[Title]]`/`[[Title#Section]]` call `onNavigate` with
  * the bare target; `[[kind:ref]]` entity links render as inert chips (not yet resolved). A link to a page that
  * doesn't exist offers to create it when `onCreate` is given (the GM), and reads as plain text for a player.
  */
