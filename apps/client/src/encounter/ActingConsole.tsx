@@ -2,6 +2,7 @@ import { IconStar } from "@vtt/ui";
 import { useEffect, useState } from "react";
 import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { command } from "../lib/command";
+import { useMovementBudget } from "../scene/useMovementBudget";
 import { ActionRunner } from "./ActionRunner";
 import { DyingTracker } from "./DyingTracker";
 import "./acting-console.css";
@@ -33,6 +34,8 @@ export function ActingConsole({
     setLegendaryActingId(null);
   }, [state.combat.turnActorId]);
   const turnActor = state.combat.turnActorId ? actorsById.get(state.combat.turnActorId) : undefined;
+  // This turn's movement as the server counts it: Dash, Slow and conditions included.
+  const movement = useMovementBudget(turnActor?.speedFeet !== undefined ? turnActor.id : null, state.revision);
   const legendaryActor =
     legendaryActingId && legendaryActingId !== state.combat.turnActorId ? actorsById.get(legendaryActingId) : undefined;
   const actor = legendaryActor ?? turnActor;
@@ -118,11 +121,8 @@ export function ActingConsole({
                 </span>
               ) : (
                 actor.speedFeet !== undefined && (
-                  <span
-                    className="economy-movement"
-                    title="Movement spent this turn / base walking speed (Dash and conditions adjust the real budget server-side)"
-                  >
-                    {Math.round(state.combat.turn.movementUsedFeet)}/{actor.speedFeet} ft
+                  <span className="economy-movement" title="Movement spent this turn / this turn's movement">
+                    {Math.round(state.combat.turn.movementUsedFeet)}/{movement?.speedFeet ?? actor.speedFeet} ft
                   </span>
                 )
               )}

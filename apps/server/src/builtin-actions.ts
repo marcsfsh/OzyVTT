@@ -115,7 +115,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Magic",
     activation: "action",
     description:
-      "Cast a spell with a casting time of an action, or use a feature or magic item that requires the Magic action. Spell mechanics stay with the GM (slots and effects aren't modeled yet). (SRD 5.2.1, Magic [Action])",
+      "Cast a spell with a casting time of an action, or use a feature or magic item that requires the Magic action. A spell's own row casts it and spends its slot; this row takes the action for anything else. (SRD 5.2.1, Magic [Action])",
     damage: []
   },
   {

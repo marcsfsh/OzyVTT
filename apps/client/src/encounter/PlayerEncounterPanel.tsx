@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type MutationResult, type PlayerView } from "@vtt/domain";
 import { Button, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
+import { useMovementBudget } from "../scene/useMovementBudget";
 import { MyPendingAsks } from "./RuleAsk";
 import { useTargetingResult } from "./targeting";
 import { useRollPreference } from "../dice/roll-preference";
@@ -44,9 +45,19 @@ export function PlayerTurnEconomy({
   combat,
   myId,
   myTurn,
-  mySpeedFeet
-}: Readonly<{ combat: PlayerView["combat"]; myId: string; myTurn: boolean; mySpeedFeet?: number }>) {
+  mySpeedFeet,
+  revision
+}: Readonly<{
+  combat: PlayerView["combat"];
+  myId: string;
+  myTurn: boolean;
+  mySpeedFeet?: number;
+  /** The game's revision: this turn's movement budget (Dash and Slow included) is asked again as it changes. */
+  revision?: number;
+}>) {
   const [busy, setBusy] = useState(false);
+  const budget = useMovementBudget(myTurn && revision !== undefined ? myId : null, revision ?? 0);
+  const moveBudget = budget?.speedFeet ?? mySpeedFeet;
   const [feedback, setFeedback] = useState("");
   const emit = (run: () => Promise<MutationResult>, failure: string) => {
     setBusy(true);
@@ -118,9 +129,9 @@ export function PlayerTurnEconomy({
       >
         Reaction
       </button>
-      {myTurn && mySpeedFeet !== undefined && (
-        <span className="economy-movement" title="Movement spent this turn / base walking speed">
-          Move {Math.round(combat.turn.movementUsedFeet)}/{mySpeedFeet} ft
+      {myTurn && moveBudget !== undefined && moveBudget !== null && (
+        <span className="economy-movement" title="Movement spent this turn / this turn's movement">
+          Move {Math.round(combat.turn.movementUsedFeet)}/{moveBudget} ft
         </span>
       )}
       {myTurn && (
@@ -257,7 +268,13 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                   {/* The row shared with the shared-screen viewer, so the two lists never drift. */}
                   <InitiativeRow entry={entry} self={isMe} />
                   {isMe && myId !== null && (
-                    <PlayerTurnEconomy combat={combat} myId={myId} myTurn={myTurn} mySpeedFeet={rowActor?.speedFeet} />
+                    <PlayerTurnEconomy
+                      combat={combat}
+                      myId={myId}
+                      myTurn={myTurn}
+                      mySpeedFeet={rowActor?.speedFeet}
+                      revision={state.revision}
+                    />
                   )}
                   {/* On your turn, the interactive action console. */}
                   {isMe && myTurn && myId !== null && rowActor?.definition && (
