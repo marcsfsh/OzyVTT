@@ -1,10 +1,12 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { type ActionResolution, type PendingReaction, type PlayerPendingReaction } from "@vtt/domain";
 import { Button, IconX } from "@vtt/ui";
+import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { damageAdjustments } from "./format";
 import { PushChoice } from "./AttackPreview";
-import { DieModeButtons, type DieMode } from "./RollControls";
+import { modeWords } from "./roll-mode-notes";
+import { FaceEntry, ForceModeButtons, RerollControl, type DieMode } from "./RollControls";
 import "./prompts.css";
 
 /**
@@ -12,7 +14,8 @@ import "./prompts.css";
  * - Uncanny Dodge: the hit's damage is parked here, so both buttons apply it, halved on Use. Each names what the
  *   server weighed through the reactor's defences; a prompt parked before that was recorded shows the raw numbers.
  * - Parry or Shield: the attack waits at its roll; both buttons finish it, Use against the raised AC.
- * - An opportunity attack or Retaliation: Attack rolls a melee swing to confirm, re-roll or type; Let them go clears.
+ * - An opportunity attack or Retaliation: Attack rolls a melee swing (or takes a typed d20) to confirm; the server holds
+ *   the die, so only Heroic Inspiration or the GM throws it again. Let them go clears.
  * - Hellish Rebuke or Storm's Thunder: Use strikes the creature that dealt the damage.
  * The GM's dismiss clears the prompt without applying anything it holds, for a moment settled by hand.
  */
@@ -21,30 +24,38 @@ export function ReactionPrompt({
   actorName,
   canDismiss,
   onFeedback,
-  rollMode
+  rollMode,
+  viewer,
+  inspired = false
 }: Readonly<{
   reaction: PendingReaction | PlayerPendingReaction;
   actorName: string;
   canDismiss: boolean;
   onFeedback: (text: string) => void;
   rollMode: "auto" | "manual";
+  /** The GM may force a mode and reroll freely; a player rerolls with Heroic Inspiration. */
+  viewer: "gm" | "player";
+  /** The reacting character holds Heroic Inspiration. */
+  inspired?: boolean;
 }>) {
+  const { mayType } = useRollPreference();
   const [busy, setBusy] = useState(false);
   // Answering rolls a melee swing first: an opportunity attack, or Retaliation.
   const opportunity =
     reaction.kind === "leaves-reach" || (reaction.kind === "damaged-by-creature" && reaction.rollsAttack);
-  // An opportunity attack previewed but not applied: confirm, re-roll adv/disadv, or type a d20,
-  // as with a saving throw.
+  // An opportunity attack previewed but not applied: confirm it, as with a saving throw.
   const [rolled, setRolled] = useState<{
     attack: NonNullable<ActionResolution["attack"]>;
-    mode?: DieMode;
+    rollMode?: ActionResolution["rollMode"];
     push?: ActionResolution["push"];
   } | null>(null);
+  // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
+  const [forced, setForced] = useState<DieMode | undefined>(undefined);
+  const [typed, setTyped] = useState(false);
   // null means the full distance, so a re-roll that changes the offer never carries a stale pick.
   const [pushPick, setPushPick] = useState<number | null>(null);
   const push = rolled?.push ?? null;
   const pushFeet = push ? Math.min(pushPick ?? push.maxFeet, push.maxFeet) : undefined;
-  const [dieEdit, setDieEdit] = useState("");
   const autoRolled = useRef(false);
   const weighed = reaction.weighed;
   const takeIfUsed =
@@ -53,10 +64,17 @@ export function ReactionPrompt({
   // `use` distinguishes the swing (Attack) from letting the mover go; opts drive the preview flow.
   const answer = (
     use: boolean,
-    opts: { commit?: boolean; rollMode?: DieMode; attackNatural?: number; pushFeet?: number } = {}
+    opts: { commit?: boolean; attackNatural?: number; reroll?: boolean; pushFeet?: number; mode?: DieMode } = {}
   ) => {
     setBusy(true);
-    void command("reaction:answer", { reactionId: reaction.id, use, ...opts }).then((result) => {
+    const { mode: picked, ...rest } = opts;
+    const mode = "mode" in opts ? picked : forced;
+    void command("reaction:answer", {
+      reactionId: reaction.id,
+      use,
+      ...rest,
+      ...(use && mode ? { rollMode: mode } : {})
+    }).then((result) => {
       setBusy(false);
       if (!result.ok) {
         onFeedback(result.message ?? "The reaction could not be answered.");
@@ -67,9 +85,12 @@ export function ReactionPrompt({
       if (opportunity) {
         // A preview keeps the prompt open to confirm; an applied answer clears it.
         if (outcome.resolution?.preview && outcome.resolution.attack) {
+          // A typed die stays typed until a reroll the server throws (the GM's) replaces it.
+          if (opts.attackNatural !== undefined) setTyped(true);
+          else if (opts.reroll) setTyped(false);
           setRolled({
             attack: outcome.resolution.attack,
-            mode: outcome.resolution.rollMode?.mode,
+            rollMode: outcome.resolution.rollMode,
             push: outcome.resolution.push
           });
           return;
@@ -127,14 +148,6 @@ export function ReactionPrompt({
       rollOnAppear();
     }
   }, [opportunity, rollMode, rolled]);
-  const submitDie = () => {
-    const value = Number(dieEdit.trim());
-    if (!Number.isInteger(value) || value < 1 || value > 20) {
-      onFeedback("Enter the attack d20 (1-20).");
-      return;
-    }
-    answer(true, { commit: false, attackNatural: value });
-  };
   const dismiss = () => {
     setBusy(true);
     void command("reaction:dismiss", { reactionId: reaction.id }).then((result) => {
@@ -173,60 +186,46 @@ export function ReactionPrompt({
       </span>
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       {opportunity && rolled ? (
-        // The swing is rolled: confirm it, re-roll adv/disadv, type a d20, or let them go.
+        // The swing is rolled: confirm it, or let them go. The GM may force a mode or reroll; a player rerolls with
+        // Heroic Inspiration.
         <span className="save-prompt-confirm">
           <strong className={hit ? "save-pass" : "save-fail"}>
             Rolled {rolled.attack.total}
-            {rolled.mode && rolled.mode !== "normal" ? ` (${rolled.mode === "advantage" ? "adv" : "disadv"})` : ""}
+            {modeWords(rolled.rollMode)}
             {rolled.attack.targetAc !== null ? ` vs AC ${rolled.attack.targetAc}` : ""} -{" "}
             {rolled.attack.outcome === "crit" ? "CRIT" : rolled.attack.outcome.toUpperCase()} (nat{" "}
             {rolled.attack.naturalRoll})
           </strong>
-          <DieModeButtons
-            current={rolled.mode}
-            disabled={busy}
-            onPick={(mode) => answer(true, { commit: false, rollMode: mode })}
-          />
+          {viewer === "gm" && (
+            <ForceModeButtons
+              current={forced}
+              disabled={busy}
+              onPick={(mode) => {
+                const next = mode === "normal" ? undefined : mode;
+                setForced(next);
+                answer(true, { commit: false, mode: next });
+              }}
+            />
+          )}
           <button
             type="button"
             className="encounter-primary"
             disabled={busy}
-            onClick={() =>
-              answer(true, {
-                commit: true,
-                attackNatural: rolled.attack.naturalRoll,
-                ...(pushFeet !== undefined ? { pushFeet } : {})
-              })
-            }
+            onClick={() => answer(true, { commit: true, ...(pushFeet !== undefined ? { pushFeet } : {}) })}
           >
             Confirm {hit ? "hit" : "miss"}
           </button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={busy}
-            title="Roll the swing again"
-            onClick={() => answer(true, { commit: false })}
-          >
-            Re-roll
-          </Button>
-          <span className="save-prompt-manual">
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="or type the d20"
-              aria-label="Attack d20"
-              value={dieEdit}
-              onChange={(event) => setDieEdit(event.target.value.replace(/[^0-9]/g, ""))}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && dieEdit.trim() !== "") submitDie();
-              }}
+          {(viewer === "gm" || inspired) && (
+            <RerollControl
+              viewer={viewer}
+              typed={typed}
+              busy={busy}
+              onInvalid={onFeedback}
+              onReroll={(face) =>
+                answer(true, { commit: false, reroll: true, ...(face !== undefined ? { attackNatural: face } : {}) })
+              }
             />
-            <button type="button" disabled={busy || dieEdit.trim() === ""} onClick={submitDie}>
-              Use
-            </button>
-          </span>
+          )}
           <Button
             type="button"
             variant="secondary"
@@ -252,6 +251,14 @@ export function ReactionPrompt({
               >
                 Attack
               </button>
+              {mayType && (
+                <FaceEntry
+                  label="Attack d20"
+                  busy={busy}
+                  onInvalid={onFeedback}
+                  onFace={(face) => answer(true, { commit: false, attackNatural: face })}
+                />
+              )}
               <button
                 type="button"
                 disabled={busy}

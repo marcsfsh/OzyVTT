@@ -376,6 +376,10 @@ describe("a death save over the API", () => {
     const record = server.store.snapshot.rolls.at(-1)!;
     expect(record.normalizedFormula).toMatch(/1d4/);
     expect(record.dice.filter((die) => die.sides === 20)).toHaveLength(1);
+    // The total the prompt shows carries Bless's d4 on top of the die.
+    expect(first.total).toBe(record.total);
+    expect(first.total - first.naturalRoll).toBeGreaterThanOrEqual(1);
+    expect(first.total - first.naturalRoll).toBeLessThanOrEqual(4);
     const recorded = server.store.snapshot.rolls.length;
     expect((await (await preview()).json()).data.deathSave.naturalRoll).toBe(first.naturalRoll);
     expect(server.store.snapshot.rolls).toHaveLength(recorded);

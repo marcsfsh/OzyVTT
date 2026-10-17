@@ -149,6 +149,11 @@
 .reaction-prompt .save-prompt-label strong {
   color: var(--text);
 }
+/* The GM's forced Advantage or Disadvantage: a pair kept together when the confirm row wraps. */
+.roll-force {
+  display: inline-flex;
+  gap: var(--space-1);
+}
 .save-die-mode {
   padding: 0.35rem 0.6rem;
   border: 1px solid var(--line-strong);

@@ -37,6 +37,8 @@ export type TargetingSession = Readonly<{
 
 let session: TargetingSession | null = null;
 let result: ActionResolution | null = null;
+/** The previewed attack's die was typed from a physical die, so its reroll is typed too. */
+let typedPreview = false;
 let busy = false;
 /** A strict-mode rejection awaiting the GM's call (ADR-0020); here so any surface can show the dialog. */
 let blockedPrompt: {
@@ -96,6 +98,7 @@ export function beginTargeting(
     };
   }
   result = null;
+  typedPreview = false;
   emit();
 }
 export function toggleTarget(actorId: string) {
@@ -149,6 +152,7 @@ export function clearTargeting() {
 }
 export function setTargetingResult(next: ActionResolution | null) {
   result = next;
+  if (next === null) typedPreview = false;
   emit();
 }
 export function clearBlockedPrompt() {
@@ -166,14 +170,12 @@ export type ResolveOptions = Readonly<{
   override?: { reason: string };
   /** false previews the attack roll (no apply); the confirming call passes commit:true. Attacks default to preview. */
   commit?: boolean;
-  /** The answerer's advantage/disadvantage choice for the attack d20 (re-previewing). */
+  /** The GM's forced Advantage or Disadvantage for the attack d20; the server ignores a player's. */
   rollMode?: "advantage" | "disadvantage" | "normal";
-  /** A confirmed or hand-rolled natural d20, used instead of rolling. */
+  /** The face a physical d20 shows, used instead of the server's throw. */
   attackNatural?: number;
-  /** A hand-entered final total ("final total" manual mode), used as is against AC. */
-  attackTotal?: number;
-  /** Declares a natural 20 (crit) for the hand-entered-total path, where the natural die is unknown. */
-  critical?: boolean;
+  /** Throw the previewed d20 again: Heroic Inspiration for a player, free for the GM. */
+  reroll?: boolean;
   /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
   pushFeet?: number;
   /** Extras the confirmed hit carries (Sneak Attack, a smite), from the preview's offers. */
@@ -187,17 +189,16 @@ export function resolveTargeting(
 ) {
   if (!session || busy) return;
   const { attackerId, action, mode, selected, template, slotLevel, darts, damageType } = session;
-  // A single-target attack previews first (commit: false) so the result card can offer Adv/Disadv, a
-  // typed d20 and Confirm. Templates, multi-target and save/utility actions resolve straight through.
-  // An explicit `commit` in opts wins (the Confirm tap).
+  // A single-target attack previews first (commit: false) so the result card can offer Confirm, and the
+  // server holds the die for it. Templates, multi-target and save/utility actions resolve straight
+  // through. An explicit `commit` in opts wins (the Confirm tap).
   const isAttack = action.attackBonus !== null && mode === "single";
   const commit = opts.commit ?? !isAttack;
   const extra = {
     ...(opts.override ? { override: opts.override } : {}),
     ...(opts.rollMode ? { rollMode: opts.rollMode } : {}),
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
-    ...(opts.attackTotal !== undefined ? { attackTotal: opts.attackTotal } : {}),
-    ...(opts.critical !== undefined ? { critical: opts.critical } : {}),
+    ...(opts.reroll ? { reroll: true } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
@@ -227,6 +228,9 @@ export function resolveTargeting(
     // A preview keeps the session for re-rolls or confirm; a committed resolve ends it.
     if (response.ok && response.resolution) {
       result = response.resolution;
+      // A typed die stays typed until a reroll the server throws (the GM's) replaces it.
+      if (response.resolution.preview)
+        typedPreview = opts.attackNatural !== undefined ? true : opts.reroll ? false : typedPreview;
       if (!response.resolution.preview) session = null;
     }
     // Overridable rejection: keep the session (same targets) and offer the audited override; the retry
@@ -283,6 +287,14 @@ export function useTargetingResult() {
     subscribe,
     () => result,
     () => result
+  );
+}
+/** Whether the previewed attack's die was typed from a physical die. */
+export function useTargetingTyped() {
+  return useSyncExternalStore(
+    subscribe,
+    () => typedPreview,
+    () => typedPreview
   );
 }
 export function useTargetingBusy() {

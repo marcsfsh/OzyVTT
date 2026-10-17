@@ -35,8 +35,8 @@ const mount = (hitOffers: readonly HitOffer[]) => {
     <AttackPreview
       attack={HIT}
       busy={false}
-      rollMode="auto"
-      bonusMode="auto"
+      viewer="player"
+      inspired
       onFeedback={() => {}}
       hitOffers={hitOffers}
       resolve={resolve}
@@ -53,7 +53,8 @@ describe("the extras a previewed hit offers", () => {
     );
     expect(screen.getByText("Costs once per turn.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
-    expect(resolve).toHaveBeenLastCalledWith({ commit: true, attackNatural: 18 });
+    // The server holds the die shown, so Confirm names none.
+    expect(resolve).toHaveBeenLastCalledWith({ commit: true });
   });
 
   it("sends the chosen extras with Confirm, and with their slot or type", () => {
@@ -66,7 +67,6 @@ describe("the extras a previewed hit offers", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
     expect(resolve).toHaveBeenLastCalledWith({
       commit: true,
-      attackNatural: 18,
       hitOptions: [
         { id: "sneak-attack" },
         { id: "spell-divine-smite", slotLevel: 2 },
@@ -75,13 +75,13 @@ describe("the extras a previewed hit offers", () => {
     });
   });
 
-  it("keeps a re-roll a plain preview, and says what the engine couldn't check", () => {
+  it("keeps a reroll a plain preview, and says what the engine couldn't check", () => {
     const resolve = mount([
       { ...SNEAK, unverified: "The map can't show whether an ally is within 5 feet of the target." }
     ]);
     expect(screen.getByText(/The map can't show whether an ally/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Sneak Attack +3d6 Piercing" }));
-    fireEvent.click(screen.getByRole("button", { name: "Re-roll" }));
-    expect(resolve).toHaveBeenLastCalledWith({ commit: false });
+    fireEvent.click(screen.getByRole("button", { name: "Reroll · Heroic Inspiration" }));
+    expect(resolve).toHaveBeenLastCalledWith({ commit: false, reroll: true });
   });
 });

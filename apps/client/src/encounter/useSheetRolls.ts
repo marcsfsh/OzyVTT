@@ -1,9 +1,10 @@
 import { useState } from "react";
-import type { AbilityId, ActionRollMode, CheckRollOutcome, CheckSubject, RollVisibility } from "@vtt/domain";
+import type { AbilityId, CheckRollOutcome, CheckSubject, RollVisibility } from "@vtt/domain";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import { usePrompt } from "../components/feedback";
 import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
+import { modeWords } from "./roll-mode-notes";
 
 const ABILITY_WORDS: Readonly<Record<AbilityId, string>> = {
   str: "Strength",
@@ -13,13 +14,6 @@ const ABILITY_WORDS: Readonly<Record<AbilityId, string>> = {
   wis: "Wisdom",
   cha: "Charisma"
 };
-
-/** " · Disadvantage (Poisoned)", for a result line; empty for a plain d20. */
-export function modeWords(mode: ActionRollMode | undefined): string {
-  if (!mode || mode.mode === "normal") return "";
-  const sources = mode.mode === "advantage" ? mode.advantage : mode.disadvantage;
-  return ` · ${mode.mode === "advantage" ? "Advantage" : "Disadvantage"}${sources.length > 0 ? ` (${sources.join(", ")})` : ""}`;
-}
 
 /** A check's result as the sheet says it: the total, the d20, and whatever changed how it was rolled. */
 export function checkLine(outcome: CheckRollOutcome): string {

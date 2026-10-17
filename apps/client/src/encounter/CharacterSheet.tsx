@@ -129,9 +129,11 @@ export function CharacterSheet({
   const { busy, edit } = useSheetEdit(setFeedback);
   const rolls = useSheetRolls(actor.id, setFeedback);
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
-  // The shared per-browser dice-input preference: thrown by the server, or a typed face from a physical die.
+  // The shared per-browser dice-input preference: thrown by the server, or a typed face from a physical die. A
+  // player at a table that keeps players' dice on the server has no choice to make.
   const {
     rollInput,
+    mayType,
     sheetAttackMode,
     setRollInput: chooseRollInput,
     setSheetAttackMode: chooseSheetAttackMode
@@ -319,6 +321,8 @@ export function CharacterSheet({
               canDismiss={role === "gm"}
               onFeedback={setFeedback}
               rollMode="auto"
+              viewer={role}
+              inspired={holdsInspiration}
             />
           ))}
         </div>
@@ -516,16 +520,18 @@ export function CharacterSheet({
   const rollbar = definition ? (
     <div className="sheet-rollbar" role="group" aria-label="Roll entry settings">
       <span className="sheet-settings-label">Rolls</span>
-      <SegmentedControl
-        size="sm"
-        ariaLabel="Roll input mode"
-        value={rollInput}
-        onChange={(mode) => chooseRollInput(mode as "digital" | "manual")}
-        options={[
-          { value: "digital", label: "Digital" },
-          { value: "manual", label: "Manual" }
-        ]}
-      />
+      {mayType && (
+        <SegmentedControl
+          size="sm"
+          ariaLabel="Roll input mode"
+          value={rollInput}
+          onChange={(mode) => chooseRollInput(mode as "digital" | "manual")}
+          options={[
+            { value: "digital", label: "Digital" },
+            { value: "manual", label: "Manual" }
+          ]}
+        />
+      )}
       <Select
         className="sheet-roll-visibility"
         aria-label="Who sees the sheet's rolls"

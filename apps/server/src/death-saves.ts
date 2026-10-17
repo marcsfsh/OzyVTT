@@ -23,6 +23,8 @@ export type DeathSaveRollDependencies = Readonly<{
 export type DeathSaveRollResult = Readonly<{
   /** The natural d20 (the kept die under adv/disadv) that decides the save. */
   face: number;
+  /** The face with what the save adds (Exhaustion, Bless's d4, an aura), which meets the DC of 10. */
+  total: number;
   outcome: ReturnType<typeof resolveDeathSave>;
   /** The adv/disadv mode when one was chosen; absent for a plain d20. */
   mode?: DeathSaveMode;
@@ -102,5 +104,5 @@ export function rollDeathSave(
   }
   const outcome = resolveDeathSave(actor.deathSaves, face, total);
   if (options.commit) actor.deathSaves = outcome.state;
-  return { face, outcome, mode, committed: options.commit };
+  return { face, total, outcome, mode, committed: options.commit };
 }

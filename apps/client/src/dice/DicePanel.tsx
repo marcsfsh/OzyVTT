@@ -65,8 +65,8 @@ export function DicePanel({
   const [disadvantage, setDisadvantage] = useState(false);
   const [fallFeet, setFallFeet] = useState("");
   const { toast } = useToast();
-  // The shared per-browser dice-input preference.
-  const { rollInput, bonusMode, setRollInput, setBonusMode } = useRollPreference();
+  // The shared per-browser dice-input preference; no choice at a table that keeps players' dice on the server.
+  const { rollInput, mayType, setRollInput } = useRollPreference();
   // A player's "self-only" roll is seen by the roller and the GM but no other player. "blind" hides
   // the result from the roller too.
   const visibilityOptions = VISIBILITY_OPTIONS[role];
@@ -148,30 +148,20 @@ export function DicePanel({
         </label>
       </div>
       {/* The per-browser roll-input preference, shared with the character sheet's toggle. */}
-      <div className="dice-roll-pref" role="group" aria-label="How you roll">
-        <SegmentedControl
-          size="sm"
-          ariaLabel="Roll input mode"
-          value={rollInput}
-          onChange={(mode) => setRollInput(mode as "digital" | "manual")}
-          options={[
-            { value: "digital", label: "Digital" },
-            { value: "manual", label: "Manual" }
-          ]}
-        />
-        {rollInput === "manual" && (
+      {mayType && (
+        <div className="dice-roll-pref" role="group" aria-label="How you roll">
           <SegmentedControl
             size="sm"
-            ariaLabel="Typed bonus handling"
-            value={bonusMode}
-            onChange={(mode) => setBonusMode(mode as "auto" | "total")}
+            ariaLabel="Roll input mode"
+            value={rollInput}
+            onChange={(mode) => setRollInput(mode as "digital" | "manual")}
             options={[
-              { value: "auto", label: "Auto-add bonus" },
-              { value: "total", label: "Final total" }
+              { value: "digital", label: "Digital" },
+              { value: "manual", label: "Manual" }
             ]}
           />
-        )}
-      </div>
+        </div>
+      )}
       <div className="dice-quick" role="group" aria-label="Quick rolls">
         {QUICK_DICE.map((sides) => (
           <button key={sides} onClick={() => quickRoll(sides)}>

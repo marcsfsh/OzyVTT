@@ -144,7 +144,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
   // and combat context so its actions resolve as real attacks.
   const [view, setView] = useState<"initiative" | "sheet">("initiative");
   // The shared per-browser dice-input preference.
-  const { rollMode, bonusMode } = useRollPreference();
+  const { rollMode } = useRollPreference();
   // "Jump" sheet-attack mode: an attack tapped on the sheet comes here to pick and confirm, then
   // returns to the sheet once it commits.
   const [returnToSheetAfterAttack, setReturnToSheetAfterAttack] = useState(false);
@@ -255,8 +255,7 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                       actorId={myId}
                       definition={rowActor.definition}
                       revision={state.revision}
-                      rollMode={rollMode}
-                      bonusMode={bonusMode}
+                      inspired={rowActor.heroicInspiration === true}
                       playerDamageMode={combat.playerDamageMode}
                       targets={combat.initiative.map((initiativeEntry) => ({
                         actorId: initiativeEntry.actorId,
@@ -306,6 +305,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                           onFeedback={onFeedback}
                           rollMode={rollMode}
                           isActingTurn={myTurn}
+                          viewer="player"
+                          inspired={rowActor.heroicInspiration === true}
                         />
                       )}
                     </OwnFeedback>
@@ -321,6 +322,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                             canDismiss={false}
                             onFeedback={onFeedback}
                             rollMode={rollMode}
+                            viewer="player"
+                            inspired={rowActor?.heroicInspiration === true}
                           />
                         ))
                       }
@@ -337,6 +340,8 @@ export function PlayerEncounterPanel({ state, dock }: Readonly<{ state: PlayerVi
                             canDismiss={false}
                             onFeedback={onFeedback}
                             rollMode={rollMode}
+                            viewer="player"
+                            inspired={rowActor?.heroicInspiration === true}
                           />
                         ))
                       }

@@ -15,17 +15,7 @@ const HIT: NonNullable<ActionResolution["attack"]> = {
 
 const mount = (push: ActionResolution["push"]) => {
   const resolve = vi.fn<(options: ResolveOptions) => void>();
-  render(
-    <AttackPreview
-      attack={HIT}
-      busy={false}
-      rollMode="auto"
-      bonusMode="auto"
-      onFeedback={() => {}}
-      push={push}
-      resolve={resolve}
-    />
-  );
+  render(<AttackPreview attack={HIT} busy={false} viewer="gm" onFeedback={() => {}} push={push} resolve={resolve} />);
   return resolve;
 };
 
@@ -34,24 +24,24 @@ describe("the Push choice on a previewed hit", () => {
     const resolve = mount({ targetName: "Foe", maxFeet: 10 });
     expect(screen.getByRole("button", { name: "10 ft" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
-    expect(resolve).toHaveBeenLastCalledWith({ commit: true, attackNatural: 18, pushFeet: 10 });
+    expect(resolve).toHaveBeenLastCalledWith({ commit: true, pushFeet: 10 });
 
     fireEvent.click(screen.getByRole("button", { name: "No push" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
-    expect(resolve).toHaveBeenLastCalledWith({ commit: true, attackNatural: 18, pushFeet: 0 });
+    expect(resolve).toHaveBeenLastCalledWith({ commit: true, pushFeet: 0 });
   });
 
-  it("leaves a re-roll preview without a push distance", () => {
+  it("leaves a reroll preview without a push distance", () => {
     const resolve = mount({ targetName: "Foe", maxFeet: 10 });
     fireEvent.click(screen.getByRole("button", { name: "5 ft" }));
-    fireEvent.click(screen.getByRole("button", { name: "Re-roll" }));
-    expect(resolve).toHaveBeenLastCalledWith({ commit: false });
+    fireEvent.click(screen.getByRole("button", { name: "Reroll" }));
+    expect(resolve).toHaveBeenLastCalledWith({ commit: false, reroll: true });
   });
 
   it("asks nothing when the hit offers no push", () => {
     const resolve = mount(null);
     expect(screen.queryByRole("group", { name: /Push/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
-    expect(resolve).toHaveBeenLastCalledWith({ commit: true, attackNatural: 18 });
+    expect(resolve).toHaveBeenLastCalledWith({ commit: true });
   });
 });

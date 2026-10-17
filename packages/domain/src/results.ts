@@ -197,6 +197,8 @@ export type DamageApplyResult = MutationResult & { applied?: DamageApplication }
 export type DeathSaveResult = MutationResult & {
   deathSave?: Readonly<{
     naturalRoll: number;
+    /** The face with what the save adds (Exhaustion, Bless's d4, an aura). */
+    total?: number;
     outcome: "success" | "failure" | "critical-success" | "critical-failure";
     successes: number;
     failures: number;

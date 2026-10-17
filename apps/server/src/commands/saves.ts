@@ -338,6 +338,7 @@ export const saveCommands = [
         rollId,
         deathSave: {
           naturalRoll: roll.face,
+          total: roll.total,
           outcome: outcome.outcome,
           successes: outcome.state.successes,
           failures: outcome.state.failures,

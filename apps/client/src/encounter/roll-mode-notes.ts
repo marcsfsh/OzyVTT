@@ -1,4 +1,4 @@
-import type { AbilityId, ActorDerivedSheet, DerivedAbilityRow } from "@vtt/domain";
+import type { AbilityId, ActionRollMode, ActorDerivedSheet, DerivedAbilityRow } from "@vtt/domain";
 
 /** A roll's mode as the server counts it, with what grants each side. */
 export type RollModeSummary = DerivedAbilityRow["checkMode"];
@@ -19,6 +19,13 @@ export function modeLabel(mode: RollModeSummary | undefined | null): string {
   if (!mode || mode.mode === "normal") return "";
   const sources = mode[mode.mode];
   return ` with ${mode.mode === "advantage" ? "Advantage" : "Disadvantage"}${sources.length > 0 ? ` (${sources.join(", ")})` : ""}`;
+}
+
+/** " · Disadvantage (Poisoned)", for a result line; empty for a plain d20. The GM's forced mode reads "GM's choice". */
+export function modeWords(mode: ActionRollMode | undefined): string {
+  if (!mode || mode.mode === "normal") return "";
+  const sources = mode.mode === "advantage" ? mode.advantage : mode.disadvantage;
+  return ` · ${mode.mode === "advantage" ? "Advantage" : "Disadvantage"}${sources.length > 0 ? ` (${sources.join(", ")})` : ""}`;
 }
 
 /** One thing that gives some of the sheet's rolls Advantage or Disadvantage, and which rolls. */

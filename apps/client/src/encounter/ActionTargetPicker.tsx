@@ -1,25 +1,32 @@
 import { useId } from "react";
 import { Button, Select, Stepper } from "@vtt/ui";
+import { useRollPreference } from "../dice/roll-preference";
+import { FaceEntry } from "./RollControls";
 import { clearTargeting, setDamageType, setTargetDarts, toggleTarget, type TargetingSession } from "./targeting";
 
 /**
  * Choosing who an action targets: one (radio) or several (checkboxes), or, for an area, where to drag
- * the template on the map. Back drops the action; Roll sends it to the server.
+ * the template on the map. Back drops the action; Roll sends it to the server, which throws the attack's
+ * d20, or the face a physical die shows is typed in its place while the table lets this browser type.
  */
 export function ActionTargetPicker({
   picking,
   targets,
   onMap = false,
   busy,
-  onRoll
+  onRoll,
+  onInvalidFace
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<{ id: string; label: string }>;
   /** The GM can also pick by clicking tokens on the map, so the heading says so. */
   onMap?: boolean;
   busy: boolean;
-  onRoll: () => void;
+  /** `face` is a typed attack d20. */
+  onRoll: (face?: number) => void;
+  onInvalidFace?: (message: string) => void;
 }>) {
+  const { mayType } = useRollPreference();
   const group = useId();
   const ready = picking.mode === "template" ? Boolean(picking.template?.placed) : picking.selected.length > 0;
   const darts = picking.darts;
@@ -88,10 +95,20 @@ export function ActionTargetPicker({
         <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
           Back
         </Button>
-        <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={onRoll}>
+        <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
           Roll {picking.action.name}
         </button>
       </div>
+      {mayType && ready && picking.mode === "single" && picking.action.attackBonus !== null && (
+        <div className="action-targeting-face">
+          <FaceEntry
+            label={`Attack d20 for ${picking.action.name}`}
+            busy={busy}
+            onInvalid={onInvalidFace}
+            onFace={(face) => onRoll(face)}
+          />
+        </div>
+      )}
     </div>
   );
 }
