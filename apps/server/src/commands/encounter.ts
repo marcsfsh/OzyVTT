@@ -12,7 +12,8 @@ import {
   rollSelfInitiative,
   setInitiativeScore,
   startEncounter,
-  swapInitiative
+  swapInitiative,
+  type TurnAdvanceDeps
 } from "../encounter.js";
 import {
   AddCombatantSchema,
@@ -32,11 +33,36 @@ import {
 import { CommandRejectedError, type JournalEntry } from "../game-store.js";
 import { requireTypedDie } from "../held-rolls.js";
 import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
-import { initiatorOf, isGmGrade, principalTag } from "./kit.js";
+import { initiatorOf, isGmGrade, principalTag, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 import { recoverAmmunition } from "../ammunition.js";
 
 // The encounter lifecycle, initiative and the turn economy.
+
+/** Where creatures stand on the fight's map; a map that can't be read leaves every distance unknown, so a turn still
+ *  moves on. */
+async function mappedDistance(
+  kit: Kit
+): Promise<(state: GameState, actorIdA: string, actorIdB: string) => number | null> {
+  return kit.creatureDistance().catch(() => () => null);
+}
+
+/** What a turn's end and the next one's start read: stat blocks, items, the server's dice, and where creatures stand
+ *  (the auras that reach them). */
+function turnAdvanceDeps(
+  kit: Kit,
+  state: GameState,
+  distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null
+): TurnAdvanceDeps {
+  return {
+    resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+    catalog: kit.equipmentCatalog(),
+    rollDie: (sides) => kit.context.random(sides),
+    newId: kit.context.newId,
+    now: () => new Date().toISOString(),
+    distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
+  };
+}
 
 export const encounterCommands = [
   defineCommand({
@@ -238,6 +264,7 @@ export const encounterCommands = [
       const { actorId } = request;
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
+      const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
           throw new CommandRejectedError(
@@ -247,13 +274,7 @@ export const encounterCommands = [
         // Its turn ends first, recorded like any other, so Previous can bring it back.
         if (draft.combat.turnActorId === actorId && draft.combat.initiative.length > 1 && !gathering)
           outcome = planNextTurn(draft, timeline, false, (advancing) =>
-            nextInitiativeTurn(advancing, effectEvents, {
-              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
-              catalog: kit.equipmentCatalog(),
-              rollDie: (sides) => kit.context.random(sides),
-              newId: kit.context.newId,
-              now: () => new Date().toISOString()
-            })
+            nextInitiativeTurn(advancing, effectEvents, turnAdvanceDeps(kit, advancing, distance))
           );
         else if (draft.combat.turnActorId === actorId && gathering) {
           const order = draft.combat.initiative.filter((entry) => entry.actorId !== actorId);
@@ -382,15 +403,10 @@ export const encounterCommands = [
       // Rewound and changed: rewrite history only after GM confirmation (TimelineConfirmationRequired).
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
+      const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         outcome = planNextTurn(draft, timeline, request.confirmRewrite === true, (advancing) =>
-          nextInitiativeTurn(advancing, effectEvents, {
-            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
-            catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides),
-            newId: kit.context.newId,
-            now: () => new Date().toISOString()
-          })
+          nextInitiativeTurn(advancing, effectEvents, turnAdvanceDeps(kit, advancing, distance))
         );
       });
       if (duplicate) return;
@@ -430,6 +446,7 @@ export const encounterCommands = [
     async run({ principal, executeTimeline }, kit) {
       // End Turn is a live forward step like the GM's Next. Players cannot advance while the table is rewound.
       const effectEvents: EffectNarration[] = [];
+      const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
           throw new CommandRejectedError(
@@ -437,13 +454,7 @@ export const encounterCommands = [
             "history_review"
           );
         planNextTurn(draft, timeline, false, (advancing) =>
-          endTurn(advancing, initiatorOf(principal), effectEvents, {
-            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
-            catalog: kit.equipmentCatalog(),
-            rollDie: (sides) => kit.context.random(sides),
-            newId: kit.context.newId,
-            now: () => new Date().toISOString()
-          })
+          endTurn(advancing, initiatorOf(principal), effectEvents, turnAdvanceDeps(kit, advancing, distance))
         );
       });
       if (duplicate) return;

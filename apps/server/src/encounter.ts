@@ -544,6 +544,8 @@ export type TurnAdvanceDeps = Readonly<{
   /** Mint the repeat saves the ending turn opens; absent, effects still expire but no save is opened. */
   newId?: () => string;
   now?: () => string;
+  /** Creature-to-creature distance on the map, for the auras that reach creatures as turns start and end. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /** SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the spent
@@ -619,7 +621,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     state,
     state.combat.turnActorId,
     ending,
-    deps?.newId ? { newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
+    deps?.newId ? { ...deps, newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
   );
   events?.push(...ending);
   // A new round sorts the whole order again, settling any mid-round score change.

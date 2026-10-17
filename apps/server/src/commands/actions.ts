@@ -208,7 +208,8 @@ export const actionCommands = [
               newId: kit.context.newId,
               now: () => Date.now(),
               catalog: kit.equipmentCatalog(),
-              distanceFeet
+              distanceFeet,
+              rollDie: (sides) => kit.context.random(sides)
             }
           );
         // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.

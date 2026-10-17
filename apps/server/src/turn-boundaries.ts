@@ -6,12 +6,21 @@ import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
 import { createPendingSaves } from "./saving-throws.js";
+import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
 
-/** What the end-of-turn step needs to open prompts; without it (scene bookkeeping) durations still end. */
-export type TurnEndDeps = Readonly<{ newId: () => string; now: () => string }>;
+/** What the end-of-turn step needs to open prompts; without it (scene bookkeeping) durations still end. With dice and
+ *  the stat blocks, a trait that burns as its bearer's turn ends (Fire Aura) deals its damage too. */
+export type TurnEndDeps = Readonly<{
+  newId: () => string;
+  now: () => string;
+  rollDie?: (sides: number) => number;
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+  catalog?: EquipmentCatalog;
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+}>;
 
 /** What the start-of-turn step needs to roll ongoing damage and weigh it; prompts open only with `newId`. */
 export type TurnStartDeps = Readonly<{
@@ -20,17 +29,28 @@ export type TurnStartDeps = Readonly<{
   catalog?: EquipmentCatalog;
   newId?: () => string;
   now?: () => string;
+  /** Creature-to-creature distance on the map, for the auras a creature starts its turn in. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /**
  * SRD: "at the end of its turn". When `actorId`'s turn ends, before the next begins:
  * 1. "until the end of its/your next turn" durations it owns end (`expireEffectsAtTurnEnd`);
  * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save, a success ending
- *    the effect (`openRepeatSaves`).
+ *    the effect (`openRepeatSaves`);
+ * 3. its stat block's traits that act as its turn ends (Fire Aura) do (`traitsAtTurnEnd`).
  */
 export function endOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps?: TurnEndDeps): void {
   events.push(...expireEffectsAtTurnEnd(state, actorId));
   if (deps) events.push(...openRepeatSaves(state, actorId, deps));
+  if (deps?.rollDie && deps.resolveDefinition)
+    events.push(
+      ...traitsAtTurnEnd(state, actorId, {
+        ...deps,
+        rollDie: deps.rollDie,
+        resolveDefinition: deps.resolveDefinition
+      })
+    );
 }
 
 /**
@@ -38,10 +58,12 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
  * (`expireEffectsAtTurnStart`), each effect whose ongoing damage falls on this turn deals it: one the creature bears
  * ("each of its turns") or one it is the source of ("each of the behir's turns"; a source at 0 HP has no turns to
  * deal it on). The dice roll here and the damage meets the bearer's defences like any hit. A save that follows the
- * damage opens next, a success ending the effect (Searing Smite).
+ * damage opens next, a success ending the effect (Searing Smite). Before that, its stat block's traits act
+ * (`traitsAtTurnStart`: Regeneration, Berserk, Barbed Hide) and the auras it starts its turn in ask their saves.
  */
 export function startOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
   heroicWarrior(state, actorId, events, deps);
+  events.push(...traitsAtTurnStart(state, actorId, deps));
   const inFight = new Set(state.combat.initiative.map((entry) => entry.actorId));
   for (const bearer of state.actors) {
     if (!inFight.has(bearer.id)) continue;
@@ -99,6 +121,7 @@ function dealOngoingDamage(state: GameState, bearer: Actor, effect: Effect, deps
     { role: "gm" },
     {
       resolveDefinition: deps.resolveDefinition,
+      rollDie: deps.rollDie,
       ...(deps.catalog ? { catalog: deps.catalog } : {}),
       ...(deps.newId ? { newId: deps.newId } : {}),
       ...(deps.now ? { now: deps.now } : {})

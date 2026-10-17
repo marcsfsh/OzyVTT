@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { GameStateSchema, type GameState } from "@vtt/domain";
+import { GameStateSchema, isDead, type GameState } from "@vtt/domain";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions, loadSpells } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import type { EffectNarration } from "../src/effects.js";
-import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { nextInitiativeTurn, startEncounter, type TurnAdvanceDeps } from "../src/encounter.js";
+import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { testCatalog } from "./catalog-records.js";
 
@@ -282,5 +283,366 @@ describe("Pack Tactics", () => {
     // The hero's own ally beside it is no ally of the wolf's.
     const alone = game("wolf");
     expect(wolfBites(alone, { [IDS.hero]: [0, 0], [IDS.foe]: [5, 0], [IDS.ally]: [0, 5] }).rollMode).toBeUndefined();
+  });
+});
+
+type Positions = Readonly<Record<string, readonly [number, number]>>;
+/** Ends the current turn and starts the next, with dice from `faces` (then 1s) and the tokens where `positions` puts
+ *  them. */
+function advance(state: GameState, faces: number[] = [], positions?: Positions): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  const deps: TurnAdvanceDeps = {
+    resolveDefinition,
+    catalog,
+    rollDie: () => faces.shift() ?? 1,
+    newId: nextId,
+    now: NOW,
+    ...(positions ? { distanceFeet: distanceBy(positions) } : {})
+  };
+  nextInitiativeTurn(state, events, deps);
+  return events;
+}
+const texts = (events: readonly EffectNarration[]) => events.map((event) => event.text);
+/** Damage from the hero, as the GM's apply would land it. */
+function hurt(
+  state: GameState,
+  targetId: string,
+  parts: Array<{ amount: number; type: string }>,
+  faces: number[] = []
+) {
+  return applyDamageDetailed(
+    state,
+    targetId,
+    { amount: parts.reduce((sum, part) => sum + part.amount, 0), parts, sourceActorId: IDS.hero, sourceName: "Hero" },
+    GM,
+    { resolveDefinition, catalog, newId: nextId, now: NOW, rollDie: () => faces.shift() ?? 1 }
+  );
+}
+
+describe("Regeneration", () => {
+  it("heals a troll at the start of each of its turns", () => {
+    const state = game("troll", { foeHp: 64 });
+    const events = advance(state);
+    expect(actor(state, IDS.foe).hp.current).toBe(79);
+    expect(texts(events)).toContain("Troll regains 15 hit points (Regeneration).");
+  });
+
+  it("doesn't work on the troll's next turn after it takes Fire damage, and comes back on the one after", () => {
+    const state = game("troll", { foeHp: 64 });
+    hurt(state, IDS.foe, [{ amount: 10, type: "fire" }]);
+    expect(actor(state, IDS.foe).hp.current).toBe(54);
+    const stopped = advance(state);
+    expect(actor(state, IDS.foe).hp.current).toBe(54);
+    expect(texts(stopped)).toContain("Troll's Regeneration doesn't work this turn (it took Acid or Fire damage).");
+    // The ally's turn, the hero's, then the troll's again.
+    advance(state);
+    advance(state);
+    advance(state);
+    expect(state.combat.turnActorId).toBe(IDS.foe);
+    expect(actor(state, IDS.foe).hp.current).toBe(69);
+  });
+
+  it("keeps a troll at 0 HP down rather than dead, and raises it when its turn starts", () => {
+    const state = game("troll", { foeHp: 10 });
+    const { events } = hurt(state, IDS.foe, [{ amount: 12, type: "slashing" }]);
+    const troll = actor(state, IDS.foe);
+    expect(troll.hp.current).toBe(0);
+    expect(isDead(troll)).toBe(false);
+    expect(troll.conditions.map((condition) => condition.id)).toContain("unconscious");
+    expect(texts(events)).toContain(
+      "Troll drops to 0 HP - it dies only if it starts its turn at 0 HP and doesn't regenerate."
+    );
+    advance(state);
+    expect(actor(state, IDS.foe).hp.current).toBe(15);
+    expect(actor(state, IDS.foe).conditions.map((condition) => condition.id)).not.toContain("unconscious");
+  });
+
+  it("lets a troll at 0 HP die when its turn starts after it took Acid", () => {
+    const state = game("troll", { foeHp: 10 });
+    hurt(state, IDS.foe, [{ amount: 12, type: "acid" }]);
+    const events = advance(state);
+    const troll = actor(state, IDS.foe);
+    expect(troll.hp.current).toBe(0);
+    expect(isDead(troll)).toBe(true);
+    expect(texts(events)).toContain(
+      "Troll dies - it started its turn at 0 HP and its Regeneration didn't work (it took Acid or Fire damage)."
+    );
+  });
+
+  it("needs at least 1 Hit Point for an oni, which dies at 0 like any monster", () => {
+    const hurtOni = game("oni", { foeHp: 50 });
+    advance(hurtOni);
+    expect(actor(hurtOni, IDS.foe).hp.current).toBe(60);
+
+    const downed = game("oni", { foeHp: 5 });
+    hurt(downed, IDS.foe, [{ amount: 9, type: "slashing" }]);
+    expect(isDead(actor(downed, IDS.foe))).toBe(true);
+    advance(downed);
+    expect(actor(downed, IDS.foe).hp.current).toBe(0);
+  });
+});
+
+describe("Undead Fortitude", () => {
+  it("leaves a zombie at 1 HP on a Constitution save of DC 5 plus the damage taken", () => {
+    const state = game("zombie", { foeHp: 3 });
+    // DC 10; the zombie's Con save is +3, so a 7 makes it.
+    const { events } = hurt(state, IDS.foe, [{ amount: 5, type: "slashing" }], [7]);
+    expect(actor(state, IDS.foe).hp.current).toBe(1);
+    expect(texts(events)).toContain(
+      "Zombie's Undead Fortitude: CON save 10 (d20 7) vs DC 10 - it drops to 1 HP instead."
+    );
+  });
+
+  it("lets it fall on a failed save", () => {
+    const state = game("zombie", { foeHp: 3 });
+    const { events } = hurt(state, IDS.foe, [{ amount: 5, type: "slashing" }], [6]);
+    expect(actor(state, IDS.foe).hp.current).toBe(0);
+    expect(isDead(actor(state, IDS.foe))).toBe(true);
+    expect(texts(events)).toContain("Zombie's Undead Fortitude: CON save 9 (d20 6) vs DC 10 - it falls.");
+  });
+
+  it("gives no save against Radiant damage or a Critical Hit", () => {
+    const radiant = game("zombie", { foeHp: 3 });
+    const { events } = hurt(radiant, IDS.foe, [{ amount: 5, type: "radiant" }], [20]);
+    expect(actor(radiant, IDS.foe).hp.current).toBe(0);
+    expect(texts(events)).toContain("Zombie's Undead Fortitude doesn't hold against radiant damage.");
+
+    const critical = game("zombie", { foeHp: 3 });
+    applyDamageDetailed(
+      critical,
+      IDS.foe,
+      { amount: 5, parts: [{ amount: 5, type: "slashing" }], critical: true },
+      GM,
+      { resolveDefinition, rollDie: () => 20 }
+    );
+    expect(actor(critical, IDS.foe).hp.current).toBe(0);
+  });
+});
+
+describe("auras", () => {
+  const near: Positions = { [IDS.hero]: [0, 0], [IDS.foe]: [5, 0], [IDS.ally]: [30, 0], [IDS.foe2]: [0, 5] };
+
+  it("asks a creature that starts its turn in a ghast's Stench for the save, and Poisons it until its next turn", () => {
+    const state = game("ghast");
+    // Hero's turn ends; the ghast's, then the ally's, then the hero starts its turn beside the ghast.
+    advance(state, [], near);
+    advance(state, [], near);
+    const events = advance(state, [], near);
+    expect(state.combat.turnActorId).toBe(IDS.hero);
+    expect(texts(events)).toContain("Hero starts its turn in Ghast's Stench: DC 10 CON save.");
+    const [pending] = pendingOn(state, IDS.hero);
+    expect(pending).toMatchObject({ ability: "con", dc: 10, conditionIds: ["poisoned"], immuneOnSuccess: true });
+    answerSave(state, nextId(), pending!.id, "manual", 5, true, GM, saveDeps([]));
+    expect(actor(state, IDS.hero).conditions.map((condition) => condition.id)).toEqual(["poisoned"]);
+    expect(actor(state, IDS.hero).effects[0]?.duration).toEqual({ type: "until-bearer-next-turn" });
+    // Through the ghast's turn the hero stays Poisoned; at the hero's next turn it ends, and the save asks again.
+    advance(state, [], near);
+    expect(actor(state, IDS.hero).conditions.map((condition) => condition.id)).toEqual(["poisoned"]);
+    advance(state, [], near);
+    advance(state, [], near);
+    expect(state.combat.turnActorId).toBe(IDS.hero);
+    expect(actor(state, IDS.hero).conditions).toEqual([]);
+    expect(pendingOn(state, IDS.hero)).toHaveLength(1);
+  });
+
+  it("makes a creature that succeeds immune to that ghast's Stench for the fight", () => {
+    const state = game("ghast");
+    advance(state, [], near);
+    advance(state, [], near);
+    advance(state, [], near);
+    const [pending] = pendingOn(state, IDS.hero);
+    answerSave(state, nextId(), pending!.id, "manual", 15, true, GM, saveDeps([]));
+    expect(actor(state, IDS.hero).effects.map((effect) => effect.name)).toEqual(["Immune to Ghast's Stench"]);
+    for (let turn = 0; turn < 3; turn += 1) advance(state, [], near);
+    expect(state.combat.turnActorId).toBe(IDS.hero);
+    expect(pendingOn(state, IDS.hero)).toEqual([]);
+  });
+
+  it("reaches only a pit fiend's enemies with its Fear Aura, and nobody while it is Incapacitated", () => {
+    const state = game("pit-fiend", { foe2: "imp" });
+    const reach: Positions = { [IDS.hero]: [0, 0], [IDS.foe]: [20, 0], [IDS.ally]: [60, 0], [IDS.foe2]: [10, 0] };
+    // The imp, an ally of the fiend, starts its turn in the aura and is left alone.
+    advance(state, [], reach);
+    advance(state, [], reach);
+    advance(state, [], reach);
+    expect(state.combat.turnActorId).toBe(IDS.foe2);
+    expect(pendingOn(state, IDS.foe2)).toEqual([]);
+    const events = advance(state, [], reach);
+    expect(texts(events)).toContain("Hero starts its turn in Pit Fiend's Fear Aura: DC 21 WIS save.");
+
+    const stunned = game("pit-fiend");
+    actor(stunned, IDS.foe).conditions = [{ id: "stunned" }];
+    for (let turn = 0; turn < 3; turn += 1) advance(stunned, [], reach);
+    expect(pendingOn(stunned, IDS.hero)).toEqual([]);
+  });
+
+  it("burns everyone within 5 feet as a balor's turn ends, rolling the damage once", () => {
+    const state = game("balor", { foe2: "imp" });
+    state.combat = { ...state.combat, turnActorId: IDS.foe };
+    const events = advance(state, [3, 4, 5], near);
+    // 3d8 = 12 Fire to the hero beside it and to its own imp, none to the ally 30 feet off.
+    expect(actor(state, IDS.hero).hp.current).toBe(18);
+    expect(actor(state, IDS.ally).hp.current).toBe(25);
+    expect(texts(events)).toContain("Hero takes 12 Fire damage from Balor's Fire Aura.");
+    expect(texts(events)).toContain("Imp 2 takes 0 Fire damage from Balor's Fire Aura (12 fire → 0, immunity).");
+  });
+
+  it("burns only an azer's enemies, sets nobody burning, and is silent while it is Incapacitated", () => {
+    const state = game("azer-sentinel", { foe2: "azer-sentinel" });
+    state.combat = { ...state.combat, turnActorId: IDS.foe };
+    advance(state, [6], near);
+    expect(actor(state, IDS.hero).hp.current).toBe(24);
+    expect(actor(state, IDS.foe2).hp.current).toBe(actor(state, IDS.foe2).hp.maximum);
+
+    const stunned = game("azer-sentinel");
+    stunned.combat = { ...stunned.combat, turnActorId: IDS.foe };
+    actor(stunned, IDS.foe).conditions = [{ id: "stunned" }];
+    advance(stunned, [6], near);
+    expect(actor(stunned, IDS.hero).hp.current).toBe(30);
+  });
+
+  it("sets what a fire elemental's aura burns alight", () => {
+    const state = game("fire-elemental");
+    state.combat = { ...state.combat, turnActorId: IDS.foe };
+    advance(state, [4], near);
+    expect(actor(state, IDS.hero).hp.current).toBe(26);
+    expect(actor(state, IDS.hero).effects.map((effect) => effect.name)).toEqual(["Burning"]);
+  });
+
+  it("tells the GM what a burning aura deals when the map can't measure", () => {
+    const state = game("balor");
+    state.combat = { ...state.combat, turnActorId: IDS.foe };
+    const events = advance(state, [3, 4, 5]);
+    expect(actor(state, IDS.hero).hp.current).toBe(30);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        gmOnly: true,
+        text: "Balor's Fire Aura: each creature within 5 feet takes 3d8 fire damage - the map can't measure, so apply it by hand."
+      })
+    );
+  });
+
+  it("pricks what a barbed devil grapples at the start of its turns", () => {
+    const state = game("barbed-devil");
+    actor(state, IDS.hero).effects = [
+      {
+        id: "grip",
+        name: "Grappled by Barbed Devil",
+        tags: ["grapple"],
+        sourceActorId: IDS.foe,
+        sourceName: "Barbed Devil",
+        sourceActionId: null,
+        startedRound: 1,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: true,
+        voidWhileIncapacitated: false,
+        concentration: false,
+        endsWithTag: null,
+        modifiers: [],
+        linkedConditionIds: ["grappled"],
+        escapeDc: 15,
+        onEnd: []
+      }
+    ];
+    actor(state, IDS.hero).conditions = [{ id: "grappled" }];
+    const events = advance(state, [7], near);
+    expect(actor(state, IDS.hero).hp.current).toBe(23);
+    expect(texts(events)).toContain("Hero takes 7 Piercing damage from Barbed Devil's Barbed Hide.");
+    expect(actor(state, IDS.ally).hp.current).toBe(25);
+  });
+});
+
+describe("Death Burst and Death Throes", () => {
+  it("asks each creature within reach of a dying magmin for the save, with the damage rolled once", () => {
+    const state = game("magmin", { foeHp: 4 });
+    const positions: Positions = { [IDS.hero]: [0, 0], [IDS.foe]: [10, 0], [IDS.ally]: [25, 0] };
+    const { events } = applyDamageDetailed(
+      state,
+      IDS.foe,
+      { amount: 8, parts: [{ amount: 8, type: "slashing" }] },
+      GM,
+      { resolveDefinition, newId: nextId, now: NOW, rollDie: () => 4, distanceFeet: distanceBy(positions) }
+    );
+    expect(texts(events)).toContain("Magmin explodes (Death Burst): DC 11 DEX save for 1 creature within 10 feet.");
+    expect(pendingOn(state, IDS.hero)).toEqual([
+      expect.objectContaining({
+        sourceActorId: IDS.foe,
+        actionName: "Death Burst",
+        ability: "dex",
+        dc: 11,
+        proposedDamage: 8,
+        proposedDamageParts: [{ amount: 8, type: "fire" }],
+        halfOnSuccess: true
+      })
+    ]);
+    expect(pendingOn(state, IDS.ally)).toEqual([]);
+  });
+
+  it("rolls a balor's Fire and Force together", () => {
+    const state = game("balor", { foeHp: 4 });
+    applyDamageDetailed(state, IDS.foe, { amount: 8, parts: [{ amount: 8, type: "cold" }] }, GM, {
+      resolveDefinition,
+      newId: nextId,
+      now: NOW,
+      rollDie: () => 2,
+      distanceFeet: distanceBy({ [IDS.hero]: [0, 0], [IDS.foe]: [25, 0] })
+    });
+    expect(pendingOn(state, IDS.hero)[0]?.proposedDamageParts).toEqual([
+      { amount: 18, type: "fire" },
+      { amount: 18, type: "force" }
+    ]);
+  });
+});
+
+describe("Berserk", () => {
+  it("rolls a d6 when a golem starts its turn Bloodied, and a 6 sends it berserk until it isn't", () => {
+    const calm = game("clay-golem", { foeHp: 50 });
+    const stays = advance(calm, [5]);
+    expect(actor(calm, IDS.foe).effects).toEqual([]);
+    expect(stays).toContainEqual(expect.objectContaining({ gmOnly: true, text: expect.stringContaining("rolled 5") }));
+
+    const state = game("clay-golem", { foeHp: 50 });
+    const events = advance(state, [6]);
+    expect(actor(state, IDS.foe).effects.map((effect) => effect.name)).toEqual(["Berserk"]);
+    expect(texts(events)).toContain(
+      "Clay Golem goes berserk (rolled 6) - it attacks the nearest creature it can see until it is no longer Bloodied."
+    );
+    actor(state, IDS.foe).hp.current = 100;
+    for (let turn = 0; turn < 3; turn += 1) advance(state);
+    expect(actor(state, IDS.foe).effects).toEqual([]);
+  });
+});
+
+describe("Corrosive Form", () => {
+  const SWORD: ActorAction = {
+    id: "longsword",
+    name: "Longsword",
+    activation: "action",
+    description: "Melee weapon attack.",
+    attack: { bonus: 5, reachFeet: 5 },
+    damage: [{ formula: "1d8 + 3", type: "slashing" }]
+  };
+  const BOW: ActorAction = {
+    id: "longbow",
+    name: "Longbow",
+    activation: "action",
+    description: "Ranged weapon attack.",
+    attack: { bonus: 5, rangeFeet: 150 },
+    damage: [{ formula: "1d8 + 3", type: "piercing" }]
+  };
+
+  it("burns the creature that hits a black pudding in melee, and not one that hits it from range", () => {
+    const state = game("black-pudding");
+    const resolution = heroUses(state, SWORD, [15, 4, 6]);
+    expect(resolution.attack?.outcome).toBe("hit");
+    // The sword's d8 rolled 4; the pudding's 1d8 Acid rolled 6.
+    expect(actor(state, IDS.hero).hp.current).toBe(24);
+    expect(resolution.tableNarration?.map((line) => line.text)).toContain(
+      "Hero takes 6 damage from Black Pudding's Corrosive Form."
+    );
+
+    const ranged = game("black-pudding");
+    heroUses(ranged, BOW, [15, 4, 6]);
+    expect(actor(ranged, IDS.hero).hp.current).toBe(30);
   });
 });

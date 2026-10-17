@@ -3,11 +3,14 @@ import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
+  d20TestFormula,
   diceRiders,
   diceRiderTerms,
   halveDamageParts,
   otherDiceOf,
+  parseDiceFormula,
   rescaleDamageParts,
+  resolveDice,
   sumRiders,
   type AggregatedRollMode,
   type DiceResolution,
@@ -21,6 +24,7 @@ import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
 import { areAllies } from "./creature-sides.js";
 import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
+import { AURA_IMMUNE_TAG, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -253,6 +257,36 @@ export function saveTotalFor(
 }
 
 /**
+ * A save the server rolls at once, with no prompt, for a creature's own trait (Undead Fortitude): the same total, riders
+ * and Advantage the prompt would use, cover aside. The kept d20 and the total, with what shaped the roll.
+ */
+export function rollSaveAtOnce(
+  state: GameState,
+  actor: Actor,
+  ability: AbilityId,
+  deps: Readonly<{
+    resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+    catalog?: EquipmentCatalog;
+    distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+    rollDie: RandomSource;
+  }>
+): Readonly<{ natural: number; total: number; rollMode: AggregatedRollMode }> {
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  const derivation = deriveEquipment(actor, definition, deps.catalog);
+  const modifier =
+    saveTotalFor(definition, actor, ability, derivation) + (auraOfProtection(state, actor, deps)?.amount ?? 0);
+  const sources = saveRollSources(actor, ability, derivation);
+  const rollMode = aggregateRollMode(sources.advantage, sources.disadvantage);
+  const resolution = resolveDice(
+    parseDiceFormula(d20TestFormula(rollMode.mode, modifier) + saveRiderDiceTerms(derivation, ability)),
+    deps.rollDie
+  );
+  const d20 = resolution.terms.find((term) => term.kind === "dice");
+  const natural = d20 && d20.kind === "dice" ? (d20.dice.find((die) => die.kept) ?? d20.dice[0])!.face : 0;
+  return { natural, total: resolution.total, rollMode };
+}
+
+/**
  * Evasion (Rogue 7, Monk 7, and stat blocks that print it, the Assassin's): a held `evasion` class feature, or a
  * trait of that name on the sheet.
  */
@@ -286,6 +320,8 @@ export function createPendingSaves(
     callId?: string;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
+    /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
+    immuneOnSuccess?: boolean;
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -311,6 +347,7 @@ export function createPendingSaves(
     ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
     ...(input.callId !== undefined ? { callId: input.callId } : {}),
     ...(input.magical ? { magical: true as const } : {}),
+    ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -691,6 +728,7 @@ export function answerSave(
         newId: deps.newRollId,
         now: deps.now,
         commandId,
+        rollDie: deps.random,
         ...(deps.catalog ? { catalog: deps.catalog } : {}),
         ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
       }
@@ -739,6 +777,22 @@ export function answerSave(
     conditionApplied = target.conditions.some(
       (condition) =>
         pending.conditionIds.includes(condition.id) || pending.onFailEffect?.linkedConditionIds.includes(condition.id)
+    );
+  // "Success: The target is immune to this ghast's Stench for 24 hours", held for the fight.
+  if (success && pending.immuneOnSuccess && pending.sourceActorId !== null)
+    addEffect(
+      state,
+      target.id,
+      makeEffect({
+        id: `${commandId}:${saveId}:immune`,
+        name: `Immune to ${pending.sourceName}'s ${pending.actionName}`.slice(0, 120),
+        tags: [AURA_IMMUNE_TAG],
+        sourceActorId: pending.sourceActorId,
+        sourceName: pending.sourceName,
+        sourceActionId: traitActionId(pending.actionName),
+        startedRound: state.combat.round,
+        duration: { type: "encounter" }
+      })
     );
   // A repeated save that succeeds ends the effect it was repeated for (Hold Person ends on that target).
   if (success && pending.repeatOf)

@@ -179,7 +179,9 @@ const PENDING_SAVE_FIELDS = {
   // The call reaches the player through `rollCalls`, which carries only their own part of it.
   callId: "never",
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
-  magical: "never"
+  magical: "never",
+  // What a success earns is the stat block's text, the GM's knowledge.
+  immuneOnSuccess: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.

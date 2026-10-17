@@ -265,6 +265,9 @@ export const PendingSaveSchema = z
     callId: z.uuid().optional(),
     /** Against a spell or another magical effect (a magic item's): Magic Resistance gives Advantage on it. */
     magical: z.literal(true).optional(),
+    /** A success makes the target immune to this source's trait for the rest of the fight ("immune to this ghast's
+     * Stench for 24 hours"). */
+    immuneOnSuccess: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
