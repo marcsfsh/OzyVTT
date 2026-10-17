@@ -5,6 +5,17 @@ import { Select, Switch } from "@vtt/ui";
 import { command } from "../lib/command";
 import { HealthAudienceOptions, HealthStyleOptions, healthStylePhrase, type HealthStyle } from "./health-display";
 import "./fight-menu.css";
+import {
+  BADGE_AUDIENCE_REASON,
+  DIAL_COPY,
+  dialLabel,
+  dialLine,
+  HEALTH_AUDIENCE_LABEL,
+  HEALTH_DISPLAY_LABEL,
+  optionLabel,
+  PLAYER_HITS,
+  PLAYER_INITIATIVE
+} from "../settings/table-words";
 
 /* The ⋯ fight menu's geometry: margin from viewport edges, gap from the trigger, and box width. */
 const MENU_MARGIN = 8;
@@ -187,19 +198,21 @@ export function FightMenu({
                       void command("encounter:set-rules-mode", { mode }).then((result) =>
                         onFeedback(
                           result.ok
-                            ? `Rules assistant: ${mode === "strict" ? "Enforce" : mode === "assisted" ? "Advise" : "Off"}.`
+                            ? `Rules assistant: ${dialLabel(mode)}.`
                             : (result.message ?? "The rules assistant could not be changed.")
                         )
                       );
                     }}
                   >
-                    <option value="strict">Enforce - blocks illegal moves; you can allow them</option>
-                    <option value="assisted">Advise - allows everything, leaves notes</option>
-                    <option value="freeform">Off - no checks, no prompts</option>
+                    {DIAL_COPY.map((entry) => (
+                      <option key={entry.value} value={entry.value}>
+                        {dialLine(entry)}
+                      </option>
+                    ))}
                   </Select>
                 </label>
                 <label className="rules-mode-control">
-                  Players' hits
+                  {PLAYER_HITS.label}
                   <Select
                     value={state.combat.playerDamageMode}
                     disabled={busy}
@@ -208,18 +221,21 @@ export function FightMenu({
                       void command("encounter:set-player-damage-mode", { mode }).then((result) =>
                         onFeedback(
                           result.ok
-                            ? `Players' hits ${mode === "direct" ? "apply directly." : "wait for your OK."}`
+                            ? `${PLAYER_HITS.label}: ${optionLabel(PLAYER_HITS, mode)}.`
                             : (result.message ?? "The player damage mode could not be changed.")
                         )
                       );
                     }}
                   >
-                    <option value="proposal">GM confirms - apply on your tap</option>
-                    <option value="direct">Direct - players apply damage</option>
+                    {PLAYER_HITS.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </Select>
                 </label>
                 <label className="rules-mode-control">
-                  Player initiative
+                  {PLAYER_INITIATIVE.label}
                   <Select
                     value={state.combat.playerInitiativeMode}
                     disabled={busy}
@@ -228,18 +244,21 @@ export function FightMenu({
                       void command("encounter:set-player-initiative-mode", { mode }).then((result) =>
                         onFeedback(
                           result.ok
-                            ? `Player initiative ${mode === "wait" ? "waits for everyone." : "begins immediately."}`
+                            ? `${PLAYER_INITIATIVE.label}: ${optionLabel(PLAYER_INITIATIVE, mode)}.`
                             : (result.message ?? "The player initiative mode could not be changed.")
                         )
                       );
                     }}
                   >
-                    <option value="immediate">Start now - players roll in</option>
-                    <option value="wait">Wait for all players</option>
+                    {PLAYER_INITIATIVE.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </Select>
                 </label>
                 <label className="rules-mode-control">
-                  Health
+                  {HEALTH_DISPLAY_LABEL}
                   <Select
                     value={state.combat.healthDisplay.style}
                     disabled={busy}
@@ -261,7 +280,7 @@ export function FightMenu({
                   </Select>
                 </label>
                 <label className="rules-mode-control">
-                  Health is
+                  {HEALTH_AUDIENCE_LABEL}
                   <Select
                     value={state.combat.healthDisplay.audience}
                     disabled={busy || state.combat.healthDisplay.style === "band"}
@@ -282,6 +301,7 @@ export function FightMenu({
                     <HealthAudienceOptions />
                   </Select>
                 </label>
+                {state.combat.healthDisplay.style === "band" && <p className="menu-note">{BADGE_AUDIENCE_REASON}</p>}
                 <Switch
                   className="environment-control"
                   label="Underwater fight"

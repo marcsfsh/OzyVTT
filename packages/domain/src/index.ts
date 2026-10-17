@@ -10,6 +10,8 @@ export * from "./damage-parts.js";
 export * from "./death.js";
 /** Game time for rests, shared so the 16-hour rule and the GM's rest panel agree. */
 export * from "./rest-clock.js";
+/** Articles and counts, shared so a line the server writes and one the client builds read the same. */
+export * from "./words.js";
 
 /** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
 export * from "./codex-entities.js";

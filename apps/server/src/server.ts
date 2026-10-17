@@ -319,6 +319,7 @@ export function createServer(options: CreateServerOptions) {
       actorIds?: readonly string[];
       gmOnly?: boolean;
       logged?: boolean;
+      playersOnly?: boolean;
     }>
   ) {
     const actorIds = event.actorIds ?? [];
@@ -328,8 +329,9 @@ export function createServer(options: CreateServerOptions) {
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
-      if (auth.verify(token)) socket.emit("table:event", payload);
-      else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
+      if (auth.verify(token)) {
+        if (event.playersOnly !== true) socket.emit("table:event", payload);
+      } else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
     }
     // Every toast is also a feed line, gated the same way, unless the caller writes a richer row itself
     // (`logged: false`). Call `appendLog` directly only for lines with no toast.
@@ -497,6 +499,16 @@ export function createServer(options: CreateServerOptions) {
     // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
     archiveDocument: (id) => store.getEncounterArchive(id),
     sound,
+    onTimePassed: ({ fromHours, toHours }) => {
+      // The game keeps the hour and the Codex calendar the day: each midnight crossed moves the date a day.
+      const days = Math.floor(toHours / 24) - Math.floor(fromHours / 24);
+      try {
+        if (codexStore.advanceCampaignDate(days)) notifyCodexChanged();
+      } catch (error) {
+        // Best-effort (the rest already committed), but logged.
+        console.error("moving the codex date failed:", error instanceof Error ? error.message : error);
+      }
+    },
     claimReleased: (sessionId, event) => {
       for (const socket of io.sockets.sockets.values())
         if (auth.verifyPlayer(socket.handshake.auth?.token)?.sessionId === sessionId)
@@ -688,7 +700,8 @@ export function createServer(options: CreateServerOptions) {
       list: () => store.listEncounterArchives(),
       get: (id) => store.getEncounterArchive(id),
       remove: (id) => store.deleteEncounterArchive(id),
-      setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible)
+      setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible),
+      rename: (id, name) => store.renameEncounterArchive(id, name)
     },
     sessions: {
       // The HTTP mirror of the socket's LAN-trust join: anyone who can reach the host may take a player seat

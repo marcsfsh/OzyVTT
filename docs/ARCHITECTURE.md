@@ -151,7 +151,8 @@ audience. There are four:
   scene ids on markers and sessions) are GM-only even when revealed. A hidden record is a 404,
   never a 403, and ETags are computed after every gate.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
-  allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public.
+  allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
+  list of shared replays carries the GM's name for one, never the name of the scene it was fought on.
 
 Sight is part of the boundary (ADR-0023). `vision/audience.ts` decides, per audience, which
 creatures it may know of. A player sees through their own placed characters; the table viewer, a
@@ -327,7 +328,12 @@ reveal flag. Its HTTP shapes are defined once in `packages/domain/src/codex-wire
 shape is the stored row, its player shape is a separate allow-list type, and the projections and
 the client's reads are typed against both. The GM can preview the player view through
 `POST /api/v1/codex/preview-session`, which mints a real player session. The player calendar and
-the GM calendar are separate clocks; a date reaches players only when it is published.
+the GM calendar are separate dates; a date reaches players only when it is published.
+
+The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
+(`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that
+crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
+`codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day.
 
 ## Public HTTP API
 

@@ -177,15 +177,7 @@ export function CampaignHome({
           </Alert>
         )}
         {showReveal ? (
-          <div className="codex-main-empty">
-            <h3>No pages yet</h3>
-            <p>Create characters, locations, factions and more. They are organized here by kind and tag.</p>
-            {onCreate && (
-              <Button variant="primary" onClick={onCreate}>
-                New page
-              </Button>
-            )}
-          </div>
+          <FirstPage onCreate={onCreate} />
         ) : (
           <div className="codex-main-empty">
             <h3>Nothing shared yet</h3>
@@ -196,6 +188,8 @@ export function CampaignHome({
     );
   }
 
+  // A GM with no pages yet starts with the first one; cards with nothing in them wait until there is something.
+  const fresh = showReveal && pages.length === 0;
   return (
     <div className="codex-campaign">
       {error && (
@@ -204,10 +198,12 @@ export function CampaignHome({
         </Alert>
       )}
 
-      <div className="codex-campaign-stats">
+      {fresh && <FirstPage onCreate={onCreate} />}
+
+      <div className="codex-campaign-stats" hidden={fresh}>
         <div className="codex-campaign-stat">
           <span className="codex-campaign-statnum">{pages.length}</span>
-          <span>pages</span>
+          <span>{pages.length === 1 ? "page" : "pages"}</span>
         </div>
         {showReveal && (
           <div className="codex-campaign-stat">
@@ -217,7 +213,7 @@ export function CampaignHome({
         )}
         <div className="codex-campaign-stat">
           <span className="codex-campaign-statnum">{tags.length}</span>
-          <span>tags</span>
+          <span>{tags.length === 1 ? "tag" : "tags"}</span>
         </div>
         <div className="codex-campaign-stat">
           <span className="codex-campaign-statnum">{maps.length}</span>
@@ -250,7 +246,7 @@ export function CampaignHome({
 
         {/* 2. Where the party is. The GM's empty state links to the Atlas, where pins are placed. */}
         {party && <PartyCard party={party} showReveal={showReveal} onOpenParty={onOpenParty} />}
-        {!party && showReveal && (
+        {!party && showReveal && !fresh && (
           <DashCard
             title="Party location"
             iconId="pin"
@@ -260,42 +256,46 @@ export function CampaignHome({
         )}
 
         {/* 3. Open quests. */}
-        <QuestsCard
-          quests={quests}
-          showReveal={showReveal}
-          onOpenQuest={onOpenQuest}
-          onSeeAll={onSeeAll && (() => onSeeAll("quests"))}
-        />
+        {!(fresh && quests.length === 0) && (
+          <QuestsCard
+            quests={quests}
+            showReveal={showReveal}
+            onOpenQuest={onOpenQuest}
+            onSeeAll={onSeeAll && (() => onSeeAll("quests"))}
+          />
+        )}
 
         {/* 4. Deadlines, passed ones kept. */}
-        <DashCard
-          title="Deadlines"
-          iconId={CHRONICLE_KIND_META.deadline.iconId}
-          count={{ shown: deadlineList.length, total: deadlines.length }}
-          seeAll={onSeeAll ? { label: "See all deadlines", onClick: () => onSeeAll("deadlines") } : undefined}
-          empty="No deadlines yet."
-        >
-          {deadlineList.length > 0 ? (
-            <nav className="codex-campaign-recent" aria-label="Deadlines">
-              {deadlineList.map((deadline) => (
-                <RecordRow
-                  key={deadline.id}
-                  iconId={CHRONICLE_KIND_META.deadline.iconId}
-                  title={deadline.summary || "Untitled deadline"}
-                  revealed={shown(deadline.revealed)}
-                  when={deadline.when}
-                  whenClassName="codex-campaign-deadlinewhen"
-                  onClick={() => onOpenEntry(deadline.id)}
-                >
-                  <Badge tone={deadlineStateTone(deadline.fired)}>{deadlineStateLabel(deadline.fired)}</Badge>
-                </RecordRow>
-              ))}
-            </nav>
-          ) : null}
-        </DashCard>
+        {!(fresh && deadlines.length === 0) && (
+          <DashCard
+            title="Deadlines"
+            iconId={CHRONICLE_KIND_META.deadline.iconId}
+            count={{ shown: deadlineList.length, total: deadlines.length }}
+            seeAll={onSeeAll ? { label: "See all deadlines", onClick: () => onSeeAll("deadlines") } : undefined}
+            empty="No deadlines yet."
+          >
+            {deadlineList.length > 0 ? (
+              <nav className="codex-campaign-recent" aria-label="Deadlines">
+                {deadlineList.map((deadline) => (
+                  <RecordRow
+                    key={deadline.id}
+                    iconId={CHRONICLE_KIND_META.deadline.iconId}
+                    title={deadline.summary || "Untitled deadline"}
+                    revealed={shown(deadline.revealed)}
+                    when={deadline.when}
+                    whenClassName="codex-campaign-deadlinewhen"
+                    onClick={() => onOpenEntry(deadline.id)}
+                  >
+                    <Badge tone={deadlineStateTone(deadline.fired)}>{deadlineStateLabel(deadline.fired)}</Badge>
+                  </RecordRow>
+                ))}
+              </nav>
+            ) : null}
+          </DashCard>
+        )}
 
         {/* 5. Downtime awaiting confirmation (GM-only). */}
-        {onOpenDowntime && (
+        {onOpenDowntime && !(fresh && downtimePending.length === 0) && (
           <DashCard
             title="Downtime pending"
             iconId="campfire"
@@ -321,33 +321,35 @@ export function CampaignHome({
         )}
 
         {/* 6. Latest journal activity. */}
-        <DashCard
-          title="Latest journal activity"
-          iconId="book"
-          count={{ shown: recentEntries.length, total: entries.length }}
-          seeAll={onSeeAll ? { label: "Open the Journal", onClick: () => onSeeAll("journal") } : undefined}
-          empty="No journal entries yet."
-        >
-          {recentEntries.length > 0 ? (
-            <nav className="codex-campaign-recent" aria-label="Latest journal activity">
-              {recentEntries.map((entry) => {
-                const meta = CHRONICLE_KIND_META[entry.kind];
-                return (
-                  <RecordRow
-                    key={entry.id}
-                    iconId={meta.iconId}
-                    title={entry.summary || "Untitled entry"}
-                    revealed={shown(entry.revealed)}
-                    when={entry.when}
-                    onClick={() => onOpenEntry(entry.id)}
-                  >
-                    {entry.kind !== "entry" && <Badge tone={meta.tone}>{meta.label}</Badge>}
-                  </RecordRow>
-                );
-              })}
-            </nav>
-          ) : null}
-        </DashCard>
+        {!(fresh && entries.length === 0) && (
+          <DashCard
+            title="Latest journal activity"
+            iconId="book"
+            count={{ shown: recentEntries.length, total: entries.length }}
+            seeAll={onSeeAll ? { label: "Open the Journal", onClick: () => onSeeAll("journal") } : undefined}
+            empty="No journal entries yet."
+          >
+            {recentEntries.length > 0 ? (
+              <nav className="codex-campaign-recent" aria-label="Latest journal activity">
+                {recentEntries.map((entry) => {
+                  const meta = CHRONICLE_KIND_META[entry.kind];
+                  return (
+                    <RecordRow
+                      key={entry.id}
+                      iconId={meta.iconId}
+                      title={entry.summary || "Untitled entry"}
+                      revealed={shown(entry.revealed)}
+                      when={entry.when}
+                      onClick={() => onOpenEntry(entry.id)}
+                    >
+                      {entry.kind !== "entry" && <Badge tone={meta.tone}>{meta.label}</Badge>}
+                    </RecordRow>
+                  );
+                })}
+              </nav>
+            ) : null}
+          </DashCard>
+        )}
 
         {/* 7. Faction standing, expanding in place (Adjust lives only here). */}
         <StandingCard
@@ -358,57 +360,86 @@ export function CampaignHome({
         />
 
         {/* 8. By kind. */}
-        <KindsCard pages={pages} onPickType={onPickType} />
+        {!fresh && <KindsCard pages={pages} onPickType={onPickType} />}
 
         {/* 9. Atlas. */}
-        <DashCard
-          title="Atlas"
-          iconId="compass"
-          count={{ shown: Math.min(maps.length, 5), total: maps.length }}
-          seeAll={onSeeAll ? { label: "Open the Atlas", onClick: () => onSeeAll("atlas") } : undefined}
-          empty="No maps yet."
-        >
-          {maps.length > 0 ? (
-            <nav className="codex-campaign-recent" aria-label="Maps in the atlas">
-              {maps.slice(0, 5).map((map) => (
-                <RecordRow
-                  key={map.id}
-                  iconId="compass"
-                  title={map.name}
-                  revealed={shown(map.revealedToPlayers)}
-                  onClick={() => onOpenMap(map.id)}
-                />
-              ))}
-            </nav>
-          ) : null}
-        </DashCard>
+        {!(fresh && maps.length === 0) && (
+          <DashCard
+            title="Atlas"
+            iconId="compass"
+            count={{ shown: Math.min(maps.length, 5), total: maps.length }}
+            seeAll={onSeeAll ? { label: "Open the Atlas", onClick: () => onSeeAll("atlas") } : undefined}
+            empty="No maps yet."
+          >
+            {maps.length > 0 ? (
+              <nav className="codex-campaign-recent" aria-label="Maps in the atlas">
+                {maps.slice(0, 5).map((map) => (
+                  <RecordRow
+                    key={map.id}
+                    iconId="compass"
+                    title={map.name}
+                    revealed={shown(map.revealedToPlayers)}
+                    onClick={() => onOpenMap(map.id)}
+                  />
+                ))}
+              </nav>
+            ) : null}
+          </DashCard>
+        )}
 
         {/* 10. Recently updated. */}
-        <DashCard
-          title="Recently updated"
-          iconId="scroll"
-          count={{ shown: recent.length, total: pages.length }}
-          seeAll={onSeeAll ? { label: "See all pages", onClick: () => onSeeAll("recent") } : undefined}
-          empty="No pages yet."
-        >
-          {recent.length > 0 ? (
-            <nav className="codex-campaign-recent" aria-label="Recently updated pages">
-              {recent.map((page) => (
-                <RecordRow
-                  key={page.id}
-                  entityType={page.entityType}
-                  title={page.title}
-                  revealed={shown(page.revealedToPlayers)}
-                  onClick={() => onOpenPage(page.id)}
-                />
-              ))}
-            </nav>
-          ) : null}
-        </DashCard>
+        {!fresh && (
+          <DashCard
+            title="Recently updated"
+            iconId="scroll"
+            count={{ shown: recent.length, total: pages.length }}
+            seeAll={onSeeAll ? { label: "See all pages", onClick: () => onSeeAll("recent") } : undefined}
+            empty="No pages yet."
+          >
+            {recent.length > 0 ? (
+              <nav className="codex-campaign-recent" aria-label="Recently updated pages">
+                {recent.map((page) => (
+                  <RecordRow
+                    key={page.id}
+                    entityType={page.entityType}
+                    title={page.title}
+                    revealed={shown(page.revealedToPlayers)}
+                    onClick={() => onOpenPage(page.id)}
+                  />
+                ))}
+              </nav>
+            ) : null}
+          </DashCard>
+        )}
 
         {/* 11. Tags. */}
-        <TagsCard tags={tags} onPickTag={onPickTag} onSeePages={onSeeAll && (() => onSeeAll("recent"))} />
+        {!fresh && (
+          <TagsCard
+            tags={tags}
+            gm={showReveal}
+            onPickTag={onPickTag}
+            onSeePages={onSeeAll && (() => onSeeAll("recent"))}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+/** The GM's first step in an empty Codex: what a page is, and the button that makes one. */
+function FirstPage({ onCreate }: Readonly<{ onCreate?: () => void }>) {
+  return (
+    <section className="codex-main-empty codex-first-page" aria-labelledby="codex-first-page">
+      <h3 id="codex-first-page">Make your first page</h3>
+      <p>
+        A page holds one person, place, faction or thing in your world. It has notes the players can read once you show
+        it, and notes only you see.
+      </p>
+      {onCreate && (
+        <Button variant="primary" onClick={onCreate}>
+          New page
+        </Button>
+      )}
+    </section>
   );
 }

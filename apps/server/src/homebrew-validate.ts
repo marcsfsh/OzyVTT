@@ -1,5 +1,5 @@
 import type { HomebrewContentType, HomebrewValidationIssue, HomebrewValidity } from "@vtt/api-contract";
-import { CatalogChoiceError, resolveCatalogChoice, type CatalogChoiceCatalogs } from "@vtt/domain";
+import { CatalogChoiceError, resolveCatalogChoice, withArticle, type CatalogChoiceCatalogs } from "@vtt/domain";
 import { DAMAGE_ROLL_MOMENTS, RIDER_TRIGGER_KINDS, type ActorDefinition, type Modifier } from "@vtt/schemas";
 import {
   CONDITION_IDS,
@@ -169,7 +169,7 @@ function slugWarnings(record: unknown, recordId: string | null): Issue[] {
     warnings.push({
       path,
       recordId,
-      message: `"${slug}" is not an SRD ${kind}. It still publishes, but it only matches a ${kind} spelled exactly the same way, so check the spelling.`
+      message: `"${slug}" is not an SRD ${kind}. It still publishes, but it only matches ${withArticle(kind)} spelled exactly the same way, so check the spelling.`
     });
   };
   const walk = (node: unknown, path: Path): void => {
@@ -487,7 +487,7 @@ function spellcastingIssues(spellcasting: ContentSpellcasting | undefined, owner
   if (members.size === 0) {
     checks.add(
       [...path, "spellListId"],
-      `No spells are on the "${listId}" list, so a ${owner.name} could not be created at all. Publish the spell list (and its spells) first.`
+      `No spells are on the "${listId}" list, so ${withArticle(owner.name)} could not be created at all. Publish the spell list (and its spells) first.`
     );
   }
 }
@@ -561,8 +561,8 @@ function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, lab
       checks.add(
         [...path, index],
         read.length === 0
-          ? `"${label}" gates a ${modifier.type} on "${moment}", but a defence is read before any roll, so it would publish and then never apply. Drop the moment, or gate it on a state (while-effect-tag, while-condition, ...).`
-          : `"${label}" gates a ${modifier.type} on "${moment}", a moment the damage roll never collects - it would publish and then add nothing, ever. Gate it on ${read.map((entry) => `"${entry}"`).join(", ")} instead (or drop the moment for an always-on bonus).`
+          ? `"${label}" gates ${withArticle(modifier.type)} on "${moment}", but a defence is read before any roll, so it would publish and then never apply. Drop the moment, or gate it on a state (while-effect-tag, while-condition, ...).`
+          : `"${label}" gates ${withArticle(modifier.type)} on "${moment}", a moment the damage roll never collects - it would publish and then add nothing, ever. Gate it on ${read.map((entry) => `"${entry}"`).join(", ")} instead (or drop the moment for an always-on bonus).`
       );
     }
     if (modifier.type === "extra-damage" && modifier.formula === undefined && modifier.abilityModifier === undefined) {

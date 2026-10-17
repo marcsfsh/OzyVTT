@@ -99,7 +99,8 @@ export const GM_SIDEBAR: readonly SidebarGroup[] = [
       { id: "audit", label: "Reveal audit", iconId: "eye", path: pathForSection("audit") },
       { id: "preview", label: "Preview as player", iconId: "mask", action: "preview" },
       { id: "backup", label: "Backup", iconId: "archive", path: pathForSection("backup") },
-      { id: "settings", label: "Settings", iconId: "gear", path: pathForSection("settings") }
+      // Named for what it holds, so it is never mistaken for the app's own Settings.
+      { id: "settings", label: "Autosave and history", iconId: "gear", path: pathForSection("settings") }
     ]
   }
 ];
@@ -125,7 +126,7 @@ export const SECTION_TITLE: Readonly<Record<CodexSection, string>> = {
   tags: "Tag",
   audit: "Reveal audit",
   backup: "Backup",
-  settings: "Settings"
+  settings: "Autosave and history"
 };
 
 // ----- Jump targets -----

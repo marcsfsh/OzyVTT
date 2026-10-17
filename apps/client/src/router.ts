@@ -226,6 +226,17 @@ export function litGmTab(path: string): GmTab | null {
   return gmTabForPath(path);
 }
 
+/** The player's tabs, and which one lights for an address: the player's own sheet, its level page and the builder
+ *  belong to My character; everything that is not My character, the Codex or Settings is the table. */
+export type PlayerTab = "mine" | "table" | "codex" | "settings";
+export function litPlayerTab(path: string): PlayerTab {
+  const head = path.split("/").filter(Boolean)[0] ?? "";
+  if (head === "me" || head === "characters" || head === "builder") return "mine";
+  if (head === "codex") return "codex";
+  if (head === "settings") return "settings";
+  return "table";
+}
+
 /**
  * Addresses only the GM may reach; a player gets not-found. Shared addresses whose content a player
  * may not see are guarded by the data, which also renders not-found.

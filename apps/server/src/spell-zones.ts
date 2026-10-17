@@ -14,6 +14,7 @@ import { failureEffectFor } from "./resolution/pending.js";
 import { createPendingSaves } from "./saving-throws.js";
 import { countZoneDamage, endZone, zoneContentOf } from "./spell-zone-state.js";
 import type { TokenMapGeometry } from "./token-placement.js";
+import { withArticle } from "@vtt/domain";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -228,7 +229,7 @@ function act(
   });
   events.push({
     kind: "effect",
-    text: `${creature.name} ${meeting} ${spell.name} and makes a ${save.ability.toUpperCase()} save (DC ${save.dc}).`,
+    text: `${creature.name} ${meeting} ${spell.name} and makes ${withArticle(`${save.ability.toUpperCase()} save`)} (DC ${save.dc}).`,
     actorId: creature.id,
     ...source
   });

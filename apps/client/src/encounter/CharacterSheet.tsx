@@ -70,6 +70,7 @@ export function CharacterSheet({
   combat,
   onJumpToInitiative,
   standaloneActions,
+  onLevel,
   onClose
 }: Readonly<{
   actor: GmActor | PlayerActor;
@@ -86,6 +87,9 @@ export function CharacterSheet({
   };
   /** In "jump" sheet-attack mode, called after an attack chip starts targeting so the panel hops to the initiative view. */ onJumpToInitiative?: () => void;
   /** Page-level doors for the standalone presentation, shown as the frame's bottom row. Only the SPA's `/characters/:id` passes any; `sheet.html` has no router. */ standaloneActions?: React.ReactNode;
+  /** Opens the level page for this character; a sheet opened over another page passes it, so levelling is one tap
+   *  from wherever the sheet is. */
+  onLevel?: () => void;
   onClose: () => void;
 }>) {
   const [feedback, setFeedback] = useState("");
@@ -233,8 +237,10 @@ export function CharacterSheet({
     setDocked(value);
     writeSetting("vtt.sheet.docked", value ? "1" : "0");
   };
-  // The latest roll from this character, shown under the rolls bar (hidden when the log is visible).
-  const latestRoll = state ? ([...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null) : null;
+  // The latest roll from this character, shown under the rolls bar (hidden when the log is visible). An initiative
+  // roll belongs to its fight, so it leaves the bar when the fight ends.
+  const lastRoll = state ? ([...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null) : null;
+  const latestRoll = lastRoll?.label === "Initiative" && state?.combat.active !== true ? null : lastRoll;
   // A check this sheet rolled is rerolled while it is still the character's latest roll: with Heroic Inspiration for a
   // player, freely by the GM. Without the roll history (the embedded sheet) the server judges that.
   const holdsInspiration = "heroicInspiration" in actor && actor.heroicInspiration === true;
@@ -617,6 +623,11 @@ export function CharacterSheet({
               Edit
             </Button>
           )}
+          {onLevel && actor.kind === "player-character" && (
+            <Button size="sm" variant="ghost" className="sheet-section-edit" onClick={onLevel}>
+              Level up or down…
+            </Button>
+          )}
         </div>
       </div>
       <div className="sheet-header-controls">
@@ -692,18 +703,19 @@ export function CharacterSheet({
           ]}
         />
       )}
-      <Select
-        className="sheet-roll-visibility"
-        aria-label="Who sees the sheet's rolls"
-        value={rolls.visibility}
-        onChange={(event) => rolls.setVisibility(event.target.value as RollVisibility)}
-      >
-        {VISIBILITY_OPTIONS[role].map((value) => (
-          <option key={value} value={value}>
-            {ROLL_VISIBILITY_WORD[value]}
-          </option>
-        ))}
-      </Select>
+      <label className="sheet-roll-visibility">
+        <span className="sheet-settings-label">Visibility</span>
+        <Select
+          value={rolls.visibility}
+          onChange={(event) => rolls.setVisibility(event.target.value as RollVisibility)}
+        >
+          {VISIBILITY_OPTIONS[role].map((value) => (
+            <option key={value} value={value}>
+              {ROLL_VISIBILITY_WORD[value]}
+            </option>
+          ))}
+        </Select>
+      </label>
       {/* Mid-fight only: whether an attack tapped here resolves inline or on the initiative view. */}
       {liveCombat?.active === true && actor.kind === "player-character" && onJumpToInitiative && (
         <>

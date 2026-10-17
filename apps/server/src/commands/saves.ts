@@ -32,6 +32,7 @@ import {
 } from "../saving-throws.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { withArticle } from "@vtt/domain";
 
 // Saving throws, owed and loose, and death saves.
 
@@ -213,7 +214,7 @@ export const saveCommands = [
         });
         kit.context.broadcastTableEvent({
           kind: "save",
-          text: `${kit.actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.autoSucceeded ? "automatically succeeded on" : outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage${detail}` : ""}.`,
+          text: `${kit.actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.autoSucceeded ? "automatically succeeded on" : outcome.success ? "succeeded on" : "failed"} ${withArticle(`${pending.ability.toUpperCase()} save`)}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage${detail}` : ""}.`,
           actorIds: [pending.targetActorId],
           gmOnly: kit.actorHidden(pending.targetActorId)
         });

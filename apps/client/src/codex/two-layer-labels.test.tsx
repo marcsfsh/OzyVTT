@@ -169,6 +169,10 @@ describe("The two-layer notes control names its layers the same way everywhere (
     await expectCanonicalPair();
     // The tab doesn't say "GM only", which is the content pill's wording.
     expect(screen.getByRole("switch", { name: "Show this page to players" })).toBeInTheDocument();
+    // The page's own switch says its state in words, not only with the eye.
+    expect(screen.getByRole("switch", { name: "Show this page to players" })).toHaveTextContent(
+      /Hidden from players|Shown to players/
+    );
   });
 
   it("says it the same way on the notes importer, which asks the same question about a destination", async () => {

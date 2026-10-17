@@ -365,7 +365,12 @@ function SessionEditor({
               Make active
             </Button>
           )}
-          <RevealSwitch revealed={session.revealedToPlayers} onChange={reveal} ariaLabel="Show this recap to players" />
+          <RevealSwitch
+            revealed={session.revealedToPlayers}
+            onChange={reveal}
+            ariaLabel="Show this recap to players"
+            labelled
+          />
         </div>
       </div>
 

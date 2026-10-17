@@ -63,6 +63,12 @@
 .encounter-menu .environment-control {
   margin: 0;
 }
+/* Why the control above it can't be changed, at full strength (DESIGN: a disabled control keeps its reason). */
+.menu-note {
+  margin: -0.2rem 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 .menu-section {
   display: grid;
   gap: 0.4rem;

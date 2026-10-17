@@ -31,6 +31,7 @@ import {
   type HitDie
 } from "@vtt/rules-5e";
 import type { BuilderCatalogs } from "../content/catalogs";
+import { withArticle } from "@vtt/domain";
 
 /**
  * The character builder's draft model and payload assembly (pure, no React, no socket).
@@ -281,6 +282,20 @@ export const ABILITY_LABELS: Readonly<Record<Ability, string>> = {
   wis: "Wisdom",
   cha: "Charisma"
 };
+
+const ORDINAL_WORDS = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth"] as const;
+
+/**
+ * The accessible name of one ability-increase picker in a row of them: "Ability to raise by 2", and "First ability to
+ * raise by 1", "Second ability to raise by 1" when two or more pickers raise by the same amount.
+ */
+export function increaseLabel(amounts: readonly number[], index: number): string {
+  const amount = amounts[index];
+  const same = amounts.filter((each) => each === amount).length;
+  if (same < 2) return `Ability to raise by ${amount}`;
+  const rank = amounts.slice(0, index).filter((each) => each === amount).length;
+  return `${ORDINAL_WORDS[rank] ?? `Ability ${rank + 1}:`} ability to raise by ${amount}`;
+}
 
 /** Assign-mode methods hand out a fixed pool; point buy spends against a budget. */
 export const isAssignMethod = (method: BuilderAbilityMethod) => method !== "point-buy";
@@ -608,9 +623,12 @@ export function stepBlockedReason(
     const chosen = (draft.picks[offer.key] ?? []).length;
     if (offer.kind === "asi-or-feat" && chosen === offer.capacity)
       return `Split the +2 from ${named} across your abilities.`;
-    return offer.capacity === 1
-      ? `Choose your ${named} to continue.`
-      : `Choose ${offer.capacity} for ${named} to continue — ${chosen} of ${offer.capacity} so far.`;
+    if (offer.capacity === 1) return `Choose your ${named} to continue.`;
+    const left = offer.capacity - chosen;
+    if (chosen === 0) return `Choose ${offer.capacity} for ${named} to continue.`;
+    return left > 0
+      ? `Choose ${left} more for ${named} to continue. ${chosen} of ${offer.capacity} are chosen.`
+      : `Choose ${offer.capacity} for ${named} to continue. ${chosen} are chosen.`;
   };
   /**
    * A pick already held from another source. Options are not filtered, so a pick made before the
@@ -623,7 +641,7 @@ export function stepBlockedReason(
         const held = offer.unavailable[id];
         if (!held) continue;
         const name = offer.options.find((option) => option.id === id)?.name ?? titleize(id);
-        return `"${name}" is ${held} — pick a different ${kindNoun(offer.kind)}.`;
+        return `"${name}" is ${held}. Pick a different ${kindNoun(offer.kind)}.`;
       }
     }
     return null;
@@ -683,8 +701,8 @@ export function stepBlockedReason(
           context.classRecord;
         const label = owner?.subclassLabel ?? "subclass";
         return multiclass && owner
-          ? `Choose a ${owner.name} ${label.toLowerCase()} to continue.`
-          : `Choose a ${label} to continue.`;
+          ? `Choose ${withArticle(`${owner.name} ${label.toLowerCase()}`)} to continue.`
+          : `Choose ${withArticle(label)} to continue.`;
       }
       // An ASI past 20 is chosen here but only visible once scores exist, so both steps guard the cap
       // with the same sentence.
@@ -693,12 +711,12 @@ export function stepBlockedReason(
     }
     case "abilities": {
       if (!policy.allowedAbilityMethods.includes(draft.abilityMethod))
-        return "Your GM does not allow that ability method — pick another.";
+        return "Your GM does not allow that ability method. Pick another.";
       const base = baseScoresOf(draft);
       const missing = ABILITIES.filter((ability) => base[ability] == null);
       if (missing.length > 0) return `Assign a score to ${ABILITY_LABELS[missing[0]]} to continue.`;
       if (draft.abilityMethod === "point-buy" && !isPointBuyLegal(ABILITIES.map((ability) => base[ability]!))) {
-        return "That spread is over the 27-point budget — lower a score to continue.";
+        return "That spread is over the 27-point budget. Lower a score to continue.";
       }
       if (draft.abilityMethod === "standard-array") {
         const sorted = ABILITIES.map((ability) => base[ability]!)
@@ -716,7 +734,7 @@ export function stepBlockedReason(
         if (check.ok) {
           const outside = ABILITIES.find((ability) => base[ability]! < check.minimum || base[ability]! > check.maximum);
           if (outside)
-            return `A ${formula} roll produces ${check.minimum}-${check.maximum} — ${ABILITY_LABELS[outside]} ${base[outside]} is outside that. Re-roll it or correct the value.`;
+            return `A ${formula} roll produces ${check.minimum}-${check.maximum}, and ${ABILITY_LABELS[outside]} ${base[outside]} is outside that. Re-roll it or correct the value.`;
         }
       }
       const options = context.background?.abilityOptions ?? null;
@@ -727,7 +745,7 @@ export function stepBlockedReason(
           .sort((left, right) => right - left)
           .join("/");
         if (!options.spreads.some((legal) => [...legal].sort((left, right) => right - left).join("/") === spread)) {
-          return `${context.background!.name} allows ${options.spreads.map((legal) => `+${legal.join("/+")}`).join(" or ")} — adjust the split.`;
+          return `${context.background!.name} allows ${options.spreads.map((legal) => `+${legal.join("/+")}`).join(" or ")}. Adjust the split.`;
         }
         if (new Set(draft.backgroundBonus.map((entry) => entry.ability)).size !== draft.backgroundBonus.length) {
           return "Each background increase must go to a different ability.";

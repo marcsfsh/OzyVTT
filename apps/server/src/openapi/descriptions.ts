@@ -64,7 +64,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     payload: "The command's Socket.IO payload shape, minus commandId/expectedRevision (carried at the envelope level)"
   },
   EncounterArchiveSummary: {
-    playerVisible: "Has the GM shared this record with players? False until shared"
+    playerVisible: "Has the GM shared this record with players? False until shared",
+    name: "The GM's own name for the replay, or null; a player sees it on a shared replay",
+    sceneName: "The live scene the fight was on, or null. GM-grade callers only; a player's list leaves it out"
   },
   EncounterArchiveLaunch: {
     sceneId: "The new live scene holding the restored moment",

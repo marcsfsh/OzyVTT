@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type EffectInstance, type PlayerEffect } from "@vtt/domain";
+import { withArticle, type EffectInstance, type PlayerEffect } from "@vtt/domain";
 import { Button, Chip } from "@vtt/ui";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
@@ -55,7 +55,7 @@ function ongoingDamageNote(effect: ChipEffect): string | null {
   const when = ongoing.at.startsWith("bearer-") ? "its turns" : "its source's turns";
   const edge = ongoing.at.endsWith("-end") ? "end" : "start";
   const save = ongoing.saveToEnd
-    ? `, then a ${ongoing.saveToEnd.ability.toUpperCase()} save DC ${ongoing.saveToEnd.dc} that ends it`
+    ? `, then ${withArticle(`${ongoing.saveToEnd.ability.toUpperCase()} save`)} DC ${ongoing.saveToEnd.dc} that ends it`
     : "";
   return `${what} at the ${edge} of each of ${when}${save}`;
 }

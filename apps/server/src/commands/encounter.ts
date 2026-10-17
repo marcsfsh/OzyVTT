@@ -189,7 +189,8 @@ export const encounterCommands = [
             startedAt: document.startedAt,
             endedAt: document.endedAt,
             turnCount: document.turnCount,
-            documentJson: JSON.stringify(document)
+            documentJson: JSON.stringify(document),
+            sceneName: finalState.combat.scenes.find((scene) => scene.id === endedSceneId)?.name ?? null
           });
           endedTurnCount = document.turnCount;
         }

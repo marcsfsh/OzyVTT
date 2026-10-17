@@ -96,6 +96,8 @@ describe("Needs you", () => {
     expect(within(strip).getByText("Borin can't move through Goblin 1's space.")).toBeTruthy();
     expect(within(strip).getByText("Lyra is dying · 0 successes · 1 failure")).toBeTruthy();
     expect(within(strip).getByText("Borin asks for a long rest")).toBeTruthy();
+    // Asked for during the fight, it waits beside the fight's own decisions.
+    expect(within(strip).getByText("Approve gives Borin a long rest now. Pass the 8 hours from Rest.")).toBeTruthy();
   });
 
   it("carries each item's own buttons", async () => {

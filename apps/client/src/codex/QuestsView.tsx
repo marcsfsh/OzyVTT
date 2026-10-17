@@ -375,7 +375,12 @@ function QuestEditor({
             </Button>
           )}
           <Badge tone={questStatusTone(quest.status)}>{QUEST_STATUS_LABEL[quest.status]}</Badge>
-          <RevealSwitch revealed={quest.revealedToPlayers} onChange={reveal} ariaLabel="Show this quest to players" />
+          <RevealSwitch
+            revealed={quest.revealedToPlayers}
+            onChange={reveal}
+            ariaLabel="Show this quest to players"
+            labelled
+          />
           <Button
             variant="ghost"
             size="sm"

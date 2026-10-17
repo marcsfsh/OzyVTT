@@ -81,6 +81,7 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
+import { TagsCard } from "./CampaignCards";
 import type {
   CodexCalendar,
   CodexChronicleRecord,
@@ -392,6 +393,11 @@ describe("The Campaign dashboard shows what exists today", () => {
     expect(await screen.findByRole("navigation", { name: "Latest journal activity" })).toBeInTheDocument();
     // Scoped to the whole-surface heading; individual cards may truthfully say "No pages yet."
     expect(screen.queryByRole("heading", { name: /No pages yet/i })).not.toBeInTheDocument();
+    // It says how to make the first page and offers it, and leaves out the cards with nothing in them yet.
+    const first = screen.getByRole("region", { name: "Make your first page" });
+    expect(within(first).getByRole("button", { name: "New page" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Tags" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Recently updated" })).not.toBeInTheDocument();
   });
 });
 
@@ -504,6 +510,16 @@ describe("The player's Campaign dashboard is the server's projection (viewer saf
     expect(screen.queryByText("revealed to players")).not.toBeInTheDocument();
   });
 
+  it("counts in the singular for one, and gives a player none of the GM's how-to", async () => {
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
+    await waitFor(() => expect(playerListPages).toHaveBeenCalled());
+    await screen.findByRole("navigation", { name: "Latest journal activity" });
+    expect(screen.queryByText(/Tags are added on a page/)).not.toBeInTheDocument();
+    const stats = document.querySelector(".codex-campaign-stats")!;
+    expect(stats.textContent).toMatch(/1page(?!s)/);
+    expect(stats.textContent).toMatch(/1tag(?!s)/);
+  });
+
   it("a player's journal row jumps to the revealed timeline with that entry marked", async () => {
     const user = userEvent.setup();
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
@@ -519,5 +535,15 @@ describe("The player's Campaign dashboard is the server's projection (viewer saf
     await waitFor(() =>
       expect(document.getElementById("codex-player-entry-j1")).toHaveAttribute("aria-current", "true")
     );
+  });
+});
+
+describe("the Tags card with nothing in it", () => {
+  it("tells the GM where tags come from, and a player only that there are none", () => {
+    const view = render(<TagsCard tags={[]} gm onPickTag={() => {}} />);
+    expect(screen.getByText(/Tags are added on a page while you write it/)).toBeInTheDocument();
+    view.rerender(<TagsCard tags={[]} onPickTag={() => {}} />);
+    expect(screen.getByText("No tags yet.")).toBeInTheDocument();
+    expect(screen.queryByText(/Tags are added/)).not.toBeInTheDocument();
   });
 });

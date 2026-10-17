@@ -202,8 +202,8 @@ describe("The structured copy, pinned at its one definition", () => {
     for (const phrase of [
       "Shown to players",
       "GM only",
-      "Hidden from players — you and the GM see it",
-      "GM only — you won't see the result"
+      "Hidden from players · you and the GM see it",
+      "GM only · you won't see the result"
     ]) {
       expect(
         source.includes(`"${phrase}"`),
@@ -221,9 +221,9 @@ describe("The structured copy, pinned at its one definition", () => {
   });
 
   it("names the rules dial Enforce / Advise / Off, and the three settings groups", () => {
-    // The dial's labels are `SettingsPage.tsx`'s DIAL_COPY; the wire values stay strict/assisted/freeform,
-    // which is why the RETIRED row above is about copy only.
-    const source = readFileSync(`${process.cwd()}/src/settings/SettingsPage.tsx`, "utf8");
+    // The dial's labels are `settings/table-words.ts`'s DIAL_COPY, shared by Settings and the fight's options; the
+    // wire values stay strict/assisted/freeform, which is why the RETIRED row above is about copy only.
+    const source = readFileSync(`${process.cwd()}/src/settings/table-words.ts`, "utf8");
     expect(source).toMatch(/value: "strict", label: "Enforce"/);
     expect(source).toMatch(/value: "assisted", label: "Advise"/);
     expect(source).toMatch(/value: "freeform", label: "Off"/);

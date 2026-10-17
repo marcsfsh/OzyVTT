@@ -143,7 +143,7 @@ describe("The words the navigation itself uses", () => {
       "Reveal audit",
       "Preview as player",
       "Backup",
-      "Settings"
+      "Autosave and history"
     ]);
     // The player's Codex is the GM's navigation minus the tools.
     expect(labels(PLAYER_SIDEBAR)).toEqual(labels(GM_SIDEBAR).slice(0, 9));

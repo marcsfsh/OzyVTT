@@ -5,6 +5,7 @@ import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 import { titleCase } from "./format";
 import { useSpellReference } from "./spells";
+import { withArticle } from "@vtt/domain";
 
 /**
  * One shared, session-cached fetch of the equipment catalog, so every sheet browses the same list.
@@ -178,7 +179,7 @@ export function BaseOptionList({
             type="button"
             className="sheet-picker-add tap-target"
             disabled={busy}
-            aria-label={kinds ? `Make it ${ammunitionKindName(base)}` : `Make it a ${base.name}`}
+            aria-label={kinds ? `Make it ${ammunitionKindName(base)}` : `Make it ${withArticle(base.name)}`}
             onClick={() => onPick(base.id)}
           >
             Pick

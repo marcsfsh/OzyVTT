@@ -30,7 +30,18 @@ import { IntegrationsPanel } from "../integrations/IntegrationsPanel";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { useRollPreference } from "../dice/roll-preference";
 import { command, type CommandEvent, type CommandPayload } from "../lib/command";
+import { HealthStyleOptions } from "../encounter/health-display";
 import { setAutoArrange, useAutoArrange } from "./preferences";
+import {
+  BADGE_AUDIENCE_REASON,
+  DIAL_COPY,
+  dialLabel,
+  dialLine,
+  HEALTH_AUDIENCE_LABEL,
+  HEALTH_DISPLAY_LABEL,
+  PLAYER_HITS,
+  PLAYER_INITIATIVE
+} from "./table-words";
 import "./settings.css";
 
 /**
@@ -55,26 +66,15 @@ export function groupsFor(role: "gm" | "player"): typeof SETTINGS_GROUPS {
 }
 
 /**
- * The dial's user-facing words. The wire stays `strict | assisted | freeform`: three schemas, the
- * archive documents and the public API speak it, so renaming it would be a breaking change.
- */
-const DIAL_COPY: ReadonlyArray<Readonly<{ value: RuleMode; label: string; help: string }>> = [
-  { value: "strict", label: "Enforce", help: "blocks illegal moves; you can allow them" },
-  { value: "assisted", label: "Advise", help: "allows everything, leaves notes" },
-  { value: "freeform", label: "Off", help: "no checks, no prompts" }
-];
-const dialLabel = (mode: RuleMode) => DIAL_COPY.find((entry) => entry.value === mode)?.label ?? mode;
-
-/**
  * One toggle per server rule family, never finer: the engine classifies every rule into these five
- * (`apps/server/src/rules-families.ts`).
+ * (`apps/server/src/rules-families.ts`). On means the family follows the dial; off pins it Off.
  */
 const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>> = [
-  { family: "movement", label: "Don't police movement" },
-  { family: "economy", label: "Don't police action economy" },
-  { family: "resources", label: "Don't police limited uses" },
-  { family: "targeting", label: "Don't police targeting, range & cover" },
-  { family: "slots", label: "Don't police spell slots or prepared spells" }
+  { family: "movement", label: "Check movement" },
+  { family: "economy", label: "Check the action economy" },
+  { family: "resources", label: "Check limited uses" },
+  { family: "targeting", label: "Check targeting, range and cover" },
+  { family: "slots", label: "Check spell slots and prepared spells" }
 ];
 
 const ABILITY_METHODS: ReadonlyArray<Readonly<{ id: BuilderAbilityMethod; label: string }>> = [
@@ -103,18 +103,11 @@ const PARTY_VISIBILITY_OPTIONS = [
  * what `off` removes is the party list and the sheet.
  */
 const PARTY_VISIBILITY_HELP: Readonly<Record<PartyVisibility, string>> = {
-  off: "Players see each other's tokens and turn order — no party list, and no sheet to open.",
+  off: "Players see each other's tokens and turn order. There is no party list and no sheet to open.",
   "name-and-class": "Players see who's in the party and what they play.",
   "full-sheet": "Players can open each other's sheets, read-only.",
   "sheet-and-resources": "Players also see each other's spell slots, inventory and hit dice."
 };
-
-const HEALTH_STYLES = [
-  { value: "band", label: "Band" },
-  { value: "bar", label: "Bar" },
-  { value: "ring", label: "Ring" },
-  { value: "aura", label: "Aura" }
-] as const;
 
 /**
  * One settings group. The `--{id}` modifier is what the 1280px two-column layout places by name
@@ -221,7 +214,7 @@ function TableGroup({
   const setDial = (dial: RuleMode) =>
     send("rules:set-policy", { dial, exceptions: policy.exceptions }, "The rules setting was rejected.");
   /**
-   * ON pins that family Off whatever the dial says; OFF removes the key, which on the wire means
+   * `off` pins that family Off whatever the dial says; otherwise the key goes, which on the wire means
    * "follow the dial". A 1:1 map onto `rulesPolicy.exceptions`.
    */
   const setException = (family: RuleFamily, off: boolean) => {
@@ -280,14 +273,26 @@ function TableGroup({
           onChange={(value) => setDial(value as RuleMode)}
           options={DIAL_COPY.map((entry) => ({ value: entry.value, label: entry.label }))}
         />
-        <p className="settings-note">{DIAL_COPY.map((entry) => `${entry.label} — ${entry.help}`).join(" · ")}</p>
+        <ul className="settings-note settings-dial-help">
+          {DIAL_COPY.map((entry) => (
+            <li key={entry.value}>{dialLine(entry)}</li>
+          ))}
+        </ul>
         <div className="settings-exceptions">
-          <span className="settings-subhead">Exceptions</span>
+          <span className="settings-subhead">What it checks</span>
+          {policy.dial === "freeform" && (
+            <p className="settings-note">The rules assistant is Off, so it checks nothing. Choose Enforce or Advise.</p>
+          )}
           {FAMILY_COPY.map(({ family, label }) => {
             const stored = policy.exceptions[family];
             return (
               <div key={family} className="settings-exception">
-                <Switch checked={stored === "freeform"} onChange={(next) => setException(family, next)} label={label} />
+                <Switch
+                  checked={policy.dial !== "freeform" && stored !== "freeform"}
+                  disabled={policy.dial === "freeform"}
+                  onChange={(checks) => setException(family, !checks)}
+                  label={label}
+                />
                 {/* A family parked at Advise while the dial says Enforce is neither on nor off, so say which. */}
                 {stored && stored !== "freeform" && stored !== policy.dial && (
                   <Badge tone="info">{dialLabel(stored)}</Badge>
@@ -308,11 +313,11 @@ function TableGroup({
         />
       </Row>
 
-      <Row title="Health display" help="Per-token overrides stay on the token's own menu." stacked>
+      <Row title={HEALTH_DISPLAY_LABEL} help="Each token's own menu can change it for that token." stacked>
         <div className="settings-inline">
           <Select
             value={health.style}
-            aria-label="Health display style"
+            aria-label={HEALTH_DISPLAY_LABEL}
             onChange={(event) =>
               send(
                 "encounter:set-health-display",
@@ -321,15 +326,12 @@ function TableGroup({
               )
             }
           >
-            {HEALTH_STYLES.map((style) => (
-              <option key={style.value} value={style.value}>
-                {style.label}
-              </option>
-            ))}
+            <HealthStyleOptions />
           </Select>
-          <span className="settings-inline-label">Health is:</span>
+          <span className="settings-inline-label">{HEALTH_AUDIENCE_LABEL}</span>
           <SegmentedControl
-            ariaLabel="Who sees health"
+            ariaLabel={HEALTH_AUDIENCE_LABEL}
+            disabled={health.style === "band"}
             value={health.audience}
             onChange={(value) =>
               send(
@@ -344,6 +346,7 @@ function TableGroup({
             ]}
           />
         </div>
+        {health.style === "band" && <p className="settings-note">{BADGE_AUDIENCE_REASON}</p>}
       </Row>
 
       <Row title="What players see of each other" help={PARTY_VISIBILITY_HELP[state.partyVisibility]} stacked>
@@ -365,7 +368,7 @@ function TableGroup({
           ))}
         </Select>
         <p className="settings-note">
-          Their own character is always theirs in full — this is only what they see of the rest of the party.
+          Their own character is always theirs in full. This sets only what they see of the rest of the party.
         </p>
       </Row>
 
@@ -382,12 +385,12 @@ function TableGroup({
           }
         />
         <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new scenes for arranging automatically" />
-        <p className="settings-note">Arranging is private to you — this device.</p>
+        <p className="settings-note">Arranging is private to you on this device.</p>
       </Row>
 
-      <Row title="Players' hits">
+      <Row title={PLAYER_HITS.label}>
         <SegmentedControl
-          ariaLabel="Players' hits"
+          ariaLabel={PLAYER_HITS.label}
           value={state.combat.playerDamageMode}
           onChange={(value) =>
             send(
@@ -396,10 +399,7 @@ function TableGroup({
               "That setting was rejected."
             )
           }
-          options={[
-            { value: "proposal", label: "Applied by the GM" },
-            { value: "direct", label: "Applied immediately" }
-          ]}
+          options={PLAYER_HITS.options.map((option) => ({ ...option }))}
         />
       </Row>
 
@@ -414,9 +414,9 @@ function TableGroup({
         />
       </Row>
 
-      <Row title="Players' initiative" help="When players roll their own initiative at the start of a fight.">
+      <Row title={PLAYER_INITIATIVE.label} help="When players roll their own initiative at the start of a fight.">
         <SegmentedControl
-          ariaLabel="When turns start"
+          ariaLabel={PLAYER_INITIATIVE.label}
           value={state.combat.playerInitiativeMode}
           onChange={(value) =>
             send(
@@ -425,10 +425,7 @@ function TableGroup({
               "That setting was rejected."
             )
           }
-          options={[
-            { value: "immediate", label: "Start turns immediately" },
-            { value: "wait", label: "When everyone has rolled" }
-          ]}
+          options={PLAYER_INITIATIVE.options.map((option) => ({ ...option }))}
         />
       </Row>
 

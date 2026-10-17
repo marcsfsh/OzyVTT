@@ -12,6 +12,7 @@ import { Button, Skeleton } from "@vtt/ui";
 import { iconChildren } from "./icons";
 import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import type { CodexConnection, PlayerCodexConnection } from "@vtt/domain";
+import { countOf } from "@vtt/domain";
 
 /**
  * The world as a graph: pages as nodes (sized by degree), joined by one kind of edge. A deterministic
@@ -446,8 +447,8 @@ export function ConnectionGraph({
     <div className="codex-graph">
       <div className="codex-graph-bar">
         <span className="codex-graph-hint">
-          {visibleNodes.length} pages · {drawnEdges.length} connection{drawnEdges.length === 1 ? "" : "s"} · drag to
-          pan, scroll to zoom
+          {countOf(visibleNodes.length, "page")} · {countOf(drawnEdges.length, "connection")} · drag to pan, scroll to
+          zoom
         </span>
         <div className="codex-graph-legend">
           {usedTypes.map((type) => (

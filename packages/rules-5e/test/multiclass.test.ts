@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { meetsMulticlassMinimums, multiclassShortfalls, multiclassShortfallText } from "../src/index.js";
+import {
+  meetsMulticlassMinimums,
+  multiclassShortfalls,
+  multiclassShortfallText,
+  standardArrayOrder,
+  statPriorityFor
+} from "../src/index.js";
 
 // SRD 5.2.1 Multiclassing: "To qualify for a new class, you must have a score of at least 13 in the primary ability of
 // the new class and your current classes."
@@ -58,5 +64,18 @@ describe("multiclass prerequisites", () => {
     expect(text).toBe(
       "Druid needs Wisdom 13; you have 10. Your Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12."
     );
+  });
+});
+
+describe("the standard array's order", () => {
+  it("follows one class's own priority", () => {
+    expect(standardArrayOrder(statPriorityFor("fighter"), [fighter])).toEqual(statPriorityFor("fighter"));
+  });
+
+  it("puts every class's 13 first for a multiclass character", () => {
+    // A Barbarian who takes Druid needs Wisdom 13 as well as Strength.
+    const order = standardArrayOrder(statPriorityFor("barbarian"), [barbarian, druid]);
+    expect(order.slice(0, 2).sort()).toEqual(["str", "wis"]);
+    expect(new Set(order).size).toBe(6);
   });
 });

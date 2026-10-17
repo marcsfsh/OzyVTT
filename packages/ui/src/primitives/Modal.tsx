@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { cx } from "./util";
 import { IconX } from "./icons";
 import type { PanelAccent } from "./Panel";
@@ -17,7 +17,7 @@ interface ModalProps {
   size?: "sm" | "md" | "lg" | "full";
   /** `top` pins the dialog near the top of the viewport (the command-palette shape). */
   align?: "center" | "top";
-  /** Accessible label when there's no visible title. */
+  /** Accessible label when there's no visible title; a visible title names the dialog otherwise. */
   ariaLabel?: string;
   className?: string;
   /** Inline style for the dialog element (e.g. a CSS custom property that drives a resizable width). */
@@ -41,6 +41,7 @@ export function Modal({
   style
 }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -82,12 +83,15 @@ export function Modal({
       className={cx("nh-modal", `nh-modal--${size}`, align === "top" && "nh-modal--top", "anim-dialog", className)}
       style={style}
       aria-label={ariaLabel}
+      aria-labelledby={ariaLabel === undefined && title != null ? titleId : undefined}
     >
       {open && (
         <div className={cx("nh-modal-surface", accent !== "none" && `nh-modal--accent-${accent}`)}>
           {title != null && (
             <header className="nh-modal-head">
-              <h2 className="nh-modal-title">{title}</h2>
+              <h2 className="nh-modal-title" id={titleId}>
+                {title}
+              </h2>
               <button
                 type="button"
                 className="nh-modal-close tap-target interactive"

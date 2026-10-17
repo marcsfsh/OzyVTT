@@ -22,6 +22,7 @@ import {
 } from "./content-library.js";
 import { migrate, openDatabase, transaction, type Migration } from "./database.js";
 import { mintHomebrewId } from "./homebrew-ids.js";
+import { withArticle } from "@vtt/domain";
 
 /**
  * Persistence for GM-authored homebrew content (nine types), same pattern as `codex-store.ts`. Not GameState: a
@@ -628,7 +629,7 @@ export class HomebrewStore implements HomebrewContentSource {
     const existing = this.recordRow(id);
     if (existing && !overwrite) throw new HomebrewStateError(`A record already exists at "${id}".`);
     if (existing && existing.type !== type)
-      throw new HomebrewStateError(`"${id}" is a ${existing.type}, not a ${type}.`);
+      throw new HomebrewStateError(`"${id}" is ${withArticle(existing.type)}, not ${withArticle(type)}.`);
     const refusal = existing ? overwriteRefusal(projectSummary(existing)) : null;
     if (refusal) throw new HomebrewStateError(refusal);
     const name = recordName(body);

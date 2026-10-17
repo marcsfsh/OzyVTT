@@ -1,6 +1,15 @@
 /* The GM's calls for a roll: the call form and open calls in the dice panel, and the player's cards pinned to the
    bottom of the screen. */
 
+.roll-call-heading {
+  margin: 0;
+  font-size: var(--fs-h2);
+}
+.roll-call-hint {
+  margin: var(--space-1) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 .roll-call-form {
   display: grid;
   gap: var(--space-3);

@@ -716,6 +716,15 @@
   border-bottom-style: dashed;
   cursor: default;
 }
+/* A link to a page that doesn't exist yet, which the GM can make: caution, the "not finished" hue, with a dashed
+   rule so the state is not colour alone. */
+.codex-md-link-missing {
+  color: var(--caution-hi);
+  border-bottom: 1px dashed var(--caution);
+}
+.codex-md-link-missing:hover {
+  color: var(--text);
+}
 
 .codex-backlinks-title {
   font-family: var(--font-label);
@@ -3124,6 +3133,11 @@
 .codex-calendar-clockset:focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
+}
+/* The game clock's hour beside the GM's date; the two are the table's one clock. */
+.codex-calendar-hour {
+  color: var(--text);
+  font: 700 var(--fs-sm) var(--font-numeric);
 }
 .codex-calendar-clockhint {
   margin: 0;

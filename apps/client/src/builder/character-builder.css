@@ -128,9 +128,16 @@
 
 /* Level flow: the rail, the two directions, and the level-down preview. The page is a block scroll region, so the
    column inside keeps its height and scrolls rather than shrinking to the pane. */
+/* The level page fills the pane: the column scrolls, and the footer with the level buttons stays in view. */
 .cb-level-page {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
+}
+.cb-level-body {
+  flex: 1;
+  min-height: 0;
 }
 .cb-level {
   display: flex;
@@ -139,7 +146,17 @@
   width: 100%;
   max-width: 46rem;
   margin: 0 auto;
-  padding: 1.4rem var(--space-4) var(--space-12);
+  padding: 1.4rem var(--space-4) var(--space-6);
+}
+.cb-level-foot {
+  flex: none;
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--surface-1);
+}
+.cb-level-foot .cb-level-actions {
+  max-width: 46rem;
+  margin: 0 auto;
 }
 .cb-level-head h2 {
   margin: 0.2rem 0 0;
@@ -169,6 +186,14 @@
   color: var(--text-muted);
   font: 600 0.8rem/1 var(--font-body);
 }
+/* A phone fits the twenty levels in two rows. */
+@media (max-width: 560px) {
+  .cb-level-pip {
+    min-width: 1.6rem;
+    min-height: 1.6rem;
+    padding: 0 0.2rem;
+  }
+}
 .cb-level-pip.reached {
   color: var(--text);
   border-color: var(--line-strong);
@@ -185,7 +210,13 @@
   gap: 0.6rem;
 }
 .cb-level-actions > * {
-  flex: 1 1 12rem;
+  flex: 1 1 10rem;
+}
+/* On a phone the primary takes its own row, and the other two share the next. */
+@media (max-width: 560px) {
+  .cb-level-actions > .cb-level-up {
+    flex-basis: 100%;
+  }
 }
 .cb-level-preview {
   padding: 0.9rem var(--space-4);
@@ -284,5 +315,65 @@
   .cb-class-remove {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+}
+
+/* The random character dialog: its notes, and a multiclass character's classes, each with its levels. */
+.random-character-body {
+  display: grid;
+  gap: var(--space-4);
+  justify-items: start;
+}
+.random-character-body > :is(.random-character-classes, .nh-field) {
+  justify-self: stretch;
+}
+.random-character-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+/* The rows share one set of columns, so every class select has the same width with or without Remove. */
+.random-character-classes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.random-character-class {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+@media (max-width: 560px) {
+  .random-character-classes {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+/* The standard array's suggested layout for the class: the line it would give, and the button that applies it. */
+.cb-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.cb-suggest-text {
+  flex: 1 1 14rem;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* The step rail lists the earlier steps above 760px; below it the level step lists them itself. */
+.cb-level-earlier {
+  display: none;
+}
+@media (max-width: 760px) {
+  .cb-level-earlier {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 }

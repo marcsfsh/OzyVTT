@@ -85,13 +85,12 @@ function openSlots(ctx: ResolveContext, action: DefinitionAction): number[] {
     .sort((left, right) => left - right);
 }
 
-const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
 const capitalised = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
 /** What choosing it spends, in the card's words. */
 function costOf(action: DefinitionAction, slotLevel: number | undefined): string | null {
   const costs = [
-    ...(action.spellSlot && slotLevel !== undefined ? [`a ${ordinal(slotLevel)}-level spell slot`] : []),
+    ...(action.spellSlot && slotLevel !== undefined ? [`a level ${slotLevel} spell slot`] : []),
     ...(action.uses ? [action.uses.per === "turn" ? "once per turn" : `a use of ${action.name}`] : []),
     ...(action.activation === "bonus-action" ? ["your Bonus Action"] : [])
   ];

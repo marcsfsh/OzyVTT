@@ -91,8 +91,13 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
 
   return (
     <>
-      <details className="dice-custom roll-call-panel">
-        <summary>Call for a roll (a check or a save from the players)</summary>
+      <section className="roll-call-panel" aria-labelledby="roll-call-heading">
+        <h2 id="roll-call-heading" className="roll-call-heading">
+          Call for a roll
+        </h2>
+        <p className="roll-call-hint">
+          Ask the players for a check or a saving throw. Each one rolls on their own device.
+        </p>
         <div className="roll-call-form">
           <SegmentedControl
             size="sm"
@@ -172,7 +177,7 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
             {kind === "check" ? "Call for the check" : "Call for the save"}
           </Button>
         </div>
-      </details>
+      </section>
       {state.rollCalls.length > 0 && (
         <ul className="roll-call-open" aria-label="Open calls">
           {state.rollCalls.map((open) => (

@@ -5,7 +5,14 @@ import { Alert, Badge, ChoiceGrid, SegmentedControl, Select, type ChoiceOption }
 import type { BuilderCatalogs } from "../content/catalogs";
 // The fight's own spell card, so a spell reads the same while choosing it and while casting it.
 import { SpellCard } from "../encounter/spells";
-import { ABILITY_LABELS, ABILITY_SCORE_CAP, ASI_SHORTHAND, FEAT_KINDS, type BuilderDraft } from "./build-payload";
+import {
+  ABILITY_LABELS,
+  ABILITY_SCORE_CAP,
+  ASI_SHORTHAND,
+  FEAT_KINDS,
+  increaseLabel,
+  type BuilderDraft
+} from "./build-payload";
 
 /** The grids that answer the table's offers: one pick, or an Ability Score Improvement. */
 
@@ -255,7 +262,10 @@ export function AsiOffer({
                 <span className="cb-asi-label">+{amount} to</span>
                 <Select
                   value={chosen}
-                  aria-label={`Ability to raise by ${amount}`}
+                  aria-label={increaseLabel(
+                    slots.map(() => amount),
+                    index
+                  )}
                   onChange={(event) => setAbility(index, event.target.value)}
                 >
                   <option value="">Choose an ability…</option>

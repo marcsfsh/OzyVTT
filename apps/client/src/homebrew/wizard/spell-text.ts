@@ -14,6 +14,7 @@
 import { areaOfProse } from "@vtt/content-srd-5.2.1/action-prose";
 import { healingOfText } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { Draft } from "../schema";
+import { withArticle } from "@vtt/domain";
 
 const ABILITY_WORDS: Readonly<Record<string, string>> = {
   str: "Strength",
@@ -324,7 +325,7 @@ export function spellTextFor(draft: Draft): string {
   } else if (save?.ability) {
     const ability = ABILITY_WORDS[save.ability] ?? title(save.ability);
     const subject = who.charAt(0).toUpperCase() + who.slice(1);
-    out.push(`${subject} ${area || count > 1 ? "makes" : "must make"} a ${ability} saving throw.`);
+    out.push(`${subject} ${area || count > 1 ? "makes" : "must make"} ${withArticle(`${ability} saving throw`)}.`);
     const failure = [
       roll ? `takes ${roll} ${typeWords}` : null,
       conditions.length > 0 ? `has the ${listWords(conditions)} condition${conditions.length > 1 ? "s" : ""}` : null

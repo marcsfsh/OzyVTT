@@ -122,6 +122,6 @@ describe("Codex loading states (CF-2)", () => {
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "Home" }));
-    expect(await screen.findByText(/No pages yet/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Make your first page" })).toBeInTheDocument();
   });
 });

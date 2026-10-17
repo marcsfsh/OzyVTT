@@ -5,6 +5,7 @@ import { modeLabel } from "./roll-mode-notes";
 import { RollModeNotes, RollModeTag } from "./RollModeTag";
 import type { SrdExtension } from "./sheet-extension";
 import type { SheetRolls } from "./useSheetRolls";
+import { withArticle } from "@vtt/domain";
 
 const titleCase = (type: string) => `${type[0]?.toUpperCase() ?? ""}${type.slice(1)}`;
 const ABILITY_WORDS = {
@@ -64,7 +65,7 @@ export function SheetAbilities({
                 <button
                   type="button"
                   disabled={rolling}
-                  aria-label={`Roll a ${name}, ${signed(mod)}${modeLabel(row?.checkMode)}`}
+                  aria-label={`Roll ${withArticle(name)}, ${signed(mod)}${modeLabel(row?.checkMode)}`}
                   onClick={() => void rollCheck({ ability }, name)}
                 >
                   {signed(mod)}

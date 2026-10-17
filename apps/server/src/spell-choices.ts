@@ -13,6 +13,7 @@ import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.j
 import { CommandRejectedError } from "./game-store.js";
 import { buildRequestOf } from "./ledger-rechoice.js";
 import { LONG_REST_PREPARATION } from "./spellcasting.js";
+import { withArticle } from "@vtt/domain";
 
 /**
  * Changing what a prepared caster can prepare (SRD Spell Preparation by Class). After a Long Rest a Cleric, Druid,
@@ -166,7 +167,7 @@ export function swapClassSpell(
       ? `${record.name} is already on ${actor.name}'s sheet.`
       : classId === WIZARD
         ? `${record.name} isn't in ${actor.name}'s spellbook - copy it in first.`
-        : `${record.name} isn't a ${offered.className} spell ${actor.name} has slots for.`;
+        : `${record.name} isn't ${withArticle(offered.className)} spell ${actor.name} has slots for.`;
     throw new CommandRejectedError(why);
   }
   const rechosen = choices.map((row, at) => (at === index ? { ...row, id: spellId } : row));

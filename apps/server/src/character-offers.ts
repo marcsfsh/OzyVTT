@@ -5,6 +5,7 @@ import {
   extraPickAmount,
   resolveCatalogChoice,
   resolvePickChoice,
+  withArticle,
   type CatalogChoiceCatalogs,
   type CatalogChoiceOption
 } from "@vtt/domain";
@@ -567,7 +568,8 @@ function surveyBuild(
         );
       return null;
     }
-    if (!chosenId) reject(`A level-${level} ${record.name} has a ${label} (chosen at level ${record.subclassLevel}).`);
+    if (!chosenId)
+      reject(`A level-${level} ${record.name} has ${withArticle(label)} (chosen at level ${record.subclassLevel}).`);
     const subclass = library.subclassRecord(chosenId) ?? reject(`No subclass "${chosenId}" is in the content catalog.`);
     if (subclass.classId !== record.id)
       reject(`${subclass.name} is a ${subclass.classId} subclass, not a ${record.name} one.`);
@@ -674,8 +676,6 @@ const PICK_PREDICATE: Readonly<Record<string, string>> = {
   ranged: "with a range of 10 feet or more",
   "ranged-damage": "that deals damage at a range of 10 feet or more"
 };
-
-const withArticle = (word: string) => `${/^[aeiou]/i.test(word) ? "an" : "a"} ${word}`;
 
 /**
  * Collects every granted feature, builds the choice offers, and matches each ledger row to one. Strict, a

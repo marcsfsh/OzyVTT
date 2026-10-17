@@ -2,6 +2,7 @@ import { useState } from "react";
 import { rosterActors, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Avatar, Button } from "@vtt/ui";
 import { CharacterSheet } from "../encounter/CharacterSheet";
+import { navigate } from "../router";
 import { CLAIM_WORD, claimStateOf, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { partyVisibilityOf } from "./MyCharacter";
 import "./party-strip.css";
@@ -94,7 +95,17 @@ export function PartyStrip(props: Props) {
         })}
       </ul>
       {openActor && (
-        <CharacterSheet actor={openActor} role={props.role} state={props.state} onClose={() => setOpenId(null)} />
+        <CharacterSheet
+          actor={openActor}
+          role={props.role}
+          state={props.state}
+          onClose={() => setOpenId(null)}
+          /* The GM levels anyone here; a player only opens their own entry. */
+          onLevel={() => {
+            setOpenId(null);
+            navigate(`/characters/${openActor.id}/level`);
+          }}
+        />
       )}
     </section>
   );

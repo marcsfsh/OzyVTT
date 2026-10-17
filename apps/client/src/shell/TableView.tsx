@@ -198,7 +198,7 @@ export function TableView(props: TableViewProps) {
           log,
           token: <TokenTab state={props.state} token={token} />,
           party: <PartyStrip role="gm" state={props.state} onOpenRoster={() => navigate(pathForGmTab("roster"))} />,
-          rest: <PartyRest state={props.state} />
+          rest: <PartyRest state={props.state} token={token} />
         }}
       />
     );

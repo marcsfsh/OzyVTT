@@ -194,7 +194,13 @@ export function PlayerPages({
             )}
             <div className="codex-reader-body">
               {page.body.trim() ? (
-                <CodexMarkdown text={page.body} onNavigate={onFollowLink} token={token} knownTitles={knownTitles} />
+                <CodexMarkdown
+                  text={page.body}
+                  onNavigate={onFollowLink}
+                  token={token}
+                  knownTitles={knownTitles}
+                  audience="player"
+                />
               ) : (
                 <p className="codex-preview-empty">Nothing written here yet.</p>
               )}

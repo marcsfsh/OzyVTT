@@ -11,6 +11,7 @@ import {
   lastLocationForTab,
   layerOf,
   litGmTab,
+  litPlayerTab,
   navigate,
   pathForGmTab,
   redirectForRetiredPath,
@@ -75,6 +76,14 @@ describe("The address table", () => {
     expect(litGmTab("/scenes/maps")).toBe("scenes");
     expect(litGmTab("/replays/12")).toBe("replay");
     expect(litGmTab("/nonsense")).toBeNull();
+    // A player's own sheet, its level page and the builder belong to My character.
+    expect(litPlayerTab("/characters/a1")).toBe("mine");
+    expect(litPlayerTab("/characters/a1/level")).toBe("mine");
+    expect(litPlayerTab("/builder")).toBe("mine");
+    expect(litPlayerTab("/me")).toBe("mine");
+    expect(litPlayerTab("/codex/pages/p1")).toBe("codex");
+    expect(litPlayerTab("/replays/12")).toBe("table");
+    expect(litPlayerTab("/table")).toBe("table");
   });
 
   it("reads each layer back off its address", () => {
