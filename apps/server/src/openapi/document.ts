@@ -804,7 +804,7 @@ export const openApiDocument = {
         responses: {
           "200": {
             description:
-              "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter)",
+              "Current player-safe presentation state (map, camera, measurement, pings, initiative, encounter, and what the sound board is playing)",
             content: { "application/json": { schema: { $ref: "#/components/schemas/ViewerPresentationResponse" } } }
           },
           "401": { $ref: "#/components/responses/ApiError" }

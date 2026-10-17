@@ -142,8 +142,10 @@ describe("the playlist", () => {
     expect(fresh.music.current).toMatchObject({ assetId: BATTLE, startedAt: handOver, volume: 0.9 });
     nextTrack(fresh, deps(handOver + 1_000));
     expect(fresh.music.current?.assetId).toBe(DIRGE);
-    nextTrack(fresh, deps(handOver + 2_000));
-    expect(fresh.music.current?.assetId).toBe(TAVERN);
+    // After the server was down past a hand-over, the next track (round to the first) starts now, not in the past.
+    const missed = handOver + 1_000 + 60_000 + 3_600_000;
+    expect(advanceMusic(fresh, deps(missed))).toBe(true);
+    expect(fresh.music.current).toMatchObject({ assetId: TAVERN, startedAt: missed });
   });
 
   it("shuffles each pass on the server, never opening a pass with the track that just played", () => {

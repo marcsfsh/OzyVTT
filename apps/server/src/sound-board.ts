@@ -203,6 +203,10 @@ export function nextTrack(board: SoundBoard, deps: SoundDeps) {
   pruneFired(board, deps.now);
 }
 
+/** How late a hand-over may run and still date the next track from the boundary; later than this (the server was
+ *  down) the next track starts now instead of racing through the tracks it missed. */
+const HAND_OVER_SLACK_MS = 5_000;
+
 /** The server's own hand-over when a track reaches its end. The next track starts at the boundary itself, not
  *  when the timer happened to fire, so every screen agrees on where it is. Returns false when nothing was due. */
 export function advanceMusic(board: SoundBoard, deps: SoundDeps) {
@@ -215,7 +219,7 @@ export function advanceMusic(board: SoundBoard, deps: SoundDeps) {
     board.music.current = null;
     return true;
   }
-  startTrack(board, next, Math.min(boundary, deps.now), deps);
+  startTrack(board, next, deps.now - boundary <= HAND_OVER_SLACK_MS ? boundary : deps.now, deps);
   pruneFired(board, deps.now);
   return true;
 }
