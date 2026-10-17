@@ -1080,7 +1080,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             const limit = getAt(cast, "uses.limit");
             const name = typeof cast.spellId === "string" && cast.spellId ? humanise(cast.spellId) : "No spell chosen";
             return typeof limit === "number"
-              ? `${name} · ${limit} a ${String(getAt(cast, "uses.per") ?? "long-rest").replace(/-/g, " ")}`
+              ? `${name} · ${limit} per ${getAt(cast, "uses.per") === "short-rest" ? "Short Rest" : "Long Rest"}`
               : name;
           },
           rows: [

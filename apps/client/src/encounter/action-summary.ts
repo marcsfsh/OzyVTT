@@ -8,10 +8,16 @@ export const tagLabel = (tag: string) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
-/** How a limited use comes back, as a sheet says it ("short rest"): one back at the start of the bearer's next turn
- *  (Peerless Aim) is once a round. */
+/** How a limited use comes back, as a sheet says it ("Short Rest"): one back at the start of the bearer's next turn
+ *  (Peerless Aim) is once a round. The rests are SRD rules terms, so they are capitalised. */
 export const usesScopeLabel = (per: NonNullable<ContentActionSummary["usesPer"]>) =>
-  per === "own-turn" ? "round" : per.replace(/-/g, " ");
+  per === "own-turn"
+    ? "round"
+    : per === "short-rest"
+      ? "Short Rest"
+      : per === "long-rest"
+        ? "Long Rest"
+        : per.replace(/-/g, " ");
 
 /** An area as the SRD sizes it: a Sphere's or a Cylinder's radius, another shape's length or side ("5-foot-radius
  *  cylinder", "30-foot cone"). */

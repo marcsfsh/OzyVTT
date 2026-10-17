@@ -247,7 +247,7 @@ describe("a stat block's spell list", () => {
     const row = screen.getByRole("button", { name: /Fireball/ });
     expect(group.contains(row)).toBe(true);
     expect(row.textContent).toContain("DC 14 DEX save");
-    expect(row.textContent).toContain("2/long rest");
+    expect(row.textContent).toContain("2/Long Rest");
     expect(group.contains(screen.getByRole("button", { name: /Arcane Burst/ }))).toBe(false);
     expect(hintOf("Cone of Cold")).toBe("No uses left");
     expect(group.textContent).toContain("Nothing to roll: Detect Magic");
