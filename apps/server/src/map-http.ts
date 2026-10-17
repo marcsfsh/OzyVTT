@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
+import { sendAssetContent } from "./asset-content.js";
 import {
   adjustWizardGrid,
   completeGridCalibrationWizard,
@@ -248,50 +249,7 @@ export function createMapRouter(options: MapRouterOptions) {
     const metadata = await options.assets.get(id);
     const content = metadata ? await options.assets.readOriginal(id) : null;
     if (!metadata || !content) return sendFailure(response, 404, "not_found", "Map asset was not found.");
-    const etag = `"${id}"`;
-    response.setHeader("etag", etag);
-    response.setHeader("accept-ranges", "bytes");
-    response.setHeader("content-type", metadata.mediaType);
-    response.setHeader("content-disposition", `inline; filename="${id}.${metadata.extension}"`);
-    // Access can be revoked or the presented map can change at any time, so never leave previously
-    // authorized map bytes recoverable from a shared-screen cache.
-    response.setHeader("cache-control", "private, no-store");
-    if (request.header("if-none-match") === etag) return response.status(304).end();
-    const range = request.header("range");
-    if (!range) {
-      response.setHeader("content-length", content.length);
-      return response.send(content);
-    }
-    const match = range.match(/^bytes=(\d*)-(\d*)$/);
-    let start: number;
-    let end: number;
-    if (!match || (!match[1] && !match[2])) {
-      response.setHeader("content-range", `bytes */${content.length}`);
-      return response.status(416).end();
-    }
-    if (!match[1]) {
-      const suffix = Number(match[2]);
-      start = Math.max(0, content.length - suffix);
-      end = content.length - 1;
-    } else {
-      start = Number(match[1]);
-      end = match[2] ? Number(match[2]) : content.length - 1;
-    }
-    if (
-      !Number.isSafeInteger(start) ||
-      !Number.isSafeInteger(end) ||
-      start < 0 ||
-      start >= content.length ||
-      end < start
-    ) {
-      response.setHeader("content-range", `bytes */${content.length}`);
-      return response.status(416).end();
-    }
-    end = Math.min(end, content.length - 1);
-    const part = content.subarray(start, end + 1);
-    response.status(206).setHeader("content-range", `bytes ${start}-${end}/${content.length}`);
-    response.setHeader("content-length", part.length);
-    return response.send(part);
+    return sendAssetContent(request, response, { ...metadata, content });
   });
 
   // Calibration numbers aren't secret (clients already get grid-derived token sizing); exposing them
