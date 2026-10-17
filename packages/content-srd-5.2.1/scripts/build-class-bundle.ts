@@ -249,27 +249,27 @@ const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromC
  */
 const BLURBS: Record<string, { summary: string; description: string }> = {
   barbarian: {
-    summary: "A primal fighter who turns rage into overwhelming physical force.",
+    summary: "A primal fighter who turns Rage into raw physical force.",
     description:
-      "Barbarians fight in a fury they can enter at will, shrugging off punishment that would drop anyone else. Rage powers their damage and their resilience, and the pool of rages is the resource the class is built around."
+      "Barbarians fight in a Rage they enter as a Bonus Action. While it lasts they deal extra damage and have Resistance to Bludgeoning, Piercing and Slashing damage. The class is built around its uses of Rage."
   },
   bard: {
-    summary: "A performer whose magic works through music, words and sheer presence.",
+    summary: "A performer whose magic works through music and words.",
     description:
-      "Bards are full casters who support the party as much as they threaten enemies. Bardic Inspiration hands out a die that other characters spend, and expertise makes the Bard the party's most reliable skill user."
+      "Bards are full casters who support the party as much as they threaten enemies. Bardic Inspiration gives another character a die to spend, and Expertise makes the Bard the party's most reliable skill user."
   },
   druid: {
     summary: "A full caster drawing on the natural world, able to take animal form.",
     description:
-      "Druids cast from the nature list and can spend Wild Shape to become a beast. The class trades some direct damage for versatility, control, and the ability to change what it is on the battlefield."
+      "Druids cast from the Druid spell list and can spend a use of Wild Shape to take the form of a beast. The class trades some direct damage for control and the power to change its own form in a fight."
   },
   monk: {
-    summary: "An unarmoured martial artist spending focus on fast, precise strikes.",
+    summary: "An unarmored martial artist who spends Focus Points on fast, precise strikes.",
     description:
-      "Monks fight without armour, using a martial-arts die that grows with level and Focus Points that buy extra attacks and mobility. Speed and action economy are the class's real weapons."
+      "Monks fight without armor. Their Martial Arts die grows with level, and Focus Points pay for extra attacks and movement."
   },
   paladin: {
-    summary: "An oath-bound warrior blending heavy-armour combat with divine magic.",
+    summary: "An oath-bound warrior who joins heavy-armor combat with divine magic.",
     description:
       "Paladins are half casters who fight on the front line. Channel Divinity and spell slots spent on smites give the class burst damage on top of the durability of full plate and a shield."
   },
@@ -281,17 +281,17 @@ const BLURBS: Record<string, { summary: string; description: string }> = {
   rogue: {
     summary: "A precise, stealthy opportunist who strikes where it hurts most.",
     description:
-      "Rogues deal their damage through Sneak Attack, which scales to 10d6, and gain more expertise than any other class. The class is built to pick its moment rather than trade blows."
+      "Rogues deal their damage through Sneak Attack, which grows to 10d6, and gain more Expertise than any other class. The class is built to wait for the right moment to strike."
   },
   sorcerer: {
-    summary: "A caster whose magic is innate, reshaped on the fly through Metamagic.",
+    summary: "A caster whose magic is innate and reshaped on the fly through Metamagic.",
     description:
-      "Sorcerers know fewer spells than a Wizard but bend the ones they have. Sorcery Points buy Metamagic - twinning, quickening, or subtly casting a spell - which is what the class spends its resources on."
+      "Sorcerers know fewer spells than a Wizard but bend the ones they have. The class spends its Sorcery Points on Metamagic, such as Twinned Spell and Quickened Spell."
   },
   warlock: {
     summary: "A caster powered by a pact, with few slots that always cast at full strength.",
     description:
-      "Warlocks use Pact Magic: a small number of slots, all at the highest level available, refreshed on a short rest. Eldritch Invocations are the class's real customisation, reshaping what it can do at will."
+      "Warlocks use Pact Magic: a few spell slots, all of the highest level available, that come back on a Short Rest. Eldritch Invocations are the class's main customisation and change what it can do at will."
   }
 };
 
