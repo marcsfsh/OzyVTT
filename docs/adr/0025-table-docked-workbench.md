@@ -32,7 +32,8 @@ Option 3. The table (`shell/TableView.tsx`) is a frame of docked regions:
 
 - **The header bar** (`table/TableHeader.tsx`) above the map: the live scene and its menu (or the staged scene
   with Back to live and Make live), the status line, which also shows the newest notice through `ToastOutlet`,
-  and for the GM the fog and vision chips, the TV control (`table/TvControl.tsx`) and the sound chip.
+  and for the GM the fog and vision chips, the TV control (`table/TvControl.tsx`) and the sound chip. A
+  character sheet open over the table covers that line, so it shows the newest notice in a row of its own.
 - **The tool rail** (`scene/MapRail.tsx`) beside the map: Select, Measure and Ping, then the groups (Draw, View,
   and for the GM Fog, Terrain, Walls and Light). A group's options open in a column beside the rail and the map
   narrows to make room. The selected drawing's editor takes that column too.
@@ -46,7 +47,9 @@ Option 3. The table (`shell/TableView.tsx`) is a frame of docked regions:
   second row, the map pane, a divider, then the panel, whose footer is the bar under the thumb. The divider
   (`table/PaneDivider.tsx`) is a separator with a value that a finger drags and the arrow keys move, remembered
   on the device. Choosing a target lowers it so the map takes most of the height, and the target picker's Cancel
-  and Roll move into the bar (`table/footerSlot.tsx`) while the bar's own controls step aside.
+  and Roll move into the bar (`table/footerSlot.tsx`) while the bar's own controls step aside. What the panel
+  brings into view (the picker, a result, the active row) scrolls its own region alone (`lib/reveal.ts`), since
+  `scrollIntoView` would also move the clipped boxes above it.
 
 - **The map's camera** (`scene/useMapView.ts`, `scene/cameraFollow.ts`) fills the map pane edge to edge, so the
   map has no bands round it. It opens close enough that a one-cell token is about 32 pixels on a phone and 40 on
