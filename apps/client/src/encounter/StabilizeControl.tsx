@@ -43,14 +43,10 @@ export const isKnockedOut = (actor: Readonly<{ effects: ReadonlyArray<Readonly<{
 
 type Method = "medicine" | "healers-kit" | "spare-the-dying" | "gm";
 
-/** What a stabilize reply says happened, in one line. */
-export function stabilizeLine(targetName: string, result: StabilizeResult): string {
-  if (!result.ok) return result.message ?? "The aid could not be given.";
-  const outcome = result.stabilize;
-  if (!outcome) return "";
-  const check = outcome.check ? ` (Medicine ${outcome.check.total} vs DC ${outcome.check.dc})` : "";
-  if (outcome.woke) return `${targetName} comes round${check}.`;
-  return outcome.stabilized ? `${targetName} is stable${check}.` : `The first aid failed${check}.`;
+/** What to tell the helper about a stabilize reply: only a refusal, since the table feed already narrates every aid
+ *  given, with the check it came to. Null when there is nothing to add. */
+export function stabilizeRefusal(result: StabilizeResult): string | null {
+  return result.ok ? null : (result.message ?? "The aid could not be given.");
 }
 
 /**
@@ -84,7 +80,8 @@ export function StabilizeControl({
       ...(method === "gm" || !helper ? {} : { helperId: helper.id })
     }).then((result) => {
       setBusy(false);
-      onFeedback(stabilizeLine(targetName, result));
+      const refusal = stabilizeRefusal(result);
+      if (refusal) onFeedback(refusal);
     });
   };
   if (!gm && !helper) return null;

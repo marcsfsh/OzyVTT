@@ -13,7 +13,7 @@ vi.mock("../socket", () => {
 
 import { socket } from "../socket";
 import { ActorStabilizeSchema } from "@vtt/domain/commands";
-import { aidGiverOf, StabilizeControl, stabilizeLine, type AidGiver } from "./StabilizeControl";
+import { aidGiverOf, StabilizeControl, stabilizeRefusal, type AidGiver } from "./StabilizeControl";
 
 type EmitCall = [event: string, payload: Record<string, unknown>, ack: (result: unknown) => void];
 const emitted = () => (socket.emit as unknown as { mock: { calls: EmitCall[] } }).mock.calls;
@@ -65,15 +65,15 @@ describe("the stabilize buttons", () => {
     expect(carrying([{ id: "healers-kit", quantity: 0 }])).toBe(false);
   });
 
-  it("say what the check came to", () => {
+  it("report only a refusal, leaving the aid given to the table feed", () => {
     expect(
-      stabilizeLine("Bryn", {
+      stabilizeRefusal({
         ok: true,
         stabilize: { stabilized: false, woke: false, check: { natural: 2, total: 6, dc: 10 } }
       })
-    ).toBe("The first aid failed (Medicine 6 vs DC 10).");
-    expect(stabilizeLine("Bryn", { ok: true, stabilize: { stabilized: true, woke: false, check: null } })).toBe(
-      "Bryn is stable."
+    ).toBeNull();
+    expect(stabilizeRefusal({ ok: false, message: "Bryn is 10 ft away - first aid needs Ilse beside them." })).toBe(
+      "Bryn is 10 ft away - first aid needs Ilse beside them."
     );
   });
 });
