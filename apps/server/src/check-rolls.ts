@@ -1,18 +1,25 @@
-import type { CheckRollOutcome, GameState, RollRecord, RollVisibility } from "@vtt/domain";
+import type { CheckRollOutcome, GameState, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
 import { d20FacesFor, otherDiceOf, rerollLowestD20, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, type CheckNames, type CheckPlan, type CheckSubject, totalCheck } from "./ability-checks.js";
-import { canPlayerTarget, GameAccessDeniedError, requireActorAccess, type Initiator } from "./authorization.js";
+import {
+  canPlayerTarget,
+  GameAccessDeniedError,
+  requireActorAccess,
+  requireGm,
+  type Initiator
+} from "./authorization.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 import { heldRollFor, holdRoll, requireTypedDie, requireTypedReroll, spendRerollRight } from "./held-rolls.js";
 import { recordRoll, rolledTerms } from "./roll-history.js";
-import { shownRollMode } from "./saving-throws.js";
+import { createPendingSaves, dismissSave, recordCallResult, shownRollMode } from "./saving-throws.js";
 
 /**
- * Ability checks rolled on the server (SRD "Ability Checks"): from the sheet, and their Heroic Inspiration reroll. The
- * plan (`checkPlan`) works out the bonus and the Advantage or Disadvantage; this module throws or takes the d20, records
- * it, and holds it so Heroic Inspiration can reroll it while it is the character's latest roll.
+ * Ability checks rolled on the server (SRD "Ability Checks"): from the sheet, for the GM's call for a roll, and their
+ * Heroic Inspiration reroll. The plan (`checkPlan`) works out the bonus and the Advantage or Disadvantage; this module
+ * throws or takes the d20, records it, and holds it so Heroic Inspiration can reroll it while it is the character's
+ * latest roll.
  */
 
 export type CheckRollDependencies = Readonly<{
@@ -36,6 +43,8 @@ export type CheckRollInput = Readonly<{
   /** The GM's choice of roll mode; a player's is never passed. */
   forcedMode?: "advantage" | "disadvantage" | "normal";
   findActorId?: string;
+  /** The GM's call this check answers. */
+  callId?: string;
 }>;
 
 /** A check as it was rolled, and whether its numbers are kept from the one who rolled it (a blind roll). */
@@ -118,9 +127,12 @@ function recordCheck(
       dc: input.dc,
       visibility: input.visibility,
       ...(!typed && input.forcedMode !== undefined ? { rollMode: input.forcedMode } : {}),
+      ...(input.callId !== undefined ? { callId: input.callId } : {}),
       ...(input.findActorId !== undefined ? { findActorId: input.findActorId } : {})
     }
   });
+  if (input.callId !== undefined)
+    recordCallResult(state, input.callId, actor.id, { natural: roll.natural, total: roll.total, success, rollId });
   // A typed die was thrown under the mode the rules gave, which the player was told before rolling.
   const rollMode = shownRollMode(plan.rollMode, typed ? undefined : input.forcedMode);
   return {
@@ -188,7 +200,8 @@ export function rerollAbilityCheck(
     dc: check.dc,
     visibility: check.visibility,
     ...(check.rollMode !== undefined ? { forcedMode: check.rollMode } : {}),
-    ...(check.findActorId !== undefined ? { findActorId: check.findActorId } : {})
+    ...(check.findActorId !== undefined ? { findActorId: check.findActorId } : {}),
+    ...(check.callId !== undefined ? { callId: check.callId } : {})
   };
   const { plan } = planFor(state, scope, rollInput, deps);
   const label = `${plan.label} reroll`;
@@ -208,4 +221,107 @@ export function rerollAbilityCheck(
     label,
     ...(scope.role === "gm" ? {} : { others: held.others })
   });
+}
+
+const MAX_CALLS = 20;
+
+/** The GM calls for a check or a save from one or several characters. A save call opens a pending save for each, which
+ *  they answer like any save; a check call is answered with `answerRollCall`. */
+export function startRollCall(
+  state: GameState,
+  input: Readonly<{
+    id: string;
+    kind: RollCall["kind"];
+    subject: CheckSubject;
+    dc: number | null;
+    actorIds: readonly string[];
+    blind: boolean;
+  }>,
+  deps: Readonly<{ newId: () => string; now: () => number }>
+): RollCall {
+  if (state.rollCalls.length >= MAX_CALLS)
+    throw new CommandRejectedError("Close an earlier call for a roll before starting another.");
+  for (const actorId of input.actorIds) {
+    const actor = state.actors.find((candidate) => candidate.id === actorId);
+    if (!actor || actor.archived) throw new CommandRejectedError("Every character you call on must be on the roster.");
+  }
+  if (input.kind === "save" && input.dc === null) throw new CommandRejectedError("A saving throw needs a DC.");
+  const entries = input.actorIds.map((actorId) => ({
+    actorId,
+    ...(input.kind === "save" ? { saveId: deps.newId() } : {})
+  }));
+  if (input.kind === "save") {
+    // The saves are made in target order, so each takes the id its call entry holds.
+    const saveIds = entries.map((entry) => entry.saveId!);
+    createPendingSaves(state, {
+      sourceActorId: null,
+      sourceName: "The GM",
+      actionName: "Called save",
+      ability: input.subject.ability,
+      dc: input.dc!,
+      targetIds: input.actorIds,
+      proposedDamage: 0,
+      halfOnSuccess: false,
+      conditionIds: [],
+      replaceExisting: false,
+      callId: input.id,
+      newSaveId: () => saveIds.shift()!,
+      createdAt: deps.now()
+    });
+  }
+  const call: RollCall = {
+    id: input.id,
+    kind: input.kind,
+    subject: { ...input.subject },
+    dc: input.dc,
+    blind: input.blind,
+    entries,
+    createdAt: deps.now()
+  };
+  state.rollCalls = [...state.rollCalls, call];
+  return call;
+}
+
+/** A character answers the GM's check call: the server rolls it (or takes a typed d20), once. */
+export function answerRollCall(
+  state: GameState,
+  scope: Initiator,
+  input: Readonly<{ commandId: string; callId: string; actorId: string; face?: number }>,
+  deps: CheckRollDependencies
+): CheckResult {
+  const call = state.rollCalls.find((candidate) => candidate.id === input.callId);
+  if (!call) throw new CommandRejectedError("That call for a roll was closed.");
+  const entry = call.entries.find((candidate) => candidate.actorId === input.actorId);
+  // Same answer for a character the call doesn't name and one that isn't theirs, so ids can't be probed.
+  requireActorAccess(scope, state, input.actorId, "check", "You can only roll for your own character.");
+  if (!entry) throw new CommandRejectedError("This call doesn't ask that character for a roll.");
+  if (call.kind === "save") throw new CommandRejectedError("Answer the saving throw itself.");
+  if (entry.result) throw new CommandRejectedError("That character has already rolled for this call.");
+  // A blind call is the GM's: a player rolls blind, and the GM's own roll for them stays GM-only.
+  const visibility: RollVisibility = call.blind ? (scope.role === "gm" ? "gm-only" : "blind") : "public";
+  return rollAbilityCheck(
+    state,
+    scope,
+    {
+      commandId: input.commandId,
+      actorId: input.actorId,
+      subject: call.subject,
+      dc: call.dc,
+      visibility,
+      callId: call.id,
+      ...(input.face !== undefined ? { face: input.face } : {})
+    },
+    deps
+  );
+}
+
+/** The GM closes a call; the saves it opened that nobody answered are dismissed. */
+export function closeRollCall(state: GameState, scope: Initiator, callId: string): void {
+  requireGm(scope, "Only the GM can close a call for a roll.");
+  const call = state.rollCalls.find((candidate) => candidate.id === callId);
+  if (!call) throw new CommandRejectedError("That call for a roll was already closed.");
+  for (const entry of call.entries)
+    if (entry.saveId && state.combat.pendingSaves.some((save) => save.id === entry.saveId))
+      dismissSave(state, entry.saveId, scope);
+  state.rollCalls = state.rollCalls.filter((candidate) => candidate.id !== callId);
 }

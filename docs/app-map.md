@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 12 GameState fields · 99 commands · 217 HTTP paths
+- 13 GameState fields · 102 commands · 220 HTTP paths
 
 ## GameState shape
 
@@ -21,6 +21,7 @@ single JSON blob the server persists and projects per role.
 - `partyVisibility`
 - `pendingImports`
 - `revision`
+- `rollCalls`
 - `rolls`
 - `rulesPolicy`
 - `schemaVersion`
@@ -34,7 +35,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
 register from. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `rules`, `save`, `scene`, `table`, `terrain`, `token`, `turn`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `effect`, `encounter`, `fog`, `initiative`, `reaction`, `replay`, `roll-call`, `rules`, `save`, `scene`, `table`, `terrain`, `token`, `turn`.
 
 | Command | Scope |
 | --- | --- |
@@ -115,6 +116,9 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
 | `replay.launch` | `combat:write` |
+| `roll-call.answer` | `combat:write` |
+| `roll-call.close` | `combat:write` |
+| `roll-call.start` | `combat:write` |
 | `rules.answer` | `combat:write` |
 | `rules.ask` | `combat:write` |
 | `rules.set-policy` | `combat:write` |
@@ -297,6 +301,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/game/log`
 - `POST /api/v1/game/reactions/{reactionId}/answer`
 - `POST /api/v1/game/reactions/{reactionId}/dismiss`
+- `POST /api/v1/game/roll-calls`
+- `POST /api/v1/game/roll-calls/{callId}/answer`
+- `POST /api/v1/game/roll-calls/{callId}/close`
 - `POST /api/v1/game/rolls`
 - `POST /api/v1/game/rules/answer`
 - `POST /api/v1/game/rules/ask`

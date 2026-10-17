@@ -3,6 +3,7 @@ import type { Actor, ActorDefinition, EffectInstance } from "@vtt/schemas";
 import type {
   Annotation,
   BuilderPolicy,
+  CheckSubject,
   CombatState,
   EncounterToken,
   GameState,
@@ -11,6 +12,7 @@ import type {
   PendingRuleAsk,
   PendingSave,
   PlayerRollRecord,
+  RollCall,
   RuleExceptions,
   RuleMode
 } from "./state.js";
@@ -130,12 +132,31 @@ export type PlayerCombatView = Readonly<{
 }>;
 /** An archived, public character the GM shared for preview: id and name only. */
 export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;
+/** One of the GM's calls for a roll as a player who must answer it sees it: only their own characters' entries, and a
+ *  blind call carries neither its DC nor its results. */
+export type PlayerRollCall = Readonly<{
+  id: string;
+  kind: RollCall["kind"];
+  subject: CheckSubject;
+  dc: number | null;
+  blind: boolean;
+  entries: ReadonlyArray<
+    Readonly<{
+      actorId: string;
+      saveId?: string;
+      answered: boolean;
+      result?: NonNullable<RollCall["entries"][number]["result"]>;
+    }>
+  >;
+  createdAt: number;
+}>;
 export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;
   actors: PlayerActor[];
   rolls: PlayerRollRecord[];
   /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
   /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[];
+  /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;
 };
 export type GmActor = Actor & { presence: PresenceStatus | null };

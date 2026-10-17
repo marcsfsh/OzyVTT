@@ -261,6 +261,8 @@ export function createPendingSaves(
     /** Replace an older prompt with the same (target, actionName, source) key. Default true; per-hit riders
      *  pass false since Extra Attack can owe two saves. */
     replaceExisting?: boolean;
+    /** The GM's call for a roll these saves answer. */
+    callId?: string;
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -284,6 +286,7 @@ export function createPendingSaves(
       ? { onFailEffect: { ...input.onFailEffect, modifiers: [...(input.onFailEffect.modifiers ?? [])] } }
       : {}),
     ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
+    ...(input.callId !== undefined ? { callId: input.callId } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -694,6 +697,14 @@ export function answerSave(
   if (success && pending.repeatOf)
     events.push(...endEffectIfPresent(state, pending.repeatOf.actorId, pending.repeatOf.effectId));
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
+  // A save the GM called for reports back to the call.
+  if (pending.callId !== undefined)
+    recordCallResult(state, pending.callId, target.id, {
+      natural: natural ?? 0,
+      total,
+      success,
+      ...(autoFailed !== null ? { autoFailed } : {})
+    });
   return {
     outcome: {
       success,
@@ -723,4 +734,23 @@ export function dismissSave(state: GameState, saveId: string, scope: Initiator) 
     throw new CommandRejectedError("That saving throw was already answered or dismissed.");
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
   releaseHeldRoll(state, `save:${saveId}`);
+}
+
+/** Writes one character's result into the GM's call for a roll; a closed call is left alone. */
+export function recordCallResult(
+  state: GameState,
+  callId: string,
+  actorId: string,
+  result: NonNullable<GameState["rollCalls"][number]["entries"][number]["result"]>
+): void {
+  state.rollCalls = state.rollCalls.map((call) =>
+    call.id !== callId
+      ? call
+      : {
+          ...call,
+          entries: call.entries.map((entry) =>
+            entry.actorId === actorId ? { ...entry, result: { ...result } } : entry
+          )
+        }
+  );
 }

@@ -1,11 +1,27 @@
 import type { GameState } from "@vtt/domain";
-import { ActorSetHeroicInspirationSchema, CheckRerollSchema, CheckRollSchema } from "@vtt/domain/commands";
-import { rerollAbilityCheck, rollAbilityCheck, type CheckResult, type CheckRollDependencies } from "../check-rolls.js";
+import {
+  ActorSetHeroicInspirationSchema,
+  CheckRerollSchema,
+  CheckRollSchema,
+  RollCallAnswerSchema,
+  RollCallCloseSchema,
+  RollCallStartSchema
+} from "@vtt/domain/commands";
+import { ABILITY_NAMES, checkLabel } from "../ability-checks.js";
+import {
+  answerRollCall,
+  closeRollCall,
+  rerollAbilityCheck,
+  rollAbilityCheck,
+  startRollCall,
+  type CheckResult,
+  type CheckRollDependencies
+} from "../check-rolls.js";
 import { CommandRejectedError } from "../game-store.js";
 import { initiatorOf, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
-// Ability checks rolled on the server, and Heroic Inspiration (ADR-0012).
+// Ability checks rolled on the server, the GM's calls for a roll, and Heroic Inspiration (ADR-0012).
 
 function checkDeps(kit: Kit, principal: GamePrincipal, draft: GameState): CheckRollDependencies {
   const skills = kit.catalogFor(principal).skillSummaries();
@@ -109,6 +125,93 @@ export const rollCommands = [
       kit.publishRolls(state, request.commandId);
       narrateVerdict(kit, request.actorId, result, visibility);
       return checkReply(result);
+    }
+  }),
+
+  defineCommand({
+    type: "roll-call.start",
+    operationId: "startRollCall",
+    description:
+      "The GM calls for a roll from one or several characters (GM-grade only): an ability, skill or tool check, or a saving throw with a DC. A save call opens a pending save for each character, answered like any save (the outcome is written back to the call); a check call is answered with `roll-call.answer`. A `blind` call keeps its DC and results from the players: they roll blind. Players see their own part of an open call in `rollCalls`; the GM sees every result and closes the call. The response carries `callId`.",
+    summary: "Call for a check or a saving throw from one or several characters (GM).",
+    schema: RollCallStartSchema,
+    malformed: "The call for a roll is malformed.",
+    issueMessage: true,
+    gmOnly: "Only the GM can call for a roll.",
+    async run({ request, execute }, kit) {
+      const { commandId, kind, ability, skill, tool, dc, actorIds, blind } = request;
+      const subject = { ability, ...(skill !== undefined ? { skill } : {}), ...(tool !== undefined ? { tool } : {}) };
+      const committed = await execute((draft) => {
+        startRollCall(
+          draft,
+          { id: commandId, kind, subject, dc: dc ?? null, actorIds, blind: blind === true },
+          { newId: kit.context.newId, now: () => Date.now() }
+        );
+      });
+      if (!committed.duplicate) {
+        const skills = kit.contentLibrary.forAudience("gm").skillSummaries();
+        const label = checkLabel(subject, {
+          skill: (id) => skills.find((entry) => entry.id === id)?.name,
+          tool: (id) => kit.equipmentCatalog().equipmentRecord(id)?.name
+        });
+        const what =
+          kind === "save"
+            ? `a ${ABILITY_NAMES[ability]} saving throw`
+            : `a ${label.endsWith(" check") ? label : `${label} check`}`;
+        kit.context.broadcastTableEvent({
+          kind: "action",
+          text: `The GM calls for ${what}${dc !== undefined && blind !== true ? ` (DC ${dc})` : ""}.`,
+          gmOnly: actorIds.every((actorId) => kit.actorHidden(actorId))
+        });
+      }
+      return { callId: commandId };
+    }
+  }),
+
+  defineCommand({
+    type: "roll-call.answer",
+    operationId: "answerRollCall",
+    description:
+      "Answers the GM's check call for one character: the server rolls the call's check as `check.roll` does (or takes `face`, a typed d20, from a player only while the table's typedRolls is open), once per character, and writes the result to the call. A blind call's roll is hidden from the player. A save call is answered through its pending save instead. GM-grade for anyone the call names; a player session only for their own claimed character. The response carries `check`.",
+    summary: "Answer the GM's call for a check for your character.",
+    schema: RollCallAnswerSchema,
+    malformed: "The answer is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const initiator = initiatorOf(principal);
+      let result: CheckResult | undefined;
+      let blind = false;
+      const { state, duplicate } = await execute((draft) => {
+        blind = draft.rollCalls.find((call) => call.id === request.callId)?.blind === true;
+        result = answerRollCall(
+          draft,
+          initiator,
+          {
+            commandId: request.commandId,
+            callId: request.callId,
+            actorId: request.actorId,
+            ...(request.face !== undefined ? { face: request.face } : {})
+          },
+          checkDeps(kit, principal, draft)
+        );
+      });
+      if (duplicate || !result) return;
+      kit.publishRolls(state, request.commandId);
+      narrateVerdict(kit, request.actorId, result, blind ? "gm-only" : "public");
+      return checkReply(result);
+    }
+  }),
+
+  defineCommand({
+    type: "roll-call.close",
+    operationId: "closeRollCall",
+    description:
+      "Closes the GM's call for a roll (GM-grade only); the saves it opened that nobody answered are dismissed.",
+    summary: "Close a call for a roll (GM).",
+    schema: RollCallCloseSchema,
+    malformed: "The close is malformed.",
+    gmOnly: "Only the GM can close a call for a roll.",
+    async run({ principal, request, execute }) {
+      await execute((draft) => closeRollCall(draft, initiatorOf(principal), request.callId));
     }
   }),
 

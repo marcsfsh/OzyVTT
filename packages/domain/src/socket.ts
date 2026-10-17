@@ -101,6 +101,9 @@ import type {
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
+  RollCallAnswerSchema,
+  RollCallCloseSchema,
+  RollCallStartSchema,
   RulesAnswerSchema,
   RulesAskSchema,
   RulesSetPolicySchema,
@@ -283,6 +286,21 @@ export interface ClientToServerEvents {
   "check:reroll": (
     payload: CommandPayload<typeof CheckRerollSchema>,
     acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** GM: call for a check or a save from one or several characters. */
+  "roll-call:start": (
+    payload: CommandPayload<typeof RollCallStartSchema>,
+    acknowledgement: (result: MutationResult & { callId?: string }) => void
+  ) => void;
+  /** Answer a check call for your character (the GM for anyone). */
+  "roll-call:answer": (
+    payload: CommandPayload<typeof RollCallAnswerSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** GM: close a call; its unanswered saves are dismissed. */
+  "roll-call:close": (
+    payload: CommandPayload<typeof RollCallCloseSchema>,
+    acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM: give or take a character's Heroic Inspiration. */
   "actor:set-heroic-inspiration": (

@@ -259,6 +259,8 @@ export const PendingSaveSchema = z
       .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
       .strict()
       .optional(),
+    /** The GM's call for a roll this save answers; the outcome is written back to the call. */
+    callId: z.uuid().optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -315,6 +317,7 @@ export const HeldRollSchema = z
         visibility: RollVisibilitySchema,
         /** The GM's forced mode, which a reroll keeps. */
         rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+        callId: z.uuid().optional(),
         findActorId: z.uuid().optional()
       })
       .strict()
@@ -323,6 +326,43 @@ export const HeldRollSchema = z
   })
   .strict();
 export type HeldRoll = z.infer<typeof HeldRollSchema>;
+
+/** One character's part of a call for a roll: who, the pending save a save call opened, and the result once rolled. */
+export const RollCallEntrySchema = z
+  .object({
+    actorId: z.uuid(),
+    saveId: z.uuid().optional(),
+    result: z
+      .object({
+        natural: z.number().int().min(0).max(20),
+        total: z.number().int(),
+        /** Null when the call set no DC. */
+        success: z.boolean().nullable(),
+        /** The condition that made a Strength or Dexterity save fail without a roll. */
+        autoFailed: z.string().max(60).optional(),
+        rollId: z.uuid().optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+/**
+ * The GM's call for a roll: a check or a save from one or several characters, with an optional DC. A save call opens a
+ * pending save for each character; a check call is answered with `roll-call.answer`. A blind call's rolls are hidden from
+ * the players who make them. Closed by the GM.
+ */
+export const RollCallSchema = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(["check", "save"]),
+    subject: CheckSubjectSchema,
+    dc: z.number().int().min(1).max(40).nullable(),
+    blind: z.boolean().default(false),
+    entries: z.array(RollCallEntrySchema).min(1).max(20),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type RollCall = z.infer<typeof RollCallSchema>;
 
 /** An attack a reaction (Parry, Shield) may still turn into a miss, held at the roll until the prompt is answered and
  * then replayed with the same die. The economy it spent was committed when it rolled. GM-only. */
@@ -889,6 +929,8 @@ export const GameStateSchema = z.object({
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */
   partyVisibility: PartyVisibilitySchema.default("name-and-class"),
   /** Dice thrown before they count (see HeldRollSchema). GM-only. */
-  heldRolls: z.array(HeldRollSchema).max(100).default([])
+  heldRolls: z.array(HeldRollSchema).max(100).default([]),
+  /** The GM's open calls for a roll. A player reads only their own part of each. */
+  rollCalls: z.array(RollCallSchema).max(20).default([])
 });
 export type GameState = z.infer<typeof GameStateSchema>;

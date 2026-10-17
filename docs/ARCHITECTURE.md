@@ -189,11 +189,11 @@ What a save does is data on the action's save block, not read from its descripti
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
 
-Every ability check, from a sheet chip or a builtin action, comes from one plan (`checkPlan` in
-`ability-checks.ts`), so the number a sheet shows is the bonus the server rolls with. A die a player sees
-before it counts (a previewed attack, save or death save) is held on the server (`held-rolls.ts`,
-ADR-0012): a second look shows the same die, and Heroic Inspiration is a player's only reroll. Players
-type die faces, never totals, and only while the table allows typed dice.
+Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
+(`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
+player sees before it counts (a previewed attack, save or death save) is held on the server
+(`held-rolls.ts`, ADR-0012): a second look shows the same die, and Heroic Inspiration is a player's only
+reroll. Players type die faces, never totals, and only while the table allows typed dice.
 
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
 off, with per-family exceptions (`rules-families.ts`). A player blocked by a rule can ask the GM

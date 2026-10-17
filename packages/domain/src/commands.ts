@@ -651,6 +651,57 @@ export const CheckRerollSchema = z
   })
   .strict();
 
+/** The GM calls for a check or a save from one or several characters, with an optional DC. */
+export const RollCallStartSchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["check", "save"]),
+    ability: AbilitySchema,
+    /** A check's skill or tool; a save takes neither. */
+    skill: SkillOrToolIdSchema.optional(),
+    tool: SkillOrToolIdSchema.optional(),
+    /** Required for a save. */
+    dc: z.number().int().min(1).max(40).optional(),
+    actorIds: z.array(z.uuid()).min(1).max(20),
+    /** A check the players roll blind: they see neither its result nor its DC. A save is never blind: its outcome
+     *  lands on the character. */
+    blind: z.boolean().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((payload) => payload.kind === "check" || payload.dc !== undefined, {
+    error: "A saving throw needs a DC."
+  })
+  .refine((payload) => payload.kind === "check" || payload.blind !== true, {
+    error: "A saving throw can't be rolled blind: its outcome lands on the character."
+  })
+  .refine((payload) => payload.kind === "check" || (payload.skill === undefined && payload.tool === undefined), {
+    error: "A saving throw takes no skill or tool."
+  })
+  .refine((payload) => new Set(payload.actorIds).size === payload.actorIds.length, {
+    error: "Name each character once."
+  });
+
+/** A character answers a check call: the server rolls it (or takes the typed `face`). */
+export const RollCallAnswerSchema = z
+  .object({
+    commandId: z.uuid(),
+    callId: z.uuid(),
+    actorId: z.uuid(),
+    face: z.number().int().min(1).max(20).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** The GM closes a call; the saves it opened that nobody answered are dismissed. */
+export const RollCallCloseSchema = z
+  .object({
+    commandId: z.uuid(),
+    callId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
 /** The GM gives or takes a character's Heroic Inspiration. */
 export const ActorSetHeroicInspirationSchema = z
   .object({
