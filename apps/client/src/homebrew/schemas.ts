@@ -55,7 +55,7 @@ const spellcastingGroup = (ownerWord: string): FieldDef => ({
   key: "spellcasting",
   label: "Spellcasting",
   kind: "group",
-  help: "Full casters get slots from level 1, half-casters from 2, third-casters from 3. Pact magic is the warlock's short-rest pool.",
+  help: "Full casters and half-casters get slots from level 1, third-casters from level 3. Pact Magic is the Warlock's pool, regained on a Short Rest.",
   rows: [
     {
       key: "spellcasting.multiclassProgression",
@@ -269,7 +269,7 @@ const CLASS_SCHEMA: HomebrewSchema = {
         numberChips(
           "asiLevels",
           "Ability score improvements at",
-          "Seeded with 4, 8, 12, 16 and 19 — every SRD class's ladder."
+          "Seeded with 4, 8, 12, 16 and 19, the levels every SRD class uses."
         ),
         spellcastingGroup("class")
       ]
@@ -375,7 +375,7 @@ const SUBCLASS_SCHEMA: HomebrewSchema = {
       title: "Belongs to",
       // The rules engine reads the class's level table, so a subclass has no slot field.
       blurb:
-        "A subclass can't grant its own spell slots — the rules engine reads the class's level table. It can still grant always-prepared spells through a feature.",
+        "A subclass can't grant its own spell slots, because the rules engine reads the class's level table. It can still grant always-prepared spells through a feature.",
       fields: [
         { key: "classId", label: "Class", kind: "select", required: true, options: (ctx) => ctx.classes },
         {
@@ -412,7 +412,7 @@ const SPECIES_SCHEMA: HomebrewSchema = {
           min: 0,
           max: 240,
           unit: "ft",
-          note: "Display only — the rules engine doesn't grant darkvision yet."
+          note: "Display only. The rules engine doesn't grant Darkvision yet."
         },
         {
           key: "creatureType",
@@ -464,7 +464,7 @@ const SPECIES_SCHEMA: HomebrewSchema = {
       id: "lineages",
       title: "Lineages",
       blurb:
-        "A lineage trait can grant things, but it can't ask the player a question yet — put any choice on a species trait instead.",
+        "A lineage trait can grant things, but it can't ask the player a question yet. Put any choice on a species trait.",
       fields: [
         {
           key: "lineages",
@@ -700,7 +700,7 @@ const SPELL_SCHEMA: HomebrewSchema = {
               kind: "select",
               emptyValue: "null",
               options: [
-                opt("creature", "Creatures"),
+                opt("creature", "Characters or monsters"),
                 opt("object", "Objects"),
                 opt("point", "A point"),
                 opt("area", "An area"),
@@ -740,7 +740,7 @@ const SPELL_SCHEMA: HomebrewSchema = {
     {
       id: "lists",
       title: "Spell lists",
-      blurb: "Naming a list here puts this spell on it — you don't also have to edit the list.",
+      blurb: "Naming a list here puts this spell on it. The list itself needs no edit.",
       fields: [
         { key: "classes", label: "On these lists", kind: "multiselect", wide: true, options: (ctx) => ctx.spellLists }
       ]
@@ -757,8 +757,7 @@ const SPELL_LIST_SCHEMA: HomebrewSchema = {
     {
       id: "contents",
       title: "Contents",
-      blurb:
-        "Homebrew spells can just name this list in their own Spell lists field. Use this to pull in SRD spells too.",
+      blurb: "Homebrew spells can name this list in their own Spell lists field. Use this to pull in SRD spells.",
       fields: [
         {
           key: "basedOn",
@@ -789,22 +788,22 @@ const SPELL_LIST_SCHEMA: HomebrewSchema = {
 const SLOTS = [
   opt("weapon", "A weapon", "Held"),
   opt("shield", "A shield", "Held"),
-  opt("held", "Held - a wand, orb, rod or staff", "Held"),
+  opt("held", "Held: a wand, orb, rod or staff", "Held"),
   opt("armor", "Body armour", "Worn"),
-  opt("head", "On the head - a circlet or helm", "Worn"),
-  opt("eyes", "Over the eyes - lenses or goggles", "Worn"),
-  opt("neck", "Around the neck - an amulet", "Worn"),
-  opt("shoulders", "Over the shoulders - a cloak", "Worn"),
-  opt("body", "Over the clothes - a robe", "Worn"),
-  opt("hands", "On the hands - gloves or gauntlets", "Worn"),
-  opt("bracers", "On the forearms - bracers", "Worn"),
+  opt("head", "On the head: a circlet or helm", "Worn"),
+  opt("eyes", "Over the eyes: lenses or goggles", "Worn"),
+  opt("neck", "Around the neck: an amulet", "Worn"),
+  opt("shoulders", "Over the shoulders: a cloak", "Worn"),
+  opt("body", "Over the clothes: a robe", "Worn"),
+  opt("hands", "On the hands: gloves or gauntlets", "Worn"),
+  opt("bracers", "On the forearms: bracers", "Worn"),
   opt("ring", "A ring", "Worn"),
   opt("belt", "At the belt", "Worn"),
-  opt("feet", "On the feet - boots", "Worn"),
-  opt("wondrous", "Wondrous - attunable, worn nowhere", "Everything else"),
-  opt("consumable", "Used up - a potion or scroll", "Everything else"),
+  opt("feet", "On the feet: boots", "Worn"),
+  opt("wondrous", "Wondrous: attunable, worn nowhere", "Everything else"),
+  opt("consumable", "Used up: a potion or scroll", "Everything else"),
   opt("ammunition", "Ammunition", "Everything else"),
-  opt("none", "Just carried", "Everything else")
+  opt("none", "Carried (no slot)", "Everything else")
 ];
 
 const AMMUNITION_KINDS = [
@@ -857,7 +856,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           required: true,
           suggestions: (ctx) => ctx.equipmentCategories.map((option) => option.value),
           // Open slug; `slot` drives the mechanics, so the category is only a browse facet.
-          help: "Your own word for it — “relic”, “trinket”. What it DOES is the field beside this one."
+          help: 'Your own word for it, such as "relic" or "trinket". What it DOES is the field beside this one.'
         },
         {
           key: "slot",
@@ -987,14 +986,14 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Only by",
           kind: "tags",
           placeholder: "cleric",
-          help: "A class or species. It's shown on the sheet, never enforced — handing a player a restricted item on purpose is a normal table event.",
+          help: "A class or species. It's shown on the sheet and never enforced, because handing a player a restricted item on purpose is a normal table event.",
           visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
         },
         {
           key: "cursed",
           label: "Cursed",
           kind: "switch",
-          help: "Players can't unattune, unequip or drop it — only you can. Its magic stays hidden from them until they attune.",
+          help: "Players can't unattune, unequip or drop it. Only you can. Its magic stays hidden from them until they attune.",
           visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
         },
         // The charges themselves are the `uses` on its spells and actions; these say how they come back.
@@ -1003,7 +1002,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Charges regained at dawn",
           placeholder: "1d6 + 1",
           emptyValue: "omit",
-          help: "Dice, as printed. Leave empty and a long rest gives every charge back.",
+          help: "Dice, as printed. Leave empty and a Long Rest gives every charge back.",
           visibleWhen: (draft) => draft.isMagic === true
         },
         {
@@ -1053,7 +1052,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           key: "appliesTo.label",
           label: "Applies to (as printed)",
           placeholder: "Any martial weapon",
-          help: "The words your players see when they choose — like the book's “Weapon (Any Simple or Martial)”. Fill this AND the base list below, or neither.",
+          help: `The words your players see when they choose, like the book's "Weapon (Any Simple or Martial)". Fill this AND the base list below, or neither.`,
           visibleWhen: (draft) => draft.isMagic === true
         },
         {
@@ -1061,7 +1060,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "The bases it can be",
           kind: "tags",
           placeholder: "longsword",
-          help: "Weapon or armor ids from the catalog — “longsword”, “chain-mail”, your own published base. The player picks ONE of these; its stats become the item's.",
+          help: `Weapon or armor ids from the catalog, such as "longsword", "chain-mail" or your own published base. The player picks ONE of these, and its stats become the item's.`,
           visibleWhen: (draft) => draft.isMagic === true && String(getAt(draft, "appliesTo.label") ?? "").trim() !== ""
         },
         {
@@ -1081,7 +1080,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             const limit = getAt(cast, "uses.limit");
             const name = typeof cast.spellId === "string" && cast.spellId ? humanise(cast.spellId) : "No spell chosen";
             return typeof limit === "number"
-              ? `${name} — ${limit} a ${String(getAt(cast, "uses.per") ?? "long-rest").replace(/-/g, " ")}`
+              ? `${name} · ${limit} a ${String(getAt(cast, "uses.per") ?? "long-rest").replace(/-/g, " ")}`
               : name;
           },
           rows: [
@@ -1114,7 +1113,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
               kind: "number",
               min: 1,
               max: 40,
-              help: "The item's own DC, not the character's."
+              help: "The item's own DC. The character's spell save DC doesn't apply."
             },
             {
               key: "uses.limit",
@@ -1137,10 +1136,10 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
               kind: "select",
               options: [
                 opt("encounter", "Every encounter"),
-                opt("short-rest", "On a short rest"),
-                opt("long-rest", "On a long rest")
+                opt("short-rest", "On a Short Rest"),
+                opt("long-rest", "On a Long Rest")
               ],
-              help: "A long rest is this table's day, so “once per day” is “on a long rest”."
+              help: 'A Long Rest is the day at this table, so "once per day" means "on a Long Rest".'
             },
             {
               key: "uses.pool",
@@ -1175,7 +1174,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
     {
       id: "weapon",
       title: "Weapon",
-      blurb: "Fill these in only for a weapon. The category has to be “weapon” too, or nothing here is read.",
+      blurb: 'Fill these in only for a weapon. The category has to be "weapon" too, or nothing here is read.',
       fields: [
         ...inContainer("weapon", SUB_OBJECT_DEFAULTS.equipment!.weapon, [
           {
@@ -1358,7 +1357,7 @@ const MONSTER_SCHEMA: HomebrewSchema = {
           label: "Hit dice",
           placeholder: "19d12 + 133",
           validate: diceValidate,
-          help: "Like 19d12 + 133. Without it, short rests give this monster no hit dice."
+          help: "Like 19d12 + 133. Without it, Short Rests give this monster no hit dice."
         },
         { key: "proficiencyBonus", label: "Proficiency bonus", kind: "number", min: 0, max: 12 },
         { key: "initiativeBonus", label: "Initiative bonus", kind: "number", min: -20, max: 30, allowNegative: true },

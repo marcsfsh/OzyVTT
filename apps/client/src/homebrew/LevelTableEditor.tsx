@@ -46,8 +46,6 @@ export function progressionOf(draft: Draft): Progression {
   return value === "full" || value === "half" || value === "third" || value === "pact" ? value : "full";
 }
 
-const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
-
 /** The derived half of one row. `undefined` means the column is absent: the schema is `.strict()`
     with `.optional()` columns, so a non-caster row carries no `spellSlots` key at all. */
 function generateFor(level: number, progression: Progression, classId: string) {
@@ -69,13 +67,16 @@ const sameSlots = (a: readonly number[] | undefined, b: readonly number[] | unde
 const samePact = (a: PactSlots | undefined, b: PactSlots | undefined) =>
   a === b || (!!a && !!b && a.level === b.level && a.slots === b.slots);
 
-/** Accessible text for the collapsed slots cell, e.g. "1st: 4, 2nd: 3, 4th–9th: none". */
+/** The nine spell slot levels, for the per-level slot fields. */
+const SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+/** Accessible text for the collapsed slots cell, e.g. "Level 1: 4, Level 2: 3, Levels 4-9: none". */
 function describeSlots(slots: readonly number[]): string {
   const parts: string[] = [];
   let runStart = -1;
   const flushRun = (end: number) => {
     if (runStart === -1) return;
-    parts.push(runStart === end ? `${ORDINALS[runStart]}: none` : `${ORDINALS[runStart]}–${ORDINALS[end]}: none`);
+    parts.push(runStart === end ? `Level ${runStart + 1}: none` : `Levels ${runStart + 1}-${end + 1}: none`);
     runStart = -1;
   };
   slots.forEach((count, index) => {
@@ -84,7 +85,7 @@ function describeSlots(slots: readonly number[]): string {
       return;
     }
     flushRun(index - 1);
-    parts.push(`${ORDINALS[index]}: ${count}`);
+    parts.push(`Level ${index + 1}: ${count}`);
   });
   flushRun(slots.length - 1);
   return parts.join(", ");
@@ -194,24 +195,23 @@ export function LevelTableEditor({
 
   const slotText = (index: number): { text: string; label: string } => {
     const row = rows[index];
-    if (!row) return { text: "—", label: "No spell slots" };
+    if (!row) return { text: "None", label: "No spell slots" };
     if (row.pactSlots) {
-      const ordinal = ORDINALS[row.pactSlots.level - 1] ?? `${row.pactSlots.level}th`;
       return {
-        text: `${row.pactSlots.slots} × ${ordinal}`,
-        label: `${row.pactSlots.slots} pact ${row.pactSlots.slots === 1 ? "slot" : "slots"} of ${ordinal} level`
+        text: `${row.pactSlots.slots} × level ${row.pactSlots.level}`,
+        label: `${row.pactSlots.slots} level ${row.pactSlots.level} pact ${row.pactSlots.slots === 1 ? "slot" : "slots"}`
       };
     }
-    if (!row.spellSlots) return { text: "—", label: "No spell slots" };
+    if (!row.spellSlots) return { text: "None", label: "No spell slots" };
     return {
-      text: row.spellSlots.map((count) => (count === 0 ? "–" : String(count))).join(" "),
+      text: row.spellSlots.map(String).join(" "),
       label: describeSlots(row.spellSlots)
     };
   };
 
   const featureText = (index: number) => {
     const ids = rows[index]?.features ?? [];
-    if (ids.length === 0) return "—";
+    if (ids.length === 0) return "None";
     return ids.map((id) => featureName.get(id) ?? id).join(", ");
   };
 
@@ -231,7 +231,7 @@ export function LevelTableEditor({
     for (const resource of before) {
       if (!nowAt.has(resource.id)) parts.push(`${resource.name || resource.id} gone`);
     }
-    return parts.length === 0 ? "—" : parts.join(", ");
+    return parts.length === 0 ? "None" : parts.join(", ");
   };
 
   const placed = useMemo(() => {
@@ -283,7 +283,7 @@ export function LevelTableEditor({
                 value={row.cantripsKnown ?? null}
                 min={0}
                 max={10}
-                placeholder="—"
+                placeholder="None"
                 onChange={(next) => writeRow(index, { cantripsKnown: next ?? undefined })}
               />
             </span>
@@ -293,7 +293,7 @@ export function LevelTableEditor({
                 value={row.preparedCount ?? null}
                 min={0}
                 max={60}
-                placeholder="—"
+                placeholder="None"
                 onChange={(next) => writeRow(index, { preparedCount: next ?? undefined })}
               />
             </span>
@@ -361,9 +361,9 @@ export function LevelTableEditor({
               </FieldGrid>
             ) : (
               <div className="hb-lt-slotstrip" role="group" aria-label={`Spell slots at level ${value}`}>
-                {ORDINALS.map((ordinal, slot) => (
-                  <label key={ordinal} className="hb-lt-slotfield">
-                    <span className="nh-field-label">{ordinal}</span>
+                {SLOT_LEVELS.map((slotLevel, slot) => (
+                  <label key={slotLevel} className="hb-lt-slotfield">
+                    <span className="nh-field-label">Level {slotLevel}</span>
                     <NumberField
                       value={row.spellSlots?.[slot] ?? 0}
                       min={0}

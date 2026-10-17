@@ -609,8 +609,8 @@ export function RecordDetail({
           ) : (
             <Alert tone="warning" title="No editor for this kind yet">
               <p>
-                Nothing here knows how to author {withArticle(typeLabel(doc.type))}. Your record is safe — it just
-                can&rsquo;t be edited from this screen.
+                Nothing here knows how to author {withArticle(typeLabel(doc.type))}. Your record is safe. It can't be
+                edited from this screen.
               </p>
             </Alert>
           )}

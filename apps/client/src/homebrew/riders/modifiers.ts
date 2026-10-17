@@ -37,7 +37,7 @@ const MODIFIER_LABELS: Readonly<
   darkvision: ["The character", "Darkvision"],
   sense: ["The character", "Another sense"],
   "resource-bonus": ["The character", "A limited-use pool"],
-  "short-rest-regain": ["The character", "Uses back on a short rest"],
+  "short-rest-regain": ["The character", "Uses back on a Short Rest"],
   "attunement-slots": ["The character", "Attunement slots"]
 };
 
@@ -157,7 +157,7 @@ export const specialSpeedFields = (): FieldDef[] => [
     label: "Equal to its Speed",
     kind: "switch",
     visibleWhen: hasType("special-speed"),
-    help: "On for “a Climb Speed equal to your Speed”."
+    help: 'On for "a Climb Speed equal to your Speed".'
   },
   {
     key: "feet",
@@ -359,9 +359,9 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       label: "A shield still counts",
       kind: "switch",
       visibleWhen: hasType("unarmored-defense"),
-      help: "On is the Barbarian's rule, off the Monk's — off, a shield replaces this defence with the ordinary 10 + Dexterity.",
+      help: "On follows the Barbarian's rule, and off follows the Monk's. With it off, a shield replaces this defence with the ordinary 10 + Dexterity.",
       ...(scope === "item"
-        ? { note: "Not read on an item — this defence only reaches a sheet from a feature or a feat." }
+        ? { note: "Not read on an item. This defence only reaches a sheet from a feature or a feat." }
         : {})
     },
     {
@@ -379,7 +379,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       options: ABILITIES,
       emptyValue: "omit",
       visibleWhen: hasType("extra-damage"),
-      help: "Adds the character's own modifier, resolved at the roll — “add your Charisma modifier to the damage”."
+      help: `Adds the character's own modifier when the damage is rolled, as in "add your Charisma modifier to the damage".`
     },
     {
       key: "damageType",
@@ -389,7 +389,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       placeholder: "Same as the attack",
       emptyValue: "omit",
       visibleWhen: hasType("extra-damage"),
-      help: "Leave it on “Same as the attack” for damage that follows the weapon or spell."
+      help: 'Leave it on "Same as the attack" for damage that follows the weapon or spell.'
     },
     {
       key: "doubleOnCritical",
@@ -436,7 +436,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       placeholder: "rage",
       validate: slugValidate,
       visibleWhen: hasType("short-rest-regain"),
-      help: "The shared-pool name a feature already uses. It still comes back in full on a long rest."
+      help: "The shared-pool name a feature already uses. It still comes back in full on a Long Rest."
     },
     {
       key: "threshold",

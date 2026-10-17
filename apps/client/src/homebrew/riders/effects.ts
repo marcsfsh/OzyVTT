@@ -50,7 +50,7 @@ const effectModifiersField = (): FieldDef => ({
   wide: true,
   help: "An effect with nothing here is a label the fight cannot feel.",
   addLabel: "Add a modifier",
-  emptyText: "Nothing yet — this effect changes no numbers.",
+  emptyText: "Nothing yet. This effect changes no numbers.",
   maxRows: 8,
   maxRowsReason: "Eight modifiers is as many as one effect carries.",
   rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
@@ -65,7 +65,7 @@ const effectModifiersField = (): FieldDef => ({
       return `${name} ${signed(modifier.amount)} ft`;
     if (modifier.type === "special-speed") return specialSpeedLabel(modifier);
     const types = Array.isArray(modifier.damageTypes) ? modifier.damageTypes.map(String) : [];
-    return types.length > 0 ? `${name} — ${types.slice(0, 3).join(", ")}${types.length > 3 ? "…" : ""}` : name;
+    return types.length > 0 ? `${name} · ${types.slice(0, 3).join(", ")}${types.length > 3 ? "…" : ""}` : name;
   },
   rows: [
     {
@@ -129,7 +129,7 @@ export const effectsField = (scope: RiderScope): FieldDef => ({
     scope === "item"
       ? "Each of these applies while the item is equipped."
       : scope === "statblock"
-        ? "A stat block's action carries one effect, not a list."
+        ? "A stat block's action carries one effect."
         : "Only the first effect is applied by the rules engine today.",
   addLabel: "Add an effect",
   emptyText: "No effects yet.",
@@ -138,7 +138,7 @@ export const effectsField = (scope: RiderScope): FieldDef => ({
     scope === "item"
       ? "Four effects is as many as one item carries."
       : scope === "statblock"
-        ? "A stat block's action carries one effect, not a list."
+        ? "A stat block's action carries one effect."
         : "Only the first effect is applied by the rules engine today.",
   rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
   newRow: () => ({ rowId: newId(), name: "", tags: [], duration: { type: "encounter" }, modifiers: [], onEnd: [] }),

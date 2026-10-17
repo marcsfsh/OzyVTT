@@ -112,8 +112,8 @@ export function HomebrewRail({
         <div className="nh-empty">
           <span className="nh-empty-title">Nothing homebrewed yet.</span>
           <span className="nh-empty-text">
-            Make a class, a monster or an item the SRD doesn&rsquo;t have. Start blank, or duplicate an SRD record and
-            change what you need.
+            Make a class, a monster or an item the SRD doesn't have. Start blank, or duplicate an SRD record and change
+            what you need.
           </span>
           <Button variant="primary" onClick={onNew}>
             New homebrew
@@ -124,7 +124,7 @@ export function HomebrewRail({
     if (filters.query.trim()) {
       return (
         <div className="nh-empty">
-          <span className="nh-empty-title">No homebrew matches &ldquo;{filters.query.trim()}&rdquo;.</span>
+          <span className="nh-empty-title">No homebrew matches "{filters.query.trim()}".</span>
           <Button variant="ghost" className="tap-target" onClick={() => onFilters({ ...filters, query: "" })}>
             Clear search
           </Button>

@@ -184,7 +184,7 @@ export function summaryLineOf(draft: Draft): string {
   const cr =
     rating === null
       ? ""
-      : ` - CR ${rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : rating}`;
+      : ` · CR ${rating === 0.125 ? "1/8" : rating === 0.25 ? "1/4" : rating === 0.5 ? "1/2" : rating}`;
   return `${size.charAt(0).toUpperCase()}${size.slice(1)} ${type}${alignment}${cr}`;
 }
 

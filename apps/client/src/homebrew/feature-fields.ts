@@ -112,7 +112,7 @@ const asksAChoice = (feature: Draft) => choiceBlocksOf(feature).length > 0;
 const offerValidate = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
   if (text === "" || /^[a-z0-9-]+(:[a-z0-9-]+)?$/.test(text)) return null;
-  return "Write it as an offer key — lowercase-with-dashes, or feature:<a-feature-id>.";
+  return "Write it as an offer key: lowercase-with-dashes, or feature:<a-feature-id>.";
 };
 
 /**
@@ -207,7 +207,7 @@ function requiresField(): FieldDef {
     key: "requires",
     label: "Only when an earlier pick chose",
     kind: "group",
-    help: "Leave both empty to offer this option to everyone. When the gates leave exactly as many options as the choice takes, the player is asked nothing and the survivor is simply granted.",
+    help: "Leave both empty to offer this option to everyone. When the gates leave exactly as many options as the choice takes, the player is asked nothing and gets what is left.",
     rows: [
       {
         key: "requires.offer",
@@ -252,7 +252,7 @@ function extraPicksField(): FieldDef {
     label: "Extra picks",
     kind: "rows",
     wide: true,
-    help: "Budgets this raises — an extra cantrip, one more skill. The player still makes the pick.",
+    help: "Budgets this raises, such as an extra cantrip or one more skill. The player still makes the pick.",
     addLabel: "Add an extra pick",
     emptyText: "Raises no budgets.",
     maxRows: 4,
@@ -263,7 +263,7 @@ function extraPicksField(): FieldDef {
       const grant = row as { offer?: unknown; amount?: unknown; scaling?: { id?: unknown } };
       const offer = String(grant.offer || "no pick named");
       return grant.scaling
-        ? `${offer} — grows with ${String(grant.scaling.id || "a column")}`
+        ? `${offer} · grows with ${String(grant.scaling.id || "a column")}`
         : `${offer} +${Number(grant.amount ?? 1)}`;
     },
     rows: [
@@ -327,7 +327,7 @@ function replacesField(): FieldDef {
     label: "Picks it re-opens",
     kind: "rows",
     wide: true,
-    help: "Answers the player may take back later — a land type on a long rest, a damage type on a short one.",
+    help: "Answers the player may take back later, such as a land type on a Long Rest or a damage type on a Short Rest.",
     addLabel: "Add a re-openable pick",
     emptyText: "Re-opens nothing.",
     maxRows: 4,
@@ -339,7 +339,7 @@ function replacesField(): FieldDef {
       const clause = row as { offer?: unknown; when?: unknown; amount?: unknown };
       const amount = Number(clause.amount ?? 1);
       const each = amount > 1 ? `${amount} at a time` : "one";
-      return `${String(clause.offer || "no pick named")} — ${each}, ${WHEN_LABELS[String(clause.when ?? "")] ?? "when?"}`;
+      return `${String(clause.offer || "no pick named")} · ${each}, ${WHEN_LABELS[String(clause.when ?? "")] ?? "at no set time"}`;
     },
     rows: [
       {
@@ -347,7 +347,7 @@ function replacesField(): FieldDef {
         label: "Which pick",
         pick: true,
         placeholder: "feature:my-feature",
-        help: "A named budget, or feature:<id> for one of this record's own features — usually this one.",
+        help: "A named budget, or feature:<id> for one of this record's own features. That is usually this one.",
         suggestions: (_ctx, draft) => [...NAMED_PICK_BUDGET_KEYS, ...featureIdsOf(draft).map((id) => `feature:${id}`)],
         validate: offerValidate
       },
@@ -357,8 +357,8 @@ function replacesField(): FieldDef {
         kind: "select",
         options: [
           { value: "level-up", label: "At level-up" },
-          { value: "short-rest", label: "On a short rest" },
-          { value: "long-rest", label: "On a long rest" }
+          { value: "short-rest", label: "On a Short Rest" },
+          { value: "long-rest", label: "On a Long Rest" }
         ]
       },
       { key: "amount", label: "How many at once", kind: "number", min: 1, max: 5 }
@@ -368,8 +368,8 @@ function replacesField(): FieldDef {
 
 const WHEN_LABELS: Readonly<Record<string, string>> = {
   "level-up": "at level-up",
-  "short-rest": "on a short rest",
-  "long-rest": "on a long rest"
+  "short-rest": "on a Short Rest",
+  "long-rest": "on a Long Rest"
 };
 
 /** `replacesFeatureId`: this feature supersedes an earlier one (Extra Attack (2)), so the sheet shows
@@ -383,12 +383,12 @@ const replacesFeatureIdField = (): FieldDef => ({
   // Only a class has a level table, and only a class's own features are read for this.
   visibleWhen: (_feature, draft) => Array.isArray(draft.levelTable),
   options: (_ctx, draft) => [
-    { value: "", label: "Nothing — this is a feature of its own" },
+    { value: "", label: "Nothing · this is a feature of its own" },
     ...featureIdsOf(draft).map((id) => ({ value: id, label: featureLabelOf(draft, id) }))
   ],
   // `options` receives the record, not the row, so self-reference is caught here instead.
   validate: (value, feature) =>
-    value && value === feature.id ? "A feature cannot supersede itself — pick the earlier one it replaces." : null
+    value && value === feature.id ? "A feature cannot supersede itself. Pick the earlier one it replaces." : null
 });
 
 /** The spell window applies to these kinds, or to any block already holding a bound (kind is open). */
@@ -420,7 +420,7 @@ function choiceBlockFields(): readonly FieldDef[] {
       kind: "number",
       min: 0,
       max: 9,
-      help: "0 is cantrips only. Compared against the catalog's own spell levels — a list typed by hand has none.",
+      help: "0 is cantrips only. Compared against the catalog's own spell levels. A list typed by hand has none.",
       visibleWhen: showsSpellWindow
     },
     {
@@ -429,7 +429,7 @@ function choiceBlockFields(): readonly FieldDef[] {
       kind: "number",
       min: 0,
       max: 9,
-      help: "Set both to the same number for “exactly a level 6 spell”.",
+      help: 'Set both to the same number for "exactly a level 6 spell".',
       visibleWhen: showsSpellWindow
     },
     /** Maximum score an ability-score pick from this block may reach (epic boons). Distinct from the
@@ -467,7 +467,7 @@ function choiceBlockFields(): readonly FieldDef[] {
       key: "fromPicks",
       label: "Which earlier pick",
       kind: "group",
-      help: "The player picks from answers they already gave. Nothing eligible chosen yet defers the pick rather than showing an empty list.",
+      help: "The player picks from answers they already gave. Until an eligible answer exists, the pick waits.",
       visibleWhen: (block) => Boolean(block.fromPicks),
       rows: [
         {
@@ -592,7 +592,7 @@ export function featureFields(): readonly FieldDef[] {
       write: (next, feature) => writeChoiceBlocks(feature, Array.isArray(next) ? (next as ChoiceBlock[]) : []),
       rowKey: (_row, index) => String(index),
       newRow: () => ({ ...NEW_CHOICE }),
-      rowLabel: (row, index) => `Choice ${index + 1} — ${String((row as { kind?: unknown }).kind ?? "")}`,
+      rowLabel: (row, index) => `Choice ${index + 1} · ${String((row as { kind?: unknown }).kind ?? "")}`,
       rows: blockFields
     },
     extraPicksField(),

@@ -209,7 +209,7 @@ export function isDiceFormula(text: string): boolean {
 export const diceValidate = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
   if (text === "") return null;
-  return isDiceFormula(text) ? null : `“${text}” isn't a dice formula. Try 1d8, 2d6 + 3, or 1d8 + 1d6.`;
+  return isDiceFormula(text) ? null : `"${text}" isn't a dice formula. Try 1d8, 2d6 + 3, or 1d8 + 1d6.`;
 };
 
 /** Multi-term damage as a field factory rather than a kind; used by `actionsField()` in `RiderEditor.tsx`. */

@@ -338,13 +338,13 @@ export function FeatureEditor({
                 }
               >
                 {selfCatalog
-                  ? "Players pick from the records that name this one. They only have to exist in your library — they don't have to be published."
+                  ? "Players pick from the records that name this one. Records in your library count, published or not."
                   : !catalogSlug
                     ? family
                       ? "Pick which one, and this will say how many options players get."
-                      : "This matches no catalog — the choice would be skipped."
+                      : "This matches no catalog, so the choice would be skipped."
                     : catalogResult && "error" in catalogResult
-                      ? `This matches no catalog — the choice would be skipped. (${catalogResult.error})`
+                      ? `This matches no catalog, so the choice would be skipped. (${catalogResult.error})`
                       : `Players will pick from ${catalogResult?.count ?? 0} ${catalogResult?.count === 1 ? "option" : "options"}.`}
               </p>
             </>
@@ -473,7 +473,7 @@ export function FeatureEditor({
                   ? "Granted the moment this subclass is taken. Pick a level to hold it back until then."
                   : `Granted at level ${levels[0]}. Tap it again to grant it with the subclass instead.`
                 : levels.length === 0
-                  ? "On no level row, so the class never grants it — pick at least one level."
+                  ? "On no level row, so the class never grants it. Pick at least one level."
                   : levels.length === 1
                     ? `On the level table at level ${levels[0]}. A class feature is always granted at a level, so add another before clearing this one.`
                     : `On the level table at levels ${levels.join(", ")}.`}

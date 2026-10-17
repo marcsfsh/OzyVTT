@@ -86,12 +86,12 @@ function badGating(draft: Draft, sectionId: string): BlockedReason | null {
       const kinds = when.map((entry) => triggerKindOf((entry as { type?: unknown })?.type));
       const name = modifierLabel(record.type);
       if (kinds.filter((kind) => kind === "moment").length > 1) {
-        found = { text: `Leave “${name}” one “Only when…” line — a modifier fires at one moment, not two.`, sectionId };
+        found = { text: `Leave "${name}" one "Only when…" line. A modifier fires at only one moment.`, sectionId };
         return;
       }
       if (kinds.includes("filter") && !kinds.includes("moment")) {
         found = {
-          text: `Add an “Only when…” line to “${name}” — an “Only for…” line has nothing to narrow on its own.`,
+          text: `Add an "Only when…" line to "${name}". An "Only for…" line has nothing to narrow on its own.`,
           sectionId
         };
         return;
@@ -127,7 +127,7 @@ function ungrantedChoice(draft: Draft): BlockedReason | null {
   for (const entry of featuresOf(draft)) {
     if (draftPicksOf(entry).length === 0 || typeof entry.id !== "string" || granted.has(entry.id)) continue;
     return {
-      text: `Give “${entry.name || "an unnamed feature"}” a level. It asks the player to choose, and a choice granted at no level makes the character impossible to create.`,
+      text: `Give "${entry.name || "an unnamed feature"}" a level. It asks the player to choose, and a choice granted at no level makes the character impossible to create.`,
       sectionId: "features"
     };
   }
@@ -150,7 +150,7 @@ function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): Blo
       const result = ctx.resolveCatalog(slug);
       if ("error" in result) {
         return {
-          text: `Fix the catalog for “${entry.name || "an unnamed feature"}” — it matches nothing, so the choice would be skipped.`,
+          text: `Fix the catalog for "${entry.name || "an unnamed feature"}". It matches nothing, so the choice would be skipped.`,
           sectionId
         };
       }
@@ -186,19 +186,19 @@ const hasDerivedCard = (draft: Draft): boolean => {
 const SHOWN_TO_PLAYERS: Partial<
   Record<HomebrewType, Readonly<{ path: string; text: string; unless?: (draft: Draft) => boolean }>>
 > = {
-  class: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this class from." },
+  class: { path: "summary", text: "Write the one-line summary. It's the whole card a player picks this class from." },
   species: {
     path: "summary",
-    text: "Write the one-line summary — it's the whole card a player picks this species from."
+    text: "Write the one-line summary. It's the whole card a player picks this species from."
   },
   background: {
     path: "summary",
-    text: "Write the one-line summary — it's the whole card a player picks this background from."
+    text: "Write the one-line summary. It's the whole card a player picks this background from."
   },
-  feat: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this feat from." },
+  feat: { path: "summary", text: "Write the one-line summary. It's the whole card a player picks this feat from." },
   equipment: {
     path: "description",
-    text: "Describe this item — with no weapon or armour numbers, the description is the whole card the inventory shows.",
+    text: "Describe this item. With no weapon or armour numbers, the description is the whole card the inventory shows.",
     unless: hasDerivedCard
   }
 };
@@ -217,7 +217,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
 
   const formula = badFormula(draft);
   const formulaBlocker: BlockedReason | null = formula
-    ? { text: `Fix the damage formula “${formula}” — it isn't a dice roll the game can make.`, sectionId: "features" }
+    ? { text: `Fix the damage formula "${formula}". It isn't a dice roll the game can make.`, sectionId: "features" }
     : null;
 
   switch (type) {
@@ -297,7 +297,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         need(draft, "castingTime", "Say how long this spell takes to cast.", "casting"),
         need(draft, "duration", "Give this spell a duration.", "casting"),
         typeof getAt(draft, "damage.roll") === "string" && !isDiceFormula(String(getAt(draft, "damage.roll")))
-          ? { text: `Fix the damage formula “${getAt(draft, "damage.roll")}”.`, sectionId: "effect" }
+          ? { text: `Fix the damage formula "${getAt(draft, "damage.roll")}".`, sectionId: "effect" }
           : null,
         !blank(getAt(draft, "damage.roll")) && blank(getAt(draft, "damage.types"))
           ? { text: "Give this spell a damage type.", sectionId: "effect" }
@@ -311,7 +311,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         blankCard,
         add.length === 0 && basedOn.length === 0
           ? {
-              text: "Add at least one spell to this list — a class using an empty list can't be created.",
+              text: "Add at least one spell to this list. A class using an empty list can't be created.",
               sectionId: "contents"
             }
           : null
@@ -328,7 +328,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         // dice: an attack that rolls nothing.
         weapon && blank(weapon.damageDice)
           ? {
-              text: "Give this weapon its damage, or clear the whole Weapon section — a weapon with no dice rolls nothing.",
+              text: "Give this weapon its damage, or clear the whole Weapon section. A weapon with no dice rolls nothing.",
               sectionId: "weapon",
               path: "weapon.damageDice"
             }
@@ -340,7 +340,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
           typeof weapon.damageDice === "string" &&
           weapon.damageDice.trim() !== "" &&
           !isDiceFormula(weapon.damageDice)
-          ? { text: `Fix the damage formula “${weapon.damageDice}”.`, sectionId: "weapon" }
+          ? { text: `Fix the damage formula "${weapon.damageDice}".`, sectionId: "weapon" }
           : null,
         casts.some((cast) => blank(cast.spellId))
           ? { text: "Choose which spell this item casts, or take the empty row off.", sectionId: "magic" }
@@ -348,14 +348,14 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         // `appliesTo` is both-or-neither: label and bases are required together.
         !blank(getAt(draft, "appliesTo.label")) && blank(getAt(draft, "appliesTo.baseIds"))
           ? {
-              text: "List the bases this item can be, or clear its “applies to” line.",
+              text: 'List the bases this item can be, or clear its "applies to" line.',
               sectionId: "magic",
               path: "appliesTo.baseIds"
             }
           : null,
         blank(getAt(draft, "appliesTo.label")) && !blank(getAt(draft, "appliesTo.baseIds"))
           ? {
-              text: "Give the “applies to” choice its printed wording, or clear the base list.",
+              text: 'Give the "applies to" choice its printed wording, or clear the base list.',
               sectionId: "magic",
               path: "appliesTo.label"
             }
@@ -363,7 +363,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         // Attunement is what springs a curse and the boundary the hiding rule needs.
         draft.cursed === true && getAt(draft, "attunement.required") !== true
           ? {
-              text: "Make this item require attunement — attuning is what springs a curse and what reveals it.",
+              text: "Make this item require attunement. Attuning is what springs a curse and what reveals it.",
               sectionId: "magic"
             }
           : null,
@@ -391,7 +391,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         typeof getAt(draft, "hitPoints.formula") === "string" &&
           String(getAt(draft, "hitPoints.formula")).trim() !== "" &&
           !isDiceFormula(String(getAt(draft, "hitPoints.formula")))
-          ? { text: `Fix the hit-point formula “${getAt(draft, "hitPoints.formula")}”.`, sectionId: "defences" }
+          ? { text: `Fix the hit-point formula "${getAt(draft, "hitPoints.formula")}".`, sectionId: "defences" }
           : null,
         formulaBlocker
       );
@@ -424,7 +424,7 @@ export function issueReason(
   return {
     text: issue.missing
       ? `Fill in ${found.label}.`
-      : `Fix ${found.label} — ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`,
+      : `Fix ${found.label}: ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`,
     sectionId: found.sectionId,
     path: dotted || undefined
   };

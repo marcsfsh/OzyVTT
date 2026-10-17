@@ -112,7 +112,7 @@ export const usesField = (label: string, scope: RiderScope): FieldDef => ({
             label: "Which column",
             placeholder: "rage",
             validate: slugValidate,
-            help: "The column's id on the class's level table — the count is read from it at the character's own level.",
+            help: "The column's id on the class's level table. The count is read from it at the character's own level.",
             visibleWhen: (scope_: Draft) =>
               (scope_.uses as { scaling?: { type?: string } } | undefined)?.scaling?.type === "class-resource"
           }
@@ -142,11 +142,13 @@ export const usesField = (label: string, scope: RiderScope): FieldDef => ({
         opt("turn", "Every turn"),
         opt("own-turn", "At the start of its next turn"),
         opt("encounter", "Every encounter"),
-        opt("short-rest", "On a short rest"),
-        opt("long-rest", "On a long rest")
+        opt("short-rest", "On a Short Rest"),
+        opt("long-rest", "On a Long Rest")
       ],
       // No "day" option: a long rest is this app's day.
-      ...(scope === "item" ? { help: "A long rest is this table's day, so “once per day” is “on a long rest”." } : {})
+      ...(scope === "item"
+        ? { help: 'A Long Rest is the day at this table, so "once per day" means "on a Long Rest".' }
+        : {})
     },
     // Anything naming the same pool shares one counter.
     {
@@ -177,7 +179,7 @@ const toHitFields = (scope: RiderScope): readonly FieldDef[] =>
           allowNegative: true,
           min: -5,
           max: 20,
-          help: "The flat bonus the stat block prints — the +9 in “+9 to hit”."
+          help: 'The flat bonus the stat block prints, such as the +9 in "+9 to hit".'
         }
       ]
     : [
@@ -214,8 +216,8 @@ const ACTION_USES_PER: readonly SelectOption[] = [
   opt("turn", "Every turn"),
   opt("own-turn", "At the start of its next turn"),
   opt("encounter", "Every encounter"),
-  opt("short-rest", "On a short rest"),
-  opt("long-rest", "On a long rest"),
+  opt("short-rest", "On a Short Rest"),
+  opt("long-rest", "On a Long Rest"),
   opt("recharge", "On a die roll")
 ];
 
@@ -270,7 +272,7 @@ const actionUsesField = (): FieldDef => ({
       kind: "number",
       min: 2,
       max: 6,
-      help: "A d6 at the start of its turn: 5 is a printed “Recharge 5–6”. The table sees the die either way.",
+      help: 'A d6 at the start of its turn: 5 is a printed "Recharge 5-6". The table sees the die either way.',
       visibleWhen: (scope_) => (scope_.uses as { per?: string } | undefined)?.per === "recharge"
     },
     {
@@ -278,7 +280,7 @@ const actionUsesField = (): FieldDef => ({
       label: "Shared pool",
       placeholder: "breath-weapon",
       validate: slugValidate,
-      help: "Actions sharing a pool share one counter — and one recharge roll."
+      help: "Actions sharing a pool share one counter and one recharge roll."
     }
   ]
 });
@@ -303,7 +305,7 @@ export const actionsField = (scope: RiderScope): FieldDef => ({
       kind: "select",
       options: [
         opt("action", "An action"),
-        opt("bonus-action", "A bonus action"),
+        opt("bonus-action", "A Bonus Action"),
         opt("reaction", "A reaction"),
         opt("other", "No action")
       ]
@@ -342,7 +344,7 @@ export const actionsField = (scope: RiderScope): FieldDef => ({
           min: 1,
           max: 1000,
           unit: "ft",
-          help: "The 80 in “range 80/320”. Past it, up to the range, the attack rolls at disadvantage."
+          help: 'The 80 in "range 80/320". Past it, up to the range, the attack rolls at Disadvantage.'
         },
         {
           key: "missDamage",
@@ -381,5 +383,5 @@ export const tagsField = (label: string): FieldDef => ({
   key: "tags",
   label,
   kind: "tags",
-  help: "Grouping only — no mechanical effect."
+  help: "Grouping only. It has no mechanical effect."
 });

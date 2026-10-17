@@ -218,7 +218,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         >
           <p className="hb-unavailable-text">
             {load === "unavailable"
-              ? "This table's server doesn't have the homebrew library yet, so there's nothing to show. Nothing you've made has been lost — it just isn't reachable from here."
+              ? "This table's server doesn't have the homebrew library yet, so there's nothing to show. Nothing you've made is lost. It isn't reachable from here."
               : loadMessage}
           </p>
           <Button
@@ -305,8 +305,8 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
             <div className="nh-empty">
               <span className="nh-empty-title">Select a record</span>
               <span className="nh-empty-text">
-                Every record starts as a draft only you can see. Publish it when it&rsquo;s ready, and choose then
-                whether players can browse it.
+                Every record starts as a draft only you can see. Publish it when it's ready, and choose then whether
+                players can browse it.
               </span>
               <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 New homebrew
