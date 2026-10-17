@@ -496,6 +496,21 @@ describe("what the table hears", () => {
     expect(heard).toContain("Knight used Parry - Corin's Longsword misses.");
   });
 
+  it("a prompt is withdrawn once its creature drops, and the held attack finishes without it", async () => {
+    const { store, heard, run } = await table(buildGame(["fighter", "knight"]), [6, 6, 6]);
+    await run("action.resolve", {
+      actorId: IDS.fighter,
+      actionId: "longsword",
+      targetIds: [IDS.knight],
+      attackNatural: 14
+    });
+    expect(store.snapshot.combat.pendingReactions).toHaveLength(1);
+    // Something else drops the Knight before the answer: a creature at 0 HP can't take a reaction.
+    await run("actor.apply-damage", { actorId: IDS.knight, amount: 999 });
+    expect(store.snapshot.combat.pendingReactions).toEqual([]);
+    expect(heard.some((line) => line.startsWith("Knight declined Parry - Corin's Longsword hits"))).toBe(true);
+  });
+
   it("Hellish Rebuke: the GM's applied damage names its source, and the answer forces the save", async () => {
     const { store, heard, run } = await table(buildGame(["brute", "wizard"]), [6, 4]);
     await run("actor.apply-damage", {

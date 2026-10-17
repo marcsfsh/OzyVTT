@@ -498,6 +498,8 @@ export const PendingReactionSchema = z
     rollsAttack: z.boolean().default(false),
     /** attack-would-hit: the attack the answer finishes. */
     parkedAttack: ParkedAttackSchema.nullable().default(null),
+    /** attack-would-hit: the held attack's total, against the reactor's AC before the reaction. */
+    attackTotal: z.number().int().min(-100).max(1000).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

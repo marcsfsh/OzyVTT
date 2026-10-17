@@ -224,7 +224,8 @@ describe("player view pending prompts", () => {
         "acBonus",
         "rollsAttack",
         "createdAt",
-        "sourceName"
+        "sourceName",
+        "lastsUntilNextTurn"
       ].sort()
     );
     expect(Object.keys(combat.pendingRuleAsks[0]).sort()).toEqual(
