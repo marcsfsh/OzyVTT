@@ -97,6 +97,9 @@ mouse is a bug.
 - Draggable or zoomable surfaces use Pointer Events with `setPointerCapture` and set
   `touch-action: none`. On the encounter map a second finger aborts the gesture in progress and
   commits nothing.
+- Every element with `touch-action: none` takes its ref from `useDragSurface` (`@vtt/ui`), which
+  cancels its touchmove. Without it, a drag that lifts mid-motion starts a browser fling, and the
+  browser spends the next tap on stopping it. `drag-surfaces.test.tsx` fails on a surface without it.
 - A focused input inside a locked region must stay visible above the on-screen keyboard.
 - `prefers-reduced-motion` freezes animations; reduced transparency replaces blur with a solid
   surface.

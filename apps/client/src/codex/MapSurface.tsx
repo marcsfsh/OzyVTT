@@ -1,4 +1,4 @@
-import { Skeleton } from "@vtt/ui";
+import { Skeleton, useDragSurface } from "@vtt/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clampPoint, imagePointFromClient, useAuthorizedMapImage } from "../scene/mapImage";
 import { iconChildren, pinSwatchVar } from "./icons";
@@ -71,6 +71,7 @@ export function MapSurface({
 }: MapSurfaceProps) {
   const image = useAuthorizedMapImage(assetId, token);
   const svgRef = useRef<SVGSVGElement>(null);
+  const surface = useDragSurface<HTMLDivElement>();
   const gesture = useRef<Gesture>({ mode: "idle" });
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const [camera, setCamera] = useState<Camera | null>(null);
@@ -226,7 +227,7 @@ export function MapSurface({
   const glyphSize = Math.min(Math.max(Math.min(width, height) * 0.045, 26), 120);
 
   return (
-    <div className={`codex-mapsurface${placing ? " is-placing" : ""}`}>
+    <div ref={surface} className={`codex-mapsurface${placing ? " is-placing" : ""}`}>
       <svg
         ref={svgRef}
         className="codex-map-svg"

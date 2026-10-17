@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent
 } from "react";
-import { Button, Skeleton } from "@vtt/ui";
+import { Button, Skeleton, useDragSurface } from "@vtt/ui";
 import { iconChildren } from "./icons";
 import { entityColor, entityIconId, ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import type { CodexConnection, PlayerCodexConnection } from "@vtt/domain";
@@ -194,6 +194,7 @@ export function ConnectionGraph({
     },
     []
   );
+  const svgSurface = useDragSurface(attachSvg);
   const [hover, setHover] = useState<string | null>(null);
   /** The node a jump landed on; unlike `hover`, it survives the pointer leaving. */
   const [pinned, setPinned] = useState<string | null>(null);
@@ -487,7 +488,7 @@ export function ConnectionGraph({
         </div>
       </div>
       <svg
-        ref={attachSvg}
+        ref={svgSurface}
         className="codex-graph-svg"
         viewBox={`${VB.minX} ${VB.minY} ${VB.w} ${VB.h}`}
         preserveAspectRatio="xMidYMid meet"

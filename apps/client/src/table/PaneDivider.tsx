@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { IconGrip } from "@vtt/ui";
+import { IconGrip, useDragSurface } from "@vtt/ui";
 import "./pane-divider.css";
 
 /** The map pane's share of the table's height on a phone: never less than a fifth, never more than four fifths. */
@@ -78,6 +78,7 @@ export function PaneDivider({
   container: () => HTMLElement | null;
 }>) {
   const drag = useRef<{ top: number; height: number } | null>(null);
+  const surface = useDragSurface<HTMLDivElement>();
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     const box = container()?.getBoundingClientRect();
     if (!box || box.height <= 0) return;
@@ -111,6 +112,7 @@ export function PaneDivider({
   };
   return (
     <div
+      ref={surface}
       className="pane-divider"
       role="separator"
       aria-orientation="horizontal"

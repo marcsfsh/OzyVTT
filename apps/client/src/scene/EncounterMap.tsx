@@ -13,7 +13,7 @@ import type {
   SceneVision,
   VisionPreviewReply
 } from "@vtt/domain";
-import { Button, useToastMute } from "@vtt/ui";
+import { Button, useDragSurface, useToastMute } from "@vtt/ui";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { read } from "../lib/command";
 import { useTargeting } from "../encounter/targeting";
@@ -177,6 +177,7 @@ export function EncounterMap({
   }, [sessionColor]);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const stageSurface = useDragSurface(stageRef);
   const trayRef = useRef<HTMLDivElement | null>(null);
   const actorsById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
   const tokensById = useMemo(
@@ -583,7 +584,7 @@ export function EncounterMap({
               placeAtCenter={commands.placeAtCenter}
             />
           )}
-          <div className="encounter-map-stage" ref={stageRef} aria-busy={image.status !== "ready"}>
+          <div className="encounter-map-stage" ref={stageSurface} aria-busy={image.status !== "ready"}>
             {image.status === "ready" && size ? (
               <>
                 <svg
