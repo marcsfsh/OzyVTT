@@ -23,14 +23,25 @@ interface StepsProps {
   maxSelectable?: number;
   /** Accessible name for the flow — used by the compact indicator's progress bar. */
   ariaLabel?: string;
+  /** The full form's direction above 760px: a horizontal rail (default) or a vertical list for a column beside the
+      step body. */
+  orientation?: "horizontal" | "vertical";
   className?: string;
 }
 
 /** Progress indicator for multi-step flows. Two forms swapped by media query (no JS breakpoint):
       - ≤760px: "Step 3 of 7" + the step name + a progress bar.
-      - >760px: the full horizontal rail, scrolling sideways rather than wrapping.
+      - >760px: the full rail, scrolling sideways rather than wrapping, or a vertical list (`orientation`).
     Only one form is displayed, so `display:none` keeps the other out of the accessibility tree. */
-export function Steps({ steps, current, onStepSelect, maxSelectable, ariaLabel = "Progress", className }: StepsProps) {
+export function Steps({
+  steps,
+  current,
+  onStepSelect,
+  maxSelectable,
+  ariaLabel = "Progress",
+  orientation = "horizontal",
+  className
+}: StepsProps) {
   const total = Math.max(steps.length, 1);
   const index = Math.min(Math.max(current, 0), total - 1);
   const active = steps[index];
@@ -59,7 +70,7 @@ export function Steps({ steps, current, onStepSelect, maxSelectable, ariaLabel =
         </div>
       </div>
 
-      <ol className="nh-steps" aria-label={ariaLabel}>
+      <ol className={cx("nh-steps", orientation === "vertical" && "nh-steps--vertical")} aria-label={ariaLabel}>
         {steps.map((step, i) => {
           // Precedence: the current step, then the flow's declared state, then position.
           const state = i === index ? "current" : (step.state ?? (i < index ? "done" : "upcoming"));
