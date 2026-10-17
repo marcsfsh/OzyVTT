@@ -87,7 +87,8 @@ export const FeatureUsesSchema = z
         z.object({ type: z.literal("class-resource"), id: ContentIdSchema }).strict()
       ])
       .optional(),
-    per: z.enum(["turn", "encounter", "short-rest", "long-rest"]),
+    /** "own-turn": back at the start of the bearer's next turn ("until the start of your next turn"). */
+    per: z.enum(["turn", "own-turn", "encounter", "short-rest", "long-rest"]),
     pool: ContentIdSchema.optional()
   })
   .strict()

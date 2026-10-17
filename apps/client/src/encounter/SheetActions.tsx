@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import type { ActorDefinition, ContentActionSummary, GmActor, PlayerActor } from "@vtt/domain";
 import { abilityModifier as modifierOf, weaponAbilityModifierFrom } from "@vtt/rules-5e";
 import { useRollPreference } from "../dice/roll-preference";
+import { usesScopeLabel } from "./action-summary";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { RichText } from "./RichText";
 import { ordinal, signed } from "./format";
@@ -277,7 +278,7 @@ export function SheetActions({
                             · {left !== null ? `${left} of ` : ""}
                             {row.usesLimit} {row.usesLimit === 1 ? "charge" : "charges"}
                             {left !== null ? " left" : ""}
-                            {row.usesPer ? ` per ${row.usesPer.replace(/-/g, " ")}` : ""}
+                            {row.usesPer ? ` per ${usesScopeLabel(row.usesPer)}` : ""}
                           </span>
                         )}
                       </p>

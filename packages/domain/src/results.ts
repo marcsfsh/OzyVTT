@@ -265,7 +265,7 @@ export const ActionAvailabilitySchema = z.strictObject({
   saveDc: z.number().int().nullable(),
   damage: z.array(z.strictObject({ formula: z.string(), type: z.string() })),
   usesLimit: z.number().int().nullable(),
-  usesPer: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
+  usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
   usesPool: z.string().nullable(),
   requiresEffectTag: z.string().nullable(),
   multiattack: z

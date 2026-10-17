@@ -1055,12 +1055,13 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   armorClassBonus: z.number().int().min(1).max(10).optional()
 }).strict();
 
-/** Limited uses. "turn"/"encounter"/rests reset as named; "recharge" on a start-of-turn d6 >= `recharge`.
+/** Limited uses. "turn"/"encounter"/rests reset as named; "own-turn" at the start of the bearer's next turn ("you
+ * can't use it again until the start of your next turn"); "recharge" on a start-of-turn d6 >= `recharge`.
  * `pool` shares one counter across actions (Sneak Attack once per turn regardless of weapon). */
 export const ActionUsesSchema = z
   .object({
     limit: z.number().int().min(1).max(20),
-    per: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]),
+    per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
     pool: z
       .string()
       .regex(/^[a-z0-9-]+$/)

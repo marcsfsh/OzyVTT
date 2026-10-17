@@ -503,6 +503,25 @@ describe("Barbarian: Reckless Attack is an effect the table can see and swing un
   });
 });
 
+describe("Boon of Combat Prowess: Peerless Aim until the start of the bearer's next turn", () => {
+  it("stays spent through the other creatures' turns and comes back with its own", () => {
+    const built = onTheTable(build(barbarianInput()));
+    const turnDeps = {
+      resolveDefinition: (id: string) => (id === built.hero.definitionId ? built.definition : undefined),
+      catalog,
+      rollDie: () => 1
+    };
+    use(built, "boon-of-combat-prowess");
+    nextInitiativeTurn(built.state, [], turnDeps); // the foe's turn: a missed opportunity attack can't use it
+    expect(() => use(built, "boon-of-combat-prowess")).toThrowError(
+      /no uses remaining \(spent - back at the start of its next turn\)/
+    );
+    nextInitiativeTurn(built.state, [], turnDeps); // Ozar's own turn again
+    use(built, "boon-of-combat-prowess");
+    expect(built.hero.actionUses["boon-of-combat-prowess"]).toBe(1);
+  });
+});
+
 describe("Barbarian: Rage Damage on attacks using Strength", () => {
   it("prints the column's number on the Rage action and grants it as the damage bonus", () => {
     const rageOf = (level: number) => build(barbarianInput(level)).actions.find((action) => action.id === "rage")!;

@@ -64,7 +64,9 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
     if (spent >= action.usesLimit)
       return action.usesPer === "recharge"
         ? `Spent - recharges on ${action.usesRecharge}+ at its turn start`
-        : "No uses left";
+        : action.usesPer === "own-turn"
+          ? "Spent - back at its next turn"
+          : "No uses left";
   }
   const myTurn = state.combat.turnActorId === actor.id;
   if (!myTurn) return null;

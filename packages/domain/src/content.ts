@@ -481,7 +481,7 @@ export type ContentActionSummary = Readonly<{
   area: ContentActionArea | null;
   attackCount: number | null;
   usesLimit: number | null;
-  usesPer: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
+  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
   /** d6 threshold for usesPer "recharge" ("Recharge 5-6" → 5); rolled automatically at the start of the owner's turn. */ usesRecharge:
     number | null;
   usesPool: string | null;

@@ -423,7 +423,7 @@
       },
       "uses": {
         "limit": 1,
-        "per": "turn"
+        "per": "own-turn"
       }
     }
   },

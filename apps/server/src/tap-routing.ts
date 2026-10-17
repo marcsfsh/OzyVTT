@@ -55,7 +55,8 @@ export function looseRollPlan(
 }
 
 /** What a loose use spends: an item's charges or a feature's per-rest uses count outside a fight as in one, and so
- *  does a spell slot an item cast consumes. Per-turn and per-encounter limits have no fight to count against.
+ *  does a spell slot an item cast consumes. Per-turn, until-its-next-turn and per-encounter limits have no fight to
+ *  count against.
  *  Mutates the actor, refusing before anything is spent when nothing remains. A missing spell slot is refused only
  *  while the table polices slots (`slots`); advised, it is a GM note, and nothing is spent. */
 export function spendLooseUses(
@@ -66,7 +67,10 @@ export function spendLooseUses(
   slots: RuleMode = "strict",
   definition?: ActorDefinition
 ): Readonly<{ usesLeft: number | null; spent: boolean; warning?: string }> {
-  const uses = action.uses && action.uses.per !== "turn" && action.uses.per !== "encounter" ? action.uses : null;
+  const uses =
+    action.uses && action.uses.per !== "turn" && action.uses.per !== "own-turn" && action.uses.per !== "encounter"
+      ? action.uses
+      : null;
   const key = uses ? (uses.pool ?? action.id) : null;
   const limit = uses ? useLimitFor(siblings, action) : 0;
   const used = key ? (actor.actionUses[key] ?? 0) : 0;

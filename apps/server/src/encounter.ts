@@ -38,7 +38,8 @@ const EMPTY_TURN = {
   movementUsedFeet: 0
 } as const;
 
-/** A fresh fight refreshes per-encounter pools (Frenzy) and recharge pools (a dragon's breath starts ready); long-rest pools persist. */
+/** A fresh fight refreshes per-encounter pools (Frenzy), recharge pools (a dragon's breath starts ready) and uses that
+ *  come back with the bearer's turn (Peerless Aim); long-rest pools persist. */
 function clearPerEncounterUses(
   state: GameState,
   combatantIds: ReadonlySet<string>,
@@ -50,7 +51,8 @@ function clearPerEncounterUses(
     const definition = resolveDefinition(actor.definitionId);
     if (!definition) continue;
     for (const action of effectiveActions(definition, actor, catalog)) {
-      if (action.uses?.per !== "encounter" && action.uses?.per !== "recharge") continue;
+      if (action.uses?.per !== "encounter" && action.uses?.per !== "recharge" && action.uses?.per !== "own-turn")
+        continue;
       const key = action.uses.pool ?? action.id;
       if (actor.actionUses[key] !== undefined) {
         const { [key]: _cleared, ...rest } = actor.actionUses;
@@ -508,6 +510,22 @@ function rollRecharges(state: GameState, actorId: string, deps: TurnAdvanceDeps,
   }
 }
 
+/** "You can't use it again until the start of your next turn" (Peerless Aim): such a use comes back as the bearer's
+ *  turn starts. */
+function refreshOwnTurnUses(state: GameState, actorId: string, deps: TurnAdvanceDeps) {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId) return;
+  const definition = deps.resolveDefinition(actor.definitionId);
+  if (!definition) return;
+  for (const action of effectiveActions(definition, actor, deps.catalog)) {
+    if (action.uses?.per !== "own-turn") continue;
+    const key = action.uses.pool ?? action.id;
+    if (actor.actionUses[key] === undefined) continue;
+    const { [key]: _spent, ...rest } = actor.actionUses;
+    actor.actionUses = rest;
+  }
+}
+
 /** A creature's legendary pool refills at the start of its turn, and so do the actions it couldn't take again until
  *  then (marked `<actorId>:<actionId>`). */
 function legendaryRefilled(used: GameState["combat"]["legendaryUsed"], actorId: string) {
@@ -554,6 +572,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   startOfTurn(state, nextActorId, starting, deps);
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
+  refreshOwnTurnUses(state, nextActorId, deps);
 }
 
 export function previousInitiativeTurn(state: GameState) {

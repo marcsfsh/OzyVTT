@@ -43,7 +43,7 @@ export type EconomyPlan = Readonly<{
   /** The same for a compound bonus action (Flurry of Blows). */
   bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
   /** Limited-use spend to record, keyed per scope. */
-  spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
+  spendUse: Readonly<{ key: string; per: NonNullable<DefinitionAction["uses"]>["per"] }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions), and the mark of one it
    *  can't take again until its next turn. */
   spendLegendary: Readonly<{ cost: number; onceKey?: string }> | null;
@@ -470,7 +470,9 @@ export function noUsesRemaining(action: DefinitionAction, limit: number): string
   return `${action.name}: no uses remaining (${
     uses.per === "recharge"
       ? `spent - recharges on ${uses.recharge}+ at the start of its turn`
-      : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
+      : uses.per === "own-turn"
+        ? `spent - back at the start of its next turn`
+        : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
   }).`;
 }
 
