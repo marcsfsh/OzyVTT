@@ -50,6 +50,7 @@ import type {
   ActorImportDefinitionSchema,
   ActorRechooseSchema,
   ActorRemoveSchema,
+  CharacterForceReleaseSchema,
   ActorRestSchema,
   ActorReviveSchema,
   ActorSetSpeedSchema,
@@ -166,6 +167,8 @@ export type TableEvent = Readonly<{
   actorIds: readonly string[];
   at: number;
 }>;
+/** Which character the GM released, told to the player who had it so the picker can say why it is back. */
+export type ClaimReleasedEvent = Readonly<{ actorId: string; name: string }>;
 /** The codex changed. Revision only, so each recipient refetches its own projection without learning what changed. */
 export type CodexChangedEvent = Readonly<{ codexRevision: number }>;
 /** The homebrew library changed. Revision only: a payload would hand players GM-only drafts. */
@@ -181,6 +184,8 @@ export interface ServerToClientEvents {
   "sound:changed": (view: SoundBoardView) => void;
   /** This socket's session was revoked or ran out. The server disconnects it right after; the client signs in again. */
   "session:ended": () => void;
+  /** The GM let go of this player's character. Sent only to that player's own devices. */
+  "claim:released": (event: ClaimReleasedEvent) => void;
 }
 export type SessionJoinResult = {
   ok: boolean;
@@ -213,7 +218,7 @@ export interface ClientToServerEvents {
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:force-release": (
-    payload: CommandPayload<typeof ActorRemoveSchema>,
+    payload: CommandPayload<typeof CharacterForceReleaseSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "content:monsters": (

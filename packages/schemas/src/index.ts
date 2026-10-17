@@ -1008,6 +1008,11 @@ export const ActorSchema = z.object({
   healthDisplay: HealthDisplaySchema.optional(),
   /** Epoch ms when this actor last entered a fight; powers the scene-setup "Recent" list. GM-only, stripped from the player projection. */
   lastUsedAt: z.number().int().nonnegative().optional(),
+  /** Epoch ms when a player first claimed this character. With `lastUsedAt` it says whether a character was ever
+   *  played; one never played can be deleted straight from the roster. GM-only. */
+  firstClaimedAt: z.number().int().nonnegative().optional(),
+  /** One of the sample party a fresh table starts with. The roster labels it and can remove the set. GM-only. */
+  sample: z.literal(true).optional(),
   /** Live spell-slot pools by level, restored by rests; null = not a modeled spellcaster. Owner-only in projections. */
   spellSlots: z.array(SpellSlotSchema).max(9).nullable().default(null),
   /** Warlock Pact Magic pool (one level, uniform slots); null = none. Owner-only in projections. */

@@ -48,7 +48,9 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     effects: PlayerEffect[];
     claimStatus: "available" | "mine" | "claimed";
     presence: PresenceStatus | null;
-    /** "Fighter 5 / Rogue 2", derived server-side; only on another player's claimed character. */ classLine?: string;
+    /** "Fighter 5 / Rogue 2", derived server-side; on another player's claimed character (the party tier decides),
+     *  and on an unclaimed character for the claim picker. */ classLine?: string;
+    /** "Dwarf", for the claim picker; only on an unclaimed character, which any player could claim and read in full. */ species?: string;
     /** The imported sheet. Your own claimed character always; another player's only at `partyVisibility` `full-sheet` or `sheet-and-resources`. */ definition?: ActorDefinition;
     /** Spent limited-use counts. Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ actionUses?: Record<
       string,

@@ -1,7 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 
-export function claimCharacter(state: GameState, actorId: string, sessionId: string) {
+export function claimCharacter(state: GameState, actorId: string, sessionId: string, now = Date.now()) {
   const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character");
   if (!actor) throw new CommandRejectedError("Character is unavailable.");
   // Archived characters can't be claimed by replaying a known actorId. Same wording as not-found so the
@@ -14,6 +14,7 @@ export function claimCharacter(state: GameState, actorId: string, sessionId: str
   if (state.actors.some((item) => item.ownerSessionId === sessionId && item.id !== actorId))
     throw new CommandRejectedError("Release your current character before claiming another one.");
   actor.ownerSessionId = sessionId;
+  actor.firstClaimedAt ??= now;
 }
 
 export function releaseCharactersForSession(state: GameState, sessionId: string) {
@@ -22,10 +23,26 @@ export function releaseCharactersForSession(state: GameState, sessionId: string)
   });
 }
 
-/** GM-only, gated by the command: a reducer that trusts its caller. */
-export function forceReleaseCharacter(state: GameState, actorId: string) {
+/**
+ * GM-only, gated by the command: a reducer that trusts its caller. A character in the running fight is released only
+ * on the GM's second yes (`inFight`), because the player loses their turn controls mid-fight. Returns the session
+ * that held it, so that player can be told.
+ */
+export function forceReleaseCharacter(
+  state: GameState,
+  actorId: string,
+  options: Readonly<{ inFight?: boolean }> = {}
+) {
   const actor = state.actors.find((item) => item.id === actorId && item.kind === "player-character");
   if (!actor) throw new CommandRejectedError("Character is unavailable.");
   if (!actor.ownerSessionId) throw new CommandRejectedError("That character is not currently claimed.");
+  const fighting = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId);
+  if (fighting && !options.inFight)
+    throw new CommandRejectedError(
+      `${actor.name} is in the fight. Releasing ${actor.name} takes the player's turn controls away until someone claims ${actor.name} again.`,
+      "in_fight"
+    );
+  const sessionId = actor.ownerSessionId;
   actor.ownerSessionId = null;
+  return { sessionId, name: actor.name };
 }

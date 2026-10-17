@@ -3,6 +3,7 @@ import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } fr
 import { setCharacterIdentity, setCharacterProficiencies } from "../character-edit.js";
 import {
   ActorRemoveSchema,
+  CharacterForceReleaseSchema,
   CharacterGiveItemSchema,
   CharacterRecoverAmmunitionSchema,
   CharacterSetCurrencySchema,
@@ -56,13 +57,20 @@ export const characterSheetCommands = [
   defineCommand({
     type: "character.force-release",
     operationId: "forceReleaseCharacter",
-    description: "Force-releases a claimed character (GM-grade only) - the recovery path for a lost player device.",
+    description:
+      "Force-releases a claimed character (GM-grade only) - the recovery path for a lost player device. A character in the running fight is refused with code `in_fight` (409) unless the request carries `inFight: true`. The player who held it is told on their own devices.",
     summary: "Force-release a claimed character (GM).",
-    schema: ActorRemoveSchema,
+    schema: CharacterForceReleaseSchema,
     malformed: "The force-release command is malformed.",
     gmOnly: "Only the GM can force-release a character.",
-    async run({ request, execute }) {
-      await execute((state) => forceReleaseCharacter(state, request.actorId));
+    async run({ request, execute }, kit) {
+      let released: ReturnType<typeof forceReleaseCharacter> | null = null;
+      const { duplicate } = await execute((state) => {
+        released = forceReleaseCharacter(state, request.actorId, { inFight: request.inFight === true });
+      });
+      const held = released as ReturnType<typeof forceReleaseCharacter> | null;
+      if (!duplicate && held)
+        kit.context.claimReleased?.(held.sessionId, { actorId: request.actorId, name: held.name });
     }
   }),
 

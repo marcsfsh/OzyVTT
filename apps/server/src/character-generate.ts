@@ -40,6 +40,12 @@ export type GenerateCharacterInput = Readonly<{
   classes?: ReadonlyArray<Readonly<{ classId: string; level: number }>>;
   /** A name to use verbatim; omitted draws one from the species' own name bundle. */
   name?: string;
+  /** The server's own fixed builds (the sample party) pin these, which a caller's request cannot. */
+  speciesId?: string;
+  backgroundId?: string;
+  subclassId?: string;
+  /** Option ids taken first wherever an offer or a spell list has them: the sample party's signature picks. */
+  favour?: ReadonlySet<string>;
 }>;
 
 /** One hit-point die thrown for a level, at its class's die size. */
@@ -407,7 +413,17 @@ function answerOffer(
     preferred = legal.filter((id) => carried.has(id));
   }
 
-  let drawn = drawPreferring(preferred, candidates, outstanding, random);
+  // The caller's favourites go first, in the order the offer lists them; the draw fills whatever is left.
+  const favoured = input.favour ? preferred.filter((id) => input.favour!.has(id)).slice(0, outstanding) : [];
+  let drawn = [
+    ...favoured,
+    ...drawPreferring(
+      preferred.filter((id) => !favoured.includes(id)),
+      candidates.filter((id) => !favoured.includes(id)),
+      outstanding - favoured.length,
+      random
+    )
+  ];
   if (!fitsLevelGates(offer, survey, drawn)) drawn = drawWithinLevelGates(offer, survey, preferred, candidates, random);
   const rows = drawn.map((id, at) => rowFor(offer, id, offer.taken.length + at));
   // A feat-kinded offer with no legal feat still owes its pick, and "asi" always fits.
@@ -460,7 +476,8 @@ type SpellOption = Readonly<{ id: string; name: string; level?: number }>;
 function fillSpellBudgets(
   survey: ServerOfferSurvey,
   choices: readonly CharacterChoice[],
-  random: DiceRandom
+  random: DiceRandom,
+  favour?: ReadonlySet<string>
 ): CharacterChoice[] {
   const claimed = new Set(choices.filter((row) => row.kind === "spell" || row.kind === "cantrip").map((row) => row.id));
   const rows: CharacterChoice[] = [];
@@ -477,11 +494,16 @@ function fillSpellBudgets(
     const top = (kind: "cantrip" | "spell", cap: number, eligible: readonly SpellOption[]) => {
       const missing = cap - untagged(kind);
       if (missing <= 0) return;
-      for (const option of drawSome(
-        eligible.filter((spell) => !claimed.has(spell.id)),
-        missing,
-        random
-      )) {
+      const open = eligible.filter((spell) => !claimed.has(spell.id));
+      const favoured = favour ? open.filter((spell) => favour.has(spell.id)).slice(0, missing) : [];
+      for (const option of [
+        ...favoured,
+        ...drawSome(
+          open.filter((spell) => !favoured.includes(spell)),
+          missing - favoured.length,
+          random
+        )
+      ]) {
         claimed.add(option.id);
         rows.push({ level: budget.takenAt, classId: budget.classId, kind, id: option.id });
       }
@@ -547,10 +569,12 @@ export function generateCharacterRequest(
   const classRecord = records[0];
   const classId = classRecord.id;
   const sequence = plan.flatMap((entry) => Array.from({ length: entry.level }, () => entry.classId));
-  const speciesId = drawOne(sortedIds(library.speciesSummaries().map((entry) => entry.id)), random);
-  const species = library.speciesRecord(speciesId)!;
-  const backgroundId = drawOne(sortedIds(library.backgroundSummaries().map((entry) => entry.id)), random);
-  const background = library.backgroundRecord(backgroundId)!;
+  const speciesId = input.speciesId ?? drawOne(sortedIds(library.speciesSummaries().map((entry) => entry.id)), random);
+  const species = library.speciesRecord(speciesId) ?? reject(`No species "${speciesId}" is in the content catalog.`);
+  const backgroundId =
+    input.backgroundId ?? drawOne(sortedIds(library.backgroundSummaries().map((entry) => entry.id)), random);
+  const background =
+    library.backgroundRecord(backgroundId) ?? reject(`No background "${backgroundId}" is in the content catalog.`);
 
   /** A subclass drawn for a class that has reached its subclass level. */
   const drawSubclass = (record: ClassReference, level: number): string | undefined => {
@@ -567,7 +591,10 @@ export function generateCharacterRequest(
       );
     return drawOne(available, random);
   };
-  const subclassId = drawSubclass(classRecord, plan[0].level);
+  const subclassId =
+    input.subclassId && plan[0].level >= classRecord.subclassLevel
+      ? input.subclassId
+      : drawSubclass(classRecord, plan[0].level);
   // A later class names its subclass in a ledger row at the character level it reached its subclass level, as the
   // wizard writes it.
   const laterSubclassRows: CharacterChoice[] = records.slice(1).flatMap((record, index) => {
@@ -654,7 +681,7 @@ export function generateCharacterRequest(
   for (let pass = 0; pass < MAX_PASSES; pass += 1) {
     const survey = computeServerOffers({ ...identity, choices }, library, policy);
     // Fill spell budgets first: they only grow, and `fromPicks` offers need known spells present.
-    const spells = fillSpellBudgets(survey, choices, random);
+    const spells = fillSpellBudgets(survey, choices, random, input.favour);
     if (spells.length > 0) {
       choices.push(...spells);
       continue;

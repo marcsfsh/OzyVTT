@@ -471,6 +471,11 @@ export function createServer(options: CreateServerOptions) {
     // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
     archiveDocument: (id) => store.getEncounterArchive(id),
     sound,
+    claimReleased: (sessionId, event) => {
+      for (const socket of io.sockets.sockets.values())
+        if (auth.verifyPlayer(socket.handshake.auth?.token)?.sessionId === sessionId)
+          socket.emit("claim:released", event);
+    },
     onEncounterArchived: ({ sceneId, turnCount }) => {
       // Log the fight to the codex timeline, pinned to the location marker that links this scene, if any.
       try {

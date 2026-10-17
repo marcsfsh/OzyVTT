@@ -1,6 +1,7 @@
 import type {
   ActionResolution,
   ActionTableNarration,
+  ClaimReleasedEvent,
   CombatLogEntry,
   GameState,
   GmView,
@@ -123,6 +124,8 @@ export type CommandContext = Readonly<{
   archiveDocument?: (id: number) => string | null;
   /** The sound board, kept in its own store (ADR-0024); without it the sound commands refuse. */
   sound?: SoundPort;
+  /** Tells the player whose character the GM released, on that player's devices alone. */
+  claimReleased?: (sessionId: string, event: ClaimReleasedEvent) => void;
 }>;
 
 /** What the sound commands need from the sound board service (`sound-service.ts`). */
