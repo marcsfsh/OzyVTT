@@ -24,6 +24,8 @@ export type EffectNarration = Readonly<{
 
 const MAX_EFFECTS = 20;
 
+/** Mage Armor: AC 13 + Dexterity while the creature wears no armor; donning armor ends it. */
+export const MAGE_ARMOR_TAG = "mage-armor";
 /** The bearer can't take an action or a Bonus Action while this lasts (SRD Stinking Cloud's poisoning). */
 export const NO_ACTIONS_TAG = "no-actions";
 /** On an escapable effect: the escape is a Strength (Athletics) check alone (a spell's restraint: Web, Entangle). */

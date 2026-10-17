@@ -15,6 +15,7 @@ import {
   CommandIdentitySchema
 } from "@vtt/domain/commands";
 import { recoverAmmunition } from "../ammunition.js";
+import type { EffectNarration } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
 import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
 import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
@@ -141,14 +142,17 @@ export const characterSheetCommands = [
     malformed: "The inventory command is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, item } = request;
-      await execute((state) => {
+      let ended: EffectNarration[] = [];
+      const { duplicate } = await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
-        setInventoryItem(state, actorId, item, (definitionId) => kit.resolveDefinitionIn(state, definitionId), {
+        // Donning armor ends Mage Armor, which the table is told.
+        ended = setInventoryItem(state, actorId, item, (definitionId) => kit.resolveDefinitionIn(state, definitionId), {
           catalog: kit.equipmentCatalog(),
           role: initiatorOf(principal).role,
           pickableSpell: (spellId) => kit.catalogFor(principal).spellRecord(spellId)
         });
       });
+      if (!duplicate) kit.publishNarrations(ended);
     }
   }),
 

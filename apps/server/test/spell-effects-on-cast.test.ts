@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { armorClassInPlay, type GameState } from "@vtt/domain";
-import type { ActorAction } from "@vtt/schemas";
+import { InventoryItemSchema, type ActorAction } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { endEffect } from "../src/effects.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
+import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 import { currentSpeedFeet } from "../src/speed.js";
 import {
@@ -332,6 +333,27 @@ describe("Mage Armor", () => {
     const cast = resolve("spell-mage-armor", { targetIds: [FOE] });
     expect(cast.warnings?.join(" ")).toMatch(/Goblin is wearing armor, so Mage Armor does nothing/);
     expect(goblin.effects).toEqual([]);
+  });
+
+  it("ends when the creature dons armor, and not for a Shield", () => {
+    const { state, resolve } = fight(wizard);
+    resolve("spell-mage-armor", { targetIds: [HERO] });
+    const resolveDefinition = definitions(state);
+    const shield = { id: "shield", name: "Shield", quantity: 1, equipped: true, attuned: false, category: "shield" };
+    setInventoryItem(state, HERO, InventoryItemSchema.parse(shield), resolveDefinition, { catalog });
+    expect(actorOf(state, HERO).effects.map((effect) => effect.name)).toEqual(["Mage Armor"]);
+    const leather = { id: "leather-armor", name: "Leather Armor", quantity: 1, equipped: true, attuned: false };
+    const ended = setInventoryItem(
+      state,
+      HERO,
+      InventoryItemSchema.parse({ ...leather, category: "armor" }),
+      resolveDefinition,
+      {
+        catalog
+      }
+    );
+    expect(ended.map((event) => event.text)).toContain("Mage Armor ended on Ansel.");
+    expect(actorOf(state, HERO).effects).toEqual([]);
   });
 });
 
