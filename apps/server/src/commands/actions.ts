@@ -148,11 +148,12 @@ export const actionCommands = [
         } else {
           resolvedTargetIds = targetIds ?? [];
           // A player may target only public combatants they can see: resolving against a hidden actor would leak
-          // its name/AC/outcome through the ack (and in direct mode damage it).
-          if (isPlayer) {
+          // its name/AC/outcome through the ack (and in direct mode damage it). The refusal is the one a missing
+          // creature gets, at the same point, so it says nothing of what is hidden.
+          if (isPlayer && draft.combat.active && draft.combat.initiative.some((entry) => entry.actorId === actorId)) {
             const unseen = hiddenFromPlayer(draft);
             if (resolvedTargetIds.some((targetId) => unseen.has(targetId)))
-              throw new CommandRejectedError("You can only target combatants you can see.");
+              throw new CommandRejectedError("Every target must be in this encounter.");
           }
         }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.

@@ -282,13 +282,19 @@ describe("dynamic vision end to end", () => {
     expect(received.filter(mentionsGoblin)).toEqual([]);
     expect(mentionsGoblin(server.viewerPresentation.snapshot)).toBe(false);
     expect(JSON.stringify(server.viewerPresentation.snapshot)).toContain(ORC);
-    // Nor can the player aim at it by id.
+    // Nor can the player aim at it by id, and the refusal reads as it would for a creature that isn't there.
     const attack = await emit(player, "action:resolve", {
       actorId: HERO,
       actionId: "unarmed-strike",
       targetIds: [GOBLIN]
     });
-    expect(attack).toMatchObject({ ok: false, message: "You can only target combatants you can see." });
+    const missing = await emit(player, "action:resolve", {
+      actorId: HERO,
+      actionId: "unarmed-strike",
+      targetIds: ["10000000-0000-4000-8000-00000000ffff"]
+    });
+    expect(attack).toMatchObject({ ok: false, message: "Every target must be in this encounter." });
+    expect(missing).toEqual(attack);
 
     // The fight ends and the GM shares it: the replay keeps the goblin hidden in every turn.
     expect(await emit(gm, "encounter:end", {})).toMatchObject({ ok: true });

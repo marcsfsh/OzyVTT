@@ -6,6 +6,17 @@ import { projectPlayerView } from "../src/projections.js";
 import { projectViewerEncounterScene } from "../src/viewer-encounter.js";
 import { bootServer } from "./boot-server.js";
 import { png } from "./image-fixtures.js";
+import {
+  cell,
+  DIVIDER,
+  frozen,
+  GOBLIN,
+  GOBLIN_NAME,
+  HERO as SEER,
+  ORC,
+  SESSION_A,
+  visionGame
+} from "./vision-fixtures.js";
 
 // "Make live" means the same on phones and the table screen: the live scene's map, the public tokens the GM has
 // placed, and the fog, before any fight. What the fog covers, the GM's secrets and who waits in the tray stay off it.
@@ -126,6 +137,21 @@ describe("a live scene before its fight", () => {
       LURKER
     ]);
     expect(projectViewerEncounterScene(state).tokens.map((entry) => entry.actorId)).toEqual([HERO, LURKER]);
+  });
+});
+
+describe("a live scene with dynamic vision before its fight", () => {
+  it("keeps a creature no character sees off the players' map and the table screen", () => {
+    const state = frozen(visionGame({ active: false, walls: [DIVIDER()], positions: { [ORC]: cell(3, 5) } }));
+    const view = projectPlayerView(state, SESSION_A, () => null);
+    expect(view.combat.active).toBe(false);
+    expect(view.combat.tokens.map((entry) => entry.actorId).sort()).toEqual([SEER, ORC].sort());
+    const scene = projectViewerEncounterScene(state);
+    expect(scene.tokens.map((entry) => entry.actorId).sort()).toEqual([SEER, ORC].sort());
+    for (const sent of [view, scene]) {
+      expect(JSON.stringify(sent)).not.toContain(GOBLIN);
+      expect(JSON.stringify(sent)).not.toContain(GOBLIN_NAME);
+    }
   });
 });
 

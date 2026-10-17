@@ -149,6 +149,30 @@ describe("a player's area spell", () => {
     expect(JSON.stringify(hiddenBody)).not.toContain("Goblin Lurker");
   });
 
+  it("leaves out a creature the walls hide from the caster as it does one under the fog", async () => {
+    const { server, gmToken, playerToken, post, aim } = await fight();
+    // Fog off and vision on: a wall down x = 550 below the first row hides the lurker from Lyra.
+    expect((await post(GAME_PATHS.fogEnabled, gmToken, { commandId: randomUUID(), enabled: false })).status).toBe(200);
+    expect((await post(GAME_PATHS.visionEnabled, gmToken, { commandId: randomUUID(), enabled: true })).status).toBe(
+      200
+    );
+    const walled = await post(GAME_PATHS.walls, gmToken, {
+      commandId: randomUUID(),
+      kind: "wall",
+      points: [
+        { x: 550, y: 100 },
+        { x: 550, y: 400 }
+      ]
+    });
+    expect(walled.status).toBe(200);
+    const cast = await aim(playerToken, CASTER, { x: 550, y: 100 }, { x: 650, y: 100 });
+    expect(cast.status).toBe(200);
+    const body = await cast.json();
+    expect(body.data.resolution.save.targets.map((target: { targetId: string }) => target.targetId)).toEqual([SEEN]);
+    for (const hidden of [FOGGED, "Goblin Lurker"]) expect(JSON.stringify(body)).not.toContain(hidden);
+    expect(server.store.snapshot.combat.pendingSaves.map((save) => save.targetActorId)).toContain(FOGGED);
+  });
+
   it("is refused for a character the player doesn't own", async () => {
     const { playerToken, aim } = await fight();
     const foreign = await aim(playerToken, ALLY, { x: 550, y: 100 }, { x: 650, y: 100 });
