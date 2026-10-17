@@ -144,6 +144,19 @@ describe("features that raise a budget", () => {
     expect(capacityOf(fighter(1), "feature:weapon-mastery")).toBe(3);
     expect(capacityOf(fighter(4), "feature:weapon-mastery")).toBe(4);
   });
+
+  it("offers Weapon Mastery the kinds of weapon in the Weapons table, and no magic weapon", () => {
+    const options = ids(
+      offerNamed(
+        offers({ speciesId: "human", backgroundId: "soldier", classId: "fighter", level: 1 }),
+        "feature:weapon-mastery"
+      )
+    );
+    expect(options).toEqual(expect.arrayContaining(["longsword", "dagger", "battleaxe", "longbow"]));
+    expect(options).not.toContain("berserker-axe");
+    expect(options).not.toContain("dagger-of-venom");
+    expect(options).not.toContain("weapon-1");
+  });
 });
 
 describe("a chosen option's own pick", () => {

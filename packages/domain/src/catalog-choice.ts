@@ -15,7 +15,8 @@ import type {
  *
  * Slug families over open ids:
  *   - `skills`, `weapons`, `tools`, `languages`, `feats` -> the whole catalog list (`feats` is every category:
- *                               "no category is specified" in the SRD's feat rules).
+ *                               "no category is specified" in the SRD's feat rules; `weapons` is the kinds of
+ *                               weapon, without the magic weapons made from them).
  *   - `<table>-languages`    -> languages printed in one SRD table ("standard-languages").
  *   - `<listId>-spells`      -> spells whose `classes` includes the class's `spellcasting.spellListId`.
  *   - `<listId>-spells-of-<school>` -> those spells of one school ("wizard-spells-of-evocation").
@@ -92,10 +93,14 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       "The skills catalog is empty."
     );
   }
+  // The kinds of weapon, as the Weapons table lists them. A magic weapon (a Berserker Axe, a +1 weapon) is made from
+  // one of those kinds and has no weapon statistics of its own, so it is no kind to pick.
   if (slug === "weapons") {
     return nonEmpty(
       slug,
-      catalogs.equipment.filter((item) => item.category === "weapon").map((item) => ({ id: item.id, name: item.name })),
+      catalogs.equipment
+        .filter((item) => item.category === "weapon" && item.weapon !== null)
+        .map((item) => ({ id: item.id, name: item.name })),
       "The equipment catalog has no weapons."
     );
   }
