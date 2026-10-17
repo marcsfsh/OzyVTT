@@ -72,6 +72,15 @@
     "goldPieces": 75
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -1039,6 +1048,51 @@
     "goldPieces": 90
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": [],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "acrobatics",
+     "animal-handling",
+     "arcana",
+     "athletics",
+     "deception",
+     "history",
+     "insight",
+     "intimidation",
+     "investigation",
+     "medicine",
+     "nature",
+     "perception",
+     "performance",
+     "persuasion",
+     "religion",
+     "sleight-of-hand",
+     "stealth",
+     "survival"
+    ]
+   },
+   "toolChoices": {
+    "choose": 1,
+    "from": [
+     "instrument-bagpipes",
+     "instrument-drum",
+     "instrument-dulcimer",
+     "instrument-flute",
+     "instrument-horn",
+     "instrument-lute",
+     "instrument-lyre",
+     "instrument-pan-flute",
+     "instrument-shawm",
+     "instrument-viol"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -2879,6 +2933,14 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "shields"
+   ],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -3806,7 +3868,6 @@
     "shields"
    ],
    "weapons": [
-    "simple",
     "martial"
    ],
    "tools": []
@@ -4704,6 +4765,11 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -5735,6 +5801,17 @@
     "goldPieces": 150
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "medium",
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -6756,6 +6833,30 @@
     "goldPieces": 150
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light",
+    "medium",
+    "shields"
+   ],
+   "weapons": [
+    "martial"
+   ],
+   "tools": [],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "animal-handling",
+     "athletics",
+     "insight",
+     "investigation",
+     "nature",
+     "perception",
+     "stealth",
+     "survival"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -7636,6 +7737,30 @@
     "goldPieces": 100
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": [
+    "thieves-tools"
+   ],
+   "skills": {
+    "choose": 1,
+    "from": [
+     "acrobatics",
+     "athletics",
+     "deception",
+     "insight",
+     "intimidation",
+     "investigation",
+     "perception",
+     "persuasion",
+     "sleight-of-hand",
+     "stealth"
+    ]
+   }
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -8291,6 +8416,11 @@
     "goldPieces": 50
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -9163,6 +9293,13 @@
     "goldPieces": 100
    }
   ],
+  "multiclassProficiencies": {
+   "armor": [
+    "light"
+   ],
+   "weapons": [],
+   "tools": []
+  },
   "multiclassPrerequisites": {
    "mode": "all",
    "minimums": [
@@ -9713,7 +9850,7 @@
         "choose": 1,
         "fromPicks": {
          "offer": "class-cantrips",
-         "where": "ranged"
+         "where": "ranged-damage"
         }
        }
       },

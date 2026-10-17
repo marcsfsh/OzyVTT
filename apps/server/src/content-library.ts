@@ -388,7 +388,8 @@ const classSummaryOf = (entry: ClassReference): ContentClassSummary => ({
         armor: entry.multiclassProficiencies.armor,
         weapons: entry.multiclassProficiencies.weapons,
         tools: entry.multiclassProficiencies.tools,
-        skillChoices: choiceListOf(entry.multiclassProficiencies.skills)
+        skillChoices: choiceListOf(entry.multiclassProficiencies.skills),
+        toolChoices: choiceListOf(entry.multiclassProficiencies.toolChoices)
       }
     : null,
   multiclassPrerequisites: entry.multiclassPrerequisites
@@ -596,7 +597,9 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     // The template eligibility list, for the base chooser. Printed SRD text plus resolved ids; nothing GM-secret.
     appliesTo: item.appliesTo ?? null,
     // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
-    ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {})
+    ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
+    // The levels a Spell Scroll can bear, as its name says, for the picker's spell step.
+    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();

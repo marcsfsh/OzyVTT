@@ -396,6 +396,13 @@
               ],
               "additionalProperties": false
             },
+            "failureHazard": {
+              "type": "string",
+              "enum": [
+                "burning",
+                "oil"
+              ]
+            },
             "failureEffect": {
               "type": "object",
               "properties": {
@@ -664,6 +671,11 @@
             "concentration": {
               "default": false,
               "type": "boolean"
+            },
+            "damageUses": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
             },
             "onHit": {
               "type": "boolean"
@@ -3489,6 +3501,11 @@
         },
         "chosenDamageType": {
           "$ref": "#/$defs/__schema19"
+        },
+        "spellId": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9-]+$"
         },
         "ammunitionLeft": {
           "type": "integer",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CharacterDraftSchema } from "@vtt/domain";
-import { emptyDraft, type BuilderDraft } from "./build-payload";
+import { emptyDraft, withClassAdded, withClassLevels, type BuilderDraft } from "./build-payload";
 
 // The server parks exactly what the wizard keeps, so every draft the wizard makes must pass the server's schema.
 
@@ -30,6 +30,17 @@ describe("a wizard draft is one the server will park", () => {
       asiIncreases: { "level-4:asi": [{ ability: "str", amount: 2 }] },
       name: "Brunhild Stonefist"
     };
+    const parsed = CharacterDraftSchema.safeParse(draft);
+    expect(parsed.error?.issues ?? []).toEqual([]);
+  });
+
+  it("a multiclass build, with the class each level went to", () => {
+    const draft = withClassLevels(
+      withClassAdded({ ...emptyDraft(), speciesId: "human", classId: "fighter", level: 3 }, "wizard"),
+      "wizard",
+      2
+    );
+    expect(draft.classLevels).toEqual(["fighter", "fighter", "fighter", "wizard", "wizard"]);
     const parsed = CharacterDraftSchema.safeParse(draft);
     expect(parsed.error?.issues ?? []).toEqual([]);
   });

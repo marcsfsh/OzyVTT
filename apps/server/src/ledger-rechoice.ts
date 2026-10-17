@@ -1,16 +1,13 @@
 import type { BuilderPolicy, GameState, Rechoice } from "@vtt/domain";
 import type { Actor, ActorDefinition, CharacterChoice } from "@vtt/schemas";
 import { rebuildActorDefinition } from "./actor-roster.js";
-import {
-  buildCharacterDefinition,
-  storedAbilityScores,
-  storedHitPointRolls,
-  type CharacterCreateRequestInput
-} from "./character-build.js";
+import { buildCharacterDefinition, storedHitPointRolls, type CharacterCreateRequestInput } from "./character-build.js";
+import { storedClassSequence } from "./character-offers.js";
 import { replaceableOffers } from "./choice-overrides.js";
 import type { ContentView } from "./content-library.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
+import { sheetAbilityScores, sheetSourceOf } from "./sheet-abilities.js";
 
 /**
  * A pick re-made on a rest whose answer the build itself reads. SRD Circle of the Land: "Whenever you finish a Long
@@ -21,27 +18,28 @@ import { CommandRejectedError } from "./game-store.js";
  */
 
 /** The build request a stored sheet was made from, read back off its ledger. Null when the sheet can't be rebuilt
- *  here: no ledger (an import), more than one class, or ability scores the ledger never recorded. */
-export function buildRequestOf(definition: ActorDefinition): CharacterCreateRequestInput | null {
-  const character = definition.character;
-  const choices = character?.choices;
-  const primary = character?.classes[0];
-  if (!character || !choices || !primary || character.classes.length !== 1) return null;
-  if (!character.race || !character.background) return null;
-  const scores = storedAbilityScores(choices);
-  if (!scores) return null;
+ *  here: no ledger (an import), or ability scores neither recorded nor reproducible from the sheet. */
+export function buildRequestOf(definition: ActorDefinition, library: ContentView): CharacterCreateRequestInput | null {
+  const source = sheetSourceOf(definition);
+  const scores = source ? sheetAbilityScores(source, library) : null;
+  if (!source || !scores) return null;
+  const { derived: _derived, ...sent } = scores;
+  // A multiclass sheet re-sends the order its levels were taken in; the starting class names its own subclass.
+  const sequence = storedClassSequence(source.choices);
+  const subclass = definition.character?.classes[0]?.subclass;
   // Rolled hit points are re-sent as recorded, so the maximum doesn't move.
-  const rolls = storedHitPointRolls(choices, primary.level);
+  const rolls = storedHitPointRolls(source.choices, source.level);
   return {
     name: definition.name,
-    speciesId: character.race.id,
-    backgroundId: character.background.id,
-    classId: primary.id,
-    level: primary.level,
-    ...(primary.subclass ? { subclassId: primary.subclass.id } : {}),
-    ...scores,
+    speciesId: source.speciesId,
+    backgroundId: source.backgroundId,
+    classId: source.classId,
+    level: source.level,
+    ...(subclass ? { subclassId: subclass.id } : {}),
+    ...(sequence ? { classLevels: sequence } : {}),
+    ...sent,
     hp: rolls !== null && rolls.length > 0 ? { mode: "entries", entries: rolls } : { mode: "average" },
-    choices,
+    choices: source.choices,
     keepsRecordedScores: true
   };
 }
@@ -68,7 +66,7 @@ export function rechooseInLedger(
   const definition = state.definitions.find((entry) => entry.id === actor.definitionId)?.definition;
   const choices = definition?.character?.choices ?? [];
   const index = rowIndexOf(choices, offer);
-  const request = definition && index >= 0 ? buildRequestOf(definition) : null;
+  const request = definition && index >= 0 ? buildRequestOf(definition, deps.library) : null;
   if (!request)
     throw new CommandRejectedError(
       `${actor.name}'s sheet doesn't record how it was built, so this pick can't change here - make it in the Level flow.`

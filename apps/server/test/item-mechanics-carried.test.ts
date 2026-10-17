@@ -664,10 +664,15 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
 // The absences, pinned so none is authored by accident.
 
 describe("what no carried item can carry", () => {
-  it("no potion or oil carries a rider, because a consumed item is unsayable", () => {
+  it("of the potions and oils, only the Potions of Healing act: the rest last an hour or more", () => {
+    // A consumed item is sayable (`consumedOnUse`), but no effect counts an hour.
     const consumables = CARRIED_ROWS.filter((row) => row.category === "consumable");
     expect(consumables.length).toBeGreaterThan(0);
-    expect(consumables.filter(carries).map((row) => row.id)).toEqual([]);
+    expect(consumables.filter(carries).map((row) => row.id)).toEqual([
+      "potion-of-healing-greater",
+      "potion-of-healing-superior",
+      "potion-of-healing-supreme"
+    ]);
   });
 
   it("authors no curse, and could not have, since no carried row requires attunement AND prints a curse", () => {
@@ -697,15 +702,8 @@ describe("the absences that were measured and must stay absent", () => {
     expect(invulnerability.grants).toBeUndefined();
   });
 
-  it("every row whose printed effect restores or grants hit points is prose", () => {
-    for (const id of [
-      "potions-of-healing",
-      "potion-of-vitality",
-      "ioun-stone",
-      "dragon-orb",
-      "potion-of-heroism",
-      "bag-of-beans"
-    ]) {
+  it("every row whose printed effect restores or grants hit points is prose, but the Potions of Healing", () => {
+    for (const id of ["potion-of-vitality", "ioun-stone", "dragon-orb", "potion-of-heroism", "bag-of-beans"]) {
       const row = view.equipmentRecord(id)!;
       expect({ id, carries: carries(row) }).toEqual({ id, carries: false });
     }

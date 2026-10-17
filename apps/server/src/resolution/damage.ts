@@ -7,6 +7,7 @@ import {
   type RiderCarrier,
   type RiderMoment
 } from "@vtt/rules-5e";
+import { endEffect } from "../effects.js";
 import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
@@ -188,6 +189,25 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       const total = rolled.total + abilityAmount;
       damage.push({ formula: rolled.expression.source, type, total });
       warnings.push(`${rider.label}: +${total} ${type}.`);
+      if (rider.sourceEffectId !== undefined) ctx.damageEffectIds.push(rider.sourceEffectId);
     }
+  }
+}
+
+/** A coat of Basic Poison is spent "once its damage is dealt": an effect with damage uses loses one each hit its
+ *  damage lands on, and ends at none. */
+export function spendDamageUses(ctx: ResolveContext): void {
+  const { state, attacker, damageEffectIds, effectsEnded } = ctx;
+  for (const effectId of new Set(damageEffectIds)) {
+    const effect = attacker.effects.find((candidate) => candidate.id === effectId);
+    if (effect?.damageUses === undefined) continue;
+    if (effect.damageUses > 1) {
+      attacker.effects = attacker.effects.map((candidate) =>
+        candidate.id === effectId ? { ...candidate, damageUses: effect.damageUses! - 1 } : candidate
+      );
+      continue;
+    }
+    endEffect(state, attacker.id, effectId);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
   }
 }

@@ -488,13 +488,14 @@ function choiceBlockFields(): readonly FieldDef[] {
           key: "fromPicks.where",
           label: "Narrowed to",
           kind: "select",
-          // Closed: a three-value schema enum the resolver reads by name.
+          // Closed: a four-value schema enum the resolver reads by name.
           options: [
             { value: "deals-damage", label: "Ones that deal damage" },
             { value: "attack-roll", label: "Ones that need an attack roll" },
-            { value: "ranged", label: "Ones with a range of 10 ft or more" }
+            { value: "ranged", label: "Ones with a range of 10 ft or more" },
+            { value: "ranged-damage", label: "Ones that deal damage at 10 ft or more" }
           ],
-          help: "Leave unset to offer every answer to that pick. All three read the spell catalog, so they narrow spell picks only.",
+          help: "Leave unset to offer every answer to that pick. All four read the spell catalog, so they narrow spell picks only.",
           write: (next, block) => writeFromPicks(block, "where", next)
         }
       ]

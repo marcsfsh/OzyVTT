@@ -126,8 +126,18 @@ export function GmActionList({
       </ul>
       {builtins.length > 0 &&
         (() => {
-          const primary = PRIMARY_BUILTINS.flatMap((id) => builtins.filter((action) => action.id === id));
-          const rest = builtins.filter((action) => !(PRIMARY_BUILTINS as readonly string[]).includes(action.id));
+          // A builtin whose required effect this creature has (Put Out the Fire while burning) joins the common ones.
+          const called = builtins.filter(
+            (action) =>
+              !(PRIMARY_BUILTINS as readonly string[]).includes(action.id) &&
+              action.requiresEffectTag !== null &&
+              actor.effects.some((effect) => effect.tags.includes(action.requiresEffectTag!))
+          );
+          const primary = [
+            ...called,
+            ...PRIMARY_BUILTINS.flatMap((id) => builtins.filter((action) => action.id === id))
+          ];
+          const rest = builtins.filter((action) => !primary.includes(action));
           const shown = moreBuiltins ? [...primary, ...rest] : primary.length > 0 ? primary : builtins;
           return (
             <div className="builtin-actions" role="group" aria-label="Common actions">

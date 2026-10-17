@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ContentEquipmentSummary } from "@vtt/domain";
+import type { ContentEquipmentSummary, ContentSpellSummary } from "@vtt/domain";
 import { Input, Modal } from "@vtt/ui";
 import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 import { titleCase } from "./format";
+import { useSpellReference } from "./spells";
 
 /**
  * One shared, session-cached fetch of the equipment catalog, so every sheet browses the same list.
@@ -122,10 +123,20 @@ function metaLine(item: ContentEquipmentSummary): string {
   return parts.join(" · ");
 }
 
+/** A piece of magic ammunition is one kind of the gear table's ammunition: "Arrows", not "Arrows (20)". */
+export const ammunitionKindName = (base: Pick<ContentEquipmentSummary, "name">) => base.name.replace(/\s*\(\d+\)$/, "");
+
+/** What picking a base decides, for the chooser's lead line. */
+const pickConsequence = (template: ContentEquipmentSummary) =>
+  template.category === "ammunition"
+    ? "only a weapon that fires that kind can shoot it."
+    : "its numbers come from that choice.";
+
 /**
  * The eligible-base list for a template magic item ("Weapon (Any Simple or Martial)"), shared by the
- * picker's chooser step and the sheet's bind prompt. Each row shows the base's own numbers. Bases the
- * catalog cannot resolve (e.g. a deleted homebrew base) are omitted; the server would refuse them.
+ * picker's chooser step and the sheet's bind prompt. Each row shows the base's own numbers, or for magic
+ * ammunition the weapons its kind fits. Bases the catalog cannot resolve (e.g. a deleted homebrew base) are
+ * omitted; the server would refuse them.
  */
 export function BaseOptionList({
   template,
@@ -151,19 +162,22 @@ export function BaseOptionList({
         {needle ? "No base matches that search." : "None of this item's bases are in the catalog."}
       </p>
     );
+  const kinds = template.category === "ammunition";
   return (
     <ul className="sheet-picker-list scroll-y">
       {bases.map((base) => (
         <li key={base.id}>
           <div className="sheet-picker-item">
-            <span className="sheet-picker-name">{base.name}</span>
-            <span className="sheet-picker-meta">{metaLine(base)}</span>
+            <span className="sheet-picker-name">{kinds ? ammunitionKindName(base) : base.name}</span>
+            <span className="sheet-picker-meta">
+              {kinds ? (base.description?.split(/(?<=\.)\s/)[0] ?? "") : metaLine(base)}
+            </span>
           </div>
           <button
             type="button"
             className="sheet-picker-add tap-target"
             disabled={busy}
-            aria-label={`Make it a ${base.name}`}
+            aria-label={kinds ? `Make it ${ammunitionKindName(base)}` : `Make it a ${base.name}`}
             onClick={() => onPick(base.id)}
           >
             Pick
@@ -171,6 +185,136 @@ export function BaseOptionList({
         </li>
       ))}
     </ul>
+  );
+}
+
+/** "Level 3 · Evocation · Sorcerer, Wizard": the lists say whose readers can cast it. */
+const spellLevelLine = (spell: ContentSpellSummary) =>
+  [
+    spell.level === 0 ? "Cantrip" : `Level ${spell.level}`,
+    titleCase(spell.school),
+    spell.classes.map((list) => list.split("-").map(titleCase).join(" ")).join(", ")
+  ]
+    .filter((part) => part !== "")
+    .join(" · ");
+
+/**
+ * The spells a Spell Scroll can bear, by its levels: a search, a chip per level when it holds more than one, and a
+ * Pick per spell. Shared by the picker's scroll step and the sheet's prompt for a scroll with no spell yet.
+ */
+export function ScrollSpellPicker({
+  scroll,
+  busy,
+  onPick,
+  back
+}: Readonly<{
+  scroll: ContentEquipmentSummary;
+  busy: boolean;
+  onPick: (spellId: string) => void;
+  /** The picker's way back to the catalog; the sheet's modal closes instead. */
+  back?: () => void;
+}>) {
+  const spells = useSpellReference();
+  const [query, setQuery] = useState("");
+  const [level, setLevel] = useState<number | null>(null);
+  const range = scroll.spellScroll ?? { minLevel: 0, maxLevel: 9 };
+  const levels = Array.from({ length: range.maxLevel - range.minLevel + 1 }, (_, index) => range.minLevel + index);
+  const needle = query.trim().toLowerCase();
+  const shown = spells
+    .filter((spell) => spell.level >= range.minLevel && spell.level <= range.maxLevel)
+    .filter((spell) => level === null || spell.level === level)
+    .filter((spell) => !needle || spell.name.toLowerCase().includes(needle))
+    .sort((left, right) => left.level - right.level || left.name.localeCompare(right.name));
+  return (
+    <>
+      <p className="sheet-picker-empty">
+        A Spell Scroll bears one spell. Pick it - a reader whose spell list has it can cast it once, and the scroll
+        crumbles.
+      </p>
+      <div className="sheet-picker-controls">
+        <Input
+          type="search"
+          className="sheet-picker-search"
+          value={query}
+          maxLength={60}
+          placeholder="Search spells…"
+          aria-label="Search spells"
+          onChange={(event) => setQuery(event.target.value)}
+          autoFocus
+        />
+        {levels.length > 1 && (
+          <div className="sheet-picker-filters" role="group" aria-label="Filter by spell level">
+            {[null, ...levels].map((entry) => (
+              <button
+                key={entry ?? "all"}
+                type="button"
+                className={`sheet-picker-chip${entry === level ? " is-active" : ""}`}
+                aria-pressed={entry === level}
+                onClick={() => setLevel(entry)}
+              >
+                {entry === null ? "All" : entry === 0 ? "Cantrip" : `Level ${entry}`}
+              </button>
+            ))}
+          </div>
+        )}
+        {back && (
+          <button type="button" className="sheet-picker-chip" onClick={back}>
+            Back to the list
+          </button>
+        )}
+      </div>
+      {spells.length === 0 ? (
+        <p className="sheet-picker-empty">Loading the spells…</p>
+      ) : shown.length === 0 ? (
+        <p className="sheet-picker-empty">No spell matches that search.</p>
+      ) : (
+        <ul className="sheet-picker-list scroll-y">
+          {shown.map((spell) => (
+            <li key={spell.id}>
+              <div className="sheet-picker-item">
+                <span className="sheet-picker-name">{spell.name}</span>
+                <span className="sheet-picker-meta">{spellLevelLine(spell)}</span>
+              </div>
+              <button
+                type="button"
+                className="sheet-picker-add tap-target"
+                disabled={busy}
+                aria-label={`Put ${spell.name} on the scroll`}
+                onClick={() => onPick(spell.id)}
+              >
+                Pick
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+/** The sheet's prompt for a scroll with no spell picked yet: the same list, own modal. */
+export function ScrollSpellModal({
+  scroll,
+  busy,
+  onPick,
+  onClose
+}: Readonly<{
+  scroll: ContentEquipmentSummary;
+  busy: boolean;
+  onPick: (spellId: string) => void;
+  onClose: () => void;
+}>) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      accent="cyan"
+      title={`${scroll.name} · Choose its spell`}
+      ariaLabel={`Choose the spell on ${scroll.name}`}
+    >
+      <ScrollSpellPicker scroll={scroll} busy={busy} onPick={onPick} />
+    </Modal>
   );
 }
 
@@ -198,8 +342,8 @@ export function BindItemModal({
       ariaLabel={`Choose which ${template.category} ${template.name} is`}
     >
       <p className="sheet-picker-empty">
-        {template.name} applies to {template.appliesTo?.label ?? "a base"}. Pick which one it is - its numbers come from
-        that choice.
+        {template.name} applies to {template.appliesTo?.label ?? "a base"}. Pick which one it is -{" "}
+        {pickConsequence(template)}
       </p>
       <div className="sheet-picker-controls">
         <Input
@@ -235,13 +379,14 @@ export function EquipmentPicker({
 }: Readonly<{
   ownedCounts: ReadonlyMap<string, number>;
   busy: boolean;
-  onAdd: (item: ContentEquipmentSummary, baseId?: string) => void;
+  onAdd: (item: ContentEquipmentSummary, baseId?: string, spellId?: string) => void;
   onClose: () => void;
 }>) {
   const { catalog, attribution } = useEquipmentReference();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [choosing, setChoosing] = useState<ContentEquipmentSummary | null>(null);
+  const [scrolling, setScrolling] = useState<ContentEquipmentSummary | null>(null);
   const active = FILTERS.find((entry) => entry.id === filter) ?? FILTERS[0];
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -259,8 +404,36 @@ export function EquipmentPicker({
       setChoosing(item);
       return;
     }
+    // Each scroll bears its own spell, so every copy asks.
+    if (item.spellScroll) {
+      setScrolling(item);
+      return;
+    }
     onAdd(item);
   };
+
+  if (scrolling) {
+    return (
+      <Modal
+        open
+        onClose={onClose}
+        size="lg"
+        accent="cyan"
+        title={`${scrolling.name} · Choose its spell`}
+        ariaLabel={`Choose the spell on ${scrolling.name}`}
+      >
+        <ScrollSpellPicker
+          scroll={scrolling}
+          busy={busy}
+          back={() => setScrolling(null)}
+          onPick={(spellId) => {
+            onAdd(scrolling, undefined, spellId);
+            setScrolling(null);
+          }}
+        />
+      </Modal>
+    );
+  }
 
   if (choosing) {
     return (
@@ -273,8 +446,10 @@ export function EquipmentPicker({
         ariaLabel={`Choose which ${choosing.category} ${choosing.name} is`}
       >
         <p className="sheet-picker-empty">
-          {choosing.name} applies to {choosing.appliesTo?.label}. Pick which one it is - its dice, reach and properties
-          come from that choice.
+          {choosing.name} applies to {choosing.appliesTo?.label}. Pick which one it is -{" "}
+          {choosing.category === "ammunition"
+            ? pickConsequence(choosing)
+            : "its dice, reach and properties come from that choice."}
         </p>
         <div className="sheet-picker-controls">
           <Input

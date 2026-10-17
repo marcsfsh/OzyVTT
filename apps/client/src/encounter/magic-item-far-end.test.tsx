@@ -142,7 +142,7 @@ describe("the far end of the magic-item ETL", () => {
     expect(within(row).getByRole("button", { name: "Attune" })).toBeTruthy();
   });
 
-  it("makes all 268 magic rows reachable without scrolling a 400-row list", async () => {
+  it("makes all 270 magic rows reachable without scrolling a 400-row list", async () => {
     serveCatalog();
     render(<EquipmentPicker ownedCounts={new Map()} busy={false} onAdd={() => {}} onClose={() => {}} />);
     await screen.findByRole("searchbox", { name: "Search equipment" });
@@ -157,12 +157,14 @@ describe("the far end of the magic-item ETL", () => {
       expect(screen.getAllByRole("listitem"), chip).toHaveLength(count);
     }
     await user.click(screen.getByRole("button", { name: "Consumables" }));
-    // Both the mundane 50 gp potion and the SRD's magic potion exist.
+    // The 50 gp potion and the three stronger ones the magic item table prints, each its own row.
     const names = screen
       .getAllByRole("listitem")
       .map((row) => within(row).getByRole("button").getAttribute("aria-label"));
     expect(names).toContain("Add Potion of Healing");
-    expect(names).toContain("Add Potions of Healing");
+    for (const strength of ["greater", "superior", "supreme"])
+      expect(names).toContain(`Add Potion of Healing (${strength})`);
+    expect(names).not.toContain("Add Potions of Healing");
   });
 
   it("keeps a table-bearing entry legible: Armor of Resistance browses as one row, not ten", async () => {

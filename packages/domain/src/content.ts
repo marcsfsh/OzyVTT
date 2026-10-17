@@ -141,7 +141,9 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .nullable(),
   appliesTo: z.strictObject({ label: z.string(), baseIds: z.array(slug(60)).min(1).max(40) }).nullable(),
   /** The damage types the GM may pick for the item's resistance ("The GM chooses the type"). */
-  damageTypeChoice: z.array(slug(20)).max(13).optional()
+  damageTypeChoice: z.array(slug(20)).max(13).optional(),
+  /** A Spell Scroll: the spell levels one copy can bear, as its name prints them; the pick is the row's `spellId`. */
+  spellScroll: z.strictObject({ minLevel: z.number().int(), maxLevel: z.number().int() }).optional()
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
 export type ContentEquipmentResult = {
@@ -195,7 +197,10 @@ export const ContentFeatureChoiceSummarySchema = z.strictObject({
   minSpellLevel: z.number().int().min(0).max(9).nullable(),
   /** Options drawn from the character's own earlier picks; `offer` names the budget, `where` a predicate slug. */
   fromPicks: z
-    .strictObject({ offer: z.string(), where: z.enum(["deals-damage", "attack-roll", "ranged"]).nullable() })
+    .strictObject({
+      offer: z.string(),
+      where: z.enum(["deals-damage", "attack-roll", "ranged", "ranged-damage"]).nullable()
+    })
     .nullable(),
   /** Inline options with their names and any nested pick. Empty when the options come from `fromCatalog` or are plain ids in `from`. */
   get options(): z.ZodArray<typeof ContentFeatureOptionSummarySchema> {
@@ -296,7 +301,9 @@ export const ContentClassSummarySchema = z.strictObject({
       armor: z.array(slug()),
       weapons: z.array(slug()),
       tools: z.array(slug()),
-      skillChoices: ContentChoiceListSchema.nullable()
+      skillChoices: ContentChoiceListSchema.nullable(),
+      /** "One Musical Instrument of your choice" (Bard); null when the class keeps no tool pick. */
+      toolChoices: ContentChoiceListSchema.nullable()
     })
     .nullable(),
   /** Ability minimums for multiclassing into this class; `mode: "any"` covers "STR 13 or DEX 13". Null = always allowed. Display only; the server re-validates. */
@@ -494,6 +501,9 @@ export type ContentActionSummary = Readonly<{
   /** SRD generic action rows (Dodge, Dash, Help, ...) appended after the stat block's own. */ builtin?: boolean;
   /** Targeting: "single" picks one combatant, "multi" several (Preserve Life), "none" is a direct tap. */ targeting?:
     "single" | "multi" | "none";
+  /** The hit points it restores, when it heals (a potion drunk from the pack). */ healing?: Readonly<{
+    formula: string;
+  }> | null;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];

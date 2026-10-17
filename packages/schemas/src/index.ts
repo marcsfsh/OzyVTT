@@ -213,6 +213,8 @@ export const RiderTriggerSchema = z.discriminatedUnion("type", [
     .object({ type: z.literal("versus-creature-type"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) })
     .strict(),
   z.object({ type: z.literal("versus-size"), sizes: z.array(SizeSchema).min(1).max(6) }).strict(),
+  /** On an attack, a condition the target has; on a saving throw, one the save would impose or end ("saving throws
+   * to avoid or end the Poisoned condition"). */
   z.object({ type: z.literal("versus-condition"), conditionIds: z.array(ConditionSchema).min(1).max(6) }).strict(),
   /** On an effect, its riders fire only for the creature that put the effect on its bearer, never for the bearer:
    * Hunter's Mark's extra damage when its caster hits the marked creature. */
@@ -667,7 +669,9 @@ export const EffectInstanceSchema = z
         .optional()
     })
       .strict()
-      .optional()
+      .optional(),
+    /** How many more times its damage riders may land before it ends (a coat of Basic Poison). */
+    damageUses: z.number().int().min(1).max(10).optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -790,6 +794,13 @@ export const InventoryItemSchema = z
     /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
      *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
     chosenDamageType: DamageTypeSchema.optional(),
+    /** The spell a Spell Scroll bears, picked when it is added. The server checks it against the scroll's levels;
+     *  every copy in the row bears it. */
+    spellId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
      *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
     ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
@@ -1055,7 +1066,10 @@ export const EffectGrantSchema = z
     /** Dodge: benefits lapse while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
     /** The granter concentrates to sustain the effect (SRD Concentration). */
-    concentration: z.boolean().default(false)
+    concentration: z.boolean().default(false),
+    /** Its damage riders land this many times, then it ends (Basic Poison: one coated weapon's hit, or three
+     *  pieces of ammunition). */
+    damageUses: z.number().int().min(1).max(10).optional()
   })
   .strict();
 
@@ -1147,7 +1161,11 @@ export const SaveOutcomeFields = {
    * repeated save can end it (Power Word Stun's 150); one with more is spared. */
   failsAtHitPoints: z.number().int().min(1).max(1000).optional(),
   /** Damage the failure's conditions bring at the start of each turn while they last (a swallow's acid). */
-  ongoingDamage: OngoingDamageSchema.optional()
+  ongoingDamage: OngoingDamageSchema.optional(),
+  /** What else a failure starts, from the SRD's own rules: "burning" (Rules Glossary Burning: 1d4 Fire at the start of
+   * each of its turns until it is put out) or "oil" (covered in Oil: Fire damage before the oil dries, within 1
+   * minute, brings 5 more Fire damage). */
+  failureHazard: z.enum(["burning", "oil"]).optional()
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */

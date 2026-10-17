@@ -766,6 +766,12 @@ const AMMUNITION_KINDS = [
   opt("sling-bullet", "Sling bullets")
 ];
 const isAmmunition = (draft: Draft) => draft.category === "ammunition" || draft.slot === "ammunition";
+/** What a Spell Scroll can bear: one level, as the gear table sells them, or any, as the magic item table prints it. */
+const SCROLL_LEVELS = [
+  opt("any", "Any spell"),
+  opt("0", "A cantrip"),
+  ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => opt(String(level), `A level ${level} spell`))
+];
 
 /** Turning magic off removes all of these; a leftover `isMagic: false` or orphan rider would fail
     `.strict()` invisibly. */
@@ -776,6 +782,7 @@ const MAGIC_KEYS = [
   "cursed",
   "charges",
   "damageTypeChoice",
+  "vulnerableToOtherChoices",
   "removesArmorDrawbacks",
   "casts",
   "grantsFeatIds",
@@ -834,7 +841,37 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           key: "consumedOnUse",
           label: "Used up when used",
           kind: "switch",
-          help: "A potion or a flask: each use of its actions takes one from the stack, and it works from the pack."
+          help: "A potion, a flask or a scroll: each use of its actions takes one from the stack, and it works from the pack.",
+          // A scroll is only ever read once, so turning this off unmakes it rather than leaving a record publish refuses.
+          write: (next, draft) => {
+            if (next === true) return { ...draft, consumedOnUse: true };
+            const { spellScroll: _scroll, ...rest } = draft;
+            return { ...rest, consumedOnUse: false };
+          }
+        },
+        // A Spell Scroll: each copy bears one spell of these levels, picked when it lands on a sheet.
+        {
+          key: "spellScroll",
+          label: "A Spell Scroll of",
+          kind: "select",
+          options: SCROLL_LEVELS,
+          placeholder: "Not a scroll",
+          help: "Each copy bears one spell, picked when it is added to a sheet; reading it casts the spell with the scroll's DC and attack bonus.",
+          visibleWhen: (draft) => draft.consumedOnUse === true,
+          read: (draft) => {
+            const range = draft.spellScroll as { minLevel?: number; maxLevel?: number } | undefined;
+            if (!range) return "";
+            return range.minLevel === 0 && range.maxLevel === 9 ? "any" : String(range.minLevel ?? "");
+          },
+          write: (next, draft) => {
+            const { spellScroll: _old, ...rest } = draft;
+            if (next === "") return rest;
+            const level = Number(next);
+            return {
+              ...rest,
+              spellScroll: next === "any" ? { minLevel: 0, maxLevel: 9 } : { minLevel: level, maxLevel: level }
+            };
+          }
         },
         // Ammunition sold in bundles counts its pieces: each shot spends one, and half come back after the fight.
         {
@@ -950,6 +987,15 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             const { damageTypeChoice: _old, ...rest } = draft;
             return Array.isArray(next) && next.length > 0 ? { ...rest, damageTypeChoice: next } : rest;
           }
+        },
+        // Like Armor of Vulnerability: the curse makes the bearer vulnerable to every choice it doesn't resist.
+        {
+          key: "vulnerableToOtherChoices",
+          label: "Curse: vulnerable to the other types",
+          kind: "switch",
+          help: "While attuned, worn or not, the bearer is vulnerable to every type in the GM's choice except the one it resists.",
+          visibleWhen: (draft) =>
+            draft.isMagic === true && draft.cursed === true && Array.isArray(draft.damageTypeChoice)
         },
         // Template pair, like the SRD's "Weapon, +1 (Any Simple or Martial)": with both set, the
         // player picks the base when the item lands on a sheet and the server copies its stats.

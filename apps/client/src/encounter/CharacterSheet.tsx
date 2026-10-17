@@ -401,6 +401,7 @@ export function CharacterSheet({
               edit={edit}
               role={role}
               attunementSlots={derived?.attunementSlots ?? 3}
+              inFight={inFight}
               others={
                 role === "gm" && state
                   ? state.actors

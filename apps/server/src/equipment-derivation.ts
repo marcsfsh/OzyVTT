@@ -1,10 +1,12 @@
 import type { Actor } from "@vtt/domain";
 import type {
+  ClassReference,
   EquipmentReference,
   FeatReference,
   FeatureOption,
   FeatureRecord,
-  SpellReference
+  SpellReference,
+  SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem, type Modifier } from "@vtt/schemas";
 import {
@@ -22,6 +24,7 @@ import {
   type RollModeSource
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
+import { scrollCastAction } from "./scrolls.js";
 import { speedZeroed } from "./speed.js";
 import {
   castAction,
@@ -80,15 +83,20 @@ export type EquipmentCatalog = Readonly<{
   featureRecord?: (ref: CharacterFeatureRef) => RiderBlock | undefined;
   /** The spell an item's `casts` entry names, so the synthesised cast can resolve real damage/attack/save. */
   spellRecord?: (id: string) => SpellReference | undefined;
+  /** A class or subclass record, for the spell list a Spell Scroll's reader draws from. */
+  classRecord?: (id: string) => ClassReference | undefined;
+  subclassRecord?: (id: string) => SubclassReference | undefined;
 }>;
 
-/** Narrows a content view to the four hooks the derivation reads. */
+/** Narrows a content view to the hooks the derivation reads. */
 export function equipmentCatalogOf(view: EquipmentCatalog): EquipmentCatalog {
   return {
     equipmentRecord: view.equipmentRecord,
     ...(view.featRecord ? { featRecord: view.featRecord } : {}),
     ...(view.featureRecord ? { featureRecord: view.featureRecord } : {}),
-    ...(view.spellRecord ? { spellRecord: view.spellRecord } : {})
+    ...(view.spellRecord ? { spellRecord: view.spellRecord } : {}),
+    ...(view.classRecord ? { classRecord: view.classRecord } : {}),
+    ...(view.subclassRecord ? { subclassRecord: view.subclassRecord } : {})
   };
 }
 
@@ -381,6 +389,8 @@ export function deriveEquipment(
   const active: ActiveItem[] = [];
   /** Potions and flasks in the pack: only their actions, which use one up. */
   const packed: ActiveItem[] = [];
+  /** A curse's vulnerabilities, which hold while attuned whether or not the item is worn. */
+  const cursedVulnerabilities: Defence[] = [];
   for (const item of catalog ? actor.inventory : []) {
     if (item.quantity <= 0) continue;
     const record = catalog!.equipmentRecord(catalogIdOf(item));
@@ -388,13 +398,20 @@ export function deriveEquipment(
     if (item.equipped) equipped.push(entry);
     if (item.equipped && itemIsActive(item, record)) active.push(entry);
     else if (record?.consumedOnUse) packed.push(entry);
+    if (item.attuned && record) cursedVulnerabilities.push(...curseVulnerabilitiesOf(record, item));
   }
   const carriers: RiderCarrier[] = [
     ...(catalog ? characterCarriers(definition, catalog) : []),
     ...effectCarriers(actor)
   ];
   const gatedGrants = catalog ? characterGatedGrants(definition, catalog) : [];
-  if (equipped.length === 0 && packed.length === 0 && carriers.length === 0 && gatedGrants.length === 0)
+  if (
+    equipped.length === 0 &&
+    packed.length === 0 &&
+    carriers.length === 0 &&
+    gatedGrants.length === 0 &&
+    cursedVulnerabilities.length === 0
+  )
     return EMPTY_DERIVATION;
   /** Feats the character already holds, so an item granting one adds nothing twice. */
   const heldFeatIds = new Set((definition?.character?.feats ?? []).map((feat) => feat.id));
@@ -454,6 +471,8 @@ export function deriveEquipment(
     for (const declared of record.actions) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
       actions.push(castAction(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
+    const read = record.spellScroll ? scrollCastAction(item, definition, catalog) : null;
+    if (read) actions.push(read);
     // Depth 1: the feat's riders join this block, so unequipping removes them in one recomputation.
     for (const featId of record.grantsFeatIds) {
       // Already a builder carrier (with its baked half in the definition); granting again would double it.
@@ -468,8 +487,12 @@ export function deriveEquipment(
     if (record.modifiers.length > 0 || record.grants || record.effects.length > 0 || record.grantsFeatIds.length > 0)
       sources.push({ itemId: item.id, itemName: label, summary: summarise(record) });
   }
-  for (const { item, record } of packed)
+  for (const { item, record } of packed) {
     for (const declared of record?.actions ?? []) actions.push(itemAction(item, declared, definition));
+    // A scroll is read from the pack like a potion is drunk from it.
+    const read = record?.spellScroll ? scrollCastAction(item, definition, catalog) : null;
+    if (read) actions.push(read);
+  }
   // Gated grants on own feats/features (the builder baked only ungated ones). The `feature:<id>` source
   // is never in `attunedItemIds`, so an `attuned` gate on a feature fails closed.
   for (const { id, name, block } of gatedGrants) {
@@ -566,7 +589,7 @@ export function deriveEquipment(
     skills,
     saves,
     damageResistances: [...damageResistances, ...defencesOf(standing, "damage-resistance")],
-    damageVulnerabilities: defencesOf(standing, "damage-vulnerability"),
+    damageVulnerabilities: [...defencesOf(standing, "damage-vulnerability"), ...cursedVulnerabilities],
     damageImmunities,
     conditionImmunities,
     armorClass: sumRiders(standing, "armor-class"),
@@ -652,6 +675,16 @@ function withChosenResistance(record: EquipmentReference, item: InventoryItem): 
   const chosen = item.chosenDamageType;
   if (!chosen || !record.grants || !record.damageTypeChoice?.includes(chosen)) return record;
   return { ...record, grants: { ...record.grants, damageResistances: [chosen] } };
+}
+
+/** Armor of Vulnerability: "Vulnerability to two of the three damage types associated with the armor (not the one to
+ *  which it grants Resistance)", on an attuned copy. */
+function curseVulnerabilitiesOf(record: EquipmentReference, item: InventoryItem): Defence[] {
+  if (!record.vulnerableToOtherChoices || !record.damageTypeChoice) return [];
+  const resisted = withChosenResistance(record, item).grants?.damageResistances ?? [];
+  return record.damageTypeChoice
+    .filter((type) => !resisted.includes(type))
+    .map((id) => ({ id, source: `${record.name} (curse)` }));
 }
 
 function summarise(record: RiderBlock | EquipmentReference): string {

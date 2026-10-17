@@ -28,6 +28,7 @@ import {
   addEffect,
   applyCondition,
   endConcentrationSustainedBy,
+  endEffect,
   endEffectsOnDamage,
   endEffectsSustainedBy,
   endKnockOut,
@@ -42,6 +43,7 @@ import { offerDamageReaction } from "./damage-reactions.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import { oilIgnition, OILED_TAG } from "./hazards.js";
 
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
   if (hp.current <= 0) return "down";
@@ -209,7 +211,10 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
   let totalAdjusted: number;
   let flatReduction = 0;
   let parts: DamageApplication["parts"] = [];
-  const typed = damagePartsOf(input);
+  const given = damagePartsOf(input);
+  // Fire reaching a creature covered in oil burns the oil too (SRD Oil).
+  const ignition = given !== null ? oilIgnition(actor, given) : null;
+  const typed = given !== null && ignition !== null ? [...given, ignition] : given;
   if (typed !== null) {
     const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
     // A rest-time re-choice replaces the build-time pick, so it both adds and subtracts defences.
@@ -293,7 +298,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     totalAdjusted = totalRequested;
   }
 
-  return { totalRequested, totalAdjusted, flatReduction, parts };
+  return { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited: ignition !== null };
 }
 
 type DamageWeighing = Readonly<{
@@ -301,6 +306,8 @@ type DamageWeighing = Readonly<{
   totalAdjusted: number;
   flatReduction: number;
   parts: DamageApplication["parts"];
+  /** The hit's Fire set the bearer's oil alight, which adds its 5 Fire and uses the oil up. */
+  oilIgnited: boolean;
 }>;
 
 /** Half the hit (Uncanny Dodge), rounded down once on the total and spread back over its types. */
@@ -338,7 +345,13 @@ export function applyDamageDetailed(
 ): DamageOutcome {
   const actor = adjustableActor(state, actorId, scope);
   const events: EffectNarration[] = [];
-  const { totalRequested, totalAdjusted, flatReduction, parts } = weighDamage(state, actor, input, deps);
+  const { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited } = weighDamage(state, actor, input, deps);
+  // Burning oil is spent once it flares.
+  if (oilIgnited) {
+    events.push({ kind: "damage", text: `The oil on ${actor.name} catches fire (5 Fire damage).`, actorId: actor.id });
+    for (const oil of actor.effects.filter((effect) => effect.tags.includes(OILED_TAG)))
+      events.push(...endEffect(state, actor.id, oil.id));
+  }
 
   const hpBefore = actor.hp.current;
   const wasAtZero = hpBefore <= 0;

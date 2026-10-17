@@ -24,6 +24,13 @@ const policy = BuilderPolicySchema.parse({});
 const DRUID = "70000000-0000-4000-8000-000000000001";
 const LAND = "feature:circle-of-the-land-spells";
 
+type ClassPlan = ReadonlyArray<{ classId: string; level: number }>;
+/** A Fighter 1 / Druid 3, whose Circle of the Land comes with the later class. */
+const FIGHTER_DRUID: ClassPlan = [
+  { classId: "fighter", level: 1 },
+  { classId: "druid", level: 3 }
+];
+
 /** A seeded stand-in for the dice (mulberry32), so the generated Druid is the same every run. */
 function seeded(seed: number): (sides: number) => number {
   let state = seed >>> 0;
@@ -35,9 +42,15 @@ function seeded(seed: number): (sides: number) => number {
   };
 }
 
-/** A Circle of the Land Druid at `level` with the given land, and the hit points the generator rolled. */
-function landDruid(level: number, land: string): ActorDefinition {
-  const { request } = generateCharacterRequest({ classId: "druid", level }, library, policy, seeded(7));
+/** A Circle of the Land Druid at `level` with the given land, and the hit points the generator rolled. A `plan`
+ *  multiclasses it, each class with its levels and the starting class first. */
+function landDruid(level: number, land: string, plan?: ClassPlan): ActorDefinition {
+  const { request } = generateCharacterRequest(
+    plan ? { level, classes: plan } : { classId: "druid", level },
+    library,
+    policy,
+    seeded(7)
+  );
   const choices = request.choices.map((row) =>
     row.payload?.featureId === "circle-of-the-land-spells" ? { ...row, id: land } : row
   ) as CharacterChoice[];
@@ -56,8 +69,15 @@ function table(definition: ActorDefinition): GameState {
 describe("reading a built character's request back off its ledger", () => {
   it("rebuilds the very sheet it was made from, rolled hit points included", () => {
     const sheet = landDruid(10, "polar");
-    const request = buildRequestOf(sheet);
+    const request = buildRequestOf(sheet, library);
     expect(request?.hp.mode).toBe("entries");
+    expect(buildCharacterDefinition(request!, library, policy)).toEqual(sheet);
+  });
+
+  it("reads a multiclass sheet back with its class order and the later class's subclass", () => {
+    const sheet = landDruid(4, "polar", FIGHTER_DRUID);
+    const request = buildRequestOf(sheet, library);
+    expect(request?.classLevels).toEqual(["fighter", "druid", "druid", "druid"]);
     expect(buildCharacterDefinition(request!, library, policy)).toEqual(sheet);
   });
 
@@ -172,5 +192,23 @@ describe("choosing a land on a Long Rest", () => {
     const inFight = await rechoose("polar");
     expect(inFight.status).toBe(409);
     expect((await inFight.json()).error.message).toMatch(/end the encounter first/);
+  });
+
+  it("swaps the land of a Druid who multiclassed into the circle", async () => {
+    const { server, gmToken, post, close } = await bootServer(table(landDruid(4, "polar", FIGHTER_DRUID)));
+    cleanups.push(close);
+    const reply = await post(GAME_PATHS.actorRechoose.replace("{actorId}", DRUID), gmToken, {
+      commandId: randomUUID(),
+      offer: LAND,
+      id: "arid"
+    });
+    expect(reply.status).toBe(200);
+    const stored = server.store.snapshot.definitions[0]?.definition;
+    expect(stored).toEqual(landDruid(4, "arid", FIGHTER_DRUID));
+    expect(stored?.character?.classes.map((entry) => [entry.id, entry.level])).toEqual([
+      ["fighter", 1],
+      ["druid", 3]
+    ]);
+    expect(alwaysPrepared(stored)).toEqual(expect.arrayContaining(["blur", "burning-hands", "fire-bolt"]));
   });
 });

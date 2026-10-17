@@ -75,6 +75,7 @@ import type {
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
+  CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
   CharacterSetProficienciesSchema,
@@ -507,6 +508,10 @@ export interface ClientToServerEvents {
   ) => void;
   "character:give-item": (
     payload: CommandPayload<typeof CharacterGiveItemSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "character:recover-ammunition": (
+    payload: CommandPayload<typeof CharacterRecoverAmmunitionSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-currency": (

@@ -48,7 +48,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -74,7 +83,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "uncommon",
   "isMagic": true,
   "attunement": {
@@ -131,7 +149,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "rare",
   "isMagic": true,
   "attunement": {
@@ -188,7 +215,16 @@
   "weapon": null,
   "armor": null,
   "slot": "ammunition",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Any Ammunition",
+   "baseIds": [
+    "arrows-20",
+    "crossbow-bolts-20",
+    "sling-bullets-20",
+    "blowgun-needles-50",
+    "firearm-bullets-10"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -523,10 +559,31 @@
   },
   "cursed": true,
   "casts": [],
+  "damageTypeChoice": [
+   "bludgeoning",
+   "piercing",
+   "slashing"
+  ],
+  "vulnerableToOtherChoices": true,
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "bludgeoning"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": []
  },
  {
@@ -5343,6 +5400,120 @@
   "modifiers": []
  },
  {
+  "id": "potion-of-healing-greater",
+  "name": "Potion of Healing (greater)",
+  "source": "srd",
+  "category": "consumable",
+  "costGp": null,
+  "weightLb": null,
+  "description": "Potion, Uncommon. You regain Hit Points when you drink this potion. The number of Hit Points depends on the potion's rarity, as shown in the table below. Whatever its potency, the potion's red liquid glimmers when agitated. Potion Potion of Healing: HP Regained 2d4 + 2, Rarity Common; Potion Potion of Healing (greater): HP Regained 4d4 + 4, Rarity Uncommon; Potion Potion of Healing (superior): HP Regained 8d4 + 8, Rarity Rare; Potion Potion of Healing (supreme): HP Regained 10d4 + 20, Rarity Very Rare.",
+  "weapon": null,
+  "armor": null,
+  "slot": "consumable",
+  "appliesTo": null,
+  "rarity": "uncommon",
+  "isMagic": true,
+  "attunement": {
+   "required": false,
+   "restrictedTo": []
+  },
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Healing (greater)",
+    "activation": "bonus-action",
+    "description": "Drink it, or give it to a creature within 5 feet of you. The drinker regains 4d4 + 4 Hit Points.",
+    "damage": [],
+    "healing": {
+     "formula": "4d4 + 4"
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "potion-of-healing-superior",
+  "name": "Potion of Healing (superior)",
+  "source": "srd",
+  "category": "consumable",
+  "costGp": null,
+  "weightLb": null,
+  "description": "Potion, Rare. You regain Hit Points when you drink this potion. The number of Hit Points depends on the potion's rarity, as shown in the table below. Whatever its potency, the potion's red liquid glimmers when agitated. Potion Potion of Healing: HP Regained 2d4 + 2, Rarity Common; Potion Potion of Healing (greater): HP Regained 4d4 + 4, Rarity Uncommon; Potion Potion of Healing (superior): HP Regained 8d4 + 8, Rarity Rare; Potion Potion of Healing (supreme): HP Regained 10d4 + 20, Rarity Very Rare.",
+  "weapon": null,
+  "armor": null,
+  "slot": "consumable",
+  "appliesTo": null,
+  "rarity": "rare",
+  "isMagic": true,
+  "attunement": {
+   "required": false,
+   "restrictedTo": []
+  },
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Healing (superior)",
+    "activation": "bonus-action",
+    "description": "Drink it, or give it to a creature within 5 feet of you. The drinker regains 8d4 + 8 Hit Points.",
+    "damage": [],
+    "healing": {
+     "formula": "8d4 + 8"
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
+  "id": "potion-of-healing-supreme",
+  "name": "Potion of Healing (supreme)",
+  "source": "srd",
+  "category": "consumable",
+  "costGp": null,
+  "weightLb": null,
+  "description": "Potion, Very Rare. You regain Hit Points when you drink this potion. The number of Hit Points depends on the potion's rarity, as shown in the table below. Whatever its potency, the potion's red liquid glimmers when agitated. Potion Potion of Healing: HP Regained 2d4 + 2, Rarity Common; Potion Potion of Healing (greater): HP Regained 4d4 + 4, Rarity Uncommon; Potion Potion of Healing (superior): HP Regained 8d4 + 8, Rarity Rare; Potion Potion of Healing (supreme): HP Regained 10d4 + 20, Rarity Very Rare.",
+  "weapon": null,
+  "armor": null,
+  "slot": "consumable",
+  "appliesTo": null,
+  "rarity": "very-rare",
+  "isMagic": true,
+  "attunement": {
+   "required": false,
+   "restrictedTo": []
+  },
+  "cursed": false,
+  "casts": [],
+  "consumedOnUse": true,
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Healing (supreme)",
+    "activation": "bonus-action",
+    "description": "Drink it, or give it to a creature within 5 feet of you. The drinker regains 10d4 + 20 Hit Points.",
+    "damage": [],
+    "healing": {
+     "formula": "10d4 + 20"
+    }
+   }
+  ],
+  "effects": [],
+  "modifiers": []
+ },
+ {
   "id": "potion-of-heroism",
   "name": "Potion of Heroism",
   "source": "srd",
@@ -5589,32 +5760,6 @@
   "slot": "consumable",
   "appliesTo": null,
   "rarity": "uncommon",
-  "isMagic": true,
-  "attunement": {
-   "required": false,
-   "restrictedTo": []
-  },
-  "cursed": false,
-  "casts": [],
-  "grantsFeatIds": [],
-  "tags": [],
-  "actions": [],
-  "effects": [],
-  "modifiers": []
- },
- {
-  "id": "potions-of-healing",
-  "name": "Potions of Healing",
-  "source": "srd",
-  "category": "consumable",
-  "costGp": null,
-  "weightLb": null,
-  "description": "Potion, Rarity Varies. You regain Hit Points when you drink this potion. The number of Hit Points depends on the potion's rarity, as shown in the table below. Whatever its potency, the potion's red liquid glimmers when agitated. Potion Potion of Healing: HP Regained 2d4 + 2, Rarity Common; Potion Potion of Healing (greater): HP Regained 4d4 + 4, Rarity Uncommon; Potion Potion of Healing (superior): HP Regained 8d4 + 8, Rarity Rare; Potion Potion of Healing (supreme): HP Regained 10d4 + 20, Rarity Very Rare.",
-  "weapon": null,
-  "armor": null,
-  "slot": "consumable",
-  "appliesTo": null,
-  "rarity": "varies",
   "isMagic": true,
   "attunement": {
    "required": false,
@@ -7262,6 +7407,11 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
+  "spellScroll": {
+   "minLevel": 0,
+   "maxLevel": 9
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],

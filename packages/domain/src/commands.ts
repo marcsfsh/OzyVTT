@@ -872,6 +872,14 @@ export const CharacterSetInventorySchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Picks up the ammunition a character fired outside a fight: half of each row's fired pieces come back. */
+export const CharacterRecoverAmmunitionSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** Moves one carried row, whole, from one character to another, with the charges it has spent (GM). */
 export const CharacterGiveItemSchema = z
   .object({
@@ -909,6 +917,17 @@ export const CharacterSetProficienciesSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The class each character level went to, in order: index 0 is level 1, the starting class. */
+const ClassLevelsSchema = z
+  .array(
+    z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+  )
+  .min(1)
+  .max(20);
+
 /** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
@@ -932,6 +951,9 @@ export const CharacterCreateSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** A multiclass build: the class each character level went to, in order. Index 0 is level 1 and must be
+     *  `classId`; the list is `level` long. Absent when every level is `classId`. */
+    classLevels: ClassLevelsSchema.optional(),
     abilityMethod: BuilderAbilityMethodSchema,
     baseScores: z
       .object({
@@ -973,6 +995,7 @@ export const BuilderOffersSchema = z
     backgroundId: BuilderContentIdSchema.optional(),
     classId: BuilderContentIdSchema.optional(),
     level: z.number().int().min(1).max(20),
+    classLevels: ClassLevelsSchema.optional(),
     picks: z
       .record(OfferKeySchema, z.array(BuilderContentIdSchema).max(40))
       .refine((picks) => Object.keys(picks).length <= 200)
@@ -984,7 +1007,23 @@ export const BuilderOffersSchema = z
       )
       .refine((increases) => Object.keys(increases).length <= 40)
       .optional(),
-    choices: z.array(CharacterChoiceSchema).max(200).optional()
+    choices: z.array(CharacterChoiceSchema).max(200).optional(),
+    sheet: z
+      .object({
+        level: z.number().int().min(1).max(20),
+        abilityScores: z
+          .object({
+            str: z.number().int().min(1).max(30),
+            dex: z.number().int().min(1).max(30),
+            con: z.number().int().min(1).max(30),
+            int: z.number().int().min(1).max(30),
+            wis: z.number().int().min(1).max(30),
+            cha: z.number().int().min(1).max(30)
+          })
+          .strict()
+      })
+      .strict()
+      .optional()
   })
   .strict()
   .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
@@ -1006,6 +1045,22 @@ export const CharacterGenerateSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80)
+      .optional(),
+    /** A multiclass character: each class with its levels, the starting class first; the levels add up to `level`. */
+    classes: z
+      .array(
+        z
+          .object({
+            classId: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(80),
+            level: z.number().int().min(1).max(20)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(4)
       .optional(),
     name: z.string().trim().min(1).max(120).optional(),
     expectedRevision: z.number().int().nonnegative().optional()

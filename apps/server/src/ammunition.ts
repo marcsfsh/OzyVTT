@@ -1,7 +1,7 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { EquipmentReference } from "@vtt/content-srd-5.2.1";
 import { catalogIdOf, type AmmunitionKind, type InventoryItem } from "@vtt/schemas";
-import { effectiveSlot } from "@vtt/rules-5e";
+import { effectiveSlot, type RiderCarrier } from "@vtt/rules-5e";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 
 /**
@@ -37,8 +37,11 @@ export type AmmunitionRow = Readonly<{
   /** Pieces per one quantity: 20 for "Arrows (20)", 1 for magic ammunition. */
   count: number;
   left: number;
-  /** Undefined for magic ammunition, which fits the launcher it was made for. */
+  /** The bundle's kind, or the kind magic ammunition was bound to (its `baseId`). Undefined when nothing records
+   *  one (homebrew ammunition with no base), which fits any launcher. */
   kind: AmmunitionKind | undefined;
+  /** Magic ammunition still waiting for its kind to be picked: it fits no launcher. */
+  unbound: boolean;
 }>;
 
 const piecesLeft = (row: InventoryItem, count: number) => Math.max(0, row.ammunitionLeft ?? row.quantity * count);
@@ -49,7 +52,16 @@ function ammunitionOf(row: InventoryItem, catalog: EquipmentCatalog | undefined)
   const slot = effectiveSlot({ slot: record?.slot ?? row.magic?.slot, category: row.category });
   if (bundle === undefined && slot !== "ammunition") return null;
   const count = bundle?.count ?? 1;
-  return { row, record, count, left: piecesLeft(row, count), kind: bundle?.kind };
+  // "Weapon (Any Ammunition)": a magic arrow is an arrow, so it fits only a bow.
+  const base = row.baseId !== undefined ? catalog?.equipmentRecord(row.baseId)?.ammunition : undefined;
+  return {
+    row,
+    record,
+    count,
+    left: piecesLeft(row, count),
+    kind: bundle?.kind ?? base?.kind,
+    unbound: record?.appliesTo != null && base === undefined
+  };
 }
 
 /** The row a shot draws from: equipped magic ammunition first (its bonus applies only while it is equipped), then
@@ -63,9 +75,49 @@ export function ammunitionFor(
     ammo.row.equipped ? (ammo.record?.isMagic ? 0 : 1) : ammo.record?.isMagic ? 3 : 2;
   const fitting = actor.inventory.flatMap((row) => {
     const ammo = ammunitionOf(row, catalog);
-    return ammo && ammo.left > 0 && (ammo.kind === undefined || kind === undefined || ammo.kind === kind) ? [ammo] : [];
+    return ammo &&
+      !ammo.unbound &&
+      ammo.left > 0 &&
+      (ammo.kind === undefined || kind === undefined || ammo.kind === kind)
+      ? [ammo]
+      : [];
   });
   return fitting.sort((left, right) => rank(left) - rank(right))[0] ?? null;
+}
+
+/** The ammunition a shot from this row fires: the launcher's kind and the piece it draws. Null when the row is no
+ *  launcher; `ammo` is null when nothing that fits is left. */
+export function shotFrom(
+  actor: Pick<Actor, "inventory">,
+  launcherId: string | null,
+  catalog: EquipmentCatalog | undefined
+): Readonly<{ launcher: InventoryItem; kind: AmmunitionKind | undefined; ammo: AmmunitionRow | null }> | null {
+  const launcher = launcherId === null ? undefined : actor.inventory.find((row) => row.id === launcherId);
+  const kind = launcher ? launcherKind(launcher, catalog) : null;
+  if (!launcher || kind === null) return null;
+  return { launcher, kind, ammo: ammunitionFor(actor, kind, catalog) };
+}
+
+/** A piece of magic ammunition's bonus is for attacks "made with this piece" (SRD): a resolve keeps the riders of
+ *  the ammunition row its shot draws from, and none of any other ammunition row. */
+export function withShotAmmunitionOnly<T extends Readonly<{ carriers: readonly RiderCarrier[] }>>(
+  derivation: T,
+  actor: Pick<Actor, "inventory">,
+  launcherId: string | null,
+  catalog: EquipmentCatalog | undefined
+): T {
+  const drawn = shotFrom(actor, launcherId, catalog)?.ammo?.row.id;
+  const others = new Set(
+    actor.inventory.filter((row) => row.id !== drawn && ammunitionOf(row, catalog) !== null).map((row) => row.id)
+  );
+  if (!derivation.carriers.some((carrier) => carrier.sourceItemId !== undefined && others.has(carrier.sourceItemId)))
+    return derivation;
+  return {
+    ...derivation,
+    carriers: derivation.carriers.filter(
+      (carrier) => carrier.sourceItemId === undefined || !others.has(carrier.sourceItemId)
+    )
+  };
 }
 
 /** A row holding `left` pieces: its quantity is the bundles still holding any, and a partly spent bundle keeps the
