@@ -69,6 +69,45 @@ answer the projections use:
   its token is left out.
 - An audience's own characters are always sent. A creature any part of whose space is revealed is
   sent.
+- With the fog on, a creature in the fight that isn't on the map yet (in the turn order or the tray)
+  is hidden too, as dynamic vision hides it: the party can't see what isn't there.
+
+**The shared hidden check.** `hiddenFrom` in `vision/audience.ts` is the one test for "is this
+creature hidden from this audience as a GM-only one is": GM-only, or hidden by sight or the fog.
+Without a session it answers for the table (the whole party's eyes), which every public line and die
+follows, and the table screen too. With a player's session it answers for that player's characters,
+which a refusal, a reply or a prompt only that player reads follows. Every rule and line that used to
+ask only "is it GM-only" asks it. Where a line would name a hidden creature it says "A hidden threat",
+the projections' mask, or leaves the name out, so play still reads for the GM. What it covers:
+
+- Feed lines and toasts that name a cause: the GM's Apply of a hit, the turn reminder, an effect
+  ended by Escape or another rule, a strike-back offer, aura and trait lines, Heat Metal's note, a
+  held creature dragged along, an opportunity attack against a hidden mover, and every resolver line
+  built from a rules event.
+- A creature that was hidden when it set off is narrated only where it is now ("came into view"),
+  never with the distance it came or its old ranges.
+- No opportunity attack opens for a player's character against a mover hidden from the table, and no
+  strike-back (Hellish Rebuke, Retaliation) against a source hidden from the damaged creature's
+  player. A player's Shield or Parry answer tells them only whether the attack landed and what it
+  dealt.
+- What a hidden creature would show in public dice: Disadvantage on a ranged attack beside it, Sneak
+  Attack through it, Pack Tactics, Aura of Authority and Aura of Protection. Hide counts only the
+  enemies the hider's player may know of.
+- Refusals: the off-turn refusal, moving Hunter's Mark, a reeling creature, ending an imposed effect
+  and a parked attack that can't finish name no hidden creature. A missing creature and someone
+  else's get the same answer, so a player can't probe which ids exist.
+- A public roll made by a creature hidden from the table becomes GM-only as the command that made it
+  commits, so it never reaches players later, live or in a replay, when the creature steps into view.
+- A light carried by a creature an audience doesn't perceive adds nothing to that audience's polygons
+  or to what the party remembers. Its circle would draw the carrier's position.
+- An area template drawn from a caster hidden from the table (a cone, line or emanation) is the GM's.
+- A player may load a token image only for a creature in their own view, the table screen only for
+  one the table may know of.
+- A creature hidden from the table when the GM takes it out of the fight, or when a new fight leaves
+  it out, becomes GM-only. Sight and the fog hide only what is on a map, and without this a creature
+  no one saw would join every player's roster as it left.
+- Players get opaque feed ids, the same for the same line, so the gaps between two lines don't count
+  the GM-only lines between them.
 
 **What players get.** The fog shapes as before. With vision on: the polygons their characters see
 now, the party's explored ground as rectangles (a bitmap of half-cells, at most 256 per side), the
@@ -106,6 +145,20 @@ about 40 ms in the dark (7 ms in bright light), and a player's vision block is a
 - Turning vision on in bright light before drawing walls explores the whole map at once. Drawing
   the walls first, or "Forget what the party has seen", undoes that.
 - Walls only matter while vision is on.
+- Left as they are, on purpose:
+  - A hidden creature's turn still shows as a hidden turn, as a GM-only one's always has, so the
+    table can count hidden slots in the order. The table needs to see play is waiting on the GM.
+  - Every command still raises the revision players receive, a hidden creature's move included. The
+    client checks staleness by it.
+  - The movement path search uses every wall and door, seen or not, so a move's cost or refusal can
+    tell a player a wall is there. At a table you learn of a wall by walking into it.
+  - The map image reaches players whole, as with ADR-0022's fog. It shows the layout, never a token.
+  - Damage, a save or a zone from a hidden source tells the player something unseen is there. The
+    source is masked.
+  - A hidden carrier's light isn't drawn even where it spills into sight round a corner. That is the
+    price of not drawing where the carrier stands.
+  - A rule that a hidden creature would trigger for a visible one (Pack Tactics, an aura, an ally for
+    Sneak Attack, Disadvantage beside it) doesn't apply. The GM can still set the roll mode.
 - Not modelled yet: the Light and Daylight spells (the GM places a light), the Bullseye Lantern's
   cone, Darkvision granted by an effect (the effect schema refuses senses), locked doors, opening a
   door as the turn's object interaction, magical Darkness and heavily obscured areas, and dim
@@ -139,7 +192,12 @@ once the fog over it lifts. `vision-projections.test.ts` and `fog-projections.te
 projection's whole payload (partly revealed, edge-touching, re-hidden, own and other characters,
 staged scenes, replays turn by turn). `vision-geometry.test.ts`, `vision-sight.test.ts` and
 `vision-rules.test.ts` cover the polygons, the senses and lights, movement through walls, the
-attack modes and Hide. The rules-5e path test and the client's move-preview mirror test cover walls
+attack modes and Hide. The shared hidden check has its own end-to-end tests, each of which failed
+before its fix: `hidden-narration.test.ts` (feed lines and toasts), `hidden-prompts.test.ts`
+(reaction prompts and their replies), `hidden-rules.test.ts` (refusals, dice, templates, token
+images, id probing) and `hidden-rolls.test.ts` (rolls made while hidden, the replay, unplaced
+creatures under the fog, feed ids). `vision-projections.test.ts` covers a hidden creature's carried
+light. The rules-5e path test and the client's move-preview mirror test cover walls
 in the path search. A browser look at 390 x 844 (touch) and 1280 x 800 covered a player's view in
 the dark, a door tapped open on a phone, the GM's Vision group, looking through a character, and a
 manual-fog scene with the goblins missing from the players' DOM.

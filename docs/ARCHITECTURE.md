@@ -140,8 +140,12 @@ creatures it may know of. A player sees through their own placed characters; the
 spectator and a replay see through the whole party. A creature that isn't a player character is
 hidden from an audience, exactly like a `gm-only` one, when none of its characters perceive it
 (dynamic vision on), or when its whole space lies under the scene's manual fog (fog on). The same
-goes for one staged that way in a prepared scene. Every projection, the feed and toast gate, and a
-player's target check read that one answer (`AudienceSight`). Another player's character out of
+goes for one staged that way in a prepared scene, and, with the fog on, for one in the fight but not
+yet on the map. Every projection, the feed and toast gate, and a player's target check read that one
+answer (`AudienceSight`). Rules, narration and refusals ask it through `hiddenFrom`, the shared hidden
+check: GM-only, or hidden by sight or the fog, for the table or for one player. A line that would
+name a hidden creature names "A hidden threat", a rule it would bend for a visible creature doesn't
+apply, and a public roll it makes is recorded GM-only. Another player's character out of
 sight keeps its actor but loses its token. An audience's own characters are always sent, and so
 is a creature with any part of its space revealed.
 

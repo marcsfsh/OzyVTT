@@ -38,7 +38,7 @@ import { endZone } from "../spell-zone-state.js";
 import { placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
-import { partySight } from "../vision/audience.js";
+import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { sceneSight } from "../vision/sight.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -99,6 +99,7 @@ export const mapCommands = [
       let released: EffectNarration[] = [];
       const zoneEvents: EffectNarration[] = [];
       const draggedNames: string[] = [];
+      let moverHiddenAtStart = false;
       const { duplicate } = await execute((state) => {
         if (state.combat.mapAssetId !== mapAssetId)
           throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
@@ -125,6 +126,9 @@ export const mapCommands = [
         const seenAtStart = sight.enabled
           ? new Set(state.actors.filter((actor) => sight.sees(actor.id, actorId)).map((actor) => actor.id))
           : null;
+        // Hidden from the table as it set off (the shared check): it provokes no player's opportunity attack, and the
+        // table's line about it can't say where it came from.
+        moverHiddenAtStart = kit.hiddenFromTable(state)(actorId);
         // Taking a placed token off the map mid-fight would move it for free.
         if (position === null && from !== null && !isGmGrade(principal) && state.combat.active)
           throw new CommandRejectedError("Only the GM takes a token off the map during a fight.");
@@ -171,6 +175,7 @@ export const mapCommands = [
           catalog: kit.equipmentCatalog(),
           ...(perceives ? { perceives } : {}),
           ...(seenAtStart ? { seenBy: (id: string) => seenAtStart.has(id) } : {}),
+          moverHiddenFromPlayers: moverHiddenAtStart,
           newPromptId: kit.context.newId,
           now: Date.now,
           commandId
@@ -194,9 +199,9 @@ export const mapCommands = [
           );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
-        // A creature the party can't perceive after the move is left out of the table's line. Setting the scene
-        // before a fight tells the table nothing: the feed narrates moves in a fight.
-        const unseen = partySight(state, kit.sightContent()).hidden;
+        // A creature hidden from the table after the move is left out of the table's line. Setting the scene before
+        // a fight tells the table nothing: the feed narrates moves in a fight.
+        const hiddenAfter = kit.hiddenFromTable(state);
         movement = state.combat.active
           ? narrateTokenMove({
               state,
@@ -205,13 +210,14 @@ export const mapCommands = [
               geometry,
               mode,
               crawled: outcome.crawled,
-              hiddenFromTable: (id) => unseen.has(id)
+              hiddenFromTable: hiddenAfter,
+              fromHiding: moverHiddenAtStart
             })
           : null;
         const to = moverToken?.position ?? null;
         if (from !== null && to !== null)
           for (const heldId of dragAlong(state, dragged, from, to, geometry)) {
-            draggedNames.push(kit.actorName(heldId));
+            draggedNames.push(hiddenAfter(heldId) ? HIDDEN_SOURCE : kit.actorName(heldId));
             // A creature dragged along meets the spell areas it is dragged into.
             const held = state.combat.tokens.find((token) => token.actorId === heldId)?.position;
             if (held)
@@ -258,10 +264,12 @@ export const mapCommands = [
           text: `OVERRIDE (movement): ${kit.actorName(actorId)} moved past a movement rule - ${movementOverridden}`,
           actorIds: [actorId]
         });
+      // A GM creature's prompt against a mover hidden from the table names it as the projection does.
+      const moverName = moverHiddenAtStart || kit.actorHidden(actorId) ? HIDDEN_SOURCE : kit.actorName(actorId);
       for (const prompt of opportunityPrompts)
         kit.context.broadcastTableEvent({
           kind: "reaction",
-          text: `${prompt.name} may make an opportunity attack against ${kit.actorName(actorId)}.`,
+          text: `${prompt.name} may make an opportunity attack against ${moverName}.`,
           actorIds: [prompt.actorId],
           gmOnly: kit.actorHidden(prompt.actorId)
         });

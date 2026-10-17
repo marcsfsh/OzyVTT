@@ -127,6 +127,9 @@ export function narrateTokenMove(
     crawled?: boolean;
     /** Creatures the table can't know of beyond the GM-only ones (dynamic vision: none of the party perceives them). */
     hiddenFromTable?: (actorId: string) => boolean;
+    /** It was hidden from the table when it set off. The table's line then says only where it is now: where it
+     *  started and how far it came would say where it hid. */
+    fromHiding?: boolean;
   }>
 ): MovementNarration | null {
   const { state, actorId, from, geometry } = input;
@@ -153,7 +156,7 @@ export function narrateTokenMove(
     sizeCells: moverToken?.sizeCells ?? 1,
     sizePx: moverToken?.sizePx ?? 0
   });
-  type Range = Readonly<{ name: string; hidden: boolean; label: string }>;
+  type Range = Readonly<{ name: string; hidden: boolean; label: string; nowLabel: string }>;
   const ranges: Range[] = [];
   for (const entry of state.combat.initiative) {
     if (entry.actorId === actorId) continue;
@@ -172,7 +175,7 @@ export function narrateTokenMove(
       before === null
         ? `${other.name} ${formatDistance(now)}`
         : `${other.name} ${formatDistance(before)} → ${formatDistance(now)}`;
-    ranges.push({ name: other.name, hidden: hidden(other), label });
+    ranges.push({ name: other.name, hidden: hidden(other), label, nowLabel: `${other.name} ${formatDistance(now)}` });
   }
 
   const how = input.crawled ? "crawled" : MODE_VERBS[input.mode ?? "walk"];
@@ -188,6 +191,13 @@ export function narrateTokenMove(
   if (moverHidden) return { publicText: null, gmText: withRanges(ranges) };
   const visible = ranges.filter((range) => !range.hidden);
   const concealed = ranges.filter((range) => range.hidden);
+  if (input.fromHiding) {
+    const now = visible.map((range) => range.nowLabel);
+    return {
+      publicText: `${mover.name} came into view${now.length > 0 ? ` - ${now.join(", ")}` : ""}.`,
+      gmText: withRanges(ranges)
+    };
+  }
   return {
     publicText: withRanges(visible),
     gmText:

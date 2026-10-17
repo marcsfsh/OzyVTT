@@ -4,7 +4,9 @@ import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
 import { pushTokenAway } from "../forced-movement.js";
 import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome } from "../reactions.js";
-import { initiatorOf, sessionIdOf } from "./kit.js";
+import type { ActionResolution } from "@vtt/domain";
+import { withoutSourceName } from "../hidden-source.js";
+import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Answers to what a hit leaves open: reaction prompts (ADR-0020) and the GM's damage proposals.
@@ -63,6 +65,25 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
       return { kind: "reaction", text: `${outcome.actorName} ${what} - ${result}.` };
     }
   }
+}
+
+/** The attack a player's Parry or Shield met, as that player reads it: whether it hit and what it dealt. The attack
+ *  is the GM's creature's, so what its engine noted stays with the GM. An attacker hidden from the player stays
+ *  unnamed in the action and in what the hit imposed. */
+function metAttack(resolution: ActionResolution, attacker: string | null, attackerHidden: boolean): ActionResolution {
+  const named = (text: string) => (attackerHidden ? withoutSourceName(text, attacker) : text);
+  return {
+    actionName: attackerHidden ? "An attack" : resolution.actionName,
+    activation: resolution.activation,
+    attack: resolution.attack,
+    save: null,
+    damage: resolution.damage.map(({ source: _source, ...part }) => part),
+    damageTotal: resolution.damageTotal,
+    crit: resolution.crit,
+    ...(resolution.effectsApplied
+      ? { effectsApplied: resolution.effectsApplied.map((applied) => ({ ...applied, name: named(applied.name) })) }
+      : {})
+  };
 }
 
 export const reactionCommands = [
@@ -143,11 +164,19 @@ export const reactionCommands = [
           outcome.kind === "attack-would-hit" ? outcome.other!.id : outcome.actorId
         );
       kit.publishNarrations(outcome.events);
+      const resolution =
+        outcome.resolution && outcome.kind === "attack-would-hit" && !isGmGrade(principal)
+          ? metAttack(
+              outcome.resolution,
+              outcome.other?.name ?? null,
+              outcome.other ? kit.hiddenFor(initiator, state)(outcome.other.id) : true
+            )
+          : outcome.resolution;
       return {
         outcome: {
           used: outcome.used,
           appliedDamage: outcome.appliedDamage,
-          ...(outcome.resolution ? { resolution: outcome.resolution } : {}),
+          ...(resolution ? { resolution } : {}),
           ...(outcome.parts ? { parts: outcome.parts } : {}),
           ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {})
         }

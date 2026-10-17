@@ -114,7 +114,8 @@ export const saveCommands = [
         const aura =
           auraOfProtection(draft, live, {
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
-            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB),
+            catalog: kit.equipmentCatalog()
           })?.amount ?? 0;
         const sources = saveRollSources(live, ability, derivation);
         const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
@@ -251,9 +252,10 @@ export const saveCommands = [
       let rollModeSources: ReturnType<typeof shownRollMode>;
       let events: EffectNarration[] = [];
       const { state, duplicate } = await execute((draft) => {
+        // Access first: a missing creature and someone else's get one answer.
+        requireActorAccess(initiator, draft, actorId, "save", "You can only roll for your own character.");
         const actor = draft.actors.find((candidate) => candidate.id === actorId);
         if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-        requireActorAccess(initiator, draft, actorId, "save", "You can only roll for your own character.");
         if (actor.deathSaves === null || actor.hp.current > 0)
           throw new CommandRejectedError("That character isn't dying.");
         if (actor.deathSaves.stable) throw new CommandRejectedError("A stable character doesn't roll death saves.");
@@ -274,7 +276,8 @@ export const saveCommands = [
         const aura =
           auraOfProtection(draft, actor, {
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
-            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+            distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB),
+            catalog: kit.equipmentCatalog()
           })?.amount ?? 0;
         const modifier = exhaustionPenalty(actor) + saveRiderBonusForAnySave(derivation) + aura;
         const sources = anySaveRollSources(derivation);

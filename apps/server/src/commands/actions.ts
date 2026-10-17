@@ -3,7 +3,7 @@ import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
-import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -75,13 +75,11 @@ export const actionCommands = [
       // name, so a player's is kept.
       const initiator = initiatorOf(principal);
       const isPlayer = initiator.role === "player";
-      // The creatures a player may not target or be told of: GM-only ones, and those their characters can't perceive
-      // or that stand wholly under the fog.
+      // The creatures a player may not target or be told of: the shared hidden check from this player's own view
+      // (GM-only, out of their characters' sight, under the fog, or not on the map).
       const hiddenFromPlayer = (state: GameState): ReadonlySet<string> => {
-        const unseen = kit.unseenBy(initiator, state);
-        return new Set(
-          state.actors.filter((actor) => !canPlayerTarget(state, actor.id, unseen)).map((actor) => actor.id)
-        );
+        const hidden = kit.hiddenFor(initiator, state);
+        return new Set(state.actors.filter((actor) => hidden(actor.id)).map((actor) => actor.id));
       };
       if (isPlayer && override) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
       // A player types the face their die shows, never a total: the server adds the bonus and reads a 1 or a 20.
@@ -104,10 +102,11 @@ export const actionCommands = [
       // narration.
       let playerDamageApplied: readonly AppliedDamage[] = [];
       const { state, duplicate } = await execute((draft) => {
+        // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
+        // else's get one answer, so a player can't probe which ids exist.
+        requireActorAccess(initiator, draft, actorId, "attack");
         const attacker = draft.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
-        // The action kind is passed for the per-table policy hook (ADR-0021).
-        requireActorAccess(initiator, draft, actorId, "attack");
         const definition = attacker.definitionId ? kit.resolveDefinitionIn(draft, attacker.definitionId) : undefined;
         // Effective actions, so `item-<itemId>` ids resolve and item-raised numbers apply. A stat-block
         // action wins on id collision; builtins cover every combatant.
@@ -119,6 +118,7 @@ export const actionCommands = [
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
         const action = withChosenCost(listed, request.spend);
         let resolvedTargetIds: readonly string[];
+        let originAtCaster = false;
         if (template) {
           if (action.attack)
             throw new CommandRejectedError(
@@ -131,6 +131,7 @@ export const actionCommands = [
           const snapped = shapeGeometry(calibration, template.shape, template.origin, template.target);
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
+          originAtCaster = casterOutside;
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
@@ -236,7 +237,9 @@ export const actionCommands = [
               rollDie: (sides) => kit.context.random(sides)
             }
           );
-        // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
+        // Record the blast as a shape; id=commandId keeps re-delivery idempotent. A cone or line starts at its caster,
+        // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
+        const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
         if (template)
           addAnnotation(
             draft,
@@ -246,7 +249,7 @@ export const actionCommands = [
               shape: template.shape,
               origin: template.origin,
               target: template.target,
-              visibility: "public",
+              visibility: fromHiddenCaster ? "gm-only" : "public",
               actor: { sessionId: gmSessionId, role: "gm" },
               now: Date.now()
             },

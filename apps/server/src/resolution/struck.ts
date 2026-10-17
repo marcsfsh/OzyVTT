@@ -1,7 +1,7 @@
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import { applyDamageDetailed, damageAdjustmentDetail } from "../hit-points.js";
 import { traitOf } from "../statblock-traits.js";
-import type { ResolveContext } from "./context.js";
+import { tableLineOf, type ResolveContext } from "./context.js";
 
 /**
  * What hitting the target costs the attacker, from the target's stat block: "A creature that hits the pudding with a
@@ -45,11 +45,5 @@ export function strikeBackOnHit(ctx: ResolveContext): void {
     text: `${attacker.name} takes ${application.totalApplied} damage from ${target.name}'s ${trait.name}${damageAdjustmentDetail(application)}.`,
     actorIds: [attacker.id, target.id]
   });
-  for (const event of events)
-    ctx.tableNarration.push({
-      kind: "effect",
-      text: event.text,
-      actorIds: [event.actorId],
-      ...(event.gmOnly ? { gmOnly: true } : {})
-    });
+  for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }

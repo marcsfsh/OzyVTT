@@ -13,6 +13,7 @@ import type { EquipmentCatalog } from "./equipment-derivation.js";
 import type { DefinitionAction, LiveActor, ResolveInput } from "./resolution/context.js";
 import { damagePartsOf } from "./resolution/damage.js";
 import { commitEconomy, planEconomy } from "./resolution/economy.js";
+import { hiddenFrom } from "./vision/audience.js";
 import { checkPlan } from "./ability-checks.js";
 import { rollSettledCheck } from "./check-rolls.js";
 import { withOneUsedUp } from "./consumables.js";
@@ -416,8 +417,19 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
             (candidate) => candidate.id === parked.actionId
           )
       : undefined;
-  if (!attacker || !parked || !action || !state.combat.initiative.some((entry) => entry.actorId === attacker.id))
-    throw new CommandRejectedError(`${pending.sourceName}'s attack can't be finished any more - dismiss the prompt.`);
+  if (!attacker || !parked || !action || !state.combat.initiative.some((entry) => entry.actorId === attacker.id)) {
+    // An attacker hidden from whoever answers stays unnamed, as the prompt itself shows it.
+    const hidden =
+      pending.sourceActorId === null ||
+      hiddenFrom(
+        state,
+        { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) },
+        answer.scope.role === "player" ? answer.scope.sessionId : undefined
+      )(pending.sourceActorId);
+    throw new CommandRejectedError(
+      `${hidden ? "The" : `${pending.sourceName}'s`} attack can't be finished any more - dismiss the prompt.`
+    );
+  }
 
   clearPrompt(false);
   let effectName: string | null = null;

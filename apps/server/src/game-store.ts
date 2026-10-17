@@ -74,9 +74,10 @@ export type GameStoreOptions = Readonly<{
   /** Whether a mutation changed restorable state; while rewound, true marks historyDirty. Injected so the
    *  store doesn't know which fields are restorable. */
   timelineDirtied?: (before: GameState, after: GameState) => boolean;
-  /** Runs after every command's own changes, in the same transaction: state the server keeps derived from the rest
-   *  (what the party has seen, under dynamic vision). Must not throw for a command that is otherwise fine. */
-  afterMutate?: (state: GameState) => void;
+  /** Runs after every command's own changes, in the same transaction, with the state before them: state the server
+   *  keeps derived from the rest (what the party has seen, which new rolls a hidden creature made). Must not throw for
+   *  a command that is otherwise fine. */
+  afterMutate?: (state: GameState, before: GameState) => void;
 }>;
 
 /** Timeline operations for a plan. Reads run immediately (inside the serialized queue); writes are queued
@@ -409,7 +410,7 @@ export class GameStore {
 
       const nextState = structuredClone(this.state);
       const pendingTimelineWrites = operate(nextState);
-      this.options.afterMutate?.(nextState);
+      this.options.afterMutate?.(nextState, this.state);
       nextState.revision += 1;
       const acceptedAt = new Date().toISOString();
 
