@@ -16,10 +16,11 @@ describe("casting a spell that isn't prepared", () => {
   it("is refused while the table polices spellcasting, and advised otherwise", () => {
     const { state, resolve, hero } = fight(wizard);
     hero.preparedSpellIds = hero.preparedSpellIds.filter((id) => id !== "fireball");
+    state.combat = { ...state.combat, rulesMode: "assisted" };
     expect(resolve("spell-fireball", {}).warnings?.join(" ")).toMatch(/hasn't prepared Fireball/);
+    // The dial starts on Enforce, and slots follow it.
     const strict = fight(wizard);
     strict.hero.preparedSpellIds = strict.hero.preparedSpellIds.filter((id) => id !== "fireball");
-    strict.state.combat = { ...strict.state.combat, ruleExceptions: { slots: "strict" } };
     expect(() => strict.resolve("spell-fireball", {})).toThrowError(/hasn't prepared Fireball/);
     expect(state.combat.turn.actionUsed).toBe(true);
   });

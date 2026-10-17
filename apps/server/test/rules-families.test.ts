@@ -130,11 +130,13 @@ describe("effective mode", () => {
     expect(effectiveModeFor(state.combat, "cover.total")).toBe("strict");
   });
 
-  it("defaults spell slots to advisory so new enforcement cannot silently start blocking old saves", () => {
+  it("has spell slots follow the campaign's dial like every other family", () => {
     const fresh = GameStateSchema.parse({ schemaVersion: 1 });
-    expect(fresh.combat.ruleExceptions).toEqual({ slots: "assisted" });
-    expect(fresh.rulesPolicy).toEqual({ dial: "strict", exceptions: { slots: "assisted" } });
-    expect(effectiveModeFor(fresh.combat, "slots.none-remaining")).toBe("assisted");
+    expect(fresh.combat.ruleExceptions).toEqual({});
+    expect(fresh.rulesPolicy).toEqual({ dial: "strict", exceptions: {} });
+    expect(effectiveModeFor(fresh.combat, "slots.none-remaining")).toBe("strict");
+    const advised = stateWith({ rulesMode: "assisted", ruleExceptions: {} });
+    expect(effectiveModeFor(advised.combat, "slots.none-remaining")).toBe("assisted");
   });
 });
 

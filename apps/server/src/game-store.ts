@@ -164,6 +164,36 @@ const MIGRATIONS: readonly Migration[] = [
           at TEXT NOT NULL
         ) STRICT;
       `)
+  },
+  {
+    // Spell slots used to advise whatever the campaign's rules dial said; they follow the dial now. The settings
+    // page only ever stores "freeform" for a family or clears it, so a stored "assisted" for slots is the old default.
+    version: 2,
+    up: (database) => {
+      const rewrite = (json: string) => {
+        const state = JSON.parse(json) as {
+          rulesPolicy?: { exceptions?: Record<string, string> };
+          combat?: { ruleExceptions?: Record<string, string> };
+          scenes?: { combat?: { ruleExceptions?: Record<string, string> } }[];
+        };
+        const exceptions = [
+          state.rulesPolicy?.exceptions,
+          state.combat?.ruleExceptions,
+          ...(state.scenes ?? []).map((scene) => scene.combat?.ruleExceptions)
+        ];
+        for (const entry of exceptions) if (entry?.slots === "assisted") delete entry.slots;
+        return JSON.stringify(state);
+      };
+      for (const table of ["game_state", "turn_snapshots"] as const) {
+        // `rowid` comes back under the primary key's own name, so alias it.
+        const rows = database.prepare(`SELECT rowid AS row_id, state_json FROM ${table}`).all() as {
+          row_id: number;
+          state_json: string;
+        }[];
+        const update = database.prepare(`UPDATE ${table} SET state_json = ? WHERE rowid = ?`);
+        for (const row of rows) update.run(rewrite(row.state_json), row.row_id);
+      }
+    }
   }
 ];
 

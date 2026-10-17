@@ -59,10 +59,54 @@ describe("SQLite GameStore", () => {
       expect(
         (database.prepare("SELECT COUNT(*) AS count FROM command_receipts").get() as { count: number }).count
       ).toBe(50);
-      expect(database.prepare("SELECT store, version FROM migrations").all()).toEqual([{ store: "game", version: 1 }]);
+      expect(database.prepare("SELECT store, version FROM migrations").all()).toEqual([
+        { store: "game", version: 1 },
+        { store: "game", version: 2 }
+      ]);
       database.close();
     } finally {
       store?.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("lets spell slots follow the rules dial in a game saved when they always advised", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-game-store-"));
+    const databasePath = join(directory, "vtt.sqlite");
+    try {
+      const store = new GameStore(databasePath);
+      await store.initialize();
+      store.close();
+      // Back to how an older build left it: migration 2 not applied, and the old default stored everywhere.
+      const old = GameStateSchema.parse({ schemaVersion: 1 });
+      const saved = {
+        ...old,
+        rulesPolicy: { dial: "strict", exceptions: { slots: "assisted", movement: "freeform" } },
+        combat: { ...old.combat, ruleExceptions: { slots: "assisted" } }
+      };
+      const database = new DatabaseSync(databasePath);
+      database.prepare("DELETE FROM migrations WHERE store = 'game' AND version = 2").run();
+      database.prepare("UPDATE game_state SET state_json = ? WHERE id = 1").run(JSON.stringify(saved));
+      database
+        .prepare(
+          "INSERT INTO turn_snapshots (idx, kind, label, revision, state_json, created_at) VALUES (0, 'turn', 'Round 1', 0, ?, ?)"
+        )
+        .run(JSON.stringify(saved), new Date().toISOString());
+      database.close();
+
+      const reopened = new GameStore(databasePath);
+      await reopened.initialize();
+      // A family the GM turned off stays off; only the old slots default goes.
+      expect(reopened.snapshot.rulesPolicy.exceptions).toEqual({ movement: "freeform" });
+      expect(reopened.snapshot.combat.ruleExceptions).toEqual({});
+      reopened.close();
+      const check = new DatabaseSync(databasePath, { readOnly: true });
+      const snapshot = check.prepare("SELECT state_json FROM turn_snapshots WHERE idx = 0").get() as {
+        state_json: string;
+      };
+      expect(JSON.parse(snapshot.state_json).combat.ruleExceptions).toEqual({});
+      check.close();
+    } finally {
       await rm(directory, { recursive: true, force: true });
     }
   });
