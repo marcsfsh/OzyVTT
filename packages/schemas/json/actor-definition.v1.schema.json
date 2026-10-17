@@ -737,6 +737,14 @@
                 "$ref": "#/$defs/__schema53"
               }
             },
+            "conditions": {
+              "minItems": 1,
+              "maxItems": 3,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema53"
+              }
+            },
             "temporaryHitPointsEachTurn": {
               "anyOf": [
                 {

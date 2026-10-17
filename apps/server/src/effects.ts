@@ -44,6 +44,10 @@ export const NO_SPELLS_TAG = "no-spells";
 export const BARKSKIN_TAG = "barkskin";
 /** Death Ward: the first drop to 0 Hit Points leaves the bearer at 1 instead, and ends it. */
 export const DEATH_WARD_TAG = "death-ward";
+/** Protection from Energy: Resistance to the one damage type the caster picks from those the action offers. */
+export const RESISTS_CHOSEN_TYPE_TAG = "resists-chosen-type";
+/** Invisibility: it ends once its bearer makes an attack roll, deals damage or casts a spell. */
+export const UNTIL_IT_ACTS_TAG = "until-it-acts";
 /** On an escapable effect: the escape is a Strength (Athletics) check alone (a spell's restraint: Web, Entangle). */
 export const ESCAPE_ATHLETICS_TAG = "escape-athletics";
 /** The tag on a caster's own "Concentrating on X" effect; ending it ends everything its cast made. */

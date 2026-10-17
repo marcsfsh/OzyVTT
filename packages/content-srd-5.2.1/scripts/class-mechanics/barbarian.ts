@@ -102,7 +102,8 @@ export const barbarian: ClassMechanicsModule = {
         }
       ]
     },
-    // One more pick from the class skill list. The "as a Strength check" half stays prose.
+    // One more pick from the class skill list. While raging, `checkPlan` makes the five skills' checks as Strength
+    // checks when that is the better roll.
     "primal-knowledge": {
       extraPicks: [{ offer: "class-skills", amount: 1 }]
     },
@@ -167,9 +168,8 @@ export const barbarian: ClassMechanicsModule = {
         ]
       },
       /**
-       * Immunity gated on the `raging` tag Rage's effect writes, evaluated per read by
-       * `equipment-derivation.ts` and failing closed. Ending an existing Charmed/Frightened condition on
-       * entering Rage is not expressible and stays prose.
+       * Immunity gated on the `raging` tag Rage's effect writes, evaluated per read by `equipment-derivation.ts` and
+       * failing closed. A Charmed or Frightened condition present as the Rage starts ends then (`grant.ts`).
        */
       "mindless-rage": {
         grants: {

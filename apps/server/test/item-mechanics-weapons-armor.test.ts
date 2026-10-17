@@ -549,12 +549,23 @@ describe("the authored riders are present in the shipped bundle", () => {
 
   it("leaves every RESERVED item bare, so a later unit finds an unauthored carrier", () => {
     // Rows whose printed effects need mechanics the engine does not model yet.
-    for (const id of ["sun-blade", "energy-bow", "spellguard-shield", "thunderous-greatclub"]) {
+    for (const id of ["sun-blade", "energy-bow", "thunderous-greatclub"]) {
       const row = shipped(id) as unknown as { modifiers: unknown[]; casts: unknown[]; cursed: boolean };
       expect(row.modifiers, `${id} is reserved and must carry no modifiers`).toEqual([]);
       expect(row.casts, `${id} is reserved and must carry no casts`).toEqual([]);
       expect(row.cursed, `${id} is reserved and must not be cursed`).toBe(false);
     }
+  });
+
+  it("gives Spellguard Shield its Disadvantage on spell attacks alone", () => {
+    expect(shipped("spellguard-shield").modifiers).toEqual([
+      {
+        type: "roll-mode",
+        roll: "incoming-attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
+      }
+    ]);
   });
 
   it("holds the two riders this salvage REMOVED to their named absences", () => {

@@ -217,3 +217,16 @@ describe("a stat block's spells as cast actions", () => {
     expect(summaries.find((summary) => summary.id === "misty-step-3-day")).not.toHaveProperty("castFrom");
   });
 });
+
+describe("a stat block's Invisibility", () => {
+  it("makes the Imp Invisible until its Sting's attack roll ends the spell", () => {
+    const state = fight("imp");
+    const imp = state.actors.find((actor) => actor.id === IDS.foe)!;
+    cast(state, "imp", actionOf("imp", "invisibility"), [IDS.foe]);
+    expect(imp.conditions.map((condition) => condition.id)).toEqual(["invisible"]);
+    nextTurn(state);
+    cast(state, "imp", actionOf("imp", "sting"), [IDS.hero], [15, 3, 3, 3]);
+    expect(imp.conditions).toEqual([]);
+    expect(imp.effects).toEqual([]);
+  });
+});

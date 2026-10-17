@@ -7629,7 +7629,24 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "incoming-attack",
+    "mode": "disadvantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "spell"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "sphere-of-annihilation",

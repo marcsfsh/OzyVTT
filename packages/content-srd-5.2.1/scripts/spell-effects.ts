@@ -87,7 +87,9 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   "dragons-breath": ["acid", "cold", "fire", "lightning", "poison"],
   "conjure-elemental": ["lightning", "thunder", "fire", "cold"],
   // Radiant for a good or neutral caster, Necrotic for an evil one.
-  "spirit-guardians": ["radiant", "necrotic"]
+  "spirit-guardians": ["radiant", "necrotic"],
+  // The Resistance the touched creature gains: "one damage type of your choice".
+  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"]
 };
 
 /** Spell attack rolls one cast makes, where the text's wording misleads the reader. */
@@ -827,6 +829,37 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     tags: ["death-ward"],
     target: "target",
     duration: { type: "manual" }
+  }),
+  // "Resistance to one damage type of your choice: Acid, Cold, Fire, Lightning, or Thunder."
+  "protection-from-energy": spellGrant({
+    name: "Protection from Energy",
+    tags: ["protection-from-energy", "resists-chosen-type"],
+    target: "target",
+    duration: { type: "manual" }
+  }),
+  // "Advantage on ability checks using the chosen ability", one for every target the cast takes.
+  "enhance-ability": spellGrant({
+    name: "Enhance Ability",
+    tags: ["enhance-ability", "enhanced-ability"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
+  // "A creature you touch has the Invisible condition until the spell ends."
+  "greater-invisibility": spellGrant({
+    name: "Greater Invisibility",
+    tags: ["greater-invisibility"],
+    target: "target",
+    duration: rounds(10),
+    conditions: ["invisible"]
+  }),
+  // Invisible "until the spell ends", which it does "immediately after the target makes an attack roll, deals damage,
+  // or casts a spell".
+  invisibility: spellGrant({
+    name: "Invisibility",
+    tags: ["invisibility", "until-it-acts"],
+    target: "targets",
+    duration: { type: "manual" },
+    conditions: ["invisible"]
   }),
   "mage-armor": spellGrant({
     name: "Mage Armor",

@@ -474,9 +474,12 @@ export type ContentActionArea = Readonly<{
 /** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
  *  ability checks made with it). */
 export const CHOSEN_ABILITY_TAG = "hexed";
+/** Enhance Ability's grant: Advantage on the ability checks made with the ability its caster chooses. */
+export const ENHANCED_ABILITY_TAG = "enhanced-ability";
 /** Whether an action asks its caster to choose an ability (`action.resolve`'s `ability`). */
 export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: readonly string[] }> }>): boolean =>
-  action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true;
+  action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true ||
+  action.grants?.tags.includes(ENHANCED_ABILITY_TAG) === true;
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
 export type ContentActionSummary = Readonly<{
   id: string;

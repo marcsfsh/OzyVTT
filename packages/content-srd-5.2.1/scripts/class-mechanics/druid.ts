@@ -1,5 +1,8 @@
 // Druid and Circle of the Land mechanics, merged over the ETL-generated prose.
-import type { ClassMechanicsModule, TableSpell } from "./overlay.js";
+import { potentSpellcasting, type ClassMechanicsModule, type TableSpell } from "./overlay.js";
+
+/** The SRD Druid cantrips that deal damage, which Potent Spellcasting adds to. */
+const DRUID_DAMAGE_CANTRIPS = ["poison-spray", "produce-flame", "starry-wisp"];
 
 /** The Circle of the Land table: each land's spells by Druid level (3, 5, 7, 9). */
 const LANDS: ReadonlyArray<{
@@ -155,7 +158,8 @@ export const druid: ClassMechanicsModule = {
             id: "potent-spellcasting",
             name: "Potent Spellcasting",
             description:
-              "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet."
+              "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet.",
+            modifiers: [potentSpellcasting(DRUID_DAMAGE_CANTRIPS)]
           },
           {
             id: "primal-strike",

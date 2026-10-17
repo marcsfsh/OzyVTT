@@ -7588,7 +7588,22 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Enhance Ability",
+    "tags": [
+     "enhance-ability",
+     "enhanced-ability"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -10853,7 +10868,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Greater Invisibility",
+    "tags": [
+     "greater-invisibility"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "conditions": [
+     "invisible"
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -13573,7 +13606,25 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Invisibility",
+    "tags": [
+     "invisibility",
+     "until-it-acts"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    },
+    "conditions": [
+     "invisible"
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -17742,7 +17793,29 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "damageTypes": [
+    "acid",
+    "cold",
+    "fire",
+    "lightning",
+    "thunder"
+   ],
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Protection from Energy",
+    "tags": [
+     "protection-from-energy",
+     "resists-chosen-type"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "cleric",

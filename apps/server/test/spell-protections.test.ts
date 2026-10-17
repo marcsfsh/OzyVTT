@@ -1,18 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { armorClassInPlay, type GameState } from "@vtt/domain";
-import type { ActorAction } from "@vtt/schemas";
-import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { InventoryItemSchema, type ActorAction, type Modifier } from "@vtt/schemas";
+import { resolveDefinitionAction, type ResolveInput } from "../src/action-resolution.js";
+import { checkRollMode } from "../src/ability-checks.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { upcastAction } from "../src/item-actions.js";
 import { answerSave, saveRollSources } from "../src/saving-throws.js";
-import { ESCAPE_ATHLETICS_TAG } from "../src/effects.js";
-import { build, castOf, catalog, druidInput, fight, FOE, HERO, view, wizardInput } from "./spell-casters.js";
+import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect } from "../src/effects.js";
+import {
+  build,
+  castOf,
+  catalog,
+  druidInput,
+  fight,
+  FOE,
+  HERO,
+  heroTurnAgain,
+  view,
+  wizardInput
+} from "./spell-casters.js";
 
 // SRD 5.2.1 spells whose lasting part the server now applies: Stoneskin's Resistance, Blur's and Foresight's roll
 // modes, Divine Favor's Radiant, Barkskin's AC 17, Death Ward's 1 Hit Point, Befuddlement's bar on spells, Vitriolic
-// Sphere's later Acid, and Ensnaring Strike's vines.
+// Sphere's later Acid, Ensnaring Strike's vines, the Invisible condition of Invisibility and Greater Invisibility,
+// Enhance Ability's Advantage and Protection from Energy's Resistance.
 
 const wizard = build(wizardInput(["blur"]));
 const druid = build(druidInput(["barkskin"]));
@@ -21,11 +34,17 @@ const actor = (state: GameState, id: string) => state.actors.find((candidate) =>
 let ids = 0;
 const nextId = () => `50000000-0000-4000-8000-${String((ids += 1)).padStart(12, "0")}`;
 /** The wizard uses `action` on `targetIds`, its dice `faces` then 3s. */
-function use(state: GameState, action: ActorAction, targetIds: string[], faces: number[] = []) {
+function use(
+  state: GameState,
+  action: ActorAction,
+  targetIds: string[],
+  faces: number[] = [],
+  extra: Partial<ResolveInput> = {}
+) {
   return resolveDefinitionAction(
     state,
     action,
-    { actorId: HERO, targetIds, commandId: nextId() },
+    { actorId: HERO, targetIds, commandId: nextId(), ...extra },
     {
       random: () => faces.shift() ?? 3,
       newRollId: nextId,
@@ -222,5 +241,145 @@ describe("Ensnaring Strike", () => {
     expect(upcastAction(ensnare, view.spellRecord("ensnaring-strike")!, 3).save?.ongoingDamage?.damage).toEqual([
       { formula: "3d6", type: "piercing" }
     ]);
+  });
+});
+
+describe("Greater Invisibility and Invisibility", () => {
+  const conditionIds = (state: GameState, id: string) => actor(state, id).conditions.map((condition) => condition.id);
+
+  it("Greater Invisibility gives its target the Invisible condition, which ends with the spell", () => {
+    const { state } = fight(wizard);
+    use(state, castOf("greater-invisibility"), [FOE]);
+    expect(conditionIds(state, FOE)).toEqual(["invisible"]);
+    const spell = actor(state, FOE).effects[0]!;
+    expect(spell).toMatchObject({ name: "Greater Invisibility", duration: { type: "rounds", remaining: 10 } });
+    endEffect(state, FOE, spell.id);
+    expect(conditionIds(state, FOE)).toEqual([]);
+  });
+
+  it("Invisibility ends once its bearer makes an attack roll, and outlasts the cast that gave it", () => {
+    const { state, resolve } = fight(build(wizardInput([])));
+    use(state, castOf("invisibility"), [HERO]);
+    expect(conditionIds(state, HERO)).toEqual(["invisible"]);
+    heroTurnAgain(state);
+    const bolt = resolve("spell-fire-bolt", {}, [15, 4]);
+    expect(conditionIds(state, HERO)).toEqual([]);
+    expect(actor(state, HERO).effects).toEqual([]);
+    expect(bolt.effectsEnded).toContainEqual(expect.objectContaining({ actorId: HERO, name: "Invisibility" }));
+  });
+
+  it("leaves another creature's Invisibility alone when the caster attacks", () => {
+    const { state, resolve } = fight(build(wizardInput([])));
+    use(state, castOf("invisibility"), [FOE]);
+    heroTurnAgain(state);
+    resolve("spell-fire-bolt", { targetIds: [FOE] }, [15, 4]);
+    expect(conditionIds(state, FOE)).toEqual(["invisible"]);
+  });
+});
+
+describe("Enhance Ability", () => {
+  it("gives Advantage on checks with the ability the caster picks, and asks again for Constitution", () => {
+    const { state } = fight(wizard);
+    use(state, castOf("enhance-ability"), [FOE], [], { ability: "str" });
+    const goblin = actor(state, FOE);
+    expect(goblin.effects[0]).toMatchObject({ name: "Enhance Ability (Strength)" });
+    const derivation = deriveEquipment(goblin, undefined, catalog);
+    expect(checkRollMode(derivation, { ability: "str" }).mode).toBe("advantage");
+    expect(checkRollMode(derivation, { ability: "dex" }).mode).toBe("normal");
+    const refused = fight(wizard);
+    const result = use(refused.state, castOf("enhance-ability"), [FOE], [], { ability: "con" });
+    expect((result.warnings ?? []).join(" ")).toMatch(/choose Strength, Dexterity, Intelligence, Wisdom or Charisma/);
+    expect(checkRollMode(deriveEquipment(actor(refused.state, FOE), undefined, catalog), { ability: "con" }).mode).toBe(
+      "normal"
+    );
+  });
+});
+
+describe("Protection from Energy", () => {
+  it("gives Resistance to the one damage type the caster picks", () => {
+    const { state } = fight(wizard);
+    use(state, castOf("protection-from-energy"), [FOE], [], { damageType: "fire" });
+    expect(actor(state, FOE).effects[0]).toMatchObject({ name: "Protection from Energy (Fire)" });
+    const hit = (type: "fire" | "cold") =>
+      applyDamageDetailed(
+        state,
+        FOE,
+        { amount: 10, parts: [{ amount: 10, type }] },
+        { role: "gm" },
+        { resolveDefinition: () => undefined, catalog }
+      ).application.totalApplied;
+    expect(hit("fire")).toBe(5);
+    expect(hit("cold")).toBe(10);
+  });
+});
+
+describe("Riders on attacks against a creature that read the attack's kind", () => {
+  const OPPORTUNITY_DISADVANTAGE: Modifier = {
+    type: "roll-mode",
+    roll: "incoming-attack",
+    mode: "disadvantage",
+    when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["opportunity"] }]
+  };
+
+  it("give an Opportunity Attack Disadvantage, and leave an ordinary attack alone (Escape the Horde)", () => {
+    const fighter = fight(build(wizardInput([])));
+    addEffect(
+      fighter.state,
+      FOE,
+      makeEffect({
+        id: "escape-the-horde",
+        name: "Escape the Horde",
+        tags: ["escape-the-horde"],
+        sourceActorId: FOE,
+        sourceName: "Goblin",
+        sourceActionId: null,
+        startedRound: 1,
+        duration: { type: "manual" },
+        modifiers: [OPPORTUNITY_DISADVANTAGE]
+      })
+    );
+    const dagger = fighter.action("item-dagger");
+    const swing = (attackKinds: ResolveInput["attackKinds"]) =>
+      resolveDefinitionAction(
+        fighter.state,
+        dagger,
+        {
+          actorId: HERO,
+          targetIds: [FOE],
+          commandId: nextId(),
+          commit: false,
+          ...(attackKinds ? { attackKinds } : {})
+        },
+        {
+          random: () => 10,
+          newRollId: nextId,
+          gmSessionId: "30000000-0000-4000-8000-00000000000a",
+          now: () => "2026-10-17T00:00:00.000Z",
+          definition: fighter.definition,
+          catalog
+        }
+      );
+    expect(swing(["reaction", "opportunity"]).rollMode).toMatchObject({ mode: "disadvantage" });
+    expect(swing(undefined).rollMode?.mode ?? "normal").toBe("normal");
+  });
+
+  it("give a spell attack Disadvantage against a creature holding a Spellguard Shield", () => {
+    const { state, resolve } = fight(build(wizardInput([])));
+    const shield = view.equipmentRecord("spellguard-shield")!;
+    actor(state, FOE).inventory = [
+      InventoryItemSchema.parse({
+        id: "spellguard-shield",
+        name: shield.name,
+        quantity: 1,
+        category: shield.category,
+        equipped: true,
+        attuned: true,
+        ...(shield.armor ? { armor: shield.armor } : {})
+      })
+    ];
+    expect(resolve("spell-fire-bolt", { commit: false }, [15, 4, 4]).rollMode).toMatchObject({
+      mode: "disadvantage",
+      disadvantage: [expect.stringContaining("Spellguard Shield")]
+    });
   });
 });

@@ -5,7 +5,7 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { ContentLibrary } from "../src/content-library.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { deriveEquipment, equipmentCatalogOf, rollModeClaims } from "../src/equipment-derivation.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
@@ -13,7 +13,7 @@ import { setCondition } from "../src/actor-conditions.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { currentSpeedFeet } from "../src/speed.js";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { asiRows } from "./asi-rows.js";
 
@@ -821,6 +821,17 @@ describe("Ranger - the rest of the kit", () => {
     );
   });
 
+  it("gives the Ranger the Invisible condition until the end of its next turn", () => {
+    const built = table(rangerInput(14));
+    resolve(built, "natures-veil", [], []);
+    expect(built.hero.conditions.map((condition) => condition.id)).toEqual(["invisible"]);
+    // Taken on its own turn, so the end of this turn doesn't count.
+    expect(built.hero.effects[0]).toMatchObject({
+      name: "Nature's Veil",
+      duration: { type: "until-source-turn-end", skipsCurrentTurn: true }
+    });
+  });
+
   it("REFUSES a level-19 Ranger with no Epic Boon feat", () => {
     const missing = rangerInput(19);
     missing.choices = missing.choices.filter(
@@ -897,6 +908,58 @@ describe("Ranger - Hunter's Prey and Defensive Tactics, audit rows 21 and 22", (
       table(rangerInput(7)).definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string }> }
     ).traits.map((trait) => trait.name);
     expect(traits).toContain("Escape the Horde");
+  });
+
+  it("gives a creature that hit a Multiattack Defense Ranger Disadvantage on its other attacks this turn", () => {
+    const input = rangerInput(7);
+    input.choices = input.choices.map((row) =>
+      row.kind === "defensive-tactics" ? { ...row, id: "multiattack-defense" } : row
+    );
+    const built = table(input);
+    built.state.combat = {
+      ...built.state.combat,
+      turnActorId: IDS.foe,
+      ruleExceptions: { economy: "freeform" }
+    };
+    const claw: ActorAction = {
+      id: "claw",
+      name: "Claw",
+      activation: "action",
+      description: "Melee Attack Roll: +5, reach 5 ft. Hit: 4 (1d6) Slashing damage.",
+      attack: { bonus: 5, reachFeet: 5 },
+      damage: [{ formula: "1d6", type: "slashing" }]
+    };
+    const swing = (faces: number[], commit = true) =>
+      resolveDefinitionAction(
+        built.state,
+        claw,
+        { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextCommandId(), commit },
+        { ...deps(built, faces), definition: undefined }
+      );
+    expect(swing([19, 4]).attack?.outcome).toBe("hit");
+    expect(built.hero.effects).toEqual([
+      expect.objectContaining({ name: "Multiattack Defense", sourceActorId: IDS.foe })
+    ]);
+    expect(swing([10, 12], false).rollMode).toMatchObject({ mode: "disadvantage" });
+    // The foe's turn ends, and the mark with it.
+    nextInitiativeTurn(built.state, [], {
+      resolveDefinition: (id) => resolveIn(built.state, id),
+      rollDie: () => 3,
+      newId: nextCommandId,
+      now: () => "2026-08-07T00:00:00.000Z"
+    });
+    expect(built.hero.effects).toEqual([]);
+  });
+
+  it("gives Opportunity Attacks against an Escape the Horde Ranger Disadvantage, and no other attack", () => {
+    const built = table(rangerInput(7));
+    const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
+    const claims = (attackKinds: NonNullable<Parameters<typeof rollModeClaims>[3]>["attackKinds"]) =>
+      rollModeClaims(derivation, ["incoming-attack"], "on-attack-roll", { attackKinds }).disadvantage;
+    expect(claims(["melee", "reaction", "opportunity"])).toEqual([
+      expect.objectContaining({ label: expect.stringContaining("Escape the Horde") })
+    ]);
+    expect(claims(["melee"])).toEqual([]);
   });
 });
 

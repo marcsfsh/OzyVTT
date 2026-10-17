@@ -657,17 +657,17 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:eldritch-invocations": guided(
     "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. The senses (Devil's Sight, Witch Sight), the pact-weapon invocations, Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
   ),
-  "feature:elemental-fury": guided(
-    "Primal Strike's extra damage is applied once a turn. Potent Spellcasting's bonus to cantrip damage is the GM's."
+  "feature:elemental-fury": enforced(
+    "Primal Strike's extra damage, of the type the Druid picks, is applied once a turn. Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
   ),
   "feature:lands-aid": guided(
     "The save and its Necrotic damage against the Druid's spell save DC are applied, and a use of Wild Shape is spent. Healing the creature it picks is the GM's."
   ),
-  "feature:mindless-rage": guided(
-    "Immunity to Charmed and Frightened while raging is applied (equipment-derivation.ts). Ending either condition when the Rage starts is the GM's."
+  "feature:mindless-rage": enforced(
+    "Immunity to Charmed and Frightened while raging is applied (equipment-derivation.ts), and either condition ends as the Rage starts (resolution/grant.ts)."
   ),
-  "feature:primal-knowledge": guided(
-    "The extra skill is applied. Making those checks as Strength checks while raging is the GM's."
+  "feature:primal-knowledge": enforced(
+    "The extra skill is applied. While raging, Acrobatics, Intimidation, Perception, Stealth and Survival checks are made as Strength checks when that is the better roll (ability-checks.ts)."
   ),
   "feature:primal-order": guided(
     "Magician's extra cantrip and Warden's training are applied. The Wisdom bonus to the checks each role names is the GM's."
@@ -788,6 +788,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:scimitar-of-speed": guided(
     "The +2 to attack and damage rolls is applied. The extra attack as a Bonus Action is the GM's."
+  ),
+  "item:spellguard-shield": guided(
+    "Spell attack rolls against its holder have Disadvantage (resolution/attack.ts). Advantage on saves against spells and other magical effects is the GM's."
   ),
   "item:staff-of-charming": guided(
     "Its one-charge casts are cast actions. Reflecting an enchantment, and resisting one, are the GM's."

@@ -1153,6 +1153,8 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   armorClassBonus: z.number().int().min(1).max(10).optional(),
   /** Conditions the recipient is immune to while it lasts (Heroism: Frightened). */
   conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
+  /** Conditions the recipient has while it lasts, ending with it (Greater Invisibility: Invisible). */
+  conditions: z.array(ConditionIdSchema).min(1).max(3).optional(),
   /** Temporary Hit Points the recipient gains at the start of each of its turns (Heroism: the caster's spellcasting
    *  ability modifier, fixed when the spell is cast). */
   temporaryHitPointsEachTurn: z

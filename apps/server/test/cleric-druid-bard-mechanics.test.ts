@@ -4,7 +4,9 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { importActorDefinition } from "../src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
+import { effectiveActions } from "../src/effective-actions.js";
 import { startEncounter } from "../src/encounter.js";
+import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 
 // Cleric, Druid and Bard mechanics, asserted as numbers a player can act on, counters the engine
 // spends, or refusals the server issues; never "the rider survived derivation" on its own. Uses the
@@ -423,6 +425,35 @@ describe("Elemental Fury - the twin of Blessed Strikes (audit row 5)", () => {
       } as Row
     ]);
     expect(() => build(bogus)).toThrowError(/not an offered option/);
+  });
+
+  it("adds the Wisdom modifier to a Druid cantrip's damage with Potent Spellcasting, and not with Primal Strike", () => {
+    // Wisdom 15 + 2 (Sage) = 17: +3. Produce Flame's hurl, 1d8 at level 7 is 2d8, both dice 3.
+    const flame = (option: "potent-spellcasting" | "primal-strike") => {
+      const definition = build(
+        druid(7, [
+          primalOrder("warden"),
+          elementalFury(option),
+          { level: 4, kind: "cantrip", id: "produce-flame" } as Row
+        ])
+      );
+      const state = encounterWith(definition);
+      const faces = [15, 3, 3];
+      // The catalog is where the chosen option's rider is read from.
+      const flameDeps = { ...deps(definition), catalog: equipmentCatalogOf(library), random: () => faces.shift() ?? 3 };
+      const act = (id: string, targetIds: string[]) =>
+        resolveDefinitionAction(
+          state,
+          effectiveActions(definition, state.actors[0]!, undefined).find((action) => action.id === id)!,
+          { actorId: HERO, targetIds, commandId: command() },
+          flameDeps
+        );
+      act("spell-produce-flame", []);
+      return act("spell-produce-flame-then-hurl", [FOE]);
+    };
+    const potent = flame("potent-spellcasting");
+    expect(potent.damage).toContainEqual({ formula: "3", type: "fire", total: 3 });
+    expect(flame("primal-strike").damage.map((part) => part.type)).toEqual(["fire"]);
   });
 
   it("refuses the build outright when the level-7 pick is missing", () => {

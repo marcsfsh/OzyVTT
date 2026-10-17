@@ -879,9 +879,16 @@ describe("character-builder content records", () => {
       { level: 7, formula: "1d8", type: "radiant" },
       { level: 14, formula: "2d8", type: "radiant" }
     ]);
-    // Potent Spellcasting stays prose: no rider expresses an ability-derived damage bonus (ADR-0008).
+    // Potent Spellcasting adds the Wisdom modifier to Sacred Flame's damage, the one Cleric cantrip that deals any.
     expect(strikes[1].actions).toEqual([]);
-    expect(strikes[1].modifiers).toEqual([]);
+    expect(strikes[1].modifiers).toEqual([
+      {
+        type: "extra-damage",
+        abilityModifier: "wis",
+        doubleOnCritical: true,
+        when: [{ type: "on-damage-roll" }, { type: "spell-id-is", spellIds: ["sacred-flame"] }]
+      }
+    ]);
 
     // Giant Ancestry: each of the six boons carries its own action and a PB-per-Long-Rest counter on
     // one shared pool.

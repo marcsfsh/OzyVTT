@@ -137,6 +137,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
+  // "Spell attack rolls have Disadvantage against you." The Advantage on saves against spells and other magical
+  // effects has no gate for a save's source and stays the GM's.
+  "spellguard-shield": {
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "incoming-attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
+      }
+    ]
+  },
+
   // "Until the next dawn" is a long rest.
   "plate-armor-of-etherealness": {
     casts: [{ spellId: "etherealness", uses: { limit: 1, per: "long-rest" } }]
@@ -387,7 +400,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   `javelin-of-lightning` - Lightning instead of Piercing, and a Line area.
   //   `sun-blade`, `energy-bow` - deal Radiant/Force instead of the weapon's type; unbound until
   //       weapon-swing overrides exist. Energy Bow's arrow options are not expressible either.
-  //   `spellguard-shield` - needs a "spell" attack kind and an "against spells" save gate.
   //   `thunderous-greatclub` - "your Strength is 20" is `ability-score`, refused on items; areas.
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
   //   `mithral-armor` - no rider removes a base armor's stealth disadvantage or Strength requirement.

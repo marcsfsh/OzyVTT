@@ -25,7 +25,7 @@ import {
 } from "../held-rolls.js";
 import { GM_CHOICE, magicResistanceOf } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
-import { endEffect, STEADY_AIM_TAG } from "../effects.js";
+import { CONCENTRATING_TAG, endEffect, STEADY_AIM_TAG, UNTIL_IT_ACTS_TAG } from "../effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
@@ -153,10 +153,37 @@ const outlined = (actor: LiveActor) => actor.effects.some((effect) => effect.tag
 
 /** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
  *  attacker's claims on its attack (Reckless Attack, a cursed blade) and the target's on attacks against it
- *  (Dodge, a Cloak of Displacement). */
-function riderClaims(ctx: ResolveContext, targetDerivation: EquipmentDerivation, sources: RollModeClaims): void {
+ *  (Dodge, Blur). The target's riders see only the attack's kinds (Escape the Horde: "Opportunity Attacks have
+ *  Disadvantage against you"); the attacker's other filters describe the attacker. */
+function riderClaims(
+  ctx: ResolveContext,
+  target: LiveActor,
+  targetDerivation: EquipmentDerivation,
+  sources: RollModeClaims
+): void {
   rollModeClaims(ctx.derivation, ["attack"], "on-attack-roll", ctx.riderFilters, sources);
-  rollModeClaims(targetDerivation, ["incoming-attack"], "on-attack-roll", {}, sources, "Target: ");
+  const kinds = ctx.riderFilters.attackKinds;
+  const filters = kinds ? { attackKinds: kinds } : {};
+  rollModeClaims(targetDerivation, ["incoming-attack"], "on-attack-roll", filters, sources, "Target: ");
+  // What this attacker left on the target against itself alone (Multiattack Defense after its hit), read only for
+  // `by-effect-source` riders so nothing counts twice.
+  const marks = target.effects
+    .filter((effect) => effect.sourceActorId === ctx.attacker.id)
+    .map((effect) => ({
+      label: effect.name,
+      sourceEffectId: effect.id,
+      modifiers: effect.modifiers.filter((modifier) => modifier.when?.some((gate) => gate.type === "by-effect-source"))
+    }))
+    .filter((mark) => mark.modifiers.length > 0);
+  if (marks.length > 0)
+    rollModeClaims(
+      { ...targetDerivation, carriers: marks },
+      ["incoming-attack"],
+      "on-attack-roll",
+      { ...filters, fromEffectSource: true },
+      sources,
+      "Target: "
+    );
 }
 
 /** Conditions on either side, including the two that depend on who or where: Grappled and a Prone target. */
@@ -294,7 +321,7 @@ function attackRollSources(
   distance: number | null
 ): RollModeClaims {
   const sources: RollModeClaims = { advantage: [], disadvantage: [] };
-  riderClaims(ctx, targetDerivation, sources);
+  riderClaims(ctx, target, targetDerivation, sources);
   conditionClaims(ctx, target, distance, sources);
   positionClaims(ctx, distance, sources);
   traitClaims(ctx, target, sources);
@@ -565,6 +592,33 @@ export function spendUntilAttacked(ctx: ResolveContext): void {
     }
     endEffect(state, target.id, effect.id);
     effectsEnded.push({ actorId: target.id, actorName: target.name, name: effect.name });
+  }
+}
+
+/** SRD Invisibility: "The spell ends early immediately after the target makes an attack roll, deals damage, or casts a
+ *  spell." Read once a resolve is committed; an effect this very resolve granted stays. */
+export function spendUntilItActs(ctx: ResolveContext): void {
+  const { state, action, attacker, attack, input, damage, effectsEnded } = ctx;
+  if (input.commit === false) return;
+  const acted = attack !== null || action.spellId !== undefined || action.spellSlot !== undefined || damage.length > 0;
+  if (!acted) return;
+  for (const effect of attacker.effects.filter(
+    (candidate) => candidate.tags.includes(UNTIL_IT_ACTS_TAG) && !candidate.id.startsWith(input.commandId)
+  )) {
+    endEffect(state, attacker.id, effect.id);
+    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
+    // Once no creature keeps the spell, it is over, and so is its caster's Concentration on it.
+    const { castId, sourceActorId } = effect;
+    if (castId === undefined || sourceActorId === null) continue;
+    const kept = state.actors.some((actor) =>
+      actor.effects.some((other) => other.castId === castId && !other.tags.includes(CONCENTRATING_TAG))
+    );
+    const caster = state.actors.find((actor) => actor.id === sourceActorId);
+    const holding = caster?.effects.find((other) => other.castId === castId && other.tags.includes(CONCENTRATING_TAG));
+    if (!kept && caster && holding) {
+      endEffect(state, caster.id, holding.id);
+      effectsEnded.push({ actorId: caster.id, actorName: caster.name, name: holding.name });
+    }
   }
 }
 

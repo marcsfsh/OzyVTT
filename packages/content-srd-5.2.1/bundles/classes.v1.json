@@ -2790,7 +2790,24 @@
       {
        "id": "potent-spellcasting",
        "name": "Potent Spellcasting",
-       "description": "Add your Wisdom modifier to the damage you deal with any Cleric cantrip. When Improved Blessed Strikes takes effect at Cleric level 14, casting a Cleric cantrip that damages a creature also grants you or a creature within 60 feet Temporary Hit Points equal to twice your Wisdom modifier."
+       "description": "Add your Wisdom modifier to the damage you deal with any Cleric cantrip. When Improved Blessed Strikes takes effect at Cleric level 14, casting a Cleric cantrip that damages a creature also grants you or a creature within 60 feet Temporary Hit Points equal to twice your Wisdom modifier.",
+       "modifiers": [
+        {
+         "type": "extra-damage",
+         "abilityModifier": "wis",
+         "when": [
+          {
+           "type": "on-damage-roll"
+          },
+          {
+           "type": "spell-id-is",
+           "spellIds": [
+            "sacred-flame"
+           ]
+          }
+         ]
+        }
+       ]
       }
      ]
     }
@@ -3677,7 +3694,26 @@
       {
        "id": "potent-spellcasting",
        "name": "Potent Spellcasting",
-       "description": "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet."
+       "description": "Add your Wisdom modifier to the damage you deal with any Druid cantrip. When Improved Elemental Fury takes effect at Druid level 15, a Druid cantrip with a range of 10 feet or greater has its range increased by 300 feet.",
+       "modifiers": [
+        {
+         "type": "extra-damage",
+         "abilityModifier": "wis",
+         "when": [
+          {
+           "type": "on-damage-roll"
+          },
+          {
+           "type": "spell-id-is",
+           "spellIds": [
+            "poison-spray",
+            "produce-flame",
+            "starry-wisp"
+           ]
+          }
+         ]
+        }
+       ]
       },
       {
        "id": "primal-strike",
@@ -7666,7 +7702,24 @@
       "name": "Nature's Veil",
       "activation": "bonus-action",
       "description": "You invoke spirits of nature to magically hide yourself, giving yourself the Invisible condition until the end of your next turn.",
-      "damage": []
+      "damage": [],
+      "grants": {
+       "name": "Nature's Veil",
+       "tags": [
+        "natures-veil"
+       ],
+       "duration": {
+        "type": "until-source-turn-end"
+       },
+       "modifiers": [],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false,
+       "conditions": [
+        "invisible"
+       ]
+      }
      }
     ]
    },

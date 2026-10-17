@@ -306,6 +306,30 @@ describe("the curated claims hold in the engine", () => {
     expect(game.actors[0]!.hp.current).toBe(15);
   });
 
+  it("a condition a grant holds: Greater Invisibility's grant carries the Invisible condition", () => {
+    const spell = loadSpells().find((entry) => entry.id === "greater-invisibility")!;
+    expect(spellState(spell)).toBe("enforced");
+    expect(spell.effect!.grant).toMatchObject({ conditions: ["invisible"] });
+  });
+
+  it("a check made with another ability: a raging Barbarian's Stealth is a Strength check with Primal Knowledge", () => {
+    expect(state(RECORD_OVERRIDES["feature:primal-knowledge"]!)).toBe("enforced");
+    expect(state(RECORD_OVERRIDES["feature:mindless-rage"]!)).toBe("enforced");
+    const raging = ActorSchema.parse({
+      ...creature(),
+      effects: [{ id: "rage", name: "Raging", tags: ["raging"], duration: { type: "manual" } }]
+    });
+    const barbarian = sheet({
+      abilityScores: { str: 16, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+      character: { classes: [], feats: [], features: [{ id: "primal-knowledge" }] }
+    });
+    const plan = checkPlan(raging, barbarian, deriveEquipment(raging, barbarian, undefined), {
+      ability: "dex",
+      skill: "stealth"
+    });
+    expect(plan.subject.ability).toBe("str");
+  });
+
   it("a trait kind the bundle runs as a mechanic is never curated reference", () => {
     const running = [...monsterTraitKinds()].filter(([, kind]) => kind.running > 0).map(([name]) => name);
     expect(running.length).toBeGreaterThan(0);

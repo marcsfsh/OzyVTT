@@ -20,6 +20,7 @@ import {
   spendDistraction,
   spendSteadyAim,
   spendUntilAttacked,
+  spendUntilItActs,
   spendUntilOwnAttack
 } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
@@ -39,7 +40,7 @@ import {
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
-import { strikeBackOnHit } from "./resolution/struck.js";
+import { markMultiattackDefense, strikeBackOnHit } from "./resolution/struck.js";
 import {
   parkActionSave,
   parkBurstSave,
@@ -113,6 +114,7 @@ export function resolveDefinitionAction(
     recordLoadingShot(ctx);
     recordAttackRoll(ctx);
     releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
 
@@ -128,6 +130,7 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   strikeBackOnHit(ctx);
+  markMultiattackDefense(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
   markSpellUp(ctx);
@@ -154,6 +157,7 @@ export function resolveDefinitionAction(
   recordAttackRoll(ctx);
   recordCleaveOpening(ctx);
   releaseHideAndReady(ctx);
+  spendUntilItActs(ctx);
   return resolutionOf(ctx);
 }
 

@@ -17,6 +17,7 @@ import {
 import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import { conditionLabel, exhaustionPenalty } from "./condition-rules.js";
+import { RAGING_TAG } from "./effects.js";
 import {
   checkRiderBonus,
   effectiveSkillTier,
@@ -192,13 +193,49 @@ function skillBase(
   return { base: modifier + proficiencyBonus * multiplier + jack, proficient: multiplier > 0 };
 }
 
-/** What one ability check of `actor` adds to its d20 and how it is rolled, as the rules work it out. */
+/** SRD Primal Knowledge: while raging, a check with one of these skills can be made as a Strength check. */
+const PRIMAL_KNOWLEDGE_SKILLS: ReadonlySet<string> = new Set([
+  "acrobatics",
+  "intimidation",
+  "perception",
+  "stealth",
+  "survival"
+]);
+
+/** A plan's worth for picking between two ways to make one check: Advantage counts as +5 and Disadvantage as -5, as
+ *  the SRD scores a passive check. */
+const planWorth = (plan: CheckPlan) =>
+  plan.modifier + (plan.rollMode.mode === "advantage" ? 5 : plan.rollMode.mode === "disadvantage" ? -5 : 0);
+
+/** What one ability check of `actor` adds to its d20 and how it is rolled, as the rules work it out. A raging
+ *  Barbarian with Primal Knowledge makes the check as a Strength check when that is the better roll. */
 export function checkPlan(
   actor: Actor,
   definition: ActorDefinition | undefined,
   derivation: EquipmentDerivation,
   subject: CheckSubject,
   context: CheckContext = {}
+): CheckPlan {
+  const plan = plainCheckPlan(actor, definition, derivation, subject, context);
+  if (
+    subject.skill === undefined ||
+    subject.tool !== undefined ||
+    subject.ability === "str" ||
+    !PRIMAL_KNOWLEDGE_SKILLS.has(subject.skill) ||
+    !actor.effects.some((effect) => effect.tags.includes(RAGING_TAG)) ||
+    !holdsFeature(definition, "primal-knowledge", "Primal Knowledge")
+  )
+    return plan;
+  const strength = plainCheckPlan(actor, definition, derivation, { ...subject, ability: "str" }, context);
+  return planWorth(strength) > planWorth(plan) ? strength : plan;
+}
+
+function plainCheckPlan(
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  derivation: EquipmentDerivation,
+  subject: CheckSubject,
+  context: CheckContext
 ): CheckPlan {
   const narrow = { ability: subject.ability, ...(subject.skill !== undefined ? { skill: subject.skill } : {}) };
   const toolProficient = subject.tool !== undefined && toolProficiencies(definition, derivation).includes(subject.tool);

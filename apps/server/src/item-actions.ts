@@ -258,7 +258,10 @@ export function spellCastMechanics(
     // What its damage drains as it lands (Vampiric Touch's healing, Harm's lower Hit Point maximum).
     ...(effect.drain ? { drain: { ...effect.drain } } : {}),
     ...(effect.darts ? { darts: effect.darts } : {}),
-    ...(effect.damageTypes && damage.length > 0 ? { damageTypes: [...effect.damageTypes] } : {}),
+    // The type the caster picks: of the damage (Chromatic Orb), or of the Resistance it grants (Protection from Energy).
+    ...(effect.damageTypes && (damage.length > 0 || effect.grant !== undefined)
+      ? { damageTypes: [...effect.damageTypes] }
+      : {}),
     ...(attacks > 0
       ? {
           attack: {
