@@ -39,7 +39,14 @@ import { VEXED_TAG } from "../weapon-mastery.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
 import { sceneSight } from "../vision/sight.js";
-import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
+import {
+  endedEffect,
+  naturalFace,
+  recordRoll,
+  type DefinitionAction,
+  type LiveActor,
+  type ResolveContext
+} from "./context.js";
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
  *  ranged, so a mapless table never hands a thrown weapon melee-gated riders or bonuses. */
@@ -221,7 +228,7 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
     const helper = ctx.state.actors.find((actor) => actor.id === distraction.sourceActorId);
     sources.advantage.push({
       source: "help",
-      label: helper?.visibility === "public" ? `Help (${helper.name})` : "Help"
+      label: helper && !ctx.hiddenFromInitiator(helper.id) ? `Help (${helper.name})` : "Help"
     });
   }
   // 2024 rule: advantage within 5 feet, disadvantage beyond. Unknown distance contributes nothing.
@@ -262,9 +269,9 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!enemy || enemy.hp.current <= 0 || isIncapacitated(enemy)) continue;
     if (!areEnemies(attacker, enemy, deps.resolveDefinition)) continue;
-    // A creature the players can't see never spoils a visible attacker's shot on its own: the Disadvantage
-    // would reveal it. The GM can still impose it.
-    if (enemy.visibility !== "public" && attacker.visibility === "public") continue;
+    // A creature hidden from the table (GM-only, out of every character's sight, or under the fog) never spoils a
+    // visible attacker's shot on its own: the Disadvantage would show in the public dice. The GM can still impose it.
+    if (ctx.hiddenFromTable(enemy.id) && !ctx.hiddenFromTable(attacker.id)) continue;
     const enemyDistance = deps.distanceFeet(attacker.id, enemy.id);
     if (enemyDistance !== null && enemyDistance <= 5 + 1e-6) {
       sources.disadvantage.push({ source: "ranged-in-close-combat", label: `Enemy within 5 feet (${enemy.name})` });
@@ -502,7 +509,7 @@ export function spendDistraction(ctx: ResolveContext): void {
   const distraction = distractionOf(ctx, target);
   if (!distraction) return;
   endEffect(state, target.id, distraction.id);
-  effectsEnded.push({ actorId: target.id, actorName: target.name, name: distraction.name });
+  effectsEnded.push(endedEffect(target, distraction));
 }
 
 /** Steady Aim gives Advantage on the next attack roll this turn: the roll spends it, hit or miss, while the Speed 0 it
@@ -526,6 +533,6 @@ export function spendUntilAttacked(ctx: ResolveContext): void {
   const target = targets[0];
   for (const effect of target.effects.filter((candidate) => candidate.tags.includes(UNTIL_ATTACKED_TAG))) {
     endEffect(state, target.id, effect.id);
-    effectsEnded.push({ actorId: target.id, actorName: target.name, name: effect.name });
+    effectsEnded.push(endedEffect(target, effect));
   }
 }

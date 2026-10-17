@@ -18,6 +18,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import type { EquipmentCatalog, EquipmentDerivation } from "../equipment-derivation.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "../roll-history.js";
 import type { RuleId, RulesOverride } from "../rules-families.js";
+import { hiddenFrom } from "../vision/audience.js";
 import type { MasterySwing } from "../weapon-mastery.js";
 import type { BuiltinHandler } from "./builtins.js";
 import type { EconomyPlan } from "./economy.js";
@@ -118,6 +119,39 @@ type RollBase = Pick<
   | "createdAt"
 >;
 
+/** An effect a resolve ended, as the result tells it: whose it was, its name, and who caused it. */
+export type EndedEffect = { actorId: string; actorName: string; name: string; source?: EffectSource };
+export type EffectSource = Readonly<{ actorId: string | null; name: string | null }>;
+
+/** An ended-effect line for `bearer`, carrying the effect's source. */
+export const endedEffect = (
+  bearer: Readonly<{ id: string; name: string }>,
+  effect: Readonly<{ name: string; sourceActorId: string | null; sourceName: string | null }>
+): EndedEffect => ({
+  actorId: bearer.id,
+  actorName: bearer.name,
+  name: effect.name,
+  source: { actorId: effect.sourceActorId, name: effect.sourceName }
+});
+
+/** The shared hidden check (`hiddenFrom`) for a resolve, read with its own content. `forInitiator` takes the initiating
+ *  player's view, for what only that player reads (a refusal, a name in the reply); without it, or for the GM, it is
+ *  the table's, for what shows in public dice and the feed. */
+export function resolveHiddenCheck(
+  state: GameState,
+  deps: Pick<ResolveDependencies, "resolveDefinition" | "catalog" | "initiatorRole" | "initiatorSessionId">,
+  forInitiator: boolean
+): (actorId: string) => boolean {
+  return hiddenFrom(
+    state,
+    {
+      ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    },
+    forInitiator && deps.initiatorRole === "player" ? deps.initiatorSessionId : undefined
+  );
+}
+
 /** One resolve's inputs and everything its steps have decided so far. Each step reads what the earlier
  *  steps wrote and adds its own part; the result is read off the finished context. */
 export type ResolveContext = {
@@ -126,6 +160,11 @@ export type ResolveContext = {
   action: DefinitionAction;
   readonly input: ResolveInput;
   readonly deps: ResolveDependencies;
+  /** Hidden from the table (GM-only, or out of every character's sight or under the fog): what public dice and the
+   *  feed must not give away. */
+  readonly hiddenFromTable: (actorId: string) => boolean;
+  /** Hidden from whoever initiated: that player's own view, the table's for the GM. For names in a refusal or reply. */
+  readonly hiddenFromInitiator: (actorId: string) => boolean;
   readonly attacker: LiveActor;
   readonly targets: readonly LiveActor[];
   /** The builtin's special cases; only for an action taken from the builtin catalog. */
@@ -165,7 +204,8 @@ export type ResolveContext = {
     conditionIds: readonly string[];
   }>;
   effectGranted: ActionResolution["effectGranted"];
-  readonly effectsEnded: Array<{ actorId: string; actorName: string; name: string }>;
+  /** Effects this resolve ended, each with its source so a hidden one can be masked before the result is told. */
+  readonly effectsEnded: EndedEffect[];
   readonly reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string }>;
   /** A save a builtin forced (grapple, shove); an action's own `save` is reported from the action. */
   builtinSave: ActionResolution["save"];

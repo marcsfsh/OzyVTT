@@ -3,6 +3,7 @@ import { setCondition } from "../actor-conditions.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { replaceableOffers } from "../choice-overrides.js";
 import type { EffectNarration } from "../effects.js";
+import { HIDDEN_SOURCE } from "../projections.js";
 import {
   ActorRechooseSchema,
   ActorRestoreUsesSchema,
@@ -123,8 +124,11 @@ export const actorHealthCommands = [
       // Typed damage narrates its adjustments ("17 bludgeoning → 8, resistance: Rage") so the table sees
       // why the number differs (ADR-0020).
       const detail = damageAdjustmentDetail(outcome.application);
-      const attribution = sourceName
-        ? `${sourceName} hit ${kit.actorName(actorId)} for`
+      // The GM's Apply names the attacker; one hidden from the table is "A hidden threat" there, as everywhere.
+      const shownSource =
+        sourceName && sourceActorId !== undefined && kit.actorHidden(sourceActorId) ? HIDDEN_SOURCE : sourceName;
+      const attribution = shownSource
+        ? `${shownSource} hit ${kit.actorName(actorId)} for`
         : `${kit.actorName(actorId)} took`;
       const text = `${attribution} ${outcome.application.totalApplied} damage${detail}.`;
       kit.context.broadcastTableEvent({ kind: "damage", text, actorIds: [actorId] });
@@ -285,10 +289,10 @@ export const actorHealthCommands = [
       const initiator = initiatorOf(principal);
       let line = "";
       const { duplicate } = await execute((state) => {
+        // Same owner-or-GM rule as a rest, checked first so a missing creature and someone else's get one answer.
+        requireActorAccess(initiator, state, actorId, "resource");
         const actor = state.actors.find((candidate) => candidate.id === actorId);
         if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-        // Same owner-or-GM rule as a rest.
-        requireActorAccess(initiator, state, actorId, "resource");
         const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
         // GM audience: legality is a content question and must match what the GM would get. Nothing GM-only
         // is projected.

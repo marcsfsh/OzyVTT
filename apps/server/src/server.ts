@@ -68,7 +68,7 @@ import { SoundService } from "./sound-service.js";
 import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
-import { partySight, rememberExplored } from "./vision/audience.js";
+import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
 import type { SightContent } from "./vision/senses.js";
 
 export type CreateServerOptions = {
@@ -108,11 +108,16 @@ export function createServer(options: CreateServerOptions) {
     timelineDirtied,
     // What the party sees joins what it has seen, in the same transaction as the move or door that showed it. A
     // failure here must not undo the command; the next one catches up.
-    afterMutate: (state) => {
+    afterMutate: (state, before) => {
       try {
         rememberExplored(state, sightContent());
       } catch (error) {
         console.error("remembering what the party saw failed:", error instanceof Error ? error.message : error);
+      }
+      try {
+        hideRollsOfHidden(state, before, sightContent());
+      } catch (error) {
+        console.error("hiding a hidden creature's rolls failed:", error instanceof Error ? error.message : error);
       }
     }
   });
@@ -286,14 +291,10 @@ export function createServer(options: CreateServerOptions) {
       logged?: boolean;
     }>
   ) {
-    const current = committedState.read();
-    const { actors } = current;
     const actorIds = event.actorIds ?? [];
-    // Dynamic vision: a creature no character perceives is as hidden from the table as a GM-only one.
-    const unseen = partySight(current, sightContent()).hidden;
-    const publicToPlayers =
-      !event.gmOnly &&
-      actorIds.every((id) => actors.find((actor) => actor.id === id)?.visibility === "public" && !unseen.has(id));
+    // The shared check: GM-only, or out of every character's sight or under the fog (ADR-0023).
+    const hidden = hiddenFrom(committedState.read(), sightContent());
+    const publicToPlayers = !event.gmOnly && !actorIds.some(hidden);
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
@@ -304,8 +305,8 @@ export function createServer(options: CreateServerOptions) {
     // (`logged: false`). Call `appendLog` directly only for lines with no toast.
     if (event.logged !== false) appendLog({ kind: event.kind, text: event.text, actorIds, gmOnly: event.gmOnly });
   }
-  /** Appends a feed line and pushes it live, gated like toasts. `!== "public"` so an actor no longer on the
-   *  roster (or a future visibility) fails closed. */
+  /** Appends a feed line and pushes it live, gated like toasts. An actor no longer on the roster counts as hidden, so
+   *  the gate fails closed. */
   function appendLog(
     entry: Readonly<{
       kind: CombatLogEntry["kind"];
@@ -318,10 +319,7 @@ export function createServer(options: CreateServerOptions) {
   ) {
     const current = committedState.read();
     const actorIds = entry.actorIds ?? [];
-    const unseen = partySight(current, sightContent()).hidden;
-    const gmOnly =
-      entry.gmOnly === true ||
-      actorIds.some((id) => current.actors.find((actor) => actor.id === id)?.visibility !== "public" || unseen.has(id));
+    const gmOnly = entry.gmOnly === true || actorIds.some(hiddenFrom(current, sightContent()));
     const row = combatLog.append({
       kind: entry.kind,
       text: entry.text,
@@ -354,7 +352,7 @@ export function createServer(options: CreateServerOptions) {
       text: `Round ${state.combat.round} - ${name}'s turn.`,
       actorIds: [state.combat.turnActorId]
     });
-    const reminder = turnReminder(state, state.combat.turnActorId);
+    const reminder = turnReminder(state, state.combat.turnActorId, hiddenFrom(state, sightContent()));
     if (reminder !== null) appendLog({ kind: "turn", text: reminder, actorIds: [state.combat.turnActorId] });
   }
   /** Turns a timeline navigation outcome into log lines: plain turns for forward play, GM-only notes for rewinds. */
@@ -588,18 +586,24 @@ export function createServer(options: CreateServerOptions) {
       authorizeGm,
       // A joined player may browse the GM's token library and upload their own token image.
       playerSession: (token) => auth.verifyPlayer(token),
-      authorizePlayer: (token, assetId) =>
-        auth.verifyPlayer(token) !== null &&
-        committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
+      // Only a creature the reader may know of: an image worn by one hidden by sight or the fog would answer
+      // whether it is in play.
+      authorizePlayer: (token, assetId) => {
+        const player = auth.verifyPlayer(token);
+        if (!player) return false;
+        const state = committedState.read();
+        const hidden = hiddenFrom(state, sightContent(), player.sessionId);
+        return state.actors.some((actor) => actor.tokenAssetId === assetId && !hidden(actor.id));
+      },
       authorizeViewer: (token, assetId) => {
         if (!token) return false;
         try {
           viewerAccess.verify(token);
+          const state = committedState.read();
+          const hidden = hiddenFrom(state, sightContent());
           return (
             viewerPresentation.project().enabled &&
-            committedState
-              .read()
-              .actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
+            state.actors.some((actor) => actor.tokenAssetId === assetId && !hidden(actor.id))
           );
         } catch {
           return false;

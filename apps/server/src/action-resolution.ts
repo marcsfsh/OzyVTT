@@ -16,7 +16,14 @@ import { useUpConsumable } from "./resolution/consumables.js";
 import { consumableRowFor } from "./consumables.js";
 import { rollAttack, spendDistraction, spendSteadyAim, spendUntilAttacked } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
-import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
+import type {
+  DefinitionAction,
+  EndedEffect,
+  ResolveContext,
+  ResolveDependencies,
+  ResolveInput
+} from "./resolution/context.js";
+import { withoutSourceName } from "./projections.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
@@ -162,6 +169,13 @@ function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"]
   return ctx.targets.map((target) => ({ targetId: target.id, targetName: target.name, parts, total }));
 }
 
+/** An ended effect as the result tells it, to the initiator and in the table's toast: a source hidden from the
+ *  initiator is masked in its name, as the projection masks it, and the source itself isn't told. */
+function toldEnded(ctx: ResolveContext, { source, ...ended }: EndedEffect) {
+  const masked = source?.actorId != null && ctx.hiddenFromInitiator(source.actorId);
+  return masked ? { ...ended, name: withoutSourceName(ended.name, source.name) } : ended;
+}
+
 function resolutionOf(ctx: ResolveContext): ActionResolution {
   const { state, action, attacker, targets, damage, bonusDamage, warnings } = ctx;
   const instance = state.combat.turn.actionInstance;
@@ -194,7 +208,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     overridden: ctx.overridden,
     ...(ctx.reactionPrompts.length > 0 ? { reactionPrompts: ctx.reactionPrompts } : {}),
     ...(ctx.check ? { check: ctx.check } : {}),
-    ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded } : {}),
+    ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded.map((ended) => toldEnded(ctx, ended)) } : {}),
     ...(ctx.healing ? { healing: ctx.healing } : {}),
     ...(ctx.opens ? { opens: ctx.opens } : {}),
     ...(damageTargets ? { damageTargets } : {})

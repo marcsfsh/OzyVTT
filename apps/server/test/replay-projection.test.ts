@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type CombatLogEntry, type GameState, type RollRecord } from "@vtt/domain";
+import { playerFeedId } from "../src/combat-log.js";
 import { playerReplayMapAssetIds, projectPlayerReplay } from "../src/replay-projection.js";
 import { startEncounter } from "../src/encounter.js";
 import type { EncounterArchiveDocument } from "../src/encounter-archive.js";
@@ -184,16 +185,16 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     const replay = projectPlayerReplay(3, document());
     expect(replay.rolls.map((entry) => entry.id)).toEqual(["r-public"]);
     const logIds = replay.turns.flatMap((turn) => turn.log.map((entry) => entry.id));
-    // Row 2 is gmOnly, row 3 is another player's self-only roll: neither survives.
-    expect(logIds).toEqual([1, 4]);
+    // Row 2 is gmOnly, row 3 is another player's self-only roll: neither survives. Ids are the live feed's opaque ones.
+    expect(logIds).toEqual([1, 4].map(playerFeedId));
     expect(JSON.stringify(replay)).not.toContain("readies an ambush");
     expect(JSON.stringify(replay)).not.toContain("in secret");
   });
 
   it("slices the log by turn boundary, so each moment carries its own commentary", () => {
     const replay = projectPlayerReplay(3, document());
-    expect(replay.turns[0].log.map((entry) => entry.id)).toEqual([1]);
-    expect(replay.turns[1].log.map((entry) => entry.id)).toEqual([4]);
+    expect(replay.turns[0].log.map((entry) => entry.id)).toEqual([playerFeedId(1)]);
+    expect(replay.turns[1].log.map((entry) => entry.id)).toEqual([playerFeedId(4)]);
   });
 
   it("never carries a session id, the journal, the raw states, the notes, or the stat blocks", () => {

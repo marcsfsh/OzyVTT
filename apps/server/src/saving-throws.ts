@@ -18,6 +18,7 @@ import { CommandRejectedError } from "./game-store.js";
 import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
+import { hiddenFrom } from "./vision/audience.js";
 import { holdsFeature } from "./class-features.js";
 import { areAllies } from "./creature-sides.js";
 import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
@@ -144,6 +145,8 @@ export function anySaveRollSources(derivation: EquipmentDerivation): RollModeCla
 export type AuraContext = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** The item catalog, for the senses that decide who the table can see; absent means fewer senses. */
+  catalog?: EquipmentCatalog;
 }>;
 
 /** A Paladin's own Aura of Protection bonus: its Charisma modifier, at least +1, while it holds the feature and isn't
@@ -156,8 +159,8 @@ export function auraBonusOf(paladin: Actor, definition: ActorDefinition | undefi
 /**
  * SRD Aura of Protection: "You and your allies in the aura gain a bonus to saving throws equal to your Charisma
  * modifier (minimum bonus of +1)", in a 10-foot Emanation (30 feet with Aura Expansion). A creature benefits from one
- * aura at a time, so the best counts. A hidden Paladin's aura never shows on a visible creature's save, which would
- * reveal it.
+ * aura at a time, so the best counts. A Paladin hidden from the table (the shared check: GM-only, out of every
+ * character's sight or under the fog) never shows its aura on a visible creature's save, which would reveal it.
  */
 export function auraOfProtection(
   state: GameState,
@@ -165,11 +168,17 @@ export function auraOfProtection(
   context: AuraContext
 ): Readonly<{ amount: number; source: string }> | null {
   let best: { amount: number; source: string } | null = null;
+  const hidden = hiddenFrom(state, {
+    definition: context.resolveDefinition,
+    ...(context.catalog ? { catalog: context.catalog } : {})
+  });
   for (const paladin of state.actors) {
-    if (paladin.archived || (paladin.visibility !== "public" && target.visibility === "public")) continue;
+    if (paladin.archived) continue;
+    // Only a Paladin with the aura is asked about, so a table with none builds no sight.
     const definition = paladin.definitionId ? context.resolveDefinition(paladin.definitionId) : undefined;
     const amount = auraBonusOf(paladin, definition);
     if (amount === null) continue;
+    if (hidden(paladin.id) && !hidden(target.id)) continue;
     if (paladin.id !== target.id) {
       if (!areAllies(paladin, target, context.resolveDefinition)) continue;
       const reach = holdsFeature(definition, "aura-expansion", "Aura Expansion") ? 30 : 10;

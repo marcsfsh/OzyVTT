@@ -35,6 +35,7 @@ import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn
 import { initiatorOf, isGmGrade, principalTag } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 import { refreshVisionMeasure } from "../vision/edit.js";
+import { hiddenCombatants, keepUnseenHidden } from "../vision/audience.js";
 import { recoverAmmunition } from "../ammunition.js";
 
 // The encounter lifecycle, initiative and the turn economy.
@@ -67,6 +68,8 @@ export const encounterCommands = [
       };
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         const entries = request.entries ?? stagedEntries(draft);
+        // Hidden from the table before the new fight: one this start leaves off the map stays unknown.
+        const unseenBefore = hiddenCombatants(draft, kit.sightContent());
         // A fresh fight starts from the table's standing rules policy unless this command names its own.
         startEncounter(
           draft,
@@ -87,6 +90,11 @@ export const encounterCommands = [
         );
         // The fight may be on another map than the one the walls were drawn on: keep feet and pixels in step.
         refreshVisionMeasure(draft, tokenGeometry);
+        const fighting = new Set(draft.combat.initiative.map((entry) => entry.actorId));
+        keepUnseenHidden(
+          draft,
+          [...unseenBefore].filter((actorId) => !fighting.has(actorId))
+        );
         // Fresh fight: clear prior snapshots and record this start as the rewind baseline.
         timeline.truncateAll();
         // The previous fight's journal goes with it; this very command stays as the new fight's first entry.
@@ -241,11 +249,14 @@ export const encounterCommands = [
       const { actorId } = request;
       let outcome: TimelineOutcome | undefined;
       const effectEvents: EffectNarration[] = [];
+      let unseen = false;
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         if (draft.combat.historyCursor !== null)
           throw new CommandRejectedError(
             "Finish reviewing the combat history before taking a combatant out of the fight."
           );
+        // Hidden from the table as it leaves: it stays unknown to players, and so does its leaving.
+        unseen = kit.hiddenFromTable(draft)(actorId);
         const gathering = draft.combat.playerInitiativeMode === "wait" && draft.combat.pendingInitiative.length > 0;
         // Its turn ends first, recorded like any other, so Previous can bring it back.
         if (draft.combat.turnActorId === actorId && draft.combat.initiative.length > 1 && !gathering)
@@ -265,6 +276,7 @@ export const encounterCommands = [
         effectEvents.push(
           ...removeCombatant(draft, actorId, (definitionId) => kit.resolveDefinitionIn(draft, definitionId))
         );
+        if (unseen) keepUnseenHidden(draft, [actorId]);
       });
       if (duplicate) return;
       if (outcome) kit.context.logTimelineOutcome(outcome, state);
@@ -273,7 +285,7 @@ export const encounterCommands = [
         kind: "encounter",
         text: `${kit.actorName(actorId)} left the fight.`,
         actorIds: [actorId],
-        gmOnly: kit.actorHidden(actorId)
+        gmOnly: unseen || kit.actorHidden(actorId)
       });
     }
   }),

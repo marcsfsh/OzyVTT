@@ -1,4 +1,5 @@
 import type { CombatLogEntry, PlayerCombatView, PlayerHp, PlayerRollRecord, RollRecord } from "@vtt/domain";
+import { playerFeedId } from "./combat-log.js";
 import type { EncounterArchiveDocument, EncounterArchiveTurn } from "./encounter-archive.js";
 import { conditionLabels, playerHp, playerRoll, projectPlayerCombat } from "./projections.js";
 import { partySight, type AudienceSight } from "./vision/audience.js";
@@ -52,11 +53,13 @@ function logSliceFor(document: EncounterArchiveDocument, turnIndex: number): rea
  *  must also be a public roll, since the reader is never assumed to be the roller. */
 function playerLogRow(entry: CombatLogEntry): CombatLogEntry | null {
   if (entry.gmOnly) return null;
+  // The live feed's opaque id, so the gaps between rows don't count the GM-only ones.
+  const id = playerFeedId(entry.id);
   if (entry.roll) {
     if (entry.roll.visibility !== "public") return null;
-    return { ...entry, roll: playerRoll(entry.roll) };
+    return { ...entry, id, roll: playerRoll(entry.roll) };
   }
-  return entry;
+  return { ...entry, id };
 }
 
 /** The public creatures at this boundary as cards: no notes, owner or definition. */

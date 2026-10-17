@@ -93,10 +93,11 @@ export const actionCommands = [
       // narration.
       let playerDamageApplied: readonly AppliedDamage[] = [];
       const { state, duplicate } = await execute((draft) => {
+        // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
+        // else's get one answer, so a player can't probe which ids exist.
+        requireActorAccess(initiator, draft, actorId, "attack");
         const attacker = draft.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
-        // The action kind is passed for the per-table policy hook (ADR-0021).
-        requireActorAccess(initiator, draft, actorId, "attack");
         const definition = attacker.definitionId ? kit.resolveDefinitionIn(draft, attacker.definitionId) : undefined;
         // Effective actions, so `item-<itemId>` ids resolve and item-raised numbers apply. A stat-block
         // action wins on id collision; builtins cover every combatant.
@@ -108,6 +109,7 @@ export const actionCommands = [
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
         const action = withChosenCost(listed, request.spend);
         let resolvedTargetIds: readonly string[];
+        let originAtCaster = false;
         if (template) {
           if (action.attack)
             throw new CommandRejectedError(
@@ -120,6 +122,7 @@ export const actionCommands = [
           const snapped = shapeGeometry(calibration, template.shape, template.origin, template.target);
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
+          originAtCaster = casterOutside;
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
@@ -214,7 +217,9 @@ export const actionCommands = [
               distanceFeet
             }
           );
-        // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
+        // Record the blast as a shape; id=commandId keeps re-delivery idempotent. A cone or line starts at its caster,
+        // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
+        const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
         if (template)
           addAnnotation(
             draft,
@@ -224,7 +229,7 @@ export const actionCommands = [
               shape: template.shape,
               origin: template.origin,
               target: template.target,
-              visibility: "public",
+              visibility: fromHiddenCaster ? "gm-only" : "public",
               actor: { sessionId: gmSessionId, role: "gm" },
               now: Date.now()
             },
