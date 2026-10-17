@@ -661,7 +661,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Magician's extra cantrip and Warden's training are applied. The Wisdom bonus to the checks each role names is the GM's."
   ),
   "feature:stunning-strike": guided(
-    "A failed Constitution save against the Monk's DC is Stunned until the start of its next turn, once a turn for a Focus Point. The halved Speed and Advantage on a success are the GM's."
+    "A target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. The halved Speed and Advantage on a success are the GM's."
   ),
   "feature:use-magic-device": guided(
     "The fourth attuned item is applied (inventory.ts). The roll to save a charge, and reading any Spell Scroll, are the GM's."

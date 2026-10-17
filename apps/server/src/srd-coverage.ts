@@ -326,7 +326,8 @@ export function srdCoverageRows(): CoverageRow[] {
   return rows;
 }
 
-const byName = (a: CoverageRow, b: CoverageRow) => a.name.localeCompare(b.name);
+// Numeric, so Unarmored Movement (level 2) comes before (level 10).
+const byName = (a: CoverageRow, b: CoverageRow) => a.name.localeCompare(b.name, "en", { numeric: true });
 const capitalized = (state: CoverageState) => `${state[0]!.toUpperCase()}${state.slice(1)}`;
 
 /** Groups whose every row is curated: they print as one table with the notes. */

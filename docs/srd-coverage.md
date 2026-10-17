@@ -338,7 +338,7 @@ Notes on the curated rows:
 
 ## Monk features
 
-**Enforced (18):** Ability Score Improvement · Body And Mind · Disciplined Survivor · Epic Boon · Evasion · Extra Attack · Martial Arts · Monk Subclass · Monks Focus · Quivering Palm (Warrior of the Open Hand) · Superior Defense · Unarmored Defense · Unarmored Movement (level 10) · Unarmored Movement (level 14) · Unarmored Movement (level 18) · Unarmored Movement (level 2) · Unarmored Movement (level 6) · Wholeness of Body (Warrior of the Open Hand)
+**Enforced (18):** Ability Score Improvement · Body And Mind · Disciplined Survivor · Epic Boon · Evasion · Extra Attack · Martial Arts · Monk Subclass · Monks Focus · Quivering Palm (Warrior of the Open Hand) · Superior Defense · Unarmored Defense · Unarmored Movement (level 2) · Unarmored Movement (level 6) · Unarmored Movement (level 10) · Unarmored Movement (level 14) · Unarmored Movement (level 18) · Wholeness of Body (Warrior of the Open Hand)
 
 **Guided (3):** Heightened Focus · Stunning Strike · Uncanny Metabolism
 
@@ -351,11 +351,11 @@ Notes on the curated rows:
 | Evasion | enforced | saving-throws.ts takes no damage on a successful Dexterity save for half damage and half on a failure, while the creature isn't Incapacitated. |
 | Heightened Focus | guided | Flurry of Blows makes three strikes from Monk level 10 (Monk's Focus carries it). The Temporary Hit Points from Patient Defense and the creature carried by Step of the Wind are the GM's. |
 | Martial Arts | enforced | builtin-actions.ts offers an Unarmed Strike as a Bonus Action, and resolution/attack.ts rolls Unarmed Strikes and Monk weapons with the Martial Arts die and the better of Strength and Dexterity. |
-| Stunning Strike | guided | A failed Constitution save against the Monk's DC is Stunned until the start of its next turn, once a turn for a Focus Point. The halved Speed and Advantage on a success are the GM's. |
+| Stunning Strike | guided | A target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. The halved Speed and Advantage on a success are the GM's. |
 
 ## Paladin features
 
-**Enforced (18):** Ability Score Improvement · Aura Expansion · Aura Of Protection · Epic Boon · Extra Attack · Faithful Steed · Fighting Style · Lay On Hands · Oath of Devotion Spells (Level 13) (Oath of Devotion) · Oath of Devotion Spells (Level 17) (Oath of Devotion) · Oath of Devotion Spells (Level 5) (Oath of Devotion) · Oath of Devotion Spells (Level 9) (Oath of Devotion) · Oath of Devotion Spells (Oath of Devotion) · Paladin Subclass · Paladins Smite · Radiant Strikes · Spellcasting · Weapon Mastery
+**Enforced (18):** Ability Score Improvement · Aura Expansion · Aura Of Protection · Epic Boon · Extra Attack · Faithful Steed · Fighting Style · Lay On Hands · Oath of Devotion Spells (Level 5) (Oath of Devotion) · Oath of Devotion Spells (Level 9) (Oath of Devotion) · Oath of Devotion Spells (Level 13) (Oath of Devotion) · Oath of Devotion Spells (Level 17) (Oath of Devotion) · Oath of Devotion Spells (Oath of Devotion) · Paladin Subclass · Paladins Smite · Radiant Strikes · Spellcasting · Weapon Mastery
 
 **Guided (6):** Abjure Foes · Aura Of Courage · Aura of Devotion (Oath of Devotion) · Channel Divinity · Holy Nimbus (Oath of Devotion) · Sacred Weapon (Oath of Devotion)
 
