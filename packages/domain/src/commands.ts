@@ -961,11 +961,18 @@ export const DiceRollSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** How a token move travels (SRD Movement): on foot or by one of the special speeds, spending movement; by
+ *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
+export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
+export type MoveMode = z.infer<typeof MoveModeSchema>;
+
 export const TokenMoveSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     position: EncounterTokenPositionSchema.nullable(),
+    /** Absent: walking. A player may teleport only with the GM's go-ahead, and only the GM moves a creature by force. */
+    mode: MoveModeSchema.optional(),
     sceneId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
     override: RulesOverrideSchema.optional(),

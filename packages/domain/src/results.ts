@@ -333,7 +333,22 @@ export const ActorMovementReplySchema = z.strictObject({
   speedFeet: z.number().min(0).nullable(),
   usedFeet: z.number().min(0),
   /** What going over does: `strict` refuses the move, `assisted` lets it through with a warning. */
-  enforcement: RuleModeSchema
+  enforcement: RuleModeSchema,
+  /** The ways it can move this turn and each one's budget: walking always, a special speed when it has one, and
+   *  climbing or swimming with Speed when it hasn't (`extraCost`: each foot costs an extra foot). */
+  modes: z
+    .array(
+      z.strictObject({
+        mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]),
+        budgetFeet: z.number().min(0),
+        extraCost: z.boolean()
+      })
+    )
+    .optional(),
+  /** Prone: it can only crawl, each foot costing an extra foot (two in Difficult Terrain). */
+  crawling: z.boolean().optional(),
+  /** It drags a creature it grapples that isn't Tiny or two sizes smaller, each foot costing an extra foot. */
+  dragging: z.boolean().optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;

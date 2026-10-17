@@ -24,8 +24,8 @@ export const ranger: ClassMechanicsModule = {
 
     /**
      * "Speed increases by 10 feet while you aren't wearing Heavy armor": the +10 is in the sheet's Speed, and a live
-     * -10 takes it back while Heavy armor is worn, so sheets built with the +10 stay right. Climb and Swim Speeds
-     * stay prose.
+     * -10 takes it back while Heavy armor is worn, so sheets built with the +10 stay right. The Climb and Swim
+     * Speeds equal to Speed are read from this feature by the movement rules (`specialSpeedsOf`).
      */
     roving: {
       modifiers: [

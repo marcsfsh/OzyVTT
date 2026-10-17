@@ -14,6 +14,14 @@ const RULE_FAMILIES = {
   "movement.stand-up-off-turn": "movement",
   // Steady Aim is only for a creature that hasn't moved this turn.
   "movement.already-moved": "movement",
+  // A player's move off their turn, and a player's teleport, are the GM's to allow.
+  "movement.off-turn": "movement",
+  "movement.teleport": "movement",
+  // "You can't willingly end a move in a space occupied by another creature."
+  "movement.occupied": "movement",
+  // Flying or burrowing without the speed, and a path that hostile creatures shut.
+  "movement.no-speed": "movement",
+  "movement.blocked-path": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",

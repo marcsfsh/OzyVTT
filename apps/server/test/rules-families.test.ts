@@ -42,6 +42,12 @@ describe("rule families", () => {
       ["movement.stand-up-off-turn", "movement"],
       // Steady Aim, only before moving: what the turn's movement has done.
       ["movement.already-moved", "movement"],
+      // Where and when a creature may move, and how: the GM's to waive with the rest of movement.
+      ["movement.off-turn", "movement"],
+      ["movement.teleport", "movement"],
+      ["movement.occupied", "movement"],
+      ["movement.no-speed", "movement"],
+      ["movement.blocked-path", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
