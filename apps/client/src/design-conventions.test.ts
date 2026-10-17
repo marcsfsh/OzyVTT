@@ -243,7 +243,8 @@ const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/scene/TokenContextMenu.tsx", 4],
   ["apps/client/src/scenes/SceneBuilder.tsx", 6],
   ["apps/client/src/scenes/ScenePanel.tsx", 3],
-  ["apps/client/src/viewer/ViewerApp.tsx", 4]
+  ["apps/client/src/viewer/ScreenPairing.tsx", 4],
+  ["apps/client/src/viewer/ViewerApp.tsx", 2]
 ];
 
 describe("(e) feedback is a toast", () => {

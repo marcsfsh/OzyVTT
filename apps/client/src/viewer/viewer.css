@@ -73,13 +73,28 @@
   mask-image: var(--sky-sun-mask);
   pointer-events: none;
 }
-.viewer-pairing form {
-  width: min(100%, 34rem);
+.viewer-pairing-card {
+  container-type: inline-size;
+  width: min(100%, 44rem);
   padding: clamp(1.5rem, 4vw, 3rem);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
   background: var(--surface-1);
-  text-align: left;
+  text-align: center;
+}
+/* The code is read across a room and typed on another device: as large as the card allows, on one line (seven
+   display-face glyphs are about 5.5em wide). */
+.viewer-screen-code {
+  display: block;
+  margin: var(--space-4) 0;
+  font: 400 clamp(2rem, 16cqi, 9rem) / 1 var(--font-display);
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  text-shadow: var(--heading-shadow, none);
+}
+.viewer-pairing .viewer-pairing-note {
+  font-size: clamp(0.9rem, 1.2vw, 1.15rem);
 }
 .viewer-pairing h1,
 .viewer-waiting h1 {
@@ -92,39 +107,6 @@
   line-height: 1.5;
   font-size: clamp(1rem, 1.5vw, 1.45rem);
 }
-.viewer-pairing label {
-  display: block;
-  margin-top: var(--space-5);
-  color: var(--text-dim);
-  font-weight: 700;
-}
-.viewer-pairing input {
-  width: 100%;
-  margin-top: 0.4rem;
-  padding: 0.9rem var(--space-4);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-3);
-  color: var(--text);
-  font-size: 1.1rem;
-}
-.viewer-pairing button {
-  width: 100%;
-  margin-top: var(--space-6);
-  padding: var(--space-4);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--primary);
-  color: var(--text-on-neon);
-  font-weight: 800;
-  cursor: pointer;
-}
-.viewer-pairing button:hover {
-  background: var(--magenta-hi);
-  box-shadow: var(--glow-magenta);
-}
-.viewer-pairing button:focus-visible,
-.viewer-pairing input:focus-visible,
 .viewer-fullscreen:focus-visible {
   outline: none;
   box-shadow:
