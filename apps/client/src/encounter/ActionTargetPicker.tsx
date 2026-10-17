@@ -1,10 +1,11 @@
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { AbilityId } from "@vtt/domain";
 import { Button, Select, Stepper } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
 import { ABILITY_WORDS } from "../dice/roll-call-words";
 import { useRollPreference } from "../dice/roll-preference";
 import { FaceEntry } from "./RollControls";
+import { plainActionName } from "./format";
 import type { TargetRow } from "../table/targetRows";
 import { InFooter } from "../table/footerSlot";
 import {
@@ -46,22 +47,32 @@ export function ActionTargetPicker({
   insideNow?: readonly TargetRow[];
 }>) {
   const { mayType } = useRollPreference();
+  // On a phone the panel under the map is short, so the picker scrolls up to show its first rows.
+  const groupRef = useRef<HTMLDivElement | null>(null);
+  const actionId = picking.action.id;
+  useEffect(() => {
+    const phone = window.matchMedia?.("(max-width: 979px)").matches ?? false;
+    groupRef.current?.scrollIntoView({ block: phone ? "start" : "nearest" });
+  }, [actionId]);
   const skillCatalog = useSkillCatalog();
   const group = useId();
   const ready = targetingReady(picking);
   const skillName = (id: string) => skillCatalog.items.find((skill) => skill.id === id)?.name ?? id;
   const darts = picking.darts;
   const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
+  // The level or "Cantrip" the list shows in brackets is noise once the action is chosen.
+  const name = plainActionName(picking.action.name);
+  const where = onMap ? " on the map or in the list" : "";
   return (
-    <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
+    <div className="action-targeting" role="group" aria-label={`Targets for ${name}`} ref={groupRef}>
       {picking.mode === "none" ? (
         <p className="action-targeting-head">
-          <strong>{picking.action.name}</strong> - choose the skill, then Roll.
+          <strong>{name}</strong> · choose the skill, then Roll.
         </p>
       ) : picking.mode === "template" ? (
         <>
           <p className="action-targeting-head">
-            <strong>{picking.action.name}</strong> · {picking.action.area?.sizeFeet}-foot {picking.action.area?.shape}
+            <strong>{name}</strong> · {picking.action.area?.sizeFeet}-foot {picking.action.area?.shape}
           </p>
           <p className="action-targeting-hint">
             {picking.template?.placed
@@ -86,9 +97,8 @@ export function ActionTargetPicker({
       ) : (
         <>
           <p className="action-targeting-head">
-            <strong>{picking.action.name}</strong> -{" "}
-            {picking.mode === "single" ? "choose one target" : "choose targets"}
-            {onMap ? (picking.mode === "single" ? " here or on the map" : " here or on the map") : ""}
+            <strong>{name}</strong> · {picking.mode === "single" ? "choose one target" : "choose targets"}
+            {where}
             {darts
               ? `. ${darts.total} darts: ${assigned >= darts.total ? "all assigned" : `${darts.total - Math.min(assigned, darts.total)} left, which go round the chosen targets in order`}.`
               : ""}
@@ -187,7 +197,7 @@ export function ActionTargetPicker({
             Cancel
           </Button>
           <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
-            Roll {picking.action.name}
+            Roll {name}
           </button>
         </div>
       </InFooter>

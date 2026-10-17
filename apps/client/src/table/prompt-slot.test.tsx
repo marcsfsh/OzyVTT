@@ -24,6 +24,7 @@ const lyra = (changes: Record<string, unknown> = {}) => ({
   visibility: "public",
   claimStatus: "mine",
   hp: { kind: "exact", current: 37, maximum: 44, temporary: 0 },
+  armorClass: 15,
   conditions: [],
   effects: [],
   ...changes
@@ -66,8 +67,8 @@ const SHIELD = {
   id: "40000000-0000-4000-8000-0000000000e1",
   kind: "attack-would-hit",
   actorId: LYRA,
-  actionId: "shield",
-  actionName: "Shield",
+  actionId: "spell-shield",
+  actionName: "Shield (1st, Reaction)",
   targetActorId: LYRA,
   sourceName: "Goblin 1",
   triggerCommandId: "50000000-0000-4000-8000-0000000000e1",
@@ -76,7 +77,9 @@ const SHIELD = {
   critical: false,
   acBonus: 5,
   rollsAttack: false,
-  createdAt: 0
+  createdAt: 0,
+  attackRoll: 16,
+  lastsUntilNextTurn: true
 };
 const SAVE = {
   id: "40000000-0000-4000-8000-0000000000e2",
@@ -107,8 +110,13 @@ describe("the player's prompt slot", () => {
     expect(region).toBeTruthy();
     const heading = screen.getByRole("heading", { name: "Goblin 1's attack would hit you" });
     expect(document.activeElement).toBe(heading);
-    expect(screen.getByText("Shield gives you +5 AC against it, so the hit becomes a miss.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Use - \+5 AC/ })).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The roll is 16 against your AC 15. Shield gives you +5 AC until the start of your next turn, so this hit becomes a miss."
+      )
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Take the hit" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cast Shield" }).className).toContain("encounter-primary");
     expect(screen.getByText("1 more after this: DC 15 Dexterity saving throw")).toBeTruthy();
     // The reaction is announced for a screen reader.
     expect(screen.getByText("Answer now: Goblin 1's attack would hit you.")).toBeTruthy();

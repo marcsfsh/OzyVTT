@@ -81,14 +81,18 @@ export function PlayerTurnEconomy({
   const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
   const lockedTitle = "Spent - only the GM can give it back";
   return (
-    <div className="turn-economy" role="group" aria-label="Your turn resources">
+    <div
+      className={`turn-economy${unconscious ? " is-unconscious" : ""}`}
+      role="group"
+      aria-label={unconscious ? "Your turn resources · Unconscious" : "Your turn resources"}
+    >
       {myTurn && (
         <>
           <button
             type="button"
             className="economy-slot"
             aria-pressed={combat.turn.actionUsed}
-            disabled={busy || (combat.turn.actionUsed && giveBackLocked)}
+            disabled={busy || unconscious || (combat.turn.actionUsed && giveBackLocked)}
             title={combat.turn.actionUsed && giveBackLocked ? lockedTitle : undefined}
             onClick={() =>
               emit(
@@ -103,7 +107,7 @@ export function PlayerTurnEconomy({
             type="button"
             className="economy-slot"
             aria-pressed={combat.turn.bonusActionUsed}
-            disabled={busy || (combat.turn.bonusActionUsed && giveBackLocked)}
+            disabled={busy || unconscious || (combat.turn.bonusActionUsed && giveBackLocked)}
             title={combat.turn.bonusActionUsed && giveBackLocked ? lockedTitle : undefined}
             onClick={() =>
               emit(
@@ -224,7 +228,6 @@ export function PlayerEncounterPanel({
   const { rollMode } = useRollPreference();
   const myTurn = myId !== null && combat.turnActorId === myId;
   const inFight = myId !== null && combat.initiative.some((entry) => entry.actorId === myId);
-  const actingName = combat.initiative.find((entry) => entry.active)?.name;
   const targets = combat.initiative.map((entry) => ({ actorId: entry.actorId, name: entry.name }));
 
   const sheet = (inCombat: boolean) =>
@@ -269,19 +272,9 @@ export function PlayerEncounterPanel({
             <SunMark size="sm" />
             Your turn
           </h2>
-        ) : combat.hiddenTurn ? (
-          <p className="encounter-quiet-note">The GM is taking a hidden turn.</p>
         ) : (
-          <p className="encounter-quiet-note">
-            {actingName ? `${actingName} is acting.` : "Waiting for the next turn."}
-          </p>
-        )}
-        {/* The player's own hit points, which their row never showed. */}
-        {myActor && myActor.hp.kind === "exact" && (
-          <span className="player-turn-hp">
-            HP {myActor.hp.current}/{myActor.hp.maximum}
-            {myActor.hp.temporary > 0 ? ` +${myActor.hp.temporary}` : ""}
-          </span>
+          // Who acts is in the header's status line; this tab is about the player's own turn.
+          <p className="encounter-quiet-note">Your actions show here on your turn.</p>
         )}
         {combat.rewound && <p className="encounter-quiet-note">The GM is reviewing an earlier turn.</p>}
       </div>
@@ -363,9 +356,6 @@ export function PlayerEncounterPanel({
 
   const orderBody = (
     <section className="encounter-panel combat-active" aria-label={`Turn order · round ${combat.round}`}>
-      <div className="encounter-order-head">
-        <strong className="encounter-round">Round {combat.round}</strong>
-      </div>
       <ol className="initiative-list player">
         {combat.initiative.map((entry) => {
           const isMe = entry.actorId === myId;
@@ -424,17 +414,14 @@ export function PlayerEncounterPanel({
 
   // The footer keeps the turn under the thumb: the economy and End turn on this player's turn, and their reaction
   // and HP while someone else acts.
+  const ownHp = myActor && myActor.hp.kind === "exact" ? myActor.hp : null;
   const footer =
     fighting && inFight && myId !== null ? (
       <div className="table-panel-foot-row player-foot">
-        {!myTurn && (
-          <span className="player-foot-watch">
-            <strong>{combat.hiddenTurn ? "A hidden turn" : actingName ? `${actingName} is acting` : "Waiting"}</strong>
-            {myActor && "hp" in myActor && myActor.hp.kind === "exact" && (
-              <span>
-                HP {myActor.hp.current}/{myActor.hp.maximum}
-              </span>
-            )}
+        {/* The character's hit points, in view on every tab. */}
+        {ownHp && (
+          <span className="player-foot-hp">
+            {`HP ${ownHp.current}/${ownHp.maximum}${ownHp.temporary > 0 ? ` +${ownHp.temporary}` : ""}`}
           </span>
         )}
         <PlayerTurnEconomy

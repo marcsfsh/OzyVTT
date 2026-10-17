@@ -375,14 +375,12 @@ export function GmEncounterPanel({
       className="encounter-panel combat-active encounter-order"
       aria-label={`Turn order · round ${state.combat.round}`}
     >
-      <div className="encounter-order-head">
-        <strong className="encounter-round">Round {state.combat.round}</strong>
-        {placed < total && (
-          <span className="encounter-place-nudge">
-            {placed} of {total} tokens are on the map. Drag the rest from the tray.
-          </span>
-        )}
-      </div>
+      {/* The round is in the header's status line. */}
+      {placed < total && (
+        <p className="encounter-place-nudge">
+          {placed} of {total} tokens are on the map. Drag the rest from the tray.
+        </p>
+      )}
       {reviewing && (
         <div className={`turn-review${dirty ? " dirty" : ""}`} role="status">
           <strong>Reviewing {reviewing.label ?? "an earlier turn"}</strong>
@@ -445,15 +443,17 @@ export function GmEncounterPanel({
 
   // The acting creature's console: its economy and actions, with its name, HP and AC at the top.
   const actBody = actingActor ? (
-    <section className="encounter-acting scroll-y" aria-label={`Now acting · ${actingActor.name}`}>
+    <section className="encounter-acting" aria-label={`Now acting · ${actingActor.name}`}>
+      {/* Outside the console's scroll, so who acts stays in view while their actions scroll. */}
       <p className="encounter-acting-head">
         <span>Now acting · {actingActor.name}</span>
         <span className="encounter-acting-numbers">
-          {actingActor.hp.current}/{actingActor.hp.maximum}
-          {actingActor.armorClass !== undefined ? ` · AC ${actingActor.armorClass}` : ""}
+          {`${actingActor.hp.current}/${actingActor.hp.maximum}${actingActor.armorClass !== undefined ? ` · AC ${actingActor.armorClass}` : ""}`}
         </span>
       </p>
-      <ActingConsole state={state} actorsById={actorsById} busy={busy} run={run} onFeedback={setMessage} />
+      <div className="encounter-acting-body scroll-y">
+        <ActingConsole state={state} actorsById={actorsById} busy={busy} run={run} onFeedback={setMessage} />
+      </div>
     </section>
   ) : (
     <p className="table-panel-empty">Nobody is acting yet.</p>
