@@ -68,6 +68,14 @@ export function PlayFight({
     [serverActions, definition]
   );
   if (!definition) return <div className="cs-play">{death}</div>;
+  // At 0 Hit Points the Death Saving Throws are the turn; the list would only say it can't be used.
+  if (isDown(actor))
+    return (
+      <div className="cs-play">
+        {death}
+        <UnconsciousNote name={actor.name} />
+      </div>
+    );
   const combat = controller.liveCombat;
   const acting = state ? ((state as PlayerView).combat.initiative.find((entry) => entry.active)?.name ?? null) : null;
   const readied = actor.effects.some((effect) => effect.tags.includes("readied"));
@@ -115,6 +123,18 @@ export function PlayFight({
         />
       )}
     </div>
+  );
+}
+
+/** What an Unconscious character can do: nothing on a turn, while every other tab stays open for reading. */
+export function UnconsciousNote({ name }: Readonly<{ name: string }>) {
+  return (
+    <section className="cs-group" aria-label="While Unconscious">
+      <span className="cs-eyebrow">While Unconscious</span>
+      <p className="cs-note">
+        While Unconscious, {name} can't take any action or Reaction. The other tabs stay open for reading.
+      </p>
+    </section>
   );
 }
 

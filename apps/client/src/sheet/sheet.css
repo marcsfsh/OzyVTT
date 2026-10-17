@@ -1063,7 +1063,7 @@ button.cs-lastroll-open {
 }
 .cs-vitals-grid {
   display: grid;
-  grid-template-columns: 1.6fr 1fr 1fr;
+  grid-template-columns: 1.9fr 1fr 1fr;
   gap: var(--space-1);
 }
 .cs-vitals-hp {
@@ -1075,28 +1075,32 @@ button.cs-lastroll-open {
   border: 1px solid var(--line-strong);
   background: var(--surface-1);
 }
-/* The Vitals' Hit Points: the number large with its maximum and Temp beside it, then the amount over Damage and
-   Heal. */
-.cs-vitals-hp .cs-hp-row {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: var(--space-2);
-  align-items: end;
-}
+/* The Vitals' Hit Points: the number large with its maximum and Temp on one line, the bar, then the amount, Damage
+   and Heal in one row. */
 .cs-vitals-hp .cs-hp-big {
-  grid-row: span 2;
+  font-size: 1.6rem;
 }
+.cs-vitals-hp .cs-hp-of,
 .cs-vitals-hp .cs-hp-temp {
-  margin-left: 0;
+  font-size: var(--fs-xs);
 }
 .cs-vitals-hp .hp-editor {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-1);
+  grid-template-columns: 2.6rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3px;
 }
-.cs-vitals-hp .hp-editor > :first-child {
-  grid-column: 1 / -1;
+.cs-vitals-hp .hp-editor > input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.3rem 0;
+}
+.cs-vitals-hp .hp-editor > button {
+  min-width: 0;
+  padding-inline: 2px;
+  font-size: var(--fs-xs);
+}
+.cs-vitals-grid > .cs-stat {
+  min-height: 0;
 }
 .cs-vitals-pair {
   display: grid;
@@ -1921,4 +1925,49 @@ button.cs-circle::after {
   margin: 0 0 0 auto;
   color: var(--text-muted);
   font-size: var(--fs-2xs);
+}
+.cs-item-charges {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.cs-use-cost {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.cs-masteries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.cs-mastery {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--raised);
+  box-shadow: var(--raised-sheen);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cs-mastery.is-on {
+  border-color: var(--cyan);
+  background: var(--tab-on);
+}
+.cs-mastery :is(span, strong) {
+  margin-top: 0;
+}
+.cs-mastery-weapon {
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+}
+.cs-mastery .cs-mastery-name {
+  color: var(--cyan-hi);
+  font: 600 var(--fs-xs) / 1.2 var(--font-label);
 }

@@ -12,6 +12,7 @@ import { EffectChips } from "./EffectChips";
 import { DyingTracker } from "./DyingTracker";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "./StabilizeControl";
 import { PlayerActionRunner } from "./PlayerActionRunner";
+import { UnconsciousNote } from "../sheet/PlayFight";
 import { isDying, owesDeathSave } from "../table/playerPrompts";
 import { hasPlayerPrompt } from "../table/PromptSlot";
 import { TablePanel, useRememberedTab, type PanelTab } from "../table/TablePanel";
@@ -296,8 +297,9 @@ export function PlayerEncounterPanel({
     );
 
   const acting = combat.initiative.find((entry) => entry.active)?.name ?? null;
+  const dying = myActor !== null && isDying(myActor);
   const runner =
-    inFight && myId !== null && myActor?.definition ? (
+    inFight && myId !== null && myActor?.definition && !dying ? (
       <PlayerActionRunner
         actorId={myId}
         definition={myActor.definition}
@@ -310,7 +312,6 @@ export function PlayerEncounterPanel({
         look={phone ? "card" : "list"}
         round={combat.round}
         acting={acting}
-        {...(isDying(myActor) ? { unavailable: "Unavailable while Unconscious" } : {})}
         targetRows={targetHints.rows}
         {...(targetHints.insideNow ? { insideNow: targetHints.insideNow } : {})}
       />
@@ -338,6 +339,8 @@ export function PlayerEncounterPanel({
       {/* Questions this player has waiting. */}
       <MyPendingAsks state={state} />
       {!inFight && myActor && <p className="table-panel-empty">{myActor.name} isn't in this fight.</p>}
+      {/* The death save waits in the prompt slot above the tabs; this tab says what Unconscious leaves. */}
+      {inFight && dying && myActor && <UnconsciousNote name={myActor.name} />}
       {runner}
       {myActor && inFight && (
         <OwnFeedback className="own-effect-row" empty={myActor.effects.length === 0}>

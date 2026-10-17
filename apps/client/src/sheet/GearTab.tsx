@@ -251,8 +251,15 @@ export function GearTab({
             </div>
             {open.description && <p className="cs-item-desc">{open.description}</p>}
             {charges && (
-              <p className="cs-sub">
-                {charges.left} of {charges.limit} charges left · {returnsWords(charges.per)}
+              <p className="cs-item-charges">
+                <UseBoxes
+                  left={charges.left}
+                  limit={charges.limit}
+                  label={`${charges.left} of ${charges.limit} charges left`}
+                />
+                <span className="cs-sub">
+                  {charges.left} of {charges.limit} charges left · {returnsWords(charges.per)}
+                </span>
               </p>
             )}
             {open.ammunitionLeft !== undefined && (
@@ -260,32 +267,6 @@ export function GearTab({
             )}
             {role === "player" && open.chosenDamageType && (
               <p className="cs-sub">Resists {titleCase(open.chosenDamageType)}.</p>
-            )}
-            {rows.length > 0 && (
-              <div className="cs-item-actions">
-                {rows.map((action, index) => {
-                  // An action whose charges are all spent waits for them to come back.
-                  const empty =
-                    action.usesLimit !== null && action.usesLimit - (spent[action.usesPool ?? action.id] ?? 0) <= 0;
-                  const why =
-                    facts.get(action.id)?.reason ??
-                    (empty ? `No charges left. ${returnsWords(action.usesPer ?? "long-rest")}.` : null);
-                  return (
-                    <span key={action.id} className="cs-item-action">
-                      <Button
-                        variant={index === 0 ? "primary" : "secondary"}
-                        block
-                        disabled={busy || actionBlocked !== null || why !== null}
-                        onClick={() => onUseAction(action)}
-                      >
-                        {action.id === `item-${open.id}` && open.weapon ? `Attack with the ${open.name}` : action.name}
-                      </Button>
-                      {why && actionBlocked === null && <span className="cs-sub">{why}</span>}
-                    </span>
-                  );
-                })}
-                {actionBlocked && <p className="cs-sub">{actionBlocked}</p>}
-              </div>
             )}
             <div className="cs-chiprow">
               <button
@@ -379,6 +360,32 @@ export function GearTab({
             >
               Remove {open.name}
             </Button>
+            {rows.length > 0 && (
+              <div className="cs-item-actions">
+                {rows.map((action, index) => {
+                  // An action whose charges are all spent waits for them to come back.
+                  const empty =
+                    action.usesLimit !== null && action.usesLimit - (spent[action.usesPool ?? action.id] ?? 0) <= 0;
+                  const why =
+                    facts.get(action.id)?.reason ??
+                    (empty ? `No charges left. ${returnsWords(action.usesPer ?? "long-rest")}.` : null);
+                  return (
+                    <span key={action.id} className="cs-item-action">
+                      <Button
+                        variant={index === 0 ? "primary" : "secondary"}
+                        block
+                        disabled={busy || actionBlocked !== null || why !== null}
+                        onClick={() => onUseAction(action)}
+                      >
+                        {action.id === `item-${open.id}` && open.weapon ? `Attack with the ${open.name}` : action.name}
+                      </Button>
+                      {why && actionBlocked === null && <span className="cs-sub">{why}</span>}
+                    </span>
+                  );
+                })}
+                {actionBlocked && <p className="cs-sub">{actionBlocked}</p>}
+              </div>
+            )}
           </section>
         );
       })()
@@ -439,20 +446,30 @@ export function GearTab({
       </div>
     );
 
-  const worn = inventory.filter((item) => item.equipped && item.quantity > 0);
-  const pack = inventory.filter((item) => !item.equipped && item.quantity > 0);
+  // An attuned item is listed with its attunement, so each item reads once.
+  const worn = inventory.filter((item) => item.equipped && !item.attuned && item.quantity > 0);
+  const pack = inventory.filter((item) => !item.equipped && !item.attuned && item.quantity > 0);
   return (
     <div className="cs-gear">
       <section className="cs-group" aria-label="Attunement">
         <span className="cs-section-head">
           <span className="cs-eyebrow">Attunement</span>
-          <span className={`cs-count${attuned.length > attunementSlots ? " is-over" : ""}`}>
-            {attuned.length} of {attunementSlots}
+          <span className="cs-chiprow">
+            <span className={`cs-count${attuned.length > attunementSlots ? " is-over" : ""}`}>
+              {attuned.length} of {attunementSlots}
+            </span>
+            <span className="cs-boxes" aria-hidden="true">
+              {Array.from({ length: attunementSlots }, (_, index) => (
+                <i key={index} className={index < attuned.length ? "is-on" : undefined} />
+              ))}
+            </span>
           </span>
         </span>
-        <p className="cs-sub">
-          {attuned.length > 0 ? attuned.map((item) => item.name).join(" · ") : "Nothing is attuned."}
-        </p>
+        {attuned.length > 0 ? (
+          <ul className="cs-items">{attuned.map(row)}</ul>
+        ) : (
+          <p className="cs-sub">Nothing is attuned.</p>
+        )}
       </section>
       <section className="cs-group" aria-label="Coins">
         <span className="cs-section-head">

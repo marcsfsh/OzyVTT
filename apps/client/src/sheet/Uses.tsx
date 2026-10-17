@@ -75,6 +75,7 @@ export function UseRow({
   pool,
   spent,
   detail,
+  cost,
   actions = true,
   onUse
 }: Readonly<{
@@ -82,6 +83,8 @@ export function UseRow({
   role: "gm" | "player";
   pool: Pool;
   spent: number;
+  /** What it costs on a turn ("Bonus Action"), beside its name. */
+  cost?: string | null;
   /** What the feature does, in a line. */
   detail?: string | null;
   /** False on the Play tab, which shows what is left without the controls. */
@@ -104,7 +107,10 @@ export function UseRow({
   return (
     <li className="cs-use">
       <span className="cs-use-text">
-        <strong className="cs-use-name">{pool.name}</strong>
+        <strong className="cs-use-name">
+          {pool.name}
+          {cost && <span className="cs-use-cost"> · {cost}</span>}
+        </strong>
         <span className="cs-sub">
           {returnsWords(pool.per)}
           {detail ? ` · ${detail}` : ""}
@@ -154,6 +160,7 @@ export function UseList({
   pools,
   spent,
   details,
+  costs,
   actions = true,
   acting,
   onUse
@@ -163,6 +170,7 @@ export function UseList({
   pools: readonly Pool[];
   spent: Readonly<Record<string, number>>;
   details?: ReadonlyMap<string, string>;
+  costs?: ReadonlyMap<string, string>;
   actions?: boolean;
   /** The pools used through their own action, by pool: the action's id. */
   acting?: ReadonlyMap<string, string>;
@@ -185,6 +193,7 @@ export function UseList({
             pool={pool}
             spent={spent[pool.id] ?? 0}
             detail={details?.get(pool.id) ?? null}
+            cost={costs?.get(pool.id) ?? null}
             actions={actions}
             {...(onUse && acting?.has(pool.id) ? { onUse: () => onUse(acting.get(pool.id)!) } : {})}
           />

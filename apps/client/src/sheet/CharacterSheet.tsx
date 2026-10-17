@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useId, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode
+} from "react";
 import type { GmActor, GmView, PlayerActor } from "@vtt/domain";
 import {
   Avatar,
@@ -33,7 +41,7 @@ import { LatestRoll, useSessionRoll } from "./LatestRoll";
 import { LevelBox } from "./LevelBox";
 import { NotesTab } from "./NotesTab";
 import { PlayFight } from "./PlayFight";
-import { DeathSavesCard, PlayCalm, StatTile } from "./PlayTab";
+import { DeathSavesCard, PlayCalm, RestMenu, StatTile } from "./PlayTab";
 import {
   armorClassOf,
   characterLevel,
@@ -189,6 +197,11 @@ export function CharacterSheet({
   const [remembered, setTab] = useRememberedTab(`vtt.sheet.tab.${layout}`, tabs, tabs[0] ?? "play", down);
   const tab = remembered as SheetTabId;
   const idBase = `cs-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  // Going down opens Play at its top, where the Death Saving Throws are.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (down) bodyRef.current?.scrollTo({ top: 0 });
+  }, [down]);
   // An attack or a cast aimed from a tab other than Play (or from the table's Sheet tab) is picked and rolled at the
   // top of that tab; the Play tab's own list holds its own.
   const aim = useTargeting();
@@ -361,7 +374,7 @@ export function CharacterSheet({
         role={role}
         busy={busy}
         edit={edit}
-        place={place}
+        place={layout === "wide" ? place : { kind: "drawer" }}
         serverActions={serverActions}
         facts={facts}
         attunementSlots={derived?.attunementSlots ?? 3}
@@ -437,6 +450,7 @@ export function CharacterSheet({
     ) : null;
   const body = (
     <div
+      ref={bodyRef}
       className="cs-body scroll-y"
       role="tabpanel"
       id={tabIds(idBase, tab).panel}
@@ -508,6 +522,10 @@ export function CharacterSheet({
           </div>
           <span className="cs-grow" />
           {role === "gm" && <GmOnlyTag />}
+          {/* A rest is taken between fights, so the band's Rest leaves while one runs. */}
+          {!controller.inFight && (actor.kind === "player-character" || role === "gm") && (
+            <RestMenu actorId={actor.id} role={role} asked={restAsked} onFeedback={say} />
+          )}
           {menu}
           {close}
         </header>

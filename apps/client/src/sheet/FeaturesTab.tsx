@@ -6,6 +6,14 @@ import type { SrdExtension } from "../encounter/sheet-extension";
 import type { SheetActor } from "./sheet-model";
 import { UseList, type Pool } from "./Uses";
 
+/** What a use costs on a turn, in the SRD's words. */
+const ACTIVATION_WORDS: Readonly<Record<string, string>> = {
+  action: "Action",
+  "bonus-action": "Bonus Action",
+  reaction: "Reaction",
+  other: "No action"
+};
+
 /** A feature the level page records as a pick of something else, which the sheet shows as that pick. */
 const PLACEHOLDERS = /-subclass$|^ability-score-improvement$/;
 
@@ -23,22 +31,26 @@ function featureGroups(definition: ActorDefinition, extension: SrdExtension): Gr
       ? [{ key: "traits", title: "Traits", entries: traits.map((trait) => ({ key: trait.name, ...trait })) }]
       : [];
   const groups = new Map<string, { title: string; entries: Entry[] }>();
-  const titleOf = (kind: string, sourceId: string) => {
-    if (kind === "class") {
-      const klass = character.classes.find((entry) => entry.id === sourceId);
-      return klass ? `${klass.name} ${klass.level}` : sourceId;
-    }
-    if (kind === "subclass")
-      return character.classes.find((entry) => entry.subclass?.id === sourceId)?.subclass?.name ?? sourceId;
-    if (kind === "species") return character.race?.name ?? "Species";
-    return "Other";
+  // A subclass's features read with its class's: "Wizard 7 · Evoker".
+  const classOf = (kind: string, sourceId: string) =>
+    kind === "class"
+      ? character.classes.find((entry) => entry.id === sourceId)
+      : kind === "subclass"
+        ? character.classes.find((entry) => entry.subclass?.id === sourceId)
+        : undefined;
+  const groupOf = (kind: string, sourceId: string): readonly [string, string] => {
+    const klass = classOf(kind, sourceId);
+    if (klass)
+      return [`class:${klass.id}`, `${klass.name} ${klass.level}${klass.subclass ? ` · ${klass.subclass.name}` : ""}`];
+    if (kind === "species") return ["species", character.race?.name ?? "Species"];
+    return [`${kind}:${sourceId}`, "Other"];
   };
   // The traits follow the features in order, then the feats.
   features.forEach((feature, index) => {
     const trait = traits[index];
     if (!trait || PLACEHOLDERS.test(feature.id)) return;
-    const key = `${feature.kind}:${feature.sourceId}`;
-    const group = groups.get(key) ?? { title: titleOf(feature.kind, feature.sourceId), entries: [] };
+    const [key, title] = groupOf(feature.kind, feature.sourceId);
+    const group = groups.get(key) ?? { title, entries: [] };
     group.entries.push({ key: feature.id, name: trait.name, description: trait.description });
     groups.set(key, group);
   });
@@ -49,6 +61,39 @@ function featureGroups(definition: ActorDefinition, extension: SrdExtension): Gr
   }));
   if (feats.length > 0) groups.set("feats", { title: "Feats", entries: feats });
   return [...groups.entries()].map(([key, group]) => ({ key, ...group }));
+}
+
+/** The Weapon Mastery picks as tiles, each weapon kind with its property; a tap shows what the property does. */
+function MasteryBlock({ masteries }: Readonly<{ masteries: NonNullable<ActorDerivedSheet["weaponMasteries"]> }>) {
+  const [open, setOpen] = useState<string | null>(null);
+  const shown = masteries.find((pick) => pick.weaponId === open);
+  return (
+    <section className="cs-group" aria-label="Weapon Mastery">
+      <span className="cs-section-head">
+        <span className="cs-eyebrow">Weapon Mastery · {masteries.length}</span>
+        <span className="cs-sub">Change after a Long Rest</span>
+      </span>
+      <div className="cs-masteries">
+        {masteries.map((pick) => (
+          <button
+            key={pick.weaponId}
+            type="button"
+            className={`cs-mastery interactive${open === pick.weaponId ? " is-on" : ""}`}
+            aria-expanded={open === pick.weaponId}
+            onClick={() => setOpen((current) => (current === pick.weaponId ? null : pick.weaponId))}
+          >
+            <strong className="cs-mastery-weapon">{pick.weaponName}</strong>
+            <span className="cs-mastery-name">{pick.mastery.name}</span>
+          </button>
+        ))}
+      </div>
+      {shown && (
+        <p className="cs-feature-text">
+          <strong>{shown.mastery.name}.</strong> {shown.mastery.description}
+        </p>
+      )}
+    </section>
+  );
 }
 
 /** A feature's first sentence, its one line. */
@@ -102,21 +147,29 @@ export function FeaturesTab({
 }>) {
   const masteries = derived?.weaponMasteries ?? [];
   const groups = featureGroups(definition, extension);
-  // A pool whose action does something on its own (a heal, an attack, an effect) is used through that action.
   const acting = new Map<string, string>();
   for (const pool of pools) {
     const own = definition.actions.find((action) => (action.uses?.pool ?? action.id) === pool.id);
     const row = serverActions.find((action) => (action.usesPool ?? action.id) === pool.id);
+    // A pool whose action does something on its own (a heal, an attack, a spell, an effect) is used through it.
     const does = own
       ? own.healing !== undefined ||
         own.attack !== undefined ||
         own.save !== undefined ||
         own.damage.length > 0 ||
-        own.grants !== undefined
+        own.grants !== undefined ||
+        own.spellId !== undefined
       : row !== undefined &&
         (row.healing != null || row.attackBonus !== null || row.saveAbility !== null || row.damage.length > 0);
     const id = own?.id ?? row?.id;
     if (does && id) acting.set(pool.id, id);
+  }
+  // What each use costs on a turn, said beside its name.
+  const costs = new Map<string, string>();
+  for (const pool of pools) {
+    const row = serverActions.find((action) => (action.usesPool ?? action.id) === pool.id);
+    const word = row ? ACTIVATION_WORDS[row.activation] : undefined;
+    if (word) costs.set(pool.id, word);
   }
   // The monster's own actions, which have no uses to count but say what it can do.
   const monsterActions = actor.kind === "player-character" ? [] : definition.actions;
@@ -135,23 +188,7 @@ export function FeaturesTab({
           />
         </section>
       )}
-      {masteries.length > 0 && (
-        <section className="cs-group" aria-label="Weapon Mastery">
-          <span className="cs-eyebrow">Weapon Mastery</span>
-          <ul className="cs-feature-list">
-            {masteries.map((pick) => (
-              <FeatureRow
-                key={pick.weaponId}
-                entry={{
-                  key: pick.weaponId,
-                  name: `${pick.weaponName} · ${pick.mastery.name}`,
-                  description: pick.mastery.description
-                }}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
+      {masteries.length > 0 && <MasteryBlock masteries={masteries} />}
       {groups.map((group) => (
         <section key={group.key} className="cs-group" aria-label={group.title}>
           <span className="cs-eyebrow">{group.title}</span>

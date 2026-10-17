@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { ActorDefinition, ActorDerivedSheet, DeathSaves, PendingSave, PlayerPendingSave } from "@vtt/domain";
-import { Button, IconCheck, IconMoon, IconX } from "@vtt/ui";
+import { Button, IconCheck, IconMoon, IconX, Menu, MenuItem } from "@vtt/ui";
 import { abilityModifier } from "@vtt/rules-5e";
 import { rollModeOf, useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
@@ -23,7 +23,7 @@ import {
 } from "./sheet-model";
 import { slotPools } from "./spell-model";
 import { StatusStrip } from "./StatusStrip";
-import { UseList, type Pool } from "./Uses";
+import { UseBoxes, UseList, type Pool } from "./Uses";
 import type { SheetRolls } from "./useSheetRolls";
 
 /** A number read at a glance: AC, Speed, Initiative, Passive Perception. `note` names a lowered value's base. */
@@ -42,17 +42,9 @@ export function StatTile({
   );
 }
 
-/**
- * The rests between fights. A player takes a Short Rest and asks the GM for a Long Rest, which the GM approves; the
- * GM's Long Rest is in the GM tools. The server refuses a rest in a fight, at 0 Hit Points, and a Long Rest within
- * 16 hours of the last, and says why.
- */
-export function RestButtons({
-  actorId,
-  role,
-  asked,
-  onFeedback
-}: Readonly<{ actorId: string; role: "gm" | "player"; asked: boolean; onFeedback: (text: string) => void }>) {
+/** Rests through the server, which refuses one in a fight, at 0 Hit Points, or a Long Rest within 16 hours of the last,
+ *  and says why. A player asks the GM for a Long Rest, which the GM approves. */
+function useRest(actorId: string, onFeedback: (text: string) => void) {
   const [busy, setBusy] = useState(false);
   const rest = (kind: "short" | "long") => {
     setBusy(true);
@@ -78,6 +70,18 @@ export function RestButtons({
       );
     });
   };
+  return { busy, rest, ask };
+}
+
+/** The rests between fights: a player takes a Short Rest and asks for a Long Rest; the GM's Long Rest is in the GM
+ *  tools. */
+export function RestButtons({
+  actorId,
+  role,
+  asked,
+  onFeedback
+}: Readonly<{ actorId: string; role: "gm" | "player"; asked: boolean; onFeedback: (text: string) => void }>) {
+  const { busy, rest, ask } = useRest(actorId, onFeedback);
   return (
     <div className="cs-rest" role="group" aria-label="Rest">
       <Button disabled={busy} onClick={() => rest("short")}>
@@ -97,6 +101,44 @@ export function RestButtons({
           </Button>
         ))}
     </div>
+  );
+}
+
+/** The laptop band's Rest: the same rests in a menu, kept out of a fight. */
+export function RestMenu({
+  actorId,
+  role,
+  asked,
+  onFeedback
+}: Readonly<{ actorId: string; role: "gm" | "player"; asked: boolean; onFeedback: (text: string) => void }>) {
+  const { busy, rest, ask } = useRest(actorId, onFeedback);
+  return (
+    <Menu
+      trigger={
+        <>
+          <IconMoon /> Rest
+        </>
+      }
+      align="end"
+      triggerClassName="cs-rest-trigger"
+    >
+      <MenuItem icon={<IconMoon />} disabled={busy} onClick={() => rest("short")}>
+        Short Rest
+      </MenuItem>
+      {role === "gm" ? (
+        <MenuItem icon={<IconMoon />} disabled={busy} onClick={() => rest("long")}>
+          Long Rest
+        </MenuItem>
+      ) : asked ? (
+        <MenuItem disabled={busy} onClick={() => ask(true)}>
+          Take back the Long Rest request
+        </MenuItem>
+      ) : (
+        <MenuItem icon={<IconMoon />} disabled={busy} onClick={() => ask(false)}>
+          Ask for a Long Rest
+        </MenuItem>
+      )}
+    </Menu>
   );
 }
 
@@ -449,6 +491,27 @@ function Vitals({
   );
 }
 
+/** A grant's free casting of a spell, as the server names its pool. */
+const FREE_CAST = / \(no slot\)$/;
+
+/** The free casts a feat or a species gives, read as one row: the spells, and what is left of them together. */
+function FreeCasts({ pools, spent }: Readonly<{ pools: readonly Pool[]; spent: Readonly<Record<string, number>> }>) {
+  if (pools.length === 0) return null;
+  const limit = pools.reduce((sum, pool) => sum + pool.limit, 0);
+  const left = pools.reduce((sum, pool) => sum + Math.max(0, pool.limit - (spent[pool.id] ?? 0)), 0);
+  return (
+    <ul className="cs-uses">
+      <li className="cs-use">
+        <span className="cs-use-text">
+          <strong className="cs-use-name">Free casts</strong>
+          <span className="cs-sub">{pools.map((pool) => pool.name.replace(FREE_CAST, "")).join(" · ")}</span>
+        </span>
+        <UseBoxes left={left} limit={limit} label={`Free casts: ${left} of ${limit} left`} />
+      </li>
+    </ul>
+  );
+}
+
 /**
  * The Play tab between fights: the rests and Hit Point Dice (or the phone's Vitals), the pinned checks, the spell slots
  * left and the uses that come back on a rest. At 0 Hit Points the Death Saving Throws come first.
@@ -520,7 +583,14 @@ export function PlayCalm({
       {restPools.length > 0 && (
         <section className="cs-group" aria-label="Uses">
           <span className="cs-eyebrow">Uses</span>
-          <UseList actorId={actor.id} role={role} pools={restPools} spent={actor.actionUses ?? {}} actions={false} />
+          <UseList
+            actorId={actor.id}
+            role={role}
+            pools={restPools.filter((pool) => !FREE_CAST.test(pool.name))}
+            spent={actor.actionUses ?? {}}
+            actions={false}
+          />
+          <FreeCasts pools={restPools.filter((pool) => FREE_CAST.test(pool.name))} spent={actor.actionUses ?? {}} />
         </section>
       )}
     </div>

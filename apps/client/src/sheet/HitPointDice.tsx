@@ -86,7 +86,8 @@ export function HitPointDice({
       </div>
       {hitDice.remaining > 0 && (
         <div className="cs-hd-spend">
-          {hitDice.remaining > 1 && (
+          {/* The phone's boxes spend one die a tap, as a Short Rest spends them one at a time. */}
+          {hitDice.remaining > 1 && !boxes && (
             <Stepper
               value={chosen}
               onChange={setCount}
