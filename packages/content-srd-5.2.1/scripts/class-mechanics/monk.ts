@@ -6,7 +6,7 @@
  */
 import type { ClassMechanicsModule } from "./overlay.js";
 
-/** Every damage type but Force - Superior Defense's "Resistance to all damage except Force damage". */
+/** Every damage type but Force: Superior Defense's "Resistance to all damage except Force damage". */
 const ALL_BUT_FORCE = [
   "acid",
   "bludgeoning",

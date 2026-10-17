@@ -1,7 +1,7 @@
 /**
  * Sorcerer and Draconic Sorcery mechanics, merged over the ETL-generated prose.
  *
- * A Metamagic option is a pick, not an action, so it can't carry a price of its own: the 1-point options ride the
+ * A Metamagic option is a pick with no action of its own, so it can't carry a price: the 1-point options ride the
  * `sorcery-points` pool, and Heightened and Quickened Spell's 2 points are spent from the sheet's Limited uses.
  */
 import type { DamageType } from "@vtt/schemas";

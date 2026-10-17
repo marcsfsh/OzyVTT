@@ -66,7 +66,7 @@ export type MultiattackOfProse = {
 };
 
 const COUNT_WORDS: Readonly<Record<string, number>> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
-const NAME = "[A-Z][A-Za-z'’-]*(?: [A-Z][A-Za-z'’-]*)*";
+const NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";
 const NAMES = `${NAME}(?:(?:,\\s*(?:or\\s+|and\\s+)?|\\s+or\\s+|\\s+and\\s+)${NAME})*`;
 const COUNT = "one|two|three|four|five|six|[1-6]";
 /** The clauses of a plan, tried in order at each position: an any-combination pool, "two X or Y attacks", "two X

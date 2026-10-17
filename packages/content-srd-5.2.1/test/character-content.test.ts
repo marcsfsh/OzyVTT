@@ -94,7 +94,9 @@ describe("character-builder content records", () => {
     expect(nameOf("rogue", "thieves-cant")).toBe("Thieves' Cant");
     // The source's one curly apostrophe is set straight.
     expect(nameOf("ranger", "natures-veil")).toBe("Nature's Veil");
-    const curly = classes.flatMap((entry) => entry.features).filter((feature) => /[‘’“”]/.test(feature.name));
+    const curly = classes
+      .flatMap((entry) => entry.features)
+      .filter((feature) => /[\u2018\u2019\u201c\u201d]/.test(feature.name));
     expect(curly.map((feature) => feature.id)).toEqual([]);
   });
 
@@ -199,10 +201,10 @@ describe("character-builder content records", () => {
     expect(resourceAt(9, "indomitable")).toBe(1);
     expect(resourceAt(13, "indomitable")).toBe(2);
     expect(resourceAt(17, "indomitable")).toBe(3);
-    // Fighting Style is a choice, not hardcoded behavior - it writes a `choices[]` row.
+    // Fighting Style is a choice: it writes a `choices[]` row.
     const style = fighter.features.find((feature) => feature.id === "fighting-style")!;
     expect(style.choice).toMatchObject({ kind: "fighting-style", choose: 1, fromCatalog: "fighting-style-feats" });
-    // Extra Attack is a typed modifier, not a special case in the engine.
+    // Extra Attack is a typed modifier, with no special case in the engine.
     expect(fighter.features.find((feature) => feature.id === "extra-attack")!.modifiers).toEqual([
       { type: "extra-attack", count: 1 }
     ]);
@@ -280,7 +282,7 @@ describe("character-builder content records", () => {
     expect(channelAt(17)).toBe(3);
     expect(channelAt(18)).toBe(4);
     expect(channelAt(20)).toBe(4);
-    // ... and the feature's own uses scale identically, owning the shared "channel-divinity" pool.
+    // ... and the feature's own uses scale identically, and they own the shared "channel-divinity" pool.
     const channel = cleric.features.find((feature) => feature.id === "channel-divinity")!;
     expect(channel.uses).toMatchObject({
       per: "long-rest",
@@ -391,7 +393,7 @@ describe("character-builder content records", () => {
   });
 
   it("gates Champion's features at the SRD 5.2.1 levels, not the 2014 ones", () => {
-    // SRD 5.2.1 levels, not 2014's (Remarkable Athlete at 7, Additional Fighting Style at 10).
+    // SRD 5.2.1 levels (Remarkable Athlete at 7, Additional Fighting Style at 10).
     const champion = subclassesForClass("fighter")[0];
     expect(champion.features.map((feature) => [feature.id, feature.level])).toEqual([
       ["improved-critical", 3],
@@ -859,15 +861,15 @@ describe("character-builder content records", () => {
     const protector = order.find((option) => option.id === "protector")!;
     expect(protector.grants!.weapons).toEqual(["martial"]);
     expect(protector.grants!.armor).toEqual(["heavy"]);
-    // A Protector Cleric's PROFICIENCIES are the class's plus the option's - the SRD's printed result.
+    // A Protector Cleric's PROFICIENCIES are the class's plus the option's: the SRD's printed result.
     expect([...cleric.weaponProficiencies, ...protector.grants!.weapons]).toEqual(["simple", "martial"]);
     expect([...cleric.armorProficiencies, ...protector.grants!.armor]).toEqual(["light", "medium", "shields", "heavy"]);
-    // Thaumaturge raises the Cleric cantrip budget ("one extra cantrip") rather than opening a pick of its own.
+    // Thaumaturge raises the Cleric cantrip budget ("one extra cantrip") and opens no pick of its own.
     const thaumaturge = order.find((option) => option.id === "thaumaturge")!;
     expect(thaumaturge.extraPicks).toEqual([{ offer: "class-cantrips", amount: 1 }]);
     expect(thaumaturge.choice).toBeUndefined();
     expect(thaumaturge.grants).toBeUndefined();
-    // Protector raises nothing: the field is empty, not absent, so a reader never has to guard it.
+    // Protector raises nothing: the field is present and empty, so a reader never has to guard it.
     expect(protector.extraPicks).toEqual([]);
 
     // Blessed Strikes: Divine Strike is a once-per-turn rollable that grows 1d8 -> 2d8 at level 14.
@@ -1013,14 +1015,14 @@ describe("character-builder content records", () => {
     for (const lineage of dragonborn.lineages) {
       const trait = lineage.traits.find((candidate) => candidate.id === `${lineage.id}-breath`)!;
       const action = trait.actions.find((candidate) => candidate.id === "breath-weapon")!;
-      // DC 8 + Constitution modifier + Proficiency Bonus, as data - the target rolls Dexterity.
+      // DC 8 + Constitution modifier + Proficiency Bonus, as data: the target rolls Dexterity.
       expect(action.save, lineage.id).toEqual({
         ability: "dex",
         dc: { base: 8, ability: "con", proficiencyBonus: true },
         successDamage: "half",
         failureConditions: []
       });
-      // 1d10, rising by 1d10 at character levels 5, 11, and 17 - in the ancestry's own damage type.
+      // 1d10, rising by 1d10 at character levels 5, 11, and 17, in the ancestry's own damage type.
       const type = expectedTypes[lineage.id];
       expect(action.damage, lineage.id).toEqual([{ formula: "1d10", type }]);
       expect(action.damageByLevel, lineage.id).toEqual([
@@ -1072,7 +1074,7 @@ describe("character-builder content records", () => {
     expect(save({ base: 8 })).toBe(false);
   });
 
-  it("carries the SRD ability column on every skill (raw bundle - a bundle rebuild must preserve it)", () => {
+  it("carries the SRD ability column on every skill (raw bundle: a bundle rebuild must preserve it)", () => {
     const require = createRequire(import.meta.url);
     const raw = require("../bundles/skills.v1.json") as Array<{ id: string; ability?: string }>;
     expect(raw).toHaveLength(18);
@@ -1104,7 +1106,7 @@ describe("character-builder content records", () => {
  * Every class and subclass feature carries real prose, never a "See the ... in SRD 5.2.1." stub.
  * The build refuses stubs; this guards the committed bundle.
  */
-describe("2a - no class or subclass feature falls back to a pointer at an external document", () => {
+describe("2a: no class or subclass feature falls back to a pointer at an external document", () => {
   const STUB = /^See the .* in SRD 5\.2\.1\.$/;
   const classes = loadClasses();
   const subclasses = loadSubclasses();
@@ -1145,7 +1147,7 @@ describe("2a - no class or subclass feature falls back to a pointer at an extern
     expect(proseOf("barbarian", "rage")).toContain("a primal power called Rage");
     expect(proseOf("monk", "martial-arts")).toContain("Unarmed Strike");
     expect(proseOf("rogue", "sneak-attack")).toContain("Sneak Attack");
-    // Negative control: the three hand-authored classes are copied from sources/authored, not generated.
+    // Negative control: the three hand-authored classes are copied from sources/authored.
     expect(proseOf("cleric", "channel-divinity")).toContain("Channel Divinity");
     expect(proseOf("wizard", "arcane-recovery")).toContain(
       "regain some of your magical energy by studying your spellbook"
@@ -1220,7 +1222,7 @@ describe("the subclass authoring surface, and the tables the parser used to thro
   });
 
   it("carries the spell tables of the four subclass spell features into their descriptions", () => {
-    // Each spell table is rendered into the description rather than dropped.
+    // Each spell table is rendered into the description.
     const draconic = featureOf(subclasses, "draconic-sorcery", "draconic-spells").description;
     expect(draconic).toContain("Sorcerer Level 3: Alter Self, Chromatic Orb, Command, Dragon's Breath");
     expect(draconic).toContain("Sorcerer Level 9: Legend Lore, Summon Dragon");
@@ -1245,7 +1247,7 @@ describe("the subclass authoring surface, and the tables the parser used to thro
   });
 
   it("leaves no subclass spell feature ending on the word that introduced its table", () => {
-    // The shape of the bug, not one instance of it: "...as shown in the X table." followed by nothing.
+    // The shape of the bug, beyond one instance of it: "...as shown in the X table." followed by nothing.
     const truncated = subclasses.flatMap((record) =>
       record.features
         .filter(
@@ -1330,7 +1332,7 @@ describe("content-record schema guards", () => {
   });
 
   it("rejects a choice whose option list is EMPTY rather than parsing into a downstream crash", () => {
-    // An empty option list is an authoring mistake, not "no options": consumers would fall through to an
+    // An empty option list is an authoring mistake: consumers would fall through to an
     // undefined `fromCatalog`.
     const empty = FeatureChoiceSchema.safeParse({ kind: "skill", from: [] });
     expect(empty.success).toBe(false);
@@ -1348,7 +1350,7 @@ describe("content-record schema guards", () => {
       }).success
     ).toBe(false);
     expect(FeatureChoiceSchema.safeParse({ kind: "x", options: [] }).success).toBe(false);
-    // The fix is to omit the field, not to empty it.
+    // The fix is to omit the field.
     expect(FeatureChoiceSchema.safeParse({ kind: "skill", fromCatalog: "skills" }).success).toBe(true);
     // No authored record anywhere in the bundles smuggles one in.
     const everyChoice = [
@@ -1410,7 +1412,7 @@ describe("content-record schema guards", () => {
     expect(option.grants!.skills).toEqual([]);
     const asFeature: FeatureRecord = option;
     expect(FeatureRecordSchema.safeParse(asFeature).success).toBe(true);
-    // `from` is derived, never co-authored - two lists could disagree, so only one is authorable.
+    // `from` is derived, never co-authored: two lists could disagree, so only one is authorable.
     expect(parsed.choice!.from).toEqual(["warden"]);
     expect(
       FeatureChoiceSchema.safeParse({
@@ -1443,7 +1445,7 @@ describe("content-record schema guards", () => {
         ]
       }).success
     ).toBe(false);
-    // An option still needs printed text - it lands on the sheet as a trait exactly like a feature.
+    // An option still needs printed text: it lands on the sheet as a trait exactly like a feature.
     expect(FeatureChoiceSchema.safeParse({ kind: "k", options: [{ id: "a", name: "A" }] }).success).toBe(false);
     // Homebrew authors the identical record; nothing about the SRD's options is special-cased.
     expect(
@@ -1617,7 +1619,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       consumesSpellSlot: false,
       uses: { limit: 1, per: "long-rest" }
     });
-    // `restrictedTo` is advisory - it parses and displays, it never blocks.
+    // `restrictedTo` is advisory: it parses and displays, it never blocks.
     expect(amulet.attunement!.restrictedTo).toEqual(["cleric"]);
   });
 
@@ -1661,7 +1663,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     });
     const rider = shield.modifiers[0];
     expect(rider).toMatchObject({ type: "resource-bonus", poolId: "lay-on-hands", amount: 1 });
-    // A class gate is static - resolvable from the sheet, so it shows as a real number, not a note.
+    // A class gate is static: resolvable from the sheet, so it shows as a real number.
     expect(riderLayer(rider.when)).toBe("standing");
   });
 
@@ -1682,7 +1684,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
         }
       ]
     });
-    // A moment plus a filter narrowing it - the only legal way to write "on opportunity attacks".
+    // A moment plus a filter narrowing it: the only legal way to write "on opportunity attacks".
     expect(riderLayer(dagger.modifiers[0].when)).toBe("momentary");
     expect(dagger.modifiers[0].when?.map((trigger) => trigger.type)).toEqual(["on-attack-roll", "attack-kind-is"]);
   });
@@ -1760,7 +1762,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     });
     expect(proficient.grants!.skills).toEqual(["arcana"]);
     expect(expert.grants!.expertise).toEqual(["arcana"]);
-    // Same authored shape a feature uses - `FeatureGrantsSchema`, reused whole rather than restated.
+    // Same authored shape a feature uses: `FeatureGrantsSchema`, reused whole.
     expect(proficient.grants!.tools).toEqual([]);
   });
 
@@ -1787,7 +1789,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(riderLayer(bow.modifiers[1].when)).toBe("momentary");
   });
 
-  it("13. curses and debuffs - the same vocabulary with a negative number", () => {
+  it("13. curses and debuffs: the same vocabulary with a negative number", () => {
     const cursed = item({
       id: "hb-cloak-weakness",
       name: "Cloak of Weakness",
@@ -1859,7 +1861,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       { type: "initiative", amount: 2 },
       { type: "speed", amount: 10, when: [{ type: "while-unarmored" }] }
     ];
-    // Eight riders is the authored cap, so the proof runs in two records rather than one.
+    // Eight riders is the authored cap, so the proof runs in two records.
     expect(feat(everyRider).feature.modifiers).toHaveLength(8);
     expect(feat(secondHalf).feature.modifiers).toHaveLength(8);
     expect(item({ id: "hb-a", modifiers: everyRider }).modifiers).toHaveLength(8);
@@ -1892,7 +1894,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
 
   // ---- the refusals, verified by injection ------------------------------------------------------
 
-  it("refuses hit points, ability scores and attunement slots on an ITEM carrier only - a feat keeps all three", () => {
+  it("refuses hit points, ability scores and attunement slots on an ITEM carrier only: a feat keeps all three", () => {
     for (const modifier of [
       { type: "hit-points-per-level", amount: 1 },
       { type: "ability-score", ability: "str", amount: 2 },
@@ -1933,11 +1935,11 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
         { type: "damage-type-is", damageTypes: ["fire"] }
       ]).success
     ).toBe(false);
-    // A rider fires at one moment, not two.
+    // A rider fires at one moment only.
     const twoMoments = RiderWhenSchema.safeParse([{ type: "on-hit" }, { type: "on-critical-hit" }]);
     expect(twoMoments.success).toBe(false);
     expect(!twoMoments.success && JSON.stringify(twoMoments.error.issues)).toContain("only one moment");
-    // A filter with no moment is an authoring mistake, not "always".
+    // A filter with no moment is an authoring mistake; it would otherwise read as "always".
     const orphanFilter = RiderWhenSchema.safeParse([{ type: "versus-size", sizes: ["large"] }]);
     expect(orphanFilter.success).toBe(false);
     expect(!orphanFilter.success && JSON.stringify(orphanFilter.error.issues)).toContain("needs a moment to narrow");
@@ -1960,7 +1962,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
   });
 
   it("still refuses an undeclared key on the one .strict() content record", () => {
-    // The magic-item block is a longer list of declared keys, not a loosened schema.
+    // The magic-item block is a longer list of declared keys; the schema stays strict.
     expect(
       EquipmentReferenceSchema.safeParse({
         id: "hb-x",

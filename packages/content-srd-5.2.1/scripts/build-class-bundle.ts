@@ -49,7 +49,7 @@ const LEVEL_HEADING = /^Level (\d+):\s*(.+)$/;
 /** A dash-only table cell means "nothing at this level" in the printed tables. */
 const blank = (cell: string) => {
   const v = strip(cell);
-  return v === "" || v === "—" || v === "-" || v === "--";
+  return v === "" || v === "\u2014" || v === "-" || v === "--";
 };
 
 const intOf = (cell: string) => {
@@ -212,7 +212,7 @@ type ClassConfig = {
   columns: Record<string, "features" | "cantrips" | "prepared" | "pact-slots" | "pact-level" | ResourceSpec>;
   spellcasting?: ClassReference["spellcasting"];
   subclassLevel: number;
-  /** Extra `choice` riders keyed by feature slug - the picks the wizard has to render. */
+  /** Extra `choice` riders keyed by feature slug: the picks the wizard has to render. */
   choices?: Record<string, { kind: string; choose: number; fromCatalog?: string; optionsFrom?: string }>;
 };
 
@@ -244,7 +244,7 @@ const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "feats", repeat
 const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromCatalog: "weapons" });
 
 /**
- * Short class copy written for this product, not SRD text: the vendored transcription omits the
+ * Short class copy written for this product (no SRD text): the vendored transcription omits the
  * SRD's per-class flavour paragraphs. Replace these if those paragraphs are ever vendored.
  */
 const BLURBS: Record<string, { summary: string; description: string }> = {
@@ -399,7 +399,7 @@ const CONFIG: Record<string, ClassConfig> = {
       "Prepared Spells": "prepared"
     },
     choices: {
-      // See the Paladin note above - Ranger's Druidic Warrior is the same shape.
+      // See the Paladin note above: Ranger's Druidic Warrior is the same shape.
       "weapon-mastery": weaponMastery(2),
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
       "ability-score-improvement": asiChoice,
@@ -488,7 +488,7 @@ function armorOf(text: string): string[] {
 
 /**
  * Weapon training. Monk and Rogue get a qualified slice of Martial ("that have the Light property"),
- * so the id keeps the qualifier rather than flattening to `martial`.
+ * so the id keeps the qualifier (`martial` alone would lose it).
  */
 function weaponsOf(text: string): string[] {
   const out: string[] = [];
@@ -724,9 +724,9 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
       .filter(Boolean);
     row.features = named.map((label) => slug(label)).filter((id) => id && id !== "subclass-feature");
     for (const id of row.features as string[]) featureIds.set(id, (featureIds.get(id) ?? row.level) as number);
-    // A curly apostrophe in the source ("Nature’s Veil") is set straight, as the rest of the SRD prints it.
+    // A curly apostrophe in the source (in Nature's Veil) is set straight, as the rest of the SRD prints it.
     for (const label of named)
-      if (!featureNames.has(slug(label))) featureNames.set(slug(label), label.replace(/[‘’]/g, "'"));
+      if (!featureNames.has(slug(label))) featureNames.set(slug(label), label.replace(/[\u2018\u2019]/g, "'"));
     if (sawSlot && slots.some((count) => count > 0)) row.spellSlots = slots;
     if (pact) row.pactSlots = pact;
     return row as unknown as ClassLevelRow;
@@ -737,7 +737,7 @@ function levelTable(entry: ReturnType<typeof parseClass>, config: ClassConfig) {
 const built: unknown[] = [];
 const builtSubclasses: unknown[] = [];
 const report: string[] = [];
-/** Overlay keys that matched no generated feature - a renamed id whose riders would otherwise vanish. */
+/** Overlay keys that matched no generated feature: a renamed id whose riders would otherwise vanish. */
 const overlayMisses: string[] = [];
 
 for (const [id, entry] of parsed) {
@@ -763,7 +763,7 @@ for (const [id, entry] of parsed) {
     const choice = configured?.optionsFrom
       ? (() => {
           const { optionsFrom, ...rest } = configured;
-          // `from` is derived from the option ids by the schema - authoring both is rejected.
+          // `from` is derived from the option ids by the schema: authoring both is rejected.
           return { ...rest, options: optionSection(entry.body, optionsFrom, featureId) };
         })()
       : configured;
@@ -991,7 +991,7 @@ for (const record of authoredClasses) {
     if (a !== b) disagreements.push(`${record.id}.L${row.level}.spellSlots: source ${a} vs authored ${b}`);
   });
 
-  // Subclass features: ids and levels are compared, not prose (descriptions are reworded in places).
+  // Subclass features: only ids and levels are compared (descriptions are reworded in places).
   const authoredSubclass = authoredSubclasses.find((sub) => sub.classId === record.id);
   if (authoredSubclass) {
     const fromSource = parseSubclass(entry);
@@ -1053,7 +1053,7 @@ if (!subclassesOut.success) fail("subclasses", subclassesOut.error);
 
 /**
  * Refuse to write a bundle containing the "See the ... in SRD 5.2.1." fallback: it means prose was
- * lost to a key mismatch. Give a feature real text rather than re-adding a fallback.
+ * lost to a key mismatch. Give a feature real text; a fallback must not come back.
  */
 const STUB_DESCRIPTION = /^See the .* in SRD 5\.2\.1\.$/;
 const stubs = [

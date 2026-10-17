@@ -69,7 +69,7 @@ describe("the item mechanics overlay", () => {
     // The merge re-parses the touched row, so it comes back in the bundle's output form.
     expect(landed.modifiers).not.toEqual(rows.find((row) => row.id === "cloak-of-protection")!.modifiers);
 
-    // Compared against the inert emission rather than the committed file, which the real map also authors into.
+    // Compared against the inert emission, since the real map also authors into the committed file.
     const inert = emit(applyItemMechanics(rows, {}));
     const emitted = emit(merged);
     expect(emitted).not.toBe(inert);
@@ -85,7 +85,7 @@ describe("the item mechanics overlay", () => {
         "  cloak-of-protecton - no row in magic-items.v1.json carries this id, so the riders keyed to it would author nothing at all\n" +
         "Fix it in scripts/item-mechanics/items.ts - a rider that cannot land is a rider that silently authors nothing, which is the failure this overlay exists to make loud."
     );
-    // Several bad keys are reported together, so the map is fixed once, not once per run.
+    // Several bad keys are reported together, so the map is fixed in one pass.
     expect(() => applyItemMechanics(rows, { "not-an-item": { tags: ["a"] }, "also-not": { tags: ["b"] } })).toThrow(
       /2 refusals across 2 entries[\s\S]*not-an-item[\s\S]*also-not/
     );

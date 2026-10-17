@@ -29,7 +29,7 @@ export const fighter: ClassMechanicsModule = {
   subclasses: {
     champion: {
       /**
-       * Crit on 19-20 with weapons and Unarmed Strikes, not spells. `criticalThreshold` takes the lowest threshold
+       * Crit on 19-20 with weapons and Unarmed Strikes (spells excluded). `criticalThreshold` takes the lowest threshold
        * any carrier names, so this and Superior Critical compose to 18-20 at level 15.
        */
       "improved-critical": {

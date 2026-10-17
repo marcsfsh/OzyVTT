@@ -30,7 +30,7 @@ export const warlock: ClassMechanicsModule = {
   features: {
     /**
      * The Invocations column runs 1 -> 10 and steps at levels with no printed feature heading, so the
-     * level-1 feature reads the column's growth instead of repeating grants.
+     * level-1 feature reads the column's growth, so no grant repeats.
      */
     "eldritch-invocations": {
       extraPicks: [
@@ -84,7 +84,7 @@ export const warlock: ClassMechanicsModule = {
         "mask-of-many-faces": { grants: { spells: [atWill("disguise-self", 1)] } },
         "master-of-myriad-forms": { grants: { spells: [atWill("alter-self", 2)] } },
         "misty-visions": { grants: { spells: [atWill("silent-image", 1)] } },
-        /** The "while you're in Dim Light or Darkness" gate stays prose - there is no light-level trigger. */
+        /** The "while you're in Dim Light or Darkness" gate stays prose: there is no light-level trigger. */
         "one-with-shadows": { grants: { spells: [atWill("invisibility", 2)] } },
         "otherworldly-leap": { grants: { spells: [atWill("jump", 1)] } },
         "visions-of-distant-realms": { grants: { spells: [atWill("arcane-eye", 4)] } },
