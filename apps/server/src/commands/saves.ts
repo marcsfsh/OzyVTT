@@ -212,7 +212,7 @@ export const saveCommands = [
         });
         kit.context.broadcastTableEvent({
           kind: "save",
-          text: `${kit.actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage${detail}` : ""}.`,
+          text: `${kit.actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.autoSucceeded ? "automatically succeeded on" : outcome.success ? "succeeded on" : "failed"} a ${pending.ability.toUpperCase()} save${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage${detail}` : ""}.`,
           actorIds: [pending.targetActorId],
           gmOnly: kit.actorHidden(pending.targetActorId)
         });

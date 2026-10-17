@@ -13,10 +13,12 @@ import { z } from "zod";
 import {
   ActorDefinitionSchema,
   AmmunitionKindSchema,
+  DamageTypeSchema,
   SaveConditionSchema,
   type ActorAction,
   type ActorDefinition,
   type AmmunitionKind,
+  type OngoingDamage,
   type SaveFailureDuration
 } from "@vtt/schemas";
 import { experienceForChallenge } from "@vtt/rules-5e";
@@ -32,15 +34,18 @@ import {
 import { outDir, sourcePath } from "./paths.js";
 import {
   failureDurationOf,
+  hitPointLossOf,
   SPELL_SAVE_OVERRIDE_IDS,
   spellSaveOutcomeFor,
   statBlockSaveOutcome,
   withoutOngoingDamage
 } from "./save-outcomes.js";
-import { areaOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
-import { castingOptionsFor, makesSpellAttack, spellEffectFor } from "./spell-effects.js";
+import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
+import { traitMechanicsOf } from "./trait-mechanics.js";
+import { withSpellcasting } from "./monster-spells.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -311,10 +316,26 @@ const primaryDamageType = (attack: AttackFields, desc: string): string => {
  */
 type OnHitRider = {
   conditions: Array<{ id: string }>;
+  name?: string;
   escapeDc?: number;
   maxTargetSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
   duration?: SaveFailureDuration;
+  ongoingDamage?: OngoingDamage;
+  insteadOfDamage?: true;
 };
+/** "takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns" (the source's) or "... of its turns". */
+function riderOngoingDamage(text: string): OngoingDamage | undefined {
+  const match =
+    /\btakes \d+ \((\d+d\d+(?: [+-] \d+)?)\) ([A-Z][a-z]+) damage at the start of each of (its|the [A-Za-z' -]+?(?:'s|s')) turns\b/.exec(
+      text
+    );
+  const type = match ? DamageTypeSchema.safeParse(match[2]!.toLowerCase()) : null;
+  if (!match || !type?.success) return undefined;
+  return {
+    damage: [{ formula: match[1]!, type: type.data }],
+    at: match[3] === "its" ? "bearer-turn-start" : "source-turn-start"
+  };
+}
 const RIDER_CONDITIONS: ReadonlySet<string> = new Set(SaveConditionSchema.options);
 const riderConditionIds = (names: string): string[] =>
   names
@@ -325,7 +346,9 @@ const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
   const size = desc.match(/If the target is a (Tiny|Small|Medium|Large|Huge) or smaller creature/i);
   const maxTargetSize = size ? (size[1].toLowerCase() as NonNullable<OnHitRider["maxTargetSize"]>) : undefined;
   const riders: OnHitRider[] = [];
-  const grapple = desc.match(/has the Grappled condition \(escape DC (\d+)\)/i);
+  // "It has the Grappled condition (escape DC 15)", or a rug's "can give it the Grappled condition (escape DC 13) instead
+  // of dealing damage", with what the grapple deals each turn while it lasts.
+  const grapple = desc.match(/(?:has|give it) the Grappled condition \(escape DC (\d+)\)/i);
   if (grapple) {
     // What lasts exactly as long as the grapple rides the same effect, so escaping ends it too.
     const held = new Set<string>();
@@ -335,9 +358,32 @@ const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
     ))
       for (const id of riderConditionIds(match[1] ?? match[2]!)) held.add(id);
     const conditions = [{ id: "grappled" }, ...[...held].slice(0, 2).map((id) => ({ id }))];
-    riders.push({ conditions, escapeDc: Number.parseInt(grapple[1], 10), ...(maxTargetSize ? { maxTargetSize } : {}) });
+    const ongoingDamage = riderOngoingDamage(desc.slice(grapple.index ?? 0));
+    riders.push({
+      conditions,
+      escapeDc: Number.parseInt(grapple[1], 10),
+      ...(maxTargetSize ? { maxTargetSize } : {}),
+      ...(ongoingDamage ? { ongoingDamage } : {}),
+      ...(/\bGrappled condition \(escape DC \d+\) instead of dealing damage\b/.test(desc)
+        ? { insteadOfDamage: true as const }
+        : {})
+    });
   } else if (/it has the Prone condition/i.test(desc)) {
     riders.push({ conditions: [{ id: "prone" }], ...(maxTargetSize ? { maxTargetSize } : {}) });
+  } else if (/\battaches to (?:the target|it)\b/.test(desc)) {
+    // "The stirge attaches to the target. While attached, ... the target takes 5 (2d4) Necrotic damage at the start of
+    // each of the stirge's turns"; "While the cloaker is attached, the target has the Blinded condition". An attachment
+    // with nothing the engine runs (the darkmantle's) stays prose.
+    const blinded = /\bWhile (?:the [\w -]+? is )?attached, the target has the ([A-Z][a-z]+) condition\b/.exec(desc);
+    const conditions = blinded ? riderConditionIds(blinded[1]!).map((id) => ({ id })) : [];
+    const ongoingDamage = riderOngoingDamage(desc);
+    if (conditions.length > 0 || ongoingDamage)
+      riders.push({
+        conditions,
+        name: "Attached",
+        ...(maxTargetSize ? { maxTargetSize } : {}),
+        ...(ongoingDamage ? { ongoingDamage } : {})
+      });
   }
   // An unconditional rider in the hit's own sentence (not one opening with "If"): timed, or with no end printed there
   // (an otyugh's Poisoned, which a later save ends), which lasts until ended.
@@ -711,6 +757,8 @@ const report = {
   rechargeUses: 0,
   restUses: 0,
   legendaryCreatures: 0,
+  traitMechanics: 0,
+  castingActions: 0,
   typedDefenses: 0,
   corrections: [] as string[],
   untypedDamage: [] as string[],
@@ -723,6 +771,10 @@ const KNOWN_CONDITION_IDS = new Set(
     .map((condition) => condition.fields.describes)
 );
 const KNOWN_DAMAGE_TYPES = new Set<string>(DAMAGE_TYPES);
+/** The SRD spells a stat block can cast, by the id the spell bundle gives them. */
+const SRD_SPELL_IDS: ReadonlySet<string> = new Set(
+  spells.filter((spell) => spell.fields.document === "srd-2024").map((spell) => slugOf(spell.pk))
+);
 
 const monsters: ActorDefinition[] = creatures
   .filter((creature) => creature.fields.document === "srd-2024" && !EXCLUSIONS.has(creature.pk))
@@ -777,10 +829,13 @@ const monsters: ActorDefinition[] = creatures
           ? { successDamage: statBlockSaveOutcome(action.fields.desc).successDamage, failureConditions: [] }
           : statBlockSaveOutcome(action.fields.desc)
         : null;
+      // Hit points a failure takes each turn (an infernal wound) are the failure's own effect; stanching it is the GM's.
+      const loss = save && fix?.drop !== "outcome" ? hitPointLossOf(action.fields.desc) : null;
       // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
       const laterDamage = saveDamage?.laterDamage ?? null;
       const reminder =
         fix?.reminder ??
+        loss?.reminder ??
         (laterDamage !== null && saveOutcome && "ongoingDamage" in saveOutcome
           ? withoutOngoingDamage(laterDamage)
           : laterDamage) ??
@@ -865,7 +920,8 @@ const monsters: ActorDefinition[] = creatures
               save: {
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
-                ...saveOutcome!
+                ...saveOutcome!,
+                ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {})
               }
             }
           : {}),
@@ -895,7 +951,23 @@ const monsters: ActorDefinition[] = creatures
         ...(enrichment ?? {})
       });
     });
-    const actions = linkedActions(creatureActions, siblingIdOf);
+    // The spells its actions cast, each a cast action in play; only spells the SRD spell list holds.
+    const actions = withSpellcasting(
+      linkedActions(creatureActions, siblingIdOf),
+      {
+        abilityScores: {
+          str: fields.ability_score_strength,
+          dex: fields.ability_score_dexterity,
+          con: fields.ability_score_constitution,
+          int: fields.ability_score_intelligence,
+          wis: fields.ability_score_wisdom,
+          cha: fields.ability_score_charisma
+        },
+        proficiencyBonus: fields.proficiency_bonus ?? proficiencyFromChallenge(challenge)
+      },
+      (spellId) => SRD_SPELL_IDS.has(spellId)
+    );
+    report.castingActions += actions.filter((action) => action.castsSpells).length;
     const senses = [
       fields.darkvision_range ? `darkvision ${fields.darkvision_range} ft.` : null,
       fields.blindsight_range ? `blindsight ${fields.blindsight_range} ft.` : null,
@@ -926,6 +998,13 @@ const monsters: ActorDefinition[] = creatures
           }
         : null;
     if (legendaryResource) report.legendaryCreatures += 1;
+    // Upstream order is the stat block's own.
+    const traitTexts = (traitsByCreature.get(creature.pk) ?? []).map((trait) => ({
+      name: trait.fields.name,
+      description: withoutSourceTags(trait.fields.desc)
+    }));
+    const traitMechanics = traitMechanicsOf(traitTexts);
+    report.traitMechanics += traitMechanics.length;
     return {
       schemaId: "vtt.actor-monster" as const,
       schemaVersion: 1 as const,
@@ -960,6 +1039,7 @@ const monsters: ActorDefinition[] = creatures
       ...(damageVulnerabilities.length > 0 ? { damageVulnerabilities } : {}),
       ...(conditionImmunities.length > 0 ? { conditionImmunities } : {}),
       ...(legendaryResource ? { legendary: legendaryResource } : {}),
+      ...(traitMechanics.length > 0 ? { traitMechanics } : {}),
       extensions: {
         "open5e.srd-2024": {
           challengeRating: challenge,
@@ -994,11 +1074,7 @@ const monsters: ActorDefinition[] = creatures
           conditionImmunities: fields.condition_immunities_display || null,
           nonmagicalAttackImmunity: fields.nonmagical_attack_immunity,
           nonmagicalAttackResistance: fields.nonmagical_attack_resistance,
-          // Upstream order is the stat block's own.
-          traits: (traitsByCreature.get(creature.pk) ?? []).map((trait) => ({
-            name: trait.fields.name,
-            description: withoutSourceTags(trait.fields.desc)
-          }))
+          traits: traitTexts
         }
       }
     };
@@ -1116,7 +1192,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     shape: fields.shape_type
       ? { type: fields.shape_type, size: fields.shape_size, unit: fields.shape_size_unit }
       : null,
-    area: areaOfProse(fields.desc),
+    area: spellAreaFor(slugOf(spell.pk), fields.desc),
     effect,
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
@@ -1439,7 +1515,7 @@ console.log(
   `rules mechanics (ADR-0020): multiattacks ${report.structuredMultiattacks} structured / ${report.proseMultiattacks} prose-only, on-hit riders ${report.onHitRiders}, save-for-damage actions ${report.saveDamage}, monsters with typed defenses ${report.typedDefenses}`
 );
 console.log(
-  `limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures}`
+  `limited uses: ${report.rechargeUses} recharge pools, ${report.restUses} rest-scoped pools | legendary creatures: ${report.legendaryCreatures} | traits the engine runs: ${report.traitMechanics} | actions that cast spells: ${report.castingActions}`
 );
 console.log(
   `conditions: ${conditionRecords.length} | spells: ${spellRecords.length} | weapons: ${weaponRecords.length} (+${weaponPropertyRecords.length} properties) | armor: ${armorRecords.length}`

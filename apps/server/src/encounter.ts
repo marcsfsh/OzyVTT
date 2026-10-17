@@ -22,6 +22,7 @@ import {
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
+import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 
@@ -275,6 +276,7 @@ export function startEncounter(
       tokenGeometry
     ).map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
     annotations: [],
+    spellZones: [],
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
     ruleExceptions: input.ruleExceptions ?? state.combat.ruleExceptions,
@@ -409,6 +411,8 @@ export function endEncounter(state: GameState) {
     turnActorId: null,
     turn: { ...EMPTY_TURN },
     underwater: false,
+    // The fight's spell areas end with it; Concentration on them is the caster's to keep or drop.
+    spellZones: [],
     reactionsUsed: [],
     legendaryUsed: {},
     pendingSaves: [],
@@ -544,6 +548,10 @@ export type TurnAdvanceDeps = Readonly<{
   /** Mint the repeat saves the ending turn opens; absent, effects still expire but no save is opened. */
   newId?: () => string;
   now?: () => string;
+  /** The live map, so the spell areas a creature starts or ends its turn in act on it; absent, they wait for a map. */
+  geometry?: TokenMapGeometry | null;
+  /** Creature-to-creature distance on the map, for the auras that reach creatures as turns start and end. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /** SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the spent
@@ -604,6 +612,19 @@ function legendaryRefilled(used: GameState["combat"]["legendaryUsed"], actorId: 
   return Object.fromEntries(Object.entries(used).filter(([key]) => key !== actorId && !key.startsWith(`${actorId}:`)));
 }
 
+/** The spell areas' deps from a turn change's, when it has dice and ids to act with. */
+function zoneDepsOf(deps: TurnAdvanceDeps | undefined): ZoneDeps | null {
+  if (!deps?.newId) return null;
+  return {
+    geometry: deps.geometry ?? null,
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    rollDie: deps.rollDie,
+    newId: deps.newId,
+    now: deps.now ?? (() => new Date().toISOString())
+  };
+}
+
 export function nextInitiativeTurn(state: GameState, events?: EffectNarration[], deps?: TurnAdvanceDeps) {
   if (!state.combat.active || !state.combat.turnActorId || state.combat.initiative.length === 0)
     throw new CommandRejectedError("Start an encounter before advancing Initiative.");
@@ -615,12 +636,16 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const wraps = currentIndex === state.combat.initiative.length - 1;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
+  const outgoingId = state.combat.turnActorId;
   endOfTurn(
     state,
-    state.combat.turnActorId,
+    outgoingId,
     ending,
-    deps?.newId ? { newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
+    deps?.newId ? { ...deps, newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
   );
+  // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
+  const zones = zoneDepsOf(deps);
+  if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
   events?.push(...ending);
   // A new round sorts the whole order again, settling any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
@@ -642,6 +667,9 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Then what lands at the start of its turn: a swallow's acid, Searing Smite's fire.
   const starting: EffectNarration[] = [];
   startOfTurn(state, nextActorId, starting, deps);
+  // Then the spell areas: each counts "once per turn" afresh, a spell's duration runs out at its caster's turn, and
+  // the incoming creature starting its turn inside one (Web, Stinking Cloud) meets it.
+  if (zones) starting.push(...zonesAtTurnStart(state, nextActorId, zones));
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
   refreshOwnTurnUses(state, nextActorId, deps);

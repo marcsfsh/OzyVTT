@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type {
-  ActorDefinition,
-  GmActor,
+import {
+  rosterActors,
+  type ActorDefinition,
+  type GmActor,
   GmView,
-  PendingSave,
-  PlayerActor,
-  PlayerPendingSave,
-  PlayerView,
-  RollVisibility
+  type PendingSave,
+  type PlayerActor,
+  type PlayerPendingSave,
+  type PlayerView,
+  type RollVisibility
 } from "@vtt/domain";
 import { Button, IconButton, Modal, SegmentedControl, Select, IconX, useToast } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
@@ -16,6 +17,7 @@ import { RichText } from "./RichText";
 import { DicePanel, ROLL_VISIBILITY_WORD, VISIBILITY_OPTIONS } from "../dice/DicePanel";
 import { rollModeOf, useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "./DyingTracker";
+import { HealTargetPicker, type LooseHeal } from "./HealTargetPicker";
 import { isKnockedOut, partyHelpers, StabilizeControl } from "./StabilizeControl";
 import { summaryOfOwnAction } from "./PlayerActionRunner";
 import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
@@ -93,7 +95,7 @@ export function CharacterSheet({
     role === "gm" && state && "definitions" in state && "definitionId" in actor
       ? state.definitions.find((entry) => entry.id === actor.definitionId)?.definition
       : undefined;
-  const { definitionId, definition, serverActions, derived, rechoices, showEdited } = useSheetDefinition(
+  const { definitionId, definition, serverActions, derived, rechoices, spellChoices, showEdited } = useSheetDefinition(
     actor,
     role,
     setFeedback,
@@ -128,9 +130,12 @@ export function CharacterSheet({
   const savesOwed: ReadonlyArray<PendingSave | PlayerPendingSave> = (state?.combat.pendingSaves ?? []).filter(
     (save) => save.targetActorId === actor.id && !calledSaveIds.has(save.id)
   );
+  // Readied, a character acts off its turn with its Reaction (a readied spell is released by casting it), so the sheet
+  // resolves its actions then too.
+  const readied = actor.effects.some((effect) => effect.tags.includes("readied"));
   const structuredAttacks =
     liveCombat?.active === true &&
-    liveCombat.myTurn === true &&
+    (liveCombat.myTurn === true || readied) &&
     actor.kind === "player-character" &&
     definition !== null;
   // Outside the fight an item's action goes to the server's loose route, which rolls it and spends its charges.
@@ -141,12 +146,69 @@ export function CharacterSheet({
   const inFight = state
     ? state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)
     : liveCombat?.active === true;
+  const sendLoose = (actionId: string, extra: Readonly<Record<string, unknown>>, failure: string) =>
+    void command("action:use", { actorId: actor.id, actionId, ...extra }).then((response) => {
+      if (!response.ok) toast(response.message ?? failure, { tone: "error" });
+    });
+  // Who a heal outside a fight may land on, as the server allows: this character, then the party (for the GM, anyone
+  // on the roster).
+  const healCandidates = [
+    { id: actor.id, name: actor.name },
+    ...rosterActors<GmActor | PlayerActor>(state?.actors ?? [])
+      .filter(
+        (other) =>
+          other.id !== actor.id &&
+          !("archived" in other && other.archived) &&
+          (role === "gm" || other.kind === "player-character")
+      )
+      .sort((left, right) => Number(right.kind === "player-character") - Number(left.kind === "player-character"))
+      .map((other) => ({ id: other.id, name: other.name }))
+  ];
+  const [looseHeal, setLooseHeal] = useState<LooseHeal | null>(null);
+  // A heal outside a fight asks who regains the hit points, unless it only heals its user (Second Wind).
+  const looseHealOf = (actionId: string, slotLevel?: number, includeDamage?: boolean): LooseHeal | null => {
+    const own = definition?.actions.find((candidate) => candidate.id === actionId);
+    const row = serverActions.find((candidate) => candidate.id === actionId);
+    if (!(own?.healing ?? row?.healing) || own?.healing?.self || (!own && row?.targeting === "none")) return null;
+    const limit = row?.usesLimit ?? own?.uses?.limit ?? null;
+    const spent = actor.actionUses?.[row?.usesPool ?? own?.uses?.pool ?? actionId] ?? 0;
+    return {
+      actionId,
+      name: own?.name ?? row?.name ?? "Heal",
+      most: own?.healing?.divided ? healCandidates.length : (row?.healTargets ?? 1),
+      spendUpTo: (own?.useCost ?? row?.useCost) === "chosen" && limit !== null ? Math.max(1, limit - spent) : null,
+      ...(slotLevel !== undefined ? { slotLevel } : {}),
+      ...(includeDamage ? { includeDamage } : {})
+    };
+  };
   const onLooseUse = inFight
     ? null
-    : (actionId: string) =>
-        void command("action:use", { actorId: actor.id, actionId }).then((response) => {
-          if (!response.ok) toast(response.message ?? "That could not be used.", { tone: "error" });
-        });
+    : (actionId: string) => {
+        const heal = looseHealOf(actionId);
+        if (heal) setLooseHeal(heal);
+        else sendLoose(actionId, {}, "That could not be used.");
+      };
+  const healDialog = looseHeal ? (
+    <HealTargetPicker
+      heal={looseHeal}
+      candidates={healCandidates}
+      defaultId={actor.id}
+      onClose={() => setLooseHeal(null)}
+      onConfirm={(targetIds, spend) => {
+        setLooseHeal(null);
+        sendLoose(
+          looseHeal.actionId,
+          {
+            targetIds,
+            ...(spend !== null ? { spend } : {}),
+            ...(looseHeal.slotLevel !== undefined ? { slotLevel: looseHeal.slotLevel } : {}),
+            ...(looseHeal.includeDamage ? { includeDamage: true } : {})
+          },
+          "That could not be used."
+        );
+      }}
+    />
+  ) : null;
   const { busy, edit } = useSheetEdit(setFeedback);
   const rolls = useSheetRolls(actor.id, setFeedback);
   const [editMode, setEditMode] = useState<null | "prof" | "identity">(null);
@@ -254,14 +316,16 @@ export function CharacterSheet({
       routeAttack(structured, slotLevel);
       return;
     }
-    void command("action:use", {
-      actorId: actor.id,
+    const heal = inFight ? null : looseHealOf(actionId, slotLevel, true);
+    if (heal) {
+      setLooseHeal(heal);
+      return;
+    }
+    sendLoose(
       actionId,
-      includeDamage: true,
-      ...(slotLevel !== undefined ? { slotLevel } : {})
-    }).then((response) => {
-      if (!response.ok) toast(response.message ?? "The spell could not be cast.", { tone: "error" });
-    });
+      { includeDamage: true, ...(slotLevel !== undefined ? { slotLevel } : {}) },
+      "The spell could not be cast."
+    );
   };
   // The player's own server-resolvable action (has an attack, a save or damage) for an equipped
   // weapon (by name) or a spell (by linked actionId); null falls back to the quick roll.
@@ -446,6 +510,11 @@ export function CharacterSheet({
             policeSlots={slotsPoliced}
             canPrepare={role === "gm" || Boolean(actor.preparation)}
             rechoices={rechoices}
+            spellChoices={spellChoices}
+            gm={role === "gm"}
+            readiedActionId={
+              actor.effects.flatMap((effect) => (effect.readiedSpell ? [effect.readiedSpell.actionId] : []))[0] ?? null
+            }
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const note = hitExtraNote(spell.actionId);
@@ -710,6 +779,7 @@ export function CharacterSheet({
       <>
         <div className="sheet-embedded">{buildWorkspace(false)}</div>
         {rolls.dialog}
+        {healDialog}
       </>
     );
 
@@ -723,6 +793,7 @@ export function CharacterSheet({
           {standaloneActions && <div className="sheet-standalone-actions">{standaloneActions}</div>}
         </div>
         {rolls.dialog}
+        {healDialog}
       </>
     );
 
@@ -742,6 +813,7 @@ export function CharacterSheet({
           <div className="sheet-float-resize" aria-hidden="true" onPointerDown={beginDrag("resize")} />
         </div>
         {rolls.dialog}
+        {healDialog}
       </>
     );
   }
@@ -757,6 +829,7 @@ export function CharacterSheet({
         {buildWorkspace(false)}
       </Modal>
       {rolls.dialog}
+      {healDialog}
     </>
   );
 }

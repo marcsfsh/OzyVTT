@@ -67,6 +67,7 @@ export function SavePrompt({
     condition: boolean;
     rollMode?: ActionRollMode;
     autoFailed?: boolean;
+    autoSucceeded?: string;
     basis: number;
   } | null>(null);
   // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
@@ -140,6 +141,7 @@ export function SavePrompt({
           condition: outcome.conditionApplied,
           ...(outcome.rollMode ? { rollMode: outcome.rollMode } : {}),
           ...(outcome.autoFailed ? { autoFailed: true } : {}),
+          ...(outcome.autoSucceeded ? { autoSucceeded: outcome.autoSucceeded } : {}),
           basis: proposal
         });
         return;
@@ -238,7 +240,7 @@ export function SavePrompt({
         viewer={viewer}
         inspired={inspired}
         typed={typed}
-        rerollable={!rolled?.autoFailed}
+        rerollable={!rolled?.autoFailed && !rolled?.autoSucceeded}
         currentMode={forced}
         faceLabel="Your save d20"
         onInvalidFace={onFeedback}
@@ -257,7 +259,11 @@ export function SavePrompt({
             <>
               {/* The rolled total and what it will do; an explicit Confirm applies it. */}
               <strong className={rolled.success ? "save-pass" : "save-fail"}>
-                {rolled.autoFailed ? "Fails without a roll" : `Rolled ${rolled.total}`}
+                {rolled.autoFailed
+                  ? "Fails without a roll"
+                  : rolled.autoSucceeded
+                    ? `Succeeds without a roll (${rolled.autoSucceeded})`
+                    : `Rolled ${rolled.total}`}
                 {rolled.natural !== undefined ? ` (d20 ${rolled.natural})` : ""}
                 {modeWords(rolled.rollMode)} - {rolled.success ? "Success" : "Failure"}
               </strong>

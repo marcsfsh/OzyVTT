@@ -192,7 +192,14 @@ write goes through `applyCondition` in `effects.ts`, which honours innate and it
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
 Concentration and its grapples). Effects end by their duration at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
-(`turn-boundaries.ts`).
+(`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
+(`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
+Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A stat block's spells
+(`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`). A spell that leaves an area acting later (Moonbeam, Spirit Guardians, a
+wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
+runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
+such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
+(`lasting-spells.ts`).
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and

@@ -8,6 +8,7 @@ import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
 import {
   isLongCastingTime,
+  laterRowOf,
   laterSpellActionId,
   ritualSpellActionId,
   upcastAction,
@@ -29,7 +30,8 @@ function combatantsOf(
   state: GameState,
   action: DefinitionAction,
   input: ResolveInput,
-  catalog: ResolveDependencies["catalog"]
+  catalog: ResolveDependencies["catalog"],
+  spell: SpellReference | undefined
 ): { attacker: LiveActor; targets: LiveActor[] } {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) => state.combat.initiative.some((entry) => entry.actorId === actorId);
@@ -57,11 +59,16 @@ function combatantsOf(
     action.spellSlot !== undefined ||
     action.legendary !== undefined ||
     consumableRowFor(action, attacker.inventory, catalog) !== null;
+  // Casting a spell that lasts and acts again later (Produce Flame, a lingering area) is something done, even with no
+  // creature under it yet.
+  const startsALastingSpell =
+    spell !== undefined && (spell.effect?.laterActions ?? []).length > 0 && laterRowOf(spell, action.id) === undefined;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
     action.healing?.self === true ||
     action.multiattack !== undefined ||
     spendsALimitedUse ||
+    startsALastingSpell ||
     input.builtin === true;
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
@@ -75,6 +82,7 @@ function combatantsOf(
     action.grants === undefined &&
     action.multiattack === undefined &&
     !spendsALimitedUse &&
+    !startsALastingSpell &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve - run it from its description.");
@@ -108,7 +116,7 @@ export function openResolve(
 ): ResolveContext {
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
-  const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog);
+  const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog, spell);
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
@@ -243,9 +251,9 @@ export function withChosenDamageType(action: DefinitionAction, chosen: string | 
   return { ...action, damage: action.damage.map((part) => ({ ...part, type: chosen })) };
 }
 
-/** The GM's reminder on casting a spell that does more later (SRD text): the engine can't see a creature enter an
- *  area or a turn come round, so the GM resolves the later action when it happens. A scroll read for a long casting
- *  time spends no slot, and "if the casting is interrupted, the scroll isn't lost". */
+/** The GM's reminder on casting a spell that does more later (SRD text): what the caster may do on later turns, and
+ *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A scroll read for a long
+ *  casting time spends no slot, and "if the casting is interrupted, the scroll isn't lost". */
 function laterActionReminders(
   spell: SpellReference | undefined,
   action: DefinitionAction,
@@ -264,7 +272,9 @@ function laterActionReminders(
             `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost - give it back on the sheet" : "its slot isn't spent - restore it on the sheet"}.`
           ]
         : []),
-    ...later.map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
+    ...later
+      .filter((row) => row.zone === undefined)
+      .map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
   ];
 }
 

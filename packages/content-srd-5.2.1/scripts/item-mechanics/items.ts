@@ -469,7 +469,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `ring-of-spell-storing` - needs per-copy storage and the original caster's numbers.
   // `ring-of-spell-turning` - no "save against a spell" filter; ungated it would apply to every save.
-  // `ring-of-swimming` - `speed` is walking speed; there is no Swim Speed.
+  /** "You have a Swim Speed of 40 feet while wearing this ring." */
+  "ring-of-swimming": { modifiers: [{ type: "special-speed", movement: "swim", feet: 40 }] },
 
   /** "While wearing this ring, you can cast Telekinesis from it." At will, no charges, no DC override. */
   "ring-of-telekinesis": { casts: [{ spellId: "telekinesis" }] },
@@ -851,12 +852,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `boots-of-speed` - doubled speed, a 10-minute budget, and opportunity-attack disadvantage (the
   //     defender's incoming-attack riders get no attack-kind filters).
   // `boots-of-striding-and-springing` - a speed floor, encumbrance and jumping are not modeled.
-  // `slippers-of-spider-climbing` - no climb speed or surface model.
+  /** "You have a Climb Speed equal to your Speed." Walls, ceilings and slippery surfaces are the GM's. */
+  "slippers-of-spider-climbing": { modifiers: [{ type: "special-speed", movement: "climb", equalToSpeed: true }] },
 
   // Ungated in the SRD. Cold tolerance and ignoring ice or snow difficult terrain are not modeled.
   "boots-of-the-winterlands": { grants: { damageResistances: ["cold"] } },
 
-  // Charge-alone: 4 charges exact; the Fly Speed is GM-adjudicated.
+  // 4 charges exact; the Fly Speed lasts until the wearer ends it on the sheet, the hour being the GM's to count.
   "winged-boots": {
     charges: { regain: "1d4" },
     actions: [
@@ -865,8 +867,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Winged Flight",
         activation: "action",
         description:
-          "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
-        uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" }
+          "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land. End it on your sheet once the hour is up.",
+        uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" },
+        grants: {
+          name: "Winged Flight (1 hour)",
+          tags: ["winged-flight"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", feet: 30 }]
+        }
       }
     ]
   },
@@ -1417,9 +1425,31 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Potions: "Drinking a potion or administering it to another creature requires a Bonus Action."
   "potion-of-healing-greater": healingPotion("Potion of Healing (greater)", "4d4 + 4"),
   "potion-of-healing-superior": healingPotion("Potion of Healing (superior)", "8d4 + 8"),
-  "potion-of-healing-supreme": healingPotion("Potion of Healing (supreme)", "10d4 + 20")
+  "potion-of-healing-supreme": healingPotion("Potion of Healing (supreme)", "10d4 + 20"),
 
-  // The other potions and the oils stay prose: their effects last an hour or more, which an effect can't count.
+  // "You gain a Fly Speed equal to your Speed for 1 hour and can hover." The drinker ends it once the hour is up.
+  "potion-of-flying": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "drink",
+        name: "Drink Potion of Flying",
+        activation: "bonus-action",
+        description:
+          "Drink it: you gain a Fly Speed equal to your Speed for 1 hour and can hover. If you're in the air when it wears off, you fall unless you have some other means of staying aloft. End it on your sheet once the hour is up.",
+        damage: [],
+        grants: {
+          name: "Potion of Flying (1 hour)",
+          tags: ["potion-of-flying"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", equalToSpeed: true, hover: true }]
+        }
+      }
+    ]
+  }
+
+  // The other potions and the oils stay prose: their effects last an hour or more, which an effect can't count
+  // without the GM ending it.
 };
 
 /** A potion that heals its printed dice when drunk or given to a creature within 5 feet, and is used up. */

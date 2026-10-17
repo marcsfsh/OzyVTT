@@ -1972,7 +1972,14 @@
        "formula": "3d6",
        "type": "bludgeoning"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true
+     }
     }
    ],
    "healing": null
@@ -2023,7 +2030,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 100,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -2047,7 +2058,14 @@
        "formula": "6d10",
        "type": "force"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true
+     }
     }
    ],
    "healing": null
@@ -2644,6 +2662,29 @@
     {
      "formula": "3d10",
      "type": "lightning"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "bolt",
+     "activation": "action",
+     "when": "Until the spell ends, a Magic action calls down another bolt at a point under the cloud.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "3d10",
+       "type": "lightning"
+      }
+     ],
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 5,
+      "widthFeet": null
+     }
     }
    ],
    "healing": null
@@ -3441,7 +3482,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn. The Sphere moves 10 feet away from you at the start of each of your turns.",
      "save": {
       "ability": "con",
       "successDamage": "half",
@@ -3452,7 +3493,14 @@
        "formula": "5d8",
        "type": "poison"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true
+     }
     }
    ],
    "healing": null
@@ -4077,7 +4125,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -4097,7 +4149,17 @@
        "formula": "3d10",
        "type": "slashing"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "point",
+      "feet": 10,
+      "affects": "enemies"
+     }
     }
    ],
    "healing": null
@@ -4558,7 +4620,17 @@
        "formula": "5d8",
        "type": "force"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "caster",
+      "feet": 10,
+      "affects": "enemies"
+     }
     }
    ],
    "healing": null
@@ -9069,7 +9141,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -9078,7 +9154,30 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that ends its turn within 5 feet of the sphere, or whose space you ram it into as a Bonus Action, makes the save.",
+     "when": "A creature that ends its turn within 5 feet of the sphere makes the save.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "2d6",
+       "type": "fire"
+      }
+     ],
+     "zone": {
+      "on": [
+       "end-turn"
+      ],
+      "around": "point",
+      "feet": 5
+     }
+    },
+    {
+     "name": "ram",
+     "activation": "bonus-action",
+     "when": "As a Bonus Action, you can roll the sphere up to 30 feet; a creature whose space you move it into makes the save, and the sphere stops for the turn.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -9287,7 +9386,29 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "fly",
+      "feet": 60,
+      "hover": true
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Fly",
+    "tags": [
+     "fly-spell"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -9643,7 +9764,27 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "swim",
+      "equalToSpeed": true
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Freedom of Movement",
+    "tags": [
+     "freedom-of-movement"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -10408,6 +10549,27 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "prone"
+      ]
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ]
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -10555,11 +10717,43 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "Any enemy that moves to a space within 10 feet of the guardian for the first time on a turn or starts its turn there makes the save. The guardian vanishes when it has dealt a total of 60 damage.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "20",
+       "type": "radiant"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "start-turn"
+      ],
+      "around": "point",
+      "feet": 10,
+      "affects": "enemies",
+      "damageCap": 60
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -12754,7 +12948,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn. The cloud moves 10 feet away from you at the start of each of your turns.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -12765,7 +12959,14 @@
        "formula": "10d8",
        "type": "fire"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true
+     }
     }
    ],
    "healing": null
@@ -12959,7 +13160,14 @@
        "formula": "4d10",
        "type": "piercing"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true
+     }
     }
    ],
    "healing": null
@@ -13835,7 +14043,26 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": 10
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Longstrider",
+    "tags": [
+     "longstrider"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -15641,7 +15868,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn.",
+     "when": "A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn. A Magic action on your later turns moves the Cylinder up to 60 feet.",
      "save": {
       "ability": "con",
       "successDamage": "half",
@@ -15652,7 +15879,14 @@
        "formula": "2d10",
        "type": "radiant"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true
+     }
     }
    ],
    "healing": null
@@ -19526,7 +19760,13 @@
        "prone"
       ]
      },
-     "damage": []
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "start-turn"
+      ]
+     }
     }
    ],
    "healing": null
@@ -19939,7 +20179,27 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "climb",
+      "equalToSpeed": true
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Spider Climb",
+    "tags": [
+     "spider-climb"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -20040,6 +20300,24 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "spikes",
+     "activation": "other",
+     "when": "A creature that moves into or within the area takes the damage for every 5 feet it travels.",
+     "damage": [
+      {
+       "formula": "2d4",
+       "type": "piercing"
+      }
+     ],
+     "zone": {
+      "on": [
+       "travel"
+      ]
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -20107,7 +20385,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. A creature makes this save only once per turn.",
+     "when": "When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. A creature makes this save only once per turn. The creatures you designate are unaffected: your allies.",
      "save": {
       "ability": "wis",
       "successDamage": "half",
@@ -20118,7 +20396,17 @@
        "formula": "3d8",
        "type": "radiant"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "caster",
+      "feet": 15,
+      "affects": "enemies"
+     }
     }
    ],
    "healing": null
@@ -20425,9 +20713,17 @@
       "successDamage": "none",
       "failureConditions": [
        "poisoned"
-      ]
+      ],
+      "failureDuration": {
+       "type": "until-bearer-turn-end"
+      }
      },
-     "damage": []
+     "damage": [],
+     "zone": {
+      "on": [
+       "start-turn"
+      ]
+     }
     }
    ],
    "healing": null
@@ -20783,6 +21079,34 @@
     {
      "formula": "6d8",
      "type": "radiant"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "line",
+     "activation": "action",
+     "when": "Until the spell ends, a Magic action creates a new Line of radiance from you.",
+     "save": {
+      "ability": "con",
+      "successDamage": "half",
+      "failureConditions": [
+       "blinded"
+      ],
+      "failureDuration": {
+       "type": "until-source-next-turn"
+      }
+     },
+     "damage": [
+      {
+       "formula": "6d8",
+       "type": "radiant"
+      }
+     ],
+     "area": {
+      "shape": "line",
+      "sizeFeet": 60,
+      "widthFeet": 5
+     }
     }
    ],
    "healing": null
@@ -21904,6 +22228,23 @@
      "type": "necrotic"
     }
    ],
+   "laterActions": [
+    {
+     "name": "touch",
+     "activation": "action",
+     "when": "Until the spell ends, a Magic action makes the attack again; you regain Hit Points equal to half the Necrotic damage dealt.",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 5
+     },
+     "damage": [
+      {
+       "formula": "3d6",
+       "type": "necrotic"
+      }
+     ]
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -22167,7 +22508,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 60,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -22180,13 +22525,19 @@
     {
      "name": "burn",
      "activation": "other",
-     "when": "A creature that ends its turn within 10 feet of the burning side or inside the wall, or enters the wall for the first time on a turn, takes the damage.",
+     "when": "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn within 10 feet of the burning side.",
      "damage": [
       {
        "formula": "5d8",
        "type": "fire"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ]
+     }
     }
    ],
    "healing": null
@@ -22453,7 +22804,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 60,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -22477,7 +22832,14 @@
        "formula": "7d8",
        "type": "slashing"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true
+     }
     }
    ],
    "healing": null
@@ -22719,7 +23081,13 @@
        "restrained"
       ]
      },
-     "damage": []
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "start-turn"
+      ]
+     }
     }
    ],
    "healing": null
@@ -23051,6 +23419,26 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "save",
+     "activation": "other",
+     "when": "A creature that enters the area for the first time on a turn or starts its turn there makes the save; on a failure it can't speak a deliberate lie while in the radius, and you know whether it succeeded.",
+     "save": {
+      "ability": "cha",
+      "successDamage": "none",
+      "failureConditions": []
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "start-turn"
+      ]
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [

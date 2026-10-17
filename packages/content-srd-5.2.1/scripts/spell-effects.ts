@@ -5,7 +5,8 @@
  * the caster makes ("Make a ranged spell attack"), never one the text only mentions. `test/spell-effects.test.ts`
  * pins the cases.
  */
-import { DamageTypeSchema, type DamageType } from "@vtt/schemas";
+import { DamageTypeSchema, type ActionArea, type DamageType } from "@vtt/schemas";
+import { areaOfProse } from "../src/action-prose.js";
 import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
 
@@ -178,10 +179,12 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "sleet-storm",
   "spirit-guardians",
   "stinking-cloud",
-  "web"
+  "web",
+  "zone-of-truth"
 ]);
 
 type Later = SpellLaterAction;
+type Zone = NonNullable<Later["zone"]>;
 const melee = (feet: number) => ({ kind: "melee" as const, feet });
 /** A save that halves the damage on a success and imposes no condition. */
 const save = (ability: "str" | "dex" | "con" | "int" | "wis" | "cha") => ({
@@ -190,11 +193,14 @@ const save = (ability: "str" | "dex" | "con" | "int" | "wis" | "cha") => ({
   failureConditions: []
 });
 const ONCE_PER_TURN = "A creature makes this save only once per turn.";
+/** Entering the area or ending a turn in it, once per turn: the shape most lingering areas print. */
+const ENTER_OR_END_ONCE: Zone = { on: ["enter", "end-turn"], oncePerTurn: true };
 
 /**
  * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
- * makes on later turns, and the saves an area forces when a creature enters it or ends its turn there. The engine
- * can't see those triggers, so the GM resolves the save against the creature; the cast reminds them.
+ * makes on later turns, and the saves or damage an area deals when a creature enters it or starts or ends its turn
+ * there. An area with a `zone` is watched by the server, which raises the save or deals the damage to the creature at
+ * that moment; the rest stay with the GM, whom the cast reminds.
  */
 const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   "arcane-sword": [
@@ -212,7 +218,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: `A creature that enters the area or ends its turn there makes the save. ${ONCE_PER_TURN}`,
       save: { ability: "str", successDamage: "none", failureConditions: ["restrained"] },
-      damage: [{ formula: "3d6", type: "bludgeoning" }]
+      damage: [{ formula: "3d6", type: "bludgeoning" }],
+      zone: ENTER_OR_END_ONCE
     }
   ],
   "blade-barrier": [
@@ -221,16 +228,29 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN}`,
       save: save("dex"),
-      damage: [{ formula: "6d10", type: "force" }]
+      damage: [{ formula: "6d10", type: "force" }],
+      zone: ENTER_OR_END_ONCE
+    }
+  ],
+  // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
+  "call-lightning": [
+    {
+      name: "bolt",
+      activation: "action",
+      when: "Until the spell ends, a Magic action calls down another bolt at a point under the cloud.",
+      save: save("dex"),
+      damage: [{ formula: "3d10", type: "lightning" }],
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null }
     }
   ],
   cloudkill: [
     {
       name: "save",
       activation: "other",
-      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The Sphere moves 10 feet away from you at the start of each of your turns.`,
       save: save("con"),
-      damage: [{ formula: "5d8", type: "poison" }]
+      damage: [{ formula: "5d8", type: "poison" }],
+      zone: ENTER_OR_END_ONCE
     }
   ],
   "conjure-animals": [
@@ -239,7 +259,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: `When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. ${ONCE_PER_TURN}`,
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
-      damage: [{ formula: "3d10", type: "slashing" }]
+      damage: [{ formula: "3d10", type: "slashing" }],
+      zone: { ...ENTER_OR_END_ONCE, around: "point", feet: 10, affects: "enemies" }
     }
   ],
   "conjure-elemental": [
@@ -266,7 +287,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: `When the Emanation enters a creature's space, or a creature enters it or ends its turn there, you can force the save. ${ONCE_PER_TURN}`,
       save: save("wis"),
-      damage: [{ formula: "5d8", type: "force" }]
+      damage: [{ formula: "5d8", type: "force" }],
+      zone: { ...ENTER_OR_END_ONCE, around: "caster", feet: 10, affects: "enemies" }
     }
   ],
   "delayed-blast-fireball": [
@@ -311,9 +333,37 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: "A creature that ends its turn within 5 feet of the sphere, or whose space you ram it into as a Bonus Action, makes the save.",
+      when: "A creature that ends its turn within 5 feet of the sphere makes the save.",
+      save: save("dex"),
+      damage: [{ formula: "2d6", type: "fire" }],
+      zone: { on: ["end-turn"], around: "point", feet: 5 }
+    },
+    {
+      name: "ram",
+      activation: "bonus-action",
+      when: "As a Bonus Action, you can roll the sphere up to 30 feet; a creature whose space you move it into makes the save, and the sphere stops for the turn.",
       save: save("dex"),
       damage: [{ formula: "2d6", type: "fire" }]
+    }
+  ],
+  grease: [
+    {
+      name: "save",
+      activation: "other",
+      when: "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
+      damage: [],
+      zone: { on: ["enter", "end-turn"] }
+    }
+  ],
+  "guardian-of-faith": [
+    {
+      name: "save",
+      activation: "other",
+      when: "Any enemy that moves to a space within 10 feet of the guardian for the first time on a turn or starts its turn there makes the save. The guardian vanishes when it has dealt a total of 60 damage.",
+      save: save("dex"),
+      damage: [{ formula: "20", type: "radiant" }],
+      zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", damageCap: 60 }
     }
   ],
   // "If the target drops to 0 Hit Points before this spell ends, you can take a Bonus Action on a later turn to curse a
@@ -350,9 +400,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns.`,
       save: save("dex"),
-      damage: [{ formula: "10d8", type: "fire" }]
+      damage: [{ formula: "10d8", type: "fire" }],
+      zone: ENTER_OR_END_ONCE
     }
   ],
   "insect-plague": [
@@ -361,16 +412,18 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: `A creature that enters the area for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
       save: save("con"),
-      damage: [{ formula: "4d10", type: "piercing" }]
+      damage: [{ formula: "4d10", type: "piercing" }],
+      zone: ENTER_OR_END_ONCE
     }
   ],
   moonbeam: [
     {
       name: "save",
       activation: "other",
-      when: `A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} A Magic action on your later turns moves the Cylinder up to 60 feet.`,
       save: save("con"),
-      damage: [{ formula: "2d10", type: "radiant" }]
+      damage: [{ formula: "2d10", type: "radiant" }],
+      zone: ENTER_OR_END_ONCE
     }
   ],
   "produce-flame": [
@@ -388,16 +441,27 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
-      damage: []
+      damage: [],
+      zone: { on: ["enter", "start-turn"] }
+    }
+  ],
+  "spike-growth": [
+    {
+      name: "spikes",
+      activation: "other",
+      when: "A creature that moves into or within the area takes the damage for every 5 feet it travels.",
+      damage: [{ formula: "2d4", type: "piercing" }],
+      zone: { on: ["travel"] }
     }
   ],
   "spirit-guardians": [
     {
       name: "save",
       activation: "other",
-      when: `When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. ${ONCE_PER_TURN}`,
+      when: `When the Emanation enters a creature's space, or a creature enters it or ends its turn there, it makes the save. ${ONCE_PER_TURN} The creatures you designate are unaffected: your allies.`,
       save: save("wis"),
-      damage: [{ formula: "3d8", type: "radiant" }]
+      damage: [{ formula: "3d8", type: "radiant" }],
+      zone: { ...ENTER_OR_END_ONCE, around: "caster", feet: 15, affects: "enemies" }
     }
   ],
   "spiritual-weapon": [
@@ -414,16 +478,49 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "save",
       activation: "other",
       when: "A creature that starts its turn in the Sphere makes the save; it is Poisoned until the end of that turn and can't take an action or a Bonus Action.",
-      save: { ability: "con", successDamage: "none", failureConditions: ["poisoned"] },
-      damage: []
+      save: {
+        ability: "con",
+        successDamage: "none",
+        failureConditions: ["poisoned"],
+        failureDuration: { type: "until-bearer-turn-end" }
+      },
+      damage: [],
+      zone: { on: ["start-turn"] }
+    }
+  ],
+  // "Until the spell ends, you can take a Magic action to create a new Line of radiance."
+  sunbeam: [
+    {
+      name: "line",
+      activation: "action",
+      when: "Until the spell ends, a Magic action creates a new Line of radiance from you.",
+      save: {
+        ability: "con",
+        successDamage: "half",
+        failureConditions: ["blinded"],
+        failureDuration: { type: "until-source-next-turn" }
+      },
+      damage: [{ formula: "6d8", type: "radiant" }],
+      area: { shape: "line", sizeFeet: 60, widthFeet: 5 }
+    }
+  ],
+  // "Until the spell ends, you can make the attack again on each of your turns as a Magic action."
+  "vampiric-touch": [
+    {
+      name: "touch",
+      activation: "action",
+      when: "Until the spell ends, a Magic action makes the attack again; you regain Hit Points equal to half the Necrotic damage dealt.",
+      attackRange: melee(5),
+      damage: [{ formula: "3d6", type: "necrotic" }]
     }
   ],
   "wall-of-fire": [
     {
       name: "burn",
       activation: "other",
-      when: "A creature that ends its turn within 10 feet of the burning side or inside the wall, or enters the wall for the first time on a turn, takes the damage.",
-      damage: [{ formula: "5d8", type: "fire" }]
+      when: "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn within 10 feet of the burning side.",
+      damage: [{ formula: "5d8", type: "fire" }],
+      zone: { on: ["enter", "end-turn"] }
     }
   ],
   "wall-of-thorns": [
@@ -432,7 +529,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: `A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
       save: save("dex"),
-      damage: [{ formula: "7d8", type: "slashing" }]
+      damage: [{ formula: "7d8", type: "slashing" }],
+      zone: ENTER_OR_END_ONCE
     }
   ],
   web: [
@@ -441,7 +539,18 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
-      damage: []
+      damage: [],
+      zone: { on: ["enter", "start-turn"] }
+    }
+  ],
+  "zone-of-truth": [
+    {
+      name: "save",
+      activation: "other",
+      when: "A creature that enters the area for the first time on a turn or starts its turn there makes the save; on a failure it can't speak a deliberate lie while in the radius, and you know whether it succeeded.",
+      save: { ability: "cha", successDamage: "none", failureConditions: [] },
+      damage: [],
+      zone: { on: ["enter", "start-turn"] }
     }
   ]
 };
@@ -540,6 +649,38 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "target",
     duration: { type: "manual" }
   }),
+  // "Gains a Fly Speed of 60 feet and can hover."
+  fly: spellGrant({
+    name: "Fly",
+    tags: ["fly-spell"],
+    target: "targets",
+    duration: rounds(100),
+    modifiers: [{ type: "special-speed", movement: "fly", feet: 60, hover: true }]
+  }),
+  // "The target also gains a Climb Speed equal to its Speed." Walls and ceilings are the GM's.
+  "spider-climb": spellGrant({
+    name: "Spider Climb",
+    tags: ["spider-climb"],
+    target: "targets",
+    duration: { type: "manual" },
+    modifiers: [{ type: "special-speed", movement: "climb", equalToSpeed: true }]
+  }),
+  // "The target's Speed increases by 10 feet until the spell ends."
+  longstrider: spellGrant({
+    name: "Longstrider",
+    tags: ["longstrider"],
+    target: "targets",
+    duration: { type: "manual" },
+    modifiers: [{ type: "speed", amount: 10 }]
+  }),
+  // "The target also has a Swim Speed equal to its Speed." Its other protections stay with the GM.
+  "freedom-of-movement": spellGrant({
+    name: "Freedom of Movement",
+    tags: ["freedom-of-movement"],
+    target: "targets",
+    duration: { type: "manual" },
+    modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
+  }),
   haste: spellGrant({
     name: "Haste",
     tags: ["hasted"],
@@ -563,6 +704,23 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   // Outlined in light: attack rolls against it have Advantage, and it can't benefit from the Invisible condition.
   "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] }
 };
+
+/** Areas the text gives no template shape for (a wall, a thing placed at a point), so the GM can place them on the
+ *  map: a straight wall as a 5-foot-wide Line (a ringed one is the GM's to draw), and a sphere, guardian or pack as the
+ *  circle its later area reaches around its point. */
+const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
+  "blade-barrier": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
+  "guardian-of-faith": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
+  "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 }
+};
+
+/** The area a spell's cast covers, for the map template: the reviewed one, else what the text names. */
+export function spellAreaFor(id: string, description: string): ActionArea | null {
+  return SPELL_AREAS[id] ?? areaOfProse(description);
+}
 
 /** The cast model for one SRD spell from its text, its range and the source's damage columns. */
 export function spellEffectFor(
@@ -665,5 +823,6 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS),
   ...Object.keys(CAST_GRANTS),
-  ...Object.keys(SAVE_FAILURE_EFFECTS)
+  ...Object.keys(SAVE_FAILURE_EFFECTS),
+  ...Object.keys(SPELL_AREAS)
 ];

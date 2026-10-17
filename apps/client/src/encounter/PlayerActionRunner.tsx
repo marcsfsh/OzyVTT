@@ -7,10 +7,11 @@ import { ActionTargetPicker } from "./ActionTargetPicker";
 import { actionSummaryParts } from "./action-summary";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
 import { CommonActionChips } from "./CommonActionChips";
+import { ReadyChooser, readyableSpells } from "./ReadyChooser";
 import { damageBreakdown } from "./format";
 import { modeWords } from "./roll-mode-notes";
 import { AskTheGmPrompt } from "./RuleAsk";
-import { summaryOfAvailability, type AvailabilityRow } from "./useSheetDefinition";
+import { awaitsItsSpell, summaryOfAvailability, type AvailabilityRow } from "./useSheetDefinition";
 import {
   beginTargeting,
   clearTargeting,
@@ -66,11 +67,15 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
 /** What the server lists for this character beyond its own rows: the generic actions it can take (with the Bonus
  *  Action forms its features give) and which of its rows are added to a hit rather than taken alone. Read once per
  *  sheet; the server still decides each use. */
-function useServerActionFacts(actorId: string, definition: ActorDefinition) {
-  const [facts, setFacts] = useState<{ common: readonly ContentActionSummary[]; ridesAHit: ReadonlySet<string> }>({
-    common: [],
-    ridesAHit: new Set()
-  });
+function useServerActionFacts(actorId: string, definition: ActorDefinition, effectsKey: string) {
+  const [facts, setFacts] = useState<{
+    common: readonly ContentActionSummary[];
+    ridesAHit: ReadonlySet<string>;
+    /** A spell's later actions whose spell isn't up, which aren't offered until it is. */
+    awaiting: ReadonlySet<string>;
+    /** The damage the server rolls for a row, where it differs (a spell's later action at the level it was cast). */
+    damage: ReadonlyMap<string, ContentActionSummary["damage"]>;
+  }>({ common: [], ridesAHit: new Set(), awaiting: new Set(), damage: new Map() });
   useEffect(() => {
     let live = true;
     void read("actor:available-actions", { actorId }).then((result) => {
@@ -78,13 +83,15 @@ function useServerActionFacts(actorId: string, definition: ActorDefinition) {
       const rows: readonly AvailabilityRow[] = result.actions ?? [];
       setFacts({
         common: rows.filter((row) => row.builtin).map(summaryOfAvailability),
-        ridesAHit: new Set(rows.filter((row) => row.ridesAHit).map((row) => row.id))
+        ridesAHit: new Set(rows.filter((row) => row.ridesAHit).map((row) => row.id)),
+        awaiting: new Set(rows.filter(awaitsItsSpell).map((row) => row.id)),
+        damage: new Map(rows.flatMap((row) => (row.damage ? [[row.id, row.damage] as const] : [])))
       });
     });
     return () => {
       live = false;
     };
-  }, [actorId, definition]);
+  }, [actorId, definition, effectsKey]);
   return facts;
 }
 
@@ -118,7 +125,12 @@ export function PlayerActionRunner({
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
-  const facts = useServerActionFacts(actorId, definition);
+  // The Ready action asks what is readied when a spell could be: a spell is cast now and held.
+  const [readying, setReadying] = useState(false);
+  const readySpells = readyableSpells(definition);
+  const slotLevels = (definition.spellcasting?.slots ?? []).filter((slot) => slot.max > 0).map((slot) => slot.level);
+  // Casting a spell, or its Concentration ending, changes which of its later actions are offered.
+  const facts = useServerActionFacts(actorId, definition, effectTags.join(","));
   // A limited use is a structured effect the server resolves, so Action Surge and the like get a
   // targetless Use tap here too. Sneak Attack, a smite and the like are added to a hit instead, so they aren't
   // offered as a tap that would be refused.
@@ -128,6 +140,9 @@ export function PlayerActionRunner({
         .filter(
           (action) =>
             !facts.ridesAHit.has(action.id) &&
+            !facts.awaiting.has(action.id) &&
+            // What a spell's area does later is the server's or the GM's to run, not a player's tap.
+            !(action.activation === "other" && /^spell-.+-then-/.test(action.id)) &&
             (action.attack ||
               action.save ||
               action.damage.length > 0 ||
@@ -135,7 +150,11 @@ export function PlayerActionRunner({
               // A feature's heal (Second Wind); a spell's heal is cast from the spell list.
               (action.healing !== undefined && action.spellId === undefined))
         )
-        .map(summaryOfOwnAction),
+        .map(summaryOfOwnAction)
+        .map((action) => {
+          const rolled = facts.damage.get(action.id);
+          return rolled && rolled.length === action.damage.length ? { ...action, damage: rolled } : action;
+        }),
       // Item-derived actions are appended: their `item-<inventory id>` keys cannot collide with
       // stat-block ids. The server says which resolve (a potion, a scroll, a coat of poison).
       ...extraActions.filter(
@@ -225,11 +244,28 @@ export function PlayerActionRunner({
             effectTags={effectTags}
             onUse={(action, targetless) => {
               setTargetingResult(null);
-              if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
+              if (action.id === "ready" && readySpells.length > 0) setReadying(true);
+              else if (targetless) resolveActionDirect(actorId, action.id, revision, onOutcome);
               else beginTargeting(action, actorId);
             }}
           />
         </>
+      )}
+      {readying && (
+        <ReadyChooser
+          spells={readySpells}
+          slotLevels={slotLevels}
+          busy={busy}
+          onClose={() => setReadying(false)}
+          onReady={(spell) => {
+            setReadying(false);
+            if (spell)
+              resolveActionDirect(actorId, spell.actionId, revision, onOutcome, undefined, {
+                ...(spell.slotLevel !== undefined ? { slotLevel: spell.slotLevel } : {})
+              });
+            else resolveActionDirect(actorId, "ready", revision, onOutcome);
+          }}
+        />
       )}
       {picking && !result?.preview && (
         <ActionTargetPicker

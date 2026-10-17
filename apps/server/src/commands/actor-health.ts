@@ -115,6 +115,7 @@ export const actorHealthCommands = [
             now: () => new Date().toISOString(),
             catalog: kit.equipmentCatalog(),
             commandId,
+            rollDie: (sides) => kit.context.random(sides),
             distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB)
           }
         );

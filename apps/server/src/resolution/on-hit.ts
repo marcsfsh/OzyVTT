@@ -50,7 +50,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
   action.onHit.forEach((rider, index) => {
     if (rider.maxTargetSize && !sizeAtMost(target.size, rider.maxTargetSize)) {
       warnings.push(
-        `${target.name} is too large for ${action.name}'s ${rider.conditions.map((condition) => conditionLabel(condition.id)).join("/")} rider.`
+        `${target.name} is too large for ${action.name}'s ${rider.name ?? rider.conditions.map((condition) => conditionLabel(condition.id)).join("/")} rider.`
       );
       return;
     }
@@ -73,7 +73,13 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     const conditionIds = rider.conditions
       .map((condition) => condition.id)
       .filter((id) => id !== "prone" && id !== "exhaustion");
-    if (conditionIds.length === 0) return;
+    if (conditionIds.length === 0 && !rider.ongoingDamage) return;
+    // "The rug can give it the Grappled condition ... instead of dealing damage": the hit's damage goes.
+    if (rider.insteadOfDamage) {
+      ctx.damage.splice(0);
+      ctx.bonusDamage.splice(0);
+      warnings.push(`${action.name}: ${target.name} is held instead of taking the hit's damage.`);
+    }
     const grapple = conditionIds.includes("grappled");
     const gained: EffectNarration[] = [];
     const effect = addEffect(
@@ -81,7 +87,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       target.id,
       makeEffect({
         id: `${input.commandId}:hit:${target.id}:${index}`,
-        name: `${conditionLabel(conditionIds[0])} by ${attacker.name} (${action.name})`,
+        name: `${rider.name ?? conditionLabel(conditionIds[0]!)} by ${attacker.name} (${action.name})`,
         tags: grapple ? ["grapple"] : [],
         sourceActorId: attacker.id,
         sourceName: attacker.name,
@@ -91,7 +97,9 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
         endsWhenSourceDefeated: grapple,
         linkedConditionIds: conditionIds,
         escapeDc: rider.escapeDc ?? null,
-        ...(grapple ? { rangeFeet: action.attack?.reachFeet ?? 5 } : {})
+        ...(grapple ? { rangeFeet: action.attack?.reachFeet ?? 5 } : {}),
+        // A stirge attached, a rug smothering: what it deals each turn while it holds on, and it lets go as it dies.
+        ...(rider.ongoingDamage ? { ongoingDamage: rider.ongoingDamage, endsWhenSourceDefeated: true } : {})
       }),
       gained,
       deps
