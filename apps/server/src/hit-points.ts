@@ -345,6 +345,70 @@ export function previewDamage(
   };
 }
 
+/**
+ * What dropping to 0 Hit Points does, by damage or by hit points lost: a character falls Unconscious and is dying (or
+ * dies outright when the overflow reaches its maximum), any other creature is defeated (a troll lies down until its
+ * turn, a Death Burst goes off), and nobody at 0 sustains effects or Concentration.
+ */
+function fallToZero(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  overflow: number,
+  deps: DamageDeps | undefined,
+  events: EffectNarration[]
+): Readonly<{ instantDeath: boolean; defeated: boolean }> {
+  let instantDeath = false;
+  let defeated = false;
+  if (actor.kind === "player-character") {
+    const outcome = droppedToZero(overflow, actor.hp.maximum);
+    actor.deathSaves = outcome.state;
+    instantDeath = outcome.instantDeath;
+    applyCondition(actor, "unconscious", { immunities: deps });
+    applyCondition(actor, "prone", { immunities: deps });
+    events.push({
+      kind: "condition",
+      text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
+      actorId: actor.id
+    });
+  } else {
+    defeated = true;
+    // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
+    events.push(...releaseSwallowedBy(state, actor.id, definition));
+    // A troll lies down until its next turn says whether it regenerates; anything else dies, and a Death Burst goes
+    // off as it does.
+    if (!holdOnAtZero(state, actor, definition, events) && deps) deathBurst(state, actor, definition, deps, events);
+  }
+  // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
+  // concentration (SRD Concentration).
+  events.push(...endEffectsSustainedBy(state, actor.id));
+  events.push(...endConcentrationSustainedBy(state, actor.id));
+  return { instantDeath, defeated };
+}
+
+/**
+ * Hit points lost rather than damage taken (an infernal wound: "the target loses 5 (1d10) Hit Points"): no type, no
+ * defence, no Temporary Hit Points and no Concentration save, since none of those meet damage that isn't dealt. A
+ * creature it drops to 0 falls as damage would drop it, with no overflow to kill it outright. Returns what it lost.
+ */
+export function loseHitPoints(
+  state: GameState,
+  actorId: string,
+  amount: number,
+  deps?: DamageDeps
+): Readonly<{ lost: number; events: EffectNarration[] }> {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || amount <= 0 || actor.hp.current <= 0) return { lost: 0, events: [] };
+  const before = actor.hp.current;
+  actor.hp.current = Math.max(0, before - amount);
+  const events: EffectNarration[] = [];
+  if (actor.hp.current === 0) {
+    const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
+    fallToZero(state, actor, definition, 0, deps, events);
+  }
+  return { lost: before - actor.hp.current, events };
+}
+
 /** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
  *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
  *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
@@ -430,30 +494,9 @@ export function applyDamageDetailed(
       actorId
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    if (isPlayerCharacter) {
-      const overflow = damageToHp - hpBefore;
-      const outcome = droppedToZero(overflow, actor.hp.maximum);
-      actor.deathSaves = outcome.state;
-      instantDeath = outcome.instantDeath;
-      applyCondition(actor, "unconscious", { immunities: deps });
-      applyCondition(actor, "prone", { immunities: deps });
-      events.push({
-        kind: "condition",
-        text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
-        actorId
-      });
-    } else {
-      defeated = true;
-      // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
-      events.push(...releaseSwallowedBy(state, actor.id, definition));
-      // A troll lies down until its next turn says whether it regenerates; anything else dies, and a Death Burst goes
-      // off as it does.
-      if (!holdOnAtZero(state, actor, definition, events) && deps) deathBurst(state, actor, definition, deps, events);
-    }
-    // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
-    // concentration (SRD Concentration).
-    events.push(...endEffectsSustainedBy(state, actor.id));
-    events.push(...endConcentrationSustainedBy(state, actor.id));
+    const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
+    instantDeath = fell.instantDeath;
+    defeated = fell.defeated;
   }
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped

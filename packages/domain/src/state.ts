@@ -251,6 +251,8 @@ export const PendingSaveSchema = z
         ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
         /** A spell's or a magic item's, so the save repeated against it is one Magic Resistance helps with. */
         magical: EffectInstanceSchema.shape.magical,
+        /** It ends when a spell restores the bearer's hit points (an infernal wound). */
+        endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
         /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
         modifiers: EffectModifiersSchema.default([])
       })

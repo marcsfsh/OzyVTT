@@ -197,6 +197,7 @@ const ON_FAIL_EFFECT_FIELDS = {
   speedZero: "player",
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
+  endsOnSpellHealing: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",

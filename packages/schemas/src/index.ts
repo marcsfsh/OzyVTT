@@ -583,15 +583,17 @@ export const SaveFailureDurationSchema = z.discriminatedUnion("type", [
 ]);
 export type SaveFailureDuration = z.infer<typeof SaveFailureDurationSchema>;
 
-/** Damage a lasting effect deals at the start of a turn while it lasts: "takes 21 (6d6) Acid damage at the start of
- * each of the behir's turns" is the source's turn, "... of each of its turns" the bearer's. */
+/** Damage a lasting effect deals as a turn starts or ends while it lasts: "takes 21 (6d6) Acid damage at the start of
+ * each of the behir's turns" is the source's turn, "... of each of its turns" the bearer's. `hitPointLoss`: the
+ * bearer loses the hit points instead (an infernal wound), which is no damage, so no type or defence applies. */
 export const OngoingDamageSchema = z
   .object({
     damage: z
-      .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+      .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema.optional() }).strict())
       .min(1)
       .max(2),
-    at: z.enum(["bearer-turn-start", "source-turn-start"])
+    at: z.enum(["bearer-turn-start", "source-turn-start", "bearer-turn-end", "source-turn-end"]),
+    hitPointLoss: z.literal(true).optional()
   })
   .strict();
 export type OngoingDamage = z.infer<typeof OngoingDamageSchema>;
@@ -677,7 +679,9 @@ export const EffectInstanceSchema = z
     /** How many more times its damage riders may land before it ends (a coat of Basic Poison). */
     damageUses: z.number().int().min(1).max(10).optional(),
     /** It comes from a spell or a magic item, so a save repeated against it is one Magic Resistance helps with. */
-    magical: z.literal(true).optional()
+    magical: z.literal(true).optional(),
+    /** It ends when a spell restores the bearer's hit points (an infernal wound). */
+    endsOnSpellHealing: z.literal(true).optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1238,7 +1242,9 @@ export const SaveFailureEffectSchema = z
       .object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) })
       .strict()
       .optional(),
-    modifiers: EffectModifiersSchema.default([])
+    modifiers: EffectModifiersSchema.default([]),
+    /** It ends when a spell restores the bearer's hit points ("The wound closes after ... a spell restores Hit Points"). */
+    endsOnSpellHealing: z.literal(true).optional()
   })
   .strict();
 
@@ -1384,10 +1390,17 @@ export const ActionSchema = z.object({
     .array(
       z
         .object({
+          /** None when the hit leaves only its `name`d effect (a stirge attached, draining blood). */
           conditions: z
             .array(z.object({ id: ConditionIdSchema, level: z.number().int().min(1).max(6).optional() }).strict())
-            .min(1)
             .max(3),
+          /** The effect's name when the text names what it is ("Attached"); absent, the first condition's. */
+          name: z.string().min(1).max(60).optional(),
+          /** Damage it deals as turns start while it lasts (a stirge's 2d4 Necrotic at the start of each of its turns). */
+          ongoingDamage: OngoingDamageSchema.optional(),
+          /** It lands in place of the hit's damage ("the rug can give it the Grappled condition ... instead of dealing
+           *  damage"): a target it can't take still takes the damage. */
+          insteadOfDamage: z.literal(true).optional(),
           escapeDc: z.number().int().min(1).max(40).optional(),
           /** The rider only applies to targets of at most this size (crocodile Bite: large). */
           maxTargetSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),

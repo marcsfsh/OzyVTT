@@ -6583,6 +6583,33 @@
       "formula": "2d6 + 3",
       "type": "bludgeoning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "grappled"
+       },
+       {
+        "id": "blinded"
+       },
+       {
+        "id": "restrained"
+       }
+      ],
+      "escapeDc": 13,
+      "maxTargetSize": "medium",
+      "ongoingDamage": {
+       "damage": [
+        {
+         "formula": "2d6 + 3",
+         "type": "bludgeoning"
+        }
+       ],
+       "at": "bearer-turn-start"
+      },
+      "insteadOfDamage": true
+     }
     ]
    }
   ],
@@ -9077,14 +9104,34 @@
      "ability": "con",
      "dc": 12,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Infernal Wound",
+      "tags": [],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "endsOnSpellHealing": true,
+      "modifiers": []
+     },
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "1d10"
+       }
+      ],
+      "at": "bearer-turn-start",
+      "hitPointLoss": true
+     }
     },
     "damage": [
      {
       "formula": "1d10 + 3",
       "type": "slashing"
      }
-    ]
+    ],
+    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 12 Wisdom (Medicine) check: end it by hand."
    }
   ],
   "token": {
@@ -12439,6 +12486,17 @@
      {
       "formula": "3d6 + 3",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "blinded"
+       }
+      ],
+      "name": "Attached",
+      "maxTargetSize": "large"
      }
     ]
    },
@@ -26079,14 +26137,34 @@
      "ability": "dex",
      "dc": 17,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Infernal Wound",
+      "tags": [],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "endsOnSpellHealing": true,
+      "modifiers": []
+     },
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6"
+       }
+      ],
+      "at": "bearer-turn-start",
+      "hitPointLoss": true
+     }
     },
     "damage": [
      {
       "formula": "1d8 + 6",
       "type": "necrotic"
      }
-    ]
+    ],
+    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 17 Wisdom (Medicine) check: end it by hand."
    }
   ],
   "token": {
@@ -40691,6 +40769,21 @@
      {
       "formula": "1d6 + 3",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Attached",
+      "ongoingDamage": {
+       "damage": [
+        {
+         "formula": "2d4",
+         "type": "necrotic"
+        }
+       ],
+       "at": "source-turn-start"
+      }
      }
     ]
    }

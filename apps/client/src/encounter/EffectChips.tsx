@@ -43,16 +43,21 @@ function endingNotes(effect: ChipEffect): string[] {
 
 const capitalised = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
-/** What it deals at the start of a turn while it lasts ("6d6 Acid at the start of each of its source's turns"). */
+/** What it deals as a turn starts or ends while it lasts ("6d6 Acid at the start of each of its source's turns", "loses
+ *  1d10 hit points at the start of each of its turns"). */
 function ongoingDamageNote(effect: ChipEffect): string | null {
   const ongoing = effect.ongoingDamage;
   if (!ongoing) return null;
-  const dice = ongoing.damage.map((part) => `${part.formula} ${capitalised(part.type)}`).join(" + ");
-  const when = ongoing.at === "bearer-turn-start" ? "its turns" : "its source's turns";
+  const dice = ongoing.damage
+    .map((part) => (part.type ? `${part.formula} ${capitalised(part.type)}` : part.formula))
+    .join(" + ");
+  const what = ongoing.hitPointLoss ? `loses ${dice} hit points` : dice;
+  const when = ongoing.at.startsWith("bearer-") ? "its turns" : "its source's turns";
+  const edge = ongoing.at.endsWith("-end") ? "end" : "start";
   const save = ongoing.saveToEnd
     ? `, then a ${ongoing.saveToEnd.ability.toUpperCase()} save DC ${ongoing.saveToEnd.dc} that ends it`
     : "";
-  return `${dice} at the start of each of ${when}${save}`;
+  return `${what} at the ${edge} of each of ${when}${save}`;
 }
 
 /** The SRD Burning hazard's tag, and the builtin action that puts the fire out on its bearer. */

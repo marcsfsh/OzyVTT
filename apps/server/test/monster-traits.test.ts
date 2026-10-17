@@ -646,3 +646,123 @@ describe("Corrosive Form", () => {
     expect(actor(ranged, IDS.hero).hp.current).toBe(30);
   });
 });
+
+describe("what a hit or a failed save leaves behind", () => {
+  /** The foe uses one of its stat block's actions on the hero, on the foe's turn. */
+  function foeUses(state: GameState, slug: string, actionId: string, faces: number[]) {
+    state.combat = { ...state.combat, turnActorId: IDS.foe };
+    const action = monster(slug).actions.find((candidate) => candidate.id === actionId)!;
+    return resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextId() },
+      resolveDeps(faces, monster(slug))
+    );
+  }
+
+  it("leaves a stirge attached, draining blood at the start of each of its turns until it dies", () => {
+    const state = game("stirge");
+    foeUses(state, "stirge", "proboscis", [15, 3]);
+    expect(actor(state, IDS.hero).effects.map((effect) => effect.name)).toEqual(["Attached by Stirge (Proboscis)"]);
+    // The stirge's turn ends and the ally's and the hero's go by; its next turn starts with 2d4 Necrotic.
+    const events = [...advance(state), ...advance(state), ...advance(state, [3, 4])];
+    expect(state.combat.turnActorId).toBe(IDS.foe);
+    expect(actor(state, IDS.hero).hp.current).toBe(23);
+    expect(texts(events)).toContain("Hero takes 7 Necrotic damage from Attached by Stirge (Proboscis).");
+    hurt(state, IDS.foe, [{ amount: 50, type: "slashing" }]);
+    expect(actor(state, IDS.hero).effects).toEqual([]);
+  });
+
+  it("lets a rug smother a Medium creature instead of hitting it, and crush it at the start of its turns", () => {
+    const state = game("animated-rug-of-smothering");
+    const resolution = foeUses(state, "animated-rug-of-smothering", "smother", [15, 4, 4]);
+    expect(resolution.damageTotal).toBe(0);
+    expect(
+      actor(state, IDS.hero)
+        .conditions.map((condition) => condition.id)
+        .sort()
+    ).toEqual(["blinded", "grappled", "restrained"]);
+    advance(state);
+    advance(state, [2, 3]);
+    expect(state.combat.turnActorId).toBe(IDS.hero);
+    expect(actor(state, IDS.hero).hp.current).toBe(22);
+
+    const big = game("animated-rug-of-smothering");
+    actor(big, IDS.hero).size = "large";
+    expect(foeUses(big, "animated-rug-of-smothering", "smother", [15, 4, 4]).damageTotal).toBe(11);
+    expect(actor(big, IDS.hero).conditions).toEqual([]);
+  });
+
+  it("gives an infernal wound that takes hit points, not damage, until a spell heals it", () => {
+    const state = game("bearded-devil");
+    foeUses(state, "bearded-devil", "infernal-glaive", [15, 5]);
+    const [pending] = pendingOn(state, IDS.hero);
+    answerSave(state, nextId(), pending!.id, "manual", 3, true, GM, saveDeps([]));
+    expect(actor(state, IDS.hero).effects[0]).toMatchObject({
+      name: "Infernal Wound",
+      duration: { type: "rounds", remaining: 10 },
+      endsOnSpellHealing: true,
+      ongoingDamage: { at: "bearer-turn-start", hitPointLoss: true }
+    });
+    actor(state, IDS.hero).hp.temporary = 5;
+    const events = [...advance(state), ...advance(state, [6])];
+    expect(state.combat.turnActorId).toBe(IDS.hero);
+    // Temporary hit points don't take a loss that isn't damage.
+    expect(actor(state, IDS.hero).hp).toMatchObject({ current: 24, temporary: 5 });
+    expect(texts(events)).toContain("Hero loses 6 hit points to Infernal Wound.");
+    const cure: ActorAction = {
+      id: "spell-cure-wounds",
+      name: "Cure Wounds",
+      activation: "action",
+      description: "Heal.",
+      spellId: "cure-wounds",
+      healing: { formula: "2d8" },
+      damage: []
+    };
+    state.combat = { ...state.combat, turnActorId: IDS.ally };
+    resolveDefinitionAction(
+      state,
+      cure,
+      { actorId: IDS.ally, targetIds: [IDS.hero], commandId: nextId() },
+      { ...resolveDeps([4, 4], hero), definition: hero }
+    );
+    expect(actor(state, IDS.hero).effects).toEqual([]);
+  });
+
+  it("deals damage printed for the end of a turn as that turn ends", () => {
+    const state = game("troll");
+    actor(state, IDS.hero).effects = [
+      {
+        id: "swallowed",
+        name: "Swallowed by Troll",
+        tags: [],
+        sourceActorId: IDS.foe,
+        sourceName: "Troll",
+        sourceActionId: null,
+        startedRound: 1,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: true,
+        voidWhileIncapacitated: false,
+        concentration: false,
+        endsWithTag: null,
+        modifiers: [],
+        linkedConditionIds: [],
+        escapeDc: null,
+        onEnd: [],
+        ongoingDamage: { damage: [{ formula: "3d6", type: "acid" }], at: "source-turn-end" }
+      }
+    ];
+    advance(state);
+    expect(actor(state, IDS.hero).hp.current).toBe(30);
+    const events = advance(state, [2, 2, 2]);
+    expect(actor(state, IDS.hero).hp.current).toBe(24);
+    expect(texts(events)).toContain("Hero takes 6 Acid damage from Swallowed by Troll.");
+  });
+
+  it("blinds what a cloaker attaches to", () => {
+    const state = game("cloaker");
+    foeUses(state, "cloaker", "attach", [15, 3, 3, 3]);
+    expect(actor(state, IDS.hero).effects.map((effect) => effect.name)).toEqual(["Attached by Cloaker (Attach)"]);
+    expect(actor(state, IDS.hero).conditions.map((condition) => condition.id)).toEqual(["blinded"]);
+  });
+});

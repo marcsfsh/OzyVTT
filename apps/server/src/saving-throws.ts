@@ -417,6 +417,7 @@ export function applyFailureEffect(
       escapeDc: onFail.escapeDc,
       ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
       ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
+      ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
       ...(onFail.speedZero ? { speedZero: true } : {}),
       ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
       ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),

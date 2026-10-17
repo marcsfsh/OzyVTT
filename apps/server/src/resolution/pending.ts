@@ -197,6 +197,7 @@ export function failureEffectFor(
     ...(duration ? { duration } : {}),
     ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
