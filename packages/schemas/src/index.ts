@@ -1799,7 +1799,7 @@ export const ProficienciesSchema = z
       .default([]),
     saveOverrides: z.partialRecord(AbilitySchema, z.number().int().min(-20).max(30)).optional(),
     skillOverrides: z.record(SkillIdSchema, z.number().int().min(-20).max(30)).optional(),
-    /** Armor/weapon/tool/language training as open slugs. Absent means "not recorded", not "none": an import that
+    /** Armor/weapon/tool/language training as open slugs. Absent means "not recorded" (an empty list means none): an import that
      * never listed armor training must not read as untrained. */
     armor: z.array(ProficiencyIdSchema).max(20).optional(),
     /** Weapon proficiencies: a group ("simple", "martial") or a single weapon id ("longsword"). */

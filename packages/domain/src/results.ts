@@ -345,7 +345,7 @@ const RollModeSummarySchema = z.strictObject({
   advantage: z.array(z.string()),
   disadvantage: z.array(z.string())
 });
-/** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. Every
+/** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor); `PlayerView` leaves them out. Every
  *  number is what the server would roll: Exhaustion, item riders and features included. */
 const DerivedAbilityRowSchema = z.strictObject({
   ability: AbilityIdSchema,

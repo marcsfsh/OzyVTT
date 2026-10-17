@@ -51,7 +51,7 @@ describe("D&D Beyond PDF import: golden fixtures (recorded widgets)", () => {
     expect(ids).toContain("ray-of-frost");
     expect(ids).toContain("fireball");
     expect(ids.every((id) => /^[a-z0-9-]+$/.test(id))).toBe(true);
-    // warlock's "Detect Magic [R]" must become "detect-magic", not "detect-magic-r"
+    // warlock's "Detect Magic [R]" must become "detect-magic", with the "[R]" dropped
     const war = importFixture("warlock20");
     if (war.parsed.success) {
       const wids = war.parsed.data.spellcasting!.spells.map((s) => s.id);

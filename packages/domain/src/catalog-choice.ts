@@ -197,7 +197,7 @@ export type PickSourceReference = Readonly<{ offer: string; where?: string | nul
  * Resolver for `fromPicks`: the options are the character's own earlier answers ("one of your known Warlock
  * cantrips that deals damage"), narrowed by a closed predicate slug over spell catalog fields (ADR-0008).
  * `answered` is the build's ledger. Unknown spell ids are dropped. Throws `CatalogChoiceError` when nothing
- * survives, which the survey treats as "defer", not "reject".
+ * survives, which the survey treats as "defer".
  */
 export function resolvePickChoice(
   source: PickSourceReference,
