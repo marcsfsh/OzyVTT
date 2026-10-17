@@ -26,6 +26,7 @@ import type {
   CodexQuestStatus,
   CodexRevealAudit,
   CodexSearchResult,
+  CodexPrepSectionInput,
   CodexSession,
   CodexSessionStatus,
   CodexSettings,
@@ -438,7 +439,8 @@ export type CodexSessionInput = Readonly<{
   sessionNumber?: number | null;
   realDate?: string | null;
   attendees?: readonly string[];
-  prepBody?: string;
+  /** The whole list of prep sections. */
+  prep?: readonly CodexPrepSectionInput[];
   recapBody?: string;
   status?: CodexSessionStatus;
   /** Slug-normalized server-side. */

@@ -1,6 +1,7 @@
 import { Alert, Badge, Button, Drawer, GmOnlyTag, Modal, Skeleton, VisibilityBadge } from "@vtt/ui";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { CodexMarkdown } from "./CodexMarkdown";
+import { prepText } from "./prep-notes";
 import { sessionTitle } from "./sessions";
 import type { CodexSession } from "@vtt/domain";
 
@@ -85,8 +86,8 @@ export function SessionConsole({
           {/* Likely open while screen-sharing, so the prep wears the GM-only marking. */}
           <div className="codex-console-prep codex-gm-block">
             <GmOnlyTag />
-            {session.prepBody.trim() ? (
-              <CodexMarkdown text={session.prepBody} token={gmToken} />
+            {prepText(session.prep) ? (
+              <CodexMarkdown text={prepText(session.prep)} token={gmToken} />
             ) : (
               <p className="codex-preview-empty">Nothing prepped for this session yet.</p>
             )}

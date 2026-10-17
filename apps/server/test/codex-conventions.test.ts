@@ -485,13 +485,26 @@ describe("codex responses validate against the schemas the document publishes", 
         sessionNumber: 4,
         realDate: "2026-07-30",
         recapBody: "They reached the gates.",
-        prepBody: "Strahd watches.",
+        prep: [{ type: "text", title: "Prep notes", text: "Strahd watches." }],
         attendees: ["Ana"],
         status: "played"
       })
     );
     const sessionId = session.data.session.id as string;
     await reveal(`/api/v1/codex/sessions/${sessionId}/reveal`);
+    // A live board to read: the session is active, its prep has a clue that was ticked and a line was logged.
+    await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, GM, {});
+    await send(base, "PATCH", `/api/v1/codex/sessions/${sessionId}`, GM, {
+      prep: [
+        { type: "checklist", title: "Clues", items: [{ text: "The mists are alive.", done: true }] },
+        { type: "scenes", title: "Scenes", scenes: [{ title: "The gates" }] }
+      ]
+    });
+    await post(base, `/api/v1/codex/sessions/${sessionId}/log`, GM, { text: "The gates opened." });
+    await post(base, "/api/v1/codex/prep-templates", GM, {
+      name: "Gothic night",
+      sections: [{ title: "Dread", prompt: "Something watches.", type: "text" }]
+    });
 
     const quest = await body(
       await post(base, "/api/v1/codex/quests", GM, {
@@ -590,17 +603,24 @@ describe("codex responses validate against the schemas the document publishes", 
   });
 
   it("validates every GM-grade read against its published schema", async () => {
-    const { base, shownId } = await populated();
+    const { base, shownId, sessionId } = await populated();
     for (const [contractPath, url] of [
       [CODEX_PATHS.folders, "/api/v1/codex/folders"],
       [CODEX_PATHS.pageRevisions, `/api/v1/codex/pages/${shownId}/revisions`],
       [CODEX_PATHS.revealAudit, "/api/v1/codex/reveal-audit"],
       [CODEX_PATHS.settings, "/api/v1/codex/settings"],
-      [CODEX_PATHS.export, "/api/v1/codex/export"]
+      [CODEX_PATHS.export, "/api/v1/codex/export"],
+      [CODEX_PATHS.prepTemplates, "/api/v1/codex/prep-templates"],
+      [CODEX_PATHS.board, "/api/v1/codex/board"],
+      [CODEX_PATHS.sessionHappened, `/api/v1/codex/sessions/${sessionId}/happened`]
     ] as const) {
       const response = await get(base, url, GM);
       expect(response.status, `GET ${url}`).toBe(200);
-      check(documentedResponse(contractPath), await body(response), `GET ${url}`);
+      const payload = await body(response);
+      check(documentedResponse(contractPath), payload, `GET ${url}`);
+      // A schema check over an empty board or recap proves nothing.
+      if (contractPath === CODEX_PATHS.board) expect(payload.data.board.checklists[0].items).toHaveLength(1);
+      if (contractPath === CODEX_PATHS.sessionHappened) expect(payload.data.happened.cluesTicked).toHaveLength(1);
     }
   });
 

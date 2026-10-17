@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { CodexInWorldDateSchema } from "./codex-calendar.js";
 import { CODEX_ENTITY_TYPES } from "./codex-entities.js";
+import { CodexPrepLinkSchema, CodexPrepChecklistItemSchema, CodexPrepSectionSchema } from "./codex-prep-wire.js";
 import type { Wire } from "./wire.js";
 
 // ----- Vocabulary -----
@@ -425,7 +426,12 @@ export const CodexSessionSchema = z.strictObject({
   /** The real-world date the group met, free text. */
   realDate: z.string().nullable(),
   attendees: z.array(z.string()),
-  prepBody: z.string(),
+  /** The session's own copy of its template's sections; editing the template never changes it. */
+  prep: z.array(CodexPrepSectionSchema),
+  /** The template the prep was last copied from. It may name a deleted template. */
+  prepTemplateId: z.uuid().nullable(),
+  /** The live board's current scene: a scene id inside one of the prep's Scenes sections. */
+  currentSceneId: z.uuid().nullable(),
   recapBody: z.string(),
   revealedToPlayers: z.boolean(),
   status: CodexSessionStatusSchema,
@@ -545,6 +551,99 @@ export type CodexSearchHit = Wire<z.infer<typeof CodexSearchHitSchema>>;
 /** The Codex is unpaginated; `truncated` means the search itself was cut off. */
 export const CodexSearchResultSchema = z.strictObject({ hits: z.array(CodexSearchHitSchema), truncated: z.boolean() });
 export type CodexSearchResult = Wire<z.infer<typeof CodexSearchResultSchema>>;
+
+// ----- The live board and the recap's sources (GM-only) -----
+
+/** A checklist item as the board shows it, with what its link names. */
+export const CodexLiveClueSchema = CodexPrepChecklistItemSchema.extend({
+  /** The linked page's or quest's title; null without a link or when the record is gone. */
+  linkTitle: z.string().nullable(),
+  /** The linked block's title, when the item links a block. */
+  blockTitle: z.string().nullable(),
+  /** A record link: whether players can read the record. A block link: whether anyone but the GM can read it. */
+  linkRevealed: z.boolean().nullable()
+});
+export type CodexLiveClue = Wire<z.infer<typeof CodexLiveClueSchema>>;
+
+export const CodexLiveBoardSchema = z.strictObject({
+  sessionId: z.uuid(),
+  sessionNumber: z.number().int().nullable(),
+  /** The session's `rev`, so an open editor can stay current. */
+  rev: z.number().int().min(0),
+  currentSceneId: z.uuid().nullable(),
+  scenes: z.array(
+    z.strictObject({
+      sectionId: z.uuid(),
+      id: z.uuid(),
+      title: z.string(),
+      placePageId: z.uuid().nullable(),
+      placeTitle: z.string().nullable(),
+      notes: z.string(),
+      current: z.boolean()
+    })
+  ),
+  pageGroups: z.array(
+    z.strictObject({
+      sectionId: z.uuid(),
+      title: z.string(),
+      pages: z.array(
+        z.strictObject({
+          id: z.uuid(),
+          title: z.string(),
+          entityType: CodexEntityTypeSchema,
+          revealedToPlayers: z.boolean()
+        })
+      )
+    })
+  ),
+  checklists: z.array(z.strictObject({ sectionId: z.uuid(), title: z.string(), items: z.array(CodexLiveClueSchema) })),
+  clocks: z.array(
+    z.strictObject({
+      id: z.uuid(),
+      text: z.string(),
+      inWorldLabel: z.string().nullable(),
+      calendarInstant: z.number().nullable(),
+      fired: z.boolean(),
+      revealedToPlayers: z.boolean()
+    })
+  ),
+  quests: z.array(
+    z.strictObject({ id: z.uuid(), title: z.string(), status: CodexQuestStatusSchema, revealedToPlayers: z.boolean() })
+  ),
+  encounterSceneIds: z.array(z.uuid()),
+  logged: z.array(
+    z.strictObject({
+      id: z.uuid(),
+      kind: CodexJournalKindSchema,
+      text: z.string(),
+      revealedToPlayers: z.boolean(),
+      createdAt: timestamp()
+    })
+  )
+});
+export type CodexLiveBoard = Wire<z.infer<typeof CodexLiveBoardSchema>>;
+
+/** What happened in a session, for the recap step. `reveals` are blocks revealed while it was active. */
+export const CodexSessionHappenedSchema = z.strictObject({
+  sessionId: z.uuid(),
+  entries: z.array(CodexJournalEntrySchema),
+  cluesTicked: z.array(CodexLiveClueSchema.extend({ sectionId: z.uuid(), sectionTitle: z.string() })),
+  reveals: z.array(
+    z.strictObject({
+      recordKind: CodexPrepLinkSchema.shape.recordKind,
+      recordId: z.uuid(),
+      recordTitle: z.string(),
+      blockId: z.uuid(),
+      blockTitle: z.string().nullable(),
+      /** Who it reached: everyone, or one character by actor id. */
+      to: z.union([z.literal("everyone"), z.uuid()]),
+      /** When it reached them, and the players' date then. */
+      at: timestamp(),
+      inWorldLabel: z.string().nullable()
+    })
+  )
+});
+export type CodexSessionHappened = Wire<z.infer<typeof CodexSessionHappenedSchema>>;
 
 // ----- Settings (GM-only) -----
 

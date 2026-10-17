@@ -33,6 +33,8 @@ import {
   projectPlayerSearchHit,
   projectPlayerSession
 } from "../src/codex-projections.js";
+import { BUILT_IN_TEMPLATE_ID } from "../src/codex/prep.js";
+import { prepNotes, prepNotesOf } from "./codex-prep-notes.js";
 
 /** The default autosave setting, spelled once. */
 const AUTOSAVE_DEFAULT = { enabled: true, intervalSeconds: 1 } as const;
@@ -750,15 +752,15 @@ describe("CodexStore entities + relationships", () => {
     expect(store.restoreRevision(page.id, rev.id, "gm").fields.goals).toBeUndefined();
   });
 
-  // The export bundle is a GM's only copy of their prep, and `prepBody` exists nowhere else in the codex.
+  // The export bundle is a GM's only copy of their prep, and the prep exists nowhere else in the codex.
   // A record type missing from the backup loses data silently.
   it("carries sessions and the active pointer into the backup bundle", () => {
     const played = store.createSession({
       sessionNumber: 1,
-      prepBody: "Ambush at the bridge.",
+      prep: prepNotes("Ambush at the bridge."),
       recapBody: "They crossed."
     });
-    const next = store.createSession({ sessionNumber: 2, prepBody: "The vault opens for a sacrifice." });
+    const next = store.createSession({ sessionNumber: 2, prep: prepNotes("The vault opens for a sacrifice.") });
     store.setActiveSession(next.id);
 
     const bundle = store.exportBundle();
@@ -766,8 +768,8 @@ describe("CodexStore entities + relationships", () => {
     expect(bundle.activeSessionId).toBe(next.id);
     // The GM layer specifically: an export that kept the recap but dropped the prep would look healthy and
     // be worthless on restore.
-    expect(bundle.sessions.find((session) => session.id === played.id)!.prepBody).toBe("Ambush at the bridge.");
-    expect(bundle.sessions.find((session) => session.id === next.id)!.prepBody).toBe(
+    expect(prepNotesOf(bundle.sessions.find((session) => session.id === played.id)!)).toBe("Ambush at the bridge.");
+    expect(prepNotesOf(bundle.sessions.find((session) => session.id === next.id)!)).toBe(
       "The vault opens for a sacrifice."
     );
   });
@@ -1305,7 +1307,7 @@ describe("CodexStore media visibility (page images)", () => {
     store.createQuest({ title: "Hidden", playerBody: `![q](codex-asset:${hiddenQuest})` });
     store.createSession({
       recapBody: `![r](codex-asset:${recap})`,
-      prepBody: `![p](codex-asset:${prep})`,
+      prep: prepNotes(`![p](codex-asset:${prep})`),
       revealedToPlayers: true
     });
     store.createEntry({ playerText: `![e](codex-asset:${entry})`, revealedToPlayers: true });
@@ -1503,7 +1505,7 @@ describe("Codex whole-graph connections: the store and projection layers, on the
     const shown = store.createPage({ title: "Vallaki", revealedToPlayers: true });
     const session = store.createSession({
       recapBody: "We reached [[Vallaki]].",
-      prepBody: "The ambush waits in [[Vallaki]]."
+      prep: prepNotes("The ambush waits in [[Vallaki]].")
     });
     const quest = store.createQuest({ title: "Find the Sunsword", playerBody: "Look in [[Vallaki]]." });
     const entry = store.createEntry({ playerText: "Arrived at [[Vallaki]].", revealedToPlayers: true });
@@ -1529,7 +1531,7 @@ describe("Codex whole-graph connections: the store and projection layers, on the
     });
 
     // A prep-only mention is GM-layer, which a player must never receive.
-    const prepOnly = store.createSession({ prepBody: "Secretly, [[Vallaki]]." });
+    const prepOnly = store.createSession({ prep: prepNotes("Secretly, [[Vallaki]].") });
     expect(store.listAllConnections().find((edge) => edge.fromId === prepOnly.id)).toMatchObject({ layer: "gm" });
 
     // The player gate per source kind: the source record's own reveal flag decides, so a connection is never
@@ -1940,14 +1942,14 @@ describe("CodexStore sessions", () => {
       sessionNumber: 4,
       realDate: "2026-07-26",
       attendees: ["Ozy", "Mara", " Ozy "],
-      prepBody: "Ambush at the bridge.",
+      prep: prepNotes("Ambush at the bridge."),
       recapBody: "The party crossed.",
       status: "planned"
     });
+    expect(prepNotesOf(created)).toBe("Ambush at the bridge.");
     expect(created).toMatchObject({
       sessionNumber: 4,
       realDate: "2026-07-26",
-      prepBody: "Ambush at the bridge.",
       recapBody: "The party crossed.",
       revealedToPlayers: false,
       status: "planned",
@@ -1965,7 +1967,7 @@ describe("CodexStore sessions", () => {
     expect(updated.rev).toBe(2);
     expect(updated.recapBody).toBe("The party crossed, one short.");
     expect(updated.status).toBe("played");
-    expect(updated.prepBody).toBe("Ambush at the bridge."); // an omitted field is unchanged, never cleared
+    expect(prepNotesOf(updated)).toBe("Ambush at the bridge."); // an omitted field is unchanged, never cleared
     expect(updated.updatedAt > created.updatedAt).toBe(true); // ...and an edit moves recency
 
     sessions.close();
@@ -1976,11 +1978,11 @@ describe("CodexStore sessions", () => {
   });
 
   it("rejects a stale expectedRev with a conflict, and accepts an omitted one", () => {
-    const session = sessions.createSession({ sessionNumber: 1, prepBody: "v1" });
-    sessions.updateSession(session.id, { prepBody: "v2" }, session.rev);
-    expect(() => sessions.updateSession(session.id, { prepBody: "v3" }, 1)).toThrow(CodexRevisionConflictError);
+    const session = sessions.createSession({ sessionNumber: 1, prep: prepNotes("v1") });
+    sessions.updateSession(session.id, { prep: prepNotes("v2") }, session.rev);
+    expect(() => sessions.updateSession(session.id, { prep: prepNotes("v3") }, 1)).toThrow(CodexRevisionConflictError);
     // An omitted expectedRev is the "I know I might be behind" path and must still write.
-    expect(sessions.updateSession(session.id, { prepBody: "v3" }, undefined).prepBody).toBe("v3");
+    expect(prepNotesOf(sessions.updateSession(session.id, { prep: prepNotes("v3") }, undefined))).toBe("v3");
   });
 
   it("does NOT move recency or `rev` on a reveal, and still bumps the codex revision", () => {
@@ -2107,7 +2109,7 @@ describe("CodexStore sessions", () => {
   });
 
   it("sets and clears the active session without touching the session record at all", () => {
-    const session = sessions.createSession({ sessionNumber: 5, prepBody: "The crypt." });
+    const session = sessions.createSession({ sessionNumber: 5, prep: prepNotes("The crypt.") });
     const born = sessions.getSession(session.id)!;
     expect(sessions.activeSessionId).toBeNull(); // nothing is active on a fresh codex
 
@@ -2545,7 +2547,7 @@ describe("CodexStore schema constraints", () => {
     const insert = (status: string) =>
       database
         .prepare(
-          "INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, tags_json, scene_ids_json, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', '', '', 0, ?, '[]', '[]', 1, '', '')"
+          "INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_json, recap_body, revealed, status, tags_json, scene_ids_json, rev, created_at, updated_at) VALUES (?, NULL, NULL, '[]', '[]', '', 0, ?, '[]', '[]', 1, '', '')"
         )
         .run(`id-${status}`, status);
 
@@ -2797,7 +2799,7 @@ describe("Codex session: the projection layer, on its own", () => {
       sessionNumber: 6,
       realDate: "2026-07-26",
       attendees: ["Ozy", "Mara"],
-      prepBody: "The ambush is at the bridge; Ireena is the real target.",
+      prep: prepNotes("The ambush is at the bridge; Ireena is the real target."),
       recapBody: "The party crossed the bridge.",
       status: "planned"
     });
@@ -2813,7 +2815,7 @@ describe("Codex session: the projection layer, on its own", () => {
     const revealed = store.setSessionRevealed(seed().id, true);
     const projected = projectPlayerSession(revealed)!;
     // The exact key set, so any new field in the player projection fails here. `attendees`, `status`,
-    // `prepBody` and `rev` are absent.
+    // `prep` and `rev` are absent.
     expect(Object.keys(projected).sort()).toEqual(["id", "realDate", "recap", "sessionNumber", "tags"]);
     expect(projected.recap).toBe("The party crossed the bridge.");
     const payload = JSON.stringify(projected);
@@ -2822,7 +2824,7 @@ describe("Codex session: the projection layer, on its own", () => {
     expect(payload).not.toContain("planned"); // scheduling state
 
     const gmRow = projectGmSession(revealed);
-    expect(gmRow.prepBody).toContain("Ireena is the real target");
+    expect(prepNotesOf(gmRow)).toContain("Ireena is the real target");
     expect(gmRow.attendees).toEqual(["Ozy", "Mara"]);
     expect(gmRow.status).toBe("planned");
     expect(gmRow.rev).toBe(1);
@@ -3866,7 +3868,10 @@ describe("CodexStore export bundle: the calendar, empty folders and revision his
       "folders",
       "revisions",
       // The settings exist nowhere else, so a bundle without them would silently revert preferences. Appended last.
-      "settings"
+      "settings",
+      // The GM's prep templates and which one is the default, appended after them.
+      "prepTemplates",
+      "defaultPrepTemplateId"
     ]);
   });
 });
@@ -4596,7 +4601,7 @@ describe("CodexStore search: sessions join the one index (three gates)", () => {
       sessionNumber: 4,
       realDate: "2026-07-30",
       tags: ["ravenloft"],
-      prepBody: "The ambush is at the bridge; Ireena is the real target.",
+      prep: prepNotes("The ambush is at the bridge; Ireena is the real target."),
       recapBody: "The party crossed the bridge.",
       attendees: ["Ozy", "Mara"]
     });
@@ -5103,7 +5108,7 @@ describe("CodexStore import: replace, all-or-nothing", () => {
     store.setPartyMarker(marker.id);
     const session = store.createSession({
       sessionNumber: 4,
-      prepBody: "The ambush.",
+      prep: prepNotes("The ambush."),
       recapBody: "They crossed.",
       attendees: ["Ozy"],
       tags: ["arc-one"]
@@ -5547,6 +5552,8 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "searchAll",
     "searchPlayerMatches",
     "searchPages",
+    "listPrepTemplates",
+    "getPrepTemplate",
     "getMap",
     "listMaps",
     "getMarker",
@@ -5729,10 +5736,46 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
       s.createSession({ sessionNumber: 1 });
     },
     updateSession: (s) => {
-      s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prepBody: "plan" }, undefined);
+      s.updateSession(s.createSession({ sessionNumber: 1 }).id, { prep: prepNotes("plan") }, undefined);
     },
     setSessionRevealed: (s) => {
       s.setSessionRevealed(s.createSession({ sessionNumber: 1 }).id, true);
+    },
+    applyPrepTemplate: (s) => {
+      s.applyPrepTemplate(s.createSession({ templateId: null }).id, BUILT_IN_TEMPLATE_ID, undefined);
+    },
+    tickPrepItem: (s) => {
+      const session = s.createSession({
+        prep: [{ type: "checklist", title: "Clues", items: [{ text: "The ledger" }] }]
+      });
+      const [section] = session.prep;
+      s.tickPrepItem(session.id, section!.type === "checklist" ? section!.items[0]!.id : "", true);
+    },
+    setCurrentScene: (s) => {
+      const session = s.createSession({ prep: [{ type: "scenes", title: "Scenes", scenes: [{ title: "Docks" }] }] });
+      const [section] = session.prep;
+      s.setCurrentScene(session.id, section!.type === "scenes" ? section!.scenes[0]!.id : null);
+    },
+    logSessionLine: (s) => {
+      s.logSessionLine(s.createSession({}).id, { text: "Lyra bribed the dockmaster." });
+    },
+    placeParty: (s) => {
+      s.placeParty({ mapId: s.createMap({ assetId: ASSET, name: "M", kind: "world" }).id, x: 1, y: 2 });
+    },
+    createPrepTemplate: (s) => {
+      s.createPrepTemplate({ name: "Heist" });
+    },
+    updatePrepTemplate: (s) => {
+      s.updatePrepTemplate(s.createPrepTemplate({ name: "Heist" }).id, { name: "Heist night" }, undefined);
+    },
+    deletePrepTemplate: (s) => {
+      s.deletePrepTemplate(s.createPrepTemplate({ name: "Heist" }).id);
+    },
+    duplicatePrepTemplate: (s) => {
+      s.duplicatePrepTemplate(BUILT_IN_TEMPLATE_ID);
+    },
+    setDefaultPrepTemplate: (s) => {
+      s.setDefaultPrepTemplate(s.createPrepTemplate({ name: "Heist" }).id);
     },
     deleteSession: (s) => {
       s.deleteSession(s.createSession({ sessionNumber: 1 }).id);

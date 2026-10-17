@@ -1213,7 +1213,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     firstShownAt: FIRST_SHOWN_AT_PLAYER
   },
   CodexSession: {
-    "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record, like a page's `playerBody`/`gmBody`: `recapBody` is the player-facing half and `prepBody` is the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused, so no group silently turns ambiguous.",
+    "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record, like a page's `playerBody`/`gmBody`: `recapBody` is the player-facing half and the `prep` sections are the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused, so no group silently turns ambiguous.",
     sessionNumber:
       '"Session 12": the session\'s DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID and resolve this live, so renumbering a session relabels every one of its entries with no journal write.',
     realDate:
@@ -1221,8 +1221,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     attendees: "Who was at the table. GM-only; absent from a player projection.",
     sceneIds:
       "the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-ONLY, ALWAYS: stricter than the session's own reveal, because a revealed session publishes its RECAP and tonight's planned fights are spoilers even then.",
-    prepBody:
-      "GM-only prep notes for the session (markdown). NEVER present in a player projection, revealed or not; revealing a session publishes its recap, never its prep.",
+    prep: "GM-only: the session's prep sections, its own copy of a template's. NEVER present in a player projection, revealed or not; revealing a session publishes its recap, never its prep.",
+    prepTemplateId: "GM-only: the template the prep was last copied from. It may name a deleted template.",
+    currentSceneId: "GM-only: the live board's current scene, a scene id in one of the prep's Scenes sections.",
     recapBody: "The player-facing recap (markdown). Reaches a revealed session's player projection as `recap`.",
     revealedToPlayers:
       "GM-only field; absent from a player projection (a player only ever receives revealed sessions).",
@@ -1234,7 +1235,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal or an activate, because neither is an edit."
   },
   CodexSessionPlayer: {
-    "": "A session as a PLAYER receives it: the tightest projection in the Codex, and every omission is a decision. `prepBody` is the GM's plan for the evening and has no player form; `attendees` is real-world personal data; `status` is the GM's own scheduling state; `rev` is the editor's conflict token. `recapBody` arrives renamed `recap`, because with only one layer left the prefix means nothing.",
+    "": "A session as a PLAYER receives it: the tightest projection in the Codex, and every omission is a decision. `prep` is the GM's plan for the evening and has no player form; `attendees` is real-world personal data; `status` is the GM's own scheduling state; `rev` is the editor's conflict token. `recapBody` arrives renamed `recap`, because with only one layer left the prefix means nothing.",
     recap: "The session's `recapBody`.",
     tags: "tags are SINGLE-LAYER in this codex (there is no GM-only tag) and every other record kind already ships its tags to players. A revealed session's tags are its player-facing categorization, and they are already in the player search index by the same rule."
   },
@@ -1305,6 +1306,21 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     entityType: "The page's entity type; null for every other kind.",
     mapId:
       "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed."
+  },
+  CodexPrepTemplate: {
+    "": "A reusable plan for session prep: an ordered list of sections, each with a title, a prompt and a type. GM-only.",
+    builtIn: "The starting template ships with the app and is read-only. Duplicate it to edit a copy.",
+    isDefault: "The template a new session copies when it names none.",
+    rev: "The conflict token for `PATCH`; 0 on the built-in.",
+    createdAt: "Null on the built-in.",
+    updatedAt: "Null on the built-in."
+  },
+  CodexLiveBoard: {
+    "": "The active session's live board, read from its prep. GM-only.",
+    rev: "The session's `rev`, so an open editor can stay current.",
+    pageGroups: "One group per Linked pages section. A page that no longer exists is left out.",
+    clocks: "The deadlines of every Clocks section, deduped. `fired` is measured against the GM's date.",
+    logged: "The 50 latest journal entries filed under the session, oldest first."
   },
   CodexSearchData: {
     hits: "The one ranked result list, all record kinds. A title equal to the query comes first for both roles. After it, a GM's hits are ranked by relevance (bm25, the title weighted 10x). A player's come by tier: a title holding every query word, then the rest, each tier ordered by kind, title and id. A player hit's place depends on its own title alone, so records a player cannot see never move it.",

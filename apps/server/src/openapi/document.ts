@@ -1728,6 +1728,12 @@ export const openApiDocument = {
       })
     },
     [CODEX_PATHS.party]: {
+      post: codexOp("placeCodexParty", codexWrite, "CodexPartyPlacedResponse", {
+        body: "CodexPartyPlaceRequest",
+        notFound: true,
+        description:
+          'Puts the party at a point on any map in one write. The party pin moves there, across maps if it must, and keeps its label, icon, links and reveal state unless `revealedToPlayers` is sent. With no party pin, one is made there (`created: true`), labelled "The party" and revealed when the map is, unless `revealedToPlayers` says otherwise.'
+      }),
       get: codexOp("getCodexPartyLocation", codexRead, "CodexPartyLocationResponse", {
         notModified: true,
         bad: false,
@@ -1922,6 +1928,106 @@ export const openApiDocument = {
         notFound: true,
         description:
           'Marks this session the ACTIVE one: the single session new journal entries (including the ones combat writes automatically at `encounter.end`) are stamped with when the caller supplies no `sessionNumber` of its own. Exactly one session is active at a time: the pointer lives on the codex metadata row, with no flag on each session, so "two active sessions" is unrepresentable. Answers with the POINTER alone, never the session: activating is a statement about the TABLE and leaves the record alone. It moves neither `rev` nor `updatedAt`, and returning the row would imply otherwise.'
+      })
+    },
+    [CODEX_PATHS.sessionApplyTemplate]: {
+      post: codexOp("applyCodexPrepTemplate", codexWrite, "CodexSessionResponse", {
+        body: "CodexSessionApplyTemplateRequest",
+        params: [uuidParam("id")],
+        notFound: true,
+        conflict: "A stale `expectedRev`; `error.currentRevision` carries the session's current revision.",
+        description:
+          "Re-applies a template to the session's prep and keeps what was written. Each template section takes the content of a section that still matches it (the same template section and type, else the same title and type); a section that matches nothing is kept after them when it holds anything."
+      })
+    },
+    [CODEX_PATHS.sessionHappened]: {
+      get: codexOp("getCodexSessionHappened", codexGmRead, "CodexSessionHappenedResponse", {
+        notModified: true,
+        bad: false,
+        notFound: true,
+        params: [uuidParam("id")],
+        description:
+          "What happened in a session, for the recap step: the journal entries filed under it, the clues ticked in its prep, and the blocks revealed while it was active. GM-only."
+      })
+    },
+    [CODEX_PATHS.sessionLog]: {
+      post: codexOp("logCodexSessionLine", codexWrite, "CodexJournalEntryResponse", {
+        ok: "201",
+        body: "CodexSessionLogRequest",
+        params: [uuidParam("id")],
+        notFound: true,
+        description:
+          "Logs one line at the table: a note filed under this session with the line as its player text, dated at the GM's date, and hidden unless `revealedToPlayers` is true."
+      })
+    },
+    [CODEX_PATHS.sessionTick]: {
+      post: codexOp("tickCodexPrepItem", codexWrite, "CodexSessionTickResponse", {
+        body: "CodexSessionTickRequest",
+        params: [uuidParam("id")],
+        notFound: true,
+        description:
+          "Ticks or unticks one checklist item of the session's prep. It changes the prep, so the session's `rev` moves. Answers with the clue as the board shows it, link included."
+      })
+    },
+    [CODEX_PATHS.sessionCurrentScene]: {
+      post: codexOp("setCodexCurrentScene", codexWrite, "CodexSessionResponse", {
+        body: "CodexSessionCurrentSceneRequest",
+        params: [uuidParam("id")],
+        notFound: true,
+        description: "Sets the live board's current scene to a scene in the session's prep, or to none."
+      })
+    },
+    [CODEX_PATHS.board]: {
+      get: codexOp("getCodexLiveBoard", codexGmRead, "CodexLiveBoardResponse", {
+        notModified: true,
+        bad: false,
+        description:
+          "The active session's live board, read from its prep: the scenes with the current one, the linked pages, the clues with what each links, the clocks by the GM's date, the quests in play, and what has been filed under it. `board` is null when no session is active. GM-only."
+      })
+    },
+    [CODEX_PATHS.prepTemplates]: {
+      get: codexOp("listCodexPrepTemplates", codexGmRead, "CodexPrepTemplateListResponse", {
+        notModified: true,
+        bad: false,
+        description:
+          "The GM's library of session prep templates: the built-in starting template first, then the GM's by name. `defaultTemplateId` is the one a new session copies when it names none. GM-only."
+      }),
+      post: codexOp("createCodexPrepTemplate", codexWrite, "CodexPrepTemplateResponse", {
+        ok: "201",
+        body: "CodexPrepTemplateCreateRequest",
+        description: "Creates a template. The library holds at most 50."
+      })
+    },
+    [CODEX_PATHS.prepTemplateById]: {
+      patch: codexOp("updateCodexPrepTemplate", codexWrite, "CodexPrepTemplateResponse", {
+        body: "CodexPrepTemplateUpdateRequest",
+        params: [uuidParam("id")],
+        notFound: true,
+        conflict: "A stale `expectedRev`; `error.currentRevision` carries the template's current revision.",
+        description:
+          "Renames a template, or replaces its sections: send the whole list to add, remove, edit or reorder them. Sessions made from it keep their own copy. The built-in template is a 400."
+      }),
+      delete: codexOp("deleteCodexPrepTemplate", codexWrite, "CodexDeletedResponse", {
+        params: [uuidParam("id")],
+        description:
+          "Deletes a template; idempotent. The built-in template is a 400. Deleting the default makes the built-in the default."
+      })
+    },
+    [CODEX_PATHS.prepTemplateDuplicate]: {
+      post: codexOp("duplicateCodexPrepTemplate", codexWrite, "CodexPrepTemplateResponse", {
+        ok: "201",
+        body: "CodexPrepTemplateDuplicateRequest",
+        params: [uuidParam("id")],
+        notFound: true,
+        description:
+          'Copies a template, the built-in included, into one the GM owns. Its sections keep their ids, so a session made from the original re-applies the copy cleanly. `name` defaults to "<name> copy".'
+      })
+    },
+    [CODEX_PATHS.prepTemplateDefault]: {
+      post: codexOp("setDefaultCodexPrepTemplate", codexWrite, "CodexPrepTemplateDefaultResponse", {
+        params: [uuidParam("id")],
+        notFound: true,
+        description: "Makes this template the one a new session copies when it names none."
       })
     },
     [CODEX_PATHS.quests]: {
@@ -2686,6 +2792,38 @@ export const openApiDocument = {
       CodexPageListData: codexDataObject("pages", codexArrayRef("CodexPageSummaryProjected")),
       CodexPageListResponse: envelopeSchema("#/components/schemas/CodexPageListData"),
       CodexSearchResponse: envelopeSchema("#/components/schemas/CodexSearchData"),
+      CodexPrepTemplateListResponse: envelopeSchema("#/components/schemas/CodexPrepTemplateListData"),
+      CodexPrepTemplateData: codexDataObject("template", { $ref: "#/components/schemas/CodexPrepTemplate" }),
+      CodexPrepTemplateResponse: envelopeSchema("#/components/schemas/CodexPrepTemplateData"),
+      CodexPrepTemplateDefaultData: codexDataObject("defaultTemplateId", codexUuid),
+      CodexPrepTemplateDefaultResponse: envelopeSchema("#/components/schemas/CodexPrepTemplateDefaultData"),
+      CodexLiveBoardData: codexDataObject("board", {
+        oneOf: [{ $ref: "#/components/schemas/CodexLiveBoard" }, { type: "null" }],
+        description: "Null when no session is active."
+      }),
+      CodexLiveBoardResponse: envelopeSchema("#/components/schemas/CodexLiveBoardData"),
+      CodexSessionHappenedData: codexDataObject("happened", { $ref: "#/components/schemas/CodexSessionHappened" }),
+      CodexSessionHappenedResponse: envelopeSchema("#/components/schemas/CodexSessionHappenedData"),
+      CodexSessionTickData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["session", "clue"],
+        properties: {
+          session: { $ref: "#/components/schemas/CodexSession" },
+          clue: { $ref: "#/components/schemas/CodexLiveClue" }
+        }
+      },
+      CodexSessionTickResponse: envelopeSchema("#/components/schemas/CodexSessionTickData"),
+      CodexPartyPlacedData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["marker", "created"],
+        properties: {
+          marker: { $ref: "#/components/schemas/CodexMarker" },
+          created: { type: "boolean", description: "A party pin was made, since none existed." }
+        }
+      },
+      CodexPartyPlacedResponse: envelopeSchema("#/components/schemas/CodexPartyPlacedData"),
       CodexConnectionProjected: codexProjected("CodexConnection"),
       CodexConnectionData: codexDataObject("connection", { $ref: "#/components/schemas/CodexConnection" }),
       CodexConnectionResponse: envelopeSchema("#/components/schemas/CodexConnectionData"),

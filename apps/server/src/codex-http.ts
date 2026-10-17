@@ -16,7 +16,9 @@ import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetStore } from "./map-assets.js";
 import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
 import type { CodexRelationshipRow } from "./codex/connections.js";
+import { liveBoard, liveClue, sessionHappened } from "./codex/live.js";
 import { PlayerCodexReads } from "./codex/player-reads.js";
+import { prepItems } from "./codex/prep.js";
 import { CodexNotFoundError, CodexRevisionConflictError, CodexValidationError } from "./codex/validate.js";
 import { revealAuditRecords, searchRecord } from "./codex/visibility.js";
 import type { CodexStore } from "./codex-store.js";
@@ -43,11 +45,19 @@ import {
   MilestoneCreateSchema,
   PageCreateSchema,
   PageUpdateSchema,
+  PartyPlaceSchema,
+  PrepTemplateCreateSchema,
+  PrepTemplateDuplicateSchema,
+  PrepTemplateUpdateSchema,
   QuestCreateSchema,
   QuestUpdateSchema,
   RevealSchema,
   RevisionsDeleteSchema,
+  SessionApplyTemplateSchema,
   SessionCreateSchema,
+  SessionCurrentSceneSchema,
+  SessionLogSchema,
+  SessionTickSchema,
   SessionUpdateSchema,
   StandingSetSchema
 } from "./codex-requests.js";
@@ -517,6 +527,13 @@ export function createCodexRouter(options: CodexRouterOptions) {
     });
   });
 
+  // Puts the party at a point on any map: the party pin moves there, or one is made, in one write.
+  write("post", CODEX_PATHS.party, (request) => {
+    const { mapId, x, y, revealedToPlayers } = PartyPlaceSchema.parse(request.body);
+    const placed = store.placeParty({ mapId, x, y, revealedToPlayers });
+    return { marker: projectGmMarker(placed.marker), created: placed.created };
+  });
+
   // One pin by id. Any player gate failure is the same 404 as a bogus id.
   router.get(expressPath(CODEX_PATHS.markerById), (request, response) => {
     const role = readGrade(request, response);
@@ -699,6 +716,90 @@ export function createCodexRouter(options: CodexRouterOptions) {
   // Answers with the pointer alone: activating a session does not edit it.
   write("post", CODEX_PATHS.sessionActivate, (request) => ({
     activeSessionId: store.setActiveSession(pathParam(request, "id"))
+  }));
+  // Re-applies a template to the prep and keeps what was written.
+  write(
+    "post",
+    CODEX_PATHS.sessionApplyTemplate,
+    (request) => {
+      const { templateId, expectedRev } = SessionApplyTemplateSchema.parse(request.body);
+      return { session: projectGmSession(store.applyPrepTemplate(pathParam(request, "id"), templateId, expectedRev)) };
+    },
+    { currentRevision: (request) => store.getSession(pathParam(request, "id"))?.rev }
+  );
+
+  // The live board and the recap step. GM-only: the prep never reaches a player.
+  router.get(expressPath(CODEX_PATHS.board), requireGmRead, (request, response) =>
+    readEnvelope(request, response, "gm", { board: liveBoard(store) })
+  );
+  router.get(expressPath(CODEX_PATHS.sessionHappened), requireGmRead, (request, response) => {
+    const session = store.getSession(pathParam(request, "id"));
+    if (!session) return sendFailure(response, 404, "not_found", "That session was not found.");
+    return readEnvelope(request, response, "gm", { happened: sessionHappened(store, session) });
+  });
+  write(
+    "post",
+    CODEX_PATHS.sessionLog,
+    (request) => {
+      const { text, revealedToPlayers } = SessionLogSchema.parse(request.body);
+      return {
+        entry: projectGmJournalEntry(store.logSessionLine(pathParam(request, "id"), { text, revealedToPlayers }))
+      };
+    },
+    CREATED
+  );
+  // Answers with the clue as the board shows it, so the client can offer to reveal a block it links.
+  write("post", CODEX_PATHS.sessionTick, (request) => {
+    const { itemId, done } = SessionTickSchema.parse(request.body);
+    const session = store.tickPrepItem(pathParam(request, "id"), itemId, done);
+    const ticked = prepItems(session.prep).find(({ item }) => item.id === itemId)!;
+    return { session: projectGmSession(session), clue: liveClue(store, ticked.item) };
+  });
+  write("post", CODEX_PATHS.sessionCurrentScene, (request) => ({
+    session: projectGmSession(
+      store.setCurrentScene(pathParam(request, "id"), SessionCurrentSceneSchema.parse(request.body).sceneId)
+    )
+  }));
+
+  // Prep templates: the GM's library. The built-in starting template is read-only.
+
+  router.get(expressPath(CODEX_PATHS.prepTemplates), requireGmRead, (request, response) =>
+    readEnvelope(request, response, "gm", store.listPrepTemplates())
+  );
+  write(
+    "post",
+    CODEX_PATHS.prepTemplates,
+    (request) => ({
+      template: store.createPrepTemplate(withoutCommandId(PrepTemplateCreateSchema.parse(request.body)))
+    }),
+    CREATED
+  );
+  write(
+    "patch",
+    CODEX_PATHS.prepTemplateById,
+    (request) => {
+      const { expectedRev, ...fields } = withoutCommandId(PrepTemplateUpdateSchema.parse(request.body));
+      return { template: store.updatePrepTemplate(pathParam(request, "id"), fields, expectedRev) };
+    },
+    { currentRevision: (request) => store.getPrepTemplate(pathParam(request, "id"))?.rev }
+  );
+  write("delete", CODEX_PATHS.prepTemplateById, (request) => {
+    store.deletePrepTemplate(pathParam(request, "id"));
+    return { deleted: true };
+  });
+  write(
+    "post",
+    CODEX_PATHS.prepTemplateDuplicate,
+    (request) => ({
+      template: store.duplicatePrepTemplate(
+        pathParam(request, "id"),
+        PrepTemplateDuplicateSchema.parse(request.body ?? {}).name
+      )
+    }),
+    CREATED
+  );
+  write("post", CODEX_PATHS.prepTemplateDefault, (request) => ({
+    defaultTemplateId: store.setDefaultPrepTemplate(pathParam(request, "id"))
   }));
 
   // Quests. A hidden quest is a 404 for a player, and its page links are filtered to revealed pages.

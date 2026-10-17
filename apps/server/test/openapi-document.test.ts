@@ -128,6 +128,16 @@ describe("the OpenAPI document", () => {
       [CODEX_PATHS.calendar, "put"],
       [CODEX_PATHS.settings, "put"],
       [CODEX_PATHS.pageRevisionsCollection, "delete"],
+      [CODEX_PATHS.party, "post"],
+      [CODEX_PATHS.prepTemplates, "post"],
+      [CODEX_PATHS.prepTemplateById, "patch"],
+      [CODEX_PATHS.prepTemplateById, "delete"],
+      [CODEX_PATHS.prepTemplateDuplicate, "post"],
+      [CODEX_PATHS.prepTemplateDefault, "post"],
+      [CODEX_PATHS.sessionApplyTemplate, "post"],
+      [CODEX_PATHS.sessionLog, "post"],
+      [CODEX_PATHS.sessionTick, "post"],
+      [CODEX_PATHS.sessionCurrentScene, "post"],
       [CODEX_ASSET_PATHS.collection, "post"]
     ] as const) {
       expect(paths[path][method].security, `${method} ${path}`).toEqual(write);
@@ -150,13 +160,16 @@ describe("the OpenAPI document", () => {
     ] as const) {
       expect(paths[path][method].security, `${method} ${path}`).toEqual(roleRead);
     }
-    // GM-grade reads: organizational, historical and backup surfaces have no player branch.
+    // GM-grade reads: organizational, historical and backup surfaces, and session prep, have no player branch.
     for (const path of [
       CODEX_PATHS.folders,
       CODEX_PATHS.pageRevisions,
       CODEX_PATHS.revealAudit,
       CODEX_PATHS.settings,
-      CODEX_PATHS.export
+      CODEX_PATHS.export,
+      CODEX_PATHS.prepTemplates,
+      CODEX_PATHS.board,
+      CODEX_PATHS.sessionHappened
     ]) {
       expect(paths[path].get.security, `get ${path}`).toEqual(gmRead);
     }

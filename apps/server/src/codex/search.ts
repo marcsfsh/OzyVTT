@@ -1,5 +1,6 @@
-import type { CodexQuestObjective, CodexRecordKind } from "@vtt/domain";
+import type { CodexPrepSection, CodexQuestObjective, CodexRecordKind } from "@vtt/domain";
 import type { CodexDb } from "./db.js";
+import { prepText } from "./prep.js";
 import { PLAYER_SEARCH_VISIBLE_SQL } from "./visibility.js";
 
 /**
@@ -110,7 +111,7 @@ export function indexSession(
     sessionNumber: number | null;
     realDate: string | null;
     attendees: readonly string[];
-    prepBody: string;
+    prep: readonly CodexPrepSection[];
     recapBody: string;
     tags: readonly string[];
   }>
@@ -125,7 +126,7 @@ export function indexSession(
     { title, body: `${session.recapBody}\n${realDate}\n${tagText}` },
     {
       title,
-      body: `${session.prepBody}\n${session.recapBody}\n${realDate}\n${session.attendees.join(" ")}\n${tagText}`
+      body: `${prepText(session.prep)}\n${session.recapBody}\n${realDate}\n${session.attendees.join(" ")}\n${tagText}`
     }
   );
 }

@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { CodexAutosaveSettingsSchema, CodexInWorldDateSchema, CodexQuestObjectiveSchema } from "@vtt/domain";
+import {
+  CODEX_PREP_LIMITS,
+  CODEX_PREP_SECTION_TYPES,
+  CodexAutosaveSettingsSchema,
+  CodexInWorldDateSchema,
+  CodexPrepLinkSchema,
+  CodexQuestObjectiveSchema
+} from "@vtt/domain";
 import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
 
 /**
@@ -136,6 +143,16 @@ export const MarkerUpdateSchema = z
 export const MarkerMoveSchema = z.object({ x: Coord, y: Coord, commandId: CommandIdSchema }).strict();
 /** Only the flag: the party marker is an ordinary marker, moved via `POST /markers/{id}/move`. */
 export const MarkerPartySchema = z.object({ isParty: z.boolean(), commandId: CommandIdSchema }).strict();
+/** Put the party at a point on a map: the party pin moves there, or one is made. */
+export const PartyPlaceSchema = z
+  .object({
+    mapId: z.uuid(),
+    x: Coord,
+    y: Coord,
+    revealedToPlayers: z.boolean().optional(),
+    commandId: CommandIdSchema
+  })
+  .strict();
 
 export const JournalWriteSchema = z
   .object({
@@ -185,18 +202,108 @@ export const MilestoneInputSchema = z
   })
   .strict();
 export const MilestoneCreateSchema = JournalWriteSchema.extend({ milestone: MilestoneInputSchema });
+// Session prep. Nested ids are optional on a write (the store mints missing ones) and `doneAt` is the server's.
+const PrepTitleSchema = z.string().trim().min(1).max(CODEX_PREP_LIMITS.sectionTitle);
+const PrepPromptSchema = z.string().max(CODEX_PREP_LIMITS.prompt).nullable().optional();
+const PrepIdsSchema = (max: number) => z.array(z.uuid()).max(max).optional();
+export const PrepTemplateSectionInputSchema = z
+  .object({
+    id: z.uuid().optional(),
+    title: PrepTitleSchema,
+    prompt: PrepPromptSchema,
+    type: z.enum(CODEX_PREP_SECTION_TYPES)
+  })
+  .strict();
+const PrepTemplateSectionsSchema = z.array(PrepTemplateSectionInputSchema).max(CODEX_PREP_LIMITS.templateSections);
+const PrepTemplateNameSchema = z.string().trim().min(1).max(CODEX_PREP_LIMITS.templateName);
+export const PrepTemplateCreateSchema = z
+  .object({ name: PrepTemplateNameSchema, sections: PrepTemplateSectionsSchema.optional(), commandId: CommandIdSchema })
+  .strict();
+/** Send `sections` whole to add, remove, rename or reorder them. */
+export const PrepTemplateUpdateSchema = z
+  .object({
+    name: PrepTemplateNameSchema.optional(),
+    sections: PrepTemplateSectionsSchema.optional(),
+    expectedRev: z.number().int().nonnegative().optional(),
+    commandId: CommandIdSchema
+  })
+  .strict();
+export const PrepTemplateDuplicateSchema = z
+  .object({ name: PrepTemplateNameSchema.optional(), commandId: CommandIdSchema })
+  .strict();
+const prepSectionBase = {
+  id: z.uuid().optional(),
+  templateSectionId: z.uuid().nullable().optional(),
+  title: PrepTitleSchema,
+  prompt: PrepPromptSchema
+};
+/** `doneAt` is accepted so a read item can be sent back whole, and ignored: the server stamps it. */
+export const PrepChecklistItemInputSchema = z
+  .object({
+    id: z.uuid().optional(),
+    text: z.string().max(CODEX_PREP_LIMITS.itemText),
+    done: z.boolean().optional(),
+    doneAt: z.string().nullable().optional(),
+    link: CodexPrepLinkSchema.nullable().optional()
+  })
+  .strict();
+export const PrepSceneInputSchema = z
+  .object({
+    id: z.uuid().optional(),
+    title: z.string().max(CODEX_PREP_LIMITS.sceneTitle),
+    placePageId: z.uuid().nullable().optional(),
+    notes: z.string().max(CODEX_PREP_LIMITS.sceneNotes).optional()
+  })
+  .strict();
+export const PrepSectionInputSchema = z.discriminatedUnion("type", [
+  z
+    .object({ ...prepSectionBase, type: z.literal("text"), text: z.string().max(CODEX_PREP_LIMITS.text).optional() })
+    .strict(),
+  z
+    .object({
+      ...prepSectionBase,
+      type: z.literal("checklist"),
+      items: z.array(PrepChecklistItemInputSchema).max(CODEX_PREP_LIMITS.items).optional()
+    })
+    .strict(),
+  z.object({ ...prepSectionBase, type: z.literal("pages"), pageIds: PrepIdsSchema(CODEX_PREP_LIMITS.pages) }).strict(),
+  z
+    .object({
+      ...prepSectionBase,
+      type: z.literal("scenes"),
+      scenes: z.array(PrepSceneInputSchema).max(CODEX_PREP_LIMITS.scenes).optional()
+    })
+    .strict(),
+  z
+    .object({ ...prepSectionBase, type: z.literal("clocks"), deadlineIds: PrepIdsSchema(CODEX_PREP_LIMITS.deadlines) })
+    .strict(),
+  z
+    .object({ ...prepSectionBase, type: z.literal("quests"), questIds: PrepIdsSchema(CODEX_PREP_LIMITS.quests) })
+    .strict(),
+  z
+    .object({
+      ...prepSectionBase,
+      type: z.literal("encounters"),
+      sceneIds: PrepIdsSchema(CODEX_PREP_LIMITS.encounters)
+    })
+    .strict()
+]);
+const PrepSchema = z.array(PrepSectionInputSchema).max(CODEX_PREP_LIMITS.sessionSections);
+
 /** Sessions. `sessionNumber` uses the journal's bounds because a journal entry resolves against it. */
 const SessionNumberSchema = z.number().int().min(0).max(100_000).nullable();
 const AttendeesSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 const SessionStatusSchema = z.enum(["planned", "played"]);
 /** Scene attachments, capped at the table's own scene cap. */
 const SessionSceneIdsSchema = z.array(z.uuid()).max(20);
+/** `templateId` omitted copies the default template, `null` starts empty; `prep` sets the sections instead. */
 export const SessionCreateSchema = z
   .object({
     sessionNumber: SessionNumberSchema.optional(),
     realDate: z.string().max(40).nullable().optional(),
     attendees: AttendeesSchema.optional(),
-    prepBody: z.string().max(100_000).optional(),
+    templateId: z.uuid().nullable().optional(),
+    prep: PrepSchema.optional(),
     recapBody: z.string().max(100_000).optional(),
     revealedToPlayers: z.boolean().optional(),
     status: SessionStatusSchema.optional(),
@@ -212,7 +319,8 @@ export const SessionUpdateSchema = z
     sessionNumber: SessionNumberSchema.optional(),
     realDate: z.string().max(40).nullable().optional(),
     attendees: AttendeesSchema.optional(),
-    prepBody: z.string().max(100_000).optional(),
+    /** The whole list of sections. */
+    prep: PrepSchema.optional(),
     recapBody: z.string().max(100_000).optional(),
     status: SessionStatusSchema.optional(),
     tags: TagsSchema.optional(),
@@ -221,6 +329,22 @@ export const SessionUpdateSchema = z
     commandId: CommandIdSchema
   })
   .strict();
+export const SessionApplyTemplateSchema = z
+  .object({ templateId: z.uuid(), expectedRev: z.number().int().nonnegative().optional(), commandId: CommandIdSchema })
+  .strict();
+/** One line logged at the table. */
+export const SessionLogSchema = z
+  .object({
+    text: z.string().trim().min(1).max(2000),
+    revealedToPlayers: z.boolean().optional(),
+    commandId: CommandIdSchema
+  })
+  .strict();
+export const SessionTickSchema = z.object({ itemId: z.uuid(), done: z.boolean(), commandId: CommandIdSchema }).strict();
+export const SessionCurrentSceneSchema = z
+  .object({ sceneId: z.uuid().nullable(), commandId: CommandIdSchema })
+  .strict();
+
 /** Bounds mirror the store's. Objective text may be empty (the editor autosaves right after "Add item"). */
 const QuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
 export const ObjectiveSchema = CodexQuestObjectiveSchema;

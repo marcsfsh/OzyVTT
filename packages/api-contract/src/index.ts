@@ -122,6 +122,18 @@ export const CODEX_PATHS = {
   sessionById: `${API_NAMESPACE}/codex/sessions/{id}`,
   sessionReveal: `${API_NAMESPACE}/codex/sessions/{id}/reveal`,
   sessionActivate: `${API_NAMESPACE}/codex/sessions/{id}/activate`,
+  sessionApplyTemplate: `${API_NAMESPACE}/codex/sessions/{id}/apply-template`,
+  sessionHappened: `${API_NAMESPACE}/codex/sessions/{id}/happened`,
+  sessionLog: `${API_NAMESPACE}/codex/sessions/{id}/log`,
+  sessionTick: `${API_NAMESPACE}/codex/sessions/{id}/tick`,
+  sessionCurrentScene: `${API_NAMESPACE}/codex/sessions/{id}/current-scene`,
+  // The active session's live board, GM-only.
+  board: `${API_NAMESPACE}/codex/board`,
+  // The GM's library of session prep templates. The built-in starting template is read-only.
+  prepTemplates: `${API_NAMESPACE}/codex/prep-templates`,
+  prepTemplateById: `${API_NAMESPACE}/codex/prep-templates/{id}`,
+  prepTemplateDuplicate: `${API_NAMESPACE}/codex/prep-templates/{id}/duplicate`,
+  prepTemplateDefault: `${API_NAMESPACE}/codex/prep-templates/{id}/default`,
   quests: `${API_NAMESPACE}/codex/quests`,
   questById: `${API_NAMESPACE}/codex/quests/{id}`,
   questReveal: `${API_NAMESPACE}/codex/quests/{id}/reveal`,

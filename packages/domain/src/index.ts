@@ -19,6 +19,8 @@ export * from "./codex-entities.js";
 export * from "./codex-calendar.js";
 /** The Codex's HTTP shapes, shared so the server's projections and the client's reads are one type. */
 export * from "./codex-wire.js";
+/** Session prep's HTTP shapes: the template library and a session's prep sections. */
+export * from "./codex-prep-wire.js";
 
 export {
   ACTOR_SCHEMA_VERSION,
