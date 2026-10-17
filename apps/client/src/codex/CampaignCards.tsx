@@ -267,10 +267,13 @@ export function KindsCard({
 /** The empty state links to pages, where tags are added; a populated card is already the full list. */
 export function TagsCard({
   tags,
+  gm = false,
   onPickTag,
   onSeePages
 }: Readonly<{
   tags: ReadonlyArray<readonly [tag: string, count: number]>;
+  /** The GM writes the tags, so only the GM is told where they come from. */
+  gm?: boolean;
   onPickTag: (tag: string) => void;
   onSeePages?: () => void;
 }>) {
@@ -278,7 +281,11 @@ export function TagsCard({
     <DashCard
       title="Tags"
       iconId="flag"
-      empty="No tags yet. Tags are added on a page while you write it, and every one you use collects here."
+      empty={
+        gm
+          ? "No tags yet. Tags are added on a page while you write it, and every one you use collects here."
+          : "No tags yet."
+      }
       seeAll={tags.length === 0 && onSeePages ? { label: "See all pages", onClick: onSeePages } : undefined}
     >
       {tags.length > 0 ? (
