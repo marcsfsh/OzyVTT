@@ -148,6 +148,7 @@ Say what the control does or what belongs in the field, and nothing else.
 - The same rules apply to code comments.
 
 `apps/client/src/writing.test.ts` checks the rules a pattern can find on every string a person reads, in the client,
-the UI kit, the server messages and the OpenAPI descriptions. It also fails on an em dash, an en dash or a curly quote
+the UI kit, the server messages and the OpenAPI descriptions. It checks the product's own summaries and descriptions
+in the SRD bundles too; the SRD text they quote is left as published. It also fails on an em dash, an en dash or a curly quote
 anywhere in the code, comments, tests and docs; code that has to match one writes its escape (`\u2014`). Each exemption
 in that file carries its reason. Contrasts, "-ing" clauses and three-part series are left to review.

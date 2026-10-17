@@ -1,8 +1,9 @@
 /**
- * The Writing section of docs/DESIGN.md as test failures, in two scans. The first holds every string a person can read
- * in the client, the UI kit, the server and the shared packages to the rules in `writing-rules.ts`. The second bans the
- * em dash, the en dash and curly quotes anywhere in the repository's code, comments, tests and docs. What a regex can't
- * judge ("X, not Y", a clause tacked on with "-ing", a three-part series) is left to review.
+ * The Writing section of docs/DESIGN.md as test failures, in three scans. The first holds every string a person can
+ * read in the client, the UI kit, the server and the shared packages to the rules in `writing-rules.ts`, and the second
+ * holds the product's own words in the SRD bundles to them. The third bans the em dash, the en dash and curly quotes
+ * anywhere in the repository's code, comments, tests and docs. What a regex can't judge ("X, not Y", a clause tacked on
+ * with "-ing", a three-part series) is left to review.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -152,6 +153,45 @@ describe("The writing rules, on every string a person reads", () => {
       expect(excused, `exemption ${JSON.stringify(`${file} :: ${text}`)} excuses nothing: delete it`).toBe(true);
       expect(why.length, `exemption ${JSON.stringify(text)} has no reason`).toBeGreaterThan(40);
     }
+  });
+});
+
+/**
+ * The bundles quote the SRD, so the scan above leaves them out, but these fields are the product's own words, written in
+ * `sources/authored/` and `scripts/build-class-bundle.ts`. The builder shows them on its cards and detail panes.
+ */
+const AUTHORED_FIELDS: ReadonlyArray<readonly [bundle: string, fields: readonly string[]]> = [
+  ["species", ["summary", "description"]],
+  ["backgrounds", ["summary", "description"]],
+  ["classes", ["summary", "description"]],
+  ["languages", ["name", "description"]],
+  ["feats", ["summary"]]
+];
+
+describe("The writing rules, on the product's own words in the SRD bundles", () => {
+  const entries = AUTHORED_FIELDS.flatMap(([bundle, fields]) => {
+    const rows = JSON.parse(
+      readFileSync(`${REPO}/packages/content-srd-5.2.1/bundles/${bundle}.v1.json`, "utf8")
+    ) as Array<Record<string, unknown>>;
+    return rows.flatMap((row) =>
+      fields.flatMap((field) => {
+        const text = row[field];
+        return typeof text === "string" ? [{ where: `${bundle}/${String(row.id)}.${field}`, text }] : [];
+      })
+    );
+  });
+
+  it("reads every authored field", () => {
+    expect(entries.some((entry) => entry.where === "species/human.summary")).toBe(true);
+    expect(entries.some((entry) => entry.where === "classes/warlock.description")).toBe(true);
+    expect(entries.length).toBeGreaterThan(60);
+  });
+
+  it("breaks none of the rules", () => {
+    const offenders = entries.flatMap((entry) =>
+      brokenRules(entry.text).map((rule) => `${rule.id}  ${entry.where}  ${entry.text.slice(0, 120)}`)
+    );
+    expect(offenders).toEqual([]);
   });
 });
 
