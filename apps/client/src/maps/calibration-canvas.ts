@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from "react";
 import { squareCorner } from "./calibration-overlays";
 import type { Point } from "./map-catalog";
 
@@ -72,10 +72,12 @@ export function usePreviewZoom(map: Size) {
 /**
  * Placing the 3 × 3 area: press on an intersection and drag diagonally; once placed, drag inside it to
  * move it or at its corner to resize it. `placing` is the square path before the server has measured;
- * `pointAt` maps a client point into the image. The placed area itself is the pane's state.
+ * `pointAt` maps a client point into the image. The placed area itself is the pane's state. `surface`
+ * is the canvas element the handlers go on.
  */
 export function useGridAreaGesture({
   map,
+  surface,
   placing,
   busy,
   pendingArea,
@@ -84,6 +86,7 @@ export function useGridAreaGesture({
   pointAt
 }: Readonly<{
   map: Size;
+  surface: RefObject<HTMLElement | null>;
   placing: boolean;
   busy: boolean;
   pendingArea: Area | null;
@@ -91,6 +94,16 @@ export function useGridAreaGesture({
   setPoints: (points: Point[]) => void;
   pointAt: (clientX: number, clientY: number) => Point | null;
 }>) {
+  // `touch-action: none` stops the page scrolling here, yet a drag that lifts mid-motion still starts a browser fling,
+  // and the browser spends the next tap (often Measure this area) on stopping it. A cancelled touchmove never becomes
+  // a scroll, so no fling starts. React's touch listeners are passive, so this one is native.
+  useEffect(() => {
+    const element = surface.current;
+    if (!element) return;
+    const cancel = (event: TouchEvent) => event.preventDefault();
+    element.addEventListener("touchmove", cancel, { passive: false });
+    return () => element.removeEventListener("touchmove", cancel);
+  }, [surface]);
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [dragCurrent, setDragCurrent] = useState<Point | null>(null);
   const [hoverPoint, setHoverPoint] = useState<Point | null>(null);

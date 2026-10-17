@@ -103,6 +103,7 @@ export function CalibrationPane({
   };
   const gesture = useGridAreaGesture({
     map,
+    surface: zoom.previewRef,
     placing: squareMode && !wizard,
     busy,
     pendingArea,
