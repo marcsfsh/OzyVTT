@@ -13,7 +13,7 @@ const NO_REST = { clockHours: 0, requests: [] as readonly string[], shortRest: n
 function blockedNote(state: GmView, actor: GmActor): string | null {
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)) return "In the fight";
   if (isDead(actor)) return "Dead";
-  if (actor.hp.current < 1) return "0 HP";
+  if (actor.hp.current < 1) return "Needs 1 HP to rest";
   return null;
 }
 

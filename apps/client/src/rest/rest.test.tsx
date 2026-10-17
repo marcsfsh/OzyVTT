@@ -143,6 +143,7 @@ describe("the GM's rest panel", () => {
     await user.click(screen.getByRole("button", { name: "Rest" }));
     expect(screen.getByRole("checkbox", { name: /Torva/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /Bryn/ })).not.toBeChecked();
+    expect(screen.getByText("0/40 HP · Needs 1 HP to rest")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Short rest" }));
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("rest:party");
