@@ -16,7 +16,7 @@ const importFixture = (name: string) => {
 
 const FIXTURES = ["cleric5", "bard20", "warlock20", "fighter20", "wizard20", "multiclass"];
 
-describe("D&D Beyond PDF import — golden fixtures (recorded widgets)", () => {
+describe("D&D Beyond PDF import: golden fixtures (recorded widgets)", () => {
   for (const f of FIXTURES) {
     it(`${f} → valid ActorDefinition`, () => {
       const { parsed } = importFixture(f);
@@ -85,7 +85,7 @@ describe("D&D Beyond PDF import — golden fixtures (recorded widgets)", () => {
   });
 });
 
-// Full pdfjs pipeline — runs only when the source PDFs are present locally (they are gitignored).
+// Full pdfjs pipeline. It runs only when the source PDFs are present locally (they are gitignored).
 describe("pdf pipeline (optional, needs local source PDFs)", () => {
   const pdf = join(here, "fixtures", "wizard20.pdf");
   it.skipIf(!existsSync(pdf))("readWidgets(PDF) reproduces the recorded widget count", async () => {

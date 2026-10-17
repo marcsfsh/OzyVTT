@@ -106,7 +106,7 @@ const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /**
- * The cheapest path a footprint can take from `from` to `to` (both top-left cells), stepping to any of the
+ * The cheapest path a footprint can take from `from` to `to` (both top-left cells), each step to any of the
  * eight neighbouring positions. A step costs one cell, or two when any cell of the footprint's new position is
  * difficult; the extra cost doesn't stack. A step into a position where the mover's Speed is halved costs twice
  * that, since each foot there spends two of its Speed. Among equally cheap paths it keeps closest to the straight
@@ -219,7 +219,7 @@ export function movementPath(
   }
 
   const cost = best.get(goalKey);
-  // The whole box was searched and nothing reached the goal: the way is shut, not merely long.
+  // The whole box was searched and nothing reached the goal: the way is shut.
   if (cost === undefined)
     return queue.size === 0 ? { steps: [], costCells: 0, difficultSteps: 0, blocked: true } : null;
   const steps: GridCell[] = [];

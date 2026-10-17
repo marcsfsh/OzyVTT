@@ -62,7 +62,7 @@ export const EncounterStartSchema = z
   .object({
     commandId: z.uuid(),
     mapAssetId: z.uuid(),
-    /** Omitted means the server derives combatants from the live scene's staged list rather than trusting the client's copy. */
+    /** Omitted means the server derives combatants from the live scene's staged list and ignores any client copy. */
     entries: z
       .array(
         z
@@ -274,7 +274,7 @@ export const ApplyDamageSchema = z
       .optional(),
     sourceName: z.string().min(1).max(120).optional(),
     critical: z.boolean().optional(),
-    /** Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable instead of dying/defeated. */
+    /** Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable, neither dying nor defeated. */
     nonlethal: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -365,7 +365,7 @@ export const ActionResolveSchema = z
     cover: z.enum(["half", "three-quarters", "total"]).optional(),
     /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
     note: z.string().trim().min(1).max(100).optional(),
-    /** Ready this spell rather than cast it now (SRD Ready): its slot is spent and it is held with Concentration until
+    /** Ready this spell for later (SRD Ready): its slot is spent and it is held with Concentration until
      *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
     ready: z.boolean().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
@@ -494,7 +494,7 @@ export const ReactionDismissSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Read-only availability lookup (no commandId - nothing mutates). */
+/** Read-only availability lookup (no commandId: nothing mutates). */
 export const ActorAvailableActionsSchema = z.object({ actorId: z.uuid() }).strict();
 /** The movement read: how much of this turn's movement a combatant has left. */
 export const ActorMovementSchema = z.object({ actorId: z.uuid() }).strict();
@@ -847,7 +847,7 @@ export const SetEnvironmentSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep instead of the live table. */
+/** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep; without it, the live table. */
 export const FogSetEnabledSchema = z
   .object({
     commandId: z.uuid(),
@@ -1126,7 +1126,7 @@ export const CharacterSetSlotSchema = z
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
-    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    /** The Warlock's Pact Magic pool at `level`; without it, the spell slots. */
     pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -1236,7 +1236,7 @@ const ClassLevelsSchema = z
   .min(1)
   .max(20);
 
-/** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
+/** Create a character from choices; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
     commandId: z.uuid(),
@@ -1426,7 +1426,7 @@ export const DiceRollSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** How a token move travels (SRD Movement): on foot or by one of the special speeds, spending movement; by
+/** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
 export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
 export type MoveMode = z.infer<typeof MoveModeSchema>;
@@ -1463,7 +1463,7 @@ export const ActorSetArmorClassSchema = z
   })
   .strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);
-/** `activate: true` goes live on the new scene in the same command, parking whatever was live (as `scene.activate` does). */
+/** `activate: true` goes live on the new scene in the same command and parks whatever was live (as `scene.activate` does). */
 export const SceneCreateSchema = z
   .object({
     commandId: z.uuid(),
@@ -1489,7 +1489,7 @@ export const SceneIdSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Make one recorded moment live. `turnIndex` indexes the archive document's `turns`, not a timeline revision. */
+/** Make one recorded moment live. `turnIndex` indexes the archive document's `turns`. */
 export const ReplayLaunchSchema = z
   .object({
     commandId: z.uuid(),

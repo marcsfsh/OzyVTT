@@ -55,7 +55,7 @@ describe("SRD class data", () => {
     expect(hitDieFor("cleric")).toBe("d8");
     expect(hitDieFor("wizard")).toBe("d6");
     expect(hitDieFor("sorcerer")).toBe("d6");
-    // An unknown (homebrew, not yet loaded) class falls back rather than throwing.
+    // An unknown (homebrew, not yet loaded) class falls back and throws nothing.
     expect(hitDieFor("moon-warden")).toBe("d8");
   });
 

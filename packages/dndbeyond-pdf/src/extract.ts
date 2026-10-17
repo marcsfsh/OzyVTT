@@ -1,7 +1,7 @@
 import type { Widget } from "./read-pdf.js";
 
 /** Pure transform: D&D Beyond widget list -> a draft `actor-character` definition + review warnings.
- * No pdfjs, no I/O — unit-testable and reusable in the browser. Output is validated by the caller. */
+ * No pdfjs and no I/O, so it is unit-testable and reusable in the browser. Output is validated by the caller. */
 export interface DraftResult {
   draft: Record<string, unknown>;
   warnings: string[];
@@ -50,7 +50,7 @@ const cleanSpellName = (raw: string): string =>
 const contentId = (name: string): string =>
   name
     .toLowerCase()
-    .replace(/['’]/g, "")
+    .replace(/['\u2019]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || "x";

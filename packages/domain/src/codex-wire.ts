@@ -254,14 +254,14 @@ export const CodexDowntimePayloadSchema = z.strictObject({
   characterPageId: z.uuid().nullable()
 });
 export type CodexDowntimePayload = Wire<z.infer<typeof CodexDowntimePayloadSchema>>;
-/** The level reached, not a delta. `reason` has no reveal split, so GM-only detail belongs in `gmText`. Both
+/** The level reached. `reason` has no reveal split, so GM-only detail belongs in `gmText`. Both
  *  audiences get the same shape. */
 export const CodexMilestonePayloadSchema = z.strictObject({
   level: z.number().int().min(1).max(20),
   reason: z.string().max(120)
 });
 export type CodexMilestonePayload = Wire<z.infer<typeof CodexMilestonePayloadSchema>>;
-/** `delta` is the change, not the new value. No foreign key, so history survives a deleted faction. */
+/** `delta` is the change from the old value. No foreign key, so history survives a deleted faction. */
 export const CodexStandingPayloadSchema = z.strictObject({
   factionPageId: z.uuid(),
   delta: z.number().int(),
@@ -541,7 +541,7 @@ const CodexRevisionHistorySettingsSchema = z.strictObject({
   windowMinutes: z.number().int().min(0).max(10_080)
 });
 export type CodexRevisionHistorySettings = Wire<z.infer<typeof CodexRevisionHistorySettingsSchema>>;
-/** What kept history costs; `versionBytes` is an approximate character count, not disk usage. */
+/** What kept history costs; `versionBytes` is an approximate character count; disk usage differs. */
 const CodexRevisionHistoryUsageSchema = z.strictObject({
   versionCount: z.number().int().min(0),
   versionBytes: z.number().int().min(0)

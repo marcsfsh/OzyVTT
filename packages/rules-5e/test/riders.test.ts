@@ -45,7 +45,7 @@ describe("collectRiders: the two passes", () => {
     expect(collectRiders(carriers, { ...base, moment: "on-attack-roll", sourceItemId: "ring" })).toHaveLength(0);
   });
 
-  it("withholds a rider naming a moment from the standing pass - the two sets are disjoint", () => {
+  it("withholds a rider naming a moment from the standing pass: the two sets are disjoint", () => {
     const carriers = carrierOf([
       { type: "extra-damage", formula: "1d6", damageType: "fire", when: [{ type: "on-critical-hit" }] }
     ]);
@@ -55,7 +55,7 @@ describe("collectRiders: the two passes", () => {
   });
 
   it("never lets a filter leak into the standing pass and become 'always'", () => {
-    // A filter with no moment must never match rather than apply at every read.
+    // A filter with no moment must never match; it would otherwise apply at every read.
     const carriers = carrierOf([
       { type: "attack-bonus", amount: 2, when: [{ type: "versus-size", sizes: ["large"] }] }
     ]);

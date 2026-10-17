@@ -228,7 +228,7 @@ export type ClassProgressionSource = Readonly<{
 }>;
 
 /** An authored class record as a progression row, so authored and homebrew classes use their own values
- * instead of SRD defaults. */
+ * where the SRD defaults would otherwise apply. */
 export function progressionFromClass(source: ClassProgressionSource): ClassProgression {
   return {
     hitDie: source.hitDie,

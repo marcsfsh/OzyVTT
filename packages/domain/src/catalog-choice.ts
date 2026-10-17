@@ -32,7 +32,7 @@ import type {
 /** One offerable option. `level` is populated for spells so callers can apply `maxSpellLevel`. */
 export type CatalogChoiceOption = Readonly<{ id: string; name: string; level?: number }>;
 
-/** The wire catalogs the resolver reads - exactly what the content endpoints serve. */
+/** The wire catalogs the resolver reads: exactly what the content endpoints serve. */
 export type CatalogChoiceCatalogs = Readonly<{
   classes: readonly ContentClassSummary[];
   subclasses: readonly ContentSubclassSummary[];

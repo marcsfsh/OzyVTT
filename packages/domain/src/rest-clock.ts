@@ -10,7 +10,7 @@ export function longRestWait(lastLongRestAt: number | null, clockHours: number):
   return Math.max(0, lastLongRestAt + LONG_REST_SPACING_HOURS - clockHours);
 }
 
-/** "Day 3, 14:00": the clock as the table reads it, counting from midnight of day 1. */
+/** "Day 3, 14:00": the clock as the table reads it, counted from midnight of day 1. */
 export function gameClockLabel(clockHours: number): string {
   return `Day ${Math.floor(clockHours / 24) + 1}, ${String(clockHours % 24).padStart(2, "0")}:00`;
 }
