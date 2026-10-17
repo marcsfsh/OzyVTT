@@ -12,7 +12,7 @@ import { notEnoughUses, useCostOf } from "./use-cost.js";
  * - `blocked`: in the fight, off turn; still resolved, where the action economy refuses it with the overridable,
  *   askable `economy.not-your-turn` block (a reaction or a legendary action is the point of acting off turn).
  * - `loose`: no fight, or this creature isn't in it; the server rolls the action's dice and attributes
- *   them, touching no combat state.
+ *   them, and combat state is left alone.
  */
 export type TapRoute = "resolved" | "loose" | "blocked";
 
@@ -60,7 +60,7 @@ export function looseRollPlan(
 /** What a loose use spends: an item's charges or a feature's per-rest uses count outside a fight as in one, and so
  *  does a spell slot an item cast consumes. Per-turn, until-its-next-turn and per-encounter limits have no fight to
  *  count against.
- *  Mutates the actor, refusing before anything is spent when nothing remains. A missing spell slot is refused only
+ *  Mutates the actor, and refuses before anything is spent when nothing remains. A missing spell slot is refused only
  *  while the table polices slots (`slots`); advised, it is a GM note, and nothing is spent. */
 export function spendLooseUses(
   actor: Actor,
@@ -85,7 +85,7 @@ export function spendLooseUses(
     slot && action.spellSlot && slot.level < action.spellSlot.level
       ? `${action.name} needs a slot of level ${action.spellSlot.level} or higher.`
       : slot && slotsLeft(actor, slot.level, slot.pact) <= 0
-        ? `${action.name} spends a level-${slot.level} ${slot.pact ? "Pact Magic" : "spell"} slot - ${actor.name} has none left.`
+        ? `${action.name} spends a level ${slot.level} ${slot.pact ? "Pact Magic" : "spell"} slot, and ${actor.name} has none left.`
         : null;
   const refusal = unpreparedSpell(actor, action, definition) ?? slotRefusal;
   if (refusal !== null && slots === "strict") throw new CommandRejectedError(refusal);

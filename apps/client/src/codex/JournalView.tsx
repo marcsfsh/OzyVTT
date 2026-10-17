@@ -40,7 +40,7 @@ const writeRevealWarn = (on: boolean) => {
   try {
     localStorage.setItem(REVEAL_WARN_KEY, on ? "on" : "off");
   } catch {
-    /* private mode - the preference stays in-session */
+    /* private mode: the preference stays in-session */
   }
 };
 
@@ -110,7 +110,7 @@ export function JournalView({
   const composer = useJournalDraft();
   /** Acknowledges a publish, since the prep-clock row disappears once the clocks agree. */
   const [notice, setNotice] = useState<NoticeMessage>(null);
-  /** State rather than a raw read, so turning it back on takes effect without a reload. */
+  /** State, so turning it back on takes effect without a reload. A raw read would need one. */
   const [revealWarn, setRevealWarn] = useState(readRevealWarn);
   // The lens survives leaving and returning to the Journal.
   const [lens, setLens] = useState<ChronicleLens>(() => {
@@ -124,7 +124,7 @@ export function JournalView({
     try {
       sessionStorage.setItem(LENS_KEY, lens);
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, [lens]);
 

@@ -104,7 +104,7 @@ const rowOf = (id: string) => document.getElementById(`codex-entry-${id}`)!;
 beforeEach(() => sessionStorage.clear());
 
 describe("The milestone is a FOURTH shape of the one composer", () => {
-  it("offers Entry, Deadline, Downtime and Milestone — and never Standing", async () => {
+  it("offers Entry, Deadline, Downtime and Milestone, and never Standing", async () => {
     await renderJournal();
     const switcher = screen.getByRole("group", { name: "What to write" });
     expect(
@@ -137,7 +137,7 @@ describe("The milestone is a FOURTH shape of the one composer", () => {
     expect(createDowntime).not.toHaveBeenCalled();
   });
 
-  it("stands on its level alone — prose is optional colour, the level is the record", async () => {
+  it("stands on its level alone: prose is optional colour, the level is the record", async () => {
     await renderJournal();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Milestone" }));
@@ -160,7 +160,7 @@ describe("The milestone is a FOURTH shape of the one composer", () => {
     expect(createMilestone.mock.calls.at(-1)![1].milestone.level).toBe(20);
   });
 
-  it("needs no date — the store dates it at the campaign clock", async () => {
+  it("needs no date: the store dates it at the campaign clock", async () => {
     // Unlike a deadline, a milestone doesn't need a date.
     await renderJournal();
     createMilestone.mockResolvedValue({});
@@ -199,7 +199,7 @@ describe("A milestone and a standing row read as themselves on the chronicle", (
     expect(rowOf("m1").textContent).toContain("Milestone");
     expect(rowOf("m1").textContent).toContain("Reached level 5 · Cleared the citadel");
     expect(rowOf("s1").textContent).toContain("Standing");
-    // The faction is named from the page list; the delta is the change, not the new value.
+    // The faction is named from the page list; the delta is the change, and the new value is elsewhere.
     expect(rowOf("s1").textContent).toContain("The Zhentarim · down 20 · Burned the caravan");
     expect(rowOf("m1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
     expect(rowOf("s1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
@@ -209,7 +209,7 @@ describe("A milestone and a standing row read as themselves on the chronicle", (
     await renderJournal([
       RECORD({ kind: "entry", id: "e1", text: "An ordinary note.", payload: { level: 9, reason: "smuggled" } })
     ]);
-    // The gate is the kind, not the payload shape.
+    // The gate is the kind; the payload shape doesn't open it.
     expect(rowOf("e1").textContent).not.toContain("Reached level");
     expect(rowOf("e1").textContent).not.toContain("smuggled");
   });

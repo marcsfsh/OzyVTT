@@ -44,7 +44,7 @@ export type PageEditorProps = Readonly<{
   autosave: CodexAutosaveSettings;
   onChange: (page: CodexPage) => void;
   onDeleted: () => void;
-  /** Follow a `[[link]]`. Unresolved targets open quick-create rather than creating silently. */
+  /** Follow a `[[link]]`. Unresolved targets open quick-create, and nothing is created silently. */
   onNavigate: (target: string) => void;
   /** Jump to the archived fight an auto-logged battle came from. GM-only: archives carry GM narration. */
   onOpenReplay?: (archiveId: number) => void;
@@ -94,7 +94,7 @@ export function PageEditor({
     try {
       localStorage.setItem(DETAILS_KEY, open ? "open" : "closed");
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, []);
   // Focus the summoned panel itself, so keyboard users land on its heading.
@@ -314,7 +314,7 @@ export function PageEditor({
         <div className="codex-editor-center">
           <TwoLayerBodyTabs value={tab} onChange={setTab} />
 
-          {/* `fill` makes the editor take the frame's height instead of the primitive's 14rem floor. */}
+          {/* `fill` makes the editor take the frame's height in place of the primitive's 14rem floor. */}
           <CodexEditor
             token={gmToken}
             value={body}

@@ -282,7 +282,7 @@
   font-size: 1.1rem;
 }
 /* Swatches: 2.25rem of paint plus `.tap-target` reaches 44px, and the .3rem gap clears the 4px
-   overhang per side. They wrap rather than shrink. */
+   overhang per side. They wrap and never shrink. */
 .encounter-map-swatches {
   display: flex;
   flex-wrap: wrap;

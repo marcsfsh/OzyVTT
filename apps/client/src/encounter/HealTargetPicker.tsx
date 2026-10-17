@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, Modal, Stepper } from "@vtt/ui";
 import "./pickers.css";
 
-/** A heal used outside a fight, waiting for who it lands on. */
+/** A heal used outside a fight, which waits for who it lands on. */
 export type LooseHeal = Readonly<{
   actionId: string;
   name: string;

@@ -63,7 +63,7 @@
   align-items: stretch;
 }
 
-/* min-height: 0 lets the list shrink and scroll instead of stretching the workspace. */
+/* min-height: 0 lets the list shrink and scroll, so the workspace never stretches. */
 .hb-rail {
   display: flex;
   flex-direction: column;
@@ -94,7 +94,7 @@
   min-width: 0;
 }
 
-/* flex: 1 with min-height: 0 makes a long library scroll the list, not the page. */
+/* flex: 1 with min-height: 0 makes a long library scroll the list, and the page stays put. */
 .hb-list {
   display: flex;
   flex-direction: column;
@@ -144,7 +144,7 @@
   border-bottom: 0;
 }
 .hb-row-name {
-  /* Takes the slack, so a second badge sits beside the state badge rather than mid-row. */
+  /* Takes the slack, so a second badge sits beside the state badge, never mid-row. */
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -213,7 +213,7 @@
   min-height: 0;
   flex: 1 1 auto;
   /* position: relative makes this region the containing block for absolutely-positioned
-     descendants (such as .nh-sr-only), so they are clipped here instead of growing the document. */
+     descendants (such as .nh-sr-only), so they are clipped here and the document never grows. */
   position: relative;
   overscroll-behavior: contain;
   scroll-padding-top: var(--space-6);
@@ -432,7 +432,7 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
-/* The derived attack/damage line. Wraps rather than forcing horizontal scroll. */
+/* The derived attack/damage line. Wraps, so there is no horizontal scroll. */
 .hb-riders-readout {
   margin: 0;
   min-width: 0;
@@ -495,7 +495,7 @@
 }
 
 /* ---- Level table ----
-   One Slots cell (with an aria-label) holds all nine slot levels instead of nine columns. */
+   One Slots cell (with an aria-label) holds all nine slot levels in place of nine columns. */
 .hb-lt {
   display: flex;
   flex-direction: column;
@@ -538,7 +538,7 @@
   text-transform: uppercase;
   color: var(--text-dim);
 }
-/* Rows are hairline rules, not cards. */
+/* Rows are hairline rules, with no cards. */
 .hb-lt-row {
   padding: var(--space-2);
   border: 0;
@@ -671,7 +671,7 @@
     display: inline-flex;
   }
 
-  /* ---- Level table: one card per level. Folds here rather than narrower because seven
+  /* ---- Level table: one card per level. Folds at this width because seven
      columns truncate Features and Resources below this width. */
   .hb-lt-head {
     display: none;
@@ -694,7 +694,7 @@
   .hb-lt-slotfield {
     width: 4rem;
   }
-  /* The state cluster wraps to its own line, keeping Publish above the 44px floor. */
+  /* The state cluster wraps to its own line, which keeps Publish above the 44px floor. */
   .hb-state-actions {
     margin-left: 0;
     width: 100%;

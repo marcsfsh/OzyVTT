@@ -34,7 +34,7 @@ import { sliceReplacing, type HomebrewAuthoredIndex, type HomebrewBody, type Hom
  */
 
 export type HomebrewValidationContext = Readonly<{
-  /** The merged GM catalog - already spell-list-overlaid, so `spellSummaries()` carries real membership. */
+  /** The merged GM catalog: already spell-list-overlaid, so `spellSummaries()` carries real membership. */
   catalog: ContentView;
   /** Published spell-list overlays, so a list under validation resolves in the graph it will join. */
   spellLists: readonly SpellListReference[];
@@ -51,7 +51,7 @@ type Owner = Readonly<{ id: string; name: string }>;
 /** Self-derived slugs name this unpublished record, so they are answered from the record or the authorship index. */
 type SelfCatalog = Readonly<{ slug: string; count: number; whenEmpty: string }> | undefined;
 
-/** The context plus the two things worth resolving once per record rather than once per check. */
+/** The context plus the two things worth resolving once per record, so no check repeats them. */
 type Checks = Readonly<{
   catalog: ContentView;
   spellLists: readonly SpellListReference[];
@@ -104,7 +104,7 @@ export function validateForPublish(
   // Tier 2: identity. Read the id from the raw body: `ActorDefinitionSchema` strips `id`.
   const id = idOf(body);
   const problem = homebrewIdProblem(id, type);
-  if (problem) add(["id"], `This record's id "${id}" ${problem}. Re-create the record rather than editing its id.`);
+  if (problem) add(["id"], `This record's id "${id}" ${problem}. Re-create the record to change its id.`);
 
   // Tiers 3 and 4, per type.
   const checks: Checks = {
@@ -158,8 +158,8 @@ const DAMAGE_TYPE_LISTS: ReadonlySet<string> = new Set([
 
 /**
  * Damage-type and condition slugs the SRD does not know. The columns are open, so a homebrew "void" damage type
- * is legal and publishes, but a typo ("fier") would match nothing at the table, so the GM is told rather than
- * refused. Walks the parsed record by key, which reaches every grant list, action damage part and on-hit
+ * is legal and publishes, but a typo ("fier") would match nothing at the table, so the GM gets a warning.
+ * Walks the parsed record by key, which reaches every grant list, action damage part and on-hit
  * condition whatever the record type.
  */
 function slugWarnings(record: unknown, recordId: string | null): Issue[] {
@@ -226,7 +226,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
   const grants = new Map<string, number>();
   for (const row of entry.levelTable)
     for (const featureId of row.features) grants.set(featureId, (grants.get(featureId) ?? 0) + 1);
-  // Published subclasses plus authored drafts: a subclass must exist, not be published.
+  // Published subclasses plus authored drafts: a subclass must exist, published or not.
   const subclassIds = new Set([
     ...checks.catalog
       .subclassSummaries()
@@ -237,7 +237,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
   const self: SelfCatalog = {
     slug: `${entry.id}-subclasses`,
     count: subclassIds.size,
-    whenEmpty: `no subclass names "${entry.name}" yet. Create one first (duplicating an SRD subclass and picking this class is the quick way) - it does not have to be published, it only has to exist.`
+    whenEmpty: `no subclass names "${entry.name}" yet. Create one first (duplicating an SRD subclass and picking this class is the quick way). It has to exist, published or not.`
   };
   entry.features.forEach((feature, index) => {
     const granted = grants.get(feature.id) ?? 0;
@@ -246,7 +246,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
     if (featurePicks(feature).length > 0 && granted === 0) {
       checks.add(
         ["features", index],
-        `"${feature.name}" asks the player to choose, but no level in the table grants it - the character builder would offer the pick and then refuse to create the character. Add "${feature.id}" to a level in the level table, or remove its choice.`
+        `"${feature.name}" asks the player to choose, but no level in the table grants it, so the character builder would offer the pick and then refuse to create the character. Add "${feature.id}" to a level in the level table, or remove its choice.`
       );
       return;
     }
@@ -263,7 +263,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
 
 function subclassIssues(entry: SubclassReference, checks: Checks) {
   const parent = checks.catalog.classRecord(entry.classId);
-  // Authored, not published (a published subclass of a draft class is inert); a class id naming nothing is refused.
+  // Authored is enough (a published subclass of a draft class is inert); a class id that names nothing is refused.
   if (!parent && !checks.authored.has("class", entry.classId)) {
     checks.add(
       ["classId"],
@@ -273,7 +273,7 @@ function subclassIssues(entry: SubclassReference, checks: Checks) {
     // The check below needs the class's level table, which only a published class has here.
     checks.add(
       ["spellcasting"],
-      `A spellcasting subclass can only be checked against a published class's spell slots, and "${entry.classId}" is still a draft. Publish the class first - it does not need its subclasses published.`
+      `A spellcasting subclass can only be checked against a published class's spell slots, and "${entry.classId}" is still a draft. Publish the class first. Its subclasses can stay drafts.`
     );
   } else if (parent && entry.spellcasting) {
     // A subclass's own `levelTable` is not applied yet, so it cannot give a non-caster class spell slots.
@@ -283,7 +283,7 @@ function subclassIssues(entry: SubclassReference, checks: Checks) {
     if (!classCasts) {
       checks.add(
         ["spellcasting"],
-        `"${parent.name}" has no spell slots in its level table, and a subclass's own table is not applied yet - this subclass would create a caster with no slots. Third-caster subclasses are not supported yet.`
+        `"${parent.name}" has no spell slots in its level table, and a subclass's own table is not applied yet, so this subclass would create a caster with no slots. Third-caster subclasses are not supported yet.`
       );
     }
   }
@@ -305,7 +305,7 @@ function speciesIssues(entry: SpeciesReference, checks: Checks) {
       if (featurePicks(trait).length > 0)
         checks.add(
           ["lineages", index, "traits", traitIndex, "choice"],
-          `"${trait.name}" asks the player a question from inside a lineage. Lineage traits cannot carry choices yet - move the choice up to a species trait.`
+          `"${trait.name}" asks the player a question from inside a lineage. Lineage traits cannot carry choices yet. Move the choice up to a species trait.`
         );
     });
   });
@@ -369,7 +369,7 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
       `This creature's content id ("${definition.source.externalId ?? "missing"}") disagrees with its record id ("${id}"); its live tokens would resolve to nothing.`
     );
   }
-  // Uses the bestiary's own `statblockFacts`, so the guard cannot pass what the list would show as "CR 0 - unknown".
+  // Uses the bestiary's own `statblockFacts`, so the guard cannot pass what the list would show as "CR 0 unknown".
   const facts = statblockFacts(definition);
   if (facts.challengeRating === null)
     checks.add(
@@ -408,7 +408,7 @@ function equipmentIssues(item: EquipmentReference, checks: Checks) {
   if (item.category !== "weapon" && item.category !== "armor") {
     checks.add(
       ["appliesTo"],
-      `"${item.name}" has an "applies to" list but its category is "${item.category}" - a template must be a weapon, an armor or ammunition, because those are what a bind can make it.`
+      `"${item.name}" has an "applies to" list but its category is "${item.category}". A template must be a weapon, an armor or ammunition, because those are what a bind can make it.`
     );
     return;
   }
@@ -432,7 +432,7 @@ function equipmentIssues(item: EquipmentReference, checks: Checks) {
     if (item.category === "armor" && base.category === "shield") {
       checks.add(
         ["appliesTo", "baseIds", index],
-        `"${baseId}" is a shield, and a shield cannot be a template's base - its armor block carries its +2 bonus, not a body AC. Make the magic shield its own fixed item instead.`
+        `"${baseId}" is a shield, and a shield cannot be a template's base: its armor block carries a +2 bonus where a body armor carries its AC. Make the magic shield its own fixed item.`
       );
       return;
     }
@@ -464,7 +464,7 @@ function spellListIssues(list: SpellListReference, checks: Checks) {
   if ((resolution.memberIds.get(list.id)?.size ?? 0) === 0) {
     checks.add(
       ["add"],
-      "This spell list resolves to no spells. A caster pointed at an empty list cannot be created at all - add spell ids, base it on an existing list, or tag spells with this list's id."
+      "This spell list resolves to no spells. A caster pointed at an empty list cannot be created at all. Add spell ids, base it on an existing list, or tag spells with this list's id."
     );
   }
 }
@@ -482,7 +482,7 @@ function spellcastingIssues(spellcasting: ContentSpellcasting | undefined, owner
     );
     return;
   }
-  // `spellSummaries()` is already overlaid with published lists, matching what the build will resolve.
+  // `spellSummaries()` is already overlaid with published lists, so it matches what the build will resolve.
   const members = spellListMemberIds(listId, checks.spellLists, checks.catalog.spellSummaries());
   if (members.size === 0) {
     checks.add(
@@ -562,7 +562,7 @@ function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, lab
         [...path, index],
         read.length === 0
           ? `"${label}" gates ${withArticle(modifier.type)} on "${moment}", but a defence is read before any roll, so it would publish and then never apply. Drop the moment, or gate it on a state (while-effect-tag, while-condition, ...).`
-          : `"${label}" gates ${withArticle(modifier.type)} on "${moment}", a moment the damage roll never collects - it would publish and then add nothing, ever. Gate it on ${read.map((entry) => `"${entry}"`).join(", ")} instead (or drop the moment for an always-on bonus).`
+          : `"${label}" gates ${withArticle(modifier.type)} on "${moment}", a moment the damage roll never collects, so it would publish and then add nothing. Gate it on ${read.map((entry) => `"${entry}"`).join(", ")}, or drop the moment for an always-on bonus.`
       );
     }
     if (modifier.type === "extra-damage" && modifier.formula === undefined && modifier.abilityModifier === undefined) {
@@ -680,7 +680,7 @@ export function createHomebrewValidator(source: {
   /** Catalogs for a scenario; without it, every validation reads the live table. */
   forScenario?: ScenarioCatalogs;
   publishedSpellLists: () => readonly SpellListReference[];
-  /** Drafts included: the gate asks about authorship, not publication. */
+  /** Drafts included: the gate asks about authorship alone. */
   authoredIndex: () => HomebrewAuthoredIndex;
 }) {
   return (type: HomebrewContentType, body: unknown, scenario?: HomebrewValidationScenario): HomebrewValidity => {

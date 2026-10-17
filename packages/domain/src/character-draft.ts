@@ -12,12 +12,12 @@ const atMostKeys = (limit: number) => (record: Readonly<Record<string, unknown>>
   Object.keys(record).length <= limit;
 
 /**
- * The character builder's in-progress build, exactly as the wizard keeps it: what it chose so far, not a sheet. The
+ * The character builder's in-progress build, exactly as the wizard keeps it: what it chose so far, before any sheet exists. The
  * server parks it for its owner and hands it back; `character.create` validates the build itself when it is made.
  */
 export const CharacterDraftSchema = z
   .object({
-    /** The wizard's draft format; a draft from another format is dropped rather than half-restored. */
+    /** The wizard's draft format; a draft from another format is dropped whole, so nothing is half-restored. */
     version: z.number().int().min(1).max(100),
     speciesId: DraftSlug.nullable(),
     backgroundId: DraftSlug.nullable(),

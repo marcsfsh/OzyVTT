@@ -31,7 +31,7 @@ import { sheetAbilityScores } from "./sheet-abilities.js";
  * turned into the ledger rows a create carries. The wizard computes none of this itself.
  */
 
-/** The ASI's "raise two points instead of a feat" answer, carried as `payload.increases`. */
+/** The ASI's "raise two points in place of a feat" answer, carried as `payload.increases`. */
 const ASI_SHORTHAND = "asi";
 /** Offer kinds answered by a feat. */
 const FEAT_KINDS: ReadonlySet<string> = new Set(["feat", "fighting-style", "asi-or-feat"]);
@@ -147,7 +147,7 @@ const subclassesOf = (offers: readonly BuilderOffer[], picks: Picks, startingCla
   );
 
 /** A stored ledger's subclass rows; a row naming no class is the starting class's. */
-const subclassesInLedger = (rows: readonly CharacterChoice[], startingClassId?: string): DraftSubclasses =>
+export const subclassesInLedger = (rows: readonly CharacterChoice[], startingClassId?: string): DraftSubclasses =>
   subclassesBy(
     rows.filter((row) => row.kind === "subclass").map((row) => ({ classId: row.classId ?? null, id: row.id })),
     startingClassId

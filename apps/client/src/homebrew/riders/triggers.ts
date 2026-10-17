@@ -126,10 +126,10 @@ export const slugValidate = (value: unknown): string | null => {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "lowercase-with-dashes"
-  } — lowercase, no spaces.`;
+  }, in lowercase with no spaces.`;
 };
 
-/** A collapsed row's label, e.g. "Only for: A damage type — fire, cold". */
+/** A collapsed row's label, e.g. "Only for: A damage type: fire, cold". */
 function triggerRowLabel(row: Draft): string {
   const name = triggerLabelOf(row.type);
   const values = [
@@ -153,8 +153,8 @@ function triggerRowLabel(row: Draft): string {
     .filter(Array.isArray)
     .flat()
     .map(String);
-  if (values.length > 0) return `${name} — ${values.slice(0, 3).join(", ")}${values.length > 3 ? "…" : ""}`;
-  if (typeof row.percent === "number") return `${name} — ${row.percent}% or less`;
+  if (values.length > 0) return `${name} · ${values.slice(0, 3).join(", ")}${values.length > 3 ? "…" : ""}`;
+  if (typeof row.percent === "number") return `${name} · ${row.percent}% or less`;
   if (row.type === "while-shield") return row.wielding === false ? "Not holding a shield" : name;
   return name;
 }
@@ -188,7 +188,7 @@ export const whenField = (): FieldDef => ({
       options: [opt("light", "Light"), opt("medium", "Medium"), opt("heavy", "Heavy")],
       visibleWhen: hasType("while-armored"),
       help: "Leave all off for any armour.",
-      // `weights` is `.min(1)` when present, so "any armour" means the key is absent, not `[]`.
+      // `weights` is `.min(1)` when present, so "any armour" means the key is absent (`[]` is refused).
       write: (next, row) => {
         const chosen = next as string[];
         if (chosen.length > 0) return { ...row, weights: chosen };
@@ -268,7 +268,7 @@ export const whenField = (): FieldDef => ({
       label: "It has the condition",
       kind: "switch",
       visibleWhen: hasType("while-condition"),
-      help: "Turn off for “only while you don't have it”."
+      help: `Turn off for "only while you don't have it".`
     },
     {
       key: "kinds",
@@ -338,7 +338,7 @@ export const whenField = (): FieldDef => ({
       kind: "tags",
       visibleWhen: hasType("spell-id-is"),
       suggestions: (ctx) => ctx.spells.map((entry) => entry.id),
-      help: "Only when this exact spell is cast — “when you cast Eldritch Blast”. A school or a level names a category; this names one."
+      help: 'Only when this exact spell is cast, as in "when you cast Eldritch Blast". A school or a level names a category; this names one.'
     },
     { key: "sizes", label: "Sizes", kind: "multiselect", options: SIZES, visibleWhen: hasType("versus-size") },
     {

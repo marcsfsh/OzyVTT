@@ -51,7 +51,7 @@ async function textAt(path: string): Promise<string> {
 
 describe("A player at a GM-only address", () => {
   it.each(["/codex/audit", "/codex/backup", "/codex/settings"])(
-    "%s renders exactly what an unknown address renders — no GM section name anywhere",
+    "%s renders exactly what an unknown address renders: no GM section name anywhere",
     async (gmOnlyPath) => {
       const unknown = await textAt("/codex/zzz");
       const gmOnly = await textAt(gmOnlyPath);

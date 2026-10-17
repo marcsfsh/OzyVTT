@@ -104,7 +104,7 @@ function enforceEquipRules(
         `Already attuned to ${limit} items (${attuned
           .slice(0, limit)
           .map((entry) => entry.name)
-          .join(", ")}) - break one first.`
+          .join(", ")}). Break one first.`
       );
     }
   }
@@ -127,7 +127,7 @@ function enforceEquipRules(
   if (worn.length >= capacity) {
     throw new CommandRejectedError(
       capacity === 1
-        ? `${worn[0].name} already occupies the ${slot} slot - take it off first.`
+        ? `${worn[0].name} already occupies the ${slot} slot. Take it off first.`
         : `Only ${capacity} ${slot} items can be worn at once.`
     );
   }
@@ -165,7 +165,7 @@ function withScrollSpell(item: InventoryItem, deps: InventoryDeps, stored?: Inve
   if (spellId === undefined) return rest;
   if (spellId === stored?.spellId) return { ...rest, spellId };
   if (deps.role !== "gm" && stored?.spellId !== undefined)
-    throw new CommandRejectedError(`${item.name} already bears a spell - only the GM can change it.`);
+    throw new CommandRejectedError(`${item.name} already bears a spell. Only the GM can change it.`);
   const lookup = deps.role !== "gm" && deps.pickableSpell ? deps.pickableSpell : deps.catalog.spellRecord;
   const spell = lookup?.(spellId);
   if (!spell) throw new CommandRejectedError(`There is no spell "${spellId}" to put on ${item.name}.`);
@@ -191,7 +191,7 @@ function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps
  *   - a non-template row's `baseId` is stripped (it would self-grant proficiency and mastery);
  *   - an omitted `baseId` inherits the stored pick; only the GM may change an existing pick (an in-place
  *     swap would bypass `enforceCurse`);
- *   - a stale pick on an already-bound row fails open, keeping its stored stats.
+ *   - a stale pick on an already-bound row fails open and keeps its stored stats.
  */
 export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
   return withMagicMarker(bindTemplateStats(item, deps, stored), deps);
@@ -258,7 +258,7 @@ function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: In
     return unbound;
   }
   if (deps.role !== "gm" && stored?.baseId !== undefined && baseId !== stored.baseId) {
-    throw new CommandRejectedError(`${item.name} is already bound - remove it and add it again to change what it is.`);
+    throw new CommandRejectedError(`${item.name} is already bound. Remove it and add it again to change what it is.`);
   }
   const base = deps.catalog?.equipmentRecord(baseId);
   // Magic ammunition is a piece of one kind (an arrow, a bolt): the pick says which launchers fire it, and it has no
@@ -268,7 +268,7 @@ function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: In
     if (appliesTo.baseIds.includes(baseId) && base?.ammunition !== undefined) return { ...bare, baseId };
     if (stored?.baseId === baseId) return { ...bare, baseId };
     throw new CommandRejectedError(
-      `${item.name} applies to ${appliesTo.label} - "${baseId}" is not one of the kinds it can be.`
+      `${item.name} applies to ${appliesTo.label}, and "${baseId}" is not one of the kinds it can be.`
     );
   }
   const stats = record.category === "weapon" ? base?.weapon : base?.armor;
@@ -292,14 +292,14 @@ function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: In
     }
     if (!appliesTo.baseIds.includes(baseId))
       throw new CommandRejectedError(
-        `${item.name} applies to ${appliesTo.label} - "${baseId}" is not one of its printed bases.`
+        `${item.name} applies to ${appliesTo.label}, and "${baseId}" is not one of its printed bases.`
       );
     if (shieldBase)
       throw new CommandRejectedError(
-        `"${baseId}" is a shield, and a shield cannot be a template's base - its armor block carries its +2 bonus, not a body AC.`
+        `"${baseId}" is a shield, and a shield cannot be a template's base: its armor block carries a +2 bonus where a body armor carries its AC.`
       );
     throw new CommandRejectedError(
-      `The catalog has no ${record.category === "weapon" ? "weapon" : "armor"} stats for "${baseId}" - ${item.name} cannot be bound to it.`
+      `The catalog has no ${record.category === "weapon" ? "weapon" : "armor"} stats for "${baseId}", so ${item.name} cannot be bound to it.`
     );
   }
   const { weapon: _clientWeapon, armor: _clientArmor, ...bare } = item;
@@ -394,7 +394,7 @@ export function setInventoryItem(
       actor.inventory = actor.inventory.map((entry, position) => (position === index ? { ...item } : entry));
     else {
       if (actor.inventory.length >= MAX_ITEMS)
-        throw new CommandRejectedError("This character's pack is full - remove something first.");
+        throw new CommandRejectedError("This character's pack is full. Remove something first.");
       actor.inventory = [...actor.inventory, { ...item }];
     }
   }
@@ -444,7 +444,7 @@ export function giveItem(
   const row = from.inventory.find((entry) => entry.id === itemId);
   if (!row) throw new CommandRejectedError("That item is no longer in the pack.");
   if (to.inventory.length >= MAX_ITEMS)
-    throw new CommandRejectedError(`${to.name}'s pack is full - remove something first.`);
+    throw new CommandRejectedError(`${to.name}'s pack is full. Remove something first.`);
   const catalogId = catalogIdOf(row);
   const taken = new Set(to.inventory.map((entry) => entry.id));
   let id = catalogId;

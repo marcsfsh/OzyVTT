@@ -71,7 +71,7 @@ export function GmEncounterPanel({
   // until shortly after the last turn command settled; otherwise one double tap skips a combatant.
   const turnSettlesAt = useRef(0);
   const [message, setMessage] = useState("");
-  // Encounter-setup opt-in: claimed players roll their own initiative (per encounter, not persisted).
+  // Encounter-setup opt-in: claimed players roll their own initiative (per encounter, never persisted).
   const [playersRollInitiative, setPlayersRollInitiative] = useState(false);
   // SRD Surprise and group rolls, per fight: who rolls initiative at Disadvantage, and one roll per stat block.
   const [surprised, setSurprised] = useState<ReadonlySet<string>>(() => new Set());
@@ -120,7 +120,7 @@ export function GmEncounterPanel({
       // Roster only: a replay launch adds a burst of actors the server deletes when the replay ends.
       for (const actor of rosterActors(state.actors)) if (!known.has(actor.id) && !actor.archived) valid.add(actor.id);
       knownActorIdsRef.current = new Set(state.actors.map((actor) => actor.id));
-      // An empty tray stays empty: "nothing staged" is a decision, not a gap to fill with the roster.
+      // An empty tray stays empty: "nothing staged" is a decision, and the roster doesn't fill it.
       return valid;
     });
   }, [actorsById, state.actors, state.combat.active]);
@@ -258,7 +258,7 @@ export function GmEncounterPanel({
   const quickStartMapId =
     pickedMap?.id ?? state.combat.mapAssetId ?? (selectedMap?.kind === "battlemap" ? selectedMap.id : null);
   const panelMapName = sceneLive
-    ? (nameOf(state.combat.mapAssetId) ?? "the live scene’s map")
+    ? (nameOf(state.combat.mapAssetId) ?? "the live scene's map")
     : (pickedMap?.name ?? nameOf(quickStartMapId) ?? (selectedMap?.kind === "battlemap" ? selectedMap.name : null));
   const readyToStart =
     stagedIds.length > 0 && (sceneLive ? state.combat.mapAssetId !== null : quickStartMapId !== null);
@@ -339,7 +339,7 @@ export function GmEncounterPanel({
             />
             {stagedIds.length > 0 && (
               <fieldset className="encounter-surprise">
-                <legend>Surprised? They roll initiative at Disadvantage.</legend>
+                <legend>Pick who is Surprised. They roll initiative at Disadvantage.</legend>
                 <div className="encounter-surprise-chips">
                   {stagedIds.map((actorId) => (
                     <Chip
@@ -387,7 +387,7 @@ export function GmEncounterPanel({
           <strong>Reviewing {reviewing.label ?? "an earlier turn"}</strong>
           <span>
             {dirty
-              ? "You changed this turn. Next turn rewrites history from here, undoing everything after it. Previous discards the change."
+              ? "You changed this turn. Next turn rewrites history from here and undoes everything after it. Previous discards the change."
               : "The whole table is paused here. Step forward to resume live play. Nothing is undone until you change something."}
           </span>
         </div>
@@ -407,9 +407,10 @@ export function GmEncounterPanel({
           {confirm.message}
         </ConfirmRow>
       )}
-      {/* The spell areas the server runs on the map; one a player cast waits here to be placed. */}
-      <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
       <div className="encounter-region scroll-y">
+        {/* The spell areas the server runs on the map; one a player cast waits here to be placed. They scroll with
+            the order, so a few of them never crowd the order out of its section. */}
+        <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
         <ol className="initiative-list gm">
           {state.combat.initiative.map((entry) => {
             const active = state.combat.turnActorId === entry.actorId;

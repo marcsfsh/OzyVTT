@@ -198,7 +198,7 @@ const searchInRail = async (user: ReturnType<typeof userEvent.setup>, query: str
 };
 const railResults = () => screen.getByRole("navigation", { name: "Campaign pages" });
 
-describe("Suite-wide search — the rail result list", () => {
+describe("Suite-wide search: the rail result list", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -257,7 +257,7 @@ describe("Suite-wide search — the rail result list", () => {
   });
 });
 
-describe("Suite-wide search — every jump prepares its destination", () => {
+describe("Suite-wide search: every jump prepares its destination", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -278,14 +278,14 @@ describe("Suite-wide search — every jump prepares its destination", () => {
     getCalendar.mockResolvedValue(CALENDAR);
   });
 
-  it("a MARKER hit opens the Atlas on its map AND selects the pin — both halves", async () => {
+  it("a MARKER hit opens the Atlas on its map AND selects the pin: both halves", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     await searchInRail(user, "svalich");
     await user.click(await screen.findByText("Old Svalich Road"));
 
     expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
-    // The pin's own map, not the default.
+    // The pin's own map, where the default would be wrong.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     expect(
@@ -351,7 +351,7 @@ describe("Suite-wide search — every jump prepares its destination", () => {
   });
 });
 
-describe("Suite-wide search — the command palette is the SAME search", () => {
+describe("Suite-wide search: the command palette is the SAME search", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -414,7 +414,7 @@ describe("Suite-wide search — the command palette is the SAME search", () => {
   });
 });
 
-describe("Suite-wide search — the player surface (viewer safety)", () => {
+describe("Suite-wide search: the player surface (viewer safety)", () => {
   const PLAYER_MAP: PlayerCodexMap = {
     id: "m1",
     assetId: "a1",
@@ -464,7 +464,7 @@ describe("Suite-wide search — the player surface (viewer safety)", () => {
     await user.type(screen.getAllByLabelText("Search the Codex")[0], query);
   };
 
-  it("renders the non-page kinds the server hands it — the client must not assume page-only", async () => {
+  it("renders the non-page kinds the server hands it: the client must not assume page-only", async () => {
     const user = userEvent.setup();
     await searchAsPlayer(user, "barovia");
 
@@ -500,7 +500,7 @@ describe("Suite-wide search — the player surface (viewer safety)", () => {
  * One settled query, one request (debounced in the shared hook, so all three callers are checked).
  * `delay: null` types without pauses, so without the debounce each character would be a call.
  */
-describe("Suite-wide search — one settled query, one request", () => {
+describe("Suite-wide search: one settled query, one request", () => {
   const gmMocks = () => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -530,7 +530,7 @@ describe("Suite-wide search — one settled query, one request", () => {
     for (const prefix of ["s", "st", "str", "stra", "strah"]) expect(search).not.toHaveBeenCalledWith("gm", prefix);
   });
 
-  it("the command palette debounces the same way — it is the same hook", async () => {
+  it("the command palette debounces the same way: it is the same hook", async () => {
     gmMocks();
     const user = userEvent.setup({ delay: null });
     renderWorkspace();
@@ -574,7 +574,7 @@ describe("Suite-wide search — one settled query, one request", () => {
 
     search.mockClear();
     await user.clear(box);
-    // Cleared immediately, not after the debounce.
+    // Cleared at once, before the debounce runs.
     expect(screen.queryByText("Strahd von Zarovich")).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("No pages yet.")).toBeInTheDocument());
     expect(search).not.toHaveBeenCalled();

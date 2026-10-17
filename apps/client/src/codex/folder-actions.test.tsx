@@ -6,7 +6,7 @@ import { NotebookTree, buildFolderTree } from "./NotebookTree";
 import type { CodexPageSummary } from "@vtt/domain";
 
 /**
- * A folder row has one `Menu` trigger instead of four small icon buttons that couldn't meet the 44px tap
+ * A folder row has one `Menu` trigger in place of four small icon buttons that couldn't meet the 44px tap
  * floor. jsdom can't measure pixels, so this checks the structure: one control on the row, every action a
  * `menuitem` (which carries the floor).
  */
@@ -50,7 +50,7 @@ const renderTree = (h: ReturnType<typeof handlers>) =>
 /** The row's action control. `Menu`'s trigger is a `<summary>` with no `button` role in jsdom, so find it by name. */
 const folderMenu = () => screen.getByLabelText("Actions for NPCs");
 
-describe("Notebook folder row — one action control, not four", () => {
+describe("Notebook folder row: one action control for four actions", () => {
   it("puts every folder action behind a single menu trigger", async () => {
     const user = userEvent.setup();
     renderTree(handlers());
@@ -68,7 +68,7 @@ describe("Notebook folder row — one action control, not four", () => {
     expect(items).toEqual(["New subfolder", "New page here", "Rename folder", "Move to top level", "Delete folder"]);
   });
 
-  it("no action sits on a bare button any more — each is a menu item, which is what carries the floor", async () => {
+  it("no action sits on a bare button any more: each is a menu item, which is what carries the floor", async () => {
     const user = userEvent.setup();
     const { container } = renderTree(handlers());
 

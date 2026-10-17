@@ -64,7 +64,7 @@ describe("the party strip's sheet", () => {
         <PartyStrip role="gm" state={state} />
       </ToastProvider>
     );
-    await user.click(screen.getByRole("button", { name: /^Lyra .*Open sheet\.$/ }));
+    await user.click(screen.getByRole("button", { name: /^Lyra,.*Open sheet\.$/ }));
     await user.click(await screen.findByLabelText("Sheet menu for Lyra"));
     await user.click(screen.getByRole("menuitem", { name: "Level up to 4" }));
     expect(navigate).toHaveBeenCalledWith(`/characters/${LYRA}/level`);

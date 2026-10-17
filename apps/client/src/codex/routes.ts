@@ -88,7 +88,7 @@ const CAMPAIGN_ITEMS: readonly SidebarItem[] = [
 ];
 const HOME_ITEM: SidebarItem = { id: "home", label: "Home", iconId: "home", path: CODEX_ROOT };
 
-/** The GM's sidebar. Tools is bottom-anchored by `SidebarNav`, not by its position in this array. */
+/** The GM's sidebar. Tools is bottom-anchored by `SidebarNav`, whatever its position in this array. */
 export const GM_SIDEBAR: readonly SidebarGroup[] = [
   { items: [HOME_ITEM] },
   { label: "World", items: WORLD_ITEMS },

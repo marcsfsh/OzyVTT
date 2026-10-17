@@ -26,7 +26,7 @@ import { blocksMovement } from "./vision/sight.js";
  *  double. Stored as disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
 
 const MAX_TERRAIN_RECTS = 1000;
-const LIVE_REFUSAL = "That scene is live - edit its terrain on the table.";
+const LIVE_REFUSAL = "That scene is live. Edit its terrain on the table.";
 
 export function paintTerrain(
   state: GameState,
@@ -41,7 +41,7 @@ export function paintTerrain(
   const difficult =
     input.op === "difficult" ? unionRect(slice.layer.difficult, rect) : subtractRect(slice.layer.difficult, rect);
   if (difficult.length > MAX_TERRAIN_RECTS)
-    throw new CommandRejectedError("The terrain is too finely cut up - clear it and mark it again in larger areas.");
+    throw new CommandRejectedError("The terrain is too finely cut up. Clear it and mark it again in larger areas.");
   slice.write({ difficult });
 }
 

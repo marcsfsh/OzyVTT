@@ -217,7 +217,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
 
   it("spends its own once-per-Long-Rest use and refuses the second", () => {
     const built = table(level11());
-    // The daily use rides the arcanum spell's own free casting, spending the feature's pool.
+    // The daily use rides the arcanum spell's own free casting, which spends the feature's pool.
     expect(actionOf(built, "spell-true-seeing-free").uses).toMatchObject({
       limit: 1,
       per: "long-rest",
@@ -313,7 +313,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
         (level) => spellOf(built.definition, ["true-seeing", "forcecage", "demiplane", "foresight"][level - 6])!.level
       )
     ).toEqual([6, 7, 8, 9]);
-    // Four separate pools, not one shared counter: the SRD regains "all uses" on a Long Rest.
+    // Four separate pools: the SRD regains "all uses" on a Long Rest.
     const arcana = ["true-seeing", "forcecage", "demiplane", "foresight"];
     for (const level of [6, 7, 8, 9]) {
       expect(actionOf(built, `spell-${arcana[level - 6]}-free`).uses).toMatchObject({
@@ -332,7 +332,7 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
   it("always has Contact Other Plane prepared without charging the prepared budget", () => {
     const built = level9();
     // A level-9 Warlock prepares 10 spells. The grant is `alwaysPrepared`, so it does not count against
-    // that, which is why `grants.spells` exists rather than an extra pick.
+    // that, which is why `grants.spells` exists and is no extra pick.
     expect(spellOf(built, "contact-other-plane")).toMatchObject({ level: 5, alwaysPrepared: true, prepared: true });
     expect(built.spellcasting!.classes![0]).toMatchObject({ classId: "warlock", prepared: 10 });
   });
@@ -488,7 +488,7 @@ describe("Fiend Patron: Fiendish Resilience halves the damage it names (audit ro
       POLICY
     );
 
-  it("takes half of the chosen type and all of another - at the table, not on the record", () => {
+  it("takes half of the chosen type and all of another: at the table, not on the record", () => {
     const built = table(resilient("fire"));
     expect(built.definition.damageResistances).toEqual(["fire"]);
     const burned = applyDamageDetailed(
@@ -552,7 +552,7 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
 
   it("proposes 8d10 Psychic against a Charisma save at the Warlock's own spell save DC", () => {
     const built = level14();
-    // CHA 20 (+5) and proficiency +5 at level 14: DC 8 + 5 + 5 = 18, derived rather than authored.
+    // CHA 20 (+5) and proficiency +5 at level 14: DC 8 + 5 + 5 = 18, derived.
     const action = actionOf(built, "hurl-through-hell");
     expect(action.save).toEqual({
       ability: "cha",
@@ -764,7 +764,7 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
   // feat rows are settled before chosen options create their offers, so the row finds no offer, and
   // omitting it fails the completeness check. If that ordering changes, this fails and the row should be authored.
   it("still takes Lessons of the First Ones as a bare option, because a nested FEAT pick cannot be answered yet", () => {
-    // Takeable, granting only its prose.
+    // Takeable, and it grants only its prose.
     expect(() => withInvocation("lessons-of-the-first-ones")).not.toThrow();
     // ...and a feat row aimed at it finds no offer.
     expect(
@@ -866,7 +866,7 @@ const sorcererInput = (level: number, extra: readonly Row[] = []): CharacterCrea
   ] as CharacterCreateRequestInput["choices"]
 });
 
-/** Metamagic: two at level 2, two more at 10, two more at 17 - the SRD's six. */
+/** Metamagic: two at level 2, two more at 10, two more at 17: the SRD's six. */
 const metamagic = (level: number, ids: readonly string[]): Row[] =>
   ids.map((id) => ({ level, classId: "sorcerer", kind: "metamagic", id, payload: { featureId: "metamagic" } }) as Row);
 /** Everything a Sorcerer of this level owes beyond the base rows: metamagic, ASIs, the affinity. */
@@ -1034,7 +1034,7 @@ describe("Sorcerer: Sorcerous Restoration and Epic Boon (audit row 6, the Sorcer
 describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Magic opens", () => {
   it("debits the shared counter, so a Metamagic option and Font of Magic spend one supply", () => {
     // Careful Spell prints "Cost: 1 Sorcery Point", so the chosen option carries a use of the same
-    // `sorcery-points` pool, making Metamagic a button that spends.
+    // `sorcery-points` pool, and Metamagic is a button that spends.
     const built = table(sorcerer(5));
     expect(actionOf(built, "careful-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
 
@@ -1163,12 +1163,12 @@ describe("Draconic Sorcery: the level-3 spells and the affinity (audit rows 26, 
     const chilled = cast("fire", "cold", "50000000-0000-4000-8000-000000000121");
     expect(chilled.damage).toEqual([{ formula: "2d10", type: "cold", total: 10 }]);
     // ...and the same fire spell from a Sorcerer who chose Poison adds nothing: the rider follows the
-    // player's answer, not an authored default.
+    // player's answer.
     const unaffiliated = cast("poison", "fire", "50000000-0000-4000-8000-000000000122");
     expect(unaffiliated.damage).toEqual([{ formula: "2d10", type: "fire", total: 10 }]);
   });
 
-  it("reaches a SAVE-only spell too — the half of the feature that used to be missing", () => {
+  it("reaches a SAVE-only spell too, the half of the feature that used to be missing", () => {
     // "When you cast a spell that deals Fire damage" says nothing about attack rolls, so `damage-type-is`
     // must match a save-only spell too. The damage-type context is built from `action.damage` for both
     // attack and save branches; a save-only spell is the edge case that would catch it shrinking.
@@ -1343,7 +1343,7 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
     ).toThrow();
     expect(built.hero.actionUses["signature-spells"]).toBe(2); // the refusal spent nothing
 
-    // A short rest gives them back. Overchannel, once per long rest, is the control and must not come back.
+    // A Short Rest gives them back. Overchannel, once per Long Rest, is the control and must not come back.
     built.hero.actionUses = { ...built.hero.actionUses, overchannel: 1 };
     endEncounter(built.state);
     applyRest(built.state, IDS.hero, "short", () => built.definition, built.catalog);
@@ -1381,7 +1381,7 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
 });
 
 // Spell Mastery: "Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an
-// action." These are two picks with separate windows, not one pick of two under a single ceiling. Two
+// action." These are two picks with separate windows under separate ceilings. Two
 // level-1 spells must fail on the second block's floor, and two level-2 spells on the first block's
 // ceiling. Reads the shipped bundle through the real `ContentLibrary`.
 describe("Wizard: Spell Mastery is a level-1 pick AND a level-2 pick, not two picks under one ceiling", () => {
@@ -1421,7 +1421,7 @@ describe("Wizard: Spell Mastery is a level-1 pick AND a level-2 pick, not two pi
     );
   });
 
-  it('REFUSES a cantrip in the level-1 row — a level-0 spell is not "a level 1 spell"', () => {
+  it('REFUSES a cantrip in the level-1 row, since a level-0 spell is no "level 1 spell"', () => {
     // The window's floor: `wizard-spells` includes cantrips and `withinSpellWindow` is a plain min/max
     // check, so without a floor a cantrip would satisfy "level 1 spell". The client picker filters
     // cantrips, so only a server-side test reaches this. The refusal names the level, the minimum, and

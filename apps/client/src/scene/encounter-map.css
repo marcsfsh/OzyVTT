@@ -262,7 +262,7 @@
   stroke-dasharray: 6 4;
   opacity: 0.72;
 }
-/* Active turn: magenta ring and glow, pulsing once. The ring only renders while active, so the
+/* Active turn: magenta ring and glow that pulses once. The ring only renders while active, so the
    one-shot animation runs on each turn change. `transform-box: fill-box` is required, or the SVG
    default (view box) would scale it about the centre of the whole map. */
 .encounter-token-turn {
@@ -318,7 +318,7 @@
 .encounter-token-name {
   dominant-baseline: hanging;
 }
-/* Keyboard selection uses the token ink rather than cyan, which would merge with a healthy (cyan) HP
+/* Keyboard selection uses the token ink; cyan would merge with a healthy (cyan) HP
    ring. */
 .encounter-token.movable:focus-visible .encounter-token-body {
   stroke: var(--token-ink);

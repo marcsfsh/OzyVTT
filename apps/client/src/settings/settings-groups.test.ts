@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SETTINGS_GROUPS, groupsFor } from "./SettingsPage";
 
 /**
- * Pins the Settings declaration rather than the DOM: a player sees Mine only. A DOM test would also
+ * Pins the Settings declaration and leaves the DOM alone: a player sees Mine only. A DOM test would also
  * pass for a page that mounted the GM controls and hid them with CSS.
  */
 describe("Settings groups", () => {

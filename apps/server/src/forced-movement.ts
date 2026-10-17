@@ -10,7 +10,7 @@ import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js"
  *  1. Snapping is `moveEncounterToken`'s, the same path as a GM drag (footprint and bounds included).
  *  2. It does not go through `applyMovementRules`: forced movement provokes no Opportunity Attacks and
  *     spends none of the creature's Speed.
- *  3. Unmeasurable cases (no calibration or scale, a token not placed) return null rather than throw,
+ *  3. Unmeasurable cases (no calibration or scale, a token not placed) return null and never throw,
  *     so the caller can say "move the token". `moveEncounterToken` throws on an absent token, so those
  *     cases are checked first.
  *

@@ -156,7 +156,7 @@ export function SoundLibraryPanel({
                   ] as const
                 ).map(([slot, label, added, where, icon]) =>
                   onBoard(slot, sound.id) ? (
-                    // Already there: said in words at full strength, not as a dimmed button.
+                    // Already there: said in words at full strength, with no dimmed button.
                     <span key={slot} className="sound-asset-in">
                       {icon} {added}
                     </span>

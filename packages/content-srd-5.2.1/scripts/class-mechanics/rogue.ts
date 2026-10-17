@@ -7,7 +7,7 @@ export const rogue: ClassMechanicsModule = {
      * Once per turn (`per: "turn"`, counted in `turnUses`). It rides a hit: the server offers it on an attack's
      * preview when the hit qualifies (Finesse or Ranged weapon; Advantage, or an ally beside the target and no
      * Disadvantage) and rolls it with the hit in the weapon's type, so the `weapon` label below is never dealt.
-     * The printed column stays display-only: "6d6" is a die, not a use count.
+     * The printed column stays display-only: "6d6" is dice to roll.
      */
     "sneak-attack": {
       uses: { limit: 1, per: "turn", pool: "sneak-attack" },

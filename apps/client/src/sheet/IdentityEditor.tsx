@@ -7,7 +7,7 @@ import type { SheetEdit } from "./useSheetEdit";
 
 /**
  * One draft row per class the character has. `id` is sticky: retyping a loaded row's name edits
- * that class rather than minting another; a new row gets an id slugified from its name on save.
+ * that class and mints no other; a new row gets an id slugified from its name on save.
  * `hitDie` is carried untouched so the multiclass Hit Dice pool survives an identity edit.
  */
 type ClassDraft = {

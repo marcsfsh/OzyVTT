@@ -40,6 +40,7 @@ import { ConnectionGraph } from "./RelationshipGraph";
 import { PlayerCodex } from "./PlayerCodex";
 import { campaignFeedProps } from "./dashboard";
 import { useGmFeeds } from "./useGmFeeds";
+import { usePageLinks } from "./pageLinks";
 import "./codex.css";
 
 /**
@@ -97,7 +98,7 @@ export function CodexShell({
     try {
       localStorage.setItem(CONSOLE_KEY, consoleOpen ? "open" : "closed");
     } catch {
-      /* private mode - fine */
+      /* private mode: fine */
     }
   }, [consoleOpen]);
 
@@ -121,6 +122,8 @@ export function CodexShell({
   const refreshList = list.reload;
   const loadSessions = sessionFeed.reload;
   const loadQuests = questFeed.reload;
+  // A quest's or a session's `[[link]]` goes where a page's does, and offers to create a page no one has made yet.
+  const followLink = usePageLinks(pages, setQuickCreate);
   const standing = campaign.standing;
   const campaignLoading = campaignFeed.loading;
   const campaignError = campaignFeed.error;
@@ -273,8 +276,7 @@ export function CodexShell({
             className="codex-preview-modal"
           >
             <p className="codex-inspector-hint">
-              This is the real player Codex, read through a player session. Anything hidden from players is absent here,
-              not dimmed.
+              This is the real player Codex, read through a player session. Anything hidden from players is absent here.
             </p>
             {previewToken && <PlayerCodex token={previewToken} embedded />}
           </Modal>
@@ -320,7 +322,7 @@ export function CodexShell({
           deadlines={dash.deadlines}
           downtimePending={dash.downtimePending}
           onOpenDowntime={() => navigate(pathForSection("downtime"))}
-          /* The pin's own reveal flag, not a computed visibility: the map gates it too, and the Atlas
+          /* The pin's own reveal flag, and no computed visibility: the map gates it too, and the Atlas
              is where that switch lives. */
           party={
             campaign.party
@@ -410,6 +412,7 @@ export function CodexShell({
           statusFilter={route.query.get("status")}
           onFilterChange={setListFilter}
           onPickTag={(tag) => navigate(tagPath(tag))}
+          onFollowLink={followLink}
         />
       )}
 
@@ -425,6 +428,7 @@ export function CodexShell({
           openQuestId={recordId}
           onOpenQuest={(id) => navigate(id ? questPath(id) : pathForSection("quests"))}
           onOpenPage={(pageId) => navigate(pagePath(pageId))}
+          onFollowLink={followLink}
           filter={route.query.get("q") ?? ""}
           statusFilter={route.query.get("status")}
           onFilterChange={setListFilter}

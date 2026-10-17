@@ -5,7 +5,7 @@ import { command } from "../lib/command";
 import { useMapCatalog } from "../maps/map-catalog";
 import { ScenePrepPanel } from "./ScenePrepPanel";
 import "./scene-panel.css";
-// This panel's frame rules live with the prep room they wrap (scene-prep.css), not scene-panel.css.
+// This panel's frame rules live with the prep room they wrap (scene-prep.css), and scene-panel.css has none.
 import "./scene-prep.css";
 import { usePrompt } from "../components/feedback";
 

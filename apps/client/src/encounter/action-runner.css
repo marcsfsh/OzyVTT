@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
 }
-/* Resolution cards sit directly under the creature's name, rather than dropping below the action
+/* Resolution cards sit directly under the creature's name, above the action
    list once targeting clears on commit. */
 .action-runner > .action-result {
   order: -1;
@@ -76,7 +76,7 @@
   display: grid;
   gap: 0.18rem;
 }
-/* The bullet is a flex item, not absolute, so it never overlaps leading text like "+7 to hit". */
+/* The bullet is a flex item and no absolute box, so it never overlaps leading text like "+7 to hit". */
 .action-row-summary li {
   display: flex;
   align-items: baseline;
@@ -517,7 +517,7 @@
 .action-spellcasting-head span {
   color: var(--violet-hi);
 }
-/* A stat block's numbers wrap under the list's name on a phone rather than crowding it. */
+/* A stat block's numbers wrap under the list's name on a phone, so they never crowd it. */
 .action-spellcasting-head .action-spellcasting-numbers {
   color: var(--text-dim);
   font-size: var(--fs-xs);

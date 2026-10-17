@@ -20,7 +20,7 @@ boundary described in ADR-0007/ADR-0015. Nothing here is executable; bundles are
 Bundles are output only: no script reads its own output, and every step refuses to write when
 anything fails validation. `test/content-pipeline.test.ts` reruns the whole pipeline into an empty
 scratch directory and requires every committed bundle back byte for byte, so edit `sources/` or
-`scripts/` and rerun `npm run content` rather than editing a bundle.
+`scripts/` and rerun `npm run content`; never edit a bundle by hand.
 
 ## Layout
 
@@ -60,7 +60,7 @@ scratch directory and requires every committed bundle back byte for byte, so edi
   damage and its healing, whether its save waits for a later trigger, what it lets the caster do
   on later turns, and the effect it leaves on its targets or on a creature that fails its save) is read
   here too, by `scripts/spell-effects.ts` with a reviewed table, because the source's damage
-  and attack columns describe the prose rather than a cast. Upstream data bugs are fixed via reviewed
+  and attack columns describe the prose and no single cast. Upstream data bugs are fixed via reviewed
   `CORRECTIONS` tables (never by editing sources); fixtures open5e mislabels as SRD are dropped via
   `EXCLUSIONS`.
 - `scripts/build-class-bundle.ts`: generates the other nine classes and their subclasses from
@@ -135,31 +135,31 @@ scratch directory and requires every committed bundle back byte for byte, so edi
 
 ## What deliberately stays prose (ADR-0008)
 
-Weapon Mastery is engine behaviour rather than a rider: each weapon row carries its SRD mastery,
+Weapon Mastery is engine behaviour, with no rider: each weapon row carries its SRD mastery,
 the Fighter's picks land in the choice ledger, and all eight properties run in the server's
 resolver (`apps/server/src/weapon-mastery.ts`), as does the Light property's extra attack that
 Nick depends on.
 
 The rider vocabulary is bounded on purpose. These printed effects have **no** structured
-encoding, so they are authored as description text and adjudicated at the table rather than
+encoding, so they are authored as description text and adjudicated at the table, so none is
 mis-encoded into a rider that means something else:
 
-- **Potent Spellcasting** (Cleric Blessed Strikes) — "add your Wisdom modifier to Cleric cantrip
-  damage": `damage-bonus` carries a flat integer for weapon attacks, not an ability-derived
+- **Potent Spellcasting** (Cleric Blessed Strikes): "add your Wisdom modifier to Cleric cantrip
+  damage": `damage-bonus` carries a flat integer for weapon attacks, and no ability-derived
   bonus scoped to cantrips.
-- **Thaumaturge's Arcana/Religion bonus** — an ability-derived bonus to specific skill checks;
+- **Thaumaturge's Arcana/Religion bonus**: an ability-derived bonus to specific skill checks;
   there is no skill-check modifier in the vocabulary. The extra cantrip _is_ modeled.
-- **Stone's Endurance / Divine Spark healing** — damage reduction and "restore Hit Points equal
+- **Stone's Endurance / Divine Spark healing**: damage reduction and "restore Hit Points equal
   to the roll" have no rider; both actions carry their prose and their use counter.
-- **Frost's Chill's Speed reduction** and **Hill's Tumble's Prone** — `onHit` riders only fire
+- **Frost's Chill's Speed reduction** and **Hill's Tumble's Prone**: `onHit` riders only fire
   from an attack roll _on the same action_, and these ride an attack made with another action.
   Encoding them as `onHit` would silently never trigger.
-- **"Necrotic or Radiant, your choice"** (Divine Strike, Divine Spark) — a damage part carries
+- **"Necrotic or Radiant, your choice"** (Divine Strike, Divine Spark): a damage part carries
   one type; both are recorded as Radiant with the choice stated in the action text.
 
 ## License
 
-Game content: **CC BY 4.0** — "This work includes material from the System Reference Document
+Game content: **CC BY 4.0**: "This work includes material from the System Reference Document
 5.2.1 ('SRD 5.2.1') by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd.
 The SRD 5.2.1 is licensed under the Creative Commons Attribution 4.0 International License."
 The vendored fixture _files_ come from open5e-api, whose code is MIT; the fixtures carry the

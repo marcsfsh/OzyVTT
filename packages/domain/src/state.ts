@@ -22,7 +22,7 @@ export const StoredDefinitionSchema = z
   })
   .strict();
 export type StoredDefinition = z.infer<typeof StoredDefinitionSchema>;
-/** A player-submitted PDF import awaiting GM approval. GM-only — never in PlayerView or the viewer (ADR-0018). */
+/** A player-submitted PDF import awaiting GM approval. GM-only: never in PlayerView or the viewer (ADR-0018). */
 export const PendingImportSchema = z
   .object({
     id: z.string().max(120),
@@ -34,7 +34,11 @@ export const PendingImportSchema = z
 export type PendingImport = z.infer<typeof PendingImportSchema>;
 
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
-export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "healing", "manual"]);
+/** What a roll was for. `builder` marks the rolls the character builder makes itself (Hit Points for new levels, a
+ *  set of ability scores), which a sheet's latest-roll line leaves out; only the builder records one. */
+export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "healing", "manual", "builder"]);
+/** The purposes a free `dice.roll` may carry: every one but the builder's. */
+export const TableRollPurposeSchema = RollPurposeSchema.exclude(["builder"]);
 export const RollRecordSchema = z.object({
   id: z.uuid(),
   commandId: z.uuid(),
@@ -60,12 +64,13 @@ export const RollRecordSchema = z.object({
   ),
   modifiers: z.array(z.object({ value: z.number().int().nonnegative(), sign: z.union([z.literal(1), z.literal(-1)]) })),
   total: z.number().int(),
-  /** The d20 was typed from a physical die rather than thrown by the server. */
+  /** The d20 was typed from a physical die; the server threw nothing. */
   typed: z.literal(true).optional(),
   createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
 export type RollPurpose = z.infer<typeof RollPurposeSchema>;
+export type TableRollPurpose = z.infer<typeof TableRollPurposeSchema>;
 export type RollRecord = z.infer<typeof RollRecordSchema>;
 export type PlayerRollRecord = Omit<RollRecord, "initiatorSessionId">;
 
@@ -91,7 +96,7 @@ export const EncounterTokenSchema = z
     sizePx: z.number().positive().max(4096),
     gridSizePx: z.number().positive().max(4096).nullable().default(null),
     gridRotationRadians: z.number().min(-Math.PI).max(Math.PI).nullable().default(null),
-    /** Footprint in cells per side; even sizes snap to grid intersections instead of cell centers. */
+    /** Footprint in cells per side; even sizes snap to grid intersections, odd ones to cell centers. */
     sizeCells: z.number().int().min(1).max(4).default(1)
   })
   .strict();
@@ -212,7 +217,7 @@ const PendingSaveEffectSchema = z
     /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
      * once that has ended. */
     castId: z.string().min(1).max(120).optional(),
-    /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
+    /** The action it came from, so a second hit from the same action refreshes it and never stacks. */
     sourceActionId: z.string().max(120).optional(),
     /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
     ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
@@ -339,7 +344,7 @@ export const HeldRollSchema = z
       .default([]),
     /** The roll the faces were recorded under. */
     rollId: z.uuid().nullable().default(null),
-    /** Typed from a physical die rather than thrown by the server. */
+    /** Typed from a physical die; the server threw nothing. */
     typed: z.boolean().default(false),
     /** The round and turn they were thrown in: a die held for one turn's attack is not reused on a later turn. */
     round: z.number().int().nonnegative(),
@@ -438,7 +443,7 @@ export const ParkedAttackSchema = z
     distanceFeet: z.number().min(0).max(100000).nullable(),
     initiatorRole: z.enum(["gm", "player"]),
     initiatorSessionId: z.string().min(1).max(200),
-    /** The bonus lasts until the reactor's next turn (Shield) rather than against this attack only (Parry). */
+    /** The bonus lasts until the reactor's next turn (Shield); without it, the bonus counts against this attack only (Parry). */
     untilNextTurn: z.boolean(),
     /** Extras chosen for the hit (Sneak Attack, a smite), checked and spent only if it still hits. */
     hitOptions: z
@@ -639,9 +644,9 @@ export const PendingRuleAskSchema = z
     /** The machine-readable rule that blocked it (e.g. `economy.action-used`). */
     rule: z.string().min(1).max(120),
     family: RuleFamilySchema.nullable().default(null),
-    /** The player-facing sentence the block produced ("That needs your action - already used this turn"). */
+    /** The player-facing sentence the block produced ("Borin has already used a Bonus Action this turn."). */
     message: z.string().min(1).max(300),
-    /** The parked command, replayed verbatim on Allow. GM-only - never projected to any player. */
+    /** The parked command, replayed verbatim on Allow. GM-only, never projected to any player. */
     command: z.object({ type: AskableCommandSchema, payload: z.unknown() }).strict(),
     createdAt: z.iso.datetime()
   })
@@ -770,7 +775,7 @@ const sceneCombatShape = {
   /** The spell areas that act on creatures later (see SpellZoneSchema). GM-only. */
   spellZones: z.array(SpellZoneSchema).max(20).default([]),
   /** Action economy of the current turn's actor, reset on turn change. `actionInstance` holds remaining components
-   * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound bonus action (Flurry of
+   * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound Bonus Action (Flurry of
    * Blows); `turnUses` is keyed `${actorId}:${actionId}`. */
   turn: z
     .object({
@@ -931,7 +936,7 @@ const sceneCombatShape = {
   pendingInitiative: z.array(z.uuid()).max(200).default([])
 };
 
-/** A parked scene's frozen combat - same fields and invariants as the live combat, minus the map (the Scene owns that). */
+/** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */
 export const SceneCombatSchema = z.object(sceneCombatShape).superRefine(refineCombatContext);
 export type SceneCombat = z.infer<typeof SceneCombatSchema>;
 
@@ -1020,7 +1025,7 @@ export const CombatStateSchema = z
       context.addIssue({
         code: "custom",
         path: ["scenes"],
-        message: "The active scene's stored combat must be empty - its live copy is the top-level combat."
+        message: "The active scene's stored combat must be empty, because its live copy is the top-level combat."
       });
     }
   });

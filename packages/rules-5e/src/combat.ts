@@ -138,7 +138,7 @@ export type DeathSaveState = Readonly<{ successes: number; failures: number; sta
 export type DeathSaveRoll = Readonly<{
   state: DeathSaveState;
   outcome: "success" | "failure" | "critical-success" | "critical-failure";
-  /** Natural 20: the character regains 1 hit point and consciousness - the caller applies the heal. */
+  /** Natural 20: the character regains 1 hit point and consciousness; the caller applies the heal. */
   regainsOneHitPoint: boolean;
   dead: boolean;
 }>;

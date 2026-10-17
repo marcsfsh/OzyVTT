@@ -42,7 +42,7 @@ function useScrollEdges(active: boolean, contentKey: number) {
     }
     const measure = () => {
       const room = el.scrollHeight - el.clientHeight;
-      // 1px, not 0: sub-pixel layout leaves fractional room on boxes that don't overflow.
+      // 1px: sub-pixel layout leaves fractional room on boxes that don't overflow, so 0 would misfire.
       setEdges({ top: room > 1 && el.scrollTop > 1, bottom: room > 1 && el.scrollTop < room - 1 });
     };
     measure();

@@ -51,7 +51,7 @@ describe("a player's turn resources", () => {
     render(<PlayerTurnEconomy combat={combat("strict")} myId={ME} myTurn />);
     const action = screen.getByRole("button", { name: "Action" }) as HTMLButtonElement;
     expect(action.disabled).toBe(true);
-    expect(action.title).toBe("Spent - only the GM can give it back");
+    expect(action.title).toBe("Spent. Only the GM can give it back.");
     expect((screen.getByRole("button", { name: "Reaction" }) as HTMLButtonElement).disabled).toBe(true);
     // An unspent slot can still be marked.
     expect((screen.getByRole("button", { name: "Bonus" }) as HTMLButtonElement).disabled).toBe(false);

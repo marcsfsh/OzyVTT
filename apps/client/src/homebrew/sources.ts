@@ -95,7 +95,7 @@ export function useDuplicateSources(
   return useMemo(() => {
     if (!type) return [];
 
-    /** The GM's live record ids. Exclude by id, not by `source`: a homebrew record authored from
+    /** The GM's live record ids. Exclude by id, and never by `source`: a homebrew record authored from
         blank has no `source` (it defaults to "srd"), and spell/equipment/monster summaries carry
         none at all, so filtering on `source` would list homebrew twice. */
     const mineIds = new Set(homebrew.filter((row) => !row.deletedAt).map((row) => row.id));
@@ -161,7 +161,7 @@ export function useDuplicateSources(
           });
         break;
       case "spell-list":
-        // The SRD lists are bundle data, not an HTTP catalog.
+        // The SRD lists are bundle data with no HTTP catalog.
         break;
     }
 

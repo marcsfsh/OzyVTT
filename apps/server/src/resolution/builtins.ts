@@ -103,7 +103,9 @@ function chosenSubject(ctx: ResolveContext, ability: CheckSubject["ability"]): C
   if (skill === undefined) return { ability };
   const skillAbility = skills[skill];
   if (skillAbility === undefined)
-    throw new CommandRejectedError(`${ctx.action.name} uses ${Object.keys(skills).join(", ")}, not ${skill}.`);
+    throw new CommandRejectedError(
+      `${ctx.action.name} uses ${Object.keys(skills).join(", ")}, and ${skill} is not one of them.`
+    );
   return { ability: skillAbility, skill };
 }
 
@@ -235,7 +237,7 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
-    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet - move the token.`);
+    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet. Move the token.`);
     ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
   };
 }

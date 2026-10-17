@@ -70,7 +70,7 @@ export type ServerRolls = Readonly<{
 
 /**
  * Dice the wizard throws on the server. Rolls arrive through the roll history (`dice.roll` replies
- * with an id, not a total), so the number the wizard uses is the one the table can see was rolled.
+ * with an id and no total), so the number the wizard uses is the one the table can see was rolled.
  */
 export function useServerRolls(
   rolls: ReadonlyArray<Readonly<{ id: string; total: number }>>,
@@ -463,7 +463,7 @@ export function HitPointsSection({
         <span className="cb-offer-count tabular" role="status">
           {multiclass ? dice.join("/") : hitDie} · CON{" "}
           {base.con == null
-            ? "—"
+            ? "None"
             : abilityModifier(base.con + bonuses.con) >= 0
               ? `+${abilityModifier(base.con + bonuses.con)}`
               : abilityModifier(base.con + bonuses.con)}

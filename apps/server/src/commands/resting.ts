@@ -60,7 +60,7 @@ export const restingCommands = [
       if (!withdraw)
         kit.context.broadcastTableEvent({
           kind: "heal",
-          text: `${kit.actorName(actorId)} asks for a long rest. Answer it under Needs you on the Table.`,
+          text: `${kit.actorName(actorId)} asks for a Long Rest. Answer it under Needs you on the Table.`,
           actorIds: [actorId],
           gmOnly: true,
           logged: false
@@ -96,7 +96,7 @@ export const restingCommands = [
       kit.context.appendLog({
         kind: "heal",
         text: approve
-          ? `${kit.actorName(actorId)} completed a long rest.`
+          ? `${kit.actorName(actorId)} completed a Long Rest.`
           : `The GM turned down ${kit.actorName(actorId)}'s Long Rest.`,
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)

@@ -139,7 +139,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
 
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!map || !previewUrl || busy || !svgRef.current) return;
-    // The preview box is larger than the letterboxed map; ignore clicks outside the map rather than
+    // The preview box is larger than the letterboxed map; ignore clicks outside the map, with no
     // clamping them onto the nearest edge.
     if (!(event.target instanceof Node) || !svgRef.current.contains(event.target)) return;
     const raw = imagePointFromClient(svgRef.current, event.clientX, event.clientY);

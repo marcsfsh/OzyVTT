@@ -111,7 +111,7 @@ function useServerActionFacts(actorId: string, definition: ActorDefinition, effe
 }
 
 /**
- * A player's action console on their own turn, mirroring the GM's ActionRunner for their claimed
+ * A player's action console on their own turn, the counterpart of the GM's ActionRunner for their claimed
  * character: pick an action and targets, roll the d20 (or type the face a physical die shows), see why
  * it has Advantage or Disadvantage, and confirm.
  * Per the table's player-damage policy the server either hands the damage to the GM (proposal) or
@@ -421,7 +421,7 @@ export function PlayerActionRunner({
           picking={picking}
           targets={foesFirst(
             targets
-              // A heal may be for the healer too (a potion drunk, not handed over), and so may a touch that cures or
+              // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
               // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
               .filter(
                 (target) =>

@@ -309,7 +309,7 @@ describe("Ice Knife", () => {
     const result = resolve("spell-ice-knife", {}, [15, 5, 3, 4]);
     expect(saves(state).map((save) => save.target)).toEqual([FOE]);
     expect(result.warnings).toContain(
-      "Ice Knife: each creature within 5 feet of Goblin also makes the save - add them by hand."
+      "Ice Knife: each creature within 5 feet of Goblin also makes the save. Add them by hand."
     );
   });
 

@@ -46,7 +46,7 @@
   font-size: var(--fs-xs);
 }
 
-/* The capacity reason, stated once next to the count rather than on every locked card. Same caution colour and
+/* The capacity reason, stated once next to the count, and never on every locked card. Same caution colour and
    size as a per-option reason. */
 .nh-choicegrid-locked {
   display: flex;
@@ -63,7 +63,7 @@
   font-size: 1.05em;
 }
 
-/* One column on a phone, filling out to a dozen cards on a laptop. */
+/* One column on a phone, and up to a dozen cards across on a laptop. */
 .nh-choicegrid-items {
   display: grid;
   grid-template-columns: 1fr;
@@ -76,7 +76,7 @@
   gap: var(--space-4);
 }
 
-/* Bounded region (`ChoiceGrid bounded`): caps the list and scrolls it in place, keeping every option mounted.
+/* Bounded region (`ChoiceGrid bounded`): caps the list and scrolls it in place. Every option stays mounted.
    Rows are `max-content`: with `auto` rows, a list taller than the cap shrinks every row to its cards' minimum
    height and clips their descriptions. 21rem matches `.map-picker-grid`. `overscroll-behavior: contain` stops
    scroll chaining; the padding leaves room for the focus ring, which `overflow` would clip. */
@@ -91,7 +91,7 @@
 
 /* No detail pane; WizardShell owns master-detail. */
 
-/* auto-fit, not auto-fill, so an offer with two options doesn't reserve empty tracks and leave the cards adrift. */
+/* auto-fit, so an offer with two options doesn't reserve empty tracks and leave the cards adrift. */
 @media (min-width: 561px) {
   .nh-choicegrid-items {
     grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));

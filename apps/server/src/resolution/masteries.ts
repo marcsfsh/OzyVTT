@@ -71,7 +71,7 @@ function parkMasterySaves(ctx: ResolveContext): void {
       ...(namesAHiddenCombatant(ctx, attacker.id, forced.targetId) ? { gmOnly: true } : {})
     });
     warnings.push(
-      `${forced.actionName}: ${forced.targetName}'s save is DC ${forced.dc} - the prompt is in the turn order.`
+      `${forced.actionName}: ${forced.targetName}'s save is DC ${forced.dc}. The prompt is in the turn order.`
     );
   }
 }
@@ -114,7 +114,7 @@ export function offeredPush(ctx: ResolveContext): Readonly<{ targetName: string;
 }
 
 /** A hit's forced movement (the Push mastery, Repelling Blast, a stat block's shove), as far as the attacker chose
- *  (SRD "up to"). Failures degrade to a GM-only sentence, never a rejection; only an accomplished push is narrated to
+ *  (SRD "up to"). A failure is a GM-only sentence and refuses nothing; only an accomplished push is narrated to
  *  the table. */
 function pushMasteryTargets(ctx: ResolveContext): void {
   const { attacker, targets, deps, input, tableNarration, warnings } = ctx;
@@ -141,7 +141,7 @@ function pushMasteryTargets(ctx: ResolveContext): void {
     // square, so say nothing. Rounded so snapping noise can't print "pushed 0 ft".
     if (moved === null) {
       warnings.push(
-        `${forced.targetName} is pushed ${forced.distanceFeet} feet straight away from ${attacker.name} - move the token.`
+        `${forced.targetName} is pushed ${forced.distanceFeet} feet straight away from ${attacker.name}. Move the token.`
       );
       continue;
     }
@@ -157,7 +157,7 @@ function pushMasteryTargets(ctx: ResolveContext): void {
       continue;
     }
     warnings.push(
-      `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`
+      `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it, so the token stays where it is.`
     );
   }
 }

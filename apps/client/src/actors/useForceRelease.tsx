@@ -12,7 +12,7 @@ export function useForceRelease() {
   const release = async (actor: Readonly<{ id: string; name: string }>) => {
     const ok = await confirm({
       title: `Release ${actor.name}?`,
-      body: `The player with ${actor.name} goes back to the character list, with a note that you released ${actor.name}. Anyone at the table can claim ${actor.name} next.`,
+      body: `The player with ${actor.name} goes back to the character list and sees a message that you released ${actor.name}. Anyone at the table can claim ${actor.name} next.`,
       confirmLabel: "Release",
       danger: true
     });

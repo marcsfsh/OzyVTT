@@ -14,7 +14,7 @@ export function manualDamagePayload(
     amount: number;
     /** The canonical slug from `manualDamageType`, or `undefined` for the untyped fast path. */
     damageType?: string;
-    /** SRD knock-out: a drop to 0 leaves the target Unconscious and stable instead of dying. */
+    /** SRD knock-out: a drop to 0 leaves the target Unconscious and stable, alive. */
     nonlethal?: boolean;
     expectedRevision?: number;
   }>

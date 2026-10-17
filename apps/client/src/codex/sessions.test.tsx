@@ -95,7 +95,7 @@ import type { CodexCalendar, CodexChronicleRecord, CodexSession, PlayerCodexSess
 
 /**
  * The console is a view: it fetches nothing of its own and never writes. Journal groups without a session
- * record stay plain headings. The recap badge keys on session id, not `updatedAt`.
+ * record stay plain headings. The recap badge keys on session id.
  */
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
@@ -187,7 +187,7 @@ describe("Which session is 'now' (the rule, below the components)", () => {
     expect(pickNextSession([S3, S8], "s3")?.id).toBe("s3");
     // No pointer: the player's case.
     expect(pickNextSession([S3, S8])?.id).toBe("s8");
-    // A stale pointer falls through rather than blanking the card.
+    // A stale pointer falls through and the card stays filled.
     expect(pickNextSession([S3, S8], "deleted")?.id).toBe("s8");
     // An unnumbered record never takes the card from a numbered one.
     const scratch = SESSION({ id: "sx", sessionNumber: null });
@@ -198,7 +198,7 @@ describe("Which session is 'now' (the rule, below the components)", () => {
     expect(sessionTitle(S8)).toBe("Session 8");
   });
 
-  it("resolves a session NUMBER only when a record exists for it — there is no backfill", () => {
+  it("resolves a session NUMBER only when a record exists for it: there is no backfill", () => {
     expect(sessionByNumber([S3, S8], 3)?.id).toBe("s3");
     expect(sessionByNumber([S3, S8], 4)).toBeNull();
     expect(sessionByNumber([], 3)).toBeNull();
@@ -216,7 +216,7 @@ describe("The session console is a VIEW", () => {
       await user.click(screen.getAllByRole("button", { name: tab })[0]);
       await user.click(screen.getByRole("button", { name: "Session prep" }));
       const panel = screen.getByRole("complementary", { name: "Session prep" });
-      // The drawer stays mounted while closed, so check `inert` rather than presence.
+      // The drawer stays mounted while closed, so check `inert`; presence proves nothing.
       expect(panel).not.toHaveAttribute("inert");
       // The active session's prep rendered, so the call counts below aren't against an empty panel.
       expect(within(panel).getByRole("heading", { name: "Session 8" })).toBeInTheDocument();
@@ -271,13 +271,13 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     const log = within(await screen.findByRole("navigation", { name: "Sessions" }));
     await waitFor(() => expect(log.getByRole("button", { name: /Session 3/ })).toHaveAttribute("aria-current", "true"));
     expect(log.getByRole("button", { name: /Session 8/ })).not.toHaveAttribute("aria-current");
-    // The record is open and its prep editable, not just highlighted.
+    // The record is open and its prep editable, beyond a highlight.
     expect(screen.getByRole("textbox", { name: /Prep for this session/ })).toHaveValue(
       "Strahd ambushes them at the bridge."
     );
   });
 
-  it("from a by-session journal heading — but ONLY where a session record exists", async () => {
+  it("from a by-session journal heading, but ONLY where a session record exists", async () => {
     // Session 3 has a record; session 4 does not. Both have entries.
     gmDefaults([S3], "s1");
     chronicle.mockResolvedValue([record("j3", 3), record("j4", 4)]);
@@ -413,7 +413,7 @@ describe("The recap badge keys on session ID", () => {
     const button = await screen.findByRole("button", { name: "Open Codex 2 new" });
     await user.click(button);
     expect(await screen.findByRole("button", { name: "Open Codex" })).toBeInTheDocument();
-    // The seen set (ids, not a timestamp) is what persists.
+    // The seen set (ids, and no timestamp) is what persists.
     expect(JSON.parse(localStorage.getItem("codex-seen-sessions")!).sort()).toEqual(["s1", "s2"]);
   });
 
@@ -441,7 +441,7 @@ describe("The recap badge keys on session ID", () => {
   });
 
   it("never reads sessions for a GM token, and shows nothing before the first list lands", () => {
-    // Armed so a regression fails on the assertion rather than a TypeError. main.tsx passes null for the GM.
+    // Armed so a regression fails on the assertion and never on a TypeError. main.tsx passes null for the GM.
     playerSessions.mockResolvedValue([sessionRow("s1", 1)]);
     render(<BadgeProbe token={null} />);
     expect(screen.getByRole("button", { name: "Open Codex" })).toBeInTheDocument();

@@ -73,7 +73,7 @@
 }
 
 .nh-modal-head {
-  /* The client's bare `header { max-width: 40rem }` would clamp this title bar; fix it here, not in the app. */
+  /* The client's bare `header { max-width: 40rem }` would clamp this title bar; the fix lives here, outside the app. */
   max-width: none;
   display: flex;
   align-items: center;
@@ -173,7 +173,7 @@
   }
 }
 
-/* Top-aligned dialog: the command-palette shape, under the eye rather than centred. */
+/* Top-aligned dialog: the command-palette shape, under the eye. */
 .nh-modal--top {
   margin-block: 10vh auto;
 }

@@ -207,7 +207,7 @@ export function useMapView({
     if (!size) return;
     setCamera((current) => onTheMap(size, box, { center: point, zoom: Math.max(current.zoom, readable) }));
   };
-  /** Brings every point into view with `pad` round each, moving as little as it can. */
+  /** Brings every point into view with `pad` round each, and moves as little as it can. */
   const frame = (points: readonly Point[], pad: number) => {
     if (!size) return;
     setCamera((current) => {

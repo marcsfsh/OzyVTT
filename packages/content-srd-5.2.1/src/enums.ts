@@ -88,7 +88,7 @@ export const GEAR_CATEGORY_IDS: readonly string[] = Object.freeze([
 
 /**
  * The magic-item rarity ladder, plus `varies`. Unlike the lists above this is not a projection of a
- * bundle, so `test/enums.test.ts` checks containment rather than equality. Open slug: controls must
+ * bundle, so `test/enums.test.ts` checks containment (equality would be too strict). Open slug: controls must
  * also accept free text.
  */
 export const RARITY_IDS: readonly string[] = Object.freeze([

@@ -124,13 +124,13 @@ describe("the bind: one shipped row, two picked bases, two different numbers", (
     const action = effectiveActions(DEFINITION, state.actors[0], CATALOG).find(
       (entry) => entry.id === "item-sword-of-sharpness"
     )!;
-    // Heavy two-hander: Strength (+1) + proficiency (2). Labelled as the magic item, not the base.
+    // Heavy two-hander: Strength (+1) + proficiency (2). Labelled as the magic item.
     expect(action.name).toBe("Sword of Sharpness");
     expect(action.attack!.bonus).toBe(3);
     expect(action.damage).toEqual([{ formula: "2d6 + 1", type: "slashing" }]);
   });
 
-  it("the SAME shipped row bound to a scimitar swings off Dexterity - finesse travels with the pick", () => {
+  it("the SAME shipped row bound to a scimitar swings off Dexterity: finesse travels with the pick", () => {
     const state = stateWith();
     setInventoryItem(
       state,
@@ -194,11 +194,13 @@ describe("the bind: one shipped row, two picked bases, two different numbers", (
         { catalog: CATALOG }
       )
     ).toThrow(
-      new CommandRejectedError('Dwarven Thrower applies to Warhammer - "greatsword" is not one of its printed bases.')
+      new CommandRejectedError(
+        'Dwarven Thrower applies to Warhammer, and "greatsword" is not one of its printed bases.'
+      )
     );
   });
 
-  it("auto-binds a single-base template - no question with one answer - and its riders land whole", () => {
+  it("auto-binds a single-base template (no question with one answer) and its riders land whole", () => {
     const state = stateWith();
     // Dwarven Thrower is always a warhammer: the row arrives with no baseId and binds anyway, and its
     // +3/+3 lands: attack 1 (str) + 2 (prof) + 3 = 6, damage 1d8 + 1 + 3.
@@ -219,7 +221,7 @@ describe("the bind: one shipped row, two picked bases, two different numbers", (
     expect(action.damage).toEqual([{ formula: "1d8 + 4", type: "bludgeoning" }]);
   });
 
-  it("Sun Blade and Energy Bow do NOT bind - a wrong swing may not replace an honest absence", () => {
+  it("Sun Blade and Energy Bow do NOT bind: a wrong swing may not replace an honest absence", () => {
     // Their printed effect is more than the base (damage-type conversion plus bonuses), so the ETL
     // withholds their appliesTo and the rows stay unbound.
     const state = stateWith();
@@ -236,7 +238,7 @@ describe("the bind: one shipped row, two picked bases, two different numbers", (
     ).toBeUndefined();
   });
 
-  it("never trusts a client-supplied block on a template row - bound it is overwritten, unbound it is stripped", () => {
+  it("never trusts a client-supplied block on a template row: bound it is overwritten, unbound it is stripped", () => {
     const state = stateWith();
     // Bound, with a spoofed 9d10: the server's copy wins.
     setInventoryItem(
@@ -386,11 +388,11 @@ describe("the bind: armor", () => {
       stealthDisadvantage: true,
       strengthRequired: 13
     });
-    // Chain mail's printed 16, not unarmored 10 + Dex.
+    // Chain mail's printed 16.
     expect(state.actors[0].armorClass).toBe(16);
   });
 
-  it("a PLAYER cannot wear a bound magic armor over mundane armor - the slot rule already holds", () => {
+  it("a PLAYER cannot wear a bound magic armor over mundane armor: the slot rule already holds", () => {
     const state = stateWith([
       row({
         id: "chain-mail",
@@ -464,7 +466,7 @@ describe("the bind: the four write-path rules", () => {
       equipmentRecord: (id) => (id === "greatsword" ? undefined : RECORDS.find((record) => record.id === id)),
       featRecord: () => undefined
     };
-    // An ordinary edit keeps the frozen copied stats rather than throwing...
+    // An ordinary edit keeps the frozen copied stats and throws nothing...
     setInventoryItem(state, IDS.hero, row({ ...state.actors[0].inventory[0], equipped: false }), resolve, {
       catalog: drifted,
       role: "player"
@@ -488,7 +490,7 @@ describe("the bind: the four write-path rules", () => {
     expect(state.actors[0].inventory).toHaveLength(0);
   });
 
-  it("a non-template row STRIPS a forged baseId - proficiency and mastery cannot be self-granted", () => {
+  it("a non-template row STRIPS a forged baseId: proficiency and mastery cannot be self-granted", () => {
     const definition = definitionOf({
       proficiencies: { saves: [], skills: [], weapons: ["rapier"] },
       character: {
@@ -511,7 +513,7 @@ describe("the bind: the four write-path rules", () => {
     expect(derivation.masteryByActionId["item-greatsword"]).toBeUndefined();
   });
 
-  it("a baseId-less write INHERITS the stored pick - the free-text slug collision cannot unbind", () => {
+  it("a baseId-less write INHERITS the stored pick: the free-text slug collision cannot unbind", () => {
     const state = stateWith();
     setInventoryItem(
       state,
@@ -551,7 +553,7 @@ describe("the bind: the four write-path rules", () => {
         resolve,
         { catalog: CATALOG, role: "player" }
       )
-    ).toThrow(/already bound - remove it and add it again/);
+    ).toThrow(/already bound. Remove it and add it again/);
     setInventoryItem(
       state,
       IDS.hero,
@@ -562,7 +564,7 @@ describe("the bind: the four write-path rules", () => {
     expect(state.actors[0].inventory[0].weapon).toMatchObject({ damageDice: "2d6" });
   });
 
-  it("authored on-hit dice DOUBLE on a critical hit - a Flame Tongue crit deals 4d6 fire, as printed", () => {
+  it("authored on-hit dice DOUBLE on a critical hit: a Flame Tongue crit deals 4d6 fire, as printed", () => {
     const state = stateWith();
     setInventoryItem(
       state,
@@ -594,7 +596,7 @@ describe("the bind: the four write-path rules", () => {
       GEOMETRY
     );
     // d20 = 20 (crit): the longsword's 1d8 doubles to 2d8 (3 + 4), and the rider's 2d6 fire doubles
-    // to 4d6 (2 + 2 + 3 + 3) - SRD 5.2.1 Critical Hits: "you also roll those dice twice".
+    // to 4d6 (2 + 2 + 3 + 3), as SRD 5.2.1 Critical Hits says: "you also roll those dice twice".
     const crit = resolveDefinitionAction(
       state,
       action,

@@ -122,7 +122,7 @@ describe("the mechanics overlay", () => {
   it("reaches a GENERATED subclass, which had no authoring surface at all", () => {
     expect(Object.keys(SUBCLASS_MECHANICS)).toContain("draconic-sorcery");
     const draconic = loadSubclasses().find((record) => record.id === "draconic-sorcery")!;
-    // `allowShield: true` is authored: the printed feature restricts only "wearing armor", not a Shield.
+    // `allowShield: true` is authored: the printed feature restricts only "wearing armor", so a Shield is allowed.
     expect(draconic.features.find((entry) => entry.id === "draconic-resilience")!.modifiers).toEqual([
       { type: "unarmored-defense", ability: "cha", allowShield: true },
       { type: "hit-points-per-level", amount: 1 }
@@ -145,7 +145,7 @@ describe("the mechanics overlay", () => {
       expect(resources.length).toBeGreaterThan(0);
       expect(resources.filter((id) => !printed.has(id))).toEqual([]);
     }
-    // Classes contributing nothing are omitted rather than mapped to `{}`.
+    // Classes contributing nothing are left out (no `{}` entry).
     expect(Object.entries(CLASS_MECHANICS).filter(([, features]) => Object.keys(features).length === 0)).toEqual([]);
     expect(Object.entries(SUBCLASS_MECHANICS).filter(([, features]) => Object.keys(features).length === 0)).toEqual([]);
   });

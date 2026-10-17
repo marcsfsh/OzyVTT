@@ -186,7 +186,7 @@ describe("the GM's Sessions and Quests filters live in the address", () => {
   });
 
   /** Opening a record drops the filter from the address, as every list does; Back returns to the filtered list. */
-  it("drops the filter from the address when a record is opened — uniformly, as Pages does", async () => {
+  it("drops the filter from the address when a record is opened, uniformly, as Pages does", async () => {
     const user = userEvent.setup();
     renderGm("/codex/sessions?status=planned");
 

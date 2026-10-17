@@ -89,7 +89,7 @@ export function RiderEditor({
             ? "These apply while the item is equipped and attuned."
             : "These apply while the item is equipped."
           : scope === "statblock"
-            ? "These are the creature's own — always available to it."
+            ? "These belong to the stat block and always apply."
             : "These apply as soon as the feature is granted."}
       </p>
 

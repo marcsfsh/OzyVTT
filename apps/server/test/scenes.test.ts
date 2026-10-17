@@ -143,7 +143,7 @@ describe("scene staging (GM-private token placement)", () => {
     createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
     createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
     activateScene(game, IDS.sceneA, IDS.implicit); // A is live
-    // Stage the parked scene B privately - its token gets a position, and the live top-level is untouched.
+    // Stage the parked scene B privately: its token gets a position, and the live top-level is untouched.
     moveSceneToken(game, IDS.sceneB, IDS.beta, { x: 200, y: 150 }, GEOMETRY);
     expect(
       game.combat.scenes
@@ -381,7 +381,7 @@ describe("scene duplication and reordering", () => {
     );
     nextInitiativeTurn(game);
     const copy = duplicateScene(game, IDS.sceneA, IDS.sceneB);
-    // The active scene's own slot is empty, so the copy must capture the top-level (live) combat, not a blank.
+    // The active scene's own slot is empty, so the copy must capture the top-level (live) combat.
     expect(copy.combat.active).toBe(true);
     expect(copy.combat.initiative.map((entry) => entry.actorId)).toEqual(
       game.combat.initiative.map((entry) => entry.actorId)

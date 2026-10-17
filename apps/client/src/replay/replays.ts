@@ -116,7 +116,7 @@ export function stepsOf(document: ArchiveDocument): readonly Step[] {
     const last = steps[steps.length - 1];
     steps[steps.length - 1] = { ...last, to: document.finalState.revision };
     steps.push({
-      label: "Aftermath - how the fight ended",
+      label: "Aftermath · how the fight ended",
       at: document.endedAt,
       state: document.finalState,
       from: document.finalState.revision,

@@ -139,7 +139,7 @@ describe("half damage is half the total, rounded down once", () => {
       now: () => "2026-07-18T00:00:00.000Z",
       resolveDefinition: () => undefined
     });
-    // floor(16 / 2) = 8, not floor(7 / 2) + floor(9 / 2) = 7.
+    // floor(16 / 2) = 8. Halving each roll would give floor(7 / 2) + floor(9 / 2) = 7.
     expect(outcome.appliedDamage).toBe(8);
     expect(game.actors[0].hp.current).toBe(12);
   });

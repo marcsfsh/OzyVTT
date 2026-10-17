@@ -28,7 +28,7 @@ export function SessionConsole({
   session: CodexSession | null;
   /** The feed is still loading, so "no active session" can't be claimed yet. */
   loading: boolean;
-  /** The feed's own failure, shown rather than a blank console. */
+  /** The feed's own failure, shown so the console is never blank. */
   error: string | null;
   /** Opens Sessions on this session. */
   onOpenSession: (sessionId: string) => void;

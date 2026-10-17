@@ -61,6 +61,7 @@ import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 import { holdReadiedSpell } from "./resolution/ready.js";
 import { healLimit } from "./loose-healing.js";
+import { passiveOf, unavailableReason } from "./availability-reasons.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -232,7 +233,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
         }
       : ctx.builtinSave,
     damage,
-    // What every apply path lands: a negative part deals 0 of its type rather than eating another's.
+    // What every apply path lands: a negative part deals 0 of its type and never eats into another's.
     damageTotal: owedDamageTotal({ damage, bonusDamage }),
     crit: ctx.crit,
     ...rollModeOf(ctx),
@@ -304,12 +305,17 @@ export function actionAvailability(
       else if ((action.attack || action.replacesAttack) && instance.components["attack"] !== undefined)
         componentsRemaining = instance.components["attack"];
     }
+    const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
+    const passive = passiveOf(action, builtin);
     return {
       id: action.id,
       name: action.name,
       activation: action.activation,
       available: evaluation.violations.length === 0,
       violations: evaluation.violations,
+      // The sheet's one sentence for why not; the violations keep the full account.
+      ...(reason !== undefined ? { reason } : {}),
+      ...(passive !== undefined ? { passive } : {}),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),

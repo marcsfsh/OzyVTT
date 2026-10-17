@@ -252,7 +252,7 @@ export function appendCombatEntry(db: CodexDb, input: CodexCombatEntryInput): Co
 /** A deadline needs a structured date, since a label cannot be compared with a clock. `fired` is derived. */
 export function createDeadline(db: CodexDb, input: CodexJournalCreateInput): CodexJournalEntry {
   const dated = resolveDate(db, input.inWorldDate, input.inWorldLabel);
-  if (!dated.date) throw new CodexValidationError("A deadline needs an in-world date - the date is when it fires.");
+  if (!dated.date) throw new CodexValidationError("A deadline needs an in-world date. The date is when it fires.");
   return createOne(db, { ...authoredFields(db, input, dated), kind: "deadline", payload: null });
 }
 
@@ -267,7 +267,7 @@ export function createDowntime(db: CodexDb, input: CodexDowntimeCreateInput): Co
   return createOne(db, { ...authoredFields(db, input, dated), kind: "downtime", payload });
 }
 
-/** Level history is a journal record, not a table: the timeline already orders it. */
+/** Level history is a journal record with no table of its own: the timeline already orders it. */
 export function createMilestone(db: CodexDb, input: CodexMilestoneCreateInput): CodexJournalEntry {
   const payload = milestonePayload(input.milestone);
   const dated = resolveDate(db, input.inWorldDate ?? getCalendar(db).currentDate ?? null, input.inWorldLabel);
@@ -293,7 +293,7 @@ export function applyDowntime(
   const payload = downtimePayloadOf(existing);
   if (!payload) throw new CodexValidationError("That downtime record has no activity to apply.");
   if (payload.applied)
-    throw new CodexRevisionConflictError("That downtime has already passed - the clock has already moved.");
+    throw new CodexRevisionConflictError("That downtime has already passed, and the clock has already moved.");
   const target = proposedDateFor(db, existing);
   if (!target) throw new CodexValidationError("Set the campaign's current date before passing time.");
   const calendar = getCalendar(db);
@@ -316,11 +316,11 @@ export function updateEntry(db: CodexDb, entryId: string, input: CodexJournalUpd
     input.inWorldDate !== undefined || input.inWorldLabel !== undefined
       ? resolveDate(db, input.inWorldDate ?? null, input.inWorldLabel)
       : null;
-  // A deadline's date cannot be cleared, since without one it could never fire; rejected rather than ignored so
+  // A deadline's date cannot be cleared, since without one it could never fire; rejected, so
   // the GM learns the field is required.
   if (existing.kind === "deadline" && dated && dated.instant === null)
     throw new CodexValidationError(
-      "A deadline needs an in-world date - that is what makes it a deadline. Change its date, or delete it and write a note instead."
+      "A deadline needs an in-world date, because the date is what makes it a deadline. Change its date, or delete it and write a note."
     );
   const next = {
     playerText: input.playerText === undefined ? existing.playerText : entryText(input.playerText),

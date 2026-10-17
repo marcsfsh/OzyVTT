@@ -7,7 +7,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GmOnlyTag, HiddenFromPlayers, RevealSwitch, VisibilityBadge } from "./Reveal";
 
-describe("RevealSwitch — the one reveal toggle", () => {
+describe("RevealSwitch: the one reveal toggle", () => {
   it("says the state in the glossary's exact words, both ways round", () => {
     // Icon-only: the two strings live in the tooltip and `title`, still written in one place.
     const view = render(<RevealSwitch revealed onChange={() => {}} />);
@@ -16,13 +16,13 @@ describe("RevealSwitch — the one reveal toggle", () => {
     expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true");
 
     view.rerender(<RevealSwitch revealed={false} onChange={() => {}} />);
-    // "Hidden from players", not "GM only", so the record axis never collides with the content pill.
+    // "Hidden from players", so the record axis never collides with the content pill ("GM only").
     expect(screen.getByRole("tooltip")).toHaveTextContent("Hidden from players");
     expect(screen.getByRole("switch")).toHaveAttribute("title", "Hidden from players");
     expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "false");
   });
 
-  it("never becomes an unnamed icon — ruling 17's own constraint", () => {
+  it("never becomes an unnamed icon: ruling 17's own constraint", () => {
     // An icon-only toggle must keep its name: asserted per carrier (screen reader, pointer, long press).
     render(<RevealSwitch revealed={false} onChange={() => {}} ariaLabel="Show this page to players" />);
     const control = screen.getByRole("switch");
@@ -44,7 +44,7 @@ describe("RevealSwitch — the one reveal toggle", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const view = render(<RevealSwitch revealed={false} onChange={onChange} />);
-    // The default announces an action rather than a state.
+    // The default announces an action, and no state.
     expect(screen.getByRole("switch")).toHaveAccessibleName("Show to players");
     await user.click(screen.getByRole("switch"));
     expect(onChange).toHaveBeenCalledWith(true);
@@ -68,8 +68,8 @@ describe("RevealSwitch — the one reveal toggle", () => {
   });
 });
 
-describe("VisibilityBadge — the same fact, read-only", () => {
-  it("draws the mark and NAMES it, in both states — no visible label, never colour alone", () => {
+describe("VisibilityBadge: the same fact, read-only", () => {
+  it("draws the mark and NAMES it, in both states: no visible label, never colour alone", () => {
     // The read-only mark is the same icon-only eye (no badge, no printed words), and the glyph changes with the state
     // so it never relies on hue.
     const view = render(<VisibilityBadge revealed />);
@@ -85,7 +85,7 @@ describe("VisibilityBadge — the same fact, read-only", () => {
     expect(view.container.querySelector("svg")).not.toBeNull();
   });
 
-  it("says exactly what the switch says — a card and its toggle cannot drift into two vocabularies", () => {
+  it("says exactly what the switch says: a card and its toggle cannot drift into two vocabularies", () => {
     const badge = render(<VisibilityBadge revealed />);
     const badgeWords = badge.container.textContent;
     badge.unmount();
@@ -93,7 +93,7 @@ describe("VisibilityBadge — the same fact, read-only", () => {
     expect(control.container.textContent).toBe(badgeWords);
   });
 
-  it("is width-stable by construction — these sit in card headers whose contents must not shuffle", () => {
+  it("is width-stable by construction: these sit in card headers whose contents must not shuffle", () => {
     // No StableSwap: a fixed square holds one of two glyphs.
     const view = render(<VisibilityBadge revealed={false} />);
     expect(view.container.querySelector(".nh-stableswap")).toBeNull();

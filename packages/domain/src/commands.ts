@@ -8,11 +8,11 @@ import {
   BuilderAbilityMethodSchema,
   EncounterTokenPositionSchema,
   PartyVisibilitySchema,
-  RollPurposeSchema,
   RollVisibilitySchema,
   RuleExceptionsSchema,
   RuleFamilySchema,
-  RuleModeSchema
+  RuleModeSchema,
+  TableRollPurposeSchema
 } from "./state.js";
 import {
   AbilitySchema,
@@ -22,6 +22,8 @@ import {
   DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
+  MAX_FAVOURITE_OPTIONS,
+  OptionIdSchema,
   ProficienciesSchema
 } from "@vtt/schemas";
 import { MAX_SOUND_EFFECTS, MAX_SOUND_LAYERS, MAX_SOUND_TRACKS, SoundVolumeSchema } from "./sound.js";
@@ -62,7 +64,7 @@ export const EncounterStartSchema = z
   .object({
     commandId: z.uuid(),
     mapAssetId: z.uuid(),
-    /** Omitted means the server derives combatants from the live scene's staged list rather than trusting the client's copy. */
+    /** Omitted means the server derives combatants from the live scene's staged list and ignores any client copy. */
     entries: z
       .array(
         z
@@ -274,7 +276,7 @@ export const ApplyDamageSchema = z
       .optional(),
     sourceName: z.string().min(1).max(120).optional(),
     critical: z.boolean().optional(),
-    /** Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable instead of dying/defeated. */
+    /** Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable, neither dying nor defeated. */
     nonlethal: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -365,7 +367,7 @@ export const ActionResolveSchema = z
     cover: z.enum(["half", "three-quarters", "total"]).optional(),
     /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
     note: z.string().trim().min(1).max(100).optional(),
-    /** Ready this spell rather than cast it now (SRD Ready): its slot is spent and it is held with Concentration until
+    /** Ready this spell for later (SRD Ready): its slot is spent and it is held with Concentration until
      *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
     ready: z.boolean().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
@@ -411,13 +413,13 @@ export const ActionResolveSchema = z
   })
   .strict()
   .refine((payload) => payload.targetIds === undefined || payload.template === undefined, {
-    error: "Provide either explicit targets or an area template, not both."
+    error: "Provide explicit targets or an area template, and only one of the two."
   })
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, {
-    error: "Supply either a natural d20 or a final total, not both."
+    error: "Supply a natural d20 or a final total, and only one of the two."
   })
   .refine((payload) => !(payload.critical === true && payload.fumble === true), {
-    error: "A roll is a natural 20 or a natural 1, not both."
+    error: "A roll can't be both a natural 20 and a natural 1."
   });
 // The message `save.answer` surfaces for out-of-bounds hand-entered damage (it reports the zod issue's own text).
 const SAVE_DAMAGE_BOUND = "Enter the damage as a whole number from 0 to 1000.";
@@ -494,10 +496,12 @@ export const ReactionDismissSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Read-only availability lookup (no commandId - nothing mutates). */
+/** Read-only availability lookup (no commandId: nothing mutates). */
 export const ActorAvailableActionsSchema = z.object({ actorId: z.uuid() }).strict();
 /** The movement read: how much of this turn's movement a combatant has left. */
 export const ActorMovementSchema = z.object({ actorId: z.uuid() }).strict();
+/** The next-level read: what a character's next level brings. Nothing mutates. */
+export const CharacterNextLevelSchema = z.object({ actorId: z.uuid() }).strict();
 export const ContentActionsSchema = z
   .object({
     definitionId: z
@@ -650,7 +654,7 @@ export const SaveRollSchema = z
   })
   .strict()
   .refine((payload) => payload.face === undefined || payload.total === undefined, {
-    error: "Supply either a typed d20 or a final total, not both."
+    error: "Supply a typed d20 or a final total, and only one of the two."
   });
 
 const SkillOrToolIdSchema = z
@@ -847,7 +851,7 @@ export const SetEnvironmentSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep instead of the live table. */
+/** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep; without it, the live table. */
 export const FogSetEnabledSchema = z
   .object({
     commandId: z.uuid(),
@@ -1039,7 +1043,7 @@ export const ActorRechooseSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Spend Hit Point Dice to heal on a short rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
+/** Spend Hit Point Dice to heal on a Short Rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
 export const ActorSpendHitDiceSchema = z
   .object({
     commandId: z.uuid(),
@@ -1126,7 +1130,7 @@ export const CharacterSetSlotSchema = z
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
-    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    /** The Warlock's Pact Magic pool at `level`; without it, the spell slots. */
     pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -1201,6 +1205,18 @@ export const CharacterGiveItemSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The options a character pins to the sheet's turn card, in order. An empty list clears them. */
+export const CharacterSetFavouritesSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    optionIds: z
+      .array(OptionIdSchema)
+      .max(MAX_FAVOURITE_OPTIONS, `Pin at most ${MAX_FAVOURITE_OPTIONS} options.`)
+      .refine((ids) => new Set(ids).size === ids.length, "Each option may be pinned once."),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetCurrencySchema = z
   .object({
     commandId: z.uuid(),
@@ -1236,7 +1252,7 @@ const ClassLevelsSchema = z
   .min(1)
   .max(20);
 
-/** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
+/** Create a character from choices; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
     commandId: z.uuid(),
@@ -1334,7 +1350,10 @@ export const BuilderOffersSchema = z
       .optional()
   })
   .strict()
-  .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
+  .refine(
+    (draft) => !(draft.picks && draft.choices),
+    "Send the answers as picks or as a ledger, and only one of the two."
+  );
 
 /** Level up/down or respec: `CharacterCreateSchema` minus the name, plus the actor. Fully re-validated. */
 export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.uuid() }).strict();
@@ -1416,14 +1435,14 @@ export const DiceRollSchema = z
   .object({
     commandId: z.uuid(),
     formula: z.string().min(1).max(160),
-    purpose: RollPurposeSchema,
+    purpose: TableRollPurposeSchema,
     visibility: RollVisibilitySchema,
     label: z.string().min(1).max(80).optional(),
     actorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** How a token move travels (SRD Movement): on foot or by one of the special speeds, spending movement; by
+/** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
 export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
 export type MoveMode = z.infer<typeof MoveModeSchema>;
@@ -1460,7 +1479,7 @@ export const ActorSetArmorClassSchema = z
   })
   .strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);
-/** `activate: true` goes live on the new scene in the same command, parking whatever was live (as `scene.activate` does). */
+/** `activate: true` goes live on the new scene in the same command and parks whatever was live (as `scene.activate` does). */
 export const SceneCreateSchema = z
   .object({
     commandId: z.uuid(),
@@ -1486,7 +1505,7 @@ export const SceneIdSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Make one recorded moment live. `turnIndex` indexes the archive document's `turns`, not a timeline revision. */
+/** Make one recorded moment live. `turnIndex` indexes the archive document's `turns`. */
 export const ReplayLaunchSchema = z
   .object({
     commandId: z.uuid(),

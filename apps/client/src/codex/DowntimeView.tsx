@@ -316,11 +316,11 @@ export function DowntimeView({
       {pending.length > 0 && (
         <section className="codex-downtime-section">
           <h3 className="codex-campaign-h">Pending confirmations</h3>
-          {/* Shown once above the list: the cause is the campaign's, not any one record's. */}
+          {/* Shown once above the list: the cause is the campaign's and belongs to no one record. */}
           {noCampaignDate && (
             <Alert tone="warning">
-              Set your date on the Calendar before passing time — confirming moves it forward, and there is nothing to
-              move it from.
+              Set your date on the Calendar before passing time. Confirming moves the date forward, so it needs a date
+              to start from.
             </Alert>
           )}
           <ul className="codex-downtime-pending">

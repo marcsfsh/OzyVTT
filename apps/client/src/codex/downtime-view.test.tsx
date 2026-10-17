@@ -107,7 +107,7 @@ beforeEach(() => {
   update.mockResolvedValue(undefined);
 });
 
-describe("Totals — a person, not a spelling", () => {
+describe("Totals: a person counts once, whatever the spelling", () => {
   it("groups a linked row with its page however its `who` string is spelled", () => {
     renderDowntime({
       records: [
@@ -118,7 +118,7 @@ describe("Totals — a person, not a spelling", () => {
     });
 
     const rows = screen.getAllByRole("row").slice(1); // drop the header row
-    // Two people, not three; the linked one is named by its page.
+    // Two people, and three spellings; the linked one is named by its page.
     expect(rows).toHaveLength(2);
     expect(within(rows[0]).getByRole("rowheader")).toHaveTextContent("Vex");
     expect(within(rows[0]).getAllByRole("cell")[0]).toHaveTextContent("10");
@@ -194,7 +194,7 @@ describe("Logging downtime", () => {
     const user = userEvent.setup();
     renderDowntime();
 
-    // The toolbar shows it's the shared editor, not a bare Textarea.
+    // The toolbar shows it's the shared editor, beyond a bare Textarea.
     const editors = screen.getAllByRole("toolbar", { name: "Formatting" });
     expect(editors).toHaveLength(1);
     await user.type(screen.getByLabelText("Note"), "Worked with [[[[Ire");
@@ -215,7 +215,7 @@ describe("Pending confirmations", () => {
     const pending = within(document.querySelector(".codex-downtime-pending")!);
     expect(pending.getAllByRole("listitem")).toHaveLength(1);
     expect(pending.getByText("Vex · Forging · 7 days")).toBeInTheDocument();
-    // The button names the landing date rather than "Confirm".
+    // The button names the landing date where it could say "Confirm".
     expect(pending.getByRole("button", { name: /^Move your date to Hammer 17, 1491 DR/ })).toBeInTheDocument();
   });
 
@@ -407,7 +407,7 @@ describe("The player's Downtime", () => {
     }
   ];
 
-  it("has no Pending section — by construction, not by a role check", () => {
+  it("has no Pending section, by construction and with no role check", () => {
     render(
       <PlayerDowntimeView
         records={PLAYER_ROWS as never}

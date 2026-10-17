@@ -18,7 +18,7 @@ describe("cantrip scaling by character level", () => {
     expect(cantripTierAt(rows, 5)?.damageRoll).toBe("2d10");
     expect(cantripTierAt(rows, 16)?.damageRoll).toBe("3d10");
     expect(cantripTierAt(rows, 20)?.damageRoll).toBe("4d10");
-    // Eldritch Blast scales its beams, not its die.
+    // Eldritch Blast scales its beams; its die stays a d10.
     expect(cantripTierAt(cantripScalingOf(spell("eldritch-blast").castingOptions), 11)?.targetCount).toBe(3);
   });
 });

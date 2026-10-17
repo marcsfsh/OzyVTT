@@ -40,7 +40,7 @@ export function NotFoundPage({ role }: Readonly<{ role: "gm" | "player" }>) {
 
 /**
  * A known section whose named record is gone: a stale bookmark still lands in the section's list,
- * with this notice, rather than on the not-found view.
+ * with this notice; the not-found view never shows.
  */
 export function MissingRecordNotice({ noun }: Readonly<{ noun: string }>) {
   return (

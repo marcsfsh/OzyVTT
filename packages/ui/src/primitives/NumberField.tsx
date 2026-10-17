@@ -23,7 +23,7 @@ interface NumberFieldProps {
 }
 
 /** A free-typed number ("1250 gp", a −2 ability bonus).
-    `type="text"` + `inputMode`, not `type="number"`, which adds a useless spinner, reports "" on a stray letter
+    `type="text"` + `inputMode`: `type="number"` adds a useless spinner, reports "" on a stray letter
     and changes value on scroll. Clamp on blur, never while typing, or a `min: 10` field eats the "1" of "12".
     Use `Stepper` for small bounded nudges. */
 export function NumberField({

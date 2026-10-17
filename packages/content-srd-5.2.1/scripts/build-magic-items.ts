@@ -65,8 +65,8 @@ for (let index = azIndex; index < lines.length; index++) {
 }
 
 /**
- * Items are told apart from the two embedded creature stat blocks by the category word, not by
- * italics: every entry in the run has an italic second line.
+ * Items are told apart from the two embedded creature stat blocks by the category word. Italics
+ * can't do it: every entry in the run has an italic second line.
  */
 const CATEGORY_WORDS = [
   "Wondrous Item",
@@ -81,7 +81,7 @@ const CATEGORY_WORDS = [
 ] as const;
 type CategoryWord = (typeof CATEGORY_WORDS)[number];
 
-/** The two creature stat blocks in the run. Named and counted - a silent filter hides a parse bug. */
+/** The two creature stat blocks in the run. Named and counted: a silent filter hides a parse bug. */
 const NOT_ITEMS = ["Giant Fly", "Avatar of Death"] as const;
 
 const unItalic = (value: string) => value.replace(/^_/, "").replace(/_$/, "");
@@ -106,7 +106,7 @@ if (items.length !== 258) die(`Expected 258 items, parsed ${items.length}.`);
 
 interface TypeLine {
   readonly category: CategoryWord;
-  /** The parenthetical right after the category word - "Shield", "Any Ammunition", "Dagger" - or null. */
+  /** The parenthetical right after the category word ("Shield", "Any Ammunition", "Dagger"), or null. */
   readonly qualifier: string | null;
   /** The rarity segment with the attunement clause removed: "Rare", "Rarity Varies", or a ladder. */
   readonly rarity: string;
@@ -117,7 +117,7 @@ interface TypeLine {
 
 /**
  * "by a Bard, Cleric, or Druid" -> ["bard", "cleric", "druid"]. Display-only, so each audience is a
- * readable slug rather than a resolvable id ("a Creature Attuned to a Belt of Dwarvenkind" stays one).
+ * readable slug with no resolvable id ("a Creature Attuned to a Belt of Dwarvenkind" stays one).
  */
 function restrictions(clause: string): readonly string[] {
   const body = clause.replace(/^\s*by\s+/i, "").trim();
@@ -137,7 +137,7 @@ function parseTypeLine(entry: Entry): TypeLine {
   const qualifier = qualifierMatch ? qualifierMatch[1] : null;
   if (qualifierMatch) rest = rest.slice(qualifierMatch[0].length);
   rest = rest.replace(/^\s*,\s*/, "");
-  // The attunement clause always closes the line, after the rarity - including after a ladder.
+  // The attunement clause always closes the line, after the rarity, including after a ladder.
   const attunementMatch = rest.match(/\(Requires Attunement([^)]*)\)\s*$/i);
   const rarity = rest.replace(/\s*\(Requires Attunement[^)]*\)\s*$/i, "").trim();
   if (rarity === "") die(`${entry.name} (line ${entry.line}): no rarity segment in "${text}".`);
@@ -171,10 +171,10 @@ function rarityId(printed: string): string {
  *      (`Wings of Flying`: "While wearing this cloak").
  *   3. Demote a name match back to carried when the prose says it is held and never worn.
  *
- * Generic "while you wear this item" prose is not used: it is attunement boilerplate, not a location.
+ * Generic "while you wear this item" prose is not used: it is attunement boilerplate and names no location.
  *
  * `Ioun Stone` is `wondrous` (it orbits the head and does not compete with a helm), and horseshoes
- * are `wondrous` (worn by a horse, not the bearer).
+ * are `wondrous` (worn by a horse).
  */
 const WORN_BY_NOUN: ReadonlyArray<readonly [string, string]> = [
   ["neck", "amulets?|necklaces?|periapts?|medallions?|scarabs?|talismans?|brooches|brooch"],
@@ -238,7 +238,7 @@ function slotOf(entry: Entry, type: TypeLine): string {
 }
 
 /**
- * The browse facet, reusing existing categories where one fits (`consumable`, `ammunition`) and the
+ * The browse facet. It reuses existing categories where one fits (`consumable`, `ammunition`) and the
  * SRD's own word otherwise. `category` is an open slug.
  */
 function categoryOfRow(type: TypeLine, slotId: string): string {

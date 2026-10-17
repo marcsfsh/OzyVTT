@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — 2026-07-15.
+Proposed on 2026-07-15.
 
 ## Context and decision drivers
 

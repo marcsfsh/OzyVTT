@@ -183,7 +183,7 @@ export function ActionRunner({
       const application = response.applied;
       if (application && application.totalApplied !== application.totalRequested) {
         onFeedback(
-          `${targetName} took ${application.totalApplied} damage - ${damageAdjustments(application.parts, application.flatReduction)}.`
+          `${targetName} took ${application.totalApplied} damage: ${damageAdjustments(application.parts, application.flatReduction)}.`
         );
       } else {
         onFeedback(`${targetName} took ${application?.totalApplied ?? owed} damage.`);
@@ -225,7 +225,7 @@ export function ActionRunner({
           <strong>Blocked:</strong> {blockedPrompt.blocked.message}
         </ConfirmRow>
       )}
-      {/* Name what is left ("1× Tail") so the GM picks the next attack instead of re-tapping the last. */}
+      {/* Name what is left ("1× Tail") so the GM picks the next attack and doesn't re-tap the last. */}
       {attacksLeft > 0 && !picking && instance && (
         <p className="action-instance-note" role="status">
           Remaining in this action: {componentLabel(instance, actions)}.
@@ -233,7 +233,7 @@ export function ActionRunner({
       )}
       {bonusLeft > 0 && !picking && bonusInstance && (
         <p className="action-instance-note" role="status">
-          Remaining in this bonus action: {componentLabel(bonusInstance, actions)}.
+          Remaining in this Bonus Action: {componentLabel(bonusInstance, actions)}.
         </p>
       )}
       {actions && !picking && (

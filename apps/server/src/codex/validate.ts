@@ -264,7 +264,7 @@ export function questObjectives(value: readonly CodexQuestObjective[] | undefine
 
 export const MIN_STANDING = -100;
 export const MAX_STANDING = 100;
-/** Clamped, not rejected (the ends of the scale are real answers). Non-finite is an error. */
+/** Clamped and never rejected (the ends of the scale are real answers). Non-finite is an error. */
 export function standingValue(value: number): number {
   if (typeof value !== "number" || !Number.isFinite(value))
     throw new CodexValidationError("A standing value must be a number from -100 to 100.");
@@ -276,7 +276,7 @@ export function standingValue(value: number): number {
 /** `0` checkpoints every save, distinct from switching history off. The max is one week. */
 export const MIN_REVISION_WINDOW_MINUTES = 0;
 export const MAX_REVISION_WINDOW_MINUTES = 10_080;
-/** Seconds. 1 is the floor; autosave is switched off with `enabled: false`, not 0. */
+/** Seconds. 1 is the floor; autosave is switched off with `enabled: false`, and 0 is out of range. */
 export const MIN_AUTOSAVE_INTERVAL_SECONDS = 1;
 export const MAX_AUTOSAVE_INTERVAL_SECONDS = 600;
 /** Larger values push the cutoff out of `toISOString()`'s range. */
@@ -297,7 +297,7 @@ export function autosaveIntervalSeconds(value: number): number {
   return Math.min(MAX_AUTOSAVE_INTERVAL_SECONDS, Math.max(MIN_AUTOSAVE_INTERVAL_SECONDS, Math.trunc(value)));
 }
 
-// Stored JSON, read defensively: a malformed value degrades to empty rather than making the Codex unopenable.
+// Stored JSON, read defensively: a malformed value degrades to empty, so it can't make the Codex unopenable.
 
 export function parseStringArray(raw: string | null | undefined): string[] {
   if (!raw) return [];

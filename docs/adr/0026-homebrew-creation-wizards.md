@@ -87,7 +87,9 @@ numbers beside them.
 - Damage per round is a reading of the stat block (the best action, or the best Multiattack plan, plus the best
   Bonus Action); legendary actions and reactions are left out. The figure serves only to compare a monster with the
   SRD's own.
-- A conflict reload still replaces the draft wholesale, as it does in the editor.
+- A conflict reload takes the server's copy and keeps each top-level field changed in this editor since its last
+  save; a field changed on both sides keeps this editor's value. Reopening a record waits for the save its closing
+  editor sent, so the reopened editor starts from the saved copy.
 
 ## Mobile, security, and visibility impact
 
@@ -115,6 +117,8 @@ deleting `apps/client/src/homebrew/wizard/` and the mode switch in `RecordDetail
 - `wizard-view.test.tsx`: the spell wizard answered through its controls makes the composers' record; review places
   issues and goes to the question; the monster, item, class, subclass and background steps; every wizard walks to
   review.
+- `reopen-save.test.tsx`: a record reopened while its closing editor's save is held opens on the saved copy, and a
+  conflict reload keeps the answers given in the editor since its last save.
 - `monster-stats.test.ts` (rules and content packages): the CR, Hit Point and benchmark arithmetic against every
   bundled stat block.
 - In Chromium at 390x844 with touch and at 1280x800, every wizard walked to review with no page scroll and no

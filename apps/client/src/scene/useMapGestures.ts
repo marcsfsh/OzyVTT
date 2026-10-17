@@ -482,8 +482,8 @@ export function useMapGestures({
   const finishGesture = (event: PointerEvent<HTMLDivElement>) => {
     pointers.current.delete(event.pointerId);
     clearLongPress();
-    /* A pinch commits nothing. Lifting one of two fingers ends the pinch rather than turning the
-       remaining finger into a pan (as on the Codex atlas). */
+    /* A pinch commits nothing. Lifting one of two fingers ends the pinch, and the remaining finger
+       starts no pan (as on the Codex atlas). */
     if (gesture?.kind === "pinch") {
       event.preventDefault();
       dropCapture(event.currentTarget, event.pointerId);
@@ -565,7 +565,7 @@ export function useMapGestures({
       void commands.addAnnotation("measurement", undefined, gesture.origin, gesture.current);
       return;
     }
-    // A shape drawn while placing an area template goes on the targeting session, not into annotations;
+    // A shape drawn while placing an area template goes on the targeting session and stays out of annotations;
     // the server draws the real blast when the action resolves.
     if (activeTargeting?.mode === "template") {
       const { origin, current } = gesture;

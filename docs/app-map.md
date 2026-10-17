@@ -1,4 +1,4 @@
-# App map (generated - do not edit by hand)
+# App map (generated, do not edit by hand)
 
 Regenerate with `npm run map`. A freshness test (`apps/server/test/app-map.test.ts`) fails
 if this drifts from the code, so it is always current. This is an orientation aid: it maps the
@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 135 commands · 266 HTTP paths
+- 14 GameState fields · 137 commands · 269 HTTP paths
 
 ## GameState shape
 
@@ -48,6 +48,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `actor.import-definition` | `actor:write` |
 | `actor.rechoose` | `actor:write` |
 | `actor.remove` | `actor:write` |
+| `actor.remove-samples` | `actor:write` |
 | `actor.rest` | `actor:write` |
 | `actor.restore-uses` | `actor:write` |
 | `actor.revive` | `actor:write` |
@@ -90,6 +91,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `character.resolve-import` | `actor:write` |
 | `character.save-draft` | `actor:write` |
 | `character.set-currency` | `actor:write` |
+| `character.set-favourites` | `actor:write` |
 | `character.set-identity` | `actor:write` |
 | `character.set-inventory` | `actor:write` |
 | `character.set-prepared` | `actor:write` |
@@ -271,6 +273,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/death-save`
 - `POST /api/v1/game/actors/{actorId}/effects`
 - `POST /api/v1/game/actors/{actorId}/effects/{effectId}/end`
+- `POST /api/v1/game/actors/{actorId}/favourites`
 - `POST /api/v1/game/actors/{actorId}/finish-preparing`
 - `POST /api/v1/game/actors/{actorId}/heal`
 - `POST /api/v1/game/actors/{actorId}/health-display`
@@ -283,6 +286,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/long-rest-request`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request/answer`
 - `GET /api/v1/game/actors/{actorId}/movement`
+- `GET /api/v1/game/actors/{actorId}/next-level`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
 - `POST /api/v1/game/actors/{actorId}/proficiencies`
 - `POST /api/v1/game/actors/{actorId}/rebuild`
@@ -361,6 +365,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/rules/answer`
 - `POST /api/v1/game/rules/ask`
 - `POST /api/v1/game/rules/policy`
+- `POST /api/v1/game/sample-characters/remove`
 - `POST /api/v1/game/saves/{saveId}/answer`
 - `POST /api/v1/game/saves/{saveId}/dismiss`
 - `POST /api/v1/game/saves/roll`
@@ -450,10 +455,10 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 
 ## Where things live
 
-Curated pointers (verify line numbers before relying on them - code moves):
+Curated pointers (verify line numbers before relying on them, because code moves):
 
-- **Wire contract (single source):** `packages/domain/src/` - `GameState` in `state.ts`, projections (`PlayerView`/`GmView`) in `views.ts`, `ClientToServerEvents`/`ServerToClientEvents` in `socket.ts`.
-- **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.
+- **Wire contract (single source):** `packages/domain/src/`: `GameState` in `state.ts`, projections (`PlayerView`/`GmView`) in `views.ts`, `ClientToServerEvents`/`ServerToClientEvents` in `socket.ts`.
+- **Persisted/importable schemas:** `packages/schemas/src/index.ts`: `Actor`, `ActorDefinition`.
 - **Command Zod schemas:** `packages/domain/src/commands.ts`.
 - **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).
 - **Scopes + OpenAPI:** `packages/api-contract/src/index.ts`.

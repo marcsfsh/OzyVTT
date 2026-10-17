@@ -16,7 +16,7 @@ const importFixture = (name: string) => {
 
 const FIXTURES = ["cleric5", "bard20", "warlock20", "fighter20", "wizard20", "multiclass"];
 
-describe("D&D Beyond PDF import — golden fixtures (recorded widgets)", () => {
+describe("D&D Beyond PDF import: golden fixtures (recorded widgets)", () => {
   for (const f of FIXTURES) {
     it(`${f} → valid ActorDefinition`, () => {
       const { parsed } = importFixture(f);
@@ -51,7 +51,7 @@ describe("D&D Beyond PDF import — golden fixtures (recorded widgets)", () => {
     expect(ids).toContain("ray-of-frost");
     expect(ids).toContain("fireball");
     expect(ids.every((id) => /^[a-z0-9-]+$/.test(id))).toBe(true);
-    // warlock's "Detect Magic [R]" must become "detect-magic", not "detect-magic-r"
+    // warlock's "Detect Magic [R]" must become "detect-magic", with the "[R]" dropped
     const war = importFixture("warlock20");
     if (war.parsed.success) {
       const wids = war.parsed.data.spellcasting!.spells.map((s) => s.id);
@@ -85,7 +85,7 @@ describe("D&D Beyond PDF import — golden fixtures (recorded widgets)", () => {
   });
 });
 
-// Full pdfjs pipeline — runs only when the source PDFs are present locally (they are gitignored).
+// Full pdfjs pipeline. It runs only when the source PDFs are present locally (they are gitignored).
 describe("pdf pipeline (optional, needs local source PDFs)", () => {
   const pdf = join(here, "fixtures", "wizard20.pdf");
   it.skipIf(!existsSync(pdf))("readWidgets(PDF) reproduces the recorded widget count", async () => {

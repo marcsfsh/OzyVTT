@@ -14,10 +14,12 @@ import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { rechoicesOf } from "../ledger-rechoice.js";
 import { spellChoicesOf } from "../spell-choices.js";
+import { withMasteries } from "../weapon-masteries.js";
 import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
   BuilderOffersSchema,
+  CharacterNextLevelSchema,
   ContentActionsSchema,
   VisionPreviewSchema
 } from "@vtt/domain/commands";
@@ -26,6 +28,7 @@ import { partyViewerIds } from "../vision/audience.js";
 import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
+import { nextLevelOf } from "../next-level.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
@@ -98,7 +101,7 @@ export const gameReads = [
       const { definitionId } = input as z.output<typeof ContentActionsSchema>;
       const catalog = kit.catalogFor(principal);
       const imported = storedDefinition(kit.read(), definitionId);
-      // Browse uses the catalog's own lookup (honours draft/published/deleted), not the play-time resolver.
+      // Browse uses the catalog's own lookup (honours draft/published/deleted), and leaves the play-time resolver out.
       const definition = imported ?? catalog.monster(definitionId);
       const actions = imported ? actionSummariesOf(imported.actions) : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
@@ -166,21 +169,20 @@ export const gameReads = [
       const builtins = builtinActionsFor(definition).filter(
         (candidate) => !available.some((declared) => declared.id === candidate.id)
       );
+      const derivation = deriveEquipment(actor, definition, catalog);
       return {
         rulesMode: state.combat.rulesMode,
-        actions: [
-          ...actionAvailability(state, actor, available, definition, false, available, catalog),
-          ...actionAvailability(state, actor, builtins, definition, true, available, catalog)
-        ],
-        // Derived numbers are computed only after the authorization gate above, which is why they ride a
-        // request rather than the broadcast projection (see `actor-derived.ts`).
-        derived: deriveActorSheet(
-          actor,
-          definition,
-          deriveEquipment(actor, definition, catalog),
-          kit.catalogFor(principal).skillSummaries(),
-          catalog
+        // Each mastered swing names its property, from the same derivation the resolver reads it from.
+        actions: withMasteries(
+          [
+            ...actionAvailability(state, actor, available, definition, false, available, catalog),
+            ...actionAvailability(state, actor, builtins, definition, true, available, catalog)
+          ],
+          derivation
         ),
+        // Derived numbers are computed only after the authorization gate above, which is why they ride a
+        // request and is never on the broadcast projection (see `actor-derived.ts`).
+        derived: deriveActorSheet(actor, definition, derivation, kit.catalogFor(principal).skillSummaries(), catalog),
         // Read against the GM's content, as `actor.rechoose` checks them.
         rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm")),
         // Read against the GM's content and the table's builder policy, as the swap and the spellbook check them.
@@ -221,6 +223,34 @@ export const gameReads = [
         resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
         catalog: kit.equipmentCatalog()
       });
+    }
+  },
+
+  {
+    event: "character:next-level",
+    path: GAME_PATHS.characterNextLevel,
+    scope: "game:read",
+    schema: CharacterNextLevelSchema,
+    malformed: "The next-level lookup is malformed.",
+    // Answered only to someone who may level the character: the GM always, a player their own while the table's
+    // builder is open, as `character.rebuild` checks.
+    run: (principal, input, kit) => {
+      const state = kit.read();
+      const actorId = (input as z.output<typeof CharacterNextLevelSchema>).actorId;
+      if (!isGmGrade(principal) && state.builderPolicy.playerBuilder !== "open")
+        throw new GameAccessDeniedError("Your GM builds the characters at this table.");
+      // One answer for a missing character and someone else's, so a player can't probe which ids exist.
+      requireActorAccess(
+        initiatorOf(principal),
+        state,
+        actorId,
+        "edit",
+        "You can only read your own character's next level."
+      );
+      const actor = state.actors.find((candidate) => candidate.id === actorId);
+      if (!actor) throw new GameNotFoundError("That character no longer exists.");
+      const definition = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
+      return nextLevelOf(actor, definition, kit.catalogFor(principal), state.builderPolicy);
     }
   },
 

@@ -72,7 +72,7 @@
 .party-archived {
   margin-top: 1.4rem;
 }
-/* A disclosure row in a stacked list grows its paint to 44px rather than overhanging its neighbours. */
+/* A disclosure row in a stacked list grows its paint to 44px and stays inside its own row. */
 .party-archived > summary {
   display: flex;
   align-items: center;

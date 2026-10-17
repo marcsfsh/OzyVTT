@@ -130,7 +130,7 @@ describe("turn economy", () => {
     const notes: string[] = [];
     setTurnSlot(game, "action", false, OWNER, notes);
     expect(game.combat.turn.actionUsed).toBe(false);
-    expect(notes).toEqual(["Alpha's action is spent - only the GM can give it back."]);
+    expect(notes).toEqual(["Alpha's action is spent. Only the GM can give it back."]);
     // The GM corrects anything, whatever the mode.
     game.combat = { ...game.combat, ruleExceptions: {} };
     setReactionUsed(game, IDS.pc, false, GM);

@@ -197,7 +197,7 @@ describe("over the wire", () => {
     expect((await longRest()).status).toBe(200);
     const notInBook = await send(GAME_PATHS.characterSwapSpell, player, { spellId: "misty-step", replaces: out.id });
     expect((await notInBook.json()).error.message).toBe(
-      `Misty Step isn't in ${hero().name}'s spellbook - copy it in first.`
+      `Misty Step isn't in ${hero().name}'s spellbook. Copy it in first.`
     );
     expect((await send(GAME_PATHS.characterSwapSpell, player, { spellId: "web", replaces: out.id })).status).toBe(200);
     expect(hero().preparedSpellIds).toContain("web");
@@ -211,7 +211,7 @@ describe("over the wire", () => {
       expect((await add(player, { spellId: id, from: "level" })).status).toBe(200);
     const full = await add(player, { spellId: addable[free], from: "level" });
     expect((await full.json()).error.message).toBe(
-      `${hero().name}'s spellbook already holds the spells the Wizard's levels give - copy others in.`
+      `${hero().name}'s spellbook already holds the spells the Wizard's levels give. Copy others in.`
     );
     // The GM copies from a book the party found, for 2 hours and 50 GP a level.
     const purse = { currency: { cp: 0, sp: 0, ep: 0, gp: 120, pp: 0 } };

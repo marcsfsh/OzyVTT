@@ -34,7 +34,7 @@ export function renderAppMap(): string {
     .sort((a, b) => a.path.localeCompare(b.path));
 
   const lines: string[] = [];
-  lines.push("# App map (generated - do not edit by hand)");
+  lines.push("# App map (generated, do not edit by hand)");
   lines.push("");
   lines.push("Regenerate with `npm run map`. A freshness test (`apps/server/test/app-map.test.ts`) fails");
   lines.push("if this drifts from the code, so it is always current. This is an orientation aid: it maps the");
@@ -80,12 +80,12 @@ export function renderAppMap(): string {
 
   lines.push("## Where things live");
   lines.push("");
-  lines.push("Curated pointers (verify line numbers before relying on them - code moves):");
+  lines.push("Curated pointers (verify line numbers before relying on them, because code moves):");
   lines.push("");
   lines.push(
-    "- **Wire contract (single source):** `packages/domain/src/` - `GameState` in `state.ts`, projections (`PlayerView`/`GmView`) in `views.ts`, `ClientToServerEvents`/`ServerToClientEvents` in `socket.ts`."
+    "- **Wire contract (single source):** `packages/domain/src/`: `GameState` in `state.ts`, projections (`PlayerView`/`GmView`) in `views.ts`, `ClientToServerEvents`/`ServerToClientEvents` in `socket.ts`."
   );
-  lines.push("- **Persisted/importable schemas:** `packages/schemas/src/index.ts` - `Actor`, `ActorDefinition`.");
+  lines.push("- **Persisted/importable schemas:** `packages/schemas/src/index.ts`: `Actor`, `ActorDefinition`.");
   lines.push("- **Command Zod schemas:** `packages/domain/src/commands.ts`.");
   lines.push("- **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).");
   lines.push("- **Scopes + OpenAPI:** `packages/api-contract/src/index.ts`.");

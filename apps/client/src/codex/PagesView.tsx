@@ -24,6 +24,7 @@ import { atlasPath, graphPath, pagePath, pathForHit, pathForSection, tagPath } f
 import { useConfirm, usePrompt } from "../components/feedback";
 import type { QuickCreateRequest } from "./QuickCreate";
 import { useCodexQuery } from "./useCodexQuery";
+import { usePageLinks } from "./pageLinks";
 
 /** Pages: the notebook rail and the two-layer editor. Selection, filters and search live in the URL. */
 export type PagesViewProps = Readonly<{
@@ -136,7 +137,7 @@ export function PagesView({
       try {
         localStorage.setItem("codex-notebook-collapsed", JSON.stringify([...next]));
       } catch {
-        /* private mode - fine */
+        /* private mode: fine */
       }
       return next;
     });
@@ -207,7 +208,7 @@ export function PagesView({
     try {
       await codexApi.createFolder(gmToken, name);
     } catch {
-      /* best-effort — the move still files the page there */
+      /* best-effort: the move still files the page there */
     }
     await movePage(id, name);
   };
@@ -286,22 +287,7 @@ export function PagesView({
       onError(deleteError instanceof Error ? deleteError.message : "Couldn't delete that folder.");
     }
   };
-  /** An unresolved `[[link]]` opens quick-create with its text prefilled; cancelling creates nothing. */
-  const followLink = useCallback(
-    (target: string) => {
-      const bare = target.replace(/^(page|actor|monster|spell|map|marker):/i, "").trim();
-      const existing = pages.find((page) => page.title.trim().toLowerCase() === bare.toLowerCase());
-      if (existing) {
-        navigate(pagePath(existing.id));
-        return;
-      }
-      onQuickCreate({
-        title: bare,
-        note: "This link doesn't match a page yet. Create it, or cancel and fix the link."
-      });
-    },
-    [pages, onQuickCreate]
-  );
+  const followLink = usePageLinks(pages, onQuickCreate);
 
   const filtering = Boolean(typeFilter || tagFilter);
 
@@ -335,8 +321,8 @@ export function PagesView({
               value={sort}
               onChange={(event) => changeSort(event.target.value as NotebookSort)}
             >
-              <option value="name-asc">Name A–Z</option>
-              <option value="name-desc">Name Z–A</option>
+              <option value="name-asc">Name A-Z</option>
+              <option value="name-desc">Name Z-A</option>
               <option value="recent">Recently edited</option>
             </Select>
             <Select

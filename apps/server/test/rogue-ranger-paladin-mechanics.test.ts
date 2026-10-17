@@ -108,7 +108,7 @@ function deps(built: Table, faces: number[]): ResolveDependencies {
   };
 }
 
-/** The table's definition store: `importActorDefinition` keys it `import-<actorId>`, not by the record's id. */
+/** The table's definition store: `importActorDefinition` keys it `import-<actorId>`. */
 const resolveIn = (state: GameState, id: string) => state.definitions.find((entry) => entry.id === id)?.definition;
 
 const actionOf = (built: Table, id: string) =>
@@ -122,7 +122,7 @@ const resolve = (built: Table, id: string, faces: number[], targetIds: string[] 
   );
 
 // A fresh turn. The action economy is per turn, so draining a pool must happen over several turns or
-// the economy, not the pool, would block the second use.
+// the economy would block the second use.
 function newTurn(built: Table): void {
   built.state.combat = {
     ...built.state.combat,
@@ -167,7 +167,7 @@ const rogueInput = (level: number): MutableInput => {
     choices: [
       { level: 1, kind: "language", id: "dwarvish" },
       { level: 1, kind: "language", id: "giant" },
-      // Thieves' Cant raises `species-languages` by one: a Rogue is offered three languages, not two.
+      // Thieves' Cant raises `species-languages` by one: a Rogue is offered three languages.
       { level: 1, kind: "language", id: "goblin" },
       { level: 1, classId: "rogue", kind: "skill", id: "acrobatics" },
       { level: 1, classId: "rogue", kind: "skill", id: "investigation" },
@@ -233,7 +233,7 @@ function swing(
   );
 }
 
-describe("Rogue - Sneak Attack rides a qualifying hit", () => {
+describe("Rogue: Sneak Attack rides a qualifying hit", () => {
   it("is offered on an advantaged Finesse hit, rolls the printed column in the weapon's type, and spends the turn's use", () => {
     // Level 11 prints 6d6. The shortsword is Finesse; Advantage qualifies it.
     const built = table(rogueInput(11));
@@ -291,7 +291,7 @@ describe("Rogue - Sneak Attack rides a qualifying hit", () => {
   });
 });
 
-describe("Rogue - Sneak Attack on an opportunity attack", () => {
+describe("Rogue: Sneak Attack on an opportunity attack", () => {
   it("is offered on the swing's preview and rides the confirmed hit, on the mover's turn", () => {
     const built = table(rogueInput(5));
     // The foe's turn: it leaves the Rogue's reach.
@@ -352,7 +352,7 @@ describe("Rogue - Sneak Attack on an opportunity attack", () => {
   });
 });
 
-describe("Rogue - Sneak Attack from an ally beside the target", () => {
+describe("Rogue: Sneak Attack from an ally beside the target", () => {
   const ALLY = "10000000-0000-4000-8000-0000000000aa";
   const withAlly = (level: number) => {
     const built = table(rogueInput(level));
@@ -400,7 +400,7 @@ describe("Rogue - Sneak Attack from an ally beside the target", () => {
   });
 });
 
-describe("Rogue - Evasion on a Dexterity save for half damage", () => {
+describe("Rogue: Evasion on a Dexterity save for half damage", () => {
   const fireball = (built: Table, total: number, dc = 15) => {
     createPendingSaves(built.state, {
       sourceActorId: IDS.foe,
@@ -453,7 +453,7 @@ describe("Rogue - Evasion on a Dexterity save for half damage", () => {
   });
 });
 
-describe("Rogue - Uncanny Dodge halves the damage that hit", () => {
+describe("Rogue: Uncanny Dodge halves the damage that hit", () => {
   it("parks the attack's damage on a reaction prompt and halves it when used", () => {
     // `reaction: {trigger: "hit-by-attack", response: "half-damage"}`: the foe hits the Rogue, the
     // resolver offers the prompt, and answering it applies half. Without it full damage lands (below).
@@ -514,7 +514,7 @@ describe("Rogue - Uncanny Dodge halves the damage that hit", () => {
   });
 });
 
-describe("Rogue - the flat grants and the pick", () => {
+describe("Rogue: the flat grants and the pick", () => {
   it("puts Thieves' Cant on the sheet's languages", () => {
     expect(table(rogueInput(1)).definition.proficiencies?.languages).toContain("thieves-cant");
   });
@@ -548,7 +548,7 @@ describe("Rogue - the flat grants and the pick", () => {
     resolve(built, "stroke-of-luck", [], []);
     expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
     expect(() => resolve(built, "stroke-of-luck", [], [])).toThrowError(
-      /Stroke of Luck: no uses remaining \(1\/short rest\)/
+      /Stroke of Luck: no uses remaining \(1\/Short Rest\)/
     );
   });
 
@@ -583,7 +583,7 @@ describe("Rogue - the flat grants and the pick", () => {
     const built = table(rogueInput(11));
     built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, movementUsedFeet: 10 } };
     expect(() => resolve(built, "steady-aim", [], [])).toThrowError(
-      /has moved this turn - Steady Aim is only for a creature that hasn't/
+      /has moved this turn, and Steady Aim is only for a creature that hasn't/
     );
   });
 
@@ -702,7 +702,7 @@ const rangerInput = (level: number, options: { wisFocus?: boolean } = {}): Mutab
   };
 };
 
-describe("Ranger - Favored Enemy, audit row 32", () => {
+describe("Ranger: Favored Enemy, audit row 32", () => {
   it("hands over Hunter's Mark ALWAYS prepared, without charging the prepared budget", () => {
     // SRD: a feature-granted always-prepared spell "doesn't count against the number of spells you can
     // prepare". A level-5 Ranger prints 6, so the sheet holds seven spells and reports a budget of 6.
@@ -716,7 +716,7 @@ describe("Ranger - Favored Enemy, audit row 32", () => {
   it("gives exactly as many free casts as the printed Favored Enemy column, at two levels", () => {
     // The column reads 2 at level 1 and 6 at level 17, via `scaling: {type: "class-resource"}`. The free casts
     // are Hunter's Mark cast without a slot, counted on the feature's pool.
-    // A bonus action each, so each cast is its own turn, and each marks the foe.
+    // A Bonus Action each, so each cast is its own turn, and each marks the foe.
     const mark = (built: Table) => {
       newTurn(built);
       return resolve(built, "spell-hunters-mark-free", []);
@@ -726,16 +726,16 @@ describe("Ranger - Favored Enemy, audit row 32", () => {
     mark(first);
     expect(first.hero.actionUses["favored-enemy"]).toBe(2);
     expect(first.foe.effects.map((effect) => effect.name)).toEqual(["Hunter's Mark"]);
-    expect(() => mark(first)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(2\/long rest\)/);
+    expect(() => mark(first)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(2\/Long Rest\)/);
 
     const late = table(rangerInput(17));
     for (let cast = 0; cast < 6; cast += 1) mark(late);
     expect(late.hero.actionUses["favored-enemy"]).toBe(6);
-    expect(() => mark(late)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(6\/long rest\)/);
+    expect(() => mark(late)).toThrowError(/Hunter's Mark \(no slot\): no uses remaining \(6\/Long Rest\)/);
   });
 });
 
-describe("Ranger - the rest of the kit", () => {
+describe("Ranger: the rest of the kit", () => {
   it("REFUSES a level-2 Ranger with no Deft Explorer Expertise, and grants it when chosen", () => {
     const missing = rangerInput(2);
     missing.choices = missing.choices.filter((row) => row.payload?.featureId !== "deft-explorer");
@@ -788,13 +788,13 @@ describe("Ranger - the rest of the kit", () => {
     for (let use = 0; use < 2; use += 1) tire(plain);
     expect(plain.hero.actionUses["tireless"]).toBe(2);
     newTurn(plain);
-    expect(() => resolve(plain, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(2\/long rest\)/);
+    expect(() => resolve(plain, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(2\/Long Rest\)/);
 
     const focused = table(rangerInput(10, { wisFocus: true })); // Wis 15 + 4 -> +4
     for (let use = 0; use < 4; use += 1) tire(focused);
     expect(focused.hero.actionUses["tireless"]).toBe(4);
     newTurn(focused);
-    expect(() => resolve(focused, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(4\/long rest\)/);
+    expect(() => resolve(focused, "tireless", [], [])).toThrowError(/Tireless: no uses remaining \(4\/Long Rest\)/);
   });
 
   it("gives Tireless's 1d8 + Wisdom as Temporary Hit Points, and takes a level of Exhaustion off at a Short Rest", () => {
@@ -817,7 +817,7 @@ describe("Ranger - the rest of the kit", () => {
     expect(built.hero.actionUses["tireless"]).toBeUndefined();
     newTurn(built);
     expect(() => resolve(built, "natures-veil", [], [])).toThrowError(
-      /Nature's Veil: no uses remaining \(2\/long rest\)/
+      /Nature's Veil: no uses remaining \(2\/Long Rest\)/
     );
   });
 
@@ -842,7 +842,7 @@ describe("Ranger - the rest of the kit", () => {
     );
   });
 
-  it("carries Feral Senses as a rider on the sheet - display-level, and knowingly so", () => {
+  it("carries Feral Senses as a rider on the sheet: display-level, and knowingly so", () => {
     // `CARRIER_RIDER_DISPOSITION` records `sense` as display-only: it reaches the rider carriers and no
     // consumer applies it. Asserted only at that seam.
     const built = table(rangerInput(18));
@@ -852,7 +852,7 @@ describe("Ranger - the rest of the kit", () => {
     expect(carrier?.modifiers).toEqual([{ type: "sense", sense: "blindsight", feet: 30 }]);
   });
 
-  it("takes Extra Attack all the way to a SECOND WEAPON SWING - the engine gap, closed", () => {
+  it("takes Extra Attack all the way to a SECOND WEAPON SWING: the engine gap, closed", () => {
     // `extra-attack` is a standing rider: a Ranger declares no feature actions (swings come from equipped
     // inventory), so `effective-actions.ts` raises the count on the derived weapon swings.
     const built = table(rangerInput(5));
@@ -876,7 +876,7 @@ describe("Ranger - the rest of the kit", () => {
   });
 });
 
-describe("Ranger - Hunter's Prey and Defensive Tactics, audit rows 21 and 22", () => {
+describe("Ranger: Hunter's Prey and Defensive Tactics, audit rows 21 and 22", () => {
   it("REFUSES a Hunter who chose neither option, and puts the chosen one on the sheet", () => {
     // The Hunter's picks are real: a build without them is refused.
     const missing = rangerInput(3);
@@ -965,7 +965,7 @@ describe("Ranger - Hunter's Prey and Defensive Tactics, audit rows 21 and 22", (
 
 // Paladin
 
-/** The always-prepared spells a Paladin's own features hand over, by level - excluded from the picks. */
+/** The always-prepared spells a Paladin's own features hand over, by level: excluded from the picks. */
 const paladinGranted = (level: number): string[] => [
   ...(level >= 2 ? ["divine-smite"] : []),
   ...(level >= 3 ? ["protection-from-evil-and-good", "shield-of-faith"] : []),
@@ -1031,7 +1031,7 @@ const paladinInput = (level: number): MutableInput => {
   };
 };
 
-describe("Paladin - the two free casts, audit rows 30 and 31", () => {
+describe("Paladin: the two free casts, audit rows 30 and 31", () => {
   it("always has Divine Smite prepared and casts it free ONCE per Long Rest", () => {
     const built = table(paladinInput(5));
     const spells = built.definition.spellcasting?.spells ?? [];
@@ -1047,7 +1047,7 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
     newTurn(built);
     expect(() =>
       swing(built, "item-longsword", [19, 6, 3, 4], { hitOptions: [{ id: "spell-divine-smite-free" }] })
-    ).toThrowError(/Divine Smite \(no slot\): no uses remaining \(1\/long rest\)/);
+    ).toThrowError(/Divine Smite \(no slot\): no uses remaining \(1\/Long Rest\)/);
   });
 
   it("always has Find Steed prepared from level 5, on its OWN pool", () => {
@@ -1076,7 +1076,7 @@ describe("Paladin - the two free casts, audit rows 30 and 31", () => {
   });
 });
 
-describe("Paladin - Channel Divinity is ONE counter that three features spend", () => {
+describe("Paladin: Channel Divinity is ONE counter that three features spend", () => {
   it("drains the printed column across Divine Sense, Abjure Foes and Sacred Weapon", () => {
     // The column prints 2 at level 3. Two spends of any of the three exhaust all three, which is what
     // `uses.pool` means; a per-action key would give each feature its own two.
@@ -1086,7 +1086,7 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
     expect(built.hero.actionUses["channel-divinity"]).toBe(2);
     newTurn(built);
     expect(() => resolve(built, "abjure-foes", [], [IDS.foe])).toThrowError(
-      /Abjure Foes: no uses remaining \(2\/long rest\)/
+      /Abjure Foes: no uses remaining \(2\/Long Rest\)/
     );
   });
 
@@ -1096,7 +1096,7 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
     expect(built.hero.actionUses["channel-divinity"]).toBe(3);
     newTurn(built);
     expect(() => resolve(built, "divine-sense", [], [])).toThrowError(
-      /Divine Sense: no uses remaining \(3\/long rest\)/
+      /Divine Sense: no uses remaining \(3\/Long Rest\)/
     );
   });
 
@@ -1119,7 +1119,7 @@ describe("Paladin - Channel Divinity is ONE counter that three features spend", 
   });
 });
 
-describe("Paladin - the auras that are really immunities", () => {
+describe("Paladin: the auras that are really immunities", () => {
   // The auras are gated grants (inactive while the Paladin is Incapacitated), read live through the catalog as
   // every command path passes it.
   const immunitiesOf = (built: Table) => ({ resolveDefinition: () => built.definition, catalog: built.catalog });
@@ -1130,7 +1130,7 @@ describe("Paladin - the auras that are really immunities", () => {
     const brave = table(paladinInput(10));
     const events = setCondition(brave.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(brave));
     expect(events).toEqual([
-      { kind: "condition", text: "Bree is immune to Frightened - not applied.", actorId: IDS.hero, immune: true }
+      { kind: "condition", text: "Bree is immune to Frightened, so it isn't applied.", actorId: IDS.hero, immune: true }
     ]);
     expect(brave.hero.conditions).toEqual([]);
 
@@ -1143,7 +1143,7 @@ describe("Paladin - the auras that are really immunities", () => {
     const devoted = table(paladinInput(7));
     expect(
       setCondition(devoted.state, IDS.hero, "charmed", true, undefined, GM_SCOPE, immunitiesOf(devoted))[0].text
-    ).toBe("Bree is immune to Charmed - not applied.");
+    ).toBe("Bree is immune to Charmed, so it isn't applied.");
     // Frightened is not immune yet: the class aura is level 10.
     setCondition(devoted.state, IDS.hero, "frightened", true, undefined, GM_SCOPE, immunitiesOf(devoted));
     expect(devoted.hero.conditions).toEqual([{ id: "frightened" }]);
@@ -1157,7 +1157,7 @@ describe("Paladin - the auras that are really immunities", () => {
   });
 });
 
-describe("Paladin - Divine Smite rides a melee hit", () => {
+describe("Paladin: Divine Smite rides a melee hit", () => {
   it("adds 2d8 Radiant, doubled on a crit, with the extra 1d8 against an Undead, and spends the slot and Bonus Action", () => {
     const built = table(paladinInput(5));
     const zombie = loadMonsterDefinitions().find((monster) => monster.source.externalId === "zombie")!;
@@ -1185,7 +1185,7 @@ describe("Paladin - Divine Smite rides a melee hit", () => {
   });
 
   it("rides a Melee weapon even thrown (a Javelin), never a miss", () => {
-    // "A Melee weapon or an Unarmed Strike" names the weapon, not how it was used.
+    // "A Melee weapon or an Unarmed Strike" names the weapon, however it was used.
     const built = table(paladinInput(5));
     const thrown = resolveDefinitionAction(
       built.state,
@@ -1205,7 +1205,7 @@ const preparing = (input: MutableInput, spellId: string): MutableInput => {
   return input;
 };
 
-describe("Paladin - smites that outlast the hit", () => {
+describe("Paladin: smites that outlast the hit", () => {
   it("Shining Smite gives the Paladin its Concentration, ends the one held before, and its mark ends with it", () => {
     const built = table(preparing(paladinInput(5), "shining-smite"));
     addEffect(
@@ -1257,7 +1257,7 @@ describe("Paladin - smites that outlast the hit", () => {
   });
 });
 
-describe("Paladin - Radiant Strikes rolls extra dice on a melee hit", () => {
+describe("Paladin: Radiant Strikes rolls extra dice on a melee hit", () => {
   it("adds 1d8 Radiant to a Melee weapon hit at level 11 and nothing at level 10", () => {
     // A roll-time rider gated `on-hit` + `attack-kind-is: ["melee", "unarmed"]`: a second damage entry
     // on the resolution, rolled and typed.
@@ -1312,7 +1312,7 @@ describe("Paladin - Radiant Strikes rolls extra dice on a melee hit", () => {
     expect(stabIt.damage.find((part) => part.type === "radiant")).toMatchObject({ formula: "1d8", total: 7 });
   });
 
-  it("adds nothing to the javelin when the distance is UNMEASURABLE - no map, no placement, no grid", () => {
+  it("adds nothing to the javelin when the distance is UNMEASURABLE: no map, no placement, no grid", () => {
     // With the default dependencies `distanceFeet` returns null (no map, unplaced combatant, or
     // uncalibrated grid). With nothing to measure, a thrown weapon must read as ranged, or every mapless
     // table would add 1d8 Radiant to thrown javelins.
@@ -1323,7 +1323,7 @@ describe("Paladin - Radiant Strikes rolls extra dice on a melee hit", () => {
   });
 });
 
-describe("Paladin - Oath of Devotion, audit row 28", () => {
+describe("Paladin: Oath of Devotion, audit row 28", () => {
   it("always has the level-3 pair prepared, uncharged", () => {
     const built = table(paladinInput(3));
     const spells = built.definition.spellcasting?.spells ?? [];
@@ -1367,7 +1367,7 @@ describe("Paladin - Oath of Devotion, audit row 28", () => {
     spend(built, "holy-nimbus");
     expect(built.hero.actionUses["holy-nimbus"]).toBe(1);
     newTurn(built);
-    expect(() => resolve(built, "holy-nimbus", [], [])).toThrowError(/Holy Nimbus: no uses remaining \(1\/long rest\)/);
+    expect(() => resolve(built, "holy-nimbus", [], [])).toThrowError(/Holy Nimbus: no uses remaining \(1\/Long Rest\)/);
   });
 
   it("REFUSES a level-19 Paladin with no Epic Boon feat", () => {

@@ -30,7 +30,7 @@ import { CommandRejectedError } from "./game-store.js";
  *  drawn through the injected `random` (server dice; a seed reproduces a character). Picks come from
  *  `computeServerOffers`, recomputed after every answer since answers can create new picks. */
 
-/** A die roll, 1..sides - the shape of `CommandContext.random`. */
+/** A die roll, 1..sides: the shape of `CommandContext.random`. */
 export type DiceRandom = (sides: number) => number;
 
 export type GenerateCharacterInput = Readonly<{
@@ -87,7 +87,7 @@ function drawSome<T>(items: readonly T[], count: number, random: DiceRandom): T[
 
 const sortedIds = (ids: Iterable<string>): string[] => [...ids].sort();
 
-/** `count` items, drawing from `preferred` first and topping up from the rest of `all`. */
+/** `count` items, drawn from `preferred` first and topped up from the rest of `all`. */
 function drawPreferring<T>(preferred: readonly T[], all: readonly T[], count: number, random: DiceRandom): T[] {
   const first = drawSome(preferred, count, random);
   if (first.length >= count) return first;
@@ -314,7 +314,7 @@ function featIsTakeable(
 ): boolean {
   if (survey.heldFeatIds.has(id)) return false;
   const feat = library.featRecord(id);
-  if (!feat) return true; // an inline option rather than a catalog feat; the offer already vouched for it
+  if (!feat) return true; // an inline option and no catalog feat; the offer already vouched for it
   return featPrerequisiteFailure(feat, { ...featHoldings(survey), level, scores }) === null;
 }
 
@@ -334,7 +334,7 @@ function answerOffer(
   // An improvement follows the priority of the class it belongs to.
   const priorityClass = offer.classId ?? input.classId;
 
-  // "Raise scores instead of taking a feat", decided per pick.
+  // "Raise scores in place of a feat", decided per pick.
   if (offer.kind === "asi-or-feat" && random(2) === 1) {
     const increases = asiIncreases(survey, choices, priorityClass, library);
     if (increases) return [rowFor(offer, "asi", offer.taken.length, { increases })];
@@ -346,7 +346,7 @@ function answerOffer(
   );
 
   // Hard filters remove ids the validator would refuse; preferences only reorder legal ids, so running
-  // out of preferred ids falls through instead of leaving the pick unanswerable.
+  // out of preferred ids falls through, so the pick is never left unanswerable.
   let candidates = legal;
   let preferred: readonly string[] = legal;
   if (FEAT_KINDS.has(offer.kind)) {
@@ -390,6 +390,18 @@ function answerOffer(
     // Cast with the best of the abilities offered.
     const best = Math.max(...legal.map((id) => scores[id as Ability] ?? 0));
     preferred = legal.filter((id) => (scores[id as Ability] ?? 0) === best);
+  } else if (offer.kind === "cantrip" || offer.kind === "spell") {
+    // A spell sits on the sheet once: a feature's pick (Magic Initiate, an Evoker's Savant) of one the class already
+    // has would be spent for nothing, so it comes from the others while any are left.
+    const held = new Set([
+      ...choices.filter((row) => row.kind === "spell" || row.kind === "cantrip").map((row) => row.id),
+      ...alwaysPreparedGrants(survey)
+    ]);
+    const fresh = legal.filter((id) => !held.has(id));
+    if (fresh.length > 0) {
+      candidates = fresh;
+      preferred = fresh;
+    }
   } else if (offer.kind === "weapon-mastery") {
     // Mastery in an uncarried weapon is legal but useless, so carried weapons come first.
     const carried = carriedWeaponIds(survey, choices);
@@ -450,7 +462,7 @@ function drawWithinLevelGates(
   return drawn;
 }
 
-// The class's own spell budgets are printed columns rather than offers, so they are filled here.
+// The class's own spell budgets are printed columns with no offers, so they are filled here.
 
 type SpellOption = Readonly<{ id: string; name: string; level?: number }>;
 
@@ -546,7 +558,7 @@ export function generateCharacterRequest(
 ): GeneratedCharacter {
   if (!policy.allowedAbilityMethods.includes(GENERATOR_ABILITY_METHOD)) {
     reject(
-      "The generator sets ability scores with the standard array, which this table does not allow - enable it in Settings first."
+      "The generator sets ability scores with the standard array, which this table does not allow. Turn it on in Settings first."
     );
   }
   // A multiclass plan takes its classes' levels in turn, the starting class first.
@@ -557,7 +569,9 @@ export function generateCharacterRequest(
     }
   ];
   if (plan.reduce((total, entry) => total + entry.level, 0) !== input.level)
-    reject(`The class levels add up to ${plan.reduce((total, entry) => total + entry.level, 0)}, not ${input.level}.`);
+    reject(
+      `The class levels add up to ${plan.reduce((total, entry) => total + entry.level, 0)}, but the character is level ${input.level}.`
+    );
   if (new Set(plan.map((entry) => entry.classId)).size !== plan.length) reject("Each class may be listed once.");
   if (plan.length > MAX_CLASSES) reject(`A character can have at most ${MAX_CLASSES} classes.`);
   if (input.classId && input.classId !== plan[0].classId)
@@ -586,7 +600,7 @@ export function generateCharacterRequest(
     );
     if (available.length === 0)
       reject(
-        `No ${record.name} ${record.subclassLabel ?? "subclass"} is in the content catalog, and a level-${level} ${record.name} needs one.`
+        `No ${record.name} ${record.subclassLabel ?? "subclass"} is in the content catalog, and a level ${level} ${record.name} needs one.`
       );
     return drawOne(available, random);
   };
@@ -701,12 +715,12 @@ export function generateCharacterRequest(
     const rows = answerOffer(open, survey, choices, { ...input, classId }, library, random);
     if (rows.length === 0) {
       reject(
-        `"${open.label}" asks for ${open.capacity} "${open.kind}" pick(s) and the generator found no legal option for it - that is a gap in the content, not in the request.`
+        `"${open.label}" asks for ${open.capacity} "${open.kind}" pick(s) and the generator found no legal option for it. The gap is in the content.`
       );
     }
     choices.push(...rows);
   }
-  reject("The generator could not settle this character - the content asks for more picks than it can answer.");
+  reject("The generator could not settle this character. The content asks for more picks than it can answer.");
 }
 
 function summaryOf(survey: ServerOfferSurvey): string {

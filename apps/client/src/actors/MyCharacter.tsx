@@ -28,7 +28,7 @@ const needsAid = (actor: PlayerActor) =>
 const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet", "sheet-and-resources"];
 
 /**
- * The tier this player was given. Defaults to `name-and-class` rather than the fullest tier, so a
+ * The tier this player was given. Defaults to `name-and-class`, the narrowest tier with a card, so a
  * projection without the field never shows more than the GM opened.
  */
 export function partyVisibilityOf(state: PlayerView): PartyVisibility {
@@ -324,7 +324,7 @@ export function MyCharacter({
       <div className="my-character-body scroll-y frame-fill">
         {/* Nobody claimed: point at the Table's claim picker, which is the one place to claim. */}
         <div className="scene-empty">
-          <p>You haven&rsquo;t claimed a character yet.</p>
+          <p>You haven't claimed a character yet.</p>
           <Button variant="primary" arrow onClick={onGoToTable}>
             Go to the table
           </Button>

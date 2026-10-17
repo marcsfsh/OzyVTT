@@ -4,7 +4,7 @@ type BuiltinAction = ActorDefinition["actions"][number];
 
 /**
  * The SRD 5.2.1 generic actions every combatant can take (rules glossary "[Action]" entries) plus the
- * Unarmed Strike options. Engine behaviour rather than content data, but in the same ActionSchema
+ * Unarmed Strike options. Engine behaviour, outside the content data, but in the same ActionSchema
  * vocabulary and resolution path as stat-block actions (a test pins every entry to the schema).
  *
  * Ids are a frozen replay contract (journaled payloads reference them); a stat-block action with the
@@ -107,7 +107,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Influence",
     activation: "action",
     description:
-      "Urge a monster to do something: make a Charisma check (Deception, Intimidation, Performance, or Persuasion - or Wisdom/Animal Handling) against DC 15 or the monster's Intelligence score, whichever is higher; the GM adjudicates attitude and outcome. (SRD 5.2.1, Influence [Action])",
+      "Urge a monster to do something: make a Charisma (Deception, Intimidation, Performance, or Persuasion) or Wisdom (Animal Handling) check against DC 15 or the monster's Intelligence score, whichever is higher; the GM adjudicates attitude and outcome. (SRD 5.2.1, Influence [Action])",
     damage: []
   },
   {
@@ -174,7 +174,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Unarmed Strike (Grapple)",
     activation: "action",
     description:
-      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or it has the Grappled condition (that DC is also the escape DC). Only targets no more than one size larger, and you need a hand free - the GM adjudicates the hand. (SRD 5.2.1, Unarmed Strike / Grappling)",
+      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or it has the Grappled condition (that DC is also the escape DC). Only targets no more than one size larger, and you need a hand free; the GM adjudicates the hand. (SRD 5.2.1, Unarmed Strike / Grappling)",
     damage: [],
     replacesAttack: true
   },
@@ -192,7 +192,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Unarmed Strike (Shove Push)",
     activation: "action",
     description:
-      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away - on a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
+      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away. On a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
     damage: [],
     replacesAttack: true
   },
@@ -201,7 +201,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Escape a Grapple",
     activation: "action",
     description:
-      "Use your action to make a Strength (Athletics) or Dexterity (Acrobatics) check (your best) against the grapple's escape DC, ending the Grappled condition on a success. (SRD 5.2.1, Grappling)",
+      "Use your action to make a Strength (Athletics) or Dexterity (Acrobatics) check (your best) against the grapple's escape DC. On a success, the Grappled condition ends. (SRD 5.2.1, Grappling)",
     damage: []
   },
   {
@@ -263,8 +263,8 @@ function takenTogether(action: BuiltinAction): readonly GrantedBase[] {
 }
 
 /**
- * An action that takes two generic actions at once grants both: one effect carrying each one's tags and modifiers
- * (Dash's measured movement, Disengage's no-provoke, Dodge's Disadvantage), lasting as they do. An action that grants
+ * An action that takes two generic actions at once grants both as one effect. It carries each one's tags and modifiers
+ * (Dash's measured movement, Disengage's no-provoke, Dodge's Disadvantage) and lasts as they do. An action that grants
  * something of its own keeps it.
  */
 export function withTakenActions(action: BuiltinAction): BuiltinAction {
@@ -316,7 +316,7 @@ function bonusSources(definition: ActorDefinition | undefined): ReadonlyMap<Bonu
 }
 
 /** A generic action taken as a Bonus Action through a feature. Martial Arts' strike keeps the Monk's own numbers
- *  (its die, Dexterity) when the sheet has them; it is one attack, not part of the Attack action, so Extra Attack's
+ *  (its die, Dexterity) when the sheet has them; it is one attack outside the Attack action, so Extra Attack's
  *  count and the attack it replaces don't come along. */
 function bonusVariant(base: BonusBase, source: string, definition: ActorDefinition | undefined): BuiltinAction {
   const generic = builtinAction(base)!;
@@ -332,7 +332,7 @@ function bonusVariant(base: BonusBase, source: string, definition: ActorDefiniti
     id: `${base}${BONUS_SUFFIX}`,
     name: `${source}: ${generic.name}`,
     activation: "bonus-action",
-    description: `${source} lets you take this as a Bonus Action. ${generic.description}`
+    description: `With ${source}, you can take this as a Bonus Action. ${generic.description}`
   };
 }
 

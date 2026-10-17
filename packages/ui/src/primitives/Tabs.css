@@ -15,7 +15,7 @@
   scrollbar-width: none;
   /* Kept in step with SCROLL_PAD in Tabs.tsx and the mask widths below, so a scrolled-to tab clears the fade. */
   scroll-padding-inline: 24px;
-  /* `proximity`, not `mandatory`, so the bar stays where the finger left it. */
+  /* `proximity`, so the bar stays where the finger left it. */
   scroll-snap-type: x proximity;
 }
 .nh-tabs--horizontal::-webkit-scrollbar {

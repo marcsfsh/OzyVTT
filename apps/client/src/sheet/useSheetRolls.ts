@@ -19,7 +19,7 @@ const ABILITY_WORDS: Readonly<Record<AbilityId, string>> = {
 
 /** A check's result as the sheet says it: the total, the d20, and whatever changed how it was rolled. */
 export function checkLine(outcome: CheckRollOutcome): string {
-  const verdict = outcome.success === null ? "" : ` vs DC ${outcome.dc} - ${outcome.success ? "success" : "failure"}`;
+  const verdict = outcome.success === null ? "" : ` vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}`;
   const talent = outcome.reliableTalent ? " · Reliable Talent" : "";
   return `${outcome.label}: ${outcome.total} (d20 ${outcome.natural}${outcome.typed ? ", typed" : ""})${verdict}${modeWords(outcome.rollMode)}${talent}.`;
 }
@@ -138,7 +138,7 @@ export function useSheetRolls(
       return;
     }
     // An owed save was answered: it had a DC and its outcome has landed.
-    const verdict = "dc" in outcome ? ` vs DC ${outcome.dc} - ${outcome.success ? "success" : "failure"}` : "";
+    const verdict = "dc" in outcome ? ` vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}` : "";
     const natural = outcome.natural !== undefined ? ` (d20 ${outcome.natural})` : "";
     // A save the character owed has a verdict the line doesn't show.
     (verdict ? onFeedback : said)(`${name}: ${outcome.total}${natural}${verdict}${modeWords(outcome.rollMode)}.`);
@@ -151,7 +151,7 @@ export function useSheetRolls(
       setRolling(false);
       noteSheetRolls(result.rollId);
       if (!result.ok) onFeedback(result.message ?? "The roll was rejected.");
-      else said(`Rolled ${label} (${formula}). The dice log has it.`);
+      else said(`Rolled ${label} (${formula}). The result is in the dice log.`);
     });
   };
 

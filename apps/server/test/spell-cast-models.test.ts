@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { castAction } from "../src/item-actions.js";
 import { ALLY, build, clericInput, druidInput, fight, FOE, FOE2, view, wizardInput } from "./spell-casters.js";
 
-// What each cast does, per SRD 5.2.1: damage dealt when a spell appears, saves made later rather than on the cast,
+// What each cast does, per SRD 5.2.1: damage dealt when a spell appears, saves made on later turns,
 // a damage type the caster picks, a flame hurled on later turns, a save that ignores cover, and the range and number of
 // a spell's targets.
 
@@ -144,7 +144,7 @@ describe("a spell that takes a minute or more to cast", () => {
     const { resolve, action } = fight(caster);
     expect(action("spell-alarm").activation).toBe("action");
     expect(resolve("spell-alarm", { targetIds: [] }).warnings?.join(" ")).toMatch(
-      /Alarm takes 1 minute to cast: the Magic action on each of the caster's turns/
+      /Alarm takes 1 minute to cast\. Until then, the caster takes the Magic action on each turn/
     );
   });
 

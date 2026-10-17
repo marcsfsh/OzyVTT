@@ -167,7 +167,7 @@ describe("casting a leveled spell from the sheet", () => {
 });
 
 describe("a Warlock's Pact Magic on the sheet", () => {
-  /** Warlock 5: two 3rd-level pact slots, one spent; Hex from the builder, Hold Person from a PDF (no action). */
+  /** Warlock 5: two level 3 Pact Magic slots, one spent; Hex from the builder, Hold Person from a PDF (no action). */
   const warlock = {
     ...definition,
     actions: [

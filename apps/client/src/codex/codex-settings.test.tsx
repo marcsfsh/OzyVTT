@@ -25,7 +25,7 @@ import { CodexSettingsView } from "./CodexSettings";
 import type { CodexSettings } from "@vtt/domain";
 
 /**
- * The codex settings screen. `0` minutes means keep every save, not off; turning history off never deletes
+ * The codex settings screen. `0` minutes means keep every save, and history stays on; turning history off never deletes
  * anything; delete-all is its own button and confirm (naming the real count), never reached by winding the
  * day field down; and the server's stored answer is what the controls show.
  */
@@ -124,7 +124,7 @@ describe("How often a version is kept is configurable", () => {
   });
 
   /** Out-of-range input is bounded before posting, since the server answers 400. */
-  it("bounds an out-of-range window before asking the server for it — the server 400s on it", async () => {
+  it("bounds an out-of-range window before asking the server for it: the server 400s on it", async () => {
     const user = await open(SETTINGS({ windowMinutes: 90 }));
     const field = await screen.findByLabelText(/Save a version at most once every/);
 
@@ -139,7 +139,7 @@ describe("How often a version is kept is configurable", () => {
     );
   });
 
-  /** Zero is "keep every save", not off. */
+  /** Zero is "keep every save", and history stays on. */
   it("treats 0 as keep-every-save, with history still on", async () => {
     await open(SETTINGS({ windowMinutes: 0 }));
 

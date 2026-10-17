@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Button, IconScene } from "@vtt/ui";
 import { ClaimCharacter } from "../actors/ClaimCharacter";
@@ -19,7 +19,7 @@ import { PartyRest } from "../rest/PartyRest";
 import { ShortRestPrompt } from "../rest/ShortRestPrompt";
 import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
-import { PaneDivider, useTableSplit } from "../table/PaneDivider";
+import { PaneDivider, useMomentShare } from "../table/PaneDivider";
 import { PromptSlot } from "../table/PromptSlot";
 import { TableHeader } from "../table/TableHeader";
 import { TokenTab } from "../table/TokenTab";
@@ -50,8 +50,6 @@ type TableViewProps = Readonly<
 
 /** The phone table, below 980px (the stylesheet's breakpoint): the map pane over the panel, a bar under the thumb. */
 const PHONE_TABLE_QUERY = "(max-width: 979px)";
-/** While a target is being chosen on a phone, the map pane takes at least this share of the height. */
-const TARGETING_SHARE = 55;
 
 /**
  * The table, for both roles: a docked workbench where nothing floats over the map but tokens and marks. A header bar
@@ -73,22 +71,19 @@ export function TableView(props: TableViewProps) {
   const staged = gm?.stagedScene ?? null;
   const stagedMap = staged ? gm?.mapLibrary.find((map) => map.id === staged.mapAssetId) : undefined;
   const stagedNeedsGrid = stagedMap !== undefined && !stagedMap.calibration && !stagedMap.scale;
-  // A player who has claimed nobody while no map is live sees the picker across the whole table, not under an empty
+  // A player who has claimed nobody while no map is live sees the picker across the whole table, never under an empty
   // map box.
   const claimingOnly = props.role === "player" && !playerHasClaimed && !state.combat.mapAssetId;
   // The phone's split between the map pane and the panel. Choosing a target lowers the divider so the map takes
-  // most of the height; the person's own split comes back when the choice ends, unless they move it meanwhile.
+  // most of the height, and the player's sheet raises it so the sheet does; the person's own split comes back after.
   const splitRef = useRef<HTMLDivElement | null>(null);
-  const [split, setSplit] = useTableSplit();
   const targeting = useTargeting();
   const myId =
     props.role === "player" ? (props.state.actors.find((actor) => actor.claimStatus === "mine")?.id ?? null) : null;
   const choosing = phone && targeting !== null && (role === "gm" || targeting.attackerId === myId);
-  const [movedWhileChoosing, setMovedWhileChoosing] = useState(false);
-  useEffect(() => {
-    if (!choosing) setMovedWhileChoosing(false);
-  }, [choosing]);
-  const mapShare = choosing && !movedWhileChoosing ? Math.max(split, TARGETING_SHARE) : split;
+  const [sheetShown, setSheetShown] = useState(false);
+  const moment = choosing ? "choosing" : phone && sheetShown && playerHasClaimed ? "sheet" : null;
+  const [mapShare, moveSplit] = useMomentShare(moment);
   const liveMapName = gm?.selectedMap?.id === state.combat.mapAssetId ? (gm?.selectedMap?.name ?? null) : null;
 
   const header =
@@ -215,6 +210,7 @@ export function TableView(props: TableViewProps) {
         role="player"
         state={props.state}
         phone={phone}
+        onSheetShown={setSheetShown}
         slots={{
           top: (
             <>
@@ -251,16 +247,7 @@ export function TableView(props: TableViewProps) {
         style={phone ? ({ "--map-share": `${mapShare}%` } as React.CSSProperties) : undefined}
       >
         {map && <div className="table-bench-map">{map}</div>}
-        {phone && map && (
-          <PaneDivider
-            value={mapShare}
-            onChange={(next) => {
-              setSplit(next);
-              if (choosing) setMovedWhileChoosing(true);
-            }}
-            container={() => splitRef.current}
-          />
-        )}
+        {phone && map && <PaneDivider value={mapShare} onChange={moveSplit} container={() => splitRef.current} />}
         <div className="table-bench-panel">{panel}</div>
       </div>
     </div>

@@ -293,7 +293,7 @@ describe("Barbarian: the sheet's own numbers", () => {
     expect(definition.armorClass).toBe(19);
   });
 
-  it("Primal Champion really passes 20 - the ceiling every other increase is clamped to", () => {
+  it("Primal Champion really passes 20: the ceiling every other increase is clamped to", () => {
     // Str is 20 and Con 18 when the capstone applies; a rider without `maximum` would leave both at 20.
     expect(definition.abilityScores.str).toBeGreaterThan(20);
     expect(definition.abilityScores.con).toBeGreaterThan(20);
@@ -330,7 +330,7 @@ describe("Barbarian: the sheet's own numbers", () => {
   });
 
   it("Rage's uses come off the printed Rages column at THIS level, not a copy of it", () => {
-    // 6 at level 20, 2 at level 1, from the printed column rather than the overlay.
+    // 6 at level 20, 2 at level 1, read from the printed column.
     expect(definition.actions.find((action) => action.id === "rage")?.uses).toEqual({ limit: 6, per: "long-rest" });
     expect(build(barbarianInput(1)).actions.find((action) => action.id === "rage")?.uses).toEqual({
       limit: 2,
@@ -425,7 +425,7 @@ describe("Barbarian: Feral Instinct changes the initiative die", () => {
     const built = onTheTable(build(barbarianInput()), { fight: false });
     const resolve = (id: string) => (id === built.hero.definitionId ? built.definition : undefined);
     expect(initiativeRollMode(built.state, IDS.hero, resolve, catalog)).toBe("advantage");
-    // The die, not the flag: two faces are offered and the higher survives (+3 Dex).
+    // The die itself: two faces are offered and the higher survives (+3 Dex).
     const faces = [4, 17];
     startEncounter(
       built.state,
@@ -539,7 +539,7 @@ describe("Barbarian: Reckless Attack is an effect the table can see and swing un
     const swungFirst = onTheTable(build(barbarianInput()));
     use(swungFirst, "item-greataxe", [IDS.foe], [3, 8]);
     expect(() => use(swungFirst, "reckless-attack")).toThrowError(
-      /Ozar has already made an attack roll this turn - Reckless Attack is decided with the first/
+      /Ozar has already made an attack roll this turn, and Reckless Attack is decided with the first/
     );
     const offTurn = onTheTable(build(barbarianInput()));
     nextInitiativeTurn(offTurn.state); // the foe's turn
@@ -564,7 +564,7 @@ describe("Boon of Combat Prowess: Peerless Aim until the start of the bearer's n
     use(built, "boon-of-combat-prowess");
     nextInitiativeTurn(built.state, [], turnDeps); // the foe's turn: a missed opportunity attack can't use it
     expect(() => use(built, "boon-of-combat-prowess")).toThrowError(
-      /no uses remaining \(spent - back at the start of its next turn\)/
+      /no uses remaining \(spent · back at the start of its next turn\)/
     );
     nextInitiativeTurn(built.state, [], turnDeps); // Ozar's own turn again
     use(built, "boon-of-combat-prowess");
@@ -596,7 +596,7 @@ describe("Barbarian: Persistent Rage is a counter the engine spends", () => {
     const built = onTheTable(build(barbarianInput()));
     use(built, "persistent-rage");
     expect(built.hero.actionUses["persistent-rage"]).toBe(1);
-    expect(() => use(built, "persistent-rage")).toThrowError(/no uses remaining \(1\/long rest\)/);
+    expect(() => use(built, "persistent-rage")).toThrowError(/no uses remaining \(1\/Long Rest\)/);
   });
 });
 
@@ -607,7 +607,7 @@ describe("Barbarian: Persistent Rage is a counter the engine spends", () => {
 describe("Berserker: Mindless Rage refuses Frightened only while the Rage is running", () => {
   const built = () => onTheTable(build(barbarianInput(6)));
 
-  it("carries the gate out of the COMMITTED subclass bundle - the first link", () => {
+  it("carries the gate out of the COMMITTED subclass bundle: the first link", () => {
     const record = view.featureRecord({ kind: "subclass", sourceId: "path-of-the-berserker", id: "mindless-rage" })!;
     expect(record.grants).toMatchObject({
       conditionImmunities: ["charmed", "frightened"],
@@ -615,7 +615,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
     });
   });
 
-  it("is NOT baked into the definition - a gate the builder cannot evaluate must not be a fact", () => {
+  it("is NOT baked into the definition: a gate the builder cannot evaluate must not be a fact", () => {
     // `interpretFeature` bakes ungated grants into the sheet, and a baked immunity never comes off, so it
     // skips gated blocks.
     const definition = build(barbarianInput(6));
@@ -664,7 +664,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
       { resolveDefinition: () => table.definition, catalog }
     );
     expect(during).toEqual([
-      { kind: "condition", text: "Ozar is immune to Frightened - not applied.", actorId: IDS.hero, immune: true }
+      { kind: "condition", text: "Ozar is immune to Frightened, so it isn't applied.", actorId: IDS.hero, immune: true }
     ]);
     expect(table.hero.conditions, "the gate held but the condition landed anyway").toEqual([]);
 
@@ -678,7 +678,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
       { role: "gm" },
       { resolveDefinition: () => table.definition, catalog }
     );
-    expect(charmed[0]!.text).toBe("Ozar is immune to Charmed - not applied.");
+    expect(charmed[0]!.text).toBe("Ozar is immune to Charmed, so it isn't applied.");
     expect(table.hero.conditions).toEqual([]);
 
     // End the Rage and the immunity goes with it.
@@ -710,7 +710,7 @@ describe("Berserker: Mindless Rage refuses Frightened only while the Rage is run
     expect(early.hero.conditions.map((condition) => condition.id)).toEqual(["frightened"]);
   });
 
-  it("gives a level-5 Berserker nothing - the feature is gained at 6", () => {
+  it("gives a level-5 Berserker nothing: the feature is gained at 6", () => {
     // Non-vacuity: if the immunity came from anywhere but this feature, a raging level-5 Barbarian would show it too.
     const early = onTheTable(build(barbarianInput(5)));
     use(early, "rage");
@@ -819,7 +819,7 @@ describe("Barbarian: Intimidating Presence holds the target to the Barbarian's o
       failureDuration: { type: "rounds", rounds: 10 },
       repeatSave: true
     });
-    // The number the target is held to, not just the one printed on the sheet.
+    // The number the target is held to, which can differ from the one printed on the sheet.
     expect(use(capstone, "intimidating-presence", [IDS.foe]).save).toMatchObject({ ability: "wis", dc: 21 });
   });
 });
@@ -1068,7 +1068,7 @@ describe("Fighter: EXTRA ATTACK is a second swing that really resolves", () => {
     expect(actionOf(built, "item-greatsword").attack?.count).toBe(3);
     expect(use(built, "item-greatsword", [IDS.foe], [9, 5, 5]).componentsRemaining).toEqual({ attack: 2 });
     expect(use(built, "item-flail", [IDS.foe], [14, 6]).componentsRemaining).toEqual({ attack: 1 });
-    // Exhausted reads as `null`, not `{ attack: 0 }`: the resolver reports remaining components only while
+    // Exhausted reads as `null`: the resolver reports remaining components only while
     // some remain.
     expect(use(built, "item-spear", [IDS.foe], [16, 4]).componentsRemaining).toBeNull();
     expect(() => use(built, "item-greatsword", [IDS.foe], [18, 5, 5])).toThrow(/no attacks remaining in this action/);
@@ -1120,13 +1120,13 @@ describe("Fighter: Action Surge is one more action on the turn", () => {
     use(built, "action-surge");
     expect(() => generic(built, "magic")).toThrow(/can't be a second Magic action/);
     generic(built, "dash");
-    expect(() => use(built, "action-surge")).toThrow(/only once on a turn/);
+    expect(() => use(built, "action-surge")).toThrow(/works once on a turn/);
     nextInitiativeTurn(built.state);
     expect(() => use(built, "action-surge")).toThrow(/own turn/);
   });
 });
 
-describe("Barbarian and Monk get the same second swing - it was never Fighter-only", () => {
+describe("Barbarian and Monk get the same second swing: it was never Fighter-only", () => {
   it("opens a second attack for a level-5 Barbarian", () => {
     const built = onTheTable(build(barbarianInput(5)));
     expect(actionOf(built, "item-greataxe").attack?.count).toBe(2);
@@ -1149,7 +1149,7 @@ describe("Barbarian and Monk get the same second swing - it was never Fighter-on
 describe("Monk: the sheet's own numbers", () => {
   const twenty = build(monkInput(20));
 
-  it("Unarmored Defense is 10 + Dex + WISDOM - the other half of the shared feature id", () => {
+  it("Unarmored Defense is 10 + Dex + WISDOM: the other half of the shared feature id", () => {
     expect(twenty.abilityScores).toMatchObject({ dex: 24, wis: 24 });
     expect(twenty.armorClass).toBe(24); // 10 + 7 + 7
   });
@@ -1200,7 +1200,7 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
     }
   });
 
-  it("takes STRENGTH when Strength is the better one - it is 'instead of', not 'always Dexterity'", () => {
+  it("takes STRENGTH when Strength is the better one: it is 'instead of', not 'always Dexterity'", () => {
     // Str 15 (+2) against Dex 12 (+1): +2 and 1d6 + 2; a hard-coded Dexterity would read +1.
     const strong = build({ ...monkInput(1), baseScores: { str: 15, dex: 10, con: 13, int: 12, wis: 14, cha: 8 } });
     expect(strong.abilityScores).toMatchObject({ str: 15, dex: 12 });
@@ -1273,7 +1273,7 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
 });
 
 describe("Monk: Flurry of Blows opens its own Unarmed Strikes", () => {
-  it("opens two strikes as a bonus action, each spent by an Unarmed Strike, leaving the Attack action alone", () => {
+  it("opens two strikes as a Bonus Action, each spent by an Unarmed Strike, leaving the Attack action alone", () => {
     const built = onTheTable(build(monkInput(5)));
     expect(actionOf(built, "flurry-of-blows").multiattack).toEqual([{ actionId: "unarmed-strike", count: 2 }]);
     use(built, "flurry-of-blows");
@@ -1321,9 +1321,9 @@ describe("Monk: the Bonus Action forms Martial Arts and Monk's Focus give", () =
     expect(bonus.damage).toEqual([{ formula: "1d8 + 4", type: "bludgeoning", total: 10 }]);
     expect(bonus.damageTotal).toBe(10);
     expect(built.state.combat.turn.bonusActionUsed).toBe(true);
-    // One strike: Extra Attack belongs to the Attack action, not to the Bonus Action.
+    // One strike: Extra Attack belongs to the Attack action alone.
     expect(builtinActionFor(built.definition, "unarmed-strike-bonus")!.attack?.count).toBeUndefined();
-    expect(() => take(built, "unarmed-strike-bonus", [IDS.foe], [17, 6])).toThrow(/already used a bonus action/);
+    expect(() => take(built, "unarmed-strike-bonus", [IDS.foe], [17, 6])).toThrow(/already used a Bonus Action/);
   });
 
   it("takes Disengage or Dash alone as a Bonus Action for no Focus Point", () => {
@@ -1366,7 +1366,7 @@ describe("Monk: Focus Points are ONE pool, read off the printed column and reall
     for (const id of ["flurry-of-blows", "patient-defense", "step-of-the-wind"]) {
       expect(actionOf(built, id).uses, id).toEqual({ limit: 20, per: "short-rest", pool: "focus-points" });
     }
-    // The column, not a constant: a level-11 Monk prints 11.
+    // Read from the column: a level-11 Monk prints 11.
     const eleven = onTheTable(build(monkInput(11)));
     expect(actionOf(eleven, "flurry-of-blows").uses).toEqual({ limit: 11, per: "short-rest", pool: "focus-points" });
   });
@@ -1388,7 +1388,7 @@ describe("Monk: Focus Points are ONE pool, read off the printed column and reall
   it("refuses the twelfth spend on a level-11 Monk", () => {
     const built = onTheTable(build(monkInput(11)));
     built.hero.actionUses = { "focus-points": 11 };
-    expect(() => use(built, "flurry-of-blows")).toThrowError(/no uses remaining \(11\/short rest\)/);
+    expect(() => use(built, "flurry-of-blows")).toThrowError(/no uses remaining \(11\/Short Rest\)/);
   });
 });
 
@@ -1451,7 +1451,7 @@ describe("Monk: Superior Defense grants Resistance to everything but Force", () 
     expect(built.hero.actionUses["focus-points"]).toBe(20);
     const short = onTheTable(build(monkInput(20)));
     short.hero.actionUses = { "focus-points": 18 };
-    expect(() => use(short, "superior-defense")).toThrowError("Superior Defense has 2 left - this spends 3.");
+    expect(() => use(short, "superior-defense")).toThrowError("Superior Defense has 2 left, and this spends 3.");
   });
 });
 
@@ -1482,7 +1482,7 @@ describe("Monk: Uncanny Metabolism is a counter, and the Epic Boon is a feat", (
     const built = onTheTable(build(monkInput(11)));
     use(built, "uncanny-metabolism");
     expect(built.hero.actionUses["uncanny-metabolism"]).toBe(1);
-    expect(() => use(built, "uncanny-metabolism")).toThrowError(/no uses remaining \(1\/long rest\)/);
+    expect(() => use(built, "uncanny-metabolism")).toThrowError(/no uses remaining \(1\/Long Rest\)/);
   });
 
   it("puts the level-19 boon on the sheet", () => {
@@ -1645,7 +1645,7 @@ describe("Barbarian: Danger Sense is off while Incapacitated", () => {
   });
 });
 
-// SRD Incapacitated: "You can't take any action, Bonus Action, or Reaction" - a feature's own activation included.
+// SRD Incapacitated: "You can't take any action, Bonus Action, or Reaction", a feature's own activation included.
 describe("Incapacitated: feature activations are refused too", () => {
   it("refuses Action Surge while Stunned, but Indomitable still answers a failed save", () => {
     const built = onTheTable(build(fighterInput(9)));
@@ -1682,7 +1682,7 @@ describe("Monk: Stunning Strike once per turn", () => {
     const built = onTheTable(build(monkInput(11)));
     use(built, "stunning-strike", [IDS.foe]);
     expect(() => use(built, "stunning-strike", [IDS.foe])).toThrowError(
-      /Shan has already used Stunning Strike this turn - once per turn/
+      /Shan has already used Stunning Strike this turn, and it works once per turn/
     );
     // Only the first spent a Focus Point.
     expect(built.hero.actionUses["focus-points"]).toBe(1);

@@ -119,8 +119,8 @@ export function exportBundle(db: CodexDb): CodexBundle {
 }
 
 /**
- * Replaces the Codex with a validated bundle in one write. Replace, not merge: merging singleton and uniquely
- * indexed state has no defined answer. Rows are written as they are, with no create-time side effects (no
+ * Replaces the Codex with a validated bundle in one write. A merge would have no defined answer for singleton and
+ * uniquely indexed state. Rows are written as they are, with no create-time side effects (no
  * quest history, no revision snapshots); dates are re-resolved against the restored calendar.
  */
 export function importBundle(db: CodexDb, raw: unknown): CodexImportCounts {
@@ -193,7 +193,7 @@ const BUNDLE_KEYS: ReadonlySet<string> = new Set<string>([...BUNDLE_LIST_KEYS, .
  * Validates an untrusted bundle before any write, through the same validators as ordinary writes. A restore
  * replaces everything, so a bundle with no or unknown sections is refused: it would silently delete data. A
  * missing key within a record takes its default. Cross-record checks mirror the database's constraints, so a
- * bad file gets a readable error instead of driver text.
+ * bad file gets a readable error, with no driver text.
  */
 function normalizeBundle(raw: unknown): CodexBundle {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
@@ -202,11 +202,11 @@ function normalizeBundle(raw: unknown): CodexBundle {
   const unrecognised = Object.keys(bundle).find((key) => !BUNDLE_KEYS.has(key));
   if (unrecognised !== undefined)
     throw new CodexValidationError(
-      `That backup has a section the codex does not recognise: "${unrecognised}". Compare it with a fresh export - a mistyped section name means those records would be dropped rather than restored.`
+      `That backup has a section the codex does not recognise: "${unrecognised}". Compare it with a fresh export. With a mistyped section name, those records would be dropped.`
     );
   if (!Object.keys(bundle).some((key) => BUNDLE_KEYS.has(key)))
     throw new CodexValidationError(
-      'That backup holds no codex sections at all, so it is truncated or is not a backup file. A campaign with nothing in it still exports every section ("pages": [], and so on) - restoring this would erase the codex rather than replace it.'
+      'That backup holds no codex sections at all, so it is truncated or is not a backup file. A campaign with nothing in it still exports every section ("pages": [], and so on), so restoring this would erase the codex.'
     );
   const list = (key: string): unknown[] => {
     const value = bundle[key];
@@ -414,10 +414,10 @@ function normalizeBundle(raw: unknown): CodexBundle {
   const factions = standing.map((row) => row.factionPageId);
   if (new Set(factions).size !== factions.length)
     throw new CodexValidationError(
-      "That backup has two standing rows for the same faction - a faction holds one standing."
+      "That backup has two standing rows for the same faction. A faction holds one standing."
     );
   if (markers.filter((marker) => marker.isParty).length > 1)
-    throw new CodexValidationError("That backup marks more than one pin as the party's - only one pin can be.");
+    throw new CodexValidationError("That backup marks more than one pin as the party's. Only one pin can be.");
   const numbers = sessions.map((session) => session.sessionNumber).filter((value): value is number => value !== null);
   if (new Set(numbers).size !== numbers.length)
     throw new CodexValidationError("That backup has two sessions with the same number.");

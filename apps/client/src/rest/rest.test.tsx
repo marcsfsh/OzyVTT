@@ -77,9 +77,9 @@ describe("the GM's rest panel", () => {
     await user.click(screen.getByRole("button", { name: "Rest" }));
     const dialog = screen.getByRole("dialog", { name: "Rest" });
     expect(await within(dialog).findByText("Deepwinter 3, 1491 DR · 14:00")).toBeTruthy();
-    expect(within(dialog).getByText("12/40 HP · Long rest in 8 h")).toBeTruthy();
+    expect(within(dialog).getByText("12/40 HP · Long Rest in 8 h")).toBeTruthy();
     await user.click(within(dialog).getByRole("checkbox", { name: /Bryn/ }));
-    await user.click(within(dialog).getByRole("button", { name: "Long rest" }));
+    await user.click(within(dialog).getByRole("button", { name: "Long Rest" }));
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("rest:party");
     expect(RestPartySchema.parse({ ...payload, ...COMMAND })).toMatchObject({ kind: "long", actorIds: [TORVA] });
@@ -93,7 +93,7 @@ describe("the GM's rest panel", () => {
       </ToastProvider>
     );
     await user.click(screen.getByRole("button", { name: /Rest\s*1 asked/ }));
-    const request = within(screen.getByRole("region", { name: "Long rest requests" })).getByRole("listitem");
+    const request = within(screen.getByRole("region", { name: "Long Rest requests" })).getByRole("listitem");
     expect(within(request).getByText("Bryn")).toBeTruthy();
     await user.click(within(request).getByRole("button", { name: "Approve" }));
     const [event, payload] = emitted().at(-1)!;
@@ -108,11 +108,11 @@ describe("the GM's rest panel", () => {
         <PartyRest state={gmView({ shortRest: { actorIds: [TORVA, BRYN], done: [BRYN] } })} />
       </ToastProvider>
     );
-    await user.click(screen.getByRole("button", { name: "Short rest open" }));
+    await user.click(screen.getByRole("button", { name: "Short Rest open" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("Done")).toBeTruthy();
     expect(within(dialog).getByText("No player")).toBeTruthy();
-    await user.click(within(dialog).getByRole("button", { name: "Finish short rest" }));
+    await user.click(within(dialog).getByRole("button", { name: "Finish Short Rest" }));
     expect(emitted().at(-1)!.slice(0, 2)).toEqual(["rest:finish", expect.objectContaining({ apply: true })]);
     // Finishing is the end of the dialog's work.
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -126,8 +126,8 @@ describe("the GM's rest panel", () => {
         <PartyRest state={state} />
       </ToastProvider>
     );
-    await user.click(screen.getByRole("button", { name: "Short rest open" }));
-    const rows = within(screen.getByRole("region", { name: "Short rest under way" })).getAllByRole("listitem");
+    await user.click(screen.getByRole("button", { name: "Short Rest open" }));
+    const rows = within(screen.getByRole("region", { name: "Short Rest under way" })).getAllByRole("listitem");
     expect(within(rows[0]).getByText("No player")).toBeTruthy();
     expect(within(rows[1]).getByText("Choosing")).toBeTruthy();
     expect(screen.getByText(/A character with no player gets the rest when you finish it\./)).toBeTruthy();
@@ -144,7 +144,7 @@ describe("the GM's rest panel", () => {
     expect(screen.getByRole("checkbox", { name: /Torva/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /Bryn/ })).not.toBeChecked();
     expect(screen.getByText("0/40 HP · Needs 1 HP to rest")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Short rest" }));
+    await user.click(screen.getByRole("button", { name: "Short Rest" }));
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("rest:party");
     expect(RestPartySchema.parse({ ...payload, ...COMMAND })).toMatchObject({ kind: "short", actorIds: [TORVA] });

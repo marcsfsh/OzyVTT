@@ -1,11 +1,12 @@
 /**
  * The Homebrew tab: one master-detail library over all content types, with library-wide
- * status in a modebar rather than a second tab bar. The panel is conditionally mounted, so a
+ * status in a modebar, with no second tab bar. The panel is conditionally mounted, so a
  * tab switch destroys its state; edits are parked on the server as they are made (`useAutosave`).
  * A failed load shows a named condition with Retry, never an empty library.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { Alert, Button, Skeleton, useToast } from "@vtt/ui";
 import { IconChevron } from "@vtt/ui";
 import { socket } from "../socket";
@@ -15,6 +16,7 @@ import { PackActions } from "./PackActions";
 import { RecordDetail, type DetailMode } from "./RecordDetail";
 import { homebrewApi, listAllHomebrew, type HomebrewRecordDocument, type HomebrewRecordSummary } from "./api";
 import { ApiError } from "../lib/api";
+import { closingSave } from "./closingSaves";
 import { blankDraft } from "./defaults";
 import { typeLabel } from "./types";
 import { WIZARDS } from "./wizard";
@@ -43,7 +45,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       setLoad("ready");
       setLoadMessage(null);
     } catch (error) {
-      // 404 (router not mounted) or 501 (store not mounted) means "not available", not "broken".
+      // 404 (router not mounted) or 501 (store not mounted) means "not available"; nothing is broken.
       const status = error instanceof ApiError ? error.status : 0;
       setLoad(status === 404 || status === 501 ? "unavailable" : "error");
       setLoadMessage(error instanceof Error ? error.message : "Couldn't load your homebrew.");
@@ -65,7 +67,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
     };
   }, [refresh]);
 
-  // Patch a summary row in place rather than reloading the list under an open editor.
+  // Patch a summary row in place, so the list never reloads under an open editor.
   const patchRow = useCallback((next: HomebrewRecordDocument) => {
     setRecords((rows) => {
       const name = typeof next.record.name === "string" ? next.record.name : "";
@@ -90,11 +92,16 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
 
   const select = useCallback(
     async (id: string) => {
-      setSelectedId(id);
-      setMode("editor");
-      setSelected(null);
-      setSelectError(null);
+      // The open editor closes at once and sends its last edit; the record is read after that lands, so reopening
+      // the same record never starts from a copy without it.
+      flushSync(() => {
+        setSelectedId(id);
+        setMode("editor");
+        setSelected(null);
+        setSelectError(null);
+      });
       try {
+        await closingSave(id);
         setSelected(await homebrewApi.get(gmToken, id));
       } catch (error) {
         setSelectError(error instanceof Error ? error.message : "Couldn't open that record.");
@@ -154,7 +161,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
       const made = name || `New ${typeLabel(request.type)}`;
       const copied = companions.length - failed.length;
       if (failed.length > 0) {
-        // `info`, not `error`: the requested record was created.
+        // `info`: the requested record was created.
         toast(`${made} created, but ${failed.join(" and ")} couldn't be copied. Add a subclass before publishing.`, {
           tone: "info"
         });
@@ -218,7 +225,7 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
         >
           <p className="hb-unavailable-text">
             {load === "unavailable"
-              ? "This table's server doesn't have the homebrew library yet, so there's nothing to show. Nothing you've made has been lost — it just isn't reachable from here."
+              ? "This table's server doesn't have the homebrew library yet, so there's nothing to show. Nothing you've made is lost. It isn't reachable from here."
               : loadMessage}
           </p>
           <Button
@@ -305,8 +312,8 @@ export function HomebrewPanel({ gmToken }: Readonly<{ gmToken: string }>) {
             <div className="nh-empty">
               <span className="nh-empty-title">Select a record</span>
               <span className="nh-empty-text">
-                Every record starts as a draft only you can see. Publish it when it&rsquo;s ready, and choose then
-                whether players can browse it.
+                Every record starts as a draft only you can see. Publish it when it's ready, and choose then whether
+                players can browse it.
               </span>
               <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 New homebrew

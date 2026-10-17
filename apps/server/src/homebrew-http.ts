@@ -53,7 +53,7 @@ import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 
 /** Query booleans arrive as strings; accept the two spellings a browser or curl actually sends. */
 const QueryBoolean = z.enum(["true", "false", "1", "0"]).transform((value) => value === "true" || value === "1");
-/** Lenient (unknown keys stripped) rather than strict: a stray query parameter should not 400 a read. */
+/** Lenient (unknown keys stripped): a stray query parameter should not 400 a read. */
 const ListQuerySchema = z.object({
   type: HomebrewContentTypeSchema.optional(),
   state: HomebrewContentStateSchema.optional(),
@@ -144,7 +144,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     return refuse(response, caller, "Homebrew authoring is the GM's.");
   };
 
-  /** `type` lives on the row, not the body, but is put back here so pack records are self-describing. */
+  /** `type` lives on the row and is put back into the body here, so pack records are self-describing. */
   const documentOf = (row: HomebrewRecordRow) => ({
     id: row.id,
     type: row.type,
@@ -177,7 +177,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     return sendData(response, status, { record: documentOf(row) });
   };
 
-  /** The `type` discriminator is read off the submitted record - the same place the pack format keeps it. */
+  /** The `type` discriminator is read off the submitted record: the same place the pack format keeps it. */
   function typeOf(record: Record<string, unknown>): HomebrewContentType {
     const parsed = HomebrewContentTypeSchema.safeParse(record.type);
     if (!parsed.success)
@@ -259,7 +259,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       if (!source) return sendFailure(response, 404, "not_found", "That record was not found.");
       const copied = copyName(name ?? String((source.body as { name?: unknown }).name ?? id));
       // Minted before the rewrite because self-derived catalog slugs (`<id>-lineages`, `<id>-subclasses`)
-      // must point at the copy, not the source. See `homebrew-srd-copy.ts`.
+      // must point at the copy's id. See `homebrew-srd-copy.ts`.
       const mintedId = mintHomebrewId(source.type, copied, (candidate) => store.get(candidate) !== undefined);
       const body = rewriteForNewId(source.type, { ...source.body, name: copied }, id, mintedId);
       return sent(response, store.importRecord(mintedId, source.type, body, false, "homebrew:duplicate"), 201);
@@ -268,7 +268,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  /** Publishing requires validity. 409, not 400: the request is fine, the stored draft is not. */
+  /** Publishing requires validity. An invalid draft is a 409: the request itself is well formed. */
   router.post(expressPath(HOMEBREW_PATHS.contentPublish), requireGm, (request, response) => {
     try {
       const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
@@ -412,7 +412,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
           const type = typeOf(record);
           // The same name check the write makes, so a dry run reports exactly what the apply would.
           const name = recordName(record);
-          // Any id that is not our shape for this type is re-minted, not just an `hb-` one.
+          // Any id that is not our shape for this type is re-minted, whatever its prefix.
           const foreign = originalId !== "" && !isMintedHomebrewId(originalId, type);
           const heldRow = originalId === "" ? undefined : store.get(originalId);
           const held = heldRow !== undefined;

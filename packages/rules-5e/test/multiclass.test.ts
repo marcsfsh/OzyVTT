@@ -62,7 +62,7 @@ describe("multiclass prerequisites", () => {
   it("says plainly what is missing, naming the new class and then the classes already taken", () => {
     const text = multiclassShortfallText(scores({ str: 10, dex: 12 }), druid, [druid, fighter]);
     expect(text).toBe(
-      "Druid needs Wisdom 13; you have 10. Your Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12."
+      "Druid needs Wisdom 13; you have 10. Fighter, a class you already have, needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12."
     );
   });
 });

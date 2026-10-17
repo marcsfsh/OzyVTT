@@ -143,7 +143,7 @@ describe("actor definition v1", () => {
     expect(parsed.success, parsed.success ? undefined : JSON.stringify(parsed.error.issues)).toBe(true);
     expect(jsonValidate(structuredClone(legacyDefinition)), JSON.stringify(jsonValidate.errors)).toBe(true);
     expect(parsed.success && parsed.data.schemaVersion).toBe(1);
-    // New fields stay absent rather than materializing as empty values, so re-saving does not rewrite stored content.
+    // New fields stay absent, with no empty values materialized, so re-saving does not rewrite stored content.
     const data = parsed.success ? parsed.data : undefined;
     expect(data?.character?.choices).toBeUndefined();
     expect(data?.character?.classes[0].hitDie).toBeUndefined();

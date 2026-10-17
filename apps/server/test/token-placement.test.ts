@@ -57,7 +57,7 @@ describe("authoritative encounter token placement", () => {
 
   it("draws Tiny and Small smaller than Medium inside their shared cell, footprint unchanged (report #13)", () => {
     // One-cell sizes scale their glyph (Tiny 50% / Small 66% / Medium 82% of the 50px cell) but all
-    // still occupy a single cell - the footprint (sizeCells) that drives snapping is untouched.
+    // still occupy a single cell: the footprint (sizeCells) that drives snapping is untouched.
     expect(encounterTokenAppearance(geometry, 1, "medium").sizePx).toBe(41); // 50 * .82
     expect(encounterTokenAppearance(geometry, 1, "small").sizePx).toBe(33); // 50 * .66
     expect(encounterTokenAppearance(geometry, 1, "tiny").sizePx).toBe(25); // 50 * .50

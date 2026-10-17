@@ -57,15 +57,15 @@ const ABILITY: Draft = {
 const BY_LEVEL: Draft = { uses: { scaling: { type: "by-level", table: [{ level: 1, limit: 2 }] }, per: "long-rest" } };
 const PROFICIENCY: Draft = { uses: { scaling: { type: "proficiency-bonus" }, per: "long-rest" } };
 
-describe("3b(a) — “Uses are” reads its answer back out of the shape", () => {
-  it("a stored body renders as the mode it stores, not as “Not set”", () => {
+describe('3b(a): "Uses are" reads its answer back out of the shape', () => {
+  it('a stored body renders as the mode it stores, where "Not set" would be wrong', () => {
     expect(mount(FLAT).select().value).toBe("flat");
     expect(mount(ABILITY).select().value).toBe("ability-modifier");
     expect(mount(BY_LEVEL).select().value).toBe("by-level");
     expect(mount(PROFICIENCY).select().value).toBe("proficiency-bonus");
   });
 
-  it("a record with no uses block still reads as “Not set” — absence is the only empty", () => {
+  it('a record with no uses block still reads as "Not set": absence is the only empty', () => {
     const form = mount({ name: "Plain Mace" });
     expect(form.select().value).toBe("");
     // Reading must not write.

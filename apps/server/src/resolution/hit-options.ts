@@ -138,7 +138,7 @@ export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
       name: "Charge",
       dice: charge.damage.map((part) => `${part.formula} ${capitalised(part.type)}`).join(" + "),
       cost: null,
-      unverified: `Only if ${ctx.attacker.name} moved ${charge.feet ?? 20}+ feet straight toward the target just before the hit.`
+      unverified: `Only if ${ctx.attacker.name} moved ${charge.feet ?? 20}+ feet straight toward the target immediately before the hit.`
     });
   for (const action of ctx.siblings) {
     const rider = hitRiderOf(action);

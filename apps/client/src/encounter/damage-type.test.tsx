@@ -82,7 +82,7 @@ describe("the manual damage entry's type chooser", () => {
     await user.click(box);
     // Scoped to this listbox: the menu's Size and Health `<select>`s have native options of their own.
     const list = screen.getByRole("listbox", { name: "Damage type" });
-    // The whole vocabulary, not the chooser's default page of eight.
+    // The whole vocabulary, beyond the chooser's default page of eight.
     expect(within(list).getAllByRole("option")).toHaveLength(13);
     expect(within(list).getByRole("option", { name: "Bludgeoning" })).toBeTruthy();
   });
@@ -122,7 +122,7 @@ describe("the manual damage entry's type chooser", () => {
     const user = userEvent.setup();
     mount();
     await user.type(screen.getByLabelText("Amount"), "10");
-    // Typed, not picked, then left by moving to the next control: `Combobox` commits on blur.
+    // Typed and never picked, then left by moving to the next control: `Combobox` commits on blur.
     await user.type(screen.getByRole("combobox", { name: "Damage type" }), "Primordial Ooze");
     await user.click(screen.getByRole("button", { name: "Damage" }));
     expect(lastHpCall()[1]).toMatchObject({ amount: 10, damageType: "primordial-ooze" });
@@ -257,7 +257,7 @@ describe("the turn-order row's tools popover carries the type too", () => {
     // Drive the ack: the panel writes its line from inside the promise.
     lastHpCall()[2]({ ok: true });
     // The confirmation is built from the same computed type as the payload, and is asserted first so a
-    // wrong value fails here rather than at a payload guard.
+    // wrong value fails here and never at a payload guard.
     expect(await screen.findByText("Aria took 10 fire damage.")).toBeTruthy();
     const [event, payload] = lastHpCall();
     expect(event).toBe("actor:apply-damage");

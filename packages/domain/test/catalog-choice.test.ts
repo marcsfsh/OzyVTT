@@ -11,7 +11,7 @@ import type {
 
 /**
  * Compile-time guard: a large `z.infer` elsewhere in this program once silently truncated the spell summary
- * type, dropping fields `resolvePickChoice` reads. Instantiation budgets are per program, so the content
+ * type and dropped fields `resolvePickChoice` reads. Instantiation budgets are per program, so the content
  * package's copy of this check cannot cover this one. The `any` and `never` arms matter because a bare
  * `T[K] extends Expected` passes both, and those are the shapes a truncated inference takes.
  */
@@ -177,7 +177,7 @@ const catalogs: CatalogChoiceCatalogs = {
   ]
 };
 
-describe("resolveCatalogChoice - tools, languages and the union combinator (ruling C)", () => {
+describe("resolveCatalogChoice: tools, languages and the union combinator (ruling C)", () => {
   it("resolves tools off the equipment catalog, the way weapons already did", () => {
     // Tools are equipment rows with `category: "tool"`.
     expect(resolveCatalogChoice("tools", catalogs).map((option) => option.id)).toEqual([
@@ -222,14 +222,14 @@ describe("resolveCatalogChoice - tools, languages and the union combinator (ruli
       "magic-missile",
       "cure-wounds"
     ]);
-    // A part that is itself a content gap contributes nothing instead of taking the union down.
+    // A part that is itself a content gap contributes nothing, and the union still resolves.
     expect(resolveCatalogChoice("skills-or-bard-spells", catalogs).map((option) => option.id)).toEqual([
       "athletics",
       "stealth"
     ]);
   });
 
-  it("still throws when EVERY part of a union is a gap - a union of nothing is nothing", () => {
+  it("still throws when EVERY part of a union is a gap: a union of nothing is nothing", () => {
     expect(() => resolveCatalogChoice("bard-spells-or-rogue-spells", catalogs)).toThrowError(CatalogChoiceError);
     expect(() => resolveCatalogChoice("bard-spells-or-rogue-spells", catalogs)).toThrowError(
       /None of "bard-spells", "rogue-spells" resolved/
@@ -244,6 +244,17 @@ describe("resolveCatalogChoice", () => {
 
   it("resolves weapons to the equipment catalog's weapon rows only", () => {
     expect(resolveCatalogChoice("weapons", catalogs).map((option) => option.id)).toEqual(["longsword"]);
+  });
+
+  it("offers the kinds of weapon for `weapons`, and no magic weapon made from one", () => {
+    // A Berserker Axe is any axe made magic: it has no weapon statistics of its own (Weapon Mastery picks a kind).
+    const berserkerAxe: ContentEquipmentSummary = {
+      ...equipmentSummary("berserker-axe", "weapon"),
+      weapon: null,
+      appliesTo: { label: "Any Axe", baseIds: ["battleaxe", "greataxe", "handaxe"] }
+    };
+    const withMagic: CatalogChoiceCatalogs = { ...catalogs, equipment: [...catalogs.equipment, berserkerAxe] };
+    expect(resolveCatalogChoice("weapons", withMagic).map((option) => option.id)).toEqual(["longsword"]);
   });
 
   it("resolves <listId>-spells through the spell's classes tags, carrying the spell level", () => {

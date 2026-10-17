@@ -88,7 +88,7 @@ export function deriveSquareGridFromSegment(input: SegmentCalibrationInput): Squ
   const cellSizePx = length / input.cellsBetween;
   if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX)
     throw new InvalidRequestError(
-      `The selected segment produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`
+      `The selected segment produces a cell outside the supported ${MIN_CELL_SIZE_PX}-${MAX_CELL_SIZE_PX} pixel range.`
     );
   const segmentAngle = Math.atan2(dy, dx);
   const rotationRadians = normalizeRotation(input.axis === "horizontal" ? segmentAngle : segmentAngle - Math.PI / 2);
@@ -120,7 +120,7 @@ export function deriveSquareGridFromArea(input: AreaCalibrationInput): SquareGri
   const cellSizePx = (width / input.cellsAcross + height / input.cellsDown) / 2;
   if (cellSizePx < MIN_CELL_SIZE_PX || cellSizePx > MAX_CELL_SIZE_PX)
     throw new InvalidRequestError(
-      `The selected area produces a cell outside the supported ${MIN_CELL_SIZE_PX}–${MAX_CELL_SIZE_PX} pixel range.`
+      `The selected area produces a cell outside the supported ${MIN_CELL_SIZE_PX}-${MAX_CELL_SIZE_PX} pixel range.`
     );
   const origin = { x: Math.min(input.start.x, input.end.x), y: Math.min(input.start.y, input.end.y) };
   return validateSquareGridCalibration({

@@ -123,7 +123,7 @@ function classFor(brew: Homebrew) {
             ...(brew.boon === undefined ? [] : ["rift-apotheosis"])
           ]
         : [],
-    // The printed column, stepping 2/2/3/3/4..., read by `scaling: {type: "class-resource"}`.
+    // The printed column (2/2/3/3/4...), read by `scaling: {type: "class-resource"}`.
     classResources: [
       { id: "rift-charge", name: "Rift Charges", amount: 2 + Math.floor(index / 2), display: true },
       { id: "rift-dice", name: "Rift Dice", amount: `${1 + Math.floor(index / 4)}d6`, display: true }
@@ -482,7 +482,7 @@ describe("a feature's attack-bonus reaches the rolled to-hit", () => {
     const action = actionOf(built, "item-greatsword");
     expect(action.attack!.bonus).toBe(8);
 
-    // The roll, not just the number: d20 = 10 -> 18 total against AC 12.
+    // The roll itself: d20 = 10 -> 18 total against AC 12.
     const resolution = resolveDefinitionAction(
       built.state,
       action,
@@ -572,7 +572,7 @@ describe("a feature's spell-save-dc raises the bearer's spell save DC and nothin
       deps(built, [3, 4])
     );
     expect(resolution.save!.dc).toBe(15);
-    expect(built.state.combat.pendingSaves[0].dc).toBe(15); // the DC actually enforced, not just shown
+    expect(built.state.combat.pendingSaves[0].dc).toBe(15); // the DC actually enforced
   });
 });
 
@@ -745,7 +745,7 @@ describe("a this-item-scoped rider on a feature does not become an 'always' ride
     // "only with this weapon" into "+5 on everything", so the rider is dropped.
     const built = build({ on: "class", modifiers: [{ type: "attack-bonus", amount: 5, scope: "this-item" }] });
     expect(carrierOf(built, LABEL.class)).toBeUndefined();
-    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(6); // the base number, not 11
+    expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(6); // the base number alone
     expect(actionOf(built, "item-shortbow").attack!.bonus).toBe(4);
   });
 
@@ -768,7 +768,7 @@ describe("nothing the builder baked is counted a second time as a carrier", () =
     const derivation = deriveEquipment(built.hero, built.definition, built.catalog);
     expect(currentSpeedFeet(built.hero, derivation)).toBe(40);
     expect(derivation.initiative).toBe(0);
-    expect(derivation.armorClass).toBe(1); // the rider, read live rather than baked
+    expect(derivation.armorClass).toBe(1); // the rider, read live
 
     expect(built.definition.speedFeet).toBe(40); // 30 + 10, once
     expect(built.hero.speedFeet).toBe(40);
@@ -801,7 +801,7 @@ describe("the feature carriers fail open", () => {
     ).toBe(6);
   });
 
-  it("derives a definition with NO features array at all, exactly as before - PDF imports and the example party", () => {
+  it("derives a definition with NO features array at all, exactly as before: PDF imports and the example party", () => {
     // Sheets written before `character.features` existed have no array; `?? []` must keep derivation working.
     const built = build({ on: "class", modifiers: [{ type: "attack-bonus", amount: 2 }] });
     const legacy = structuredClone(built.definition) as ActorDefinition;
@@ -837,7 +837,7 @@ describe("the feature carriers fail open", () => {
 
 describe("the recorded feature array stays inside the schema's bound", () => {
   it("leaves real headroom for the fattest bundled SRD sheet at level 20", () => {
-    // `dedupeFeatureRefs` truncates at the schema's 80 rather than rejecting, so an overflowing sheet would
+    // `dedupeFeatureRefs` truncates at the schema's 80 without an error, so an overflowing sheet would
     // lose riders silently. This counts what the largest real sheet would record (every class feature
     // across 20 levels, the largest subclass, species + lineage and background) from the bundled content.
     const view = new ContentLibrary().forAudience("gm");
@@ -872,7 +872,7 @@ describe("the recorded feature array stays inside the schema's bound", () => {
 // Agonizing Blast: "When you cast Eldritch Blast, add your Charisma modifier to the damage it deals on
 // a hit". `spell-id-is` (matched against `ActorAction.spellId`) picks out one cantrip, which no
 // school/level combination can, and `extra-damage.abilityModifier` adds a property of the character
-// rather than an authored constant. These assert the number on the damage roll.
+// (no authored constant). These assert the number on the damage roll.
 describe("Agonizing Blast: a spell-gated rider adds the caster's own ability modifier", () => {
   /** A level-5 sheet with CHA 17 (+3), so the modifier that arrives is unmistakably the right one. */
   const CHA_HERO = {
@@ -1040,8 +1040,8 @@ describe("an ability-score choice raises past 20 when it says so", () => {
     expect(actionOf(built, "item-greatsword").attack!.bonus).toBe(8);
   });
 
-  it("refuses a pick past 20 when the choice names no maximum - the SRD default is unchanged", () => {
-    // Negative control: the cap is not lifted for every choice. The pick is refused, not quietly dropped.
+  it("refuses a pick past 20 when the choice names no maximum: the SRD default is unchanged", () => {
+    // Negative control: the cap is not lifted for every choice. The pick is refused with an error.
     expect(() => build({ ...AT_TWENTY, boon: false })).toThrowError(
       /STR would be 21; Rift Apotheosis cannot raise a score above 20/
     );
@@ -1059,7 +1059,7 @@ describe("an ability-score choice raises past 20 when it says so", () => {
 });
 
 // Uses that scale off a printed class-table column (as Rage, Bardic Inspiration and Channel Divinity
-// do), rather than a `by-level` copy of it. The resolved number lands on the same `uses.limit` the
+// do), with no `by-level` copy of it. The resolved number lands on the same `uses.limit` the
 // engine already gates, spends and re-arms.
 describe("a feature scales its uses off the class table's printed column", () => {
   it("resolves the level-5 printed amount onto the action's real use limit", () => {
@@ -1069,7 +1069,7 @@ describe("a feature scales its uses off the class table's printed column", () =>
   });
 
   it("is SPENDABLE up to that limit and refuses the use past it", () => {
-    // This is the live `actionUses` counter, not a display number.
+    // This is the live `actionUses` counter.
     const built = fight(build());
     built.hero.actionUses = { "rift-channel": 3 };
     resolveDefinitionAction(

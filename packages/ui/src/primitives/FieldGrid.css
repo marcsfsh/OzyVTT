@@ -1,5 +1,5 @@
 /* FieldGrid: auto-fitting form columns, no media query. `min(var(--nh-fg-min), 100%)` lets the track collapse in
-   a narrow container instead of overflowing. */
+   a narrow container and never overflow. */
 .nh-fieldgrid {
   box-sizing: border-box;
   display: grid;

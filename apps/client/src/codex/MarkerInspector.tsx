@@ -92,7 +92,7 @@ export function MarkerInspector({
     try {
       onUpdated(await atlasApi.updateMarker(gmToken, marker.id, input));
     } catch {
-      setError("That change didn't save - try again.");
+      setError("That change didn't save. Try again.");
     } finally {
       setBusy(false);
     }
@@ -258,7 +258,7 @@ export function MarkerInspector({
           />
           {/* Opens quick-create prefilled with the pin's label, and links the new page on success. */}
           <Button variant="ghost" size="sm" onClick={onCreatePage}>
-            <IconPlus /> New page{marker.label ? ` “${marker.label}”` : ""}
+            <IconPlus /> New page{marker.label ? ` "${marker.label}"` : ""}
           </Button>
         </div>
       </Field>

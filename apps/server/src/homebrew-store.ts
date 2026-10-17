@@ -96,7 +96,7 @@ export type HomebrewRevisionRow = Readonly<{
   authorTag: string;
 }>;
 
-/** Thrown when a write's `expectedRev` does not match the stored row - the editor's copy is stale. */
+/** Thrown when a write's `expectedRev` does not match the stored row: the editor's copy is stale. */
 export class HomebrewRevisionConflictError extends Error {
   constructor(
     message: string,
@@ -215,14 +215,14 @@ export class HomebrewStore implements HomebrewContentSource {
     this.database?.close();
     this.database = undefined;
     this.revisionValue = -1;
-    // Dropped rather than left to the revision gate: a reopened store's counter could coincide with a
+    // Dropped here, ahead of the revision gate: a reopened store's counter could coincide with a
     // cached revision from the previous handle.
     this.slices = undefined;
     this.monsters = undefined;
     this.authored = undefined;
   }
 
-  /** The coarse counter bumped inside every write transaction - drives `homebrew:changed` and the view cache. */
+  /** The coarse counter bumped inside every write transaction: drives `homebrew:changed` and the view cache. */
   get revision(): number {
     return this.revisionValue;
   }
@@ -316,7 +316,7 @@ export class HomebrewStore implements HomebrewContentSource {
     return { gm: freezeSlice(gm), player: freezeSlice(player) };
   }
 
-  /** Every monster row, ignoring `state` and `deleted_at` - see `monsterForInstance`. */
+  /** Every monster row, whatever its `state` and `deleted_at`. See `monsterForInstance`. */
   private buildMonsterIndex(): Map<string, ActorDefinition> {
     const byId = new Map<string, ActorDefinition>();
     const rows = this.requireDatabase()
@@ -386,7 +386,7 @@ export class HomebrewStore implements HomebrewContentSource {
       : undefined;
     const pageWhere = [...where];
     const pageParameters = [...parameters];
-    // The cursor is opaque, so an unresolvable one restarts from the top rather than failing.
+    // The cursor is opaque, so an unresolvable one restarts from the top.
     if (anchor && cursorId) {
       pageWhere.push("(LOWER(name), id) > (?, ?)");
       pageParameters.push(anchor.sort_key, cursorId);
@@ -539,7 +539,7 @@ export class HomebrewStore implements HomebrewContentSource {
     return this.get(id)!;
   }
 
-  /** Drops a published record's pending edits, leaving the live body as it is. A no-op without any. */
+  /** Drops a published record's pending edits. The live body stays as it is. A no-op without any. */
   discardPending(id: string, expectedRev: number | undefined): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
@@ -570,7 +570,7 @@ export class HomebrewStore implements HomebrewContentSource {
     return { id, deletedAt: stamp };
   }
 
-  /** Clears `deleted_at`, returning the record to whatever `state`/`visibleToPlayers` it had. */
+  /** Clears `deleted_at`. The record goes back to whatever `state`/`visibleToPlayers` it had. */
   restore(id: string): HomebrewRecordRow {
     const database = this.requireDatabase();
     this.requireRow(id, undefined);
@@ -594,7 +594,7 @@ export class HomebrewStore implements HomebrewContentSource {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
     if (visibleToPlayers && existing.state !== "published")
-      throw new HomebrewStateError("Publish this first - a draft can't be shown to players.");
+      throw new HomebrewStateError("Publish this first. A draft can't be shown to players.");
     const stamp = this.stamp();
     this.transaction(() => {
       database
@@ -629,7 +629,9 @@ export class HomebrewStore implements HomebrewContentSource {
     const existing = this.recordRow(id);
     if (existing && !overwrite) throw new HomebrewStateError(`A record already exists at "${id}".`);
     if (existing && existing.type !== type)
-      throw new HomebrewStateError(`"${id}" is ${withArticle(existing.type)}, not ${withArticle(type)}.`);
+      throw new HomebrewStateError(
+        `"${id}" is already ${withArticle(existing.type)}, so it can't be replaced with ${withArticle(type)}.`
+      );
     const refusal = existing ? overwriteRefusal(projectSummary(existing)) : null;
     if (refusal) throw new HomebrewStateError(refusal);
     const name = recordName(body);
@@ -776,7 +778,7 @@ function withActionProseFacts(node: unknown): unknown {
   return isAction ? withProseFacts(filled as unknown as ActorAction) : filled;
 }
 
-/** The slice under construction - the same nine keys as `HomebrewCatalogSlice`, mutable while filling. */
+/** The slice under construction: the same nine keys as `HomebrewCatalogSlice`, mutable while filling. */
 type DraftSlice = {
   classes: ClassReference[];
   subclasses: SubclassReference[];
@@ -882,7 +884,7 @@ export function overwriteRefusal(
     return "That record was deleted here. Restore it before overwriting it, or import with re-mint to land a fresh copy.";
   if (row.state === "published") {
     return row.visibleToPlayers
-      ? "That record is published and shown to players - overwriting it would take it away from them mid-session. Unpublish it first, or import with re-mint."
+      ? "That record is published and shown to players, so overwriting it would take it away from them mid-session. Unpublish it first, or import with re-mint."
       : "That record is published. Unpublish it before overwriting it, or import with re-mint to land a fresh copy.";
   }
   return null;
@@ -943,7 +945,7 @@ function likeEscape(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
-/** Opaque to clients. Carries only the last row's id, keeping it under the contract's 200-character cap. */
+/** Opaque to clients. Carries only the last row's id, so it stays under the contract's 200-character cap. */
 function encodeCursor(id: string): string {
   return Buffer.from(id, "utf8").toString("base64url");
 }

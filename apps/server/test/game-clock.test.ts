@@ -149,7 +149,7 @@ describe("notices on the GM's devices", () => {
 
     expect((await emitCommand(asker, "rest:ask", { commandId: randomUUID(), actorId: LYRA })).ok).toBe(true);
     await settle();
-    expect(gm).toEqual(["Lyra asks for a long rest. Answer it under Needs you on the Table."]);
+    expect(gm).toEqual(["Lyra asks for a Long Rest. Answer it under Needs you on the Table."]);
     expect(other).toEqual([]);
 
     // Taking the ask back is not news.

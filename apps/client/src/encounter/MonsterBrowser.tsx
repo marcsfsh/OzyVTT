@@ -6,7 +6,7 @@ import { formatChallenge, titleCase } from "./format";
 import { loadMonsterCatalog } from "./monster-catalog";
 import "./monster-browser.css";
 
-/** Challenge-rating bands for the filter: wide enough to browse by, matching the SRD's tiers of play. */
+/** Challenge-rating bands for the filter: wide enough to browse by, and close to the SRD's tiers of play. */
 const CR_BANDS = [
   { id: "any", label: "Any CR", min: 0, max: 30 },
   { id: "0-1", label: "CR 0 to 1", min: 0, max: 1 },
@@ -165,11 +165,7 @@ export function MonsterBrowser({
             <option value="cr-down">Highest CR first</option>
           </Select>
         </div>
-        <Switch
-          label="Roll hit points instead of using the average"
-          checked={rollHitPoints}
-          onChange={setRollHitPoints}
-        />
+        <Switch label="Roll hit points (off uses the average)" checked={rollHitPoints} onChange={setRollHitPoints} />
         <p className="monster-browser-target">
           Adds land in the staging tray · <strong>{visibility === "gm-only" ? "GM only" : "Shown to players"}</strong>
         </p>

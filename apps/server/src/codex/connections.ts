@@ -190,7 +190,7 @@ function endpoint(
 }
 
 type LinkTarget = Readonly<{ id: string; title: string; entityType: CodexEntityType; revealed: boolean }>;
-/** Every page by its link key, read in one query rather than once per mention. */
+/** Every page by its link key, read in one query with no query per mention. */
 function pagesByLinkKey(db: CodexDb): Map<string, LinkTarget> {
   const byKey = new Map<string, LinkTarget>();
   for (const page of db.database.prepare("SELECT id, title, entity_type, revealed FROM codex_pages").all() as Array<{

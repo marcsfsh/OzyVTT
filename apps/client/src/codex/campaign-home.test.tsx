@@ -268,13 +268,13 @@ describe("Home is the section name, and 'World' is not a destination", () => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
-    // "World" is a nav group eyebrow, not a destination.
+    // "World" is a nav group eyebrow and no destination.
     expect(
       within(screen.getByRole("navigation", { name: "Codex sections" })).queryByRole("button", { name: "World" })
     ).not.toBeInTheDocument();
   });
 
-  it("on the PLAYER mode bar too — the split the plan warned about is between these two", async () => {
+  it("on the PLAYER mode bar too: the split the plan warned about is between these two", async () => {
     playerDefaults();
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
@@ -287,7 +287,7 @@ describe("Home is the section name, and 'World' is not a destination", () => {
     expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("as the command palette's goto target — which must still reach the mode, not just be relabelled", async () => {
+  it("as the command palette's goto target, which must still reach the mode beyond a relabel", async () => {
     gmDefaults();
     const user = userEvent.setup();
     renderWorkspace();
@@ -298,7 +298,7 @@ describe("Home is the section name, and 'World' is not a destination", () => {
     expect(palette.queryByText("Go to World")).not.toBeInTheDocument();
     await user.click(palette.getByText("Go to Home"));
 
-    // The action must reach the section, not just carry the label.
+    // The action must reach the section as well as carry the label.
     expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute("aria-current", "page");
     expect(await screen.findByRole("navigation", { name: "Recently updated pages" })).toBeInTheDocument();
   });
@@ -338,7 +338,7 @@ describe("The Campaign dashboard shows what exists today", () => {
     const rows = journal.getAllByRole("button").map((row) => row.textContent ?? "");
     expect(rows[0]).toContain("A battle was fought here.");
     expect(rows[1]).toContain("The party crossed the mists.");
-    // A combat record reads by a text badge, not colour.
+    // A combat record reads by a text badge as well as colour.
     expect(journal.getByText("Battle")).toBeInTheDocument();
     const atlas = within(await screen.findByRole("navigation", { name: "Maps in the atlas" }));
     expect(atlas.getByText("Barovia map")).toBeInTheDocument();
@@ -355,7 +355,7 @@ describe("The Campaign dashboard shows what exists today", () => {
     await user.click(journal.getByText("The party crossed the mists."));
 
     expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
-    // The entry is marked, not just the Journal opened.
+    // The entry is marked as well as the Journal opened.
     await waitFor(() => expect(document.getElementById("codex-entry-j1")).toHaveAttribute("aria-current", "true"));
     expect(document.getElementById("codex-entry-j2")).not.toHaveAttribute("aria-current");
   });
@@ -447,7 +447,7 @@ describe("A record with a card of its own does not also sit in the feed (owner d
 
     const feed = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     expect(feed.queryByText("The duke's ultimatum expires.")).not.toBeInTheDocument();
-    // Still shown, in its card: de-duplicated, not deleted.
+    // Still shown, in its card: de-duplicated and kept.
     expect(
       within(screen.getByRole("navigation", { name: "Deadlines" })).getByText("The duke's ultimatum expires.")
     ).toBeInTheDocument();
@@ -463,7 +463,7 @@ describe("A record with a card of its own does not also sit in the feed (owner d
     expect(feed.getByText("The party crossed the mists.")).toBeInTheDocument();
   });
 
-  it("keeps milestones IN the feed — the dashboard has no card for them", async () => {
+  it("keeps milestones IN the feed: the dashboard has no card for them", async () => {
     const user = userEvent.setup();
     renderWorkspace();
     await openCampaign(user);
@@ -474,7 +474,7 @@ describe("A record with a card of its own does not also sit in the feed (owner d
   });
 
   /**
-   * Unconfirmed downtime has its own card, so it leaves the feed. De-duplicated by id rather than by kind
+   * Unconfirmed downtime has its own card, so it leaves the feed. De-duplicated by id and never by kind
    * because `DASHBOARD_CARDED_KINDS` is shared with the player, who has no such card.
    */
   it("moves UNCONFIRMED downtime out of the feed and into the card that can act on it", async () => {

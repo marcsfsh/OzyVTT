@@ -57,7 +57,7 @@ export function entryHitDie(entry: ClassLevelEntry, table: ClassProgressionTable
   return entry.hitDie ?? hitDieFor(entry.classId, table);
 }
 
-/** The hit-dice pool a multiclass sheet spends on short rests (Fighter 3 / Wizard 2 = 3d10 + 2d6), largest first. */
+/** The hit-dice pool a multiclass sheet spends on Short Rests (Fighter 3 / Wizard 2 = 3d10 + 2d6), largest first. */
 export function hitDicePool(
   classLevels: readonly ClassLevelEntry[],
   table: ClassProgressionTable = SRD_CLASS_PROGRESSION
@@ -133,7 +133,7 @@ export const FULL_CASTER_SLOTS: readonly (readonly number[])[] = Object.freeze(
 
 const NO_SLOTS: readonly number[] = Object.freeze([0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
-/** Warlock Pact Magic: one uniform slot level with its own count, refreshed on a short rest. */
+/** Warlock Pact Magic: one uniform slot level with its own count, refreshed on a Short Rest. */
 export const PACT_SLOTS: readonly { level: number; slots: number }[] = Object.freeze(
   [
     { level: 1, slots: 1 },
@@ -167,7 +167,7 @@ function fullCasterRow(casterLevel: number): readonly number[] {
   return clamped < 1 ? NO_SLOTS : FULL_CASTER_SLOTS[clamped - 1];
 }
 
-/** Spell slots for a single-class caster (index 0 = 1st level). Half-casters read the full table at ceil(level/2),
+/** Spell slots for a single-class caster (index 0 = level 1). Half-casters read the full table at ceil(level/2),
  * third-casters at ceil(level/3) from level 3, which reproduces the printed tables. Warlocks get zeros; see
  * `pactSlotsForLevel`. `progression` overrides the table for a homebrew class. */
 export function spellSlotsForClass(

@@ -6,7 +6,7 @@
   /* ---- Brand ---- */
   --brand-name: "OzyVTT";
 
-  /* ---- Theme: dark (default), deep indigo rather than black ---- */
+  /* ---- Theme: dark (default), deep indigo, lighter than black ---- */
 
   /* Surfaces: --surface-1 is a panel, --surface-2 a row or the foot of a raised control, --surface-3 its top. */
   --void: #07031a;
@@ -74,9 +74,9 @@
   --danger-text: #ff94aa;
 
   /* ---- State: on ----
-     The segmented control's on fill; each theme defines its own value. Literals, not aliases, so
+     The segmented control's on fill; each theme defines its own value. Literals with no aliases, so
      retuning --caution never moves a state colour. Hue collisions with other accents are resolved by
-     shape in SegmentedControl.css, not here. Fill must reach 3:1 against the surfaces and the label
+     shape in SegmentedControl.css, outside this file. Fill must reach 3:1 against the surfaces and the label
      4.5:1 against the fill. Night uses the --magenta hue. */
   --state-on: #ff2f92;
   /* The label on the fill; --text-on-neon clears 4.5:1 on all three themes' values. */
@@ -113,7 +113,7 @@
      button's frame, the current turn, the small glyph beside the current name. Never decoration on a resting
      surface, and never a fill behind words (white on its yellow end fails contrast). */
   --grad-sun: linear-gradient(180deg, #ffe66b 0%, #ff8a3d 35%, #ff2f92 70%, #9a5cff 100%);
-  /* Left to right, for frames and rules; it starts at gold rather than pale yellow so a thin line keeps its hue. */
+  /* Left to right, for frames and rules; it starts at gold, past pale yellow, so a thin line keeps its hue. */
   --grad-sun-x: linear-gradient(90deg, #ffd25c 0%, #ff8a3d 30%, #ff2f92 65%, #9a5cff 100%);
   /* The glyph stops at magenta so a 10px sun still reads as a sun. */
   --grad-sun-glyph: linear-gradient(180deg, #ffe66b 0%, #ff8a3d 45%, #ff2f92 100%);
@@ -162,9 +162,9 @@
   --grid-line: rgba(255, 46, 154, 0.16);
   --scanline-color: rgba(0, 0, 0, 0.22);
 
-  /* ---- Shared across all themes (structure, not color) ---- */
+  /* ---- Shared across all themes (structure, with no color) ---- */
 
-  /* Signature color ramp (a color and a light source, not a sun) */
+  /* Signature color ramp (a color and a light source, with no sun) */
   --grad-bloom: linear-gradient(180deg, #ff2f92 0%, #9a5cff 48%, #2be4ff 100%);
   --grad-horizon: linear-gradient(180deg, #ff2f92 0%, #5b6ef5 100%);
   /* Chrome for the title screen's wordmark: white sky, a hard dark horizon at the midline, sunset below. */
@@ -204,7 +204,7 @@
   --landing-sun: linear-gradient(180deg, #fff3a6 0%, #ffd25c 18%, #ff8a3d 38%, #ff2f92 58%, #9a5cff 80%);
   --landing-sun-glow: drop-shadow(0 0 30px rgba(255, 47, 146, 0.55)) drop-shadow(0 0 80px rgba(154, 92, 255, 0.3));
   /* The slats, a mask in fractions of the disc (72% shows above the horizon): they widen toward the line so
-     the sky shows through. Shape, not colour, so no theme overrides it. */
+     the sky shows through. Shape alone, with no colour, so no theme overrides it. */
   --landing-slats: linear-gradient(
     180deg,
     #000 0 41%,
@@ -233,7 +233,7 @@
   /* The mountains: a dark silhouette on the horizon with a sunset rim along the ridge. */
   --landing-mountain: #0c0630;
   --landing-mountain-rim: linear-gradient(180deg, rgba(255, 47, 146, 0.9), rgba(43, 228, 255, 0.6));
-  /* Larger than the app texture's 34px cell so the drive reads as a road, not a mesh. */
+  /* Larger than the app texture's 34px cell so the drive reads as a road and never a mesh. */
   --landing-grid-cell: 56px;
 
   /* ---- The work-screen sky ----
@@ -242,7 +242,7 @@
           content as the pane grows; every other layer is expressed against it.
        2. The sun is a crest: its box is the crown above the horizon, masked to the top of a circle
           centred on the horizon, brightest at the line and fading upward where text sits.
-       3. --sky-floor-opacity and --sky-sun-opacity are per-theme legibility ceilings, not taste.
+       3. --sky-floor-opacity and --sky-sun-opacity are per-theme legibility ceilings, set for reading.
      --sky-horizon-a/b and --sky-grid-x/y derive from --cyan/--magenta, so only dusk overrides them.
      --sky-wash must stay a single background layer: `.pane-sky`'s size/repeat lists assume exactly ten
      layers, and a two-layer wash would re-tile into bands (why it is not an alias of --landing-sky). */
@@ -287,7 +287,7 @@
   );
   /* Night's bloom; 0.20 stays under its AA ceiling for --text-dim. */
   --sky-bloom: radial-gradient(120% 62% at 50% 0%, rgba(164, 92, 255, 0.2) 0%, transparent 68%);
-  /* The floor: a shallow strip, not the landing's highway. Rows are denser than columns to sell the recession. */
+  /* The floor: a shallow strip, smaller than the landing's highway. Rows are denser than columns to sell the recession. */
   --sky-grid-x: color-mix(in srgb, var(--magenta) 50%, transparent);
   --sky-grid-y: color-mix(in srgb, var(--cyan) 45%, transparent);
   --sky-grid-col: 56px;
@@ -302,7 +302,7 @@
 
   /* ---- Neon linework ----
      The horizon's line reused as a structural rule (chrome row against region, dock against map). It is
-     scene language, not state: it never marks a control or a state, and runs at about half the horizon's
+     scene language and no state: it never marks a control or a state, and runs at about half the horizon's
      intensity so a resting rule never reads as "live". Derived from --cyan/--magenta. */
   --rule-beam: linear-gradient(
     90deg,
@@ -373,7 +373,7 @@
   --tracking-eyebrow: 0.08em;
   --tracking-display: 0.01em;
 
-  /* Spacing. Step names are ordinal, not pixel values (`--space-4` is the fourth step). The two smallest
+  /* Spacing. Step names are ordinal and never pixel values (`--space-4` is the fourth step). The two smallest
      steps (hairlines and tight glyph/chip gaps) stay put; tightening lives in the large steps. */
   --space-1: 4px;
   --space-2: 8px;
@@ -480,7 +480,7 @@
 
   /* Dusk inherits the dark theme's caution pair, which clears AA on these surfaces. */
 
-  /* State on: sunset orange. Its own literal, not var(--caution), so a caution retune can't move it. */
+  /* State on: sunset orange. Its own literal, kept apart from var(--caution), so a caution retune can't move it. */
   --state-on: #ff9e4a;
 
   --text: #f0eefb;
@@ -573,7 +573,7 @@
   --state-on: #0b6497;
 
   /* The material in daylight: the rim is a hard dark line (an inverted neon would vanish on a pale ground),
-     interaction changes chroma rather than lightness, the glow grounds instead of blooming, and the bezel
+     interaction changes chroma and keeps lightness, the glow grounds and doesn't bloom, and the bezel
      firms up because currentColor is deep ink here. */
   --rim-color: #3b547e;
   --rim-color-hi: var(--cyan);
@@ -594,7 +594,7 @@
   --glow-violet: 0 0 0 2px rgba(122, 63, 208, 0.9), 0 2px 6px rgba(122, 63, 208, 0.2);
   --glow-danger: 0 0 0 2px rgba(200, 20, 62, 0.9), 0 2px 6px rgba(200, 20, 62, 0.2);
 
-  /* A filter can't draw the solid ring, so the filter twins get a tight low shadow instead of a bloom. */
+  /* A filter can't draw the solid ring, so the filter twins get a tight low shadow in place of a bloom. */
   --glow-drop-magenta: drop-shadow(0 1px 4px rgba(200, 29, 128, 0.3));
   --glow-drop-magenta-strong: drop-shadow(0 2px 8px rgba(200, 29, 128, 0.45));
   --glow-drop-cyan: drop-shadow(0 1px 4px rgba(15, 127, 192, 0.28));
@@ -638,7 +638,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Text for assistive tech only — descriptions, outcome summaries, skip links.
+/* Text for assistive tech only: descriptions, outcome summaries, skip links.
    Never use it to hide information the sighted user also needs. */
 .nh-sr-only {
   position: absolute;
@@ -751,7 +751,7 @@ a:focus-visible .nav-arrow {
 }
 
 /* Role rims: a 3px start-edge bar for chrome that belongs to a role. Never on selection state (that axis
-   is cyan) and never the only signal of the role. An inset shadow rather than a border because a border
+   is cyan) and never the only signal of the role. An inset shadow, because a border
    here loses to consumers' `border` shorthands and an inset shadow adds no width; it does conflict with
    `.is-selected` / `.is-active-turn`. The utility is the edge only; sites apply the wash token in their
    own background rule so it composes with `.surface-glass`. */
@@ -863,7 +863,7 @@ a:focus-visible .nav-arrow {
 /* ---- Texture utilities: atmosphere zones only, never behind stat blocks, chat, forms or tables ---- */
 
 /* Perspective grid floor for decorative UI zones. The tactical
-   battle-map grid is drawn by the map renderer, not this. */
+   battle-map grid is drawn by the map renderer, outside this file. */
 .grid-floor {
   background-image:
     repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)),
@@ -873,8 +873,8 @@ a:focus-visible .nav-arrow {
   pointer-events: none;
 }
 
-/* Faint CRT scanlines on a positioned container. A one-gap tile rather than one large repeating gradient,
-   which rasterizes unevenly over large layers. */
+/* Faint CRT scanlines on a positioned container. A one-gap tile, because one large repeating gradient
+   rasterizes unevenly over large layers. */
 .scanlines {
   position: relative;
 }
@@ -936,7 +936,7 @@ a:focus-visible .nav-arrow {
 
 /* ---- One-shot cues (allowed; they settle, they do not loop) ---- */
 
-/* Entrance vocabulary. Attach to containers, not list items. */
+/* Entrance vocabulary. Attach to containers, and never to list items. */
 @keyframes view-in {
   from {
     opacity: 0;

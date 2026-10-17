@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cameraFocus } from "./cameraFollow";
 import { fitZoom, framingCamera, imageAtFraction, onTheMap, readableZoom, viewSize } from "./useMapView";
 
-// The battle map's camera: a view the stage's own shape, opened close enough to read, following the play.
+// The battle map's camera: a view the stage's own shape, opened close enough to read. It follows the play.
 
 const MAP = { width: 1000, height: 700 };
 const PHONE_BOX = { width: 390, height: 300 };

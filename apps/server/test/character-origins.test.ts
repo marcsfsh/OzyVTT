@@ -249,7 +249,7 @@ describe("Magic Initiate's level 1 spell", () => {
     const free = built.actions.find((action) => action.id === "spell-healing-word-free");
     expect(free?.uses).toMatchObject({ limit: 1, per: "long-rest", pool: "magic-initiate-cleric" });
     expect(free?.healing).toBeDefined();
-    // The use rides the spell's casting, not a counter that casts nothing.
+    // The use is spent by casting the spell; no separate counter casts nothing.
     expect(actionIds(built)).not.toContain("magic-initiate-cleric");
   });
 });

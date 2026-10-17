@@ -186,7 +186,7 @@ export function TokenLibrary({
       onClose={onClose}
       size="lg"
       className="token-library"
-      title={`Token image — ${actorName}`}
+      title={`Token image · ${actorName}`}
       ariaLabel={`Token image for ${actorName}`}
       footer={
         <>
@@ -296,7 +296,7 @@ export function TokenLibrary({
         {assets.length === 0 && (
           <p className="token-library-empty">
             {role === "gm"
-              ? "No token images yet — upload one to give this creature a token."
+              ? `No token images yet. Upload one to give ${actorName} a token.`
               : "Your GM hasn't shared any token images yet. Upload your own instead."}
           </p>
         )}

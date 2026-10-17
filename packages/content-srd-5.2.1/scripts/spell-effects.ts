@@ -99,7 +99,7 @@ const CAST_ATTACKS: Readonly<Record<string, number>> = {
   "spiritual-weapon": 1,
   "arcane-sword": 1,
   "conjure-fey": 1,
-  // These attack only on later turns (`LATER_ACTIONS`), not as the cast.
+  // These attack only on later turns (`LATER_ACTIONS`).
   "arcane-hand": 0,
   "flame-blade": 0,
   "produce-flame": 0
@@ -633,7 +633,7 @@ type Modifier = Grant["modifiers"][number];
 
 const rounds = (count: number) => ({ type: "rounds" as const, rounds: count });
 /** A grant with the defaults every spell's shares: no end trigger, no Concentration flag (the cast's Concentration is
- *  the caster's, not the effect's). */
+ *  the caster's alone). */
 const spellGrant = (fields: Pick<Grant, "name" | "tags" | "target" | "duration"> & Partial<Grant>): Grant => ({
   modifiers: [],
   onEnd: [],

@@ -16,7 +16,7 @@ describe("how a limited use comes back, as a sheet says it", () => {
       usesPer: "own-turn"
     } as unknown as ContentActionSummary;
     expect(actionSummaryParts(peerlessAim)).toEqual(["1/round"]);
-    expect(usesScopeLabel("short-rest")).toBe("short rest");
+    expect(usesScopeLabel("short-rest")).toBe("Short Rest");
     expect(usesScopeLabel("turn")).toBe("turn");
   });
 });

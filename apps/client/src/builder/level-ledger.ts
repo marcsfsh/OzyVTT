@@ -174,7 +174,7 @@ export function hpPlan(
 }
 
 /**
- * The ability method a rebuild claims. Scores are re-sent, not re-rolled, so "roll"/"custom" (bound
+ * The ability method a rebuild claims. Scores are re-sent and never re-rolled, so "roll"/"custom" (bound
  * checks only) are preferred; otherwise the server has the last word.
  */
 export function methodFor(policy: BuilderPolicy): BuilderAbilityMethod {

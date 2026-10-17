@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameState, SpellZone } from "@vtt/domain";
-import { addAnnotation } from "../src/annotations.js";
+import { addAnnotation, moveAnnotation } from "../src/annotations.js";
 import { endEffect } from "../src/effects.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
@@ -217,7 +217,7 @@ describe("Moonbeam: entering the Cylinder or ending a turn there, once per turn"
     expect(savesOf(state, FOE)).toEqual([expect.objectContaining({ proposedDamage: 10 })]);
   });
 
-  it("rolls at the level it was cast at: 3d10 from a 3rd-level slot", () => {
+  it("rolls at the level it was cast at: 3d10 from a level 3 spell slot", () => {
     const { state } = moonbeam(3);
     walk(
       state,
@@ -239,6 +239,24 @@ describe("Moonbeam: entering the Cylinder or ending a turn there, once per turn"
     area.geometry = { ...before, origin: cell(10, 5), target: cell(11, 5) };
     const events = zonesAfterAreaMove(state, CAST, before, zoneDeps());
     expect(events.map((event) => event.text)).toEqual(["Goblin is caught by Moonbeam and makes a CON save (DC 15)."]);
+  });
+
+  it("moves the way it was placed: at the spell's own size, reaching past the map's edge", () => {
+    const { state } = moonbeam();
+    const gm = { sessionId: "30000000-0000-4000-8000-00000000000a", role: "gm" } as const;
+    // To the last column, dragged four cells long: the far end lies past the map's right edge.
+    moveAnnotation(state, CAST, cell(39, 5), cell(43, 5), gm, GRID);
+    const area = state.combat.annotations.find((annotation) => annotation.id === CAST)!.geometry;
+    expect(area.origin).toEqual(cell(39, 5));
+    expect(area.sizeFeet).toBe(5);
+    expect(area.target.x).toBeGreaterThan(GRID.width);
+    // And on along that edge.
+    moveAnnotation(state, CAST, cell(39, 8), cell(40, 8), gm, GRID);
+    expect(state.combat.annotations.find((annotation) => annotation.id === CAST)!.geometry.origin).toEqual(cell(39, 8));
+    // Where it stands must still be on the map.
+    expect(() => moveAnnotation(state, CAST, cell(41, 8), cell(42, 8), gm, GRID)).toThrow(
+      "The starting point must be inside the map."
+    );
   });
 
   it("ends, and leaves the map, when the caster's Concentration ends", () => {
@@ -486,7 +504,7 @@ describe("Guardian of Faith: enemies only, and gone after 60 damage", () => {
     ]);
     expect(savesOf(caster.state, FOE2)[0]).toMatchObject({ ability: "dex", proposedDamage: 20 });
     const { events } = answer(caster.state, FOE2, 1);
-    expect(events.map((event) => event.text)).toContain("Guardian of Faith ends, having dealt 60 damage.");
+    expect(events.map((event) => event.text)).toContain("Guardian of Faith ends after dealing 60 damage.");
     expect(caster.state.combat.spellZones).toEqual([]);
   });
 });

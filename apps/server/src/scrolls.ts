@@ -72,7 +72,7 @@ export function scrollSpellProblem(record: EquipmentReference, spell: SpellRefer
     : null;
 }
 
-/** "1 action", "1 bonus action", "1 reaction, which you take when ..."; anything longer is outside the turn's
+/** "Action", "Bonus Action", "Reaction"; anything longer is outside the turn's
  *  economy, as the builder reads a spell's casting time. */
 function activationOf(castingTime: string): ActorAction["activation"] {
   if (/bonus/i.test(castingTime)) return "bonus-action";

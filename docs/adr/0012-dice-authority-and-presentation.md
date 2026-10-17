@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-07-15. Amended 2026-10-16: who rolls the dice (below).
+Accepted on 2026-07-15. Amended 2026-10-16: who rolls the dice (below).
 
 ## Context and decision drivers
 
@@ -16,7 +16,7 @@ Dice results are consequential shared state (they drive HP, hit/miss, and save o
 
 ## Decision
 
-All dice rolls are generated and recorded on the server, using Node's cryptographic `randomInt` (`node:crypto`), never `Math.random`. The one exception is a die typed from a physical die, which the table may allow (below); it is recorded with `typed: true`. A roll request is validated and authorized on the server: a player may only roll for an actor they own, only the GM may request a GM-only roll, and a hidden creature's roll is always the GM's. Every roll is persisted as an immutable record containing its formula, normalized formula, every die's face and whether it was kept or discarded (so keep-highest/lowest and Advantage/Disadvantage remain auditable), signed modifiers, total, visibility, and provenance (command ID, initiating session, initiating role) — the `RollRecord`/`PlayerRollRecord` shapes in `packages/domain`. Visibility is enforced at the server projection boundary (`apps/server/src/projections.ts`): public (everyone sees the full result), self-only (only roller and GM), blind player roll (roller sees only a confirmation; GM sees the full result), and GM-only (only the GM sees anything). The dice panel (`apps/client/src/dice/DicePanel.tsx`) submits a formula, purpose and visibility and renders whatever authorized record the server returns. The sheet sends no formula for a check or a save: it names the check (`check.roll`) or the save (`save.roll`), and the server works out the bonus and the Advantage or Disadvantage. Presentation (currently a numeric/face-chip result card) is explicitly a replaceable layer over an already-decided, already-authorized result.
+All dice rolls are generated and recorded on the server, using Node's cryptographic `randomInt` (`node:crypto`), never `Math.random`. The one exception is a die typed from a physical die, which the table may allow (below); it is recorded with `typed: true`. A roll request is validated and authorized on the server: a player may only roll for an actor they own, only the GM may request a GM-only roll, and a hidden creature's roll is always the GM's. Every roll is persisted as an immutable record containing its formula, normalized formula, every die's face and whether it was kept or discarded (so keep-highest/lowest and Advantage/Disadvantage remain auditable), signed modifiers, total, visibility, and provenance (command ID, initiating session, initiating role), as the `RollRecord`/`PlayerRollRecord` shapes in `packages/domain` define it. Visibility is enforced at the server projection boundary (`apps/server/src/projections.ts`): public (everyone sees the full result), self-only (only roller and GM), blind player roll (roller sees only a confirmation; GM sees the full result), and GM-only (only the GM sees anything). The dice panel (`apps/client/src/dice/DicePanel.tsx`) submits a formula, purpose and visibility and renders whatever authorized record the server returns. The sheet sends no formula for a check or a save: it names the check (`check.roll`) or the save (`save.roll`), and the server works out the bonus and the Advantage or Disadvantage. Presentation (currently a numeric/face-chip result card) is explicitly a replaceable layer over an already-decided, already-authorized result.
 
 ### Who rolls the dice (2026-10-16)
 
@@ -25,6 +25,9 @@ All dice rolls are generated and recorded on the server, using Node's cryptograp
 - **A player's Advantage or Disadvantage choice is ignored.** The engine counts the sources and cancels them per the rules; the roll card names each source, so a player sees why. The GM may force a mode, which the card names as the GM's choice.
 - **A die shown before it counts is held on the server** (`apps/server/src/held-rolls.ts`, `GameState.heldRolls`, GM-only). A previewed save, death save, opportunity attack or attack keeps its d20s under the roll's key, so a second preview returns the same die and the confirm uses it; nothing new is recorded. An attack's die belongs to the attacker's turn (a later turn throws afresh); the others belong to their pending roll until it is answered or dismissed. A typed die stands until a typed reroll replaces it, and a die the server threw is never replaced by a typed one.
 - **Heroic Inspiration is a player's only reroll** (SRD: "reroll any die immediately after rolling it"). Spending it rerolls the lowest d20 of a held roll, or of the character's latest check while it is still their latest roll (`check.reroll`); it is the only die whose reroll can help under either mode. The GM may reroll any held roll freely. A character holds at most one; the GM gives it, a Human gains it on finishing a Long Rest, and a Champion takes it at the start of its turn in a fight.
+- **The character builder's rolls carry their own purpose, `builder`** (2026-10-17): the Hit Points it throws for new
+  levels and a set of ability scores. A sheet's latest-roll line leaves them out by that purpose, and `dice.roll`
+  refuses it, so only the builder records one.
 - **Every prompt in the app offers the same controls** (`apps/client/src/encounter/RollControls.tsx`): Roll, or the face a physical d20 shows while the table lets this browser type (`apps/client/src/dice/roll-preference.ts` follows the table's setting), then Confirm, which applies the held die. The result names what gave it Advantage or Disadvantage. Only the GM sees the Advantage and Disadvantage buttons and a free Reroll; a player sees "Reroll · Heroic Inspiration" while they hold it, typed when the die was typed. The app offers faces only; the GM's typed total stays in the API as a ruling.
 
 ## Consequences and tradeoffs
@@ -33,7 +36,7 @@ Every roll requires a server round trip; there is no offline or client-only dice
 
 ## Mobile, security, and visibility impact
 
-Visibility filtering happens once, at the server projection boundary, so a phone and a desktop browser receive identically-scoped payloads for the same session — there is no client-side hiding of a blind or GM-only roll that a curious user could inspect via devtools to reveal early. `PlayerRollRecord` omits the raw `initiatorSessionId` other players would not need, preventing cross-player deanonymization of "who rolled that." Held dice never reach a player's projection. Cryptographic randomness and full per-die provenance make the result auditable by the GM without relying on client-reported values.
+Visibility filtering happens once, at the server projection boundary, so a phone and a desktop browser receive identically-scoped payloads for the same session. There is no client-side hiding of a blind or GM-only roll that a curious user could inspect via devtools to reveal early. `PlayerRollRecord` omits the raw `initiatorSessionId` other players would not need, so no player can work out "who rolled that." Held dice never reach a player's projection. Cryptographic randomness and full per-die provenance make the result auditable by the GM without relying on client-reported values.
 
 ## Migration / reversibility
 

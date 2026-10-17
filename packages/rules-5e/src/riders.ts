@@ -96,7 +96,7 @@ export type RiderTrigger = Readonly<{
 }>;
 
 /** A typed numeric rider, structurally open so each consumer reads only its fields and a variant this build
- * doesn't read yet is inert rather than a type error. */
+ * doesn't read yet is inert and still compiles. */
 export type RiderModifier = Readonly<{
   type: string;
   amount?: number;
@@ -109,7 +109,7 @@ export type RiderModifier = Readonly<{
   count?: number;
   feet?: number;
   formula?: string;
-  /** `extra-damage` may name an ability instead of (or beside) dice: the bearer's modifier, resolved at the roll. */
+  /** `extra-damage` may name an ability, alone or beside dice: the bearer's modifier, resolved at the roll. */
   abilityModifier?: RiderAbility;
   damageType?: string;
   /** `damage-resistance` / `damage-vulnerability`. */
@@ -144,7 +144,7 @@ export type RiderCarrier = Readonly<{
   /** Riders on a weapon default to `this-item` for the attack/damage/crit family. */
   isWeapon?: boolean;
   /** SRD "Combining Game Effects": carriers sharing a key are one game effect, so `sumRiders` takes the most potent
-   * contribution instead of summing (two Slows are -10, not -20). */
+   * contribution with no sum (two Slows are -10). */
   stackKey?: string;
 }>;
 
@@ -356,7 +356,7 @@ const GATE_PROBE_TYPE = "__gate-probe";
 
 /**
  * Whether a standing gate holds now, for a grant's `when` (resistances, immunities, proficiencies). Runs the
- * list through `collectRiders`' standing pass instead of a second evaluator so items and feats can't drift;
+ * list through `collectRiders`' standing pass, with no second evaluator, so items and feats can't drift;
  * unknown triggers, moments and filters all read false, so an uncheckable gate never grants.
  * Pass the item's id as `sourceItemId` for an item's grants so `attuned` binds to it; omit it for features.
  */

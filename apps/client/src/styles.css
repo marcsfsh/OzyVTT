@@ -219,8 +219,8 @@ main:has(> .frame-tabbar.rim-player) {
 }
 /* The scanline wipe, on tab and page transitions only (≤180ms, one band, one pass). The pane's one
    child is a new element on every address change, so it fires once; do not add it elsewhere.
-   A mask, not an overlay (no pseudo is free); in Chromium `mask-image` creates no containing block
-   for fixed descendants, and `fill-mode: none` drops it after. The band dims rather than hides.
+   A mask, and no overlay (no pseudo is free); in Chromium `mask-image` creates no containing block
+   for fixed descendants, and `fill-mode: none` drops it after. The band dims and stays visible.
    The tile is 200% of the box with the band at 47-50% of it; `mask-position` percentages resolve
    against (box - image) = -100%, so 100% -> 0% sweeps the band once from top to bottom. */
 .app-pane > .anim-view {

@@ -10,7 +10,7 @@
   align-items: stretch;
 }
 
-/* `min-height: 0` lets the list shrink and scroll inside the rail instead of stretching the workspace. */
+/* `min-height: 0` lets the list shrink and scroll inside the rail, so the workspace never stretches. */
 .codex-rail {
   display: flex;
   flex-direction: column;
@@ -61,7 +61,7 @@
 }
 
 /* The rail's scroll region. `position: relative` makes it the containing block for absolute descendants
-   (including the folder menu popover), so they scroll inside it instead of growing the shell. */
+   (including the folder menu popover), so they scroll inside it and the shell never grows. */
 .codex-list {
   display: flex;
   flex-direction: column;
@@ -91,7 +91,7 @@
   font-size: var(--fs-sm);
   padding: var(--space-3) var(--space-2);
 }
-/* 44px min-height rather than an ::after hit area, which would overhang neighbouring rows in a vertical list. */
+/* 44px min-height: an ::after hit area would overhang neighbouring rows in a vertical list. */
 .codex-list-item {
   display: flex;
   align-items: center;
@@ -363,7 +363,7 @@
   flex: 1;
   min-width: 0;
 }
-/* The row wraps so the visibility badge drops below the title instead of squeezing it to nothing.
+/* The row wraps so the visibility badge drops below the title and never squeezes it to nothing.
    `min-width: 6rem` (not 0) is what makes flex-wrap trigger. */
 .codex-tree-page {
   flex-wrap: wrap;
@@ -477,7 +477,7 @@
 .codex-editor-head {
   padding-inline: var(--space-4);
 }
-/* The editor fills the definite-height `.codex-main` instead of pushing it into a scroll. */
+/* The editor fills the definite-height `.codex-main` and never pushes it into a scroll. */
 .codex-editor {
   flex: 1 1 auto;
 }
@@ -532,7 +532,7 @@
   margin: 0;
 }
 /* The writing field takes the frame's height. Its min-height is below the primitive's 14rem so a short
-   pane (landscape phone) shrinks the field instead of overflowing. */
+   pane (landscape phone) shrinks the field so nothing overflows. */
 .codex-editor-surface.is-fill {
   display: flex;
   flex-direction: column;
@@ -710,7 +710,7 @@
 .codex-md-link {
   position: relative;
 }
-/* Inert wiki-link (unresolved or unrevealed): muted, not violet; violet is reserved for GM-only content. */
+/* Inert wiki-link (unresolved or unrevealed): muted; violet is reserved for GM-only content. */
 .codex-md-link-inert {
   color: var(--text-muted);
   border-bottom-style: dashed;
@@ -776,7 +776,7 @@
   flex-direction: column;
   gap: var(--space-1);
 }
-/* 44px min-height, not an ::after hit area, in a stacked list. */
+/* 44px min-height in a stacked list, where an ::after hit area would overhang. */
 .codex-connections-item {
   min-height: var(--tap-min);
   width: 100%;
@@ -1273,7 +1273,7 @@
 
 /* ----- Sessions: the log destination and the console drawer ----- */
 
-/* 44px min-height, not an ::after hit area, in a stacked list. */
+/* 44px min-height in a stacked list, where an ::after hit area would overhang. */
 .codex-session-row {
   min-height: var(--tap-min);
   display: flex;
@@ -1346,7 +1346,7 @@
 
 /* Reuses the notebook chassis and the session log's exit row. */
 
-/* 44px min-height, not an ::after hit area, in a stacked list. */
+/* 44px min-height in a stacked list, where an ::after hit area would overhang. */
 .codex-quest-row {
   min-height: var(--tap-min);
   display: flex;
@@ -1366,7 +1366,7 @@
     color var(--dur-hover) var(--ease-settle),
     border-color var(--dur-hover) var(--ease-settle);
 }
-/* Wraps so the nowrap status and visibility badges drop below the title instead of scrolling the rail
+/* Wraps so the nowrap status and visibility badges drop below the title and the rail never scrolls
    sideways. Shared with `.codex-session-row`. */
 .codex-quest-row,
 .codex-session-row {
@@ -1481,7 +1481,7 @@
   flex-wrap: wrap;
   margin-left: auto;
 }
-/* Wrapping chips grow to 44px rather than overhang. */
+/* Wrapping chips grow to 44px and never overhang. */
 .codex-graph-legenditem {
   min-height: var(--tap-min);
   display: inline-flex;
@@ -1593,7 +1593,7 @@
   stroke-width: 3px;
 }
 
-/* Settings: a column, so every control grows its own 44px paint instead of squeezing below the floor at 320px. */
+/* Settings: a column, so every control grows its own 44px paint and none squeezes below the floor at 320px. */
 .codex-settings {
   display: flex;
   flex-direction: column;
@@ -2002,7 +2002,7 @@
   border: 1px solid transparent;
   padding: var(--space-3);
 }
-/* Wraps so the reveal switch and ⋯ drop to their own line instead of scrolling the inspector sideways. */
+/* Wraps so the reveal switch and ⋯ drop to their own line and the inspector never scrolls sideways. */
 .codex-inspector-head {
   display: flex;
   align-items: center;
@@ -2188,7 +2188,7 @@
   white-space: nowrap;
 }
 
-/* Stacked on a phone: the map keeps a rem floor and the inspector takes an equal share, scrolling inside. */
+/* Stacked on a phone: the map keeps a rem floor and the inspector takes an equal share and scrolls inside. */
 @media (max-width: 760px) {
   .codex-atlas-body {
     flex-direction: column;
@@ -2263,7 +2263,7 @@
 .codex-composer-kind {
   display: flex;
 }
-/* Prose, not a warning box: neither message is an error. */
+/* Prose and no warning box: neither message is an error. */
 .codex-composer-hint {
   margin: 0;
   color: var(--text-dim);
@@ -2466,7 +2466,7 @@
   border-radius: var(--radius-pill);
   padding: 2px;
 }
-/* The add-a-banner control is a solid button, not a dashed box. */
+/* The add-a-banner control is a solid button. */
 .codex-banner-add {
   align-self: flex-start;
   border: 1px solid transparent;
@@ -2610,7 +2610,7 @@
 /* ----- Sidebar shell. Breakpoints: >=850 expanded sidebar (collapsible to a 56px rail), 761-849 icon
    rail, <=760 off-canvas drawer. ----- */
 
-/* The shell never scrolls; `stretch` makes the sidebar a full-height column rather than content-height. */
+/* The shell never scrolls; `stretch` makes the sidebar a full-height column. */
 .codex-shell {
   display: grid;
   grid-template-columns: 1fr;
@@ -2677,7 +2677,7 @@
   min-height: 0;
   position: relative;
 }
-/* Tools is bottom-anchored by layout, not array order. */
+/* Tools is bottom-anchored by layout; array order doesn't place it. */
 .codex-sidebar-group.is-tools {
   margin-block-start: auto;
   padding-block-start: var(--space-3);
@@ -2800,7 +2800,7 @@
 .codex-sidebar.is-rail .codex-sidebar-foot {
   justify-content: center;
 }
-/* Fade an edge only while `SidebarNav.tsx` reports real overflow past it. `black` is a mask stencil, not a colour. */
+/* Fade an edge only while `SidebarNav.tsx` reports real overflow past it. `black` is a mask stencil here. */
 .codex-sidebar.is-rail .codex-sidebar-groups.has-fade-bottom {
   mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent 100%);
@@ -3025,7 +3025,7 @@
 .codex-conn-target:hover {
   text-decoration: underline;
 }
-/* The direction arrow, drawn rather than written: "out" points away from this page, "in" points at it. */
+/* The direction arrow, drawn as a shape: "out" points away from this page, "in" points at it. */
 .codex-conn-arrow {
   flex: none;
   width: 14px;
@@ -3055,7 +3055,7 @@
   gap: var(--space-2);
   margin-inline-start: auto;
 }
-/* An inline form is a solid panel, not a dashed placeholder. */
+/* An inline form is a solid panel. */
 .codex-conn-form {
   display: flex;
   flex-direction: column;
@@ -3400,7 +3400,7 @@
 .codex-chevron-right {
   transform: rotate(-90deg);
 }
-/* Inline in a wrapping meta row, so the paint grows to the floor instead of an ::after. */
+/* Inline in a wrapping meta row, so the paint grows to the floor with no ::after. */
 .codex-entry-sessionlink {
   min-height: var(--tap-min);
   display: inline-flex;
@@ -3462,7 +3462,7 @@
   border-inline-start: 2px solid var(--codex-type);
   padding-inline-start: var(--space-2);
 }
-/* The glyph takes the hue rather than the row's ink. */
+/* The glyph takes the hue; the row's ink stays on the text. */
 .codex-tree-icon {
   color: var(--codex-type);
 }

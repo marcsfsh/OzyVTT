@@ -70,14 +70,14 @@ type BuilderState = GmView | PlayerView;
 
 export type CharacterBuilderProps = Readonly<{
   state: BuilderState;
-  /** The table connection. An offline table blocks the last step with a reason instead of letting
-      Create be pressed into a socket that cannot answer. */
+  /** The table connection. An offline table blocks the last step with a reason, so Create is never
+      pressed into a socket that cannot answer. */
   connection?: "online" | "reconnecting" | "offline";
   onClose: () => void;
   onCreated: (name: string) => void;
   /**
    * Level-up / respec mode: the same wizard seeded from an existing character's choice ledger, with
-   * its identity locked, submitted as `character.rebuild` instead of `character.create`. Sharing the
+   * its identity locked, submitted as `character.rebuild` where a fresh build sends `character.create`. Sharing the
    * wizard keeps a level-up from drifting from a fresh build.
    */
   rebuild?: Readonly<{
@@ -268,7 +268,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
     step !== "review"
       ? null
       : connection !== "online"
-        ? "The table is offline — reconnecting…"
+        ? "The table is offline. Reconnecting…"
         : (offersRefusal ??
           (offersCurrent ? null : "Checking these choices with the table…") ??
           capacity?.blockedReason ??
@@ -398,9 +398,9 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
     unsaved.current = null;
     if (saved) saveDraft(draft);
     onClose();
-    if (saved) toast("Draft saved — resume it from Create a character.", { tone: "success" });
+    if (saved) toast("Draft saved. Resume it from Create a character.", { tone: "success" });
   };
-  // Escape saves and closes like the header button; this is a full page, not a Modal.
+  // Escape saves and closes like the header button; this is a full page with no Modal around it.
   const saveAndCloseRef = useRef(saveAndClose);
   saveAndCloseRef.current = saveAndClose;
   useEffect(() => {
@@ -598,7 +598,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
                 />
               )}
               {draft.level >= policy.maxLevel && (
-                <p className="cb-note">At the table&rsquo;s level cap ({policy.maxLevel}).</p>
+                <p className="cb-note">At the table's level cap ({policy.maxLevel}).</p>
               )}
               {draft.classId && room > 0 && context.classes.length < MAX_CLASSES && (
                 <Field
@@ -728,7 +728,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
               }
               help={context.species ? `Suggestions come from the ${context.species.name} name bundle.` : undefined}
             />
-            {/* Caution, not danger: the table still has room. */}
+            {/* Caution: the table still has room. */}
             {capacity?.warning && (
               <Alert tone="warning" title="The table is filling up">
                 {capacity.warning}
@@ -859,7 +859,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
               ) : (
                 <>You started a character {describeWhen(resumable.updatedAt)}.</>
               )}{" "}
-              It stays exactly as you left it until you answer — resume it, or discard it to save the one you build now.{" "}
+              It stays as you left it until you answer. Resume it, or discard it to save the one you build now.{" "}
               <Button
                 variant="secondary"
                 size="sm"

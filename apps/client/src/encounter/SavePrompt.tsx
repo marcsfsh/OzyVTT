@@ -50,7 +50,7 @@ export function SavePrompt({
   viewer: "gm" | "player";
   /** The saving character holds Heroic Inspiration. */
   inspired?: boolean;
-  /** Remaining Legendary Resistance uses (GM view of a legendary target only) - offers "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number;
+  /** Remaining Legendary Resistance uses (GM view of a legendary target only), which offer "succeed instead" after a previewed failure. */ legendaryResistanceLeft?: number;
 }>) {
   const [busy, setBusy] = useState(false);
   // A player's typed damage stands in for dice, so it follows the table's setting for typed dice.
@@ -147,7 +147,7 @@ export function SavePrompt({
         return;
       }
       onFeedback(
-        `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " - condition applied" : ""}.`
+        `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc}).${outcome.appliedDamage > 0 ? ` ${targetName} took ${outcome.appliedDamage} damage.` : ""}${outcome.conditionApplied ? " The condition is applied." : ""}`
       );
     });
   };
@@ -271,8 +271,8 @@ export function SavePrompt({
             arithmetic. While a recheck is out, show only what was typed. */}
               <span className="save-prompt-effect">
                 {stale
-                  ? `Amended to ${proposal}${recheck === "failed" ? "" : " - checking"}`
-                  : `${rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}${rolled.condition ? " + condition" : ""}${rolled.basis !== save.proposedDamage ? ` (amended - rolled ${save.proposedDamage})` : ""}`}
+                  ? `Amended to ${proposal}${recheck === "failed" ? "" : " · checking"}`
+                  : `${rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}${rolled.condition ? " + condition" : ""}${rolled.basis !== save.proposedDamage ? ` (amended · rolled ${save.proposedDamage})` : ""}`}
               </span>
               {!stale && rolled.defences && <span className="save-prompt-defences">{rolled.defences}</span>}
             </>

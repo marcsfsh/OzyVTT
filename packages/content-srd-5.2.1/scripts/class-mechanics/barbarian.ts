@@ -142,7 +142,7 @@ export const barbarian: ClassMechanicsModule = {
   subclasses: {
     "path-of-the-berserker": {
       /**
-       * DC 8 + Strength + Proficiency Bonus; a failed save is Frightened for 1 minute, repeating the save at the
+       * DC 8 + Strength + Proficiency Bonus; a failed save is Frightened for 1 minute and repeats the save at the
        * end of each of its turns. Restoring the use by spending a Rage stays prose.
        */
       "intimidating-presence": {

@@ -65,7 +65,7 @@ export function sendData(response: Response, status: number, data: unknown) {
   return response.status(status).json({ ok: true, apiVersion: API_VERSION, data });
 }
 
-/** `details` and `currentRevision` are omitted when absent: the contract makes them optional, not nullable. */
+/** `details` and `currentRevision` are omitted when absent: the contract makes them optional and never null. */
 export function sendFailure(
   response: Response,
   status: number,
@@ -95,7 +95,7 @@ export const issuesOf = (error: z.ZodError) =>
     message: issue.message
   }));
 
-/** A fault, not a refusal: logged in full for the operator and answered with a fixed message, so driver text,
+/** A server fault: logged in full for the operator and answered with a fixed message, so driver text,
  *  file paths and stack details never reach a caller. */
 export function sendInternalError(response: Response, error: unknown, message: string) {
   console.error(message, error);

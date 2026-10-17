@@ -11,7 +11,7 @@ export interface ChoiceOption {
   title: string;
   description?: ReactNode;
   icon?: ReactNode;
-  /** Provenance badge (SRD / Homebrew) — pass a `Badge`, reusing its tones. */
+  /** Provenance badge (SRD / Homebrew): pass a `Badge` and reuse its tones. */
   badge?: ReactNode;
   meta?: ReactNode;
   disabled?: boolean;
@@ -36,8 +36,8 @@ interface ChoiceGridProps {
   values?: readonly string[];
   /** multiple: `next` is false when the card was already chosen. */
   onToggle?: (value: string, next: boolean) => void;
-  /** multiple: how many may be chosen. At capacity the unchosen cards lock with a reason instead of silently
-      ignoring taps. */
+  /** multiple: how many may be chosen. At capacity the unchosen cards lock with a reason, so a tap is never
+      silently ignored. */
   max?: number;
   /** The reason shown on locked cards at capacity. */
   maxReachedReason?: ReactNode;
@@ -45,7 +45,7 @@ interface ChoiceGridProps {
   /**
    * Read about an option without choosing it: every card gets a sibling control that calls this with the
    * option's value. A sibling because a `ChoiceCard` is a button and can't nest controls. Callers should open a
-   * `Modal`, not a `Drawer`, so a stray tap beside the overlay can't land on a card.
+   * `Modal` and no `Drawer`, so a stray tap beside the overlay can't land on a card.
    */
   onInspect?: (value: string) => void;
   /** Accessible name for that control. Defaults to "About <title>". */
@@ -142,7 +142,7 @@ export function ChoiceGrid({
   const chosen = useMemo(() => new Set(values ?? []), [values]);
   const isChosen = (option: ChoiceOption) => (multiple ? chosen.has(option.value) : option.value === value);
   // At capacity the unchosen cards lock (chosen ones stay tappable so a pick can be swapped). The reason is
-  // stated once beside the count and locked cards reference it via `aria-describedby`, rather than repeating it
+  // stated once beside the count and locked cards reference it via `aria-describedby`, so it isn't repeated
   // on every card.
   const atCapacity = multiple && max != null && chosen.size >= max;
   const lockedReason =

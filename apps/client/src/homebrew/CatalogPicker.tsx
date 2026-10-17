@@ -20,7 +20,7 @@ export function CatalogPicker({
   entries: readonly CatalogEntry[];
   value: string | null;
   onChange: (next: string | null) => void;
-  /** The button's label when nothing is chosen — "Choose a spell". */
+  /** The button's label when nothing is chosen: "Choose a spell". */
   emptyLabel: string;
   title: string;
   searchPlaceholder: string;

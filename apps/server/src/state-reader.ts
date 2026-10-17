@@ -3,7 +3,7 @@ import type { GameStore } from "./game-store.js";
 
 /** The committed game state for reads, cloned once per revision. `GameStore.snapshot` clones the whole
  *  campaign on every call, and one command or broadcast reads it many times. The copy is frozen, so a read
- *  that mutates it throws instead of corrupting what the next reader sees. */
+ *  that mutates it throws, so what the next reader sees stays intact. */
 export function createStateReader(store: Pick<GameStore, "snapshot" | "revision">) {
   let cached: GameState | undefined;
   return {

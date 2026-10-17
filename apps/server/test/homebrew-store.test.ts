@@ -53,12 +53,12 @@ const bodyFor = (name: string) => ({ name, description: "Authored by the GM." })
 
 describe("homebrew id minting", () => {
   it("keeps every minted id inside the 60-character budget, slug-legal, and out of the reserved families", () => {
-    // 90 characters of name: the slug must be cut at a hyphen boundary, not merely truncated.
+    // 90 characters of name: the slug must be cut at a hyphen boundary.
     const long = "The Extremely Overlong Homebrew Class Of Considerable And Frankly Excessive Verbosity Name";
     for (const type of HomebrewContentTypeSchema.options) {
       const id = mintHomebrewId(type, long, () => false);
       expect(id.length, `${type} id "${id}"`).toBeLessThanOrEqual(HOMEBREW_ID_MAX_LENGTH);
-      // Anchored to the schema, not our constant: `CharacterIdentitySchema` caps persisted ids at 60
+      // Anchored to the schema itself: `CharacterIdentitySchema` caps persisted ids at 60
       // where `ContentIdSchema` allows 80, so raising HOMEBREW_ID_MAX_LENGTH must fail here.
       expect(
         CharacterIdentitySchema.safeParse({
@@ -187,7 +187,7 @@ describe("HomebrewStore", () => {
     const updated = store.update(row.id, bodyFor("Blood Maledict II"), row.rev, "gm");
     expect(updated.rev).toBe(2);
     // The stale write is refused with the row's real revision, so the editor's autosave can resync
-    // instead of clobbering.
+    // and clobbers nothing.
     let conflict: unknown;
     try {
       store.update(row.id, bodyFor("Stale"), row.rev, "gm");
@@ -205,7 +205,7 @@ describe("HomebrewStore", () => {
 
   it("treats state and visibility as orthogonal, and refuses the one meaningless combination", () => {
     const row = store.create({ type: "species", body: bodyFor("Ashborn") });
-    // draft + visible is meaningless, so it is refused rather than silently ignored.
+    // draft + visible is meaningless, so it is refused.
     expect(() => store.setVisibility(row.id, true, undefined)).toThrow(HomebrewStateError);
     const published = store.setState(row.id, "published", undefined);
     expect(published).toMatchObject({ state: "published", visibleToPlayers: false });
@@ -252,7 +252,7 @@ describe("HomebrewStore", () => {
     const third = store.list({ limit: 2, cursor: second.nextCursor! });
     expect(third.rows.map((row) => row.name)).toEqual(["echo"]);
     expect(third.nextCursor).toBeNull();
-    // An opaque cursor a client mangled restarts from the top rather than 500ing.
+    // An opaque cursor a client mangled restarts from the top.
     expect(store.list({ limit: 2, cursor: "not-a-cursor" }).rows.map((row) => row.name)).toEqual(["alpha", "bravo"]);
   });
 
@@ -346,7 +346,7 @@ describe("HomebrewStore revision counter", () => {
     ).map((r) => r.name);
     expect(tables).toContain("homebrew_records");
     expect(tables).toContain("homebrew_record_revisions");
-    // STRICT tables: a wrong-typed write is refused rather than coerced.
+    // STRICT tables: a wrong-typed write is refused.
     expect(() =>
       database
         .prepare(
@@ -366,7 +366,7 @@ describe("HomebrewStore as a ContentLibrary source", () => {
     store.create({ type: "class", body: bodyFor("Blood Hunter") });
     const gm = library.forAudience("gm");
     const player = library.forAudience("player");
-    // The same catalog objects for both audiences, not merely equal contents.
+    // The same catalog objects for both audiences, identical by reference.
     expect(gm.classSummaries()).toBe(player.classSummaries());
     expect(gm.monsterSummaries()).toBe(player.monsterSummaries());
     expect(gm.classSummaries().some((summary) => summary.name === "Blood Hunter")).toBe(false);
@@ -375,7 +375,7 @@ describe("HomebrewStore as a ContentLibrary source", () => {
   });
 
   // The authorship index is the publish gate's only source that can see drafts. Two gate rules ask
-  // "does this record exist" rather than "is it playable"; answering them from the published catalog
+  // "does this record exist", whether or not it is playable; answering them from the published catalog
   // would deadlock publishing.
   it("sees drafts, keys subclasses by the class they name, and forgets a deleted row", () => {
     const klass = store.create({ type: "class", body: bodyFor("Blood Hunter") });

@@ -67,7 +67,7 @@ export const mapCommands = [
     type: "token.move",
     operationId: "moveToken",
     description:
-      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene instead of the live table.",
+      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene; without it the token moves on the live table.",
     summary:
       "Move a combatant's token (server-snapped) walking, by a special speed, teleporting or by force; position null returns it to the tray.",
     schema: TokenMoveSchema,
@@ -265,7 +265,7 @@ export const mapCommands = [
       if (movementOverridden)
         kit.context.appendLog({
           kind: "override",
-          text: `OVERRIDE (movement): ${kit.actorName(actorId)} moved past a movement rule - ${movementOverridden}`,
+          text: `OVERRIDE (movement): ${kit.actorName(actorId)} moved past a movement rule · ${movementOverridden}`,
           actorIds: [actorId]
         });
       // A GM creature's prompt against a mover hidden from the table names it as the projection does.
@@ -323,7 +323,7 @@ export const mapCommands = [
     type: "spell-zone.end",
     operationId: "endSpellZone",
     description:
-      "Ends a spell's lingering area (GM-grade only), removing it from the map: webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too.",
+      "Ends a spell's lingering area and removes it from the map (GM-grade only): webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too.",
     summary: "End a spell's lingering area (GM).",
     schema: SpellZoneEndSchema,
     malformed: "The spell-area command is malformed.",

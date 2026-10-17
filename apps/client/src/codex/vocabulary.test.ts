@@ -19,17 +19,17 @@ const REVEAL_PRIMITIVE = `${process.cwd()}/../../packages/ui/src/primitives/Reve
 /** Each rule is a retired word plus the word that replaced it, so a failure tells you what to type. */
 const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
   { pattern: /\bnote ?books?\b/i, use: "Pages (the section) / page (the record)" },
-  { pattern: /\bback ?links?\b/i, use: "connection — D8 made it one list" },
-  { pattern: /\brelationships?\b/i, use: "connection — D8 made it one list" },
-  { pattern: /\bwiki[- ]?links?\b/i, use: "connection, or “[[link]]” when you mean the syntax" },
+  { pattern: /\bback ?links?\b/i, use: "connection: D8 made it one list" },
+  { pattern: /\brelationships?\b/i, use: "connection: D8 made it one list" },
+  { pattern: /\bwiki[- ]?links?\b/i, use: 'connection, or "[[link]]" when you mean the syntax' },
   { pattern: /\bmarkers?\b/i, use: "pin" },
   { pattern: /\bquest log\b/i, use: "Quests" },
   { pattern: /\bsession log\b/i, use: "Sessions" },
   { pattern: /\bcampaign clock\b/i, use: "your date / today" },
-  { pattern: /\breveal(s|ed|ing)?\b/i, use: "“Shown to players” / “Hidden from players” / “Show … to players”" },
-  { pattern: /\bpublic\b/i, use: "“Shown to players”" },
+  { pattern: /\breveal(s|ed|ing)?\b/i, use: '"Shown to players" / "Hidden from players" / "Show … to players"' },
+  { pattern: /\bpublic\b/i, use: '"Shown to players"' },
   // No lookahead: "secret" mid-sentence must match too.
-  { pattern: /\bsecret\b/i, use: "“Hidden from players” or “GM only”" },
+  { pattern: /\bsecret\b/i, use: '"Hidden from players" or "GM only"' },
   // The feature is the Journal in copy; `chronicle` identifiers are fine.
   { pattern: /\bchronicles?\b/i, use: "Journal" },
   { pattern: /\btimelines?\b/i, use: "Journal" },
@@ -37,14 +37,14 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
    * The old names of the two-layer notes control. Anchored to the whole string, because the same words
    * appear legitimately in prose and "GM only" is the content-axis pill.
    */
-  { pattern: /^Player-facing\b/, use: "“Player-visible notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx" },
+  { pattern: /^Player-facing\b/, use: '"Player-visible notes": BODY_LAYER in codex/TwoLayerBodyTabs.tsx' },
   {
     pattern: /^What (will happen|the party knows|the party was told)$/,
-    use: "“Player-visible notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx"
+    use: '"Player-visible notes": BODY_LAYER in codex/TwoLayerBodyTabs.tsx'
   },
   {
     pattern: /^(GM notes|GM-only side|GM secret body)$/,
-    use: "“GM-only notes” — BODY_LAYER in codex/TwoLayerBodyTabs.tsx"
+    use: '"GM-only notes": BODY_LAYER in codex/TwoLayerBodyTabs.tsx'
   }
 ];
 
@@ -52,7 +52,7 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
 const ALLOWED = new Set<string>([
   // A section name.
   "Reveal audit",
-  // In-fiction content (what a faction is up to), not visibility vocabulary.
+  // In-fiction content (what a faction is up to), with nothing to do with visibility.
   "Secret agenda"
 ]);
 
@@ -86,13 +86,13 @@ describe("The canonical glossary", () => {
   });
 
   for (const { pattern, use } of RETIRED) {
-    it(`never says ${String(pattern)} to a user — say ${use}`, () => {
+    it(`never says ${String(pattern)} to a user: say ${use}`, () => {
       const offenders = strings.filter((entry) => pattern.test(entry.text) && !ALLOWED.has(entry.text));
       expect(offenders.map((entry) => `${entry.file}:${entry.line}  ${JSON.stringify(entry.text)}`)).toEqual([]);
     });
   }
 
-  it("has no exemption that rescues nothing — a dead exemption is a comment pretending to be a rule", () => {
+  it("has no exemption that rescues nothing: a dead exemption is a comment pretending to be a rule", () => {
     // Every exemption must still be needed.
     for (const allowed of ALLOWED) {
       const rescued = strings.filter(
@@ -112,12 +112,12 @@ describe("The canonical glossary", () => {
         `packages/ui/src/primitives/Reveal.tsx no longer says ${JSON.stringify(phrase)}.\n` +
           `These four are D28's visibility words and the whole product reads them off this one component.\n` +
           `Fix: restore the phrase. If it is genuinely being retired, retire it HERE too (RETIRED above) and in the\n` +
-          `packages/ui reveal tests, in the same commit — never in one place only.`
+          `packages/ui reveal tests, in the same commit, and never in one place only.`
       ).toBe(true);
     }
   });
 
-  it("never re-grows a reveal control inside the Codex — the record-axis phrases come from the primitive", () => {
+  it("never re-grows a reveal control inside the Codex: the record-axis phrases come from the primitive", () => {
     // A Codex surface typing these phrases has hand-rolled the toggle again. ("GM only" is the content pill and is allowed.)
     const offenders = strings.filter((entry) => /Shown to players|Hidden from players/.test(entry.text));
     expect(

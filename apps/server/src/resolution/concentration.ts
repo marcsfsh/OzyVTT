@@ -26,8 +26,8 @@ export function spellOf(ctx: Pick<ResolveContext, "action" | "deps">): SpellRefe
 /** The level this resolve casts its spell at: the slot it spends, else the spell's own. */
 const castLevelOf = (ctx: ResolveContext, spell: SpellReference) => ctx.plan.castLevel ?? spell.level;
 
-/** Whether this action is one of what the spell lets its caster do later (Spirit Guardians' save, moving Hex), not a
- *  cast of it. */
+/** Whether this action is one of the things the spell lets its caster do later (Spirit Guardians' save, moving Hex).
+ *  Such an action is no new cast. */
 const isLaterAction = (ctx: ResolveContext, spell: SpellReference) => laterRowOf(spell, ctx.action.id) !== undefined;
 
 /**

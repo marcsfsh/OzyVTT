@@ -153,7 +153,7 @@ describe("archived characters (v4 #10, GM management)", () => {
     const view = projectPlayerView(state, playerA, noPresence);
     expect(view.actors.map((actor) => actor.name)).toEqual(["Active Hero"]);
     expect(JSON.stringify(view)).not.toContain("Retired Hero");
-    // Match the key, not the substring: `archivedCharacters` is a legitimate player-facing field. The
+    // Match the key exactly: `archivedCharacters` is a legitimate player-facing field. The
     // actor's archive flag and its sheet-sharing sibling must never appear.
     expect(JSON.stringify(view)).not.toContain('"archived":');
     expect(JSON.stringify(view)).not.toContain("sheetPreview");

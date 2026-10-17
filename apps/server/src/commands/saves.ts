@@ -42,7 +42,7 @@ export const saveCommands = [
     type: "save.roll",
     operationId: "rollSave",
     description:
-      'Rolls a saving throw for one character. When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses - the damage and condition apply and the prompt closes - and acks `route: "answered"` with the `saveId`. With nothing open it rolls a loose, attributed save under the same rules the resolver uses (the modifier, Exhaustion, an ally Paladin\'s aura, the Advantage and Disadvantage the rules give, and the automatic failure of a Strength or Dexterity save while Paralyzed, Petrified, Stunned or Unconscious), and acks `route: "loose"` with the `outcome`. `face` is a typed d20 (a player only while the table lets players type their dice); `total` and `rollMode` are the GM\'s alone. GM-grade for anyone; a player session only for their own claimed character.',
+      'Rolls a saving throw for one character. When a pending save is open for that character and ability, this ANSWERS it through the same path the encounter tracker uses (the damage and condition apply and the prompt closes) and acks `route: "answered"` with the `saveId`. With nothing open it rolls a loose, attributed save under the same rules the resolver uses (the modifier, Exhaustion, an ally Paladin\'s aura, the Advantage and Disadvantage the rules give, and the automatic failure of a Strength or Dexterity save while Paralyzed, Petrified, Stunned or Unconscious), and acks `route: "loose"` with the `outcome`. `face` is a typed d20 (a player only while the table lets players type their dice); `total` and `rollMode` are the GM\'s alone. GM-grade for anyone; a player session only for their own claimed character.',
     summary:
       "Roll a saving throw: answers a matching pending save when one is open, otherwise rolls a loose, attributed save.",
     schema: SaveRollSchema,
@@ -220,7 +220,7 @@ export const saveCommands = [
         });
         kit.context.broadcastTableEvent({
           kind: "save",
-          text: `${kit.actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.autoSucceeded ? "automatically succeeded on" : outcome.success ? "succeeded on" : "failed"} ${withArticle(`${pending.ability.toUpperCase()} save`)}${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage${detail}` : ""}.`,
+          text: `${kit.actorName(pending.targetActorId)} ${outcome.autoFailed ? "automatically failed" : outcome.autoSucceeded ? "automatically succeeded on" : outcome.success ? "succeeded on" : "failed"} ${withArticle(`${pending.ability.toUpperCase()} save`)}${outcome.appliedDamage > 0 ? ` and took ${outcome.appliedDamage} damage${detail}` : ""}.`,
           actorIds: [pending.targetActorId],
           gmOnly: kit.actorHidden(pending.targetActorId)
         });
@@ -267,7 +267,7 @@ export const saveCommands = [
           throw new CommandRejectedError("That character isn't dying.");
         if (actor.deathSaves.stable) throw new CommandRejectedError("A stable character doesn't roll death saves.");
         if (actor.deathSaves.failures >= 3)
-          throw new CommandRejectedError("That character is dead - only a revival brings them back.");
+          throw new CommandRejectedError("That character is dead. Only a revival brings a dead character back.");
         // In a fight a death save comes once, at the start of the dying creature's turn. The GM may roll
         // one any time, as a correction.
         const inFight = draft.combat.active && draft.combat.initiative.some((entry) => entry.actorId === actorId);
@@ -337,12 +337,12 @@ export const saveCommands = [
       if (commit) {
         const name = kit.actorName(actorId);
         const text = outcome.regainsOneHitPoint
-          ? `${name} rolled a natural 20 on a death save and regains 1 HP!`
+          ? `${name} rolled a natural 20 on a death save and regains 1 HP.`
           : outcome.dead
             ? `${name} failed a third death save and dies.`
             : outcome.state.stable
               ? `${name} is stable.`
-              : `${name} ${outcome.outcome === "critical-failure" ? "rolled a natural 1 - two death save failures" : outcome.outcome === "success" ? "succeeded on a death save" : "failed a death save"} (${outcome.state.successes}S/${outcome.state.failures}F).`;
+              : `${name} ${outcome.outcome === "critical-failure" ? "rolled a natural 1, which counts as two death save failures" : outcome.outcome === "success" ? "succeeded on a death save" : "failed a death save"} (${outcome.state.successes}S/${outcome.state.failures}F).`;
         kit.context.broadcastTableEvent({
           kind: "death-save",
           text,
@@ -414,7 +414,7 @@ export const saveCommands = [
       if (outcome.overridden)
         kit.context.appendLog({
           kind: "override",
-          text: `OVERRIDE (${outcome.overridden.rule}): aid for ${kit.actorName(request.actorId)} - ${outcome.overridden.reason}`,
+          text: `OVERRIDE (${outcome.overridden.rule}): aid for ${kit.actorName(request.actorId)} · ${outcome.overridden.reason}`,
           actorIds: [request.actorId]
         });
       kit.publishNarrations(outcome.events);

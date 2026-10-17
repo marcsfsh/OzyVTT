@@ -31,7 +31,7 @@ describe("a built Warlock's Pact Magic", () => {
     expect(hero.pactSlots).toEqual({ level: 3, remaining: 0 });
     heroTurnAgain(state);
     state.combat = { ...state.combat, ruleExceptions: { slots: "strict" } };
-    expect(() => resolve("spell-hold-person", {})).toThrowError(/level-3 Pact Magic slot - Vex has none left/);
+    expect(() => resolve("spell-hold-person", {})).toThrowError(/level 3 Pact Magic slot, and Vex has none left/);
   });
 
   it("comes back on a Short Rest", () => {
@@ -110,7 +110,7 @@ describe("an imported Warlock's Pact Magic", () => {
     setSpellSlotRemaining(state, HERO, 3, 4, () => imported, catalog, true);
     expect(hero.pactSlots).toEqual({ level: 3, remaining: 2 });
     expect(() => setSpellSlotRemaining(state, HERO, 2, 1, () => imported, catalog, true)).toThrowError(
-      /no level-2 Pact Magic slots/
+      /no level 2 Pact Magic slots/
     );
   });
 });

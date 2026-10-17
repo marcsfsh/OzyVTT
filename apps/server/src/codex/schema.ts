@@ -5,7 +5,7 @@ import { migrate, type Migration } from "../database.js";
  * The Codex tables. Records keep both layers in one row (`player_*` and `gm_*` columns plus `revealed`); only
  * `codex-projections.ts` decides what a player receives. `codex_links` and the two search tables are derived
  * from record text and rewritten by every write that changes it. Ids that point at other records carry no
- * foreign key where the deleting write clears them itself, so a dangling id is cleaned rather than refused.
+ * foreign key where the deleting write clears them itself, so a dangling id is cleaned and never refused.
  */
 const BASELINE = `
 CREATE TABLE codex_meta (

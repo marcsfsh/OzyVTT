@@ -69,7 +69,7 @@ const renderInspector = (markerRevealed: boolean, mapRevealed: boolean, onReveal
     />
   );
 
-describe("MarkerInspector — shown pin on a secret map (CD-6)", () => {
+describe("MarkerInspector: shown pin on a secret map (CD-6)", () => {
   it("warns when the pin is shown but its map is still secret", () => {
     renderInspector(true, false);
     expect(
@@ -100,7 +100,7 @@ describe("MarkerInspector — shown pin on a secret map (CD-6)", () => {
     expect(screen.queryByText(/is hidden from them/)).not.toBeInTheDocument();
   });
 
-  it("stays quiet when the pin itself is secret — nothing is being promised to players", () => {
+  it("stays quiet when the pin itself is secret: nothing is being promised to players", () => {
     renderInspector(false, false);
     expect(screen.queryByText(/is hidden from them/)).not.toBeInTheDocument();
   });

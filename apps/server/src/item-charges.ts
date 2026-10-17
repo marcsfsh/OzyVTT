@@ -51,7 +51,7 @@ export function rollRegain(formula: string, random: (sides: number) => number): 
 }
 
 /**
- * The charges a long rest gives back (SRD: "regains 1d6 + 1 expended charges daily at dawn"): each item pool with a
+ * The charges a Long Rest gives back (SRD: "regains 1d6 + 1 expended charges daily at dawn"): each item pool with a
  * printed regain rolls it, and keeps what is still spent. Returns the spent counts that survive the rest (every
  * other pool refills) and a line per item for the table.
  */

@@ -53,6 +53,8 @@ type SessionsViewProps = Readonly<{
   /** The table's roster, used only to tell whether a character is archived (see `characters.ts`). */
   actors?: readonly ArchivableActor[];
   onPickTag?: (tag: string) => void;
+  /** Follows a body's `[[link]]`: to its page, or to quick-create when no page has the title. */
+  onFollowLink: (target: string) => void;
 }>;
 
 export function SessionsView({
@@ -68,6 +70,7 @@ export function SessionsView({
   pages,
   actors = [],
   onPickTag,
+  onFollowLink,
   filter = "",
   statusFilter = null,
   onFilterChange
@@ -186,6 +189,7 @@ export function SessionsView({
               pages={pages}
               actors={actors}
               onPickTag={onPickTag}
+              onFollowLink={onFollowLink}
               onChanged={onChanged}
               onDeleted={() => {
                 onOpenSession(null);
@@ -235,6 +239,7 @@ function SessionEditor({
   pages,
   actors = [],
   onPickTag,
+  onFollowLink,
   onChanged,
   onDeleted
 }: Readonly<{
@@ -245,6 +250,7 @@ function SessionEditor({
   pages: readonly CodexPageSummary[];
   actors?: readonly ArchivableActor[];
   onPickTag?: (tag: string) => void;
+  onFollowLink: (target: string) => void;
   onChanged: () => void | Promise<void>;
   onDeleted: () => void;
 }>) {
@@ -431,7 +437,7 @@ function SessionEditor({
 
       {/* Its own full-width row so the chip cloud isn't squeezed on a phone. */}
       {/* `pick` shows a chooser over character pages (active first, archived marked); `allowFreeText`
-          keeps guests without a page. Stores names, not page ids. */}
+          keeps guests without a page. Stores names, and no page ids. */}
       <Field label="Who played" htmlFor="s-attendees">
         <TagInput
           id="s-attendees"
@@ -466,7 +472,8 @@ function SessionEditor({
           ariaLabel="Prep for this session"
           placeholder="Prep notes for this session"
           pages={pages}
-          onNavigate={() => undefined}
+          onNavigate={onFollowLink}
+          onCreatePage={onFollowLink}
           gmLayer
           rows={8}
         />
@@ -481,7 +488,8 @@ function SessionEditor({
           ariaLabel="Recap"
           placeholder="Recap of this session"
           pages={pages}
-          onNavigate={() => undefined}
+          onNavigate={onFollowLink}
+          onCreatePage={onFollowLink}
           rows={8}
         />
       </Field>

@@ -15,7 +15,7 @@ import {
 } from "@vtt/ui";
 import { abilityModifier } from "@vtt/rules-5e";
 import { DicePanel } from "../dice/DicePanel";
-import { useRollPreference } from "../dice/roll-preference";
+import { useRollPreference, type SheetAttackMode } from "../dice/roll-preference";
 import { signed } from "../encounter/format";
 import { PlayerActionRunner } from "../encounter/PlayerActionRunner";
 import type { SrdExtension } from "../encounter/sheet-extension";
@@ -85,6 +85,7 @@ export function CharacterSheet({
   hidePlay = false,
   combat,
   onJumpToInitiative,
+  attackMode: attackModeProp,
   top,
   end,
   doors,
@@ -104,6 +105,8 @@ export function CharacterSheet({
   combat?: SheetCombat;
   /** In "jump" mode an attack tapped on the table's sheet is aimed on its Turn tab. */
   onJumpToInitiative?: () => void;
+  /** Where an attack tapped here is aimed when the panel decides it, in place of the player's setting. */
+  attackMode?: SheetAttackMode;
   /** A band above the tab body: the party's Short Rest on My character. */
   top?: ReactNode;
   /** What closes the tab body: the shared replays under the table's own sheet. */
@@ -143,7 +146,7 @@ export function CharacterSheet({
   const rolls = useSheetRolls(actor.id, say, state !== undefined);
   const { sheetAttackMode } = useRollPreference();
   // Only the table's own sheet can send an attack to its Turn tab and back.
-  const attackMode = onJumpToInitiative ? sheetAttackMode : "inline";
+  const attackMode = onJumpToInitiative ? (attackModeProp ?? sheetAttackMode) : "inline";
   const controller = useSheetController({
     actor,
     role,
@@ -659,7 +662,9 @@ export function CharacterSheet({
           role={role}
           visibility={rolls.visibility}
           onVisibility={rolls.setVisibility}
-          attackModeChoice={onJumpToInitiative !== undefined && actor.kind === "player-character"}
+          attackModeChoice={
+            onJumpToInitiative !== undefined && attackModeProp === undefined && actor.kind === "player-character"
+          }
           onClose={() => setRollSettings(false)}
         />
       )}

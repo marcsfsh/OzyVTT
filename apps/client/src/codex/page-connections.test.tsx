@@ -279,7 +279,7 @@ describe("Page → its connections, in one place", () => {
 
     expect(screen.getByRole("button", { name: "Atlas" })).toHaveAttribute("aria-current", "page");
     const surface = await screen.findByTestId("map-surface");
-    // The pin's map, not the default.
+    // The pin's map, where the default would be wrong.
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     // The pin itself, with its inspector open.
     await waitFor(() => expect(surface).toHaveAttribute("data-selected", "k1"));
@@ -344,7 +344,7 @@ const openGraph = async (user: ReturnType<typeof userEvent.setup>) => {
 describe("The Graph tells the truth", () => {
   beforeEach(gmDefaults);
 
-  it("draws every connection, whatever its origin — one feed, one count", async () => {
+  it("draws every connection, whatever its origin: one feed, one count", async () => {
     listRelationships.mockResolvedValue([
       {
         id: "c1",
@@ -376,7 +376,7 @@ describe("The Graph tells the truth", () => {
     expect(screen.getByText(/2 connections/)).toBeInTheDocument();
   });
 
-  it("ONE edge style — origin is an attribute on the label, never a second render", async () => {
+  it("ONE edge style: origin is an attribute on the label, never a second render", async () => {
     listRelationships.mockResolvedValue([
       {
         id: "c1",
@@ -416,7 +416,7 @@ describe("The Graph tells the truth", () => {
     expect(screen.queryByText("Relationship")).not.toBeInTheDocument();
   });
 
-  it("frames every node it draws — an orphan is inside the fitted view, not off in the margins", async () => {
+  it("frames every node it draws: an orphan is inside the fitted view, clear of the margins", async () => {
     // `p3` is unconnected; it must still be inside the frame.
     listPages.mockResolvedValue([PAGE, OTHER, summary("p3", "Vallaki")]);
     listRelationships.mockResolvedValue([

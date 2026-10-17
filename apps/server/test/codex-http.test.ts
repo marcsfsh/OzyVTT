@@ -46,7 +46,7 @@ async function fixture(pings?: unknown[][]) {
         player: ["player-token", PREVIEW_TOKEN],
         integration: credentialPerScope
       }),
-      // Records arguments, not just calls, so a content-free ping can be told from one carrying a scope word.
+      // Records arguments as well as calls, so a content-free ping can be told from one carrying a scope word.
       notifyChanged: (...args: unknown[]) => {
         pings?.push(args);
       },
@@ -125,7 +125,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     await post(base, `/api/v1/codex/journal/${entry.id}/reveal`, GM, { revealed: true });
     const playerTimeline = await body(await get(base, "/api/v1/codex/journal", PLAYER));
     expect(playerTimeline.data.entries).toHaveLength(1);
-    // The exact projected key set rather than a substring search for the id (a uuid may contain "42"), so any
+    // The exact projected key set (a substring search for the id could hit a uuid containing "42"), so any
     // new field fails here.
     expect(Object.keys(playerTimeline.data.entries[0]).sort()).toEqual([
       "createdAt",
@@ -156,7 +156,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     );
     const secretId = secret.data.page.id as string;
 
-    // Minting is GM-only, and a player is authenticated-and-refused: 403, not 401.
+    // Minting is GM-only, and a player is authenticated and refused: 403.
     expect((await post(base, "/api/v1/codex/preview-session", PLAYER, {})).status).toBe(403);
     // Not even a codex:write credential: this route hands out a player session token.
     expect((await post(base, "/api/v1/codex/preview-session", INTEGRATION_WRITE, {})).status).toBe(403);
@@ -446,7 +446,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     expect((await fetch(`${base}${contentPath}`)).status).toBe(401);
   });
 
-  // An oversized page image is the documented 413, not a sanitized 500: the route-level `express.raw` parser
+  // An oversized page image is the documented 413: the route-level `express.raw` parser
   // (11 MB) reports to the codex router's catch-all, so the router must map it.
   it("answers 413 for an oversized page image instead of a sanitized 500", async () => {
     const { base } = await fixture();
@@ -594,7 +594,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     ).toBe(404);
   });
 
-  // Connection surfaces use `projectPlayerJournalEntry`, not the raw reveal flag: a standing record is gated on
+  // Connection surfaces go through `projectPlayerJournalEntry`: a standing record is gated on
   // its faction page and a quest history row on its quest. Asserted on the serialized body, then the subject
   // is revealed to prove each emptiness is the gate.
   it("gates a journal-sourced connection on the journal PROJECTION, not the entry's reveal flag", async () => {
@@ -613,7 +613,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     });
     await post(base, `/api/v1/codex/journal/${standingRecord.id}/reveal`, GM, { revealed: true });
 
-    // The GM's page panel has the edge, so the player's empty list below is the gate, not a missing row.
+    // The GM's page panel has the edge, so the player's empty list below is the gate at work.
     const gmPanel = (await body(await get(base, `/api/v1/codex/pages/${vallaki.id}`, GM))).data.connections as Json[];
     expect(gmPanel.some((row) => row.otherKind === "journal" && row.otherId === standingRecord.id)).toBe(true);
 
@@ -663,7 +663,7 @@ describe("codex HTTP viewer-safety boundary", () => {
   });
 
   // Create, relabel and delete a connection. A mention has no id, so it cannot be patched or deleted
-  // through the API; editing the sentence is the only way, keeping one sentence and one edge in step.
+  // through the API; editing the sentence is the only way, so one sentence and one edge stay in step.
   it("declares, relabels and deletes a connection, and refuses to address a mention", async () => {
     const { base } = await fixture();
     const from = await body(
@@ -703,7 +703,7 @@ describe("codex HTTP viewer-safety boundary", () => {
       await body(await patch(base, `/api/v1/codex/connections/${connection.id}`, GM, { label: null, layer: "player" }))
     ).data.connection as Json;
     expect(patched).toMatchObject({ label: null, layer: "player" });
-    // A 41-character label is a 400, and an unknown id is a 404, not a silent no-op.
+    // A 41-character label is a 400, and an unknown id is a 404.
     expect(
       (await patch(base, `/api/v1/codex/connections/${connection.id}`, GM, { label: "x".repeat(41) })).status
     ).toBe(400);
@@ -751,7 +751,7 @@ describe("codex HTTP viewer-safety boundary", () => {
       revealedToPlayers: true
     });
 
-    // The page is secret, so the question must not be answerable: 404, not an empty list, as
+    // The page is secret, so the question must not be answerable: 404 (an empty list would answer it), as
     // `GET /codex/journal?pageId=` refuses a hidden location's timeline.
     const denied = await get(base, `/api/v1/codex/pages/${pageId}/markers`, PLAYER);
     expect(denied.status).toBe(404);
@@ -969,7 +969,7 @@ describe("codex HTTP viewer-safety boundary", () => {
   });
 });
 
-// Search starts from raw matched text rather than a GM-curated list, so the player index must be gated by
+// Search starts from raw matched text with no GM-curated list, so the player index must be gated by
 // exactly the predicate its record's player list endpoint uses.
 describe("codex suite-wide search viewer safety", () => {
   /** One world holding every leak shape at once, so a single query can prove what search must not return. */
@@ -1074,7 +1074,7 @@ describe("codex suite-wide search viewer safety", () => {
     expect((await search(base, "Ireena", GM)).map((hit) => hit.kind)).toEqual(["page"]);
   });
 
-  it("a player hit carries only navigation fields - no bodies, reveal flags, or secret-map linkage", async () => {
+  it("a player hit carries only navigation fields: no bodies, reveal flags, or secret-map linkage", async () => {
     const { base, openMap, shownMarker } = await world();
     // Assert the exact key set, so any new field in the player search projection fails here.
     const marker = (await search(base, "Blinsky", PLAYER))[0];
@@ -1338,7 +1338,7 @@ describe("codex sessions HTTP boundary", () => {
     expect(stale.status).toBe(409);
     expect((await body(stale)).error.code).toBe("conflict");
 
-    // A duplicate number is a clean validation failure, not a 500.
+    // A duplicate number is a clean validation failure.
     const duplicate = await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1 });
     expect(duplicate.status).toBe(400);
     const failed = await body(duplicate);
@@ -1381,14 +1381,14 @@ describe("codex sessions HTTP boundary", () => {
     expect(pinned.data.entry.sessionId).toBe(other.data.session.id);
 
     // A bare `sessionNumber` on a write is a 400 with the key named in `details.issues`: the number is a
-    // display value the server resolves, and `.strict()` rejects it rather than ignoring the key.
+    // display value the server resolves, and `.strict()` rejects the key.
     const refused = await post(base, "/api/v1/codex/journal", GM, { playerText: "By number.", sessionNumber: 12 });
     expect(refused.status).toBe(400);
     const refusal = await body(refused);
     expect(refusal.error.code).toBe("validation_failed");
     expect(JSON.stringify(refusal.error)).toContain("sessionNumber");
     expect((refusal.error.details.issues as unknown[]).length).toBeGreaterThan(0);
-    // ...and an id naming no session is a 404, not a silently unfiled entry. All four journal creators
+    // ...and an id naming no session is a 404, so no entry goes unfiled silently. All four journal creators
     // take `sessionId`, so all four are covered.
     for (const [path, extra] of [
       ["/api/v1/codex/journal", {}],
@@ -1603,7 +1603,7 @@ describe("codex quests HTTP boundary", () => {
     ).toBeDefined();
     await post(base, `/api/v1/codex/journal/${startRecord.id}/reveal`, GM, { revealed: true });
     const playerStart = (await questRows(PLAYER))[0]!;
-    expect((playerStart.payload as Json).status, "the row a player reads as “… has not started”").toBe("not-started");
+    expect((playerStart.payload as Json).status, "the row a player reads as 'has not started'").toBe("not-started");
     expect((playerStart.payload as Json).questId).toBe(questId);
 
     const canceled = await patch(base, `/api/v1/codex/quests/${questId}`, GM, { status: "canceled" });
@@ -1777,7 +1777,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary", () => {
       )!;
     // An empty Codex's first date publishes itself.
     await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 0, day: 10 } });
-    // The GM's clock moves on; the audit names the date players hold, not the GM's.
+    // The GM's clock moves on; the audit names the date players hold.
     await put(base, "/api/v1/codex/calendar", GM, { ...WORLD, currentDate: { year: 1492, month: 1, day: 20 } });
     const shown = await dateSection();
     expect(shown).toMatchObject({ revealed: 1, total: 1 });
@@ -1842,7 +1842,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary", () => {
         }
       ])
     );
-    // The unrevealed page is the GM's business, not a warning about what players see.
+    // The unrevealed page is the GM's business and raises no warning about what players see.
     expect(moves).toHaveLength(2);
     expect((await calendar(base, GM)).months).toHaveLength(2);
     expect((await post(base, "/api/v1/codex/calendar/check", PLAYER, oneMonth)).status).toBe(403);
@@ -2007,7 +2007,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary", () => {
     expect((await calendar(base, PLAYER)).currentDate).toEqual({ year: 1492, month: 1, day: 3 });
   });
 
-  // Seeding is about the codex being empty, not the journal: a GM who builds the world first (a page, a
+  // Seeding asks whether the whole codex is empty: a GM who builds the world first (a page, a
   // map, a quest) and dates it afterwards is prepping. This catches `isUnusedCodex` checking one table only.
   it("treats a codex holding only a page as in use, so its first date stays private", async () => {
     const { base } = await fixture();
@@ -2028,7 +2028,7 @@ describe("codex deadlines, downtime and the prep clock, HTTP boundary", () => {
       ["/api/v1/codex/journal/deadline", { playerText: "x", inWorldDate: dated, kind: "deadline" }], // .strict(): the route names the kind, not the body
       ["/api/v1/codex/journal/downtime", { downtime: { who: "B", activity: "F", days: 8 }, applied: true }], // .strict(): `applied` is never an input
       ["/api/v1/codex/journal/downtime", { downtime: { who: "B", activity: "F", days: 8, applied: true } }], // ...nor inside the payload
-      ["/api/v1/codex/journal/downtime", { downtime: { who: "B", activity: "F", days: -1 } }] // days is a count, not a rewind
+      ["/api/v1/codex/journal/downtime", { downtime: { who: "B", activity: "F", days: -1 } }] // days is a count and can't be negative
     ] as const) {
       const response = await post(base, path, GM, payload);
       expect(response.status, `${path} ${JSON.stringify(payload)}`).toBe(400);
@@ -2073,7 +2073,7 @@ describe("Codex routes vs the published contract", () => {
     const byPath = new Map<string, Set<string>>();
     for (const layer of router.stack) {
       if (!layer.route) continue;
-      // Reads Express's route table rather than probing over HTTP, so an unmounted documented path cannot
+      // Reads Express's route table with no HTTP probing, so an unmounted documented path cannot
       // hide. Express writes `:id`; OpenAPI writes `{id}`.
       const path = layer.route.path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
       const methods = byPath.get(path) ?? new Set<string>();
@@ -2086,7 +2086,7 @@ describe("Codex routes vs the published contract", () => {
   it("mounts exactly the codex paths the contract declares", async () => {
     const mounted = await mountedRoutes();
     // `/api/v1/codex-assets` also starts with "/api/v1/codex", so the declared set is the union of both
-    // constants rather than a prefix filter.
+    // constants.
     const declared = [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)];
     expect([...mounted.keys()].sort()).toEqual([...declared].sort());
     expect(
@@ -2160,8 +2160,8 @@ describe("codex standing, party marker and reveal audit, HTTP boundary", () => {
     expect(Object.keys(playerStanding[0]).sort()).toEqual(["factionPageId", "value"]);
     const standingPayload = JSON.stringify(playerStanding);
     expect(standingPayload).not.toContain(secretFaction); // the unrevealed standing's faction...
-    // ...and its value, asserted as the serialized field rather than the substring "70", which random
-    // uuids often contain.
+    // ...and its value, asserted as the serialized field. A bare substring "70" would match random
+    // uuids, which often contain it.
     expect(standingPayload).not.toContain('"value":70');
     expect(standingPayload).not.toContain("revealedToPlayers");
 
@@ -2266,7 +2266,7 @@ describe("codex standing, party marker and reveal audit, HTTP boundary", () => {
         (row) => row.isParty
       )
     ).toHaveLength(0);
-    // An unknown marker is a 404, not a silent no-op that clears the flag from somewhere else.
+    // An unknown marker is a 404, and the flag stays where it was.
     expect((await put(base, `/api/v1/codex/markers/${randomUUID()}/party`, GM, { isParty: false })).status).toBe(404);
   });
 
@@ -2506,7 +2506,7 @@ describe("codex standing, party marker and reveal audit, HTTP boundary", () => {
       ["POST", "/api/v1/codex/journal/milestone", { milestone: { level: 0, reason: "x" } }], // no character is level 0
       ["POST", "/api/v1/codex/journal/milestone", { milestone: { level: 5 }, kind: "milestone" }], // .strict(): the route names the kind
       ["POST", "/api/v1/codex/journal/milestone", { playerText: "Level up." }], // the payload is required
-      ["PUT", `/api/v1/codex/markers/${markerId}/party`, { isParty: "yes" }] // a flag, not a string
+      ["PUT", `/api/v1/codex/markers/${markerId}/party`, { isParty: "yes" }] // a flag takes a boolean
     ] as const) {
       const response = method === "PUT" ? await put(base, path, GM, payload) : await post(base, path, GM, payload);
       expect(response.status, `${method} ${path} ${JSON.stringify(payload)}`).toBe(400);
@@ -2514,7 +2514,7 @@ describe("codex standing, party marker and reveal audit, HTTP boundary", () => {
     }
     expect((await put(base, `/api/v1/codex/standing/${factionId}`, GM, { value: -40 })).status).toBe(200);
     expect((await post(base, "/api/v1/codex/journal/milestone", GM, { milestone: { level: 5 } })).status).toBe(201);
-    // An unknown faction is a 404, not a silently created standing row.
+    // An unknown faction is a 404, and no standing row is created.
     expect((await put(base, `/api/v1/codex/standing/${randomUUID()}`, GM, { value: 10 })).status).toBe(404);
   });
 });
@@ -2538,7 +2538,7 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     expect(payload.revisionHistory).toEqual({ enabled: true, windowMinutes: 90, versionCount: 0, versionBytes: 0 });
   });
 
-  it("is GM-only on BOTH sides, and on the delete — a player gets 403 and changes nothing", async () => {
+  it("is GM-only on BOTH sides and on the delete: a player gets 403 and changes nothing", async () => {
     const { base, store } = await fixture();
     store.createPage({ title: "Barovia", playerBody: "a valley" });
 
@@ -2575,7 +2575,7 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     expect((await settings(base, GM)).revisionHistory).toMatchObject({ enabled: false, windowMinutes: 240 });
   });
 
-  // Autosave is in seconds, defaulting to `{enabled: true, intervalSeconds: 1}`; out-of-range values are
+  // Autosave is in seconds and defaults to `{enabled: true, intervalSeconds: 1}`; out-of-range values are
   // rejected and fractional ones truncated, as with `windowMinutes`.
   it("carries autosave in seconds, defaults to on at one second, and rejects an out-of-range interval", async () => {
     const { base } = await fixture();
@@ -2636,7 +2636,7 @@ describe("codex settings and the revision delete, HTTP boundary (owner decision,
     expect((await settings(base, GM)).revisionHistory.windowMinutes).toBe(45);
   });
 
-  // The usage figures are read-only. Sending either is a 400 rather than an ignored key (every schema in
+  // The usage figures are read-only. Sending either is a 400 (every schema in
   // `codex-http.ts` is `.strict()`): they are facts about a table the caller cannot see.
   it("refuses a body that tries to assert the usage figures, and stores nothing", async () => {
     const { base, store } = await fixture();
@@ -2760,7 +2760,7 @@ describe("codex pin-by-id and party location, HTTP boundary", () => {
     expect(player.pageIds).toEqual([page.id]);
   });
 
-  it("404s a player on a hidden pin, on a pin sitting on a hidden map, and on a bogus id - the same body each time", async () => {
+  it("404s a player on a hidden pin, on a pin sitting on a hidden map, and on a bogus id: the same body each time", async () => {
     const { base, store } = await fixture();
     const { map, marker } = await seed(base, store);
 
@@ -2788,7 +2788,7 @@ describe("codex pin-by-id and party location, HTTP boundary", () => {
     expect((await get(base, `/api/v1/codex/markers/${marker.id}`, PLAYER)).status).toBe(200);
   });
 
-  it("answers the party read with null - never a 404 - when there is no party pin or the player may not see it", async () => {
+  it("answers the party read with null, never a 404, when there is no party pin or the player may not see it", async () => {
     const { base, store } = await fixture();
     const { map, marker } = await seed(base, store);
 
@@ -2848,7 +2848,7 @@ describe("codex pin-by-id and party location, HTTP boundary", () => {
 });
 
 /** Linking existing downtime rows to character pages, so the tracker can total downtime recorded before the link existed. */
-describe("codex journal PATCH — the narrow downtime group", () => {
+describe("codex journal PATCH: the narrow downtime group", () => {
   it("edits who/activity/characterPageId, refuses `days`, and refuses the group on any other kind", async () => {
     const { base, store } = await fixture();
     const character = store.createPage({ title: "Ireena", entityType: "character" });
@@ -2873,7 +2873,7 @@ describe("codex journal PATCH — the narrow downtime group", () => {
     });
 
     // `days` is immutable: `apply-downtime` moves the clock by it, so editing it later would leave the clock
-    // disagreeing with the record. `.strict()` rejects it rather than dropping the key.
+    // disagreeing with the record. `.strict()` rejects it.
     const withDays = await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { days: 5 } });
     expect(withDays.status).toBe(400);
     expect(JSON.stringify((await body(withDays)).error)).toContain("days");
@@ -2881,7 +2881,7 @@ describe("codex journal PATCH — the narrow downtime group", () => {
       400
     );
 
-    // An id naming no page is a 404, not a dangling link.
+    // An id naming no page is a 404, so no link dangles.
     expect(
       (await patch(base, `/api/v1/codex/journal/${entry.id}`, GM, { downtime: { characterPageId: randomUUID() } }))
         .status
@@ -2892,7 +2892,7 @@ describe("codex journal PATCH — the narrow downtime group", () => {
     ).data.entry as Json;
     expect(cleared.payload).toMatchObject({ characterPageId: null, who: "Ireena", days: 30 });
 
-    // The group on a non-downtime record is a 400 rather than being silently ignored.
+    // The group on a non-downtime record is a 400.
     const milestone = store.createMilestone({ playerText: "Level 5.", milestone: { level: 5, reason: "the crypt" } });
     const wrongKind = await patch(base, `/api/v1/codex/journal/${milestone.id}`, GM, { downtime: { who: "Ireena" } });
     expect(wrongKind.status).toBe(400);
@@ -2945,7 +2945,7 @@ describe("codex export/import, HTTP boundary", () => {
     expect((await body(await get(base, "/api/v1/codex/pages", GM))).data.pages).toHaveLength(1);
   });
 
-  it("restores a bundle with NO bundleVersion — every backup taken before this feature existed", async () => {
+  it("restores a bundle with NO bundleVersion, as every backup taken before this feature has", async () => {
     const { base, store } = await fixture();
     store.createPage({ title: "Barovia" });
     const exported = (await body(await get(base, "/api/v1/codex/export", GM))).data as Json;
@@ -2996,7 +2996,7 @@ describe("codex export/import, HTTP boundary", () => {
     expect(JSON.stringify(store.exportBundle()), "every refusal left the codex exactly as it was").toBe(before);
   });
 
-  // A bundle with no recognised section is refused rather than treated as an empty campaign, which would
+  // A bundle with no recognised section is refused. Read as an empty campaign, it would
   // delete everything. Unversioned bundles and genuinely empty campaigns still restore.
   it("refuses a bundle with no recognised sections instead of wiping the codex, and still honours R1", async () => {
     const { base, store } = await fixture();
@@ -3146,7 +3146,7 @@ describe("codex commandId idempotency", () => {
     );
   });
 
-  // A key reused for a different request is refused rather than replaying the first response and dropping
+  // A key reused for a different request is refused, so it can't replay the first response and drop
   // the write. Genuine retries, including a corrected body on the same route, still replay.
   it("refuses a commandId reused for a different request instead of replaying the wrong answer", async () => {
     const { base, store } = await fixture();

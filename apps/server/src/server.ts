@@ -374,14 +374,14 @@ export function createServer(options: CreateServerOptions) {
       if (projected) socket.emit("log:entry", projected);
     }
   }
-  /** "Round 3 - Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
+  /** "Round 3 · Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
    *  GM-only (its name would otherwise leak). */
   function logTurnBegin(state: GameState) {
     if (state.combat.turnActorId === null) return;
     const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "A combatant";
     appendLog({
       kind: "turn",
-      text: `Round ${state.combat.round} - ${name}'s turn.`,
+      text: `Round ${state.combat.round} · ${name}'s turn.`,
       actorIds: [state.combat.turnActorId]
     });
     const reminder = turnReminder(state, state.combat.turnActorId, hiddenFrom(state, sightContent()));
@@ -397,7 +397,7 @@ export function createServer(options: CreateServerOptions) {
       case "rewrote":
         appendLog({
           kind: "history",
-          text: "The GM rewrote history from this turn - every later turn was undone.",
+          text: "The GM rewrote history from this turn, and every later turn was undone.",
           gmOnly: true
         });
         logTurnBegin(state);
@@ -563,7 +563,7 @@ export function createServer(options: CreateServerOptions) {
   app.use(CODEX_PATHS.import, createCodexImportGuard(codexAuth), express.json({ limit: "64mb" }));
   // Above the express default so canonical ActorDefinition imports (capped at 256kb) fit.
   app.use(express.json({ limit: "512kb" }));
-  // Give /api/v1 callers the stable error envelope for malformed/oversized JSON instead of Express's HTML.
+  // Give /api/v1 callers the stable error envelope for malformed/oversized JSON. Express would answer with HTML.
   app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!error || res.headersSent || !isApiV1(req.path)) return next(error as Error);
     return (error as { type?: string }).type === "entity.too.large"

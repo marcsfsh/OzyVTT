@@ -34,6 +34,7 @@ import { zoneRowOf } from "../spell-zones.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
 import { applyLooseHealing, looseHealTargets } from "../loose-healing.js";
+import { countOptionUse } from "../option-uses.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -135,10 +136,7 @@ export const actionCommands = [
         let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
           null;
         if (template) {
-          if (action.attack)
-            throw new CommandRejectedError(
-              "Attacks target a single token - pick it directly instead of placing a template."
-            );
+          if (action.attack) throw new CommandRejectedError("Attacks target a single token. Pick the token itself.");
           if (draft.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try again.");
           const calibration = geometry!.calibration!;
@@ -177,7 +175,7 @@ export const actionCommands = [
               throw new CommandRejectedError("Every target must be in this encounter.");
           }
         }
-        // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.
+        // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
           geometry ? (tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null) : null;
         // The attack's d20 is held between a preview and its confirm, one per creature and turn (ADR-0012), so a
@@ -187,7 +185,7 @@ export const actionCommands = [
           requireTypedDie(draft, initiator, heldRollFor(draft, holdKey), attackNatural);
         // SRD forced movement (Push), snapped like a GM drag; takes no client input. Only `targets[0]` of a hit
         // is pushed, already restricted to public combatants for players. If the map changed since the grid
-        // was fetched, degrade to null ("move the token") rather than throw.
+        // was fetched, degrade to null ("move the token") and never throw.
         const pushToken = (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
           draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null;
         resolution = resolveDefinitionAction(
@@ -236,6 +234,8 @@ export const actionCommands = [
             pushToken
           }
         );
+        // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
+        if (!resolution.preview) countOptionUse(draft, actorId, actionId);
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
@@ -292,13 +292,13 @@ export const actionCommands = [
         if (resolution.overridden)
           kit.context.appendLog({
             kind: "override",
-            text: `OVERRIDE (${resolution.overridden.rule}): ${kit.actorName(actorId)} used ${resolution.actionName} - ${resolution.overridden.reason}`,
+            text: `OVERRIDE (${resolution.overridden.rule}): ${kit.actorName(actorId)} used ${resolution.actionName} · ${resolution.overridden.reason}`,
             actorIds: [actorId]
           });
         // Builtin check rolls narrate to the table.
         if (resolution.check) {
           const verdict =
-            resolution.check.success === null ? "" : resolution.check.success ? " - success" : " - failure";
+            resolution.check.success === null ? "" : resolution.check.success ? " · success" : " · failure";
           kit.context.appendLog({
             kind: "action",
             text: `${kit.actorName(actorId)} rolled ${resolution.check.total} on ${resolution.check.skill}${resolution.check.dc !== null ? ` vs DC ${resolution.check.dc}` : ""}${verdict}.`,
@@ -324,7 +324,7 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
+      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt, because taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running, or with this creature not in the turn order, the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
       "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight, where a heal lands on whoever it is given to (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
@@ -387,7 +387,7 @@ export const actionCommands = [
       );
 
       // Loose: the server rolls the action's dice, attributed to the character, and spends what the action
-      // costs (an item's charges), touching no combat state. HP only ever moves through the resolver. Only the GM may
+      // costs (an item's charges). Combat state stays as it is; HP only moves through the resolver. Only the GM may
       // force a roll mode.
       const forcedMode = isGmGrade(principal) ? rollMode : undefined;
       const plan = looseRollPlan(action, {
@@ -408,6 +408,8 @@ export const actionCommands = [
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
+        // A use outside a fight counts toward the sheet's most-used options too; a refusal below undoes it.
+        countOptionUse(draft, actorId, actionId);
         // A heal lands on whoever it is given to, checked before anything is spent.
         const healTargets = action.healing
           ? looseHealTargets(draft, live, action, targetIds, initiator, spell, castLevel)
@@ -617,9 +619,7 @@ export const actionCommands = [
       // only while the table lets players type their dice.
       const typed = !resolution.terms.some((term) => term.kind === "dice");
       if (typed && !gmGrade && kit.read().builderPolicy.typedRolls !== "open")
-        throw new CommandRejectedError(
-          "At this table the server rolls players' dice. Roll the dice instead of typing them."
-        );
+        throw new CommandRejectedError("At this table the server rolls players' dice. Tap Roll to roll them.");
       const rollId = kit.context.newId();
       const { state, duplicate } = await execute((draft) => {
         // A player's roll with no actorId is attributed to their single claimed character (ambiguous claims

@@ -25,6 +25,7 @@ import type {
   ActorActionsAvailabilityResult,
   ActorAddResult,
   ActorMovementResult,
+  NextLevelResult,
   AnnotationAddResult,
   CharacterDraftResult,
   CheckRollResult,
@@ -37,6 +38,7 @@ import type {
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
+  SampleRemovalResult,
   SceneCreateResult,
   StabilizeResult,
   LightAddResult,
@@ -86,6 +88,7 @@ import type {
   CharacterRebuildSchema,
   CharacterResolveImportSchema,
   CharacterSetCurrencySchema,
+  CharacterSetFavouritesSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
@@ -181,7 +184,7 @@ import type {
   WallRemoveSchema
 } from "./commands.js";
 
-/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
+/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState; it is presentation only, and the roll history is the durable record. */
 export type TableEvent = Readonly<{
   id: string;
   kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "effect" | "death-save";
@@ -261,6 +264,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** Removes every sample character the GM may remove; the reply names those removed and those kept, with why. */
+  "actor:remove-samples": (
+    payload: CommandPayload<typeof CommandIdentitySchema>,
+    acknowledgement: (result: SampleRemovalResult) => void
+  ) => void;
   "actor:import-definition": (
     payload: CommandPayload<typeof ActorImportDefinitionSchema>,
     acknowledgement: (result: ActorAddResult) => void
@@ -289,7 +297,7 @@ export interface ClientToServerEvents {
   ) => void;
   /** The caller's parked character build (one per player session, one for the GM), or null. */
   "character:draft": (payload: Record<string, never>, acknowledgement: (result: CharacterDraftResult) => void) => void;
-  /** Park the caller's in-progress build on the server, replacing any it parked before. */
+  /** Park the caller's in-progress build on the server, over any it parked before. */
   "character:save-draft": (
     payload: CommandPayload<typeof CharacterDraftSaveSchema>,
     acknowledgement: (result: MutationResult & { updatedAt?: string }) => void
@@ -621,6 +629,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CharacterSetCurrencySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** Pin options to the sheet's turn card. The GM for anyone; a player for their own claimed character. */
+  "character:set-favourites": (
+    payload: CommandPayload<typeof CharacterSetFavouritesSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   // `classes[].hitDie` lets an identity edit rebuild the multiclass hit-dice pool (Fighter 3 / Wizard 2 is 3d10 + 2d6).
   "character:set-identity": (
     payload: CommandPayload<typeof CharacterSetIdentitySchema>,
@@ -656,6 +669,8 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ActorActionsAvailabilityResult) => void
   ) => void;
   "actor:movement": (payload: { actorId: string }, acknowledgement: (result: ActorMovementResult) => void) => void;
+  /** What a character's next level brings; only when the caller may level that character. */
+  "character:next-level": (payload: { actorId: string }, acknowledgement: (result: NextLevelResult) => void) => void;
   "turn:use": (
     payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void

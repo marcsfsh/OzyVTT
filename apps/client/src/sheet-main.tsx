@@ -49,7 +49,7 @@ function StandaloneSheet() {
   if (!state) return <Message>Connecting to the table…</Message>;
   const actor = (state.actors as Array<GmActor | PlayerActor>).find((candidate) => candidate.id === actorId);
   if (!actor)
-    return <Message>That character isn’t available to you. Claim it at the table, then reopen this tab.</Message>;
+    return <Message>That character isn't available to you. Claim it at the table, then reopen this tab.</Message>;
   return (
     <div className="cs-standalone">
       <CharacterSheet actor={actor} role="player" state={state} presentation="page" onClose={() => window.close()} />

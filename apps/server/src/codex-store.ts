@@ -85,7 +85,7 @@ export class CodexStore {
   setPageRevealed(pageId: string, revealed: boolean) {
     return pages.setPageRevealed(this.#db, pageId, revealed);
   }
-  /** References to the page elsewhere become label-only rather than dangling; its revisions go with it. */
+  /** References to the page elsewhere become label-only and never dangle; its revisions go with it. */
   deletePage(pageId: string): void {
     if (!isId(pageId)) return;
     const db = this.#db;

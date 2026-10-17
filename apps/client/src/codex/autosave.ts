@@ -30,7 +30,7 @@ export type UseCodexAutosaveOptions<TDraft> = Readonly<{
 export type CodexAutosave<TDraft> = Readonly<{
   status: SaveStatus;
   dirty: boolean;
-  /** Save now, ignoring the debounce. The explicit Save button calls this when autosave is off. */
+  /** Save now, past the debounce. The explicit Save button calls this when autosave is off. */
   flush: () => Promise<void>;
   /** Adopt an external draft as already saved, e.g. after a revision restore. */
   markSaved: (draft: TDraft) => void;
@@ -135,6 +135,6 @@ export function useCodexAutosave<TDraft>(options: UseCodexAutosaveOptions<TDraft
     };
   }, [disabled, settings.enabled, dirty]);
 
-  // With autosave off, an unsaved draft reads "Unsaved changes" rather than a misleading "Saved".
+  // With autosave off, an unsaved draft reads "Unsaved changes"; "Saved" would mislead.
   return { status: !settings.enabled && dirty && status !== "saving" ? "dirty" : status, dirty, flush, markSaved };
 }

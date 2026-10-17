@@ -223,7 +223,7 @@ function NeedsCard({
     case "rest": {
       const { actor } = item;
       // Approving rests this one character now; passing the 8 hours for everyone is the Rest dialog's job.
-      detail = `Approve gives ${actor.name} a long rest now. Pass the 8 hours from Rest.`;
+      detail = `Approve gives ${actor.name} a Long Rest now. Pass the 8 hours from Rest.`;
       body = (
         <div className="needs-card-buttons">
           <Button
@@ -232,7 +232,7 @@ function NeedsCard({
             onClick={() =>
               send(
                 () => command("rest:answer", { actorId: actor.id, approve: true }),
-                `${actor.name} finished a long rest.`
+                `${actor.name} finished a Long Rest.`
               )
             }
           >
@@ -245,7 +245,7 @@ function NeedsCard({
             onClick={() =>
               send(
                 () => command("rest:answer", { actorId: actor.id, approve: false }),
-                `Turned down ${actor.name}'s long rest.`
+                `Turned down ${actor.name}'s Long Rest.`
               )
             }
           >

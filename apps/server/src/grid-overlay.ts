@@ -59,7 +59,7 @@ function nonNegativeInteger(value: number, label: string, maximum: number) {
   return value;
 }
 
-/** Clips a finite segment to an axis-aligned viewport using Liang–Barsky. */
+/** Clips a finite segment to an axis-aligned viewport with Liang-Barsky. */
 function clipSegment(start: ImagePoint, end: ImagePoint, viewport: ImageViewport) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
@@ -131,7 +131,7 @@ export function gridOverlayLines(
   const requested = columns.maximum - columns.minimum + 1 + rows.maximum - rows.minimum + 1;
   if (requested > maxLines)
     throw new InvalidRequestError(
-      `Grid overlay requires ${requested} lines, exceeding the ${maxLines} line safety limit. Zoom in before displaying the grid.`
+      `Grid overlay requires ${requested} lines, more than the ${maxLines} line safety limit. Zoom in before displaying the grid.`
     );
 
   const lines: GridOverlayLine[] = [];

@@ -300,7 +300,7 @@ describe("the OpenAPI document", () => {
     const operations = homebrewPaths.flatMap((path) =>
       Object.entries(paths[path]).map(([method, op]) => [`${method} ${path}`, op] as const)
     );
-    // 11 paths, 14 operations: one polymorphic surface, not one endpoint per content type.
+    // 11 paths, 14 operations: one polymorphic surface for every content type.
     expect(homebrewPaths).toHaveLength(11);
     expect(operations).toHaveLength(14);
     for (const [label, op] of operations) {
@@ -319,7 +319,7 @@ describe("the OpenAPI document", () => {
     expect(IntegrationScopeSchema.options).not.toContain("content:read");
     // Homebrew rows are not GameState, so none of them is a game command.
     expect(Object.keys(GAME_COMMANDS).filter((type) => type.startsWith("homebrew."))).toEqual([]);
-    // The id budget is 60, not contentSlug's 80 (persisted ActorDefinition ids cap at 60).
+    // The id budget is 60, below contentSlug's 80 (persisted ActorDefinition ids cap at 60).
     for (const path of homebrewPaths.filter((path) => path.includes("{id}"))) {
       const parameter = Object.values(paths[path])[0]?.parameters?.find(
         (parameter) => parameter.name === "id" && parameter.in === "path"
@@ -432,7 +432,7 @@ describe("the OpenAPI document", () => {
         "properties" in schema ? Object.keys((schema as { properties: Record<string, unknown> }).properties) : [];
       for (const property of properties) {
         if (issuance.has(`${name}.${property}`)) continue;
-        if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces, not credentials
+        if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces
         // An ActorDefinition's `token` is its battlemap piece, a name fixed by ActorDefinitionSchema.
         if (`${name}.${property}` === "HomebrewMonsterRecord.token") continue;
         expect(property, `${name}.${property} looks secret-shaped`).not.toMatch(forbiddenNames);

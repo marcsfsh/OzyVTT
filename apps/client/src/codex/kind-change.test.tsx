@@ -92,7 +92,7 @@ beforeEach(() => {
 });
 
 describe("Changing a page's kind", () => {
-  it("asks even when NOTHING would be lost — the prompt is unconditional", async () => {
+  it("asks even when NOTHING would be lost: the prompt is unconditional", async () => {
     const user = userEvent.setup();
     // A note has no typed fields, so switching to a character drops nothing.
     renderEditor(PAGE({ entityType: "note", fields: {} }));
@@ -118,7 +118,7 @@ describe("Changing a page's kind", () => {
     expect(box.getByText(/restore them from History/i)).toBeInTheDocument();
   });
 
-  it("counts only fields that actually HAVE text — an empty field is not a loss", async () => {
+  it("counts only fields that actually HAVE text: an empty field loses nothing", async () => {
     const user = userEvent.setup();
     renderEditor(PAGE({ fields: { role: "   ", status: "" } }));
     await waitFor(() => expect(getSettings).toHaveBeenCalled());

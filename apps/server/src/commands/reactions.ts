@@ -7,6 +7,7 @@ import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome 
 import type { ActionResolution } from "@vtt/domain";
 import { withoutSourceName } from "../hidden-source.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
+import { countOptionUse } from "../option-uses.js";
 import { defineCommand } from "./pipeline.js";
 
 // Answers to what a hit leaves open: reaction prompts (ADR-0020) and the GM's damage proposals.
@@ -27,11 +28,11 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
       return outcome.used
         ? {
             kind: "reaction",
-            text: `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`
+            text: `${outcome.actorName} used ${outcome.actionName}, and ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`
           }
         : {
             kind: "damage",
-            text: `${outcome.actorName} declined ${outcome.actionName} - ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`
+            text: `${outcome.actorName} declined ${outcome.actionName}, and ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`
           };
     case "attack-would-hit": {
       if (!resolution) return null;
@@ -45,8 +46,8 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
       return {
         kind: "reaction",
         text: outcome.used
-          ? `${outcome.actorName} used ${outcome.actionName} - ${landed}.`
-          : `${outcome.actorName} declined ${outcome.actionName} - ${landed}.`
+          ? `${outcome.actorName} used ${outcome.actionName}, and ${landed}.`
+          : `${outcome.actorName} declined ${outcome.actionName}, and ${landed}.`
       };
     }
     case "leaves-reach":
@@ -120,6 +121,7 @@ export const reactionCommands = [
         // A typed die must be one the table takes, and not one typed over the strike's thrown die.
         if (attackNatural !== undefined && reroll !== true)
           requireTypedDie(draft, initiator, heldRollFor(draft, reactionHoldKey(reactionId)), attackNatural);
+        const prompt = draft.combat.pendingReactions.find((entry) => entry.id === reactionId);
         outcome = answerReaction(
           draft,
           commandId,
@@ -147,6 +149,14 @@ export const reactionCommands = [
             ...(hitOptions ? { hitOptions } : {})
           }
         );
+        // The reaction taken counts toward the sheet's most-used options: the strike's own action, or the prompt's.
+        const strike = outcome.kind === "leaves-reach" || outcome.kind === "damaged-by-creature";
+        const counted = strike
+          ? outcome.resolution?.preview
+            ? undefined
+            : outcome.resolution?.actionId
+          : prompt?.actionId;
+        if (outcome.used && counted) countOptionUse(draft, outcome.actorId, counted);
       });
       if (duplicate || !outcome) return;
       kit.publishRolls(state, commandId);
@@ -188,7 +198,7 @@ export const reactionCommands = [
     type: "reaction.dismiss",
     operationId: "dismissReaction",
     description:
-      "Dismisses a pending reaction prompt WITHOUT applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield - for when the GM settled it by hand.",
+      "Dismisses a pending reaction prompt WITHOUT applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield. It is for when the GM settled it by hand.",
     summary: "Dismiss a pending reaction prompt without applying what it holds (GM).",
     schema: ReactionDismissSchema,
     malformed: "The dismissal is malformed.",

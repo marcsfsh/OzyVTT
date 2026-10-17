@@ -90,6 +90,9 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     preparation?: Actor["preparation"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];
+    /** The options pinned to the sheet's turn card and how often each option resolved. Your own claimed character
+     *  only, at every `partyVisibility` tier. */ favouriteOptionIds?: Actor["favouriteOptionIds"];
+    optionUseCounts?: Actor["optionUseCounts"];
     /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{
       style: "bar" | "ring" | "aura";
     }>;
@@ -189,13 +192,13 @@ export type PlayerCombatView = Readonly<{
     "immediate" | "wait";
   underwater: boolean;
   reactionsUsed: readonly string[];
-  /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"];
+  /** The fog mask verbatim (geometry only; hidden things are stripped by their own filters). */ fog: CombatState["fog"];
   /** Difficult terrain, clipped to what the fog reveals so unrevealed ground keeps its layout. */ terrain: CombatState["terrain"];
   /** Dynamic vision: with it on, `tokens` holds only the creatures your characters perceive. */ vision: PlayerVision;
   pendingSaves: readonly PlayerPendingSave[];
   pendingReactions: readonly PlayerPendingReaction[];
   /** The player's own parked Ask-the-GM questions only. */ pendingRuleAsks: readonly PlayerPendingRuleAsk[];
-  /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean;
+  /** True while the GM has the table viewing an earlier turn (no labels, since those can name hidden combatants). */ rewound: boolean;
 }>;
 /** An archived, public character the GM shared for preview: id and name only. */
 export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;
@@ -227,7 +230,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;
   actors: PlayerActor[];
   rolls: PlayerRollRecord[];
-  /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
+  /** The GM's builder policy, verbatim (GM-set and player-read: a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
   /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[];
   /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;

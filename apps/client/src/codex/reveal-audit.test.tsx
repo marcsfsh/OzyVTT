@@ -129,7 +129,7 @@ describe("The audit lists every Codex record type", () => {
 
   it("says how much of what exists is shared, using the server's own counts", async () => {
     await renderAudit();
-    // Both numbers are the server's: what a player would receive, not a flag count.
+    // Both numbers are the server's: what a player would receive, which a flag count can't say.
     expect(within(sectionOf("Pages")).getByText("1 of 12 shared")).toBeInTheDocument();
     expect(within(sectionOf("Journal entries")).getByText("1 of 40 shared")).toBeInTheDocument();
     expect(screen.getByText("8 records are shown to players across the Codex.")).toBeInTheDocument();
@@ -266,7 +266,7 @@ describe("It aggregates; it does not decide", () => {
     await waitFor(() => expect(publishDate).toHaveBeenCalledWith("gm"));
   });
 
-  it("offers no bulk operation — hiding is one record at a time", async () => {
+  it("offers no bulk operation: hiding is one record at a time", async () => {
     await renderAudit();
     expect(screen.queryByRole("button", { name: /hide all/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /hide everything/i })).toBeNull();

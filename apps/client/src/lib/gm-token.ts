@@ -64,7 +64,7 @@ export function storeGmToken(token: string, keep: boolean) {
   write(() => localStorage, keep ? token : null);
 }
 
-/** Keeps a token this tab resumed with, leaving this computer's choice as it was. */
+/** Keeps a token this tab resumed with and leaves this computer's choice as it was. */
 export function adoptGmToken(token: string) {
   write(() => sessionStorage, token);
 }

@@ -119,7 +119,7 @@ describe("first aid: a DC 10 Wisdom (Medicine) check", () => {
     const outcome = stabilizeCreature(state, aid("medicine"), { role: "gm" }, deps(state, [9 - MEDICINE]));
     expect(outcome.stabilized).toBe(false);
     expect(bryn(state).deathSaves).toEqual({ successes: 1, failures: 2, stable: false });
-    expect(outcome.events.at(-1)?.text).toBe("Ilse's first aid failed (Medicine 9 vs DC 10) - Bryn is still dying.");
+    expect(outcome.events.at(-1)?.text).toBe("Ilse's first aid failed (Medicine 9 vs DC 10), and Bryn is still dying.");
   });
 
   it("wakes a creature knocked out, which a Healer's Kit can't", () => {
@@ -136,7 +136,7 @@ describe("first aid: a DC 10 Wisdom (Medicine) check", () => {
     );
     expect(bryn(state).conditions.map((condition) => condition.id)).toContain("unconscious");
     expect(() => stabilizeCreature(state, aid("healers-kit"), { role: "gm" }, deps(state))).toThrow(
-      /knocked out, not dying/
+      /knocked out and isn't dying/
     );
     const outcome = stabilizeCreature(state, aid("medicine"), { role: "gm" }, deps(state, [15]));
     expect(outcome).toMatchObject({ woke: true, stabilized: false });
@@ -197,7 +197,7 @@ describe("who and what can be stabilized", () => {
     const stable = game({ target: { deathSaves: { successes: 0, failures: 0, stable: true } } });
     expect(() => stabilizeCreature(stable, aid("gm"), { role: "gm" }, deps(stable))).toThrow(/already stable/);
     const healthy = game({ target: { hp: { current: 5, maximum: 30 }, deathSaves: null, conditions: [] } });
-    expect(() => stabilizeCreature(healthy, aid("gm"), { role: "gm" }, deps(healthy))).toThrow(/aren't dying/);
+    expect(() => stabilizeCreature(healthy, aid("gm"), { role: "gm" }, deps(healthy))).toThrow(/isn't dying/);
   });
 
   it("a player gives aid only with their own character, and only the GM rules it", () => {
@@ -257,7 +257,7 @@ describe("in a fight the aid is the helper's action", () => {
   it("first aid needs the helper beside the creature, and Spare the Dying its 15 feet", () => {
     const far = game({ fight: true });
     expect(() => stabilizeCreature(far, aid("medicine"), { role: "gm" }, deps(far, [15], 10))).toThrow(
-      /needs Ilse beside them/
+      /needs Ilse alongside/
     );
     const spell = game({ fight: true });
     expect(() => stabilizeCreature(spell, aid("spare-the-dying"), { role: "gm" }, deps(spell, [], 20))).toThrow(

@@ -1,11 +1,11 @@
 /** The homebrew content types and the words the UI uses for them. The type union is imported
-    from `@vtt/api-contract` rather than redeclared, so a contract change is a type error here. */
+    from `@vtt/api-contract` and never redeclared, so a contract change is a type error here. */
 import { HomebrewContentTypeSchema, type HomebrewContentType } from "@vtt/api-contract";
 
 export type HomebrewType = HomebrewContentType;
 
 /** Render order: class-shaped types, character options, then reference catalogs. Types the
-    contract adds that are missing from this list sort to the end rather than disappearing. */
+    contract adds that are missing from this list sort to the end, so none disappears. */
 const PREFERRED_ORDER: readonly string[] = [
   "class",
   "subclass",
@@ -51,7 +51,7 @@ export function isHomebrewType(value: string): value is HomebrewType {
   return HomebrewContentTypeSchema.safeParse(value).success;
 }
 
-/** The rail's status filter: a view over `state` and `deletedAt`, not a stored state.
+/** The rail's status filter: a view over `state` and `deletedAt`, with no stored state of its own.
     "Removed" is a soft-deleted row of either state. */
 export type StatusFilter = "all" | "draft" | "published" | "removed";
 

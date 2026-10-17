@@ -121,7 +121,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
   // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
-  // damage (resistance is by damage type, not source) and the redirect of nearby ranged attacks.
+  // damage (resistance goes by damage type alone) and the redirect of nearby ranged attacks.
   "shield-of-missile-attraction": { cursed: true },
 
   // Advantage on Initiative and on Wisdom (Perception) checks: a sheet roll, Search or the GM's call made with Perception.
@@ -150,7 +150,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "Until the next dawn" is a long rest.
+  // "Until the next dawn" is a Long Rest.
   "plate-armor-of-etherealness": {
     casts: [{ spellId: "etherealness", uses: { limit: 1, per: "long-rest" } }]
   },
@@ -226,7 +226,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * Charges recharge fully on a long rest rather than 1d3 at dawn (no partial recovery shape). The
+   * Charges recharge fully on a Long Rest: 1d3 at dawn has no partial-recovery shape. The
    * "Beast with a Swim Speed" target restriction stays prose.
    */
   "trident-of-fish-command": {
@@ -397,8 +397,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Prose-only items:
-  //   `javelin-of-lightning` - Lightning instead of Piercing, and a Line area.
-  //   `sun-blade`, `energy-bow` - deal Radiant/Force instead of the weapon's type; unbound until
+  //   `javelin-of-lightning`: Lightning where the javelin deals Piercing, and a Line area.
+  //   `sun-blade`, `energy-bow`: deal Radiant/Force where the weapon's own type would go; unbound until
   //       weapon-swing overrides exist. Energy Bow's arrow options are not expressible either.
   //   `thunderous-greatclub` - "your Strength is 20" is `ability-score`, refused on items; areas.
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
@@ -415,14 +415,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //
   // Recurring limits:
   //   - One use spends exactly one charge, so only one-charge properties are authored.
-  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a long rest, and "if you
+  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a Long Rest, and "if you
   //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
   //   - Use pools are capped at 20.
   //   - Staffs and rods have no weapon block, so "+N to attack and damage rolls made with it" would be
   //     bearer-scoped (every weapon) or inert; it is not authored.
   //   - An item action's to-hit is ability-derived; a printed flat attack bonus cannot be said.
   //   - `castAction` takes a cast's damage and attack from the spell record's `damage`/`attackRoll`
-  //     columns, which describe the spell's text rather than one cast: healing spells become Force
+  //     columns, which describe the spell's text as a whole: healing spells become Force
   //     damage, Magic Missile rolls one dart, Web always deals its fire damage, and Faerie Fire,
   //     Protection from Evil and Good and Ray of Enfeeblement gain an attack roll. Those casts are not
   //     authored.
@@ -530,11 +530,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "While wearing this ring, you cast Water Walk from it, targeting only yourself." Self-only is prose. */
   "ring-of-water-walking": { casts: [{ spellId: "water-walk" }] },
 
-  // `ring-of-x-ray-vision` - `sense` is display-only and standing, not a timed activated sense.
+  // `ring-of-x-ray-vision`: `sense` is display-only and standing, with no timed activation.
 
   // ---- Rods ------------------------------------------------------------------------------------
 
-  // `immovable-rod` - acts on the world, not on a creature; a GM ruling.
+  // `immovable-rod`: acts on the world and on no creature; a GM ruling.
   // `rod-of-absorption` - needs per-copy storage and a spell slot refund.
 
   /**
@@ -866,15 +866,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //     "to avoid the Poisoned condition" would apply to every save.
   //   - No `per` value means "never recharges", so consumable charges (beads, crumbling scarabs,
   //     talismans destroyed on the last charge) cannot be authored.
-  //   - Spell records describe the spell's text, not one cast (see the wands section), and there
+  //   - Spell records describe the spell's text as a whole (see the wands section), and there
   //     is no healing in the spell model.
   //   - `spell-save-dc` raises every save-bearing action on the sheet, including other items' printed
-  //     DCs, not just the wearer's spell save DC.
+  //     DCs as well as the wearer's spell save DC.
   //   - `ability-score` and `hit-points-per-level` are refused on items.
   //
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys, as with `winged-boots` and `cloak-of-invisibility`.
-  // Recharge "1dN at dawn" becomes a full refill on a long rest.
+  // Recharge "1dN at dawn" becomes a full refill on a Long Rest.
 
   // ---- Belt ------------------------------------------------------------------------------------
 
@@ -1148,7 +1148,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   - `itemAction` keeps `attack`, `save`, `damage`, `healing`, `uses`, `grants`, `area` and
   //     `replacesAttack`; `onHit` and the rest are dropped, so an item action cannot apply an on-hit condition.
   //   - An item's `effects` ignore `duration`, so "Resistance for 1 hour" would be permanent.
-  //   - Spell records describe the spell's text, not one cast (see the wands section), and there
+  //   - Spell records describe the spell's text as a whole (see the wands section), and there
   //     is no temporary-HP rider.
   //   - One use spends one charge, and pools are capped at 20.
   //   - `ability-score` is refused on items.
@@ -1158,14 +1158,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys: the elemental summons, `bag-of-tricks`, `gem-of-seeing`,
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
-  // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a long rest.
+  // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a Long Rest.
   //
   // Trap items (`bag-of-devouring`, `potion-of-poison`, `dust-of-sneezing-and-choking`) are not
   // authored: a button naming the real effect would spoil the trap.
 
   // ---- Carried wondrous items (alphabetical, absences inline) ----------------------------------
 
-  // `apparatus-of-the-crab` - a vehicle, not a rider.
+  // `apparatus-of-the-crab`: a vehicle, outside the rider model.
   // `bag-of-beans` - a GM-rolled table (temp HP and an ability score among its rows).
   // `bag-of-devouring` - a trap with a percentage pull and instant death.
   // `bag-of-holding` - no capacity/container model (also `handy-haversack`, `efficient-quiver`, `portable-hole`).
@@ -1368,8 +1368,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `lantern-of-revealing` - no rider suppresses Invisible within a light radius.
   // `manual-of-bodily-health`, `manual-of-gainful-exercise`, `manual-of-quickness-of-action`,
-  //     `tome-of-clear-thought`, `tome-of-leadership-and-influence`, `tome-of-understanding` - a
-  //     permanent ability increase is a sheet edit, not a reversible item rider (and `ability-score`
+  //     `tome-of-clear-thought`, `tome-of-leadership-and-influence`, `tome-of-understanding`: a
+  //     permanent ability increase is a sheet edit, and an item rider is reversible (and `ability-score`
   //     is refused on items).
   // `manual-of-golems` - crafting.
   // `marvelous-pigments` - GM fiat, consumed.

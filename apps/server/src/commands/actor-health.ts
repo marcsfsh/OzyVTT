@@ -79,7 +79,7 @@ function requireMeleeKnockOut(
     action.attack !== undefined && action.attack.reachFeet === undefined && action.attack.rangeFeet !== undefined;
   const noAttack = action.attack === undefined && (action.save !== undefined || action.spellId !== undefined);
   if (ranged || noAttack)
-    throw new CommandRejectedError(`Only a melee attack can knock a creature out - ${action.name} isn't one.`);
+    throw new CommandRejectedError(`Only a melee attack can knock a creature out, and ${action.name} isn't one.`);
 }
 
 export const actorHealthCommands = [
@@ -87,7 +87,7 @@ export const actorHealthCommands = [
     type: "actor.apply-damage",
     operationId: "applyDamage",
     description:
-      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline - immunity, then resistance (half, rounded down), then vulnerability (double) - from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). `nonlethal` knocks out instead (SRD): a melee attack that would drop the target to 0 leaves it at 1 HP and Unconscious until it regains hit points; a named `sourceActionId` that is not a melee attack is refused. On the GM's apply, a named `sourceActionId` whose damage drains (a Life Drain, Vampiric Touch) lowers the target's Hit Point maximum or heals the source as the action says. Any damage ends the target's effects that end on damage (Sleep). Player sessions may target only their claimed character.",
+      "Applies damage (temporary hit points absorb first). Optional typed `parts` run the defense pipeline (immunity, then resistance, half rounded down, then vulnerability, double) from the target's definition and active effects, with the per-part breakdown returned in `applied`; the bare `amount` is the manual path (no defense math). Dropping a player character to 0 starts the dying state (Unconscious + Prone + death saves; `critical: true` while dying adds two failures). `nonlethal` knocks out instead (SRD): a melee attack that would drop the target to 0 leaves it at 1 HP and Unconscious until it regains hit points; a named `sourceActionId` that is not a melee attack is refused. On the GM's apply, a named `sourceActionId` whose damage drains (a Life Drain, Vampiric Touch) lowers the target's Hit Point maximum or heals the source as the action says. Any damage ends the target's effects that end on damage (Sleep). Player sessions may target only their claimed character.",
     summary: "Apply damage (GM anyone; a player their claimed character).",
     schema: ApplyDamageSchema,
     malformed: "The damage command is malformed.",
@@ -163,7 +163,7 @@ export const actorHealthCommands = [
       )
         kit.context.appendLog({
           kind: "damage",
-          text: `"${damageType}" is not one of the SRD damage types - only a homebrew defence naming it exactly will match.`,
+          text: `"${damageType}" is not one of the SRD damage types. Only a homebrew defence naming it exactly will match.`,
           actorIds: [actorId],
           gmOnly: true
         });
@@ -282,7 +282,7 @@ export const actorHealthCommands = [
           .catalogFor(principal)
           .conditionSummaries()
           .find((entry) => entry.id === conditionId)?.name ?? conditionId;
-      // Immunity skips narrate through the events instead of the generic applied line.
+      // Immunity skips narrate through the events, in place of the generic applied line.
       if (!events.some((event) => event.immune))
         kit.context.broadcastTableEvent({
           kind: "condition",
@@ -299,7 +299,7 @@ export const actorHealthCommands = [
     type: "actor.rechoose",
     operationId: "rechooseActorPick",
     description:
-      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). A pick the build itself reads - its options grant spells, or another pick depends on it, as the land's spells and Nature's Ward do - is written to the character's choices ledger and the sheet is rebuilt from it, keeping what has been spent; a player makes it in the prepare step a Long Rest opens, the GM any time outside a fight. Any other pick is runtime state on the actor, cleared by the matching rest, so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
+      "Re-makes a pick the character's content says may be re-made on a rest (Circle of the Land's land type on a Long Rest; Fiendish Resilience's damage type on either). A pick the build itself reads (its options grant spells, or another pick depends on it, as the land's spells and Nature's Ward do) is written to the character's choices ledger and the sheet is rebuilt from it, keeping what has been spent; a player makes it in the prepare step a Long Rest opens, the GM any time outside a fight. Any other pick is runtime state on the actor, cleared by the matching rest, so a re-choice between fights needs no rebuild. A player session may re-choose only on their claimed character, the GM on anyone. Which offers are re-choosable, and what each may become, are both decided from the content: a client cannot widen either.",
     summary:
       "Re-make a pick a feature says may be re-made on a rest (Circle of the Land's land type on a Long Rest, Fiendish Resilience's damage type on either). Your own character; the GM anyone.",
     schema: ActorRechooseSchema,
@@ -323,7 +323,7 @@ export const actorHealthCommands = [
           throw new CommandRejectedError(
             choices.length === 0
               ? `Nothing on ${actor.name}'s sheet can be re-chosen on a rest.`
-              : `${actor.name} cannot re-choose "${offer}" - only ${choices.map((candidate) => `"${candidate.offer}"`).join(", ")}.`
+              : `${actor.name} cannot re-choose "${offer}". ${actor.name} can re-choose only ${choices.map((candidate) => `"${candidate.offer}"`).join(", ")}.`
           );
         }
         if (!match.options.includes(id)) {
@@ -340,8 +340,8 @@ export const actorHealthCommands = [
         }
         // The build reads this answer (the land's spells and Nature's Ward), so it goes into the ledger.
         if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-          throw new CommandRejectedError(`${match.label} is chosen after a rest - end the encounter first.`);
-        // SRD: "Whenever you finish a Long Rest, choose" - a player makes it in the step that rest opens.
+          throw new CommandRejectedError(`${match.label} is chosen after a rest. End the fight first.`);
+        // SRD: "Whenever you finish a Long Rest, choose", a player makes it in the step that rest opens.
         if (initiator.role !== "gm" && match.per === "long-rest" && actor.preparation === null)
           throw new CommandRejectedError(`${actor.name} chooses ${match.label} again after finishing a Long Rest.`);
         rechooseInLedger(state, actorId, offer, id, {
@@ -378,7 +378,7 @@ export const actorHealthCommands = [
       const initiator = initiatorOf(principal);
       // A Long Rest is the GM's to give: a player asks for one (rest.ask) instead.
       if (kind === "long" && initiator.role !== "gm")
-        throw new GameAccessDeniedError("Ask the GM for a Long Rest - they approve it.");
+        throw new GameAccessDeniedError("Ask the GM for a Long Rest. The GM approves it.");
       let events: EffectNarration[] = [];
       const chargeLines: string[] = [];
       // Authorized inside the mutation against live state (applyRest still refuses a combatant in a running
@@ -408,7 +408,7 @@ export const actorHealthCommands = [
     type: "actor.spend-uses",
     operationId: "spendUses",
     description:
-      "Spends several uses of one of the actor's limited-use pools at once, keyed as the counters are (`uses.pool ?? action.id`): Lay on Hands' points outside a fight, or Focus Points for a feature the engine doesn't run. A player session only on their claimed character, the GM anyone. Refused when the pool holds fewer, and for a pool that comes back every turn.",
+      "Spends several uses of one of the actor's limited-use pools at once, keyed as the counters are: Lay on Hands' points outside a fight, or Focus Points for a feature the engine doesn't run. The key is `uses.pool`, or `action.id` when there is no pool. A player session only on their claimed character, the GM anyone. Refused when the pool holds fewer, and for a pool that comes back every turn.",
     summary: "Spend several uses of a limited-use pool at once (your own character; GM anyone).",
     schema: ActorSpendUsesSchema,
     malformed: "The spend is malformed.",
@@ -464,7 +464,7 @@ export const actorHealthCommands = [
     operationId: "spendHitDice",
     description:
       "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). Player sessions may target only their claimed character; the dice land in the shared roll history.",
-    summary: "Spend Hit Point Dice to heal on a short rest (roll + Con modifier each, minimum 1).",
+    summary: "Spend Hit Point Dice to heal on a Short Rest (roll + Con modifier each, minimum 1).",
     schema: ActorSpendHitDiceSchema,
     malformed: "The hit-dice command is malformed.",
     async run({ principal, request, execute }, kit) {

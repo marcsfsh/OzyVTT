@@ -54,7 +54,7 @@ function visibleToPlayer(state: GameState, roll: RollRecord, playerSessionId?: s
 }
 
 /** The total of the attack a reaction prompt holds, when the roll it came from is one this player may see in their
- *  dice log: the attacker's latest d20 attack roll, showing the held attack's die (or, typed, its total). Null
+ *  dice log: the attacker's latest d20 attack roll, with the held attack's die (or, typed, its total). Null
  *  otherwise, so a roll the GM kept hidden never reaches the player through the prompt. */
 function shownAttackRoll(
   state: GameState,
@@ -328,7 +328,7 @@ export function projectPlayerCombat(
     tokens: state.combat.mapAssetId ? state.combat.tokens.filter(showsToken) : [],
     annotations: state.combat.mapAssetId ? projectPlayerAnnotations(state, playerSessionId, now) : [],
     // A hidden combatant's turn stays opaque: economy flags, action instance and per-turn uses (which
-    // name stat-block action ids) reset to idle rather than narrate its activity.
+    // name stat-block action ids) reset to idle, so nothing narrates its activity.
     turn: currentIsPublic
       ? {
           actionUsed: state.combat.turn.actionUsed,
@@ -362,7 +362,7 @@ export function projectPlayerCombat(
           movementUsedFeet: 0
         },
     rulesMode: state.combat.rulesMode,
-    // Rules configuration, not secrets: a player's sheet must know whether a tap will be blocked or warned.
+    // Rules configuration, which is no secret: a player's sheet must know whether a tap will be blocked or warned.
     ruleExceptions: { ...state.combat.ruleExceptions },
     // The policy only (never the GM-only pendingDamage proposals), so the runner can say who applies a hit.
     playerDamageMode: state.combat.playerDamageMode,
@@ -562,7 +562,10 @@ const PLAYER_ACTOR_FIELDS = {
   firstClaimedAt: "never",
   sample: "never",
   archived: "never",
-  sheetPreview: "never"
+  sheetPreview: "never",
+  // The owner's own turn-card pins and use counts: never another player's, whatever the party tier.
+  favouriteOptionIds: "derived",
+  optionUseCounts: "derived"
 } as const satisfies Record<keyof Actor, "table" | "party" | "derived" | "never">;
 
 type FieldsFor<Audience> = {
@@ -575,7 +578,7 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
   (key) => PLAYER_ACTOR_FIELDS[key] === "table" || PLAYER_ACTOR_FIELDS[key] === "party"
 ) as FieldsFor<"table" | "party">[];
 
-/** Copies the listed fields, leaving out optional ones that are unset. */
+/** Copies the listed fields. Optional ones that are unset are left out. */
 /** A carried row for a player. The GM's pick of a resistance type stays the GM's until the bearer attunes, when
  *  the item's properties are learned (and the resistance starts to apply). */
 function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
@@ -612,6 +615,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
+ * | favouriteOptionIds, optionUseCounts     |  Y   |  -  |       -        |     -      |          -          |
  * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, firstClaimedAt, sample, archived,          |
  * | sheetPreview, lastLongRestAt: never, at any tier.                                                              |
  *
@@ -665,7 +669,7 @@ export function projectPlayerView(
     rollCalls: projectPlayerRollCalls(state, playerSessionId),
     combat: projectPlayerCombat(state, playerSessionId, now, content, sight),
     rest: playerRest(state, yourActorIds),
-    // Tiers subtract fields, never entries; only gm-only visibility, archiving and sight remove an actor.
+    // Tiers subtract fields. An actor is removed only by gm-only visibility, archiving or sight.
     actors: state.actors
       .filter((actor) => actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id))
       .map((source) => {
@@ -682,7 +686,9 @@ export function projectPlayerView(
           preparation,
           inventory,
           currency,
-          replaySceneId
+          replaySceneId,
+          favouriteOptionIds,
+          optionUseCounts
         } = source;
         const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
         // Another player's claimed character: the only thing `partyVisibility` governs.
@@ -747,6 +753,9 @@ export function projectPlayerView(
                 currency: { ...currency }
               }
             : {}),
+          // The turn card's pins and counts are the owner's alone, so even the top party tier leaves them out.
+          ...(mine && favouriteOptionIds ? { favouriteOptionIds: [...favouriteOptionIds] } : {}),
+          ...(mine && optionUseCounts ? { optionUseCounts: { ...optionUseCounts } } : {}),
           ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
         };
       }),

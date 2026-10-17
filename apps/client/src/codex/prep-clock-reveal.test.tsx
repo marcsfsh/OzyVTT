@@ -140,7 +140,7 @@ describe("Revealing a record dated ahead of the players (owner decision, 2026-07
       )
     ).toBeInTheDocument();
     expect(screen.getByText(/date is still Hammer 10, 1492 DR/)).toBeInTheDocument();
-    // The warning must block the route, not paint after it.
+    // The warning must block the route and never paint after it.
     expect(revealEntry).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Show anyway" }));
@@ -285,7 +285,7 @@ describe("Publishing the date says so (owner decision: it used to be silent)", (
     expect(await screen.findByText("Players now see Alturiak 28, 1492 DR.")).toBeInTheDocument();
   });
 
-  it("says nothing on a failed publish — the error channel owns that", async () => {
+  it("says nothing on a failed publish: the error channel owns that", async () => {
     await renderJournal([UNDATED]);
     publishCalendar.mockRejectedValue(new Error("The calendar is locked."));
     const user = userEvent.setup();

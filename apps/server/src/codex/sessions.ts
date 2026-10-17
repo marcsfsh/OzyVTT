@@ -225,7 +225,7 @@ export function listSessions(db: CodexDb): CodexSession[] {
   ).map(toSession);
 }
 
-/** The id of a session that must exist; not-found otherwise, rather than a silent null. */
+/** The id of a session that must exist; not-found otherwise, and never a silent null. */
 export function requireSession(db: CodexDb, sessionId: string): string {
   const resolved = id(sessionId);
   if (!getSession(db, resolved)) throw new CodexNotFoundError("That session no longer exists.");

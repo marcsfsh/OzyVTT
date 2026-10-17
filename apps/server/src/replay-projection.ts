@@ -1,6 +1,7 @@
 import type { CombatLogEntry, PlayerCombatView, PlayerHp, PlayerRollRecord, RollRecord } from "@vtt/domain";
 import { playerFeedId } from "./combat-log.js";
 import type { EncounterArchiveDocument, EncounterArchiveTurn } from "./encounter-archive.js";
+import type { EncounterArchiveSummary } from "./game-store.js";
 import { conditionLabels, playerHp, playerRoll, projectPlayerCombat } from "./projections.js";
 import { partySight, type AudienceSight } from "./vision/audience.js";
 import type { SightContent } from "./vision/senses.js";
@@ -13,7 +14,7 @@ import type { SightContent } from "./vision/senses.js";
  * Each turn's state is run through the live player projection. Visibility was snapshotted per turn,
  * so a creature revealed on turn 7 stays hidden in turns 0-6 with no separate reveal logic.
  *
- * Stricter than the live feed: `self-only` rolls are dropped (the reader is any player, not the
+ * Stricter than the live feed: `self-only` rolls are dropped (the reader is any player, who may not be the
  * roller), and roll payloads lose `initiatorSessionId`. Archive turn labels can name hidden
  * combatants, so labels are recomputed from each turn's public state.
  *
@@ -40,6 +41,30 @@ export type PlayerReplayDocument = Readonly<{
   rolls: readonly PlayerRollRecord[];
   attribution: string | null;
 }>;
+
+/** A shared replay in a player's list: the GM's name for it, and never the name of the scene it was fought on. */
+export type PlayerArchiveSummary = Readonly<{
+  id: number;
+  archivedAt: string;
+  startedAt: string | null;
+  endedAt: string;
+  turnCount: number;
+  playerVisible: boolean;
+  name: string | null;
+}>;
+
+/** Builds a player's list entry field by field, so a field added to the GM's summary never reaches a player by itself. */
+export function projectPlayerArchiveSummary(entry: EncounterArchiveSummary): PlayerArchiveSummary {
+  return {
+    id: entry.id,
+    archivedAt: entry.archivedAt,
+    startedAt: entry.startedAt,
+    endedAt: entry.endedAt,
+    turnCount: entry.turnCount,
+    playerVisible: entry.playerVisible,
+    name: entry.name
+  };
+}
 
 /** Log rows from this boundary's revision up to the next boundary's; the last turn takes the rest. */
 function logSliceFor(document: EncounterArchiveDocument, turnIndex: number): readonly CombatLogEntry[] {
@@ -126,7 +151,7 @@ export function projectPlayerReplay(
     endedAt: document.endedAt,
     turnCount: turns.length,
     turns,
-    // Self-only and gm-only rolls are dropped: the reader is any player, not the roller.
+    // Self-only and gm-only rolls are dropped: the reader is any player, who may not be the roller.
     rolls: (document.rolls ?? []).filter((roll) => rollShown(roll, document.turns, sights)).map(playerRoll),
     attribution: document.attribution ?? null
     // Not projected: journal (payloads naming hidden combatants), finalState/postEncounterState (full
@@ -135,7 +160,7 @@ export function projectPlayerReplay(
 }
 
 /** The battle-map images a shared archive's player replay renders, so the map router can serve them.
- *  Derived from the projected player document, not the stored one, which also references prepared
+ *  Derived from the projected player document. The stored one also references prepared
  *  scenes' maps players must not see. Does not check the shared flag: never call it on an unshared archive. */
 export function playerReplayMapAssetIds(
   id: number,

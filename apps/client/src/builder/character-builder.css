@@ -116,7 +116,7 @@
   .cb-step {
     gap: var(--space-5);
   }
-  /* A Select next to its label wraps rather than shrinking below a tappable width. */
+  /* A Select next to its label wraps, so it never shrinks below a tappable width. */
   .cb-asi-rows {
     flex-direction: column;
     align-items: stretch;
@@ -127,7 +127,7 @@
 }
 
 /* Level flow: the rail, the two directions, and the level-down preview. The page is a block scroll region, so the
-   column inside keeps its height and scrolls rather than shrinking to the pane. */
+   column inside keeps its height and scrolls inside the pane. */
 /* The level page fills the pane: the column scrolls, and the footer with the level buttons stays in view. */
 .cb-level-page {
   position: relative;

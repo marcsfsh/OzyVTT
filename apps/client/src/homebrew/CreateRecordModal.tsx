@@ -1,6 +1,6 @@
 /** New homebrew: pick a type, then start blank or duplicate an existing record. Both starting
     points get equal weight (for a class, duplicating is the practical route), and picking
-    Duplicate reveals its catalog inline rather than adding a wizard step. */
+    Duplicate reveals its catalog inline, with no extra wizard step. */
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { Badge, Button, ChoiceCard, ChoiceGrid, Field, FieldGrid, Modal, Select, type ChoiceOption } from "@vtt/ui";
@@ -147,7 +147,7 @@ export function CreateRecordModal({
       }
     >
       <div className="hb-create-body">
-        <Field label="What are you making?" htmlFor={typeFieldId}>
+        <Field label="Record type" htmlFor={typeFieldId}>
           <Select
             id={typeFieldId}
             value={type}
@@ -198,7 +198,7 @@ export function CreateRecordModal({
               emptyTitle="Nothing to duplicate"
               emptyText={
                 type === "spell-list"
-                  ? "There's no list to copy from yet. Start from blank — you can build a list from the SRD lists once it exists."
+                  ? "There's no list to copy from yet. Start from blank, then fill the new list from the SRD lists."
                   : "No SRD or homebrew record matches. Try a different search, or start from blank."
               }
             />
@@ -207,8 +207,8 @@ export function CreateRecordModal({
 
         {companions.length > 0 && (
           <p className="hb-create-note">
-            {chosen!.name}&rsquo;s {companions.length} {companions.length === 1 ? "subclass is" : "subclasses are"}{" "}
-            copied too, so the copy has something to offer at its subclass level and can be published straight away.
+            {chosen!.name}'s {companions.length} {companions.length === 1 ? "subclass is" : "subclasses are"} copied
+            too, so the copy has something to offer at its subclass level and can be published straight away.
           </p>
         )}
 

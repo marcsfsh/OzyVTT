@@ -37,7 +37,7 @@ describe("codex entity field table", () => {
     expect(pruneCodexFields("item", { kind: "relic", race: "Vampire" })).toEqual({ kind: "relic" });
   });
 
-  it("wipes fields when switching to `note`, which carries none — the most destructive case", () => {
+  it("wipes fields when switching to `note`, which carries none: the most destructive case", () => {
     expect(CODEX_ENTITY_FIELD_KEYS.note).toEqual([]);
     expect(pruneCodexFields("note", { race: "Vampire" })).toEqual({});
   });

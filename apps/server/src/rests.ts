@@ -33,7 +33,7 @@ function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDice
     });
 }
 
-/** The sizes of the next `count` Hit Dice a pool spends, biggest first, matching `spendFromPool`: a
+/** The sizes of the next `count` Hit Dice a pool spends, biggest first as `spendFromPool` spends them: a
  *  Fighter 3 / Wizard 2 rolls d10s, then d6s. Short when the pool holds fewer. */
 export function hitDieSizesToSpend(entries: readonly HitDiceEntry[], count: number): number[] {
   return [...entries]
@@ -57,7 +57,7 @@ export function spendHitDice(
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
-    throw new CommandRejectedError("Hit Dice are spent on a rest - end the encounter first.");
+    throw new CommandRejectedError("Hit Dice are spent on a rest. End the fight first.");
   refuseRestAtZero(actor, "Hit Dice are spent on a Short Rest, which needs");
   if (!actor.hitDice)
     throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
@@ -69,7 +69,7 @@ export function spendHitDice(
   const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
   const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier), 0);
   const events = healActor(state, actorId, healed, scope);
-  // Decrement the pool, not a single counter: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
+  // Decrement the pool die by die: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
   actor.hitDice = makeHitDicePool(spendFromPool(actor.hitDice.entries, faces.length));
   return { healed, events, conModifier };
 }
@@ -77,8 +77,8 @@ export function spendHitDice(
 /** SRD Resting: "To start a Short Rest [or a Long Rest], you must have at least 1 Hit Point", and nothing brings
  *  the dead back but a revival. `needs` finishes the refusal: what asks for that 1 Hit Point. */
 function atZeroRefusal(actor: Actor, needs: string): string | null {
-  if (isDead(actor)) return `${actor.name} is dead - a rest can't bring them back.`;
-  if (actor.hp.current < 1) return `${actor.name} has 0 Hit Points - ${needs} at least 1. Heal them first.`;
+  if (isDead(actor)) return `${actor.name} is dead, and a rest can't bring ${actor.name} back.`;
+  if (actor.hp.current < 1) return `${actor.name} has 0 Hit Points. ${needs} at least 1. Heal ${actor.name} first.`;
   return null;
 }
 
@@ -91,13 +91,13 @@ function refuseRestAtZero(actor: Actor, needs: string): void {
 export function restRefusal(state: GameState, actor: Actor, kind: "long" | "short"): string | null {
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id))
     return `End the encounter before resting ${actor.name}, who is in it.`;
-  const atZero = atZeroRefusal(actor, `a ${kind === "long" ? "Long" : "Short"} Rest needs`);
+  const atZero = atZeroRefusal(actor, `A ${kind === "long" ? "Long" : "Short"} Rest needs`);
   if (atZero) return atZero;
   const wait = kind === "long" ? longRestWait(actor.lastLongRestAt, state.rest.clockHours) : 0;
   if (wait === 0) return null;
   const since = state.rest.clockHours - (actor.lastLongRestAt ?? 0);
-  const finished = since <= 0 ? "just finished a Long Rest" : `finished a Long Rest ${hoursText(since)} ago`;
-  return `${actor.name} ${finished} - another can start in ${hoursText(wait)}.`;
+  const finished = since <= 0 ? "finished a Long Rest moments ago" : `finished a Long Rest ${hoursText(since)} ago`;
+  return `${actor.name} ${finished}. Another can start in ${hoursText(wait)}.`;
 }
 
 /** The pools a Short Rest partly or wholly refills beyond their own recharge, from the `short-rest-regain` riders the
@@ -145,7 +145,7 @@ function usesAfterShortRest(
   return after;
 }
 
-/** Which re-choices a rest ends: a short rest clears those naming it; a long rest clears everything. */
+/** Which re-choices a rest ends: a Short Rest clears those naming it; a Long Rest clears everything. */
 function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "short"): Actor["choiceOverrides"] {
   if (kind === "long") return {};
   return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
@@ -200,7 +200,7 @@ export function applyRest(
   events.push(...endEffectsAtLongRest(state, actorId));
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
-  // Every die size in the pool comes back, not just the largest (SRD 5.2.1 "Regain All HP").
+  // Every die size in the pool comes back (SRD 5.2.1 "Regain All HP").
   if (actor.hitDice)
     actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
   actor.deathSaves = null;
@@ -211,13 +211,13 @@ export function applyRest(
     actor.actionUses = dawn.stillSpent;
     charges.lines.push(...dawn.lines);
   } else actor.actionUses = {};
-  // Both kinds lapse on a long rest.
+  // Both kinds lapse on a Long Rest.
   actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
   // Rested, by whatever path: nothing left to ask the GM for.
   state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
-  // SRD long rest: spell slots (and Pact Magic) refill.
+  // SRD Long Rest: spell slots (and Pact Magic) refill.
   // No spellcasting leaves these untouched.
   if (actor.spellSlots && longRestDefinition?.spellcasting) {
     // `spellSlotMaxima` covers derived multiclass tables and item-added slots, shared with seeding and the
@@ -311,7 +311,7 @@ export function startPartyRest(
   random?: (sides: number) => number
 ): EffectNarration[] {
   if (kind === "short" && state.rest.shortRest)
-    throw new CommandRejectedError("A Short Rest is already under way - finish it first.");
+    throw new CommandRejectedError("A Short Rest is already under way. Finish it first.");
   const members = actorIds.map((actorId) => {
     const actor = state.actors.find((candidate) => candidate.id === actorId);
     if (!actor) throw new CommandRejectedError("That combatant no longer exists.");

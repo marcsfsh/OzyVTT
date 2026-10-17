@@ -31,7 +31,7 @@ describe("bundled reference content exposed to the client", () => {
     expect(fireball?.castingOptions.find((option) => option.level === 9)).toMatchObject({ damageRoll: "14d6" });
     // Only slot-level upcasts are surfaced (cantrip character-level scaling is filtered out).
     expect(fireball?.castingOptions.every((option) => option.level >= 4 && option.level <= 9)).toBe(true);
-    // A target-scaling spell carries the count, not a new damage roll (Scorching Ray: +1 ray/level).
+    // A target-scaling spell carries the count and adds no damage roll (Scorching Ray: +1 ray/level).
     const scorchingRay = spells.find((spell) => spell.id === "scorching-ray");
     expect(scorchingRay?.castingOptions.find((option) => option.level === 3)).toEqual({
       level: 3,
@@ -86,7 +86,7 @@ describe("bundled reference content exposed to the client", () => {
     expect(fighter.levelTable[0].spellSlots).toBeNull();
     expect(fighter.levelTable[0].pactSlots).toBeNull();
     expect(fighter.levelTable[0].cantripsKnown).toBeNull();
-    // Named per-level resources travel as data - this is what grows Second Wind 2 -> 3 -> 4.
+    // Named per-level resources travel as data: this is what grows Second Wind 2 -> 3 -> 4.
     const secondWind = fighter.levelTable.find((row) =>
       row.classResources.some((resource) => resource.id === "second-wind")
     );

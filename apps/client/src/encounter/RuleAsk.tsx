@@ -16,13 +16,13 @@ import "./rule-ask.css";
 
 /**
  * `createdAt` is an ISO datetime string, unlike neighbouring numeric stamps. An unparseable value
- * reads as "just now" rather than NaN.
+ * reads as "a moment ago".
  */
 function askedAgo(createdAt: string): string {
   const asked = Date.parse(createdAt);
-  if (Number.isNaN(asked)) return "just now";
+  if (Number.isNaN(asked)) return "a moment ago";
   const seconds = Math.max(0, Math.round((Date.now() - asked) / 1000));
-  if (seconds < 60) return "just now";
+  if (seconds < 60) return "a moment ago";
   const minutes = Math.round(seconds / 60);
   return minutes === 1 ? "a minute ago" : `${minutes} minutes ago`;
 }
@@ -46,7 +46,7 @@ export function AskTheGmPrompt({ onFeedback }: Readonly<{ onFeedback: (message: 
         }
         // The server re-runs the command before parking it; if it is legal now it simply happens. Say which.
         onFeedback(
-          result.ran ? "That worked this time - no question needed." : "Asked the GM. Waiting for their call."
+          result.ran ? "That worked this time. No question was needed." : "Asked the GM. Waiting for their call."
         );
         clearBlockedPrompt();
       }

@@ -25,14 +25,14 @@ interface ToastApi {
 interface ToastStore {
   toasts: readonly ToastRecord[];
   dismiss: (id: number) => void;
-  /** Mounting an outlet sends toasts to it instead of the floating stack; the returned function gives them back. */
+  /** Mounting an outlet sends toasts to it, away from the floating stack; the returned function gives them back. */
   claim: () => () => void;
 }
 
 const MUTE_STORAGE_KEY = "vtt.notifications-muted";
 const ToastContext = createContext<ToastApi | null>(null);
 const ToastStoreContext = createContext<ToastStore | null>(null);
-/* Same system glyphs as Alert — one tone vocabulary, one set of shapes. */
+/* Same system glyphs as Alert: one tone vocabulary, one set of shapes. */
 const TONE_ICON: Record<ToastTone, ComponentType<{ className?: string }>> = {
   success: IconCheck,
   error: IconWarning,

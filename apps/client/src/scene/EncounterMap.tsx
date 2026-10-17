@@ -63,7 +63,7 @@ type TerrainState = Readonly<{
   difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
 }>;
 
-// On-brand annotation swatches. Concrete hexes, not theme vars: the colour travels over the wire and
+// On-brand annotation swatches. Concrete hexes, since theme vars can't travel: the colour goes over the wire and
 // must read the same on every screen.
 const PLAYER_COLORS = ["#2de2ff", "#5b6ef5", "#a45cff", "#ff2e9a", "#ff2d5e", "#ff8cc6", "#7cefff", "#ffffff"];
 
@@ -141,7 +141,7 @@ export function EncounterMap({
   /** Dynamic vision: the scene's own (walls, lights, the switch) for the GM, the player's projection of it for a
    *  player (where their characters see, what the party has seen, the walls in it). */
   vision?: SceneVision | PlayerVision;
-  /** When set, this map is a GM-private staging view of a prepared scene: token moves target that scene, not the live encounter. */
+  /** When set, this map is a GM-private staging view of a prepared scene: token moves target that scene and leave the live encounter alone. */
   moveSceneId?: string;
   /** Table-wide health-display default (GM view only; a token's own actor.healthDisplay overrides it). Players receive the resolved per-token style from the server. */
   healthDisplay?: HealthDisplay;
