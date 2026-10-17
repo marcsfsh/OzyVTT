@@ -290,7 +290,7 @@ export function PageEditor({
               Save
             </Button>
           )}
-          <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" />
+          <RevealSwitch revealed={revealed} onChange={toggleReveal} ariaLabel="Show this page to players" labelled />
           <Button
             variant="ghost"
             size="sm"
@@ -329,6 +329,8 @@ export function PageEditor({
             pages={pages}
             excludePageId={page.id}
             onNavigate={onNavigate}
+            /* The pages view's link handler opens quick-create for a title no page has. */
+            onCreatePage={onNavigate}
             gmLayer={tab === "gm"}
           />
         </div>

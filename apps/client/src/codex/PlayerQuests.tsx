@@ -115,7 +115,13 @@ export function PlayerQuests({
             </div>
             <div className="codex-reader-body">
               {open.body.trim() ? (
-                <CodexMarkdown text={open.body} onNavigate={onNavigate} token={token} knownTitles={knownTitles} />
+                <CodexMarkdown
+                  text={open.body}
+                  onNavigate={onNavigate}
+                  token={token}
+                  knownTitles={knownTitles}
+                  audience="player"
+                />
               ) : (
                 <p className="codex-preview-empty">Nothing written here yet.</p>
               )}

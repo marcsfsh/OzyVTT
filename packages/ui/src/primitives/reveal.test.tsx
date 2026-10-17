@@ -32,6 +32,14 @@ describe("RevealSwitch — the one reveal toggle", () => {
     expect(screen.getByRole("tooltip"), "a pointer gets the words too").toBeInTheDocument();
   });
 
+  it("can say its state in words beside the eye, and keeps its one name", () => {
+    const view = render(<RevealSwitch revealed={false} labelled onChange={() => {}} ariaLabel="Show this page" />);
+    const control = screen.getByRole("switch", { name: "Show this page" });
+    expect(control).toHaveTextContent("Hidden from players");
+    view.rerender(<RevealSwitch revealed labelled onChange={() => {}} ariaLabel="Show this page" />);
+    expect(screen.getByRole("switch", { name: "Show this page" })).toHaveTextContent("Shown to players");
+  });
+
   it("keeps one constant name whatever the state says, and takes the caller's when given", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

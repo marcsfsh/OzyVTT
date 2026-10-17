@@ -113,7 +113,13 @@ export function PlayerJournal({
                   </header>
                   {record.title && <h4 className="codex-entry-title">{record.title}</h4>}
                   <div className="codex-entry-body">
-                    <CodexMarkdown text={record.text} onNavigate={onNavigate} token={token} knownTitles={knownTitles} />
+                    <CodexMarkdown
+                      text={record.text}
+                      onNavigate={onNavigate}
+                      token={token}
+                      knownTitles={knownTitles}
+                      audience="player"
+                    />
                   </div>
                   {downtime && <p className="codex-downtime-what">{downtimeSummaryLabel(downtime)}</p>}
                   {milestone && <p className="codex-downtime-what">{milestoneSummaryLabel(milestone)}</p>}

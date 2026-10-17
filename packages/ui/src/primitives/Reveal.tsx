@@ -18,15 +18,16 @@ const SHOWN = "Shown to players";
 const HIDDEN = "Hidden from players";
 
 /**
- * The reveal toggle: an icon-only eye. The accessible name is required: `aria-label` for assistive tech,
- * the tooltip for pointers, and `title` for long-press on touch devices. A GM misreading this state leaks
- * secrets, so all three must stay.
+ * The reveal toggle: an eye. The accessible name is required: `aria-label` for assistive tech, the tooltip for
+ * pointers, and `title` for long-press on touch devices. A GM misreading this state leaks secrets, so all three
+ * must stay. `labelled` adds the state in words beside the eye, for a record's own header where there is room.
  */
 export function RevealSwitch({
   revealed,
   onChange,
   ariaLabel,
   banded = false,
+  labelled = false,
   disabled = false,
   className
 }: Readonly<{
@@ -35,6 +36,8 @@ export function RevealSwitch({
   ariaLabel?: string;
   /** Pass in a form grid so the control aligns with the input wells beside it. */
   banded?: boolean;
+  /** Says "Shown to players" or "Hidden from players" beside the eye. */
+  labelled?: boolean;
   disabled?: boolean;
   className?: string;
 }>) {
@@ -49,9 +52,20 @@ export function RevealSwitch({
         title={state}
         disabled={disabled}
         onClick={() => onChange(!revealed)}
-        className={cx("nh-reveal-toggle", revealed && "is-revealed", "tap-target", "interactive")}
+        className={cx(
+          "nh-reveal-toggle",
+          revealed && "is-revealed",
+          labelled && "nh-reveal-toggle--labelled",
+          "tap-target",
+          "interactive"
+        )}
       >
         {revealed ? <IconEye /> : <IconEyeOff />}
+        {labelled && (
+          <span className="nh-reveal-words" aria-hidden="true">
+            {state}
+          </span>
+        )}
       </button>
     </Tooltip>
   );

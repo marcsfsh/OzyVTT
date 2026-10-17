@@ -716,6 +716,15 @@
   border-bottom-style: dashed;
   cursor: default;
 }
+/* A link to a page that doesn't exist yet, which the GM can make: caution, the "not finished" hue, with a dashed
+   rule so the state is not colour alone. */
+.codex-md-link-missing {
+  color: var(--caution-hi);
+  border-bottom: 1px dashed var(--caution);
+}
+.codex-md-link-missing:hover {
+  color: var(--text);
+}
 
 .codex-backlinks-title {
   font-family: var(--font-label);

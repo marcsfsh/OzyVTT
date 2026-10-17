@@ -103,7 +103,13 @@ export function PlayerSessions({
             )}
             <div className="codex-reader-body">
               {open.recap.trim() ? (
-                <CodexMarkdown text={open.recap} onNavigate={onNavigate} token={token} knownTitles={knownTitles} />
+                <CodexMarkdown
+                  text={open.recap}
+                  onNavigate={onNavigate}
+                  token={token}
+                  knownTitles={knownTitles}
+                  audience="player"
+                />
               ) : (
                 <p className="codex-preview-empty">No recap written yet.</p>
               )}

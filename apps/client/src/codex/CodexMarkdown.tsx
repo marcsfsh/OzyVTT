@@ -5,7 +5,8 @@ import { CodexImage } from "./CodexImage";
  * The codex page renderer: a display-only, injection-safe markdown subset (headings, emphasis, strike,
  * `code`, lists, quotes, rules, paragraphs and [[wiki-links]]). Never uses dangerouslySetInnerHTML.
  * Normalizes em-dashes to " - " per house style. `[[Title]]`/`[[Title#Section]]` call `onNavigate` with
- * the bare target; `[[kind:ref]]` entity links render as inert chips (not yet resolved).
+ * the bare target; `[[kind:ref]]` entity links render as inert chips (not yet resolved). A link to a page that
+ * doesn't exist offers to create it when `onCreate` is given (the GM), and reads as plain text for a player.
  */
 
 const EMPHASIS = /\*\*\*([^*]+)\*\*\*|\*\*([^*]+)\*\*|\*([^*]+)\*|~~([^~]+)~~/g;
@@ -58,12 +59,15 @@ function codeAndEmphasis(text: string, keyBase: string): ReactNode[] {
   return nodes;
 }
 
-function inline(
-  text: string,
-  keyBase: string,
-  onNavigate?: (target: string) => void,
-  knownTitles?: ReadonlySet<string>
-): ReactNode[] {
+type LinkOptions = Readonly<{
+  onNavigate?: (target: string) => void;
+  knownTitles?: ReadonlySet<string>;
+  onCreate?: (title: string) => void;
+  audience: "gm" | "player";
+}>;
+
+function inline(text: string, keyBase: string, links: LinkOptions): ReactNode[] {
+  const { onNavigate, knownTitles, onCreate, audience } = links;
   const nodes: ReactNode[] = [];
   let last = 0;
   let index = 0;
@@ -91,6 +95,22 @@ function inline(
           {shown}
         </button>
       );
+    } else if (!isEntity && onCreate) {
+      nodes.push(
+        <button
+          key={`${keyBase}-w${index}`}
+          type="button"
+          className="codex-md-link codex-md-link-missing"
+          aria-label={`Create the page ${target}`}
+          title="No page has this name yet. Create it."
+          onClick={() => onCreate(target)}
+        >
+          {shown}
+        </button>
+      );
+    } else if (audience === "player") {
+      // A player can't make the page, and a link that goes nowhere would only look broken.
+      nodes.push(<span key={`${keyBase}-w${index}`}>{shown}</span>);
     } else {
       nodes.push(
         <span key={`${keyBase}-w${index}`} className="codex-md-link codex-md-link-inert">
@@ -115,23 +135,36 @@ export function CodexMarkdown({
   text,
   onNavigate,
   token,
-  knownTitles
+  knownTitles,
+  onCreate,
+  audience = "gm"
 }: Readonly<{
   text: string;
   onNavigate?: (target: string) => void;
   token?: string;
   knownTitles?: ReadonlySet<string>;
+  /** The GM's way to make the page a missing link names. */
+  onCreate?: (title: string) => void;
+  /** A player's copy: empty template headings are left out and a missing link reads as plain text. */
+  audience?: "gm" | "player";
 }>) {
+  const links: LinkOptions = { onNavigate, knownTitles, onCreate, audience };
   const normalized = text.replace(/\s*—\s*/g, " - ");
   const lines = normalized.split("\n");
   const blocks: ReactNode[] = [];
+  /** Each block's heading level, or null for content, kept beside `blocks` to find empty headings. */
+  const levels: Array<number | null> = [];
+  const push = (node: ReactNode, level: number | null = null) => {
+    blocks.push(node);
+    levels.push(level);
+  };
   let paragraph: string[] = [];
   const flush = () => {
     if (paragraph.length === 0) return;
     const key = `p-${blocks.length}`;
-    blocks.push(
+    push(
       <p key={key} className="codex-md-p">
-        {inline(paragraph.join(" "), key, onNavigate, knownTitles)}
+        {inline(paragraph.join(" "), key, links)}
       </p>
     );
     paragraph = [];
@@ -160,9 +193,9 @@ export function CodexMarkdown({
       flush();
       // Only app-served codex asset URLs render as images (injection safety); anything else stays text.
       if (token)
-        blocks.push(<CodexImage key={key} assetId={image[2]} token={token} alt={image[1]} className="codex-md-img" />);
+        push(<CodexImage key={key} assetId={image[2]} token={token} alt={image[1]} className="codex-md-img" />);
       else
-        blocks.push(
+        push(
           <p key={key} className="codex-md-p codex-preview-empty">
             [image: {image[1] || "image"}]
           </p>
@@ -172,7 +205,7 @@ export function CodexMarkdown({
     }
     if (RULE.test(line)) {
       flush();
-      blocks.push(<hr key={key} className="codex-md-hr" />);
+      push(<hr key={key} className="codex-md-hr" />);
       index += 1;
       continue;
     }
@@ -181,10 +214,11 @@ export function CodexMarkdown({
       flush();
       const level = heading[1].length;
       const Tag = (level === 1 ? "h3" : level === 2 ? "h4" : "h5") as "h3" | "h4" | "h5";
-      blocks.push(
+      push(
         <Tag key={key} className={`codex-md-h codex-md-h${level}`}>
-          {inline(heading[2], key, onNavigate, knownTitles)}
-        </Tag>
+          {inline(heading[2], key, links)}
+        </Tag>,
+        level
       );
       index += 1;
       continue;
@@ -192,11 +226,11 @@ export function CodexMarkdown({
     if (BULLET.test(line)) {
       flush();
       const { items, next } = collect(index, BULLET);
-      blocks.push(
+      push(
         <ul key={key} className="codex-md-ul">
           {items.map((item, i) => (
             <li key={i} className="codex-md-li">
-              {inline(item, `${key}-${i}`, onNavigate, knownTitles)}
+              {inline(item, `${key}-${i}`, links)}
             </li>
           ))}
         </ul>
@@ -207,11 +241,11 @@ export function CodexMarkdown({
     if (NUMBERED.test(line)) {
       flush();
       const { items, next } = collect(index, NUMBERED);
-      blocks.push(
+      push(
         <ol key={key} className="codex-md-ol">
           {items.map((item, i) => (
             <li key={i} className="codex-md-li">
-              {inline(item, `${key}-${i}`, onNavigate, knownTitles)}
+              {inline(item, `${key}-${i}`, links)}
             </li>
           ))}
         </ol>
@@ -222,9 +256,9 @@ export function CodexMarkdown({
     if (QUOTE.test(line)) {
       flush();
       const { items, next } = collect(index, QUOTE);
-      blocks.push(
+      push(
         <blockquote key={key} className="codex-md-quote">
-          {inline(items.join(" "), key, onNavigate, knownTitles)}
+          {inline(items.join(" "), key, links)}
         </blockquote>
       );
       index = next;
@@ -234,5 +268,17 @@ export function CodexMarkdown({
     index += 1;
   }
   flush();
-  return <>{blocks}</>;
+  if (audience === "gm") return <>{blocks}</>;
+  // A player sees no heading the GM left empty (a page template's unfilled sections): a heading stays only when
+  // something follows it before the next heading of its level or higher.
+  const filled = (at: number) => {
+    const level = levels[at]!;
+    for (let next = at + 1; next < blocks.length; next += 1) {
+      const nextLevel = levels[next];
+      if (nextLevel === null) return true;
+      if (nextLevel <= level) return false;
+    }
+    return false;
+  };
+  return <>{blocks.filter((_, at) => levels[at] === null || filled(at))}</>;
 }
