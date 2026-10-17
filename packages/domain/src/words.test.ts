@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { articleFor, countOf, withArticle } from "./words";
+import { articleFor, countOf, withArticle } from "./words.js";
 
 describe("articles", () => {
   it("takes an before a vowel sound", () => {
