@@ -135,7 +135,9 @@ audience. There are four:
   fight. A player's reply to an area they aimed names only the creatures they may see. A player's
   reaction prompt names the attack total it answers only when the attack's own roll is in that
   player's dice log. An unclaimed character carries its species and class line for the claim
-  picker, since any player could claim it and read its sheet.
+  picker, since any player could claim it and read its sheet. The options a player pins to the
+  sheet's turn card and how often each option resolved (`favouriteOptionIds`, `optionUseCounts`)
+  reach the owner and the GM only, whatever the party tier.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. It follows the live scene, before and during its fight, unless
   the GM paused it. Only public actors with a position become tokens; annotations
@@ -263,6 +265,12 @@ What a save does is data on the action's save block, not read from its descripti
 (half or none) and the `failureCondition` a failed save imposes. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
 
+The sheet's turn list reads `actor:available-actions`, which is owner-or-GM only: each option's availability with
+one short sentence for why it can't be used now (`availability-reasons.ts`), a flag on what belongs off a turn list
+(a rider such as Savage Attacker, a rest feature such as Arcane Recovery, a spell area's step the server runs), and the
+mastery property a mastered weapon swing carries (`weapon-masteries.ts`). The server keeps each character's turn-card
+pins (`character.set-favourites`) and counts each option that resolves for it (`option-uses.ts`), a bounded map.
+
 Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
 (`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
 player sees before it counts (a previewed attack, save or death save) is held on the server
@@ -300,7 +308,9 @@ names no family is the GM's own ruling on the whole command.
   multiclass prerequisites with the scores of the moment each class is taken. An unfinished build
   is parked on the server (`character-drafts.ts`), one per player session and one for the GM, beside
   the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
-  imported as an actor definition.
+  imported as an actor definition. What a character's next level brings is read from the same
+  survey at the next level (`next-level.ts`, `character:next-level`), for whoever may level it.
+  The builder's own rolls carry the purpose `builder`, so a sheet's latest roll leaves them out.
 - A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
   same builder from a fixed seed, so they level like any built character. Each is marked `sample`
   (GM-only) and the Roster can remove the set.
