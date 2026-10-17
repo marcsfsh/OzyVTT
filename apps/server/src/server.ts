@@ -289,6 +289,7 @@ export function createServer(options: CreateServerOptions) {
       actorIds?: readonly string[];
       gmOnly?: boolean;
       logged?: boolean;
+      playersOnly?: boolean;
     }>
   ) {
     const actorIds = event.actorIds ?? [];
@@ -298,8 +299,9 @@ export function createServer(options: CreateServerOptions) {
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
-      if (auth.verify(token)) socket.emit("table:event", payload);
-      else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
+      if (auth.verify(token)) {
+        if (event.playersOnly !== true) socket.emit("table:event", payload);
+      } else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
     }
     // Every toast is also a feed line, gated the same way, unless the caller writes a richer row itself
     // (`logged: false`). Call `appendLog` directly only for lines with no toast.
@@ -455,6 +457,16 @@ export function createServer(options: CreateServerOptions) {
     // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
     archiveDocument: (id) => store.getEncounterArchive(id),
     sound,
+    onTimePassed: ({ fromHours, toHours }) => {
+      // The game keeps the hour and the Codex calendar the day: each midnight crossed moves the date a day.
+      const days = Math.floor(toHours / 24) - Math.floor(fromHours / 24);
+      try {
+        if (codexStore.advanceCampaignDate(days)) notifyCodexChanged();
+      } catch (error) {
+        // Best-effort (the rest already committed), but logged.
+        console.error("moving the codex date failed:", error instanceof Error ? error.message : error);
+      }
+    },
     onEncounterArchived: ({ sceneId, turnCount }) => {
       // Log the fight to the codex timeline, pinned to the location marker that links this scene, if any.
       try {

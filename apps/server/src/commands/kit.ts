@@ -89,7 +89,8 @@ export type CommandContext = Readonly<{
   publishGameState: (state: GameState) => Promise<void>;
   /** Presents a newly-live scene's map on the shared screen; best-effort, a viewer failure must not undo the switch. */
   presentSceneMap: (mapAssetId: string) => Promise<void>;
-  /** Fires a transient toast, also written to the feed unless `logged: false` (a richer row is written). */
+  /** Fires a transient toast, also written to the feed unless `logged: false` (a richer row is written). A
+   *  `playersOnly` toast skips the GM's devices: it tells the players what the GM just did. */
   broadcastTableEvent: (
     event: Readonly<{
       kind: TableEvent["kind"];
@@ -97,6 +98,7 @@ export type CommandContext = Readonly<{
       actorIds?: readonly string[];
       gmOnly?: boolean;
       logged?: boolean;
+      playersOnly?: boolean;
     }>
   ) => void;
   /** Appends a feed line; `actorId` attributes it, and a `roll` row's own visibility decides who receives it. */
@@ -122,6 +124,9 @@ export type CommandContext = Readonly<{
   onEncounterArchived?: (
     info: Readonly<{ mapAssetId: string | null; sceneId: string | null; turnCount: number }>
   ) => void;
+  /** Best-effort hook after game time passed (a rest, or Pass time), so the Codex calendar's date moves with it.
+   *  Must swallow its own errors. */
+  onTimePassed?: (info: Readonly<{ fromHours: number; toHours: number }>) => void;
   /** Reads one stored archive document (raw JSON) for `replay.launch`; without it replays can't launch. */
   archiveDocument?: (id: number) => string | null;
   /** The sound board, kept in its own store (ADR-0024); without it the sound commands refuse. */

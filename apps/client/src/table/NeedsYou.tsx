@@ -222,7 +222,8 @@ function NeedsCard({
     }
     case "rest": {
       const { actor } = item;
-      detail = `A long rest takes 8 hours of game time.`;
+      // Approving rests this one character now; passing the 8 hours for everyone is the Rest dialog's job.
+      detail = `Approve gives ${actor.name} a long rest now. Pass the 8 hours from Rest.`;
       body = (
         <div className="needs-card-buttons">
           <Button

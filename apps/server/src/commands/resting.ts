@@ -6,6 +6,7 @@ import {
   RestPartySchema,
   TimePassSchema
 } from "@vtt/domain/commands";
+import type { GameState } from "@vtt/domain";
 import type { EffectNarration } from "../effects.js";
 import {
   answerLongRest,
@@ -20,6 +21,15 @@ import { initiatorOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Long Rest requests, the GM's party rest and game time (SRD Resting: a Long Rest waits 16 hours after the last).
+
+type ClockSpan = { fromHours: number; toHours: number };
+
+/** Runs a change to the state and notes how far it moved the game clock, which the Codex calendar follows. */
+function timed(state: GameState, change: () => void, span: ClockSpan): void {
+  span.fromHours = state.rest.clockHours;
+  change();
+  span.toHours = state.rest.clockHours;
+}
 
 const names = (list: readonly string[]) =>
   list.length <= 1 ? (list[0] ?? "") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
@@ -46,6 +56,15 @@ export const restingCommands = [
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)
       });
+      // The ask waits under Needs you on the GM's table; the toast reaches the GM on whatever page they are on.
+      if (!withdraw)
+        kit.context.broadcastTableEvent({
+          kind: "heal",
+          text: `${kit.actorName(actorId)} asks for a long rest. Answer it under Needs you on the Table.`,
+          actorIds: [actorId],
+          gmOnly: true,
+          logged: false
+        });
     }
   }),
 
@@ -99,12 +118,20 @@ export const restingCommands = [
     async run({ request, execute }, kit) {
       const { kind, actorIds } = request;
       let events: EffectNarration[] = [];
-      const { duplicate } = await execute((state) => {
-        events = startPartyRest(state, actorIds, kind, kit.resolveDefinition, kit.equipmentCatalog(), (sides) =>
-          kit.context.random(sides)
-        );
-      });
+      const span: ClockSpan = { fromHours: 0, toHours: 0 };
+      const { duplicate } = await execute((state) =>
+        timed(
+          state,
+          () => {
+            events = startPartyRest(state, actorIds, kind, kit.resolveDefinition, kit.equipmentCatalog(), (sides) =>
+              kit.context.random(sides)
+            );
+          },
+          span
+        )
+      );
       if (duplicate) return;
+      if (span.toHours > span.fromHours) kit.context.onTimePassed?.(span);
       const who = names(actorIds.map((actorId) => kit.actorName(actorId)));
       const hidden = actorIds.some((actorId) => kit.actorHidden(actorId));
       kit.context.appendLog({
@@ -147,10 +174,18 @@ export const restingCommands = [
       const { apply } = request;
       let events: EffectNarration[] = [];
       let rested: string[] = [];
-      const { duplicate } = await execute((state) => {
-        ({ events, rested } = finishPartyShortRest(state, apply, kit.resolveDefinition, kit.equipmentCatalog()));
-      });
+      const span: ClockSpan = { fromHours: 0, toHours: 0 };
+      const { duplicate } = await execute((state) =>
+        timed(
+          state,
+          () => {
+            ({ events, rested } = finishPartyShortRest(state, apply, kit.resolveDefinition, kit.equipmentCatalog()));
+          },
+          span
+        )
+      );
       if (duplicate) return;
+      if (span.toHours > span.fromHours) kit.context.onTimePassed?.(span);
       kit.context.appendLog({
         kind: "heal",
         text: !apply
@@ -168,15 +203,17 @@ export const restingCommands = [
     type: "time.pass",
     operationId: "passTime",
     description:
-      "GM-only: moves the game clock forward by whole hours. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). Nothing else happens with the time: effects and Concentration are the GM's to end.",
+      "GM-only: moves the game clock forward by whole hours. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day. Nothing else happens with the time: effects and Concentration are the GM's to end.",
     summary: "Move game time forward by some hours.",
     schema: TimePassSchema,
     malformed: "Choose between 1 and 720 hours.",
     gmOnly: "Only the GM moves game time.",
     async run({ request, execute }, kit) {
       const { hours } = request;
-      const { duplicate } = await execute((state) => passTime(state, hours));
+      const span: ClockSpan = { fromHours: 0, toHours: 0 };
+      const { duplicate } = await execute((state) => timed(state, () => passTime(state, hours), span));
       if (duplicate) return;
+      if (span.toHours > span.fromHours) kit.context.onTimePassed?.(span);
       kit.context.appendLog({
         kind: "encounter",
         text: `${hours} ${hours === 1 ? "hour passes" : "hours pass"}.`,

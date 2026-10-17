@@ -1,26 +1,37 @@
 import { useState } from "react";
-import { gameClockLabel, isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
+import { isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
 import { Badge, Button, Modal, Stepper, useToast } from "@vtt/ui";
+import { pathForSection } from "../codex/routes";
 import { command } from "../lib/command";
+import { navigate } from "../router";
+import { gameDate, useGmCalendar } from "./game-date";
 import "./rest.css";
 
 const NO_REST = { clockHours: 0, requests: [] as readonly string[], shortRest: null };
 
-/** Why a character can't rest now, as a short note on its row; null when nothing stands in the way. The server
- *  decides: the note only says what it will say. */
-function restNote(state: GmView, actor: GmActor): string | null {
+/** Why a character can't rest at all now (no Short Rest either); null when nothing stands in the way. */
+function blockedNote(state: GmView, actor: GmActor): string | null {
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)) return "In the fight";
   if (isDead(actor)) return "Dead";
   if (actor.hp.current < 1) return "0 HP";
+  return null;
+}
+
+/** Why a character can't rest now, as a short note on its row; null when nothing stands in the way. The server
+ *  decides: the note only says what it will say. */
+function restNote(state: GmView, actor: GmActor): string | null {
+  const blocked = blockedNote(state, actor);
+  if (blocked) return blocked;
   const wait = longRestWait(actor.lastLongRestAt ?? null, state.rest?.clockHours ?? 0);
   return wait > 0 ? `Long rest in ${wait} h` : null;
 }
 
 /**
  * The GM's rests: game time and passing it, players' Long Rest requests, and resting the party together. A Short
- * Rest stays open while each player spends Hit Dice on their own device, until the GM finishes it.
+ * Rest stays open while each player spends Hit Dice on their own device, until the GM finishes it. The clock reads
+ * the Codex calendar's date with the game's hour, the one clock both share.
  */
-export function PartyRest({ state }: Readonly<{ state: GmView }>) {
+export function PartyRest({ state, token }: Readonly<{ state: GmView; token: string | null }>) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState(8);
@@ -33,12 +44,25 @@ export function PartyRest({ state }: Readonly<{ state: GmView }>) {
   const requests = rest.requests.map(byId).filter((actor): actor is GmActor => actor !== undefined);
   const shortRest = rest.shortRest;
   const picked = party.filter((actor) => !unpicked.has(actor.id));
+  const calendar = useGmCalendar(token, open);
+  const clock = gameDate(calendar.data, rest.clockHours);
 
-  const send = async (run: () => Promise<Readonly<{ ok: boolean; message?: string }>>, success: string) => {
+  /** Opens with everyone who can rest ticked; a character who can't (down, dead, in the fight) starts unticked. */
+  const openDialog = () => {
+    setUnpicked(new Set(party.filter((actor) => blockedNote(state, actor) !== null).map((actor) => actor.id)));
+    setOpen(true);
+  };
+  /** Sends a command, says how it went, and closes the dialog when its work is done. */
+  const send = async (
+    run: () => Promise<Readonly<{ ok: boolean; message?: string }>>,
+    success: string,
+    closeAfter = false
+  ) => {
     setBusy(true);
     const result = await run();
     setBusy(false);
     toast(result.ok ? success : (result.message ?? "That was refused."), { tone: result.ok ? "success" : "error" });
+    if (result.ok && closeAfter) setOpen(false);
     return result.ok;
   };
   const toggle = (actorId: string) =>
@@ -53,13 +77,15 @@ export function PartyRest({ state }: Readonly<{ state: GmView }>) {
       () => command("rest:party", { kind, actorIds: picked.map((actor) => actor.id) }),
       kind === "long"
         ? "The party finished a long rest. 8 hours passed."
-        : "The short rest is open on each player's device."
+        : "The short rest is open on each player's device.",
+      kind === "long"
     );
+  const unclaimed = shortRest?.actorIds.some((actorId) => !byId(actorId)?.ownerSessionId) ?? false;
 
   const label = shortRest ? "Short rest open" : "Rest";
   return (
     <>
-      <Button className="party-rest-open" onClick={() => setOpen(true)} aria-haspopup="dialog">
+      <Button className="party-rest-open" onClick={openDialog} aria-haspopup="dialog">
         {label}
         {requests.length > 0 && (
           <Badge tone="info" solid>
@@ -79,7 +105,7 @@ export function PartyRest({ state }: Readonly<{ state: GmView }>) {
                 variant="ghost"
                 disabled={busy}
                 onClick={() =>
-                  void send(() => command("rest:finish", { apply: false }), "The short rest was called off.")
+                  void send(() => command("rest:finish", { apply: false }), "The short rest was called off.", true)
                 }
               >
                 Call off
@@ -88,7 +114,11 @@ export function PartyRest({ state }: Readonly<{ state: GmView }>) {
                 variant="primary"
                 disabled={busy}
                 onClick={() =>
-                  void send(() => command("rest:finish", { apply: true }), "The short rest is over. An hour passed.")
+                  void send(
+                    () => command("rest:finish", { apply: true }),
+                    "The short rest is over. An hour passed.",
+                    true
+                  )
                 }
               >
                 Finish short rest
@@ -109,7 +139,22 @@ export function PartyRest({ state }: Readonly<{ state: GmView }>) {
         <div className="party-rest">
           <section className="party-rest-section" aria-label="Game time">
             <span className="party-rest-heading">Game time</span>
-            <p className="party-rest-clock">{gameClockLabel(rest.clockHours)}</p>
+            <p className="party-rest-clock">{clock.date ? `${clock.date} · ${clock.hour}` : clock.hour}</p>
+            {!clock.date && !calendar.loading && (
+              <p className="party-rest-hint">
+                The date comes from the Codex calendar, which has no date yet.{" "}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate(pathForSection("calendar"));
+                  }}
+                >
+                  Set the date
+                </Button>
+              </p>
+            )}
             <div className="party-rest-row">
               <Stepper value={hours} onChange={setHours} min={1} max={72} disabled={busy} aria-label="Hours to pass" />
               <Button
@@ -121,7 +166,10 @@ export function PartyRest({ state }: Readonly<{ state: GmView }>) {
                 Pass {hours} {hours === 1 ? "hour" : "hours"}
               </Button>
             </div>
-            <p className="party-rest-hint">A long rest can start 16 hours after a character's last one ends.</p>
+            <p className="party-rest-hint">
+              Time that passes here moves the Codex calendar too. A long rest can start 16 hours after a
+              character&apos;s last one ends.
+            </p>
           </section>
 
           {requests.length > 0 && (
@@ -171,6 +219,8 @@ export function PartyRest({ state }: Readonly<{ state: GmView }>) {
                   const actor = byId(actorId);
                   if (!actor) return null;
                   const done = shortRest.done.includes(actorId);
+                  // Only a claimed character has a player choosing Hit Dice.
+                  const status = done ? "Done" : actor.ownerSessionId ? "Choosing" : "No player";
                   return (
                     <li key={actorId} className="party-rest-member is-static">
                       <span className="party-rest-name">{actor.name}</span>
@@ -178,13 +228,14 @@ export function PartyRest({ state }: Readonly<{ state: GmView }>) {
                         {actor.hp.current}/{actor.hp.maximum} HP
                         {actor.hitDice && ` · Hit Dice ${actor.hitDice.remaining}/${actor.hitDice.maximum}`}
                       </span>
-                      <Badge tone={done ? "success" : "neutral"}>{done ? "Done" : "Choosing"}</Badge>
+                      <Badge tone={done ? "success" : "neutral"}>{status}</Badge>
                     </li>
                   );
                 })}
               </ul>
               <p className="party-rest-hint">
                 Each player spends Hit Dice on their own device. Finishing passes an hour.
+                {unclaimed ? " A character with no player gets the rest when you finish it." : ""}
               </p>
             </section>
           ) : (

@@ -163,7 +163,9 @@ export const rollCommands = [
         kit.context.broadcastTableEvent({
           kind: "action",
           text: `The GM calls for ${what}${dc !== undefined && blind !== true ? ` (DC ${dc})` : ""}.`,
-          gmOnly: actorIds.every((actorId) => kit.actorHidden(actorId))
+          gmOnly: actorIds.every((actorId) => kit.actorHidden(actorId)),
+          // The GM's panel shows the open call, so a toast about it would only repeat it in the third person.
+          playersOnly: true
         });
       }
       return { callId: commandId };

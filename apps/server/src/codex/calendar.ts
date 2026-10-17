@@ -139,6 +139,25 @@ export function writePublishedDate(db: CodexDb, date: CodexInWorldDate | null): 
     .run(date ? date.year : null, date ? date.month : null, date ? date.day : null);
 }
 
+/**
+ * Game time passing at the table (a rest, or Pass time) moves the GM's date by the days it crossed; the game keeps
+ * the hour (`rest.clockHours`), so the two make one clock. The players' date moves too when it was the same day,
+ * since the party lived through that time at the table. Returns whether anything moved; nothing does with no date.
+ */
+export function advanceCampaignDate(db: CodexDb, days: number): boolean {
+  const current = getCalendar(db);
+  const from = current.currentDate;
+  if (!from || !Number.isSafeInteger(days) || days <= 0) return false;
+  const next = instantToDate(current, dateToInstant(current, from) + days);
+  const published = getPublishedDate(db);
+  // Only the clock moves, so the dated records keep their instants and labels; `writeCalendar` would reflow them.
+  db.database
+    .prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1")
+    .run(JSON.stringify({ ...current, currentDate: next }));
+  if (published && dateToInstant(current, published) === dateToInstant(current, from)) writePublishedDate(db, next);
+  return true;
+}
+
 /** The GM's clock as an instant. Never pass this to a player projection; use `publishedInstant`. */
 export function campaignInstant(db: CodexDb): number | null {
   const calendar = getCalendar(db);

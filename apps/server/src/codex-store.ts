@@ -285,6 +285,12 @@ export class CodexStore {
     write(db, () => calendar.writePublishedDate(db, current.currentDate ?? null));
     return current;
   }
+  /** Moves the GM's date (and the players' when it matched) by whole days of game time; false with no date set. */
+  advanceCampaignDate(days: number): boolean {
+    const db = this.#db;
+    if (!calendar.getCalendar(db).currentDate || days <= 0) return false;
+    return write(db, () => calendar.advanceCampaignDate(db, days));
+  }
   /** Takes the date away from the players: they see no date until the GM publishes again. */
   unpublishCampaignDate(): CodexCalendar {
     const db = this.#db;
