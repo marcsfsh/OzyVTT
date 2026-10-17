@@ -16,8 +16,11 @@
   gap: var(--space-3) var(--space-4);
 }
 
+/* Each scrolling region is the containing block for its own absolutely placed text (screen-reader labels), so
+   that text scrolls with it and never lengthens the page. */
 .hb-wiz-steps {
   grid-area: steps;
+  position: relative;
   min-width: 0;
   min-height: 0;
 }
@@ -25,6 +28,7 @@
 .hb-wiz-body,
 .hb-wiz-preview {
   grid-area: body;
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -81,7 +85,7 @@
   min-width: 0;
 }
 
-/* What a visited step still needs: caution, not danger, because nothing has gone wrong yet. */
+/* What a visited step still needs, in the caution colour. Nothing has gone wrong yet. */
 .hb-wiz-todo {
   display: grid;
   gap: var(--space-1);
@@ -164,10 +168,58 @@
   font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
+.hb-wiz-card > p {
+  margin: 0;
+}
 .hb-wiz-card-name {
   margin: 0;
   font: 400 var(--fs-h3) / var(--lh-tight) var(--font-display);
   color: var(--text);
+}
+.hb-wiz-card-meta {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.hb-wiz-card-text {
+  margin: 0;
+  line-height: var(--lh-body);
+  white-space: pre-wrap;
+}
+/* "More powers": the full rider form, folded until opened. */
+.hb-wiz-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+/* What each level of a class gives, one line a level. */
+.hb-wiz-levels {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.hb-wiz-levels li {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+.hb-wiz-levels-at {
+  color: var(--text-dim);
+  font-weight: 700;
+}
+.hb-wiz-levels-none {
+  color: var(--text-dim);
+}
+.hb-wiz-card-list {
+  margin: 0;
+  padding-left: 1.1rem;
 }
 .hb-wiz-card-foot {
   margin: 0;

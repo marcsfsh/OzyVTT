@@ -97,8 +97,9 @@ function formatCost(costGp: number | null): string | null {
   return `${Math.round(costGp * 100)} cp`;
 }
 
-/** The one-line detail under each catalog row: what it is plus the numbers that matter for that kind. */
-function metaLine(item: ContentEquipmentSummary): string {
+/** The one-line detail under each catalog row: what it is plus the numbers that matter for that kind. Shared with
+ *  the homebrew item wizard's preview, so a new item reads as the picker will show it. */
+export function metaLine(item: ContentEquipmentSummary): string {
   const parts: string[] = [categoryLabel(item.category)];
   if (item.weapon) {
     parts.push(`${item.weapon.damageDice} ${item.weapon.damageType}`);
