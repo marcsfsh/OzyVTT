@@ -197,6 +197,11 @@ describe("placing tokens on a live scene before its fight", () => {
     expect(combat.mapAssetId).toBe(imported.metadata.id);
     expect(combat.tokens.map((entry: { actorId: string }) => entry.actorId)).toEqual([HERO, SCOUT]);
     expect(JSON.stringify(combat)).not.toContain(LURKER);
+    // The player may load the live map's image before the fight.
+    const image = await fetch(`${base}/api/v1/map-assets/${imported.metadata.id}/content`, {
+      headers: { authorization: `Bearer ${playerToken}` }
+    });
+    expect(image.status).toBe(200);
     // The table screen shows the same.
     expect(server.viewerPresentation.snapshot.encounter.tokens.map((entry) => entry.actorId)).toEqual([HERO, SCOUT]);
     // Tokens placed before the fight keep their places when it starts.
