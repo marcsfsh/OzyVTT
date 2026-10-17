@@ -522,6 +522,13 @@ export type ContentActionSummary = Readonly<{
     Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>
   >;
   /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
+  /** A stat block's spell list (Spellcasting, Divine Aid): the numbers its casts are made with. */ spellList?: Readonly<{
+    ability: z.infer<typeof AbilitySchema>;
+    saveDc: number;
+    attackBonus: number;
+  }>;
+  /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
+  /** The spell it casts. */ spellId?: string;
 }>;
 export type ContentActionsResult = {
   ok: boolean;
