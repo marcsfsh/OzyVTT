@@ -78,7 +78,7 @@ describe("the Ready action on a player's turn", () => {
     expect(chooser.queryByRole("button", { name: /Healing Word/ })).toBeNull();
     await user.click(chooser.getByRole("button", { name: /Fireball/ }));
     const dialog = within(screen.getByRole("dialog", { name: "Ready Fireball" }));
-    await user.click(dialog.getByRole("button", { name: "4th level" }));
+    await user.click(dialog.getByRole("button", { name: "Level 4" }));
     await user.click(dialog.getByRole("button", { name: "Ready it" }));
     await waitFor(() =>
       expect(command).toHaveBeenCalledWith("action:resolve", {

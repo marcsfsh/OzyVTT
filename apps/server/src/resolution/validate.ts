@@ -40,6 +40,8 @@ function combatantsOf(
     if (!target || !inFight(targetId)) throw new CommandRejectedError("Every target must be in this encounter.");
     return target;
   });
+  // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet.
+  if (input.ready === true) return { attacker, targets };
   if (action.attack && targets.length !== 1)
     throw new CommandRejectedError("An attack roll resolves against exactly one target.");
   // A grant aimed at the action's target (Help) needs exactly one recipient; one for each target (Bless), at least one.

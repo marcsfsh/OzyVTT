@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { ActorDefinition } from "@vtt/domain";
 import { Button, Modal } from "@vtt/ui";
-import { ordinal } from "./format";
 import "./character-sheet.css";
 
 type DefinitionAction = ActorDefinition["actions"][number];
@@ -66,11 +65,12 @@ export function ReadyChooser({
       {picked ? (
         <>
           <p className="spell-choice-ask">
-            It is cast now{picked.spellSlot ? ", spending its slot," : ""} and held with Concentration until the start
-            of your next turn. Cast it when the trigger comes to release it with your Reaction.
+            {picked.name} is cast now{picked.spellSlot ? ", spending its spell slot," : ""} and held with Concentration
+            until the start of your next turn. When the trigger happens, cast it from your spell list to release it with
+            your Reaction.
           </p>
           {levels.length > 1 && (
-            <div className="heal-picker-targets" role="group" aria-label="Slot level">
+            <div className="heal-picker-targets" role="group" aria-label="Spell slot level">
               {levels.map((slot) => (
                 <button
                   key={slot}
@@ -79,7 +79,7 @@ export function ReadyChooser({
                   aria-pressed={slot === chosenLevel}
                   onClick={() => setLevel(slot)}
                 >
-                  {ordinal(slot)} level
+                  Level {slot}
                 </button>
               ))}
             </div>
