@@ -660,7 +660,7 @@ describe("buildCharacterDefinition: loud rejections", () => {
       { ability: "con", amount: 1 }
     ];
     expect(() => buildCharacterDefinition(wrongAbility, library, defaultPolicy)).toThrowError(
-      /increases STR\/DEX\/CON, not CHA/
+      /can increase only STR\/DEX\/CON, and CHA is not one of them/
     );
     const aboveLevel = fighterInput();
     aboveLevel.choices.push({ level: 6, kind: "skill", id: "history" });
