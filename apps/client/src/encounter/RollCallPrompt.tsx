@@ -155,7 +155,8 @@ export function RollCallCard({
           {call.kind === "check" && shown.check && inspired && (
             <RerollControl
               viewer="player"
-              typed={typed}
+              // The card can mount again once answered, so the result's own mark says the die was typed.
+              typed={typed || shown.check.typed === true}
               busy={busy}
               onReroll={(face) => void reroll(face)}
               onInvalid={(message) => toast(message, { tone: "error" })}
