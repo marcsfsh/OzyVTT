@@ -5,6 +5,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan } from "../src/ability-checks.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { builtinAction } from "../src/builtin-actions.js";
+import { actionSummaryOf } from "../src/content-library.js";
 import { initiativeRollFor, startEncounter } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 
@@ -123,7 +124,7 @@ describe("the check actions roll the skill they are made with", () => {
       total: 12
     });
     expect(act(fight(), "search").check).toMatchObject({ skill: "Wisdom check", total: 12 });
-    expect(() => act(fight(), "search", { skill: "stealth" })).toThrow(/Search uses insight, medicine/);
+    expect(() => act(fight(), "search", { skill: "stealth" })).toThrow(/Search uses perception, insight, medicine/);
   });
 
   it("lets Study use Arcana with Expertise", () => {
@@ -242,6 +243,16 @@ describe("Hex", () => {
     expect(initiativeRollFor(state, FOE, false, { resolveDefinition: (id) => DEFINITIONS[id] }).mode).toBe(
       "disadvantage"
     );
+  });
+
+  it("tells the action runner that its caster chooses an ability", () => {
+    expect(actionSummaryOf(HEX as unknown as ActorDefinition["actions"][number]).choosesAbility).toBe(true);
+    expect(
+      actionSummaryOf({
+        ...HEX,
+        grants: { ...HEX.grants, tags: ["blessed"] }
+      } as unknown as ActorDefinition["actions"][number]).choosesAbility
+    ).toBeUndefined();
   });
 
   it("says so when no ability was chosen", () => {

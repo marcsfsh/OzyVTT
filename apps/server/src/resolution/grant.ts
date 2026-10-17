@@ -1,3 +1,4 @@
+import { CHOSEN_ABILITY_TAG } from "@vtt/domain";
 import { abilityModifier } from "@vtt/rules-5e";
 import type { Modifier } from "@vtt/schemas";
 import { ABILITY_NAMES } from "../ability-checks.js";
@@ -9,8 +10,6 @@ import type { LiveActor, ResolveContext } from "./context.js";
 /** A grant keyed on these tags measures its recipient when it lands, as Dash does: Mage Armor's AC, Haste's Speed. */
 const MAGE_ARMOR_TAG = "mage-armor";
 const HASTED_TAG = "hasted";
-/** Hex's mark, which takes the ability its caster chose. */
-export const HEXED_TAG = "hexed";
 
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally; Bless on each creature it targets): replace-on-
  *  refresh, ending when the granter drops to 0 HP, and with the cast's Concentration when it has one (`castId`, so
@@ -46,7 +45,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const speedNow = grant.tags.includes(HASTED_TAG) ? (currentSpeedFeet(recipient, derivation) ?? 0) : 0;
   const hasteSpeed: Modifier[] = speedNow > 0 ? [{ type: "speed", amount: Math.min(60, speedNow) }] : [];
   // Hex: "choose one ability. The target has Disadvantage on ability checks made with the chosen ability."
-  const hexed = grant.tags.includes(HEXED_TAG);
+  const hexed = grant.tags.includes(CHOSEN_ABILITY_TAG);
   const hexAbility = hexed ? (input.ability ?? null) : null;
   if (hexed && hexAbility === null)
     warnings.push(`Hex on ${recipient.name}: no ability was chosen, so its checks have no Disadvantage.`);

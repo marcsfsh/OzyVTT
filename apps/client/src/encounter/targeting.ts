@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type {
+  AbilityId,
   ActionResolution,
   AnnotationPoint,
   AnnotationShapeKind,
@@ -24,7 +25,8 @@ export type TargetingTemplate = Readonly<{
 export type TargetingSession = Readonly<{
   action: ContentActionSummary;
   attackerId: string;
-  mode: "single" | "multi" | "template";
+  /** "none": no target to pick (Search, Study), only the skill it is made with. */
+  mode: "single" | "multi" | "template" | "none";
   selected: readonly string[];
   template: TargetingTemplate | null;
   /** The spell slot a spell is cast with, sent with every resolve of this session. */
@@ -33,6 +35,10 @@ export type TargetingSession = Readonly<{
   darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
   /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
   damageType?: NonNullable<ContentActionSummary["damageTypes"]>[number];
+  /** The skill a check action is made with (Search, Influence); absent, Escape a Grapple uses the better one. */
+  skill?: string;
+  /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
+  ability?: AbilityId;
 }>;
 
 let session: TargetingSession | null = null;
@@ -69,9 +75,12 @@ export function beginTargeting(
 ) {
   const area = action.area;
   const dartTotal = dartsAtSlot ?? action.darts;
+  // A check action starts on its usual skill; Escape a Grapple starts on the better of its two, the server's pick.
+  const usualSkill = action.id === "escape-grapple" ? undefined : action.checkSkills?.[0]?.id;
   const slot = {
     ...(slotLevel !== undefined ? { slotLevel } : {}),
-    ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {})
+    ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {}),
+    ...(usualSkill !== undefined ? { skill: usualSkill } : {})
   };
   if (area) {
     // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
@@ -91,7 +100,12 @@ export function beginTargeting(
     session = {
       action,
       attackerId,
-      mode: action.attackBonus !== null || action.targeting === "single" ? "single" : "multi",
+      mode:
+        action.attackBonus !== null || action.targeting === "single"
+          ? "single"
+          : action.targeting === "none"
+            ? "none"
+            : "multi",
       selected: [],
       template: null,
       ...slot
@@ -102,7 +116,7 @@ export function beginTargeting(
   emit();
 }
 export function toggleTarget(actorId: string) {
-  if (!session || session.mode === "template") return;
+  if (!session || session.mode === "template" || session.mode === "none") return;
   const dropping = session.selected.includes(actorId);
   session =
     session.mode === "single"
@@ -123,6 +137,28 @@ export function setDamageType(damageType: string) {
   if (!session || picked === undefined) return;
   session = { ...session, damageType: picked };
   emit();
+}
+/** Picks the skill a check action is made with; undefined lets Escape a Grapple use the better one. */
+export function setCheckSkill(skill: string | undefined) {
+  if (!session) return;
+  if (skill !== undefined && !session.action.checkSkills?.some((entry) => entry.id === skill)) return;
+  const { skill: _previous, ...rest } = session;
+  session = skill === undefined ? rest : { ...rest, skill };
+  emit();
+}
+/** Picks the ability a cast chooses (Hex). */
+export function setChosenAbility(ability: AbilityId) {
+  if (!session?.action.choosesAbility) return;
+  session = { ...session, ability };
+  emit();
+}
+/** Whether the session has what its Roll needs: its targets or placed area, and a chosen ability for a cast that takes
+ *  one. */
+export function targetingReady(picking: TargetingSession): boolean {
+  if (picking.action.choosesAbility && picking.ability === undefined) return false;
+  if (picking.mode === "template") return Boolean(picking.template?.placed);
+  if (picking.mode === "none") return true;
+  return picking.selected.length > 0;
 }
 /** Sets how many darts a selected target takes, within the darts the action has left to assign. */
 export function setTargetDarts(actorId: string, count: number) {
@@ -188,7 +224,7 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template, slotLevel, darts, damageType } = session;
+  const { attackerId, action, mode, selected, template, slotLevel, darts, damageType, skill, ability } = session;
   // A single-target attack previews first (commit: false) so the result card can offer Confirm, and the
   // server holds the die for it. Templates, multi-target and save/utility actions resolve straight
   // through. An explicit `commit` in opts wins (the Confirm tap).
@@ -203,22 +239,26 @@ export function resolveTargeting(
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(damageType !== undefined ? { damageType } : {}),
+    ...(skill !== undefined ? { skill } : {}),
+    ...(ability !== undefined ? { ability } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };
   const payload =
-    mode === "template"
-      ? template?.placed
-        ? {
-            actorId: attackerId,
-            actionId: action.id,
-            template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
-            ...extra
-          }
-        : null
-      : selected.length > 0
-        ? { actorId: attackerId, actionId: action.id, targetIds: dartTargetIds(selected, darts), ...extra }
-        : null;
+    mode === "none"
+      ? { actorId: attackerId, actionId: action.id, ...extra }
+      : mode === "template"
+        ? template?.placed
+          ? {
+              actorId: attackerId,
+              actionId: action.id,
+              template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
+              ...extra
+            }
+          : null
+        : selected.length > 0
+          ? { actorId: attackerId, actionId: action.id, targetIds: dartTargetIds(selected, darts), ...extra }
+          : null;
   if (!payload) return;
   busy = true;
   blockedPrompt = null;

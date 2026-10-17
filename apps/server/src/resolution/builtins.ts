@@ -47,10 +47,22 @@ function rollCheck(ctx: ResolveContext, subject: CheckSubject, dc: number | null
  *  Perception, Survival), Study's Intelligence (Arcana, History, Investigation, Nature, Religion), Influence's Charisma
  *  (Deception, Intimidation, Performance, Persuasion) or Wisdom (Animal Handling). */
 export const BUILTIN_CHECK_SKILLS: Readonly<Record<string, Readonly<Record<string, CheckSubject["ability"]>>>> = {
-  search: { insight: "wis", medicine: "wis", perception: "wis", survival: "wis" },
-  study: { arcana: "int", history: "int", investigation: "int", nature: "int", religion: "int" },
-  influence: { deception: "cha", intimidation: "cha", performance: "cha", persuasion: "cha", "animal-handling": "wis" }
+  // The usual skill first: it is the one a picker offers before the roller chooses.
+  search: { perception: "wis", insight: "wis", medicine: "wis", survival: "wis" },
+  study: { investigation: "int", arcana: "int", history: "int", nature: "int", religion: "int" },
+  influence: { persuasion: "cha", deception: "cha", intimidation: "cha", performance: "cha", "animal-handling": "wis" }
 };
+
+/** The skills a builtin check action lets its roller pick, the usual one first: Search, Study and Influence's, and
+ *  Escape a Grapple's two. Empty for any other action. */
+export function builtinCheckSkills(actionId: string): Array<{ id: string; ability: CheckSubject["ability"] }> {
+  if (actionId === "escape-grapple")
+    return [
+      { id: "athletics", ability: "str" },
+      { id: "acrobatics", ability: "dex" }
+    ];
+  return Object.entries(BUILTIN_CHECK_SKILLS[actionId] ?? {}).map(([id, ability]) => ({ id, ability }));
+}
 
 /** The check a Search, Study or Influence makes: the chosen skill with its ability, or the action's own ability alone
  *  when no skill fits (the SRD tables only suggest skills). */

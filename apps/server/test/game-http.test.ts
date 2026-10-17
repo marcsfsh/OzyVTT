@@ -484,6 +484,28 @@ describe("public game API over /api/v1", () => {
       headers: bearer(reader.token)
     });
     expect(actions.status).toBe(200);
+    // The SRD's check actions offer the skills they are made with, the usual one first; Influence picks its target.
+    const rows = (await actions.json()).data.actions as ReadonlyArray<{
+      id: string;
+      targeting?: string;
+      checkSkills?: ReadonlyArray<{ id: string; ability: string }>;
+    }>;
+    const row = (id: string) => rows.find((entry) => entry.id === id);
+    expect(row("search")?.checkSkills?.[0]).toEqual({ id: "perception", ability: "wis" });
+    expect(row("study")?.checkSkills?.map((skill) => skill.id)).toEqual([
+      "investigation",
+      "arcana",
+      "history",
+      "nature",
+      "religion"
+    ]);
+    expect(row("influence")?.targeting).toBe("single");
+    expect(row("influence")?.checkSkills).toContainEqual({ id: "animal-handling", ability: "wis" });
+    expect(row("escape-grapple")?.checkSkills).toEqual([
+      { id: "athletics", ability: "str" },
+      { id: "acrobatics", ability: "dex" }
+    ]);
+    expect(row("dodge")?.checkSkills).toBeUndefined();
     const missing = await fetch(base + CONTENT_PATHS.monsterById.replace("{definitionId}", "no-such-monster"), {
       headers: bearer(reader.token)
     });

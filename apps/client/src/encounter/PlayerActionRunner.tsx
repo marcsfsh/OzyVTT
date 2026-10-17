@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
 import { ActionResultHead, HealingOutcome } from "./ActionResultHead";
 import { ActionRow } from "./ActionRow";
 import { ActionTargetPicker } from "./ActionTargetPicker";
@@ -49,6 +49,7 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     reaction: action.reaction ?? null,
     ...(action.darts !== undefined ? { darts: action.darts } : {}),
     ...(action.damageTypes !== undefined ? { damageTypes: [...action.damageTypes] } : {}),
+    ...(choosesAbility(action) ? { choosesAbility: true } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
