@@ -604,7 +604,7 @@ export function CharacterSheet({
       {!definition && role === "gm" && definitionId && !unloaded && <p className="sheet-status">Loading stat block…</p>}
       {actor.kind === "player-character" && !definitionId && (
         <p className="sheet-status">
-          No imported sheet yet - the GM can import this character's JSON sheet from the roster.
+          No imported sheet yet. The GM can import this character's JSON sheet from the roster.
         </p>
       )}
     </div>

@@ -151,7 +151,7 @@ export function SheetProficiencies({
                     disabled={busy}
                     onClick={() => cycleSkill(skill.id)}
                   >
-                    {tier ?? "—"}
+                    {tier ?? "none"}
                   </button>
                 </li>
               );
@@ -211,7 +211,7 @@ export function SheetProficiencies({
                       className="sheet-roll-chip"
                       title={`${skill.name} names no governing ability, so it has no rollable bonus`}
                     >
-                      —
+                      None
                     </span>
                   ) : (
                     <button

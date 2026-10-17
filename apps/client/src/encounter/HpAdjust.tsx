@@ -13,7 +13,7 @@ const LABELS: Record<HpControl, { label: string; title?: string }> = {
   damage: { label: "Dmg", title: "Apply as damage (or press Enter)" },
   nonlethal: {
     label: "KO",
-    title: "Nonlethal damage - a drop to 0 knocks out (Unconscious and stable) instead of dying"
+    title: "Nonlethal damage: a drop to 0 HP knocks the target out, Unconscious and stable"
   },
   heal: { label: "Heal" },
   temp: { label: "Temp", title: "Set temporary hit points" },

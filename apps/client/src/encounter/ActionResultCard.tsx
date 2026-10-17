@@ -142,8 +142,8 @@ export function ActionResultCard({
           return (
             <p className="action-damage">
               Damage: <strong>{overriding ? typed : result.damageTotal}</strong>
-              {overriding ? ` (manual - rolled ${result.damageTotal})` : ` (${breakdown})`}
-              {!overriding && result.crit ? " - crit dice doubled" : ""}
+              {overriding ? ` (manual · rolled ${result.damageTotal})` : ` (${breakdown})`}
+              {!overriding && result.crit ? " · crit dice doubled" : ""}
             </p>
           );
         })()}

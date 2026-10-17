@@ -78,7 +78,7 @@ function InitiativeScore({
       type="button"
       className="initiative-score-value tap-target"
       disabled={busy}
-      title="Initiative - click to edit"
+      title="Edit initiative"
       onClick={() => {
         setEditScore(String(score));
         setEditing(true);
@@ -150,7 +150,7 @@ export function GmInitiativeRow({
           className="initiative-expand"
           aria-expanded={expanded}
           title={
-            expanded ? "Close" : `Manage ${actor?.name ?? "this token"} - HP, conditions, effects, reaction, sheet`
+            expanded ? "Close" : `Manage ${actor?.name ?? "this token"} · HP, conditions, effects, reaction, sheet`
           }
           onClick={onToggleExpanded}
         >

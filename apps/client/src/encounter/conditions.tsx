@@ -169,7 +169,7 @@ export function ConditionEditor({
     }).then((result) => {
       setBusy(false);
       if (!result.ok) onFeedback(result.message ?? "That question could not be sent.");
-      else onFeedback(result.ran ? "Done - no question needed." : "Asked the GM. Waiting for their call.");
+      else onFeedback(result.ran ? "Done. No question was needed." : "Asked the GM. Waiting for their call.");
     });
   };
 

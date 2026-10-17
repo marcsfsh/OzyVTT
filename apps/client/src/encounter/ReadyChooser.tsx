@@ -65,9 +65,9 @@ export function ReadyChooser({
       {picked ? (
         <>
           <p className="spell-choice-ask">
-            {picked.name} is cast now{picked.spellSlot ? ", spending its spell slot," : ""} and held with Concentration
-            until the start of your next turn. When the trigger happens, cast it from your spell list to release it with
-            your Reaction.
+            {picked.name} is cast now{picked.spellSlot ? " with its spell slot" : ""} and held with Concentration until
+            the start of your next turn. When the trigger happens, cast it from your spell list to release it with your
+            Reaction.
           </p>
           {levels.length > 1 && (
             <div className="heal-picker-targets" role="group" aria-label="Spell slot level">

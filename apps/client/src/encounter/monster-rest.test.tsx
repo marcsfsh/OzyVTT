@@ -45,8 +45,8 @@ describe("a monster's sheet", () => {
       </ToastProvider>
     );
     const rest = screen.getByRole("group", { name: "Rest" });
-    expect(within(rest).getByRole("button", { name: "Short rest" })).toBeTruthy();
-    expect(within(rest).getByRole("button", { name: "Long rest" })).toBeTruthy();
+    expect(within(rest).getByRole("button", { name: "Short Rest" })).toBeTruthy();
+    expect(within(rest).getByRole("button", { name: "Long Rest" })).toBeTruthy();
     expect(screen.queryByRole("group", { name: "Spend Hit Dice" })).toBeNull();
   });
 });

@@ -68,7 +68,7 @@ describe("a pool spent by any amount", () => {
     );
     const row = screen.getByRole("listitem");
     expect(within(row).getByText("Lay on Hands")).toBeTruthy();
-    expect(within(row).getByText("18/25 · long rest")).toBeTruthy();
+    expect(within(row).getByText("18/25 · Long Rest")).toBeTruthy();
     expect(within(row).queryByRole("button", { name: "Give back" })).toBeNull();
     await user.click(within(row).getByRole("button", { name: "Increase" }));
     await user.click(within(row).getByRole("button", { name: "Increase" }));

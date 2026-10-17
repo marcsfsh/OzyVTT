@@ -61,7 +61,7 @@ describe("the extras a previewed hit offers", () => {
     const resolve = mount([SNEAK, SMITE, STRIKE]);
     fireEvent.click(screen.getByRole("button", { name: "Sneak Attack +3d6 Piercing" }));
     fireEvent.click(screen.getByRole("button", { name: "Divine Smite +2d8 Radiant" }));
-    fireEvent.click(screen.getByRole("button", { name: "2nd slot" }));
+    fireEvent.click(screen.getByRole("button", { name: "Level 2 slot" }));
     fireEvent.click(screen.getByRole("button", { name: "Divine Strike +1d8 Radiant or Necrotic" }));
     fireEvent.click(screen.getByRole("button", { name: "Necrotic" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));

@@ -147,7 +147,7 @@ export function SavePrompt({
         return;
       }
       onFeedback(
-        `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc})${outcome.appliedDamage > 0 ? ` - ${outcome.appliedDamage} damage applied` : ""}${outcome.conditionApplied ? " - condition applied" : ""}.`
+        `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc}).${outcome.appliedDamage > 0 ? ` ${targetName} took ${outcome.appliedDamage} damage.` : ""}${outcome.conditionApplied ? " The condition is applied." : ""}`
       );
     });
   };
@@ -271,8 +271,8 @@ export function SavePrompt({
             arithmetic. While a recheck is out, show only what was typed. */}
               <span className="save-prompt-effect">
                 {stale
-                  ? `Amended to ${proposal}${recheck === "failed" ? "" : " - checking"}`
-                  : `${rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}${rolled.condition ? " + condition" : ""}${rolled.basis !== save.proposedDamage ? ` (amended - rolled ${save.proposedDamage})` : ""}`}
+                  ? `Amended to ${proposal}${recheck === "failed" ? "" : " · checking"}`
+                  : `${rolled.damage > 0 ? `${rolled.damage} dmg` : "no damage"}${rolled.condition ? " + condition" : ""}${rolled.basis !== save.proposedDamage ? ` (amended · rolled ${save.proposedDamage})` : ""}`}
               </span>
               {!stale && rolled.defences && <span className="save-prompt-defences">{rolled.defences}</span>}
             </>

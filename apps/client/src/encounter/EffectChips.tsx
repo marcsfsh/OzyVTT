@@ -114,7 +114,7 @@ export function EffectChips({
       (result) => {
         setBusy(false);
         if (!result.ok) onFeedback(result.message ?? "That question could not be sent.");
-        else onFeedback(result.ran ? "Done - no question needed." : "Asked the GM. Waiting for their call.");
+        else onFeedback(result.ran ? "Done. No question was needed." : "Asked the GM. Waiting for their call.");
       }
     );
   };
@@ -128,7 +128,7 @@ export function EffectChips({
             pressed={shown === effect.id}
             aria-expanded={shown === effect.id}
             disabled={busy}
-            title={`${effect.name}${effect.sourceName ? ` - from ${effect.sourceName}` : ""} · ${effectDurationLabel(effect)}`}
+            title={`${effect.name}${effect.sourceName ? ` · from ${effect.sourceName}` : ""} · ${effectDurationLabel(effect)}`}
             onClick={() => setShown((current) => (current === effect.id ? null : effect.id))}
           >
             {effect.name}

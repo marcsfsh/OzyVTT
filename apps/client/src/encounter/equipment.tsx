@@ -230,8 +230,8 @@ export function ScrollSpellPicker({
   return (
     <>
       <p className="sheet-picker-empty">
-        A Spell Scroll bears one spell. Pick it - a reader whose spell list has it can cast it once, and the scroll
-        crumbles.
+        A Spell Scroll bears one spell. Pick it here. A reader whose spell list has it can cast it once, and then the
+        scroll crumbles.
       </p>
       <div className="sheet-picker-controls">
         <Input
@@ -340,7 +340,7 @@ export function BindItemModal({
       onClose={onClose}
       size="lg"
       accent="cyan"
-      title={`${template.name} — what is it?`}
+      title={`Choose what ${template.name} is`}
       ariaLabel={`Choose which ${template.category} ${template.name} is`}
     >
       <p className="sheet-picker-empty">
@@ -444,7 +444,7 @@ export function EquipmentPicker({
         onClose={onClose}
         size="lg"
         accent="cyan"
-        title={`${choosing.name} — what is it?`}
+        title={`Choose what ${choosing.name} is`}
         ariaLabel={`Choose which ${choosing.category} ${choosing.name} is`}
       >
         <p className="sheet-picker-empty">

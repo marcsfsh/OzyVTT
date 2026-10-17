@@ -35,9 +35,9 @@ function ShortRestCard({ actor, done }: Readonly<{ actor: PlayerActor; done: boo
     });
   };
   return (
-    <section className="short-rest-prompt" aria-label={`Short rest for ${actor.name}`}>
+    <section className="short-rest-prompt" aria-label={`Short Rest for ${actor.name}`}>
       <p className="short-rest-prompt-label">
-        <strong>Short rest</strong> · {actor.name}
+        <strong>Short Rest</strong> · {actor.name}
         {hp && ` · ${hp}`}
       </p>
       <p className="short-rest-prompt-hint">

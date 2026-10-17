@@ -20,19 +20,19 @@ export function HitDiceSpender({
       setBusy(false);
       onFeedback(
         result.ok
-          ? `Spent ${chosen} Hit ${chosen === 1 ? "Die" : "Dice"} - the heal is in the dice log.`
+          ? `Spent ${chosen} Hit ${chosen === 1 ? "Die" : "Dice"}. The heal is in the dice log.`
           : (result.message ?? "The Hit Dice could not be spent.")
       );
       if (result.ok) setCount(1);
     });
   };
   if (hitDice.remaining === 0)
-    return <span className="sheet-rest-pool empty">Hit Dice 0/{hitDice.maximum} · a long rest restores them.</span>;
+    return <span className="sheet-rest-pool empty">Hit Dice 0/{hitDice.maximum} · a Long Rest restores them.</span>;
   return (
     <div className="sheet-rest-dice" role="group" aria-label="Spend Hit Dice">
       <span
         className="sheet-rest-pool"
-        title="Hit Point Dice - spend on a short rest; each die heals its roll plus your Constitution modifier (minimum 1)."
+        title="Hit Point Dice. Spend them on a Short Rest. Each die heals its roll plus your Constitution modifier (minimum 1)."
       >
         Hit Dice {hitDice.remaining}/{hitDice.maximum} ({hitDice.die})
       </span>
@@ -85,8 +85,8 @@ export function SheetRest({
       onFeedback(
         result.ok
           ? withdraw
-            ? "You took back your long rest request."
-            : "Asked the GM for a long rest."
+            ? "You took back your Long Rest request."
+            : "Asked the GM for a Long Rest."
           : (result.message ?? "The request could not be sent.")
       );
     });
@@ -101,7 +101,7 @@ export function SheetRest({
           title="Re-arms short-rest and recharge pools; heal by spending Hit Dice."
           onClick={() => rest("short")}
         >
-          Short rest
+          Short Rest
         </Button>
         {role === "gm" ? (
           <Button
@@ -110,11 +110,11 @@ export function SheetRest({
             title="Full HP, all spell slots and Hit Dice restored, prepared spells reset, one less Exhaustion level."
             onClick={() => rest("long")}
           >
-            Long rest
+            Long Rest
           </Button>
         ) : asked ? (
           <>
-            <span className="sheet-rest-asked">Long rest asked</span>
+            <span className="sheet-rest-asked">Long Rest asked</span>
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => ask(true)}>
               Take back
             </Button>
@@ -126,7 +126,7 @@ export function SheetRest({
             title="The GM approves it: full HP, all spell slots and Hit Dice back, one less Exhaustion level."
             onClick={() => ask(false)}
           >
-            Ask for a long rest
+            Ask for a Long Rest
           </Button>
         )}
       </div>

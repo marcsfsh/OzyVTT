@@ -13,7 +13,7 @@ import { cantripTierAt } from "@vtt/content-srd-5.2.1/schemas";
 import { spellAttackBonus, spellSaveDc } from "@vtt/rules-5e";
 import { SpellCard, useSpellReference } from "./spells";
 import { SpellbookModal, SpellSwapModal, type CopyableScroll } from "./SpellChoiceModals";
-import { ordinal, signed, titleCase } from "./format";
+import { signed, titleCase } from "./format";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
 
@@ -157,7 +157,7 @@ function SpellCastControls({
         >
           {options.map((slot) => (
             <option key={slot} value={slot} disabled={policeSlots && remainingAt(slot) === 0}>
-              {ordinal(slot)} · {remainingAt(slot)}/{maxAt(slot)}
+              Level {slot} · {remainingAt(slot)}/{maxAt(slot)}
               {atPact(slot) ? " · pact" : ""}
               {slot > spell.level ? " · upcast" : ""}
             </option>
@@ -502,7 +502,7 @@ export function SheetSpells({
         )}
         {pact && pact.max > 0 && (
           <div className="sheet-spell-group-head">
-            <h4>Pact Magic · {ordinal(pact.level)} level</h4>
+            <h4>Pact Magic · level {pact.level}</h4>
             <SlotPips
               label="Pact Magic slots"
               pipLabel="a Pact Magic slot"
@@ -532,7 +532,7 @@ export function SheetSpells({
               return (
                 <div key={level} className="sheet-spell-group">
                   <div className="sheet-spell-group-head">
-                    <h4>{level === 0 ? "Cantrips" : `${ordinal(level)} Level`}</h4>
+                    <h4>{level === 0 ? "Cantrips" : `Level ${level}`}</h4>
                     {level > 0 && max > 0 && (
                       <SlotPips
                         label={`Level ${level} spell slots`}
@@ -559,10 +559,10 @@ export function SheetSpells({
                               disabled={busy || !canPrepare}
                               title={
                                 !canPrepare
-                                  ? `${isPrepared ? "Prepared" : "Not prepared"} - change it after a Long Rest`
+                                  ? `${isPrepared ? "Prepared" : "Not prepared"} · change it after a Long Rest`
                                   : isPrepared
-                                    ? "Prepared - tap to unprepare"
-                                    : "Not prepared - tap to prepare"
+                                    ? "Prepared · tap to unprepare"
+                                    : "Not prepared · tap to prepare"
                               }
                               onClick={() => {
                                 void edit("character:set-prepared", {
@@ -577,7 +577,7 @@ export function SheetSpells({
                           ) : (
                             <span
                               className="sheet-prep-tag always"
-                              title="Always prepared — doesn't count against your prepared limit"
+                              title="Always prepared · doesn't count against your prepared limit"
                             >
                               Always
                             </span>

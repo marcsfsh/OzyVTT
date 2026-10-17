@@ -64,9 +64,9 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
         : (actor.actionUses[key] ?? 0);
     if (spent >= action.usesLimit)
       return action.usesPer === "recharge"
-        ? `Spent - recharges on ${action.usesRecharge}+ at its turn start`
+        ? `Spent · recharges on ${action.usesRecharge}+ at its turn start`
         : action.usesPer === "own-turn"
-          ? "Spent - back at its next turn"
+          ? "Spent · back at its next turn"
           : "No uses left";
   }
   const myTurn = state.combat.turnActorId === actor.id;
@@ -78,8 +78,8 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
     bonusOpen && !action.multiattack
       ? (bonusOpen[action.id] ?? 0) + (action.attackBonus !== null ? (bonusOpen["attack"] ?? 0) : 0)
       : 0;
-  if (fromBonus > 0) return `${fromBonus} left from the bonus action`;
-  if (action.activation === "bonus-action" && turn.bonusActionUsed) return "Bonus action used";
+  if (fromBonus > 0) return `${fromBonus} left from the Bonus Action`;
+  if (action.activation === "bonus-action" && turn.bonusActionUsed) return "Bonus Action used";
   if (action.activation === "action" && turn.actionUsed) {
     // Action Surge or Haste left another action; the server says which actions it can take.
     const extra = turn.extraActions?.actorId === actor.id ? turn.extraActions : undefined;

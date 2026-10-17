@@ -23,7 +23,7 @@ function restNote(state: GmView, actor: GmActor): string | null {
   const blocked = blockedNote(state, actor);
   if (blocked) return blocked;
   const wait = longRestWait(actor.lastLongRestAt ?? null, state.rest?.clockHours ?? 0);
-  return wait > 0 ? `Long rest in ${wait} h` : null;
+  return wait > 0 ? `Long Rest in ${wait} h` : null;
 }
 
 /**
@@ -76,13 +76,13 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
     send(
       () => command("rest:party", { kind, actorIds: picked.map((actor) => actor.id) }),
       kind === "long"
-        ? "The party finished a long rest. 8 hours passed."
-        : "The short rest is open on each player's device.",
+        ? "The party finished a Long Rest. 8 hours passed."
+        : "The Short Rest is open on each player's device.",
       kind === "long"
     );
   const unclaimed = shortRest?.actorIds.some((actorId) => !byId(actorId)?.ownerSessionId) ?? false;
 
-  const label = shortRest ? "Short rest open" : "Rest";
+  const label = shortRest ? "Short Rest open" : "Rest";
   return (
     <>
       <Button className="party-rest-open" onClick={openDialog} aria-haspopup="dialog">
@@ -105,7 +105,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                 variant="ghost"
                 disabled={busy}
                 onClick={() =>
-                  void send(() => command("rest:finish", { apply: false }), "The short rest was called off.", true)
+                  void send(() => command("rest:finish", { apply: false }), "The Short Rest was called off.", true)
                 }
               >
                 Call off
@@ -116,21 +116,21 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                 onClick={() =>
                   void send(
                     () => command("rest:finish", { apply: true }),
-                    "The short rest is over. An hour passed.",
+                    "The Short Rest is over. An hour passed.",
                     true
                   )
                 }
               >
-                Finish short rest
+                Finish Short Rest
               </Button>
             </>
           ) : (
             <>
               <Button disabled={busy || picked.length === 0} onClick={() => void startRest("short")}>
-                Short rest
+                Short Rest
               </Button>
               <Button disabled={busy || picked.length === 0} onClick={() => void startRest("long")}>
-                Long rest
+                Long Rest
               </Button>
             </>
           )
@@ -167,14 +167,14 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               </Button>
             </div>
             <p className="party-rest-hint">
-              Time that passes here moves the Codex calendar too. A long rest can start 16 hours after a
+              Time that passes here moves the Codex calendar too. A Long Rest can start 16 hours after a
               character&apos;s last one ends.
             </p>
           </section>
 
           {requests.length > 0 && (
-            <section className="party-rest-section" aria-label="Long rest requests">
-              <span className="party-rest-heading">Asked for a long rest</span>
+            <section className="party-rest-section" aria-label="Long Rest requests">
+              <span className="party-rest-heading">Asked for a Long Rest</span>
               <ul className="party-rest-list">
                 {requests.map((actor) => (
                   <li key={actor.id} className="party-rest-request">
@@ -186,7 +186,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                         onClick={() =>
                           void send(
                             () => command("rest:answer", { actorId: actor.id, approve: true }),
-                            `${actor.name} finished a long rest.`
+                            `${actor.name} finished a Long Rest.`
                           )
                         }
                       >
@@ -198,7 +198,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                         onClick={() =>
                           void send(
                             () => command("rest:answer", { actorId: actor.id, approve: false }),
-                            `Turned down ${actor.name}'s long rest.`
+                            `Turned down ${actor.name}'s Long Rest.`
                           )
                         }
                       >
@@ -212,8 +212,8 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
           )}
 
           {shortRest ? (
-            <section className="party-rest-section" aria-label="Short rest under way">
-              <span className="party-rest-heading">Short rest under way</span>
+            <section className="party-rest-section" aria-label="Short Rest under way">
+              <span className="party-rest-heading">Short Rest under way</span>
               <ul className="party-rest-list">
                 {shortRest.actorIds.map((actorId) => {
                   const actor = byId(actorId);
@@ -267,7 +267,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                 </ul>
               )}
               <p className="party-rest-hint">
-                A long rest happens at once and passes 8 hours. A short rest opens on each player&apos;s device.
+                A Long Rest happens at once and passes 8 hours. A Short Rest opens on each player&apos;s device.
               </p>
             </section>
           )}

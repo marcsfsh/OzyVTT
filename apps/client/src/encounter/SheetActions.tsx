@@ -4,7 +4,7 @@ import { abilityModifier as modifierOf, weaponAbilityModifierFrom } from "@vtt/r
 import { usesScopeLabel } from "./action-summary";
 import { PlayerActionRunner } from "./PlayerActionRunner";
 import { RichText } from "./RichText";
-import { ordinal, signed } from "./format";
+import { signed } from "./format";
 import { sameName } from "./sheet-names";
 import type { SheetRolls } from "./useSheetRolls";
 
@@ -350,7 +350,7 @@ export function SheetActions({
                   .sort((left, right) => left - right)
                   .map((level) => (
                     <div key={level} className="sheet-action-subgroup">
-                      <h5 className="sheet-action-subhead">{level === 0 ? "Cantrips" : `${ordinal(level)} Level`}</h5>
+                      <h5 className="sheet-action-subhead">{level === 0 ? "Cantrips" : `Level ${level}`}</h5>
                       {spellGroups.get(level)!.map(renderAction)}
                     </div>
                   ))}

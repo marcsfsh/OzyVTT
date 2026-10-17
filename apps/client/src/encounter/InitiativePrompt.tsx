@@ -34,7 +34,7 @@ export function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
     <div className="save-prompt initiative-prompt" role="group" aria-label="Roll your initiative">
       <p className="save-prompt-label">
         <strong>Roll for initiative</strong>
-        {rollInput === "manual" && " - with Advantage or Disadvantage, roll two d20s and type the one that counts."}
+        {rollInput === "manual" && ". With Advantage or Disadvantage, roll two d20s and type the one that counts."}
       </p>
       {rollInput === "manual" ? (
         <span className="save-prompt-actions">

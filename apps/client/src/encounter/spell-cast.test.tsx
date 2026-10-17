@@ -212,7 +212,7 @@ describe("a Warlock's Pact Magic on the sheet", () => {
 
   it("casts a spell with a pact slot at the pact level, through its action or from the pool", () => {
     const { castSpellAction, edit } = mountWarlock();
-    expect(screen.getAllByRole("option", { name: "3rd · 1/2 · pact · upcast" }).length).toBe(2);
+    expect(screen.getAllByRole("option", { name: "Level 3 · 1/2 · pact · upcast" }).length).toBe(2);
     const casts = screen.getAllByRole("button", { name: "Cast" });
     fireEvent.click(casts[0]);
     expect(castSpellAction).toHaveBeenLastCalledWith("spell-hex", 3);

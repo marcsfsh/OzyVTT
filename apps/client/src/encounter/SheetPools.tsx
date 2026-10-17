@@ -6,8 +6,8 @@ import { command } from "../lib/command";
 type Pool = Readonly<{ id: string; name: string; limit: number; per: string }>;
 
 const PER_LABELS: Readonly<Record<string, string>> = {
-  "long-rest": "long rest",
-  "short-rest": "short rest",
+  "long-rest": "Long Rest",
+  "short-rest": "Short Rest",
   encounter: "fight",
   recharge: "recharge"
 };

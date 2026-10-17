@@ -81,7 +81,6 @@ export function PushChoice({
   );
 }
 
-const ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
 const titled = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
 /**
@@ -160,7 +159,7 @@ export function HitOfferChoices({
                     disabled={busy}
                     onClick={() => update(offer.id, { slotLevel: level })}
                   >
-                    {ORDINALS[level] ?? level} slot
+                    Level {level} slot
                   </button>
                 ))}
               </span>

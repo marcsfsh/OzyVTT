@@ -203,7 +203,7 @@ export function ActingConsole({
                         used: !state.combat.turn.bonusActionUsed,
                         expectedRevision: state.revision
                       }),
-                    state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent."
+                    state.combat.turn.bonusActionUsed ? "Bonus Action restored." : "Bonus Action spent."
                   )
                 }
               >

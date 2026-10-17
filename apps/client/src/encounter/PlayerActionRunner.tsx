@@ -352,7 +352,7 @@ export function PlayerActionRunner({
           )}
           {result.save && (
             <p className="action-outcome">
-              Each target: DC {result.save.dc} {result.save.ability.toUpperCase()} save - the GM answers these.
+              Each target makes a DC {result.save.dc} {result.save.ability.toUpperCase()} save. The GM answers these.
             </p>
           )}
           {result.waitingOnReaction && result.attack && (
@@ -373,7 +373,7 @@ export function PlayerActionRunner({
                 <p className="action-damage">
                   Damage: <strong>{result.damageTotal}</strong>
                   {breakdown ? ` (${breakdown})` : ""}
-                  {result.crit ? " - crit dice doubled" : ""}
+                  {result.crit ? " · crit dice doubled" : ""}
                 </p>
               );
             })()}

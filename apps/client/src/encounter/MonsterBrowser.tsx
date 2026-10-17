@@ -165,11 +165,7 @@ export function MonsterBrowser({
             <option value="cr-down">Highest CR first</option>
           </Select>
         </div>
-        <Switch
-          label="Roll hit points instead of using the average"
-          checked={rollHitPoints}
-          onChange={setRollHitPoints}
-        />
+        <Switch label="Roll hit points (off uses the average)" checked={rollHitPoints} onChange={setRollHitPoints} />
         <p className="monster-browser-target">
           Adds land in the staging tray · <strong>{visibility === "gm-only" ? "GM only" : "Shown to players"}</strong>
         </p>

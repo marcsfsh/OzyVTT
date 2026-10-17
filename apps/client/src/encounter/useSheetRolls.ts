@@ -18,7 +18,7 @@ const ABILITY_WORDS: Readonly<Record<AbilityId, string>> = {
 
 /** A check's result as the sheet says it: the total, the d20, and whatever changed how it was rolled. */
 export function checkLine(outcome: CheckRollOutcome): string {
-  const verdict = outcome.success === null ? "" : ` vs DC ${outcome.dc} - ${outcome.success ? "success" : "failure"}`;
+  const verdict = outcome.success === null ? "" : ` vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}`;
   const talent = outcome.reliableTalent ? " · Reliable Talent" : "";
   return `${outcome.label}: ${outcome.total} (d20 ${outcome.natural}${outcome.typed ? ", typed" : ""})${verdict}${modeWords(outcome.rollMode)}${talent}.`;
 }
@@ -126,7 +126,7 @@ export function useSheetRolls(actorId: string, onFeedback: (text: string) => voi
       return;
     }
     // An owed save was answered: it had a DC and its outcome has landed.
-    const verdict = "dc" in outcome ? ` vs DC ${outcome.dc} - ${outcome.success ? "success" : "failure"}` : "";
+    const verdict = "dc" in outcome ? ` vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}` : "";
     const natural = outcome.natural !== undefined ? ` (d20 ${outcome.natural})` : "";
     onFeedback(`${name}: ${outcome.total}${natural}${verdict}${modeWords(outcome.rollMode)}.`);
   };
@@ -137,7 +137,9 @@ export function useSheetRolls(actorId: string, onFeedback: (text: string) => voi
     void command("dice:roll", { formula, purpose, visibility, label: label.slice(0, 80), actorId }).then((result) => {
       setRolling(false);
       onFeedback(
-        result.ok ? `Rolled ${label} (${formula}) - see the dice log.` : (result.message ?? "The roll was rejected.")
+        result.ok
+          ? `Rolled ${label} (${formula}). The result is in the dice log.`
+          : (result.message ?? "The roll was rejected.")
       );
     });
   };

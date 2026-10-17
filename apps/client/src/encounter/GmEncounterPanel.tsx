@@ -258,7 +258,7 @@ export function GmEncounterPanel({
   const quickStartMapId =
     pickedMap?.id ?? state.combat.mapAssetId ?? (selectedMap?.kind === "battlemap" ? selectedMap.id : null);
   const panelMapName = sceneLive
-    ? (nameOf(state.combat.mapAssetId) ?? "the live scene’s map")
+    ? (nameOf(state.combat.mapAssetId) ?? "the live scene's map")
     : (pickedMap?.name ?? nameOf(quickStartMapId) ?? (selectedMap?.kind === "battlemap" ? selectedMap.name : null));
   const readyToStart =
     stagedIds.length > 0 && (sceneLive ? state.combat.mapAssetId !== null : quickStartMapId !== null);
@@ -339,7 +339,7 @@ export function GmEncounterPanel({
             />
             {stagedIds.length > 0 && (
               <fieldset className="encounter-surprise">
-                <legend>Surprised? They roll initiative at Disadvantage.</legend>
+                <legend>Pick who is Surprised. They roll initiative at Disadvantage.</legend>
                 <div className="encounter-surprise-chips">
                   {stagedIds.map((actorId) => (
                     <Chip
@@ -387,7 +387,7 @@ export function GmEncounterPanel({
           <strong>Reviewing {reviewing.label ?? "an earlier turn"}</strong>
           <span>
             {dirty
-              ? "You changed this turn. Next turn rewrites history from here, undoing everything after it. Previous discards the change."
+              ? "You changed this turn. Next turn rewrites history from here and undoes everything after it. Previous discards the change."
               : "The whole table is paused here. Step forward to resume live play. Nothing is undone until you change something."}
           </span>
         </div>

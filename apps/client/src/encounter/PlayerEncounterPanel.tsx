@@ -80,7 +80,7 @@ export function PlayerTurnEconomy({
   };
   const reactionUsed = combat.reactionsUsed.includes(myId);
   const giveBackLocked = (combat.ruleExceptions.economy ?? combat.rulesMode) !== "freeform";
-  const lockedTitle = "Spent - only the GM can give it back";
+  const lockedTitle = "Spent. Only the GM can give it back.";
   return (
     <div
       className={`turn-economy${unconscious ? " is-unconscious" : ""}`}
@@ -117,7 +117,7 @@ export function PlayerTurnEconomy({
                     slot: "bonus-action",
                     used: !combat.turn.bonusActionUsed
                   }),
-                "The bonus action could not be updated."
+                "The Bonus Action could not be updated."
               )
             }
           >

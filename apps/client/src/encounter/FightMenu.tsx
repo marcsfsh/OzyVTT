@@ -158,7 +158,7 @@ export function FightMenu({
         aria-expanded={menuOpen}
         aria-haspopup="menu"
         aria-label="Fight options"
-        title="Fight options - rules assistant, environment, roster, end"
+        title="Fight options · rules assistant, environment, roster, end"
         onClick={() => setMenuOpen((current) => !current)}
       >
         ⋯
@@ -351,7 +351,7 @@ export function FightMenu({
                                   actorId: actor.id,
                                   expectedRevision: state.revision
                                 }),
-                              `${actor.name} joined the fight - their token is in the staging tray.`
+                              `${actor.name} joined the fight. The token is in the staging tray.`
                             )
                           }
                         >

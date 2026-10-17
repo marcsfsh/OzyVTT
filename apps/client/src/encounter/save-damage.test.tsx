@@ -178,7 +178,7 @@ describe("the save prompt's damage field", () => {
     await user.clear(screen.getByLabelText(/Damage on a failure/));
     await user.type(screen.getByLabelText(/Damage on a failure/), "12");
     expect(screen.queryByText("8 dmg")).toBeNull();
-    expect(screen.getByText("Amended to 12 - checking")).toBeTruthy();
+    expect(screen.getByText("Amended to 12 · checking")).toBeTruthy();
 
     // The recheck is Confirm's payload with `commit: false`: the held die, so nothing is rolled or applied.
     expect(await nextAnswer(1)).toMatchObject({
@@ -191,7 +191,7 @@ describe("the save prompt's damage field", () => {
     // 4 is the server's answer for this save (see the mirror test). Neither 12 nor its half is 4, so the
     // line must be showing the server's number.
     ack({ total: 18, success: true, appliedDamage: 4 });
-    expect(await screen.findByText("4 dmg (amended - rolled 17)")).toBeTruthy();
+    expect(await screen.findByText("4 dmg (amended · rolled 17)")).toBeTruthy();
     expect(screen.queryByText(/^12 dmg/)).toBeNull();
     expect(screen.queryByText(/^6 dmg/)).toBeNull();
 
@@ -211,7 +211,7 @@ describe("the save prompt's damage field", () => {
     await user.type(screen.getByLabelText(/Damage on a failure/), "12");
     expect(await nextAnswer(1)).toMatchObject({ commit: false, damageOverride: 12 });
     ack({ total: 18, success: true, appliedDamage: 0 });
-    expect(await screen.findByText("no damage (amended - rolled 17)")).toBeTruthy();
+    expect(await screen.findByText("no damage (amended · rolled 17)")).toBeTruthy();
   });
 
   it("says what the target's defences did to the number it prints", async () => {
