@@ -5,7 +5,16 @@ import { MyCharacter } from "../actors/MyCharacter";
 import { useRecapBadge } from "../codex/useRecapBadge";
 import { lazySurface } from "../components/lazySurface";
 import { NotFoundPage } from "../components/NotFoundView";
-import { isGmOnlyPath, isKnownPath, lastLocationForTab, layerOf, navigate, useRoute, type Route } from "../router";
+import {
+  isGmOnlyPath,
+  isKnownPath,
+  lastLocationForTab,
+  layerOf,
+  litPlayerTab,
+  navigate,
+  useRoute,
+  type Route
+} from "../router";
 import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
 import type { Connection } from "./useSession";
@@ -14,17 +23,8 @@ const PlayerCodex = lazySurface(() => import("../codex/PlayerCodex").then((m) =>
 const SettingsPage = lazySurface(() => import("../settings/SettingsPage").then((m) => m.SettingsPage));
 const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList));
 
-type PlayerTab = "mine" | "table" | "codex" | "settings";
-
-/** The player's four views. Every address that is not My character, the Codex or Settings is the table. */
-const viewOf = (route: Route): PlayerTab =>
-  route.segments[0] === "me"
-    ? "mine"
-    : route.segments[0] === "codex"
-      ? "codex"
-      : route.segments[0] === "settings"
-        ? "settings"
-        : "table";
+/** The player's four views, and the tab each address lights (see `litPlayerTab`). */
+const viewOf = (route: Route) => litPlayerTab(route.path);
 
 /** Whether the address is the player's table itself (not the shared replays listed under it). */
 export const onPlayerTable = (route: Route) => viewOf(route) === "table" && route.segments[0] !== "replays";

@@ -233,8 +233,10 @@ export function CharacterSheet({
     setDocked(value);
     writeSetting("vtt.sheet.docked", value ? "1" : "0");
   };
-  // The latest roll from this character, shown under the rolls bar (hidden when the log is visible).
-  const latestRoll = state ? ([...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null) : null;
+  // The latest roll from this character, shown under the rolls bar (hidden when the log is visible). An initiative
+  // roll belongs to its fight, so it leaves the bar when the fight ends.
+  const lastRoll = state ? ([...state.rolls].reverse().find((roll) => roll.actorId === actor.id) ?? null) : null;
+  const latestRoll = lastRoll?.label === "Initiative" && state?.combat.active !== true ? null : lastRoll;
   // A check this sheet rolled is rerolled while it is still the character's latest roll: with Heroic Inspiration for a
   // player, freely by the GM. Without the roll history (the embedded sheet) the server judges that.
   const holdsInspiration = "heroicInspiration" in actor && actor.heroicInspiration === true;
@@ -692,18 +694,19 @@ export function CharacterSheet({
           ]}
         />
       )}
-      <Select
-        className="sheet-roll-visibility"
-        aria-label="Who sees the sheet's rolls"
-        value={rolls.visibility}
-        onChange={(event) => rolls.setVisibility(event.target.value as RollVisibility)}
-      >
-        {VISIBILITY_OPTIONS[role].map((value) => (
-          <option key={value} value={value}>
-            {ROLL_VISIBILITY_WORD[value]}
-          </option>
-        ))}
-      </Select>
+      <label className="sheet-roll-visibility">
+        <span className="sheet-settings-label">Visibility</span>
+        <Select
+          value={rolls.visibility}
+          onChange={(event) => rolls.setVisibility(event.target.value as RollVisibility)}
+        >
+          {VISIBILITY_OPTIONS[role].map((value) => (
+            <option key={value} value={value}>
+              {ROLL_VISIBILITY_WORD[value]}
+            </option>
+          ))}
+        </Select>
+      </label>
       {/* Mid-fight only: whether an attack tapped here resolves inline or on the initiative view. */}
       {liveCombat?.active === true && actor.kind === "player-character" && onJumpToInitiative && (
         <>

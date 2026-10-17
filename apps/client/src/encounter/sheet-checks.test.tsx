@@ -147,6 +147,40 @@ describe("the sheet's checks", () => {
     expect(await screen.findByText("Strength check: 13 (d20 12).")).toBeTruthy();
   });
 
+  it("says an before a vowel: Roll an Intelligence check", async () => {
+    serve(derivedSheet());
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    expect(await screen.findByRole("button", { name: "Roll an Intelligence check, +1" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Roll an Intelligence saving throw/ })).toBeTruthy();
+  });
+
+  it("labels who sees the sheet's rolls where it can be read", async () => {
+    serve(derivedSheet());
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const picker = await screen.findByRole("combobox", { name: "Visibility" });
+    expect(picker.closest("label")?.textContent).toContain("Visibility");
+  });
+
+  it("drops an initiative roll from the bar once its fight is over", async () => {
+    serve(derivedSheet());
+    const initiative = { ...checkRoll("i1"), label: "Initiative", purpose: "manual", formula: "1d20 + 2", total: 14 };
+    const fighting = {
+      ...stateWith([hero()], [initiative]),
+      combat: { active: true, initiative: [], pendingSaves: [], rulesMode: "assisted", ruleExceptions: {} }
+    } as unknown as GmView;
+    const { rerender } = render(<CharacterSheet actor={hero()} role="gm" state={fighting} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    expect((await screen.findByTitle("Open the dice log")).textContent).toContain("Initiative");
+    rerender(<CharacterSheet actor={hero()} role="gm" state={stateWith([hero()], [initiative])} onClose={() => {}} />);
+    expect(screen.queryByTitle("Open the dice log")).toBeNull();
+    // Any other roll stays until the next one.
+    rerender(
+      <CharacterSheet actor={hero()} role="gm" state={stateWith([hero()], [checkRoll("c1")])} onClose={() => {}} />
+    );
+    expect(screen.getByTitle("Open the dice log").textContent).toContain("Strength check");
+  });
+
   it("names the skill, and a typed die sends its face alone", async () => {
     serve(derivedSheet());
     setRollInput("manual");

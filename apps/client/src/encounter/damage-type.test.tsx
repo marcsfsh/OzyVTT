@@ -160,6 +160,12 @@ describe("the sheet's HP box carries the type too", () => {
     expect(ApplyDamageSchema.parse(payload).damageType).toBe("fire");
   });
 
+  it("names the chooser where it can be read, not only in its placeholder", () => {
+    mountSheetHp();
+    const field = screen.getByRole("combobox", { name: "Damage type" });
+    expect(field.closest(".damage-type-field")?.textContent).toContain("Damage type");
+  });
+
   it("sends no type at all while the sheet's chooser is untouched", async () => {
     const user = userEvent.setup();
     mountSheetHp();
