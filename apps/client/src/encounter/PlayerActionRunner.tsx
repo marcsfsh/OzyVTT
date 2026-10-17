@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
-import { read } from "../lib/command";
+import { command, read } from "../lib/command";
 import { ActionList } from "../sheet/ActionList";
 import { CastDetail } from "../sheet/CastDetail";
 import { SheetDetail, type DetailPlace } from "../sheet/SheetDetail";
@@ -136,8 +136,7 @@ export function PlayerActionRunner({
   castPlace = { kind: "inline" },
   look = "list",
   round = null,
-  acting = null,
-  onSetPins
+  acting = null
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -170,8 +169,6 @@ export function PlayerActionRunner({
   /** The fight's round, and who acts off this character's turn, for the turn card's heading. */
   round?: number | null;
   acting?: string | null;
-  /** Stores the turn card's pins on the character. */
-  onSetPins?: (ids: readonly string[]) => void;
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
@@ -306,6 +303,11 @@ export function PlayerActionRunner({
     take(option.summary, choice.kind === "slot" ? choice.level : undefined, darts);
   };
 
+  /** The turn card's pins, stored on the character; the server checks each is one of its options now. */
+  const setPins = (ids: readonly string[]) =>
+    void command("character:set-favourites", { actorId, optionIds: [...ids] }).then((reply) => {
+      if (!reply.ok) onFeedback(reply.message ?? "The favourites could not be saved.");
+    });
   /** A tap on an option: a spell with a choice of slot opens its cast detail, the rest go at once. */
   const pickOption = (option: TurnOption) => {
     setTargetingResult(null);
@@ -361,7 +363,7 @@ export function PlayerActionRunner({
               header={header}
               pins={pinsOf(actor)}
               counts={optionCountsOf(actor)}
-              {...(onSetPins ? { onSetPins } : {})}
+              {...(actor ? { onSetPins: setPins } : {})}
               onUse={pickOption}
             />
           ) : (

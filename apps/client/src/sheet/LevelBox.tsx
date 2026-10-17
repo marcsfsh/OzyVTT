@@ -78,7 +78,8 @@ export function LevelBox({
           )}
           {levelUpTo !== null && brings && brings.length > 0 && (
             <p className="cs-sub">
-              Level {levelUpTo} brings {brings.join(" · ")}.
+              Level {levelUpTo} brings {brings.slice(0, 3).join(" · ")}
+              {brings.length > 3 ? ", and more" : ""}.
             </p>
           )}
           {onLevelDown && level > 1 && (

@@ -55,6 +55,7 @@ import { StatusStrip } from "./StatusStrip";
 import { useSheetController, type SheetCombat } from "./useSheetController";
 import { useSheetDefinition } from "./useSheetDefinition";
 import { useSheetEdit } from "./useSheetEdit";
+import { useNextLevel } from "./useNextLevel";
 import { useSheetRolls } from "./useSheetRolls";
 import { poolsOf } from "./Uses";
 import { useRememberedTab } from "../table/TablePanel";
@@ -200,6 +201,8 @@ export function CharacterSheet({
   const level = characterLevel(definition);
   const canLevel = mayLevel(role, state, actor) && onLevel !== undefined && level !== null;
   const levelUpTo = levelUpTarget(level, state);
+  // What the next level brings, asked only of a viewer who may take it there.
+  const next = useNextLevel(actor.id, canLevel && levelUpTo !== null, `${level}:${definitionId ?? ""}`);
   const inspired = heroicInspirationOf(actor);
   const speed = speedOf(actor, definition, extension, derived?.speedFeet ?? null);
   const hp = exactHp(actor);
@@ -236,6 +239,7 @@ export function CharacterSheet({
         level={level}
         className={soleClassName(definition)}
         levelUpTo={levelUpTo}
+        brings={next?.lines ?? null}
         {...(canLevel ? { onLevelUp: onLevel!, onLevelDown: onLevel! } : {})}
       />
     ) : null;
@@ -390,7 +394,11 @@ export function CharacterSheet({
       pools={pools}
       serverActions={serverActions}
       onUse={(actionId) => controller.sendThroughServer(actionId)}
-      next={canLevel && levelUpTo !== null ? <NextLevel level={levelUpTo} lines={[]} onLevelUp={onLevel!} /> : null}
+      next={
+        canLevel && levelUpTo !== null ? (
+          <NextLevel level={levelUpTo} lines={next?.lines ?? []} onLevelUp={onLevel!} />
+        ) : null
+      }
     />
   ) : null;
   const notesBody = (
@@ -638,7 +646,7 @@ export function CharacterSheet({
       {controller.healDialog}
       {hpOpen && (
         <Modal open onClose={() => setHpOpen(false)} align="bottom" title="Hit Points">
-          <HpCard actor={actor} role={role} onFeedback={say} />
+          <HpCard actor={actor} role={role} withSet onFeedback={say} />
         </Modal>
       )}
       {diceOpen && state && (

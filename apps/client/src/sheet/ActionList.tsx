@@ -35,7 +35,12 @@ function OptionRow({
       <span className="cs-action-text">
         <strong className="cs-action-name">
           {option.name}
-          {option.mastery && <span className="cs-action-mastery"> · {option.mastery}</span>}
+          {option.mastery && (
+            <>
+              {" · "}
+              <span className="cs-action-mastery">{option.mastery}</span>
+            </>
+          )}
           {option.concentration && <ConcentrationTag />}
           {option.freeLeft !== undefined && option.freeLeft !== 0 && (
             <span className="cs-tag is-free">{option.freeLeft === null ? "At will" : `${option.freeLeft} free`}</span>

@@ -10,9 +10,8 @@ export function useSessionRoll(state: SheetState | undefined, actorId: string): 
   const mine = useSheetRollIds();
   const rolls = (state?.rolls ?? []) as readonly PlayerRollRecord[];
   const latest =
-    [...rolls]
-      .reverse()
-      .find((roll) => roll.actorId === actorId && mine.has(roll.id) && (roll.purpose as string) !== "builder") ?? null;
+    [...rolls].reverse().find((roll) => roll.actorId === actorId && mine.has(roll.id) && roll.purpose !== "builder") ??
+    null;
   if (latest?.label === "Initiative" && state?.combat.active !== true) return null;
   return latest;
 }

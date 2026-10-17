@@ -6,17 +6,6 @@ import type { SrdExtension } from "../encounter/sheet-extension";
 import type { SheetActor } from "./sheet-model";
 import { UseList, type Pool } from "./Uses";
 
-/** One Weapon Mastery pick, as the server's derived sheet names it. */
-export type WeaponMasteryPick = Readonly<{
-  weaponId: string;
-  weaponName: string;
-  mastery: Readonly<{ id: string; name: string; description: string }>;
-}>;
-
-/** The character's Weapon Mastery picks, read defensively from a server that may not send them. */
-export const weaponMasteriesOf = (derived: ActorDerivedSheet | null): readonly WeaponMasteryPick[] =>
-  (derived as (ActorDerivedSheet & { weaponMasteries?: WeaponMasteryPick[] }) | null)?.weaponMasteries ?? [];
-
 /** A feature the level page records as a pick of something else, which the sheet shows as that pick. */
 const PLACEHOLDERS = /-subclass$|^ability-score-improvement$/;
 
@@ -111,7 +100,7 @@ export function FeaturesTab({
   /** What the next level brings and the way to it, when the caller may level the character. */
   next?: ReactNode;
 }>) {
-  const masteries = weaponMasteriesOf(derived);
+  const masteries = derived?.weaponMasteries ?? [];
   const groups = featureGroups(definition, extension);
   // A pool whose action does something on its own (a heal, an attack, an effect) is used through that action.
   const acting = new Map<string, string>();

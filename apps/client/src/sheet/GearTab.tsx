@@ -195,7 +195,12 @@ export function GearTab({
           <span className="cs-item-text">
             <strong className="cs-item-name">
               {nameOf(item)}
-              {mastery && <span className="cs-item-mastery"> · {mastery}</span>}
+              {mastery && (
+                <>
+                  {" · "}
+                  <span className="cs-item-mastery">{mastery}</span>
+                </>
+              )}
               {item.quantity > 1 && <span className="cs-item-qty"> ×{item.quantity}</span>}
               {item.attuned && <span className="cs-tag is-free">Attuned</span>}
             </strong>

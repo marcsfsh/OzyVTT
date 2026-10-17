@@ -69,7 +69,12 @@ function Tile({
       <span className="cs-turntile-cost">{option.costWords}</span>
       <strong className="cs-turntile-name">
         {option.name}
-        {option.mastery && <span className="cs-action-mastery"> · {option.mastery}</span>}
+        {option.mastery && (
+          <>
+            {" · "}
+            <span className="cs-action-mastery">{option.mastery}</span>
+          </>
+        )}
         {option.concentration && <ConcentrationTag />}
       </strong>
       {option.effect && <span className="cs-turntile-line">{option.effect}</span>}

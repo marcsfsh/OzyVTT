@@ -97,3 +97,28 @@ describe("an item's own actions", () => {
     expect(onUseAction).not.toHaveBeenCalled();
   });
 });
+
+describe("a weapon's row", () => {
+  it("names the Weapon Mastery the character applies with it, as the server says", () => {
+    const swing = { ...THROW, id: "item-greatsword", name: "Greatsword", usesLimit: null, usesPool: null };
+    render(
+      <GearTab
+        actor={
+          {
+            ...actor,
+            inventory: [{ id: "greatsword", name: "Greatsword", quantity: 1, equipped: true, attuned: false }]
+          } as unknown as GmActor
+        }
+        role="player"
+        busy={false}
+        edit={vi.fn() as unknown as SheetEdit}
+        place={{ kind: "inline" }}
+        serverActions={[swing as ContentActionSummary]}
+        facts={new Map([["item-greatsword", { available: true, reason: null, passive: null, mastery: "Graze" }]])}
+        inFight={false}
+        onUseAction={() => {}}
+      />
+    );
+    expect(screen.getByRole("button", { name: /^Greatsword · Graze/ })).toBeTruthy();
+  });
+});

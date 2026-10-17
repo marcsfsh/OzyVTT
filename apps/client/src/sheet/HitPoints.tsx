@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Input, Meter } from "@vtt/ui";
+import { Button, GmOnlyTag, Input, Meter } from "@vtt/ui";
 import { HpAdjust } from "../encounter/HpAdjust";
 import { isDeadOnSheet } from "../encounter/mortality";
 import { command } from "../lib/command";
@@ -57,16 +57,27 @@ export function HpReadout({ actor }: Readonly<{ actor: SheetActor }>) {
   );
 }
 
-/** The laptop's Hit Points card and the phone's Hit Points drawer: the numbers, then the controls. */
+/** The laptop's Hit Points card and the phone's Hit Points drawer: the numbers, then the controls. The drawer also
+ *  holds the GM's Set, in violet with the GM only mark; on a laptop it is in the GM tools beside the card. */
 export function HpCard({
   actor,
   role,
+  withSet = false,
   onFeedback
-}: Readonly<{ actor: SheetActor; role: "gm" | "player"; onFeedback: (text: string) => void }>) {
+}: Readonly<{ actor: SheetActor; role: "gm" | "player"; withSet?: boolean; onFeedback: (text: string) => void }>) {
   return (
     <section className={`cs-card cs-hp-card${isDown(actor) ? " is-down" : ""}`} aria-label="Hit Points">
       <HpReadout actor={actor} />
       <HpControls actor={actor} role={role} onFeedback={onFeedback} />
+      {withSet && role === "gm" && !isDeadOnSheet(actor) && (
+        <div className="cs-gmbox" role="group" aria-label="Set Hit Points">
+          <span className="cs-section-head">
+            <span className="cs-eyebrow">Set Hit Points</span>
+            <GmOnlyTag />
+          </span>
+          <HpAdjust actor={actor} controls={["set", "max"]} onFeedback={onFeedback} />
+        </div>
+      )}
     </section>
   );
 }

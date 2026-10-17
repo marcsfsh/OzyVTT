@@ -163,9 +163,8 @@ export const ABILITY_WORDS = {
 } as const;
 
 /** The turn card's pins, which only the owner's and the GM's copies of the character carry. */
-export const pinsOf = (actor: SheetActor | null): readonly string[] | null =>
-  (actor as { favouriteOptionIds?: readonly string[] } | null)?.favouriteOptionIds ?? null;
+export const pinsOf = (actor: SheetActor | null): readonly string[] | null => actor?.favouriteOptionIds ?? null;
 
 /** How often each option has resolved for the character, as the server counts it. */
 export const optionCountsOf = (actor: SheetActor | null): Readonly<Record<string, number>> =>
-  (actor as { optionUseCounts?: Readonly<Record<string, number>> } | null)?.optionUseCounts ?? {};
+  actor?.optionUseCounts ?? {};
