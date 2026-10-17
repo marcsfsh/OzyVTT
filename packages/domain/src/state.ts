@@ -249,6 +249,10 @@ export const PendingSaveSchema = z
         sourceActionId: z.string().max(120).optional(),
         /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
         ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
+        /** A spell's or a magic item's, so the save repeated against it is one Magic Resistance helps with. */
+        magical: EffectInstanceSchema.shape.magical,
+        /** It ends when a spell restores the bearer's hit points (an infernal wound). */
+        endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
         /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
         modifiers: EffectModifiersSchema.default([])
       })
@@ -261,6 +265,11 @@ export const PendingSaveSchema = z
       .optional(),
     /** The GM's call for a roll this save answers; the outcome is written back to the call. */
     callId: z.uuid().optional(),
+    /** Against a spell or another magical effect (a magic item's): Magic Resistance gives Advantage on it. */
+    magical: z.literal(true).optional(),
+    /** A success makes the target immune to this source's trait for the rest of the fight ("immune to this ghast's
+     * Stench for 24 hours"). */
+    immuneOnSuccess: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

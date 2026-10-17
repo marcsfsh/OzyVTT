@@ -169,6 +169,7 @@ function applyAnswerDamage(answer: Answer, targetId: string, input: DamageInput)
       newId: deps.newRollId,
       now: deps.now,
       commandId,
+      rollDie: deps.random,
       ...(deps.catalog ? { catalog: deps.catalog } : {}),
       ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
     }

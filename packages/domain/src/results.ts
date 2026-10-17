@@ -250,6 +250,7 @@ export type SaveAnswerResult = MutationResult & {
     committed: boolean;
     /** Condition id that forced an automatic failure (Paralyzed on a Dex save); null/absent when rolled. */ autoFailed?:
       string | null;
+    /** The trait that made it succeed without a roll (Greater Magic Resistance against a spell). */ autoSucceeded?: string;
     /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode;
     /** The typed breakdown behind `appliedDamage`; absent when the save applied no damage. */ parts?: DamageApplication["parts"];
     /** Flat reduction taken off before Resistance. */ flatReduction?: number;
