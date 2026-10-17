@@ -1379,6 +1379,20 @@ span.roll-mode-tag {
 
 /* Pinned "last roll" line, so a tap-to-roll shows its result without leaving the sheet pane. Hidden
    on the Dice pane and when the log is docked. */
+/* The newest result or refusal, while the sheet sits over the table; gone while there is none. */
+.sheet-toast {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 0.35rem var(--space-5);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  white-space: normal;
+}
+.sheet-toast:empty {
+  display: none;
+}
 .sheet-last-roll {
   display: flex;
   align-items: baseline;

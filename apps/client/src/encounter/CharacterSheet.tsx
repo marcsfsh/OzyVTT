@@ -11,7 +11,7 @@ import {
   type PlayerView,
   type RollVisibility
 } from "@vtt/domain";
-import { Button, IconButton, Modal, SegmentedControl, Select, IconX, useToast } from "@vtt/ui";
+import { Button, IconButton, Modal, SegmentedControl, Select, IconX, ToastOutlet, useToast } from "@vtt/ui";
 import { ConditionEditor } from "./conditions";
 import { SavePrompt } from "./SavePrompt";
 import { RichText } from "./RichText";
@@ -755,6 +755,8 @@ export function CharacterSheet({
     <div className={`sheet-workspace ${hasLog ? "has-log" : "no-log"} show-${mobilePane}${docked ? " docked" : ""}`}>
       {header(draggable)}
       {rollbar}
+      {/* Over the table the header's status line is behind the sheet, so the sheet says its results in its own row. */}
+      {!embedded && !standalone && <ToastOutlet className="sheet-toast" />}
       {latestRoll && (
         <button
           type="button"
