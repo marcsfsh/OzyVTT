@@ -32,7 +32,8 @@ const page = (id: string, title: string): CodexPageSummary => ({
   calendarInstant: null,
   rev: 1,
   createdAt: "2026-08-08T00:00:00.000Z",
-  updatedAt: "2026-08-08T00:00:00.000Z"
+  updatedAt: "2026-08-08T00:00:00.000Z",
+  playerUpdatedAt: "2026-08-08T00:00:00.000Z"
 });
 const PAGES = [page("p1", "Vallaki")];
 const BODY = "Meet Ismark in [[Vallaki]], then ride to [[Wave Echo Cave]].";

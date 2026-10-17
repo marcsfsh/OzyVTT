@@ -49,20 +49,22 @@ export function projectGmPage(row: CodexPage): CodexPage {
   return row;
 }
 
-/** null when the page is not revealed to players; otherwise the player-facing projection (no gmBody, no gmFields). */
+/**
+ * null when the page is not revealed to players; otherwise the player-facing projection. Allow-list: the GM body,
+ * GM fields, `rev`, the folder (the GM's private filing) and `updatedAt` (which a GM-only save moves) never enter
+ * it. `playerUpdatedAt` is the edit time players get.
+ */
 export function projectPlayerPage(row: CodexPage): PlayerCodexPage | null {
   if (!row.revealedToPlayers) return null;
-  // Allow-list: gmBody, gmFields and rev never enter the result (GM-only attributes live in `gmFields`).
   return {
     id: row.id,
     title: row.title,
     entityType: row.entityType,
     fields: row.fields,
-    folder: row.folder,
     tags: row.tags,
     body: row.playerBody,
     bannerAssetId: row.bannerAssetId,
-    updatedAt: row.updatedAt
+    playerUpdatedAt: row.playerUpdatedAt
   };
 }
 
@@ -70,16 +72,16 @@ export function projectGmPageSummary(row: CodexPageSummary): CodexPageSummary {
   return row;
 }
 
+/** As `projectPlayerPage`, without the body and fields. */
 export function projectPlayerPageSummary(row: CodexPageSummary): PlayerCodexPageSummary | null {
   if (!row.revealedToPlayers) return null;
   return {
     id: row.id,
     title: row.title,
     entityType: row.entityType,
-    folder: row.folder,
     tags: row.tags,
     bannerAssetId: row.bannerAssetId,
-    updatedAt: row.updatedAt
+    playerUpdatedAt: row.playerUpdatedAt
   };
 }
 

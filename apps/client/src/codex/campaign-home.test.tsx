@@ -118,7 +118,8 @@ const summary = (
   inWorldDate: null,
   rev: 1,
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  playerUpdatedAt: "2026-07-28T00:00:00.000Z"
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 
@@ -199,10 +200,9 @@ const PLAYER_PAGES: PlayerCodexPageSummary[] = [
     id: "p1",
     title: "Strahd",
     entityType: "character",
-    folder: null,
     tags: ["villain"],
     bannerAssetId: null,
-    updatedAt: "2026-07-28T00:00:00.000Z"
+    playerUpdatedAt: "2026-07-28T00:00:00.000Z"
   }
 ];
 const PLAYER_MAPS: PlayerCodexMap[] = [
@@ -545,5 +545,49 @@ describe("the Tags card with nothing in it", () => {
     view.rerender(<TagsCard tags={[]} onPickTag={() => {}} />);
     expect(screen.getByText("No tags yet.")).toBeInTheDocument();
     expect(screen.queryByText(/Tags are added/)).not.toBeInTheDocument();
+  });
+});
+
+// Players get no edit time that a GM-only save moves, so their card sorts by the date only the player half moves.
+// The GM's card sorts by every save, which is what "what have I been writing" means for the GM.
+describe("the Recently updated card", () => {
+  /** The card's titles in order; a GM row also carries its reveal badge. */
+  const rows = () =>
+    within(screen.getByRole("navigation", { name: "Recently updated pages" }))
+      .getAllByRole("button")
+      .map((row) => ["Lantern Order", "Vallaki"].find((title) => row.textContent?.includes(title)));
+
+  it("orders a player's pages by when the player half changed", async () => {
+    playerDefaults();
+    playerListPages.mockResolvedValue([
+      { ...PLAYER_PAGES[0], id: "p1", title: "Lantern Order", playerUpdatedAt: "2026-07-01T00:00:00.000Z" },
+      { ...PLAYER_PAGES[0], id: "p2", title: "Vallaki", playerUpdatedAt: "2026-07-20T00:00:00.000Z" }
+    ] satisfies PlayerCodexPageSummary[]);
+    (goTo("/codex"), render)(<PlayerCodex token="player" />);
+    await screen.findByRole("navigation", { name: "Recently updated pages" });
+    expect(rows()).toEqual(["Vallaki", "Lantern Order"]);
+  });
+
+  it("orders the GM's pages by their last save", async () => {
+    gmDefaults();
+    // By the player date Vallaki would come first; the GM's last save was to the Lantern Order's GM notes.
+    listPages.mockResolvedValue([
+      {
+        ...summary("p1", "Lantern Order", "faction"),
+        updatedAt: "2026-07-30T00:00:00.000Z",
+        playerUpdatedAt: "2026-07-01T00:00:00.000Z"
+      },
+      {
+        ...summary("p2", "Vallaki", "location"),
+        updatedAt: "2026-07-20T00:00:00.000Z",
+        playerUpdatedAt: "2026-07-20T00:00:00.000Z"
+      }
+    ]);
+    const user = userEvent.setup();
+    renderWorkspace();
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Home" }));
+    await screen.findByRole("navigation", { name: "Recently updated pages" });
+    expect(rows()).toEqual(["Lantern Order", "Vallaki"]);
   });
 });

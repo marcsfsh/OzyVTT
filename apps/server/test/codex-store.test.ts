@@ -1646,6 +1646,139 @@ describe("CodexStore recency semantics: what counts as an update", () => {
   });
 });
 
+// `playerUpdatedAt` is the edit time players get, so it moves only for what a player can see: the title, the
+// kind, the player text, the shared fields, the tags, the banner, an event page's date, and a reveal or hide.
+describe("CodexStore playerUpdatedAt: the date only the player half moves", () => {
+  let playerDirectory: string;
+  let clock: number;
+  let pages: CodexStore;
+
+  beforeEach(async () => {
+    playerDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-player-recency-"));
+    clock = Date.parse("2026-07-01T00:00:00.000Z");
+    pages = new CodexStore(join(playerDirectory, "vtt.sqlite"), () => clock);
+    await pages.initialize();
+  });
+  afterEach(async () => {
+    pages.close();
+    await rm(playerDirectory, { recursive: true, force: true });
+  });
+
+  const playerUpdatedAt = (pageId: string) => pages.getPage(pageId)!.playerUpdatedAt;
+  /** Moves the clock, runs `edit`, and says whether the player date moved with it. */
+  const moved = (pageId: string, edit: () => unknown) => {
+    const before = playerUpdatedAt(pageId);
+    clock += 60_000;
+    edit();
+    return playerUpdatedAt(pageId) !== before;
+  };
+  const seed = () =>
+    pages.createPage({
+      title: "The Lantern Order",
+      entityType: "faction",
+      playerBody: "Lamplighters.",
+      gmBody: "A front.",
+      folder: "Villains",
+      revealedToPlayers: true
+    });
+  const update = (pageId: string, input: Parameters<CodexStore["updatePage"]>[1]) => () =>
+    pages.updatePage(pageId, input, undefined, "gm");
+
+  it("starts at the page's creation", () => {
+    const page = seed();
+    expect(page.playerUpdatedAt).toBe(page.createdAt);
+  });
+
+  it("does NOT move for anything only the GM sees", () => {
+    const page = seed();
+    expect(moved(page.id, update(page.id, { gmBody: "A front for the cult." })), "GM notes").toBe(false);
+    expect(moved(page.id, update(page.id, { gmFields: { goals: "The capital" } })), "GM fields").toBe(false);
+    expect(moved(page.id, update(page.id, { folder: "Villains/Cults" })), "a folder in the editor").toBe(false);
+    expect(
+      moved(page.id, () => pages.moveFolder("Villains", "Foes")),
+      "a folder move"
+    ).toBe(false);
+    expect(
+      moved(page.id, () => pages.deleteFolder("Foes")),
+      "a folder delete"
+    ).toBe(false);
+    expect(
+      moved(page.id, update(page.id, { inWorldDate: { year: 1, month: 0, day: 2 } })),
+      "a date no player view shows"
+    ).toBe(false);
+    // A save that sends the player half back unchanged, as autosave does with a whole draft.
+    expect(
+      moved(page.id, update(page.id, { title: "The Lantern Order", playerBody: "Lamplighters." })),
+      "a resave"
+    ).toBe(false);
+    const other = pages.createPage({ title: "Vallaki", revealedToPlayers: true });
+    expect(
+      moved(page.id, () => pages.createConnection(page.id, { toPageId: other.id, layer: "gm" })),
+      "a GM-layer connection"
+    ).toBe(false);
+    // The GM's own recency moved through all of that.
+    expect(pages.getPage(page.id)!.updatedAt > page.updatedAt).toBe(true);
+  });
+
+  it("moves for each part of the page a player can see", () => {
+    const page = seed();
+    expect(moved(page.id, update(page.id, { title: "The Lantern Guild" })), "title").toBe(true);
+    expect(moved(page.id, update(page.id, { playerBody: "Lamplighters, mostly." })), "player text").toBe(true);
+    expect(moved(page.id, update(page.id, { fields: { leader: "Maelis" } })), "shared fields").toBe(true);
+    expect(moved(page.id, update(page.id, { tags: ["guild"] })), "tags").toBe(true);
+    expect(moved(page.id, update(page.id, { bannerAssetId: crypto.randomUUID() })), "banner").toBe(true);
+    expect(moved(page.id, update(page.id, { entityType: "religion" })), "kind").toBe(true);
+    expect(
+      moved(page.id, () => pages.setPageRevealed(page.id, false)),
+      "hide"
+    ).toBe(true);
+    expect(
+      moved(page.id, () => pages.setPageRevealed(page.id, true)),
+      "reveal"
+    ).toBe(true);
+    expect(
+      moved(page.id, () => pages.setPageRevealed(page.id, true)),
+      "a reveal of a shown page"
+    ).toBe(false);
+  });
+
+  it("moves for an event page's date, which the players' chronicle shows", () => {
+    const event = pages.createPage({ title: "The Feast", entityType: "event", revealedToPlayers: true });
+    expect(moved(event.id, update(event.id, { inWorldDate: { year: 1, month: 0, day: 3 } }))).toBe(true);
+  });
+
+  it("round-trips through a backup, and a backup from before it takes the old edit time", () => {
+    const page = seed();
+    clock += 60_000;
+    pages.updatePage(page.id, { gmBody: "Later GM notes." }, undefined, "gm");
+    const saved = pages.getPage(page.id)!;
+    expect(saved.playerUpdatedAt).not.toBe(saved.updatedAt);
+
+    const bundle = pages.exportBundle();
+    pages.importBundle(bundle);
+    expect(pages.getPage(page.id)!.playerUpdatedAt).toBe(saved.playerUpdatedAt);
+
+    // Players could already read `updatedAt` before this date existed, so an older backup reveals nothing new.
+    const older = { ...bundle, pages: bundle.pages.map(({ playerUpdatedAt: _dropped, ...rest }) => rest) };
+    pages.importBundle(older);
+    expect(pages.getPage(page.id)!.playerUpdatedAt).toBe(saved.updatedAt);
+  });
+
+  it("fills an existing page's date from its edit time when an older database opens", async () => {
+    const page = seed();
+    pages.close();
+    // The file as the release before this column left it.
+    const raw = new DatabaseSync(join(playerDirectory, "vtt.sqlite"));
+    raw.exec("ALTER TABLE codex_pages DROP COLUMN player_updated_at");
+    raw.prepare("DELETE FROM migrations WHERE store = 'codex' AND version = 2").run();
+    raw.prepare("UPDATE codex_pages SET updated_at = ? WHERE id = ?").run("2026-06-30T12:00:00.000Z", page.id);
+    raw.close();
+
+    await pages.initialize();
+    expect(pages.getPage(page.id)!.playerUpdatedAt).toBe("2026-06-30T12:00:00.000Z");
+  });
+});
+
 describe("CodexStore sessions", () => {
   let sessionDirectory: string;
   let clock: number;

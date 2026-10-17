@@ -17,6 +17,11 @@ const GM_ONLY_CHRONICLE = "GM-only; not declared on `CodexChronicleRecordPlayer`
 const GM_REV =
   "GM-only optimistic-concurrency counter; absent from a player projection. Pass it back as `expectedRev` to reject a stale edit.";
 const REVEALED_SUBSET = "Filtered to the revealed subset.";
+const PAGE_FOLDER =
+  "GM-only. The folder path the page is filed under, null at the top level. It is the GM's own filing, so no player shape carries it.";
+const PAGE_UPDATED_AT = "GM-only. Moves on every save, including one that changes only the GM half.";
+const PAGE_PLAYER_UPDATED_AT =
+  "When something a player can see last changed: the title, kind, player body, shared fields, tags or banner, an event page's date, or a reveal or hide. It is the only edit time a player receives, since `updatedAt` also moves on GM-only saves.";
 
 // Prose the content catalogs share.
 const CHOICE_CATALOG =
@@ -1024,25 +1029,33 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   CodexPageSummary: {
     fields: "Player-facing typed entity fields (free-form key/value).",
+    folder: PAGE_FOLDER,
     inWorldLabel: IN_WORLD_LABEL,
     calendarInstant: CALENDAR_INSTANT,
-    inWorldDate: IN_WORLD_DATE
+    inWorldDate: IN_WORLD_DATE,
+    updatedAt: PAGE_UPDATED_AT,
+    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT
   },
   CodexPage: {
     gmFields: "GM-only fields; never present in a player projection.",
     playerBody: "Player-facing markdown body.",
     gmBody: "GM-only markdown body; stripped from a player projection.",
+    folder: PAGE_FOLDER,
     inWorldLabel: IN_WORLD_LABEL,
     calendarInstant: CALENDAR_INSTANT,
-    inWorldDate: IN_WORLD_DATE
+    inWorldDate: IN_WORLD_DATE,
+    updatedAt: PAGE_UPDATED_AT,
+    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT
   },
   CodexPageSummaryPlayer: {
-    "": "A page summary as a PLAYER receives it. A strict subset of the GM summary: no `fields`, no dating trio, no `rev`, no `revealedToPlayers`, no `createdAt`."
+    "": "A page summary as a PLAYER receives it. A strict subset of the GM summary: no `fields`, no dating trio, no `rev`, no `revealedToPlayers`, no `createdAt`, no `folder` and no `updatedAt`.",
+    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT
   },
   CodexPagePlayer: {
-    "": "A page as a PLAYER receives it: the player body (renamed `body`; the layer prefix only means something when there are two layers), the player-facing `fields`, and no `gmBody`, `gmFields`, `rev`, `revealedToPlayers` or `createdAt`. An unrevealed page is never projected at all; it 404s.",
+    "": "A page as a PLAYER receives it: the player body (renamed `body`; the layer prefix only means something when there are two layers), the player-facing `fields`, and no `gmBody`, `gmFields`, `rev`, `revealedToPlayers`, `createdAt`, `folder` or `updatedAt`. An unrevealed page is never projected at all; it 404s.",
     fields: "The player-facing typed entity fields. `gmFields` has no player form.",
-    body: "The page's `playerBody`."
+    body: "The page's `playerBody`.",
+    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT
   },
   CodexConnection: {
     "": "One edge in the codex graph, GM view. ONE shape for both origins: a connection the GM declared and a connection derived from `[[wiki link]]` text differ only by an `origin` attribute, in one system with one panel and one edge kind.",

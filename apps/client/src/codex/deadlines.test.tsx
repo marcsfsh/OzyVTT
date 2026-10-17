@@ -521,7 +521,7 @@ describe("The Campaign dashboard's deadlines card", () => {
     render(
       <CampaignHome
         pages={[
-          { id: "p1", title: "Strahd", entityType: "character", tags: [], updatedAt: "2026-07-28T00:00:00.000Z" }
+          { id: "p1", title: "Strahd", entityType: "character", tags: [], playerUpdatedAt: "2026-07-28T00:00:00.000Z" }
         ]}
         onOpenEntry={vi.fn()}
         onPickType={vi.fn()}

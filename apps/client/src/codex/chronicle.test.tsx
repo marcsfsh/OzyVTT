@@ -256,6 +256,7 @@ describe("An event page is dated in the editor", () => {
     rev: 3,
     createdAt: "2026-07-28T00:00:00.000Z",
     updatedAt: "2026-07-28T00:00:00.000Z",
+    playerUpdatedAt: "2026-07-28T00:00:00.000Z",
     playerBody: "The sky tore open.",
     gmBody: ""
   };

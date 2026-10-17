@@ -78,7 +78,10 @@ export const CodexPageSummarySchema = z.strictObject({
   ...dating,
   rev: z.number().int().min(0),
   createdAt: timestamp(),
-  updatedAt: timestamp()
+  /** Moves on every save. */
+  updatedAt: timestamp(),
+  /** Moves only when something a player can see changes, so it is the one edit time players get. */
+  playerUpdatedAt: timestamp()
 });
 export type CodexPageSummary = Wire<z.infer<typeof CodexPageSummarySchema>>;
 export const CodexPageSchema = CodexPageSummarySchema.extend({
@@ -88,15 +91,17 @@ export const CodexPageSchema = CodexPageSummarySchema.extend({
 });
 export type CodexPage = Wire<z.infer<typeof CodexPageSchema>>;
 
-/** Only when revealed: no GM body, GM fields, reveal flag, date or `rev`. */
+/**
+ * Only when revealed. No GM body, GM fields, reveal flag, date or `rev`. No `folder`, which is the GM's private
+ * filing, and no `updatedAt`, which a GM-only save moves.
+ */
 export const PlayerCodexPageSummarySchema = z.strictObject({
   id: z.uuid(),
   title: z.string(),
   entityType: CodexEntityTypeSchema,
-  folder: z.string().nullable(),
   tags: tags(),
   bannerAssetId: z.uuid().nullable(),
-  updatedAt: timestamp()
+  playerUpdatedAt: timestamp()
 });
 export type PlayerCodexPageSummary = Wire<z.infer<typeof PlayerCodexPageSummarySchema>>;
 /** `playerBody` arrives as `body`. */

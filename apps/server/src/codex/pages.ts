@@ -50,7 +50,7 @@ export type CodexPageUpdateInput = Omit<CodexPageCreateInput, "title" | "reveale
   Readonly<{ title?: string }>;
 
 const SUMMARY_COLUMNS =
-  "id, title, entity_type, fields_json, folder, tags_json, revealed, banner_asset_id, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, rev, created_at, updated_at";
+  "id, title, entity_type, fields_json, folder, tags_json, revealed, banner_asset_id, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, rev, created_at, updated_at, player_updated_at";
 const PAGE_COLUMNS = `${SUMMARY_COLUMNS}, gm_fields_json, player_body, gm_body`;
 type SummaryRowRaw = {
   id: string;
@@ -69,6 +69,7 @@ type SummaryRowRaw = {
   rev: number;
   created_at: string;
   updated_at: string;
+  player_updated_at: string;
 };
 type PageRowRaw = SummaryRowRaw & { gm_fields_json: string; player_body: string; gm_body: string };
 
@@ -91,7 +92,8 @@ function toSummary(row: SummaryRowRaw): CodexPageSummary {
         : null,
     rev: row.rev,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    playerUpdatedAt: row.player_updated_at
   };
 }
 function toPage(row: PageRowRaw): CodexPage {
@@ -116,7 +118,7 @@ function sealedFields(
 export function insertPage(db: CodexDb, page: CodexPage): void {
   db.database
     .prepare(
-      `INSERT INTO codex_pages (${PAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO codex_pages (${PAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       page.id,
@@ -135,6 +137,7 @@ export function insertPage(db: CodexDb, page: CodexPage): void {
       page.rev,
       page.createdAt,
       page.updatedAt,
+      page.playerUpdatedAt,
       JSON.stringify(page.gmFields),
       page.playerBody,
       page.gmBody
@@ -180,7 +183,8 @@ export function createPage(db: CodexDb, input: CodexPageCreateInput): CodexPage 
     inWorldDate: dated.date,
     rev: 1,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    playerUpdatedAt: now
   };
   write(db, () => {
     insertPage(db, page);
@@ -218,7 +222,8 @@ export function updatePage(
       : { fields: existing.fields, gmFields: existing.gmFields };
   // Omitted `inWorldDate` keeps the stored date and `null` clears it: the editor PATCHes whole drafts.
   const dated = input.inWorldDate !== undefined ? resolveDate(db, input.inWorldDate, null) : null;
-  const next: CodexPage = {
+  const now = stamp(db);
+  const saved: CodexPage = {
     ...existing,
     title: input.title === undefined ? existing.title : title(input.title),
     entityType: nextType,
@@ -234,12 +239,16 @@ export function updatePage(
     calendarInstant: dated ? dated.instant : existing.calendarInstant,
     inWorldDate: dated ? dated.date : existing.inWorldDate,
     rev: existing.rev + 1,
-    updatedAt: stamp(db)
+    updatedAt: now
+  };
+  const next: CodexPage = {
+    ...saved,
+    playerUpdatedAt: playerHalf(saved) === playerHalf(existing) ? existing.playerUpdatedAt : now
   };
   write(db, () => {
     db.database
       .prepare(
-        "UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, in_world_label = ?, calendar_instant = ?, rev = ?, updated_at = ? WHERE id = ?"
+        "UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, in_world_label = ?, calendar_instant = ?, rev = ?, updated_at = ?, player_updated_at = ? WHERE id = ?"
       )
       .run(
         next.title,
@@ -258,6 +267,7 @@ export function updatePage(
         next.calendarInstant,
         next.rev,
         next.updatedAt,
+        next.playerUpdatedAt,
         pageId
       );
     rebuildLinks(db, "page", pageId, next.playerBody, next.gmBody);
@@ -281,13 +291,36 @@ export function restoreRevision(db: CodexDb, pageId: string, revisionId: number,
   return updatePage(db, pageId, content, undefined, authorTag, true);
 }
 
-/** Revealing is not editing: `updatedAt` stays, though the Codex revision still bumps. */
+/**
+ * Revealing is not editing: `updatedAt` stays, though the Codex revision still bumps. Players see a reveal or a
+ * hide, so `playerUpdatedAt` moves when the flag flips.
+ */
 export function setPageRevealed(db: CodexDb, pageId: string, revealed: boolean): CodexPage {
-  if (!getPage(db, pageId)) throw new CodexNotFoundError("That page no longer exists.");
+  const existing = getPage(db, pageId);
+  if (!existing) throw new CodexNotFoundError("That page no longer exists.");
   write(db, () => {
-    db.database.prepare("UPDATE codex_pages SET revealed = ? WHERE id = ?").run(revealed ? 1 : 0, pageId);
+    if (existing.revealedToPlayers === revealed) return;
+    db.database
+      .prepare("UPDATE codex_pages SET revealed = ?, player_updated_at = ? WHERE id = ?")
+      .run(revealed ? 1 : 0, stamp(db), pageId);
   });
   return getPage(db, pageId)!;
+}
+
+/**
+ * What players can see of a page: everything `projectPlayerPage` sends, and the date while the page is an event
+ * the chronicle lists. A save that changes none of it leaves `playerUpdatedAt` alone.
+ */
+function playerHalf(page: CodexPage): string {
+  return JSON.stringify([
+    page.title,
+    page.entityType,
+    page.fields,
+    page.tags,
+    page.playerBody,
+    page.bannerAssetId,
+    page.entityType === "event" ? page.inWorldDate : null
+  ]);
 }
 
 /** Leaf delete; the revisions cascade. References to the page from other records are cleared by the caller. */

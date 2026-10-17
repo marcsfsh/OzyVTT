@@ -322,8 +322,10 @@ export function createCodexRouter(options: CodexRouterOptions) {
     const role = readGrade(request, response);
     if (!role) return;
     const filter = {
+      // Folders are the GM's private filing. A player's folder filter is ignored, since an answer that changed
+      // with it would show which pages the GM filed where.
       folder:
-        request.query.folder === undefined
+        role === "player" || request.query.folder === undefined
           ? undefined
           : request.query.folder === ""
             ? null

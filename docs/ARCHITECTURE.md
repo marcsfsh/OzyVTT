@@ -149,9 +149,13 @@ audience. There are four:
   while it is in that projection.
 - **Codex** (`codex-projections.ts`): a player gets the player half of a revealed record and
   nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target, and
-  `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields (staged
-  scene ids on markers and sessions) are GM-only even when revealed. A hidden record is a 404,
-  never a 403, and ETags are computed after every gate.
+  `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields are GM-only
+  even when revealed: staged scene ids on markers and sessions, and a page's folder path, which is
+  the GM's private filing (a player's `folder` filter on the page list is ignored). A page's
+  `updatedAt` moves on every save, so it stays with the GM too; players get `playerUpdatedAt`,
+  which moves only when the title, kind, player text, shared fields, tags, banner, an event page's
+  date or the reveal flag changes. A hidden record is a 404, never a 403, and ETags are computed
+  after every gate.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
   list of shared replays carries the GM's name for one, never the name of the scene it was fought on.

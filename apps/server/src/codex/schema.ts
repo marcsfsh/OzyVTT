@@ -212,7 +212,19 @@ CREATE VIRTUAL TABLE codex_search_player USING fts5(kind UNINDEXED, record_id UN
 CREATE VIRTUAL TABLE codex_search_gm USING fts5(kind UNINDEXED, record_id UNINDEXED, title, body);
 `;
 
-export const CODEX_MIGRATIONS: readonly Migration[] = [{ version: 1, up: (database) => database.exec(BASELINE) }];
+export const CODEX_MIGRATIONS: readonly Migration[] = [
+  { version: 1, up: (database) => database.exec(BASELINE) },
+  {
+    // The edit time players get, moved only by the player half. An existing page starts from `updated_at`,
+    // which players could already read, so the upgrade shows them nothing new.
+    version: 2,
+    up: (database) =>
+      database.exec(`
+        ALTER TABLE codex_pages ADD COLUMN player_updated_at TEXT NOT NULL DEFAULT '';
+        UPDATE codex_pages SET player_updated_at = updated_at;
+      `)
+  }
+];
 
 /** Creates or checks the Codex tables. A file from before the migration history was reset is refused. */
 export function migrateCodex(database: DatabaseSync, path: string): void {

@@ -87,7 +87,8 @@ const FACTION: CodexPageSummary = {
   inWorldDate: null,
   rev: 1,
   createdAt: "2026-07-29T00:00:00.000Z",
-  updatedAt: "2026-07-29T00:00:00.000Z"
+  updatedAt: "2026-07-29T00:00:00.000Z",
+  playerUpdatedAt: "2026-07-29T00:00:00.000Z"
 };
 
 const renderJournal = async (records: CodexChronicleRecord[] = [], pages: CodexPageSummary[] = []) => {

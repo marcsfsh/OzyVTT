@@ -44,7 +44,8 @@ const page = (
   calendarInstant: null,
   rev: 1,
   createdAt: "2026-08-08T00:00:00.000Z",
-  updatedAt: "2026-08-08T00:00:00.000Z"
+  updatedAt: "2026-08-08T00:00:00.000Z",
+  playerUpdatedAt: "2026-08-08T00:00:00.000Z"
 });
 
 // Vallaki is a location and is never offered; Ireena is archived at the table, Ozy is not.

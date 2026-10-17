@@ -13,13 +13,17 @@ import { RecordRow } from "./RecordRow";
  * carry GM bodies. GM-only cards arrive through capability props the player caller doesn't pass.
  */
 
-/** Satisfied by both the GM and player page summaries. */
+/**
+ * Satisfied by both the GM and player page summaries. `updatedAt` is GM-only and moves on every save;
+ * `playerUpdatedAt` moves only for what players can see, and is the only edit time a player receives.
+ */
 type CampaignEntity = Readonly<{
   id: string;
   title: string;
   entityType: EntityType;
   tags: readonly string[];
-  updatedAt: string;
+  updatedAt?: string;
+  playerUpdatedAt: string;
   revealedToPlayers?: boolean;
 }>;
 /** One journal row, flattened by the caller from either projection. `revealed` is GM-only and optional. */
@@ -144,7 +148,11 @@ export function CampaignHome({
     for (const page of pages) for (const tag of page.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [pages]);
-  const recent = useMemo(() => [...pages].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 10), [pages]);
+  // The GM sees their own last saves; a player sees the pages whose shared half changed last.
+  const recent = useMemo(() => {
+    const changedAt = (page: CampaignEntity) => page.updatedAt ?? page.playerUpdatedAt;
+    return [...pages].sort((a, b) => changedAt(b).localeCompare(changedAt(a))).slice(0, 10);
+  }, [pages]);
   const revealed = useMemo(() => pages.filter((page) => page.revealedToPlayers).length, [pages]);
   const recentEntries = entries.slice(0, 5);
   const deadlineList = deadlines.slice(0, 5);

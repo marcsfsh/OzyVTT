@@ -7,7 +7,9 @@ import {
   projectPlayerCalendar,
   projectPlayerChronicleRecord,
   projectPlayerMarker,
+  projectPlayerPage,
   projectPlayerPageMarker,
+  projectPlayerPageSummary,
   projectPlayerStanding,
   projectRevealAudit
 } from "../src/codex-projections.js";
@@ -18,6 +20,7 @@ import type {
   CodexJournalEntry,
   CodexJournalKind,
   CodexMarker,
+  CodexPage,
   CodexStanding
 } from "@vtt/domain";
 
@@ -459,5 +462,83 @@ describe("reveal audit projection: an aggregation and not a second opinion", () 
     expect(silent).toEqual([
       { kind: "journal", id: silentStanding.id, title: "Faction standing changed", journalKind: "standing" }
     ]);
+  });
+});
+
+/** A page row as the store returns one: filed in a GM folder, with its GM-side save later than its player half. */
+function pageRow(overrides: Partial<CodexPage> = {}): CodexPage {
+  return {
+    id: "22222222-2222-4222-8222-222222222222",
+    title: "The Lantern Order",
+    entityType: "faction",
+    fields: { motto: "Light the way" },
+    gmFields: { goal: "Seize the capital" },
+    folder: "Villains/Secret societies",
+    tags: ["order"],
+    playerBody: "A guild of lamplighters.",
+    gmBody: "A front for the cult.",
+    revealedToPlayers: true,
+    bannerAssetId: null,
+    inWorldLabel: null,
+    calendarInstant: null,
+    inWorldDate: null,
+    rev: 4,
+    createdAt: "2026-07-01T00:00:00.000Z",
+    updatedAt: "2026-07-30T00:00:00.000Z",
+    playerUpdatedAt: "2026-07-02T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+// The folder path is the GM's private filing, and `updatedAt` moves on a GM-only save. Players get neither, and
+// get `playerUpdatedAt`, which only their half moves, in place of the edit time.
+describe("page projection: no folder and no GM edit time reach a player", () => {
+  it("leaves both off the player page and the player summary, and carries the player half's date", () => {
+    const row = pageRow();
+    const page = projectPlayerPage(row)!;
+    const summary = projectPlayerPageSummary(row)!;
+
+    expect(Object.keys(page).sort()).toEqual([
+      "bannerAssetId",
+      "body",
+      "entityType",
+      "fields",
+      "id",
+      "playerUpdatedAt",
+      "tags",
+      "title"
+    ]);
+    expect(Object.keys(summary).sort()).toEqual([
+      "bannerAssetId",
+      "entityType",
+      "id",
+      "playerUpdatedAt",
+      "tags",
+      "title"
+    ]);
+    for (const projected of [page, summary]) {
+      expect(projected.playerUpdatedAt).toBe("2026-07-02T00:00:00.000Z");
+      // The values as well as the keys: neither the path nor the GM's save time is anywhere in the payload.
+      expect(JSON.stringify(projected)).not.toContain("Villains");
+      expect(JSON.stringify(projected)).not.toContain("Secret societies");
+      expect(JSON.stringify(projected)).not.toContain("2026-07-30");
+    }
+  });
+
+  it("leaves both off a dated event page's chronicle row", () => {
+    const event = pageRow({
+      entityType: "event",
+      inWorldLabel: "Hammer 10, 1492 DR",
+      calendarInstant: 9,
+      inWorldDate: { year: 1492, month: 0, day: 10 }
+    });
+    const row = projectPlayerChronicleRecord({ kind: "event", page: event }, playerContext())!;
+    expect(JSON.stringify(row)).not.toContain("Villains");
+    expect(JSON.stringify(row)).not.toContain("2026-07-30");
+  });
+
+  it("projects nothing at all for a hidden page", () => {
+    expect(projectPlayerPage(pageRow({ revealedToPlayers: false }))).toBeNull();
+    expect(projectPlayerPageSummary(pageRow({ revealedToPlayers: false }))).toBeNull();
   });
 });

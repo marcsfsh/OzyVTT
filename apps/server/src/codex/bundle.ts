@@ -260,7 +260,9 @@ function normalizeBundle(raw: unknown): CodexBundle {
     inWorldDate: date(row.inWorldDate),
     rev: Math.max(1, count(row.rev, 1)),
     createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt)
+    updatedAt: text(row.updatedAt),
+    // A backup from before this date has only `updatedAt`, which players could already read.
+    playerUpdatedAt: text(row.playerUpdatedAt) || text(row.updatedAt)
   }));
   const maps = rows("maps", (row): CodexMap => ({
     id: id(text(row.id)),
