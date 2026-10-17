@@ -253,7 +253,7 @@ describe("What it can do", () => {
       "Downtime",
       "Reveal audit",
       "Backup",
-      "Settings"
+      "Autosave and history"
     ]) {
       expect(box.getByText(`Go to ${label}`)).toBeInTheDocument();
     }
@@ -396,7 +396,7 @@ describe("The player's palette", () => {
     );
 
     // Built from PLAYER_SIDEBAR, so the palette can't reach a route the nav hides.
-    for (const label of ["Reveal audit", "Backup", "Settings", "Preview as player"]) {
+    for (const label of ["Reveal audit", "Backup", "Autosave and history", "Preview as player"]) {
       expect(box.queryByText(`Go to ${label}`)).not.toBeInTheDocument();
     }
     expect(box.getByText("Go to Journal")).toBeInTheDocument();

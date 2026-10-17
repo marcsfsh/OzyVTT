@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Drawer, IconButton, Kbd } from "@vtt/ui";
+import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { discardTransient, navigate, popTransient, pushTransient, releaseStrandedEntry } from "../router";
 import { CodexIcon } from "./icons";
 import type { SidebarGroup, SidebarItem } from "./routes";
@@ -57,6 +58,8 @@ export function CodexFrame({
   children
 }: CodexFrameProps) {
   const drawerKey = `${sidebarKey}-nav`;
+  // The key that opens search, written the way this device's keyboard says it; a touch device shows none.
+  const shortcut = useMemo(() => shortcutLabel("K", currentDevice()), []);
   // Codex-scoped by design, so the shortcut leaves with the section.
   useEffect(() => {
     if (embedded) return;
@@ -131,7 +134,7 @@ export function CodexFrame({
     >
       <CodexIcon iconId="search" className="codex-navitem-icon codex-sidebar-searchglyph" aria-hidden="true" />
       {!collapsed && <span className="codex-navitem-label">Search</span>}
-      {!embedded && !collapsed && <Kbd>⌘K</Kbd>}
+      {!embedded && !collapsed && shortcut && <Kbd>{shortcut}</Kbd>}
     </button>
   );
   const nav = (asRail: boolean) => (
