@@ -1662,3 +1662,20 @@ span.roll-mode-tag {
   flex: 1 1 9rem;
   min-width: 0;
 }
+/* Who a heal outside a fight lands on. The chips wrap with a gap that keeps each 44px target its own. */
+.heal-picker-ask {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+}
+.heal-picker-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.heal-picker-targets > .sheet-picker-chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.heal-picker-spend {
+  margin-top: var(--space-4);
+}

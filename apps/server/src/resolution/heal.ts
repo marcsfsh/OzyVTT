@@ -27,7 +27,7 @@ export function applyHealing(ctx: ResolveContext): void {
     if (rolled.terms.some((term) => term.kind === "dice")) recordRoll(ctx, rolled, "healing");
     total += rolled.total;
   }
-  const shares = sharesOf(targets, Math.max(0, total), healing);
+  const shares = healingShares(targets, Math.max(0, total), healing);
   const healed = targets.map((target, index) => {
     // A dead target among living ones regains nothing until it is revived; the others still heal.
     if (isDead(target)) {
@@ -51,8 +51,8 @@ export function applyHealing(ctx: ResolveContext): void {
 
 /** What each target may regain: the whole roll each, or one pool split as evenly as each target's room allows. A cap
  *  ("no more than half its Hit Point maximum") limits both. */
-function sharesOf(
-  targets: readonly LiveActor[],
+export function healingShares(
+  targets: readonly Pick<LiveActor, "hp">[],
   total: number,
   healing: NonNullable<ResolveContext["action"]["healing"]>
 ): number[] {

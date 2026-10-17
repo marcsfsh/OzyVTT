@@ -312,6 +312,8 @@ export const ActionAvailabilitySchema = z.strictObject({
   reaction: ActionReactionSchema.nullable(),
   /** The hit points it restores (a potion's 2d4 + 2), for display. */
   healing: z.strictObject({ formula: z.string() }).nullable().optional(),
+  /** How many creatures one use heals when it can be more than one (Prayer of Healing's five); null otherwise. */
+  healTargets: z.number().int().nullable().optional(),
   /** Who a tap picks: one creature, several, or none (it acts on its user); null when nothing structured resolves. */
   targeting: z.enum(["none", "single", "multi"]).nullable().optional(),
   /** Darts it makes, each assigned to a target (Magic Missile read from a scroll or cast from a wand). */

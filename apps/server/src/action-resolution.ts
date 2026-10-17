@@ -36,6 +36,7 @@ import { markSpellUp, openSpellZone, startConcentration } from "./resolution/con
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
+import { healLimit } from "./loose-healing.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -287,6 +288,10 @@ export function actionAvailability(
         : null,
       reaction: action.reaction ?? null,
       healing: action.healing ? { formula: action.healing.formula } : null,
+      healTargets:
+        action.healing && !action.healing.self && healLimit(action, spell, undefined) > 1
+          ? healLimit(action, spell, undefined)
+          : null,
       // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
       targeting: builtin
         ? (BUILTIN_TARGETING[action.id] ?? "none")

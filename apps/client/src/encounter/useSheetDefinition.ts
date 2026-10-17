@@ -44,6 +44,7 @@ export type AvailabilityRow = Readonly<{
   multiattack?: ReadonlyArray<{ actionId: string; count: number }> | null;
   reaction?: ContentActionSummary["reaction"];
   healing?: Readonly<{ formula: string }> | null;
+  healTargets?: number | null;
   targeting?: "none" | "single" | "multi" | null;
   darts?: number | null;
   damageTypes?: ContentActionSummary["damageTypes"] | null;
@@ -84,6 +85,7 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     grants: false,
     reaction: row.reaction ?? null,
     ...(row.healing ? { healing: row.healing } : {}),
+    ...(row.healTargets ? { healTargets: row.healTargets } : {}),
     ...(row.targeting ? { targeting: row.targeting } : {}),
     // A spell an item casts picks as the spell's own cast does (Magic Missile's darts, Chromatic Orb's type).
     ...(row.darts ? { darts: row.darts } : {}),
