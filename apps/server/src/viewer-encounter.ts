@@ -1,4 +1,5 @@
 import type { GameState } from "@vtt/domain";
+import { fogCovered } from "./fog-cover.js";
 import { healthBandOf } from "./hit-points.js";
 import { conditionLabels, projectPublicInitiative } from "./projections.js";
 import { visibleTerrain } from "./terrain.js";
@@ -30,17 +31,17 @@ export function projectViewerEncounterScene(state: GameState, now = Date.now()):
   const fog = { enabled: state.combat.fog.enabled, shapes: state.combat.fog.shapes.map((shape) => ({ ...shape })) };
   // As for players: only the terrain the fog reveals.
   const terrain = visibleTerrain(state.combat);
-  // A live scene shows its map, fog and terrain immediately; tokens and drawings appear only once combat runs,
-  // so no combatant data reaches the public screen before then.
-  if (!state.combat.active) return { mapAssetId: state.combat.mapAssetId, tokens: [], annotations: [], fog, terrain };
+  // A live scene shows what players see on their own screens: its map, fog and terrain, the public tokens the GM
+  // has placed, and public drawings. A token wholly under the fog stays off it, so its position never reaches the room.
   const publicActors = new Map(
-    state.actors.filter((actor) => actor.visibility === "public").map((actor) => [actor.id, actor])
+    state.actors.filter((actor) => actor.visibility === "public" && !actor.archived).map((actor) => [actor.id, actor])
   );
+  const fogged = fogCovered(state.combat);
   return {
     mapAssetId: state.combat.mapAssetId,
     tokens: state.combat.tokens.flatMap((token) => {
       const actor = publicActors.get(token.actorId);
-      if (!actor || !token.position) return [];
+      if (!actor || !token.position || fogged.has(token.actorId)) return [];
       // The richer style reaches the shared screen only when aimed at everyone; the fill derives from the
       // band, so exact HP never reaches it.
       const effective = actor.healthDisplay ?? state.combat.healthDisplay;

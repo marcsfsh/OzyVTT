@@ -69,6 +69,13 @@ function turnLabel(turn: EncounterArchiveTurn): string {
   return `${actor.name}'s turn`;
 }
 
+/** A turn's combat as the replay shows it. A replay is the fight, so a turn recorded outside one carries no map,
+ *  even where the live table would show players the scene. */
+function replayCombat(state: EncounterArchiveTurn["state"], now: number) {
+  const combat = projectPlayerCombat(state, undefined, now);
+  return state.combat.active ? combat : { ...combat, mapAssetId: null, tokens: [], annotations: [] };
+}
+
 /** Builds the player's replay. `now` is injected so annotation expiry is deterministic. There is no
  *  `playerSessionId`: the combat projection runs with `undefined`, so owner-only extras stay off and
  *  every reader gets the same spectator document. */
@@ -81,7 +88,7 @@ export function projectPlayerReplay(
     index: turn.index,
     at: turn.at,
     label: turnLabel(turn),
-    combat: projectPlayerCombat(turn.state, undefined, now),
+    combat: replayCombat(turn.state, now),
     actors: turnActors(turn),
     log: logSliceFor(document, index).flatMap((entry) => {
       const row = playerLogRow(entry);

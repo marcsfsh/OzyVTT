@@ -60,7 +60,7 @@ export const mapCommands = [
     type: "token.move",
     operationId: "moveToken",
     description:
-      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character; in a fight, moving it off its turn or teleporting is the GM's to allow, and only the GM takes a placed token back to the tray. `sceneId` targets a prepared (GM-private) scene instead of the live table.",
+      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene instead of the live table.",
     summary:
       "Move a combatant's token (server-snapped) walking, by a special speed, teleporting or by force; position null returns it to the tray.",
     schema: TokenMoveSchema,
@@ -80,7 +80,7 @@ export const mapCommands = [
         return;
       }
       const mapAssetId = kit.read().combat.mapAssetId;
-      if (!mapAssetId) throw new CommandRejectedError("Start an encounter before moving tokens.");
+      if (!mapAssetId) throw new CommandRejectedError("Make a scene live before moving tokens.");
       if (request.override && !isGmGrade(principal))
         throw new GameAccessDeniedError("Only the GM can override movement rules.");
       if (mode === "forced" && !isGmGrade(principal))
@@ -102,6 +102,9 @@ export const mapCommands = [
           "move",
           "You may only move your claimed character token."
         );
+        // Before a fight the GM sets the scene; players move their own tokens once it starts.
+        if (!state.combat.active && !isGmGrade(principal))
+          throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
         const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         // Taking a placed token off the map mid-fight would move it for free.
         if (position === null && from !== null && !isGmGrade(principal) && state.combat.active)
@@ -150,7 +153,10 @@ export const mapCommands = [
         movementOverridden = outcome.overridden;
         opportunityPrompts.push(...outcome.prompts);
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
-        movement = narrateTokenMove({ state, actorId, from, geometry, mode, crawled: outcome.crawled });
+        // Setting the scene before a fight tells the table nothing: the feed narrates moves in a fight.
+        movement = state.combat.active
+          ? narrateTokenMove({ state, actorId, from, geometry, mode, crawled: outcome.crawled })
+          : null;
         const to = moverToken?.position ?? null;
         if (from !== null && to !== null)
           draggedNames.push(...dragAlong(state, dragged, from, to, geometry).map((heldId) => kit.actorName(heldId)));
@@ -206,7 +212,7 @@ export const mapCommands = [
     schema: AnnotationAddSchema,
     malformed: "The annotation is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Start an encounter before adding to the map.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before adding to the map.");
       const { commandId, kind, shape, visibility, visibleToActorId, movableByOthers, color } = request;
       const { duplicate } = await execute((state) => {
         requireSameMap(state.combat.mapAssetId, mapAssetId);
@@ -241,7 +247,7 @@ export const mapCommands = [
     schema: AnnotationPingSchema,
     malformed: "The ping is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Start an encounter before pinging the map.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before pinging the map.");
       const { commandId, point, color } = request;
       const { duplicate } = await execute((state) => {
         requireSameMap(state.combat.mapAssetId, mapAssetId);
@@ -266,7 +272,7 @@ export const mapCommands = [
     schema: AnnotationMoveSchema,
     malformed: "The annotation update is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { geometry } = await liveMap(kit, "Start an encounter before editing the map.");
+      const { geometry } = await liveMap(kit, "Make a scene live before editing the map.");
       const { id, geometry: moved } = request;
       await execute((state) => {
         moveAnnotation(state, id, moved.origin, moved.target, annotationActorOf(principal), geometry);

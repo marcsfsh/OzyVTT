@@ -18,6 +18,7 @@ import type {
 } from "@vtt/domain";
 import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
+import { fogCovered } from "./fog-cover.js";
 import { healthBandOf } from "./hit-points.js";
 import { visibleTerrain } from "./terrain.js";
 
@@ -249,15 +250,23 @@ export function projectPlayerCombat(state: GameState, playerSessionId?: string, 
     state.actors.filter((actor) => actor.visibility === "public").map((actor) => actor.id)
   );
   const currentIsPublic = initiative.some((entry) => entry.active);
+  // The live map reaches players before a fight as on the table screen. A token wholly under the fog stays off it
+  // (their own characters' aside), and before a fight only placed tokens are sent: who waits in the tray is the GM's.
+  const fogged = fogCovered(state.combat);
+  const showsToken = (token: GameState["combat"]["tokens"][number]) =>
+    publicActorIds.has(token.actorId) &&
+    (state.combat.active || token.position !== null) &&
+    (!fogged.has(token.actorId) || ownedBy(state, token.actorId, playerSessionId));
   return {
     active: state.combat.active,
     round: state.combat.round,
     turnActorId: currentIsPublic ? state.combat.turnActorId : null,
-    mapAssetId: state.combat.active ? state.combat.mapAssetId : null,
+    mapAssetId: state.combat.mapAssetId,
     hiddenTurn: state.combat.active && state.combat.turnActorId !== null && !currentIsPublic,
-    initiative,
-    tokens: state.combat.active ? state.combat.tokens.filter((token) => publicActorIds.has(token.actorId)) : [],
-    annotations: state.combat.active ? projectPlayerAnnotations(state, playerSessionId, now) : [],
+    // Before a fight the order holds only who the GM staged, which is not the players' to know yet.
+    initiative: state.combat.active ? initiative : [],
+    tokens: state.combat.mapAssetId ? state.combat.tokens.filter(showsToken) : [],
+    annotations: state.combat.mapAssetId ? projectPlayerAnnotations(state, playerSessionId, now) : [],
     // A hidden combatant's turn stays opaque: economy flags, action instance and per-turn uses (which
     // name stat-block action ids) reset to idle rather than narrate its activity.
     turn: currentIsPublic
