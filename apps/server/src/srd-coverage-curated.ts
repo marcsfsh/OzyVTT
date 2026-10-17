@@ -94,7 +94,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "armor-class.ts in the domain package works out AC from armor, Shield, Dexterity and riders, and every attack roll is compared with it."
   ),
   "armor-training": enforced(
-    "equipment-derivation.ts gives untrained armor Disadvantage on Strength and Dexterity D20 Tests, and resolution/economy.ts refuses spells while it is worn. An untrained Shield adds no AC."
+    "equipment-derivation.ts gives untrained armor Disadvantage on Strength and Dexterity D20 Tests, and resolution/economy.ts refuses spells while it is worn. An untrained Shield adds no AC. Training an item grants counts too (Elven Chain)."
   ),
   attack: enforced(
     "resolution/economy.ts counts the attacks the Attack action allows, Extra Attack included, and lets the creature move between them. Equipping or stowing a weapon is the table's."
@@ -724,9 +724,6 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:dwarven-plate": guided("The +2 AC is applied. The Reaction against forced movement is the GM's."),
   "item:dwarven-thrower": guided(
     "The +3 to attack and damage rolls is applied. Throwing it, its return and the extra damage against Giants are the GM's."
-  ),
-  "item:elven-chain": guided(
-    "The +1 AC is applied. The SRD counts its wearer as trained with it, but equipment-derivation.ts doesn't, so a wearer without Medium armor training takes the untrained penalties."
   ),
   "item:giant-slayer": guided(
     "The +1 to attack and damage rolls is applied. The extra 2d6 against Giants is the GM's."

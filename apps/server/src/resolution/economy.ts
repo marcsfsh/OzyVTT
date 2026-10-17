@@ -16,7 +16,7 @@ import {
 } from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
 import { SCROLL_UNREADABLE, scrollOfAction, scrollReading } from "../scrolls.js";
-import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
+import { armorTrainingGaps, deriveEquipment, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { isItemActionId, itemActionRest, TWO_HANDED_SUFFIX } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
@@ -152,7 +152,7 @@ export function evaluateActionEconomy(
   checkOwnTurn(evaluation);
   checkExtraAttackOpened(evaluation);
   checkHands(evaluation);
-  checkArmorTraining(evaluation, definition);
+  checkArmorTraining(evaluation, definition, catalog);
   checkAmmunition(evaluation, catalog);
   checkScrollLegible(evaluation, definition, catalog);
   if (!asHitRider) checkTakenAlone(evaluation);
@@ -435,11 +435,16 @@ function swingItemOf(attacker: LiveActor, action: DefinitionAction) {
 }
 
 /** SRD Armor Training: in Light, Medium or Heavy armor you lack training with, "you can't cast spells". Any action
- *  that casts a spell counts, a wand's included. Read from the sheet's own training; armor training an item grants
- *  is the GM's to allow. */
-function checkArmorTraining({ attacker, action, violations }: Evaluation, definition: ActorDefinition | undefined) {
+ *  that casts a spell counts, a wand's included. With the catalog, training an item grants counts too (Elven Chain). */
+function checkArmorTraining(
+  { attacker, action, violations }: Evaluation,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+) {
   if (action.spellId === undefined && action.spellSlot === undefined) return;
-  const { untrainedArmor } = armorTrainingGaps(attacker.inventory, definition);
+  const { untrainedArmor } = catalog
+    ? deriveEquipment(attacker, definition, catalog)
+    : armorTrainingGaps(attacker.inventory, definition);
   if (untrainedArmor)
     violations.push({
       rule: "spell.untrained-armor",

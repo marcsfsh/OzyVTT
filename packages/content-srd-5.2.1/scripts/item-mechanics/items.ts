@@ -61,8 +61,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Not modeled: the Reaction reducing forced movement.
   "dwarven-plate": { modifiers: [{ type: "armor-class", amount: 2 }] },
 
-  // "Considered trained with this armor" is not authored: nothing penalises untrained armor.
-  "elven-chain": { modifiers: [{ type: "armor-class", amount: 1 }] },
+  // "You are considered trained with this armor even if you lack training with Medium or Heavy armor": training with
+  // both weights while it is worn, since the chain is a Chain Shirt or Chain Mail.
+  "elven-chain": { grants: { armor: ["medium", "heavy"] }, modifiers: [{ type: "armor-class", amount: 1 }] },
 
   "glamoured-studded-leather": { modifiers: [{ type: "armor-class", amount: 1 }] },
 

@@ -2804,6 +2804,22 @@
   "tags": [],
   "actions": [],
   "effects": [],
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [
+    "medium",
+    "heavy"
+   ],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
   "modifiers": [
    {
     "type": "armor-class",
