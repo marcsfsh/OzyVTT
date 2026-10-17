@@ -14,7 +14,7 @@ import { defineCommand, type Committed } from "./pipeline.js";
 
 // The GM's table-wide settings. Each change leaves an audit line in the feed.
 
-// GM-only audit line per party-visibility tier. `off` removes the sheet, not the map or turn order.
+// GM-only audit line per party-visibility tier. `off` removes the sheet and leaves the map and turn order.
 const PARTY_VISIBILITY_LOG: Readonly<Record<PartyVisibility, string>> = {
   off: "Players no longer read anything of each other's sheets. Each other's characters stay on the map and in the turn order.",
   "name-and-class": "Players now see each other's name and class.",
@@ -47,7 +47,7 @@ export const tableSettingCommands = [
     async run({ request, execute }, kit) {
       const { mode, exceptions } = request;
       const committed = await execute((state) => {
-        // Omitted exceptions leave the stored ones alone (additive field, not a reset).
+        // Omitted exceptions leave the stored ones alone (an additive field, with no reset).
         state.combat = {
           ...state.combat,
           rulesMode: mode,

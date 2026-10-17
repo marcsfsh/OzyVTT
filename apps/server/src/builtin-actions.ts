@@ -4,7 +4,7 @@ type BuiltinAction = ActorDefinition["actions"][number];
 
 /**
  * The SRD 5.2.1 generic actions every combatant can take (rules glossary "[Action]" entries) plus the
- * Unarmed Strike options. Engine behaviour rather than content data, but in the same ActionSchema
+ * Unarmed Strike options. Engine behaviour, outside the content data, but in the same ActionSchema
  * vocabulary and resolution path as stat-block actions (a test pins every entry to the schema).
  *
  * Ids are a frozen replay contract (journaled payloads reference them); a stat-block action with the
@@ -263,8 +263,8 @@ function takenTogether(action: BuiltinAction): readonly GrantedBase[] {
 }
 
 /**
- * An action that takes two generic actions at once grants both: one effect carrying each one's tags and modifiers
- * (Dash's measured movement, Disengage's no-provoke, Dodge's Disadvantage), lasting as they do. An action that grants
+ * An action that takes two generic actions at once grants both as one effect. It carries each one's tags and modifiers
+ * (Dash's measured movement, Disengage's no-provoke, Dodge's Disadvantage) and lasts as they do. An action that grants
  * something of its own keeps it.
  */
 export function withTakenActions(action: BuiltinAction): BuiltinAction {
@@ -316,7 +316,7 @@ function bonusSources(definition: ActorDefinition | undefined): ReadonlyMap<Bonu
 }
 
 /** A generic action taken as a Bonus Action through a feature. Martial Arts' strike keeps the Monk's own numbers
- *  (its die, Dexterity) when the sheet has them; it is one attack, not part of the Attack action, so Extra Attack's
+ *  (its die, Dexterity) when the sheet has them; it is one attack outside the Attack action, so Extra Attack's
  *  count and the attack it replaces don't come along. */
 function bonusVariant(base: BonusBase, source: string, definition: ActorDefinition | undefined): BuiltinAction {
   const generic = builtinAction(base)!;

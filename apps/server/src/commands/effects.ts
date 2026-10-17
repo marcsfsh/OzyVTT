@@ -68,7 +68,7 @@ export const effectCommands = [
         if (sourceActorId && !source) throw new CommandRejectedError("The effect's source is no longer on the table.");
         // A concentration effect is sustained by its caster when named, else by its bearer: the one whose damage
         // prompts the CON save. A named caster already concentrating holds this as part of that same Concentration
-        // (a Bless the GM puts on three allies), rather than ending it.
+        // (a Bless the GM puts on three allies), and the effect itself stays.
         const sustainer = source?.id ?? (concentration ? actorId : null);
         const ongoing =
           concentration && source

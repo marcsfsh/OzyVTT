@@ -161,7 +161,7 @@ export const DowntimeInputSchema = z
     who: z.string().trim().max(120),
     activity: z.string().trim().max(120),
     days: z.number().int().min(0).max(3650),
-    /** Links the tracker to a person rather than a spelling; unknown ids 404, page type is not checked. */
+    /** Links the tracker to a person whatever the spelling; unknown ids 404, page type is not checked. */
     characterPageId: z.uuid().nullable().optional()
   })
   .strict();
@@ -275,7 +275,7 @@ export const CodexSettingsSchema = z
     commandId: CommandIdSchema
   })
   .strict();
-/** The Codex's one destructive route, so bad values are rejected, not clamped; the max matches the store's `MAX_PRUNE_DAYS`. */
+/** The Codex's one destructive route, so bad values are rejected and never clamped; the max matches the store's `MAX_PRUNE_DAYS`. */
 export const RevisionsDeleteSchema = z.object({ olderThanDays: z.number().int().min(0).max(36_500) }).strict();
 /** A saved export's `data`, posted back unedited. A missing `bundleVersion` is an older v1 backup; other versions are refused. */
 export const CodexImportSchema = z

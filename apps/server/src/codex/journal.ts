@@ -267,7 +267,7 @@ export function createDowntime(db: CodexDb, input: CodexDowntimeCreateInput): Co
   return createOne(db, { ...authoredFields(db, input, dated), kind: "downtime", payload });
 }
 
-/** Level history is a journal record, not a table: the timeline already orders it. */
+/** Level history is a journal record with no table of its own: the timeline already orders it. */
 export function createMilestone(db: CodexDb, input: CodexMilestoneCreateInput): CodexJournalEntry {
   const payload = milestonePayload(input.milestone);
   const dated = resolveDate(db, input.inWorldDate ?? getCalendar(db).currentDate ?? null, input.inWorldLabel);
@@ -316,7 +316,7 @@ export function updateEntry(db: CodexDb, entryId: string, input: CodexJournalUpd
     input.inWorldDate !== undefined || input.inWorldLabel !== undefined
       ? resolveDate(db, input.inWorldDate ?? null, input.inWorldLabel)
       : null;
-  // A deadline's date cannot be cleared, since without one it could never fire; rejected rather than ignored so
+  // A deadline's date cannot be cleared, since without one it could never fire; rejected, so
   // the GM learns the field is required.
   if (existing.kind === "deadline" && dated && dated.instant === null)
     throw new CodexValidationError(

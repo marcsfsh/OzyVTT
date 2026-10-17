@@ -90,7 +90,7 @@ export const rulingCommands = [
     malformed: "The answer is malformed.",
     gmOnly: "Only the GM can answer a rules question.",
     // Allow replays the parked command with an override of the asked family before clearing the ask, so a
-    // failed replay leaves it parked; a block of another family re-asks rather than riding the same Allow.
+    // failed replay leaves it parked; a block of another family re-asks and never rides the same Allow.
     // Deny clears it and tells the player.
     async run({ request, execute, dispatch }, kit) {
       const { askId, allow, reason } = request;

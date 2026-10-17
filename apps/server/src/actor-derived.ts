@@ -27,8 +27,8 @@ import { currentSpeedFeet } from "./speed.js";
  * functions the resolver uses, so a chip and a GM-forced roll never disagree and item riders apply.
  *
  * Delivered on `actor:available-actions`, a request that authorizes its caller for one actor before
- * anything is derived, rather than on the broadcast `PlayerView`. That keeps one authorization gate
- * instead of a per-actor strip that must stay right in both `projections.ts` and `PlayerActor`, and the
+ * anything is derived, and is never on the broadcast `PlayerView`. That keeps one authorization gate
+ * where a per-actor strip would have to stay right in both `projections.ts` and `PlayerActor`, and the
  * block is never computed for an actor the caller may not see.
  */
 

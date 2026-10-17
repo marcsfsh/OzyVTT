@@ -140,7 +140,7 @@ function requireServerAbilityRoll(state: GameState, request: BuilderDiceRequest,
 const sortedValues = (values: readonly number[]) => [...values].sort((left, right) => left - right).join(",");
 
 /** Whether a rebuild sends the six values its sheet recorded, under the same method, in any order: reassigning the
- *  same six is a respec, not a new roll. */
+ *  same six is a respec and no new roll. */
 function sendsRecordedScores(request: BuilderDiceRequest, ledger: readonly CharacterChoice[]): boolean {
   const recorded = storedAbilityScores(ledger);
   return (

@@ -64,7 +64,7 @@ export const encounterCommands = [
         throw new CommandRejectedError("Select an uploaded battlemap before starting the encounter.");
       const { commandId, mapAssetId, rulesMode, ruleExceptions, playersRollInitiative, groupMonsters } = request;
       const tokenGeometry = await kit.context.tokenGeometryFor(mapAssetId);
-      // Omitted `entries` means "start the fight staged here", derived from live state rather than the client.
+      // Omitted `entries` means "start the fight staged here", derived from live state and never from the client.
       // No refusal here, so `startEncounter`'s own guards keep their order and wording.
       const stagedEntries = (state: GameState): readonly EncounterStartEntry[] => {
         // The active scene's own slot is empty by invariant (its live copy is the top-level combat), so the

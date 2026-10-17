@@ -327,7 +327,7 @@ function optionAsFeature(option: FeatureOption): FeatureRecord {
     actions: option.actions,
     effects: option.effects,
     modifiers: option.modifiers,
-    // Listed explicitly rather than spread, so a field added to one carrier but not the other is a type error.
+    // Listed explicitly and never spread, so a field added to one carrier but not the other is a type error.
     extraPicks: option.extraPicks,
     replaces: option.replaces,
     ...(option.uses ? { uses: option.uses } : {}),
@@ -615,7 +615,7 @@ function surveyBuild(
     background,
     progression: library.classProgressionTable(),
     scoresBeforeIncreases: finalScores,
-    // SRD Multiclassing: the Proficiency Bonus follows the total character level, not any one class's.
+    // SRD Multiclassing: the Proficiency Bonus follows the total character level across every class.
     proficiencyBonus: proficiencyBonusForLevel(input.level)
   };
 }
@@ -874,7 +874,7 @@ function placeChoices(
           (row.payload && typeof row.payload.featureId === "string" && row.payload.featureId === featureId))
     );
   };
-  /** Options a gate determined rather than offered; drained into `granted` once every offer is built. */
+  /** Options a gate determined and never offered; drained into `granted` once every offer is built. */
   const determined: Array<{ option: FeatureOption; parentId: string; site: OfferSite }> = [];
   /** What a budget already holds, read off the ledger (narrowed by `fromPicks`). */
   const NAMED_BUDGET_KIND: Readonly<Record<string, string>> = {
@@ -1013,7 +1013,7 @@ function placeChoices(
     } else if (named.length > 0) options = new Set(named);
     else if (!choice.fromCatalog) {
       // `{kind, choose, from: []}` passes the content schema but cannot resolve; reject it as bad content
-      // instead of letting a raw TypeError reach the client.
+      // so a raw TypeError never reaches the client.
       reject(
         `"${record.name}" offers a "${choice.kind}" choice with no options. Its content record needs a non-empty "from" list or a "fromCatalog" slug.`
       );
@@ -1118,7 +1118,7 @@ function placeChoices(
       candidates[0]
     );
   };
-  /** Extra picks raise a budget rather than grant an outcome. Grants add up; each is folded in as soon as
+  /** Extra picks raise a budget and grant no outcome. Grants add up; each is folded in as soon as
    *  its source is settled, because `matchRow` refuses picks over `capacity`. A class's feature raises that class's
    *  budgets, read off that class's own table at its own level. */
   const extraPickBudgets = new Map<string, number>();

@@ -2804,7 +2804,7 @@ export const openApiDocument = {
       CodexCalendarProjectedResponse: envelopeSchema("#/components/schemas/CodexCalendarProjectedData"),
       CodexSettingsData: codexDataObject("settings", { $ref: "#/components/schemas/CodexSettings" }),
       CodexSettingsResponse: envelopeSchema("#/components/schemas/CodexSettingsData"),
-      // A count rather than `CodexDeletedData`'s `deleted: true`: the real number of rows removed.
+      // A count of the rows removed, where `CodexDeletedData` says only `deleted: true`.
       CodexRevisionsDeletedData: codexDataObject("deleted", {
         type: "integer",
         minimum: 0,

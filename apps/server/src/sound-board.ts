@@ -204,7 +204,7 @@ export function nextTrack(board: SoundBoard, deps: SoundDeps) {
 }
 
 /** How late a hand-over may run and still date the next track from the boundary; later than this (the server was
- *  down) the next track starts now instead of racing through the tracks it missed. */
+ *  down) the next track starts now and skips the tracks it missed. */
 const HAND_OVER_SLACK_MS = 5_000;
 
 /** The server's own hand-over when a track reaches its end. The next track starts at the boundary itself, not

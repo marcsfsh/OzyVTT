@@ -35,7 +35,7 @@ export function paintFog(
 ) {
   const slice = fogSlice(state, sceneId);
   const rect = normalizedRect(geometry, input.rect, "Drag a larger area to paint fog.");
-  // A stroke covering the whole map supersedes everything before it, so compact instead of accumulating.
+  // A stroke covering the whole map supersedes everything before it, so compact and never accumulate.
   const coversMap =
     rect.x <= 0 && rect.y <= 0 && rect.x + rect.width >= geometry.width && rect.y + rect.height >= geometry.height;
   const kept = coversMap ? [] : slice.fog.shapes;

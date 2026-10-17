@@ -191,7 +191,7 @@ function enforceCurse(actor: Actor, incoming: InventoryItem, deps: InventoryDeps
  *   - a non-template row's `baseId` is stripped (it would self-grant proficiency and mastery);
  *   - an omitted `baseId` inherits the stored pick; only the GM may change an existing pick (an in-place
  *     swap would bypass `enforceCurse`);
- *   - a stale pick on an already-bound row fails open, keeping its stored stats.
+ *   - a stale pick on an already-bound row fails open and keeps its stored stats.
  */
 export function bindTemplateItem(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
   return withMagicMarker(bindTemplateStats(item, deps, stored), deps);

@@ -16,7 +16,7 @@ export type HomebrewUsage = Readonly<{
   detail: string | null;
 }>;
 
-/** The contract requires a uuid; anything else is skipped rather than sent as a malformed usage. */
+/** The contract requires a uuid. A usage with anything else is skipped, so none goes out malformed. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** All usages in one pass: the library asks per row, and each state snapshot is a full clone. */

@@ -8,7 +8,7 @@ const ESCAPE = /escape from the corpse (?:by )?using (\d+) feet of movement/i;
 
 /**
  * A dead or departed swallower lets go of what it swallowed: each creature its swallow holds is no longer Restrained
- * or Blinded by it, and climbs out of the corpse with the movement the stat block names, landing Prone. On that
+ * or Blinded by it, and climbs out of the corpse with the movement the stat block names and lands Prone. On that
  * creature's own turn the movement comes out of the turn's; otherwise out of its next turn, as Speed lost until that
  * turn ends.
  */

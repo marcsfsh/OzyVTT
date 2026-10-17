@@ -114,7 +114,7 @@ export function offeredPush(ctx: ResolveContext): Readonly<{ targetName: string;
 }
 
 /** A hit's forced movement (the Push mastery, Repelling Blast, a stat block's shove), as far as the attacker chose
- *  (SRD "up to"). Failures degrade to a GM-only sentence, never a rejection; only an accomplished push is narrated to
+ *  (SRD "up to"). A failure is a GM-only sentence and refuses nothing; only an accomplished push is narrated to
  *  the table. */
 function pushMasteryTargets(ctx: ResolveContext): void {
   const { attacker, targets, deps, input, tableNarration, warnings } = ctx;

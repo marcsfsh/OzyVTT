@@ -87,7 +87,7 @@ function drawSome<T>(items: readonly T[], count: number, random: DiceRandom): T[
 
 const sortedIds = (ids: Iterable<string>): string[] => [...ids].sort();
 
-/** `count` items, drawing from `preferred` first and topping up from the rest of `all`. */
+/** `count` items, drawn from `preferred` first and topped up from the rest of `all`. */
 function drawPreferring<T>(preferred: readonly T[], all: readonly T[], count: number, random: DiceRandom): T[] {
   const first = drawSome(preferred, count, random);
   if (first.length >= count) return first;
@@ -314,7 +314,7 @@ function featIsTakeable(
 ): boolean {
   if (survey.heldFeatIds.has(id)) return false;
   const feat = library.featRecord(id);
-  if (!feat) return true; // an inline option rather than a catalog feat; the offer already vouched for it
+  if (!feat) return true; // an inline option and no catalog feat; the offer already vouched for it
   return featPrerequisiteFailure(feat, { ...featHoldings(survey), level, scores }) === null;
 }
 
@@ -334,7 +334,7 @@ function answerOffer(
   // An improvement follows the priority of the class it belongs to.
   const priorityClass = offer.classId ?? input.classId;
 
-  // "Raise scores instead of taking a feat", decided per pick.
+  // "Raise scores in place of a feat", decided per pick.
   if (offer.kind === "asi-or-feat" && random(2) === 1) {
     const increases = asiIncreases(survey, choices, priorityClass, library);
     if (increases) return [rowFor(offer, "asi", offer.taken.length, { increases })];
@@ -346,7 +346,7 @@ function answerOffer(
   );
 
   // Hard filters remove ids the validator would refuse; preferences only reorder legal ids, so running
-  // out of preferred ids falls through instead of leaving the pick unanswerable.
+  // out of preferred ids falls through, so the pick is never left unanswerable.
   let candidates = legal;
   let preferred: readonly string[] = legal;
   if (FEAT_KINDS.has(offer.kind)) {
@@ -450,7 +450,7 @@ function drawWithinLevelGates(
   return drawn;
 }
 
-// The class's own spell budgets are printed columns rather than offers, so they are filled here.
+// The class's own spell budgets are printed columns with no offers, so they are filled here.
 
 type SpellOption = Readonly<{ id: string; name: string; level?: number }>;
 

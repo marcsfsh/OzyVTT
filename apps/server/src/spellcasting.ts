@@ -8,7 +8,7 @@ type ResolveDefinition = (definitionId: string) => ActorDefinition | undefined;
 
 /** Sets the remaining slots for one level, clamped to 0..max. Covers spending and restoring (Arcane
  *  Recovery); the caller computes the target. Rejects if the actor has no pool at that level. `pact` names the
- *  Pact Magic pool instead of the spell slots. */
+ *  Pact Magic pool; without it, the spell slots. */
 export function setSpellSlotRemaining(
   state: GameState,
   actorId: string,
@@ -83,7 +83,7 @@ const chargeable = (definition: ActorDefinition, classId: string | undefined) =>
 
 /** Prepare or un-prepare a known spell on the actor's live prepared set. Validated against the definition's known
  *  list and its prepared cap; cantrips and always-prepared spells can't be toggled. A player changes the list only
- *  in the prepare step a Long Rest opens (SRD), swapping in at most what it allows, and never mid-fight; the GM may
+ *  in the prepare step a Long Rest opens (SRD), by at most what it allows, and never mid-fight; the GM may
  *  change it any time. */
 export function setPreparedSpell(
   state: GameState,

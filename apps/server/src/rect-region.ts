@@ -3,7 +3,7 @@
 
 export type Rect = Readonly<{ x: number; y: number; width: number; height: number }>;
 
-/** Slivers thinner than this are float noise from snapping, not area. */
+/** Slivers thinner than this are float noise from snapping and count as no area. */
 const EPSILON = 0.01;
 
 const right = (rect: Rect) => rect.x + rect.width;

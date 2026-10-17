@@ -98,7 +98,7 @@ export const gameReads = [
       const { definitionId } = input as z.output<typeof ContentActionsSchema>;
       const catalog = kit.catalogFor(principal);
       const imported = storedDefinition(kit.read(), definitionId);
-      // Browse uses the catalog's own lookup (honours draft/published/deleted), not the play-time resolver.
+      // Browse uses the catalog's own lookup (honours draft/published/deleted), and leaves the play-time resolver out.
       const definition = imported ?? catalog.monster(definitionId);
       const actions = imported ? actionSummariesOf(imported.actions) : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
@@ -173,7 +173,7 @@ export const gameReads = [
           ...actionAvailability(state, actor, builtins, definition, true, available, catalog)
         ],
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
-        // request rather than the broadcast projection (see `actor-derived.ts`).
+        // request and is never on the broadcast projection (see `actor-derived.ts`).
         derived: deriveActorSheet(
           actor,
           definition,

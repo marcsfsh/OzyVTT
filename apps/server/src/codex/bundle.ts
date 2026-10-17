@@ -119,8 +119,8 @@ export function exportBundle(db: CodexDb): CodexBundle {
 }
 
 /**
- * Replaces the Codex with a validated bundle in one write. Replace, not merge: merging singleton and uniquely
- * indexed state has no defined answer. Rows are written as they are, with no create-time side effects (no
+ * Replaces the Codex with a validated bundle in one write. A merge would have no defined answer for singleton and
+ * uniquely indexed state. Rows are written as they are, with no create-time side effects (no
  * quest history, no revision snapshots); dates are re-resolved against the restored calendar.
  */
 export function importBundle(db: CodexDb, raw: unknown): CodexImportCounts {
@@ -193,7 +193,7 @@ const BUNDLE_KEYS: ReadonlySet<string> = new Set<string>([...BUNDLE_LIST_KEYS, .
  * Validates an untrusted bundle before any write, through the same validators as ordinary writes. A restore
  * replaces everything, so a bundle with no or unknown sections is refused: it would silently delete data. A
  * missing key within a record takes its default. Cross-record checks mirror the database's constraints, so a
- * bad file gets a readable error instead of driver text.
+ * bad file gets a readable error, with no driver text.
  */
 function normalizeBundle(raw: unknown): CodexBundle {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))

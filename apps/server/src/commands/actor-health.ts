@@ -282,7 +282,7 @@ export const actorHealthCommands = [
           .catalogFor(principal)
           .conditionSummaries()
           .find((entry) => entry.id === conditionId)?.name ?? conditionId;
-      // Immunity skips narrate through the events instead of the generic applied line.
+      // Immunity skips narrate through the events, in place of the generic applied line.
       if (!events.some((event) => event.immune))
         kit.context.broadcastTableEvent({
           kind: "condition",

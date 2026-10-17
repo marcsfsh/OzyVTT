@@ -131,7 +131,7 @@ export function evaluateActionEconomy(
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null,
   siblings: ReadonlyArray<DefinitionAction> = definition?.actions ?? [],
   slotLevel?: number,
-  /** The action rides a hit it was chosen for (Sneak Attack), rather than being taken alone. */
+  /** The action rides a hit it was chosen for (Sneak Attack) and is never taken alone. */
   asHitRider = false,
   catalog?: EquipmentCatalog,
   /** The spell the action casts, for the slot, preparation and targeting checks. */
@@ -366,9 +366,9 @@ function checkOncePerTurn({ state, attacker, action, violations }: Evaluation): 
 }
 
 /**
- * Features with no activation of their own that answer a roll or an event rather than act (rerolling a failed save,
- * Relentless Endurance at 0 HP), which an Incapacitated creature still gets. Every other "other" activation - a
- * legendary action, Sneak Attack, Reckless Attack, Action Surge, a free cast - is an action by another name.
+ * Features with no activation of their own that answer a roll or an event (rerolling a failed save, Relentless
+ * Endurance at 0 HP), which an Incapacitated creature still gets. Every other "other" activation (a legendary
+ * action, Sneak Attack, Reckless Attack, Action Surge, a free cast) is an action by another name.
  */
 const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
   "indomitable",
@@ -778,7 +778,7 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     bonusInstance: state.combat.turn.bonusActionInstance,
     extraAction: null
   };
-  // An open compound bonus action (Flurry of Blows) spends its own strikes first, costing no further slot.
+  // An open compound bonus action (Flurry of Blows) spends its own strikes first and costs no further slot.
   const bonusOpen = state.combat.turn.bonusActionInstance;
   if (onOwnTurn && bonusOpen && bonusOpen.actorId === attacker.id && !action.multiattack) {
     const components = { ...bonusOpen.components };
@@ -972,7 +972,7 @@ function checkActionSlot(evaluation: Evaluation): SlotPlan {
       .filter(([, count]) => count > 0)
       .map(([key, count]) => `${count}× ${componentName(key)}`);
   if (action.multiattack) {
-    // Tapping the Multiattack plan mid-instance is a continue, not a violation.
+    // Tapping the Multiattack plan mid-instance continues it and breaks no rule.
     if (leftovers().length === 0) return refuse(`${attacker.name} has no attacks remaining in this action.`, current);
     return continued({ components, replacements });
   }
@@ -1140,8 +1140,8 @@ export function castSlotLevel(actor: SlotPools, base: number, requested: number 
   return castSlot(actor, base, requested).level;
 }
 
-/** Spends one slot from the pool `castSlot` picked, clamped at zero: an override spends what is there rather than
- *  going into debt. */
+/** Spends one slot from the pool `castSlot` picked, clamped at zero: an override spends what is there and never
+ *  goes into debt. */
 export function spendSlot(actor: SlotPools, slot: Readonly<{ level: number; pact?: boolean }>): void {
   if (slot.pact) {
     if (actor.pactSlots?.level === slot.level)

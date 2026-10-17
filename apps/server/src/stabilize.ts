@@ -89,7 +89,7 @@ function targetState(target: LiveActor): "dying" | "knocked-out" {
   return "dying";
 }
 
-/** Spare the Dying's range: 15 feet, doubling at character levels 5, 11 and 17 (its Cantrip Upgrade). */
+/** Spare the Dying's range: 15 feet, which doubles at character levels 5, 11 and 17 (its Cantrip Upgrade). */
 function spareTheDyingRange(definition: ActorDefinition | undefined): number {
   const level = (definition?.character?.classes ?? []).reduce((sum, entry) => sum + entry.level, 0);
   return level >= 17 ? 120 : level >= 11 ? 60 : level >= 5 ? 30 : 15;

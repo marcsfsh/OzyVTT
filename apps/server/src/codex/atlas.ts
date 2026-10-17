@@ -208,7 +208,7 @@ export function updateMap(
   return getMap(db, mapId)!;
 }
 
-/** Re-parent a map, rejecting self-parenting and cycles so world, region and city stay a tree. */
+/** Re-parent a map. Self-parenting and cycles are refused, so world, region and city stay a tree. */
 export function setMapParent(db: CodexDb, mapId: string, parentMapId: string | null): CodexMap {
   if (!mapRow(db, mapId)) throw new CodexNotFoundError("That map no longer exists.");
   const parent = optionalId(parentMapId);

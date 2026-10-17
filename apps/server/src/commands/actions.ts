@@ -174,7 +174,7 @@ export const actionCommands = [
               throw new CommandRejectedError("Every target must be in this encounter.");
           }
         }
-        // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.
+        // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
           geometry ? (tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null) : null;
         // The attack's d20 is held between a preview and its confirm, one per creature and turn (ADR-0012), so a
@@ -184,7 +184,7 @@ export const actionCommands = [
           requireTypedDie(draft, initiator, heldRollFor(draft, holdKey), attackNatural);
         // SRD forced movement (Push), snapped like a GM drag; takes no client input. Only `targets[0]` of a hit
         // is pushed, already restricted to public combatants for players. If the map changed since the grid
-        // was fetched, degrade to null ("move the token") rather than throw.
+        // was fetched, degrade to null ("move the token") and never throw.
         const pushToken = (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
           draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null;
         resolution = resolveDefinitionAction(
@@ -384,7 +384,7 @@ export const actionCommands = [
       );
 
       // Loose: the server rolls the action's dice, attributed to the character, and spends what the action
-      // costs (an item's charges), touching no combat state. HP only ever moves through the resolver. Only the GM may
+      // costs (an item's charges). Combat state stays as it is; HP only moves through the resolver. Only the GM may
       // force a roll mode.
       const forcedMode = isGmGrade(principal) ? rollMode : undefined;
       const plan = looseRollPlan(action, {

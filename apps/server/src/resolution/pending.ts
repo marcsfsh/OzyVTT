@@ -163,7 +163,7 @@ export function isMagicalAction(ctx: MagicalSource): boolean {
   return item !== undefined && ctx.deps.catalog?.equipmentRecord(catalogIdOf(item))?.isMagic === true;
 }
 
-/** Conditions a failed save leaves on their own rather than on its effect: Prone ends by standing up, and
+/** Conditions a failed save leaves on their own, outside its effect: Prone ends by standing up, and
  *  Exhaustion stacks and leaves with rests. */
 const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
 

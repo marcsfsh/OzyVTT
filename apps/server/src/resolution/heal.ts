@@ -9,7 +9,7 @@ import { useCostOf } from "../use-cost.js";
 import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Healing (Cure Wounds): rolled once, and every target regains it on the resolve. A willing creature's healing has
- *  nothing to gate, so it applies here instead of waiting on an Apply tap as damage does. Second Wind heals its user;
+ *  nothing to gate, so it applies here with no Apply tap, which damage waits on. Second Wind heals its user;
  *  Preserve Life divides one roll among its targets, none past half its maximum; Lay on Hands regains its formula once
  *  per point spent; False Life's roll is Temporary Hit Points. */
 export function applyHealing(ctx: ResolveContext): void {
@@ -88,7 +88,7 @@ export function healingShares(
   if (!healing.divided) return room.map((space) => Math.min(space, total));
   const shares = targets.map(() => 0);
   let left = total;
-  // Even shares, handing what a full target can't take to the others.
+  // Even shares. What a full target can't take goes to the others.
   for (let open = room.filter((space) => space > 0).length; left > 0 && open > 0;) {
     const each = Math.max(1, Math.floor(left / open));
     open = 0;

@@ -563,7 +563,7 @@ export function createServer(options: CreateServerOptions) {
   app.use(CODEX_PATHS.import, createCodexImportGuard(codexAuth), express.json({ limit: "64mb" }));
   // Above the express default so canonical ActorDefinition imports (capped at 256kb) fit.
   app.use(express.json({ limit: "512kb" }));
-  // Give /api/v1 callers the stable error envelope for malformed/oversized JSON instead of Express's HTML.
+  // Give /api/v1 callers the stable error envelope for malformed/oversized JSON. Express would answer with HTML.
   app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!error || res.headersSent || !isApiV1(req.path)) return next(error as Error);
     return (error as { type?: string }).type === "entity.too.large"

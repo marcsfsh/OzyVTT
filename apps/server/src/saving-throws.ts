@@ -439,7 +439,7 @@ export function applyFailureEffect(
       sourceName: onFail.sourceName,
       sourceActionId: onFail.sourceActionId ?? null,
       startedRound: state.combat.round,
-      // "Until the end of the current turn": this turn's end, not the next one's.
+      // "Until the end of the current turn": the end of this turn.
       duration:
         onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
@@ -817,7 +817,7 @@ export function answerSave(
       }
     );
     appliedDamage = outcome.application.totalApplied;
-    // Keep the whole application, not just its total.
+    // Keep the whole application along with its total.
     application = outcome.application;
     events.push(...outcome.events);
     // A spell area that stops after so much damage counts it (Guardian of Faith).

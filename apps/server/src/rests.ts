@@ -33,7 +33,7 @@ function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDice
     });
 }
 
-/** The sizes of the next `count` Hit Dice a pool spends, biggest first, matching `spendFromPool`: a
+/** The sizes of the next `count` Hit Dice a pool spends, biggest first as `spendFromPool` spends them: a
  *  Fighter 3 / Wizard 2 rolls d10s, then d6s. Short when the pool holds fewer. */
 export function hitDieSizesToSpend(entries: readonly HitDiceEntry[], count: number): number[] {
   return [...entries]
@@ -69,7 +69,7 @@ export function spendHitDice(
   const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
   const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier), 0);
   const events = healActor(state, actorId, healed, scope);
-  // Decrement the pool, not a single counter: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
+  // Decrement the pool die by die: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
   actor.hitDice = makeHitDicePool(spendFromPool(actor.hitDice.entries, faces.length));
   return { healed, events, conModifier };
 }
@@ -200,7 +200,7 @@ export function applyRest(
   events.push(...endEffectsAtLongRest(state, actorId));
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
-  // Every die size in the pool comes back, not just the largest (SRD 5.2.1 "Regain All HP").
+  // Every die size in the pool comes back (SRD 5.2.1 "Regain All HP").
   if (actor.hitDice)
     actor.hitDice = makeHitDicePool(actor.hitDice.entries.map((entry) => ({ ...entry, remaining: entry.maximum })));
   actor.deathSaves = null;

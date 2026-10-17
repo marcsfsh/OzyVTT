@@ -36,7 +36,7 @@ function replaceDefinition(
 }
 
 /**
- * Merges a supplied block over the stored one, carrying forward every field the caller omitted. Each
+ * Merges a supplied block over the stored one and carries forward every field the caller omitted. Each
  * sheet editor sends a narrow slice of a block, so a wholesale replace would destroy fields it doesn't
  * know about (the `choices` ledger, training, import overrides). Absence means "leave alone"; to clear
  * a field, supply it explicitly.

@@ -15,7 +15,7 @@ import { hiddenFrom } from "./vision/audience.js";
  * Undead Fortitude, and a Death Burst. What they do as turns start and end is in `turn-boundaries.ts`.
  */
 
-/** "This trait doesn't function on the troll's next turn": the mark Acid or Fire leaves, lasting through that turn. */
+/** "This trait doesn't function on the troll's next turn": the mark Acid or Fire leaves, which lasts that turn. */
 export const REGENERATION_STOPPED_TAG = "regeneration-stopped";
 /** A creature down at 0 Hit Points that dies only if its next turn starts without regenerating (the troll). */
 export const REGENERATING_AT_ZERO_TAG = "regenerating-at-zero";

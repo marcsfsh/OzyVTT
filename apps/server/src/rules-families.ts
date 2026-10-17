@@ -30,7 +30,7 @@ const RULE_FAMILIES = {
   "economy.spent-slot": "economy",
   // Wait mode: no one acts until every player has rolled initiative.
   "initiative.gathering": "economy",
-  // Being incapacitated or down means you have no actions: an economy block, not a targeting one.
+  // Being incapacitated or down means you have no actions: an economy block.
   "condition.incapacitated": "economy",
   "condition.down": "economy",
   // Ending a condition or effect someone else imposed skips the action (Escape) or the save its own rules ask for.
@@ -52,14 +52,14 @@ const RULE_FAMILIES = {
   "attack.no-ammunition": "economy",
   // A Two-Handed weapon can't swing while a Shield takes one hand.
   "attack.two-handed": "economy",
-  // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot
+  // No spellcasting in armor the caster isn't trained with: what the character can do at all, whatever its slots
   // (the GM can stop policing slots, and this rule stays).
   "spell.untrained-armor": "economy",
   // A Spell Scroll in a spell the reader's lists don't have is unintelligible.
   "spell.scroll-unreadable": "economy",
   // What a spell offers "on your later turns" isn't taken on the turn it was cast (Spiritual Weapon, Heat Metal).
   "spell.later-turn": "economy",
-  // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed, not taken alone.
+  // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed and never taken alone.
   "attack.rides-a-hit": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
@@ -88,7 +88,7 @@ const RULE_FAMILIES = {
   "target.too-many": "targeting",
   // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
   "attack.hit-option-unqualified": "targeting",
-  // Being Charmed by your target is a targeting restriction, not an economy one.
+  // Being Charmed by your target is a targeting restriction.
   "condition.charmed-charmer": "targeting",
   // Spellcasting is its own family, so turning off "Check spell slots and prepared spells" relaxes these alone.
   "slots.none-remaining": "slots",

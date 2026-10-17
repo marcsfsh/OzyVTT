@@ -67,7 +67,7 @@ export function seedHitDice(definition: ActorDefinition): Actor["hitDice"] {
   return single ? makeHitDicePool([single]) : null;
 }
 
-/** Spell-slot maxima by level, deriving the SRD multiclass table when only per-class casters are declared,
+/** Spell-slot maxima by level: the SRD multiclass table when only per-class casters are declared,
  *  plus item slots. Seeding, long rest and the spend clamp all read this. */
 export function spellSlotMaxima(
   definition: ActorDefinition | undefined,
@@ -167,8 +167,8 @@ export function seedPreparedSpellIds(definition: ActorDefinition): string[] {
 /** The `source.name` the character builder stamps on what it builds. */
 export const BUILDER_SOURCE_NAME = "OzyVTT Character Builder";
 
-/** Whether a sheet's Armor Class is worked out from what the character wears (a built character), rather than a
- *  printed total that already counts its armor (a stat block, an imported sheet). */
+/** Whether a sheet's Armor Class is worked out from what the character wears (a built character), where a stat block
+ *  or an imported sheet prints a total that already counts its armor. */
 export function armorClassFromLoadout(definition: ActorDefinition): boolean {
   // `source` is required by the schema, but hand-built definitions (tests, old fixtures) can lack it.
   return definition.source?.name === BUILDER_SOURCE_NAME;
@@ -610,7 +610,7 @@ function rememberHitPointRolls(previous: ActorDefinition | undefined, next: Acto
 export function removeActor(state: GameState, actorId: string) {
   const actor = state.actors.find((item) => item.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  // An archived but still-claimed character can be deleted, releasing the claim in the same mutation.
+  // An archived but still-claimed character can be deleted, and the claim is released in the same mutation.
   // A character still in play keeps the protection.
   if (actor.kind === "player-character" && actor.ownerSessionId !== null) {
     if (!actor.archived) throw new CommandRejectedError("Release that character's claim before removing it.");

@@ -101,7 +101,7 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
     }),
     geometry
   );
-  // A newly prepared scene inherits the table's current policy settings rather than resetting to defaults.
+  // A newly prepared scene inherits the table's current policy settings.
   return {
     ...emptySceneCombat(),
     rulesMode: state.combat.rulesMode,
@@ -289,7 +289,7 @@ export function sceneHeadroom(state: GameState): number {
   return MAX_SCENES - state.combat.scenes.length;
 }
 
-/** `activateScene` with the target created rather than resumed; used for replay launch. */
+/** `activateScene` for a target it creates fresh; used for replay launch. */
 export function activateNewScene(
   state: GameState,
   input: Readonly<{

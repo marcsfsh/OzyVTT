@@ -87,7 +87,7 @@ function scaledLimit(scaling: FeatureUses["scaling"], definition: ActorDefinitio
   return rows.length > 0 ? rows[rows.length - 1].limit : 0;
 }
 
-/** The bearer's spellcasting numbers, falling back to the bare ability modifier for non-casters. */
+/** The bearer's spellcasting numbers. A non-caster gets the bare ability modifier. */
 function casterNumbers(definition: ActorDefinition | undefined) {
   const casting = definition?.spellcasting;
   return {
@@ -112,7 +112,7 @@ export function itemAction(
   if (declared.attack) {
     const { ability, proficient, ...rest } = declared.attack;
     const resolved = ability === "spellcasting" ? caster.ability : ability;
-    // A spell-powered item attack on a non-caster falls back to the bare modifier rather than failing.
+    // A spell-powered item attack on a non-caster uses the bare modifier and still resolves.
     const bonus =
       ability === "spellcasting" && caster.attackBonus !== null
         ? caster.attackBonus
@@ -138,7 +138,7 @@ export function itemAction(
     // A Potion of Healing's 2d4 + 2.
     ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {}),
-    // A thrown flask takes one attack of the Attack action, not the whole action.
+    // A thrown flask uses one attack of the Attack action; the action's other attacks stay open.
     ...(declared.replacesAttack ? { replacesAttack: true } : {}),
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
@@ -208,7 +208,7 @@ export function castAction(
     { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
     { roll: upcast }
   );
-  // A healing area heals the creatures the caster picks (up to its count), so it is picked rather than templated.
+  // A healing area heals the creatures the caster picks (up to its count), so it is picked with no template.
   return { ...base, ...(spell.area && !mechanics.healing ? { area: spell.area } : {}), ...mechanics };
 }
 
@@ -392,7 +392,7 @@ export function spellAttackReach(
       : spell.range.text !== null && !/^(?:touch|self)/i.test(spell.range.text)
         ? null
         : { kind: "melee" as const, feet: 5 });
-  // A range the map can't measure (Sight) is left unchecked rather than read as a 5-foot reach.
+  // A range the map can't measure (Sight) is left unchecked; a 5-foot reach would be wrong for it.
   if (reach === null) return { rangeFeet: 5280 };
   return reach.kind === "melee" ? { reachFeet: reach.feet } : { rangeFeet: reach.feet };
 }
@@ -551,7 +551,7 @@ export type WeaponSwing = Readonly<{ action: ActorAction; dice: string; modifier
 /** The id suffix of a Versatile weapon's two-handed attack. */
 export const TWO_HANDED_SUFFIX = "two-handed";
 
-/** `twoHanded` mints a Versatile weapon's two-handed attack (its own action, `item-<id>-two-handed`), rolling the
+/** `twoHanded` mints a Versatile weapon's two-handed attack (its own action, `item-<id>-two-handed`) with the
  *  Versatile die; null when the weapon has none. */
 export function weaponSwing(
   item: InventoryItem,
@@ -642,7 +642,7 @@ export function extraAttackAction(
 /** The action cast with a higher slot, from the spell's printed row for that slot: its roll replaces the one the
  *  cast's own roll gave, in the damage and the healing (Cure Wounds' 4d8, Heal's 80), and its count is the rays or
  *  darts the cast makes (Scorching Ray's fourth ray, Magic Missile's fourth dart). A count of targets (Bless, Hold
- *  Person) is a targeting limit, not read here. */
+ *  Person) is a targeting limit and is read elsewhere. */
 /** "The damage (both initial and later) increases": what a hit leaves dealing later (Acid Arrow's 2d4) gains the dice
  *  the higher slot adds to the hit, die for die. */
 function withScaledOngoing<Rider extends Readonly<{ ongoingDamage?: OngoingDamage }>>(

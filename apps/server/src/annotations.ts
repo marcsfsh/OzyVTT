@@ -29,7 +29,7 @@ function withinMap(point: AnnotationPoint, geometry: AnnotationMapGeometry, labe
     throw new CommandRejectedError(`${label} must be inside the map.`);
 }
 
-/** Snaps both endpoints to grid cell centers and measures whole-cell Chebyshev distance (every cell = one grid step, no diagonal penalty), matching 5e's simplified movement rule. */
+/** Snaps both endpoints to grid cell centers and measures whole-cell Chebyshev distance (every cell = one grid step, no diagonal penalty), as 5e's simplified movement rule does. */
 function measurementGeometry(
   calibration: SquareGridCalibration,
   origin: AnnotationPoint,
@@ -91,8 +91,8 @@ function radialGeometry(
 
 /**
  * Cone/line: the origin (apex) and the far end (a cone's base center) each snap to a grid cell
- * center, so the shape points in any direction while both ends stay grid-aligned, instead of
- * snapping the rotation to fixed increments.
+ * center, so the shape points in any direction while both ends stay grid-aligned, and the rotation never
+ * snaps to fixed increments.
  */
 function pointableGeometry(
   calibration: SquareGridCalibration,

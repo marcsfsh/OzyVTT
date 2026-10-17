@@ -11,7 +11,7 @@ type PoolDeps = Readonly<{
 }>;
 
 /** The actor and one of its limited-use pools, keyed as the counters are (`uses.pool ?? action.id`). A pool that
- *  resets every turn lives with the turn, not the actor, so it is spent only by using it. */
+ *  resets every turn lives on the turn's state, apart from the actor, so it is spent only by using it. */
 function poolOn(state: GameState, actorId: string, poolId: string, deps: PoolDeps) {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");

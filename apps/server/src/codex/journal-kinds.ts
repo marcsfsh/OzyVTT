@@ -14,14 +14,14 @@ import { CodexValidationError, coerceQuestStatus, isId, optionalId, shortLabel }
  */
 
 const JOURNAL_KINDS = new Set<string>(["note", "combat", "deadline", "downtime", "milestone", "standing", "quest"]);
-/** Fails closed to `note` rather than throwing, so one bad row cannot make the Codex unopenable. */
+/** Fails closed to `note` and never throws, so one bad row cannot make the Codex unopenable. */
 export function journalKind(value: string): CodexJournalKind {
   return JOURNAL_KINDS.has(value) ? (value as CodexJournalKind) : "note";
 }
 
 /** 3650 days = ten default years: long enough for a decade in the tower, short enough to catch a typo. */
 const MAX_DOWNTIME_DAYS = 3650;
-/** 5e's level ceiling, matching `clampLevel` in `packages/rules-5e`. */
+/** 5e's level ceiling, the same as `clampLevel` in `packages/rules-5e`. */
 const MAX_LEVEL = 20;
 
 /** Blank `who`/`activity` allowed. `applied` always starts false: only `applyDowntime` sets it. */
@@ -39,7 +39,7 @@ export function downtimePayload(
     characterPageId: optionalId(input.characterPageId)
   };
 }
-/** An out-of-range level is rejected, not clamped: it is a stated fact. */
+/** An out-of-range level is rejected and never clamped: it is a stated fact. */
 export function milestonePayload(input: Readonly<{ level: number; reason: string }>): CodexMilestonePayload {
   const level = input?.level;
   if (!Number.isInteger(level) || level < 1 || level > MAX_LEVEL)

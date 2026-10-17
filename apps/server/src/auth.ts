@@ -134,7 +134,7 @@ export class AuthService {
     await this.persist();
   }
   private verifySession(token: string | undefined): Session | null {
-    // A socket handshake's token is whatever the client sent, not necessarily a string.
+    // A socket handshake's token is whatever the client sent, which may not be a string.
     if (typeof token !== "string" || !this.data) return null;
     const [encoded, signature] = token.split(".");
     if (!encoded || !signature) return null;

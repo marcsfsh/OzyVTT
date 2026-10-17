@@ -337,7 +337,7 @@ function excerpt(text: string): string {
 
 // The chronicle: one timeline of journal entries and dated `event` pages
 
-/** Exhaustive, no `default`: a new journal kind is a compile error here rather than rendering as a plain entry. */
+/** Exhaustive, no `default`: a new journal kind is a compile error here and never renders as a plain entry. */
 function chronicleKindOf(kind: CodexJournalKind): CodexChronicleKind {
   switch (kind) {
     case "note":
@@ -600,7 +600,7 @@ export function sessionDisplayTitle(session: Readonly<{ sessionNumber: number | 
   return excerpt(session.recap) || "Untitled session";
 }
 
-/** null when not player-visible, matching each kind's player list endpoint (markers also need their map revealed). */
+/** null when not player-visible, as each kind's player list endpoint decides (markers also need their map revealed). */
 export function projectPlayerSearchHit(
   record: CodexSearchRecord,
   context: PlayerSessionNumberContext

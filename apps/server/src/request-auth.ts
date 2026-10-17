@@ -46,7 +46,7 @@ export type CallerNeeds = Readonly<{
 
 /** The caller a token names, checked GM, player, integration credential, then viewer credential. */
 export function callerOfToken(token: string | undefined, verifiers: CredentialVerifiers, needs: CallerNeeds = {}) {
-  // A socket handshake's token is whatever the client sent, not necessarily a string.
+  // A socket handshake's token is whatever the client sent, of any type.
   if (typeof token !== "string" || token === "") return { kind: "none" } as const satisfies Caller;
   const gm = verifiers.gm(token);
   if (gm) return { kind: "gm", sessionId: gm.sessionId, token } as const satisfies Caller;

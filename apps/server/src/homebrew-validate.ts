@@ -51,7 +51,7 @@ type Owner = Readonly<{ id: string; name: string }>;
 /** Self-derived slugs name this unpublished record, so they are answered from the record or the authorship index. */
 type SelfCatalog = Readonly<{ slug: string; count: number; whenEmpty: string }> | undefined;
 
-/** The context plus the two things worth resolving once per record rather than once per check. */
+/** The context plus the two things worth resolving once per record, so no check repeats them. */
 type Checks = Readonly<{
   catalog: ContentView;
   spellLists: readonly SpellListReference[];
@@ -158,8 +158,8 @@ const DAMAGE_TYPE_LISTS: ReadonlySet<string> = new Set([
 
 /**
  * Damage-type and condition slugs the SRD does not know. The columns are open, so a homebrew "void" damage type
- * is legal and publishes, but a typo ("fier") would match nothing at the table, so the GM is told rather than
- * refused. Walks the parsed record by key, which reaches every grant list, action damage part and on-hit
+ * is legal and publishes, but a typo ("fier") would match nothing at the table, so the GM gets a warning.
+ * Walks the parsed record by key, which reaches every grant list, action damage part and on-hit
  * condition whatever the record type.
  */
 function slugWarnings(record: unknown, recordId: string | null): Issue[] {
@@ -226,7 +226,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
   const grants = new Map<string, number>();
   for (const row of entry.levelTable)
     for (const featureId of row.features) grants.set(featureId, (grants.get(featureId) ?? 0) + 1);
-  // Published subclasses plus authored drafts: a subclass must exist, not be published.
+  // Published subclasses plus authored drafts: a subclass must exist, published or not.
   const subclassIds = new Set([
     ...checks.catalog
       .subclassSummaries()
@@ -263,7 +263,7 @@ function classIssues(entry: ClassReference, checks: Checks) {
 
 function subclassIssues(entry: SubclassReference, checks: Checks) {
   const parent = checks.catalog.classRecord(entry.classId);
-  // Authored, not published (a published subclass of a draft class is inert); a class id naming nothing is refused.
+  // Authored is enough (a published subclass of a draft class is inert); a class id that names nothing is refused.
   if (!parent && !checks.authored.has("class", entry.classId)) {
     checks.add(
       ["classId"],
@@ -482,7 +482,7 @@ function spellcastingIssues(spellcasting: ContentSpellcasting | undefined, owner
     );
     return;
   }
-  // `spellSummaries()` is already overlaid with published lists, matching what the build will resolve.
+  // `spellSummaries()` is already overlaid with published lists, so it matches what the build will resolve.
   const members = spellListMemberIds(listId, checks.spellLists, checks.catalog.spellSummaries());
   if (members.size === 0) {
     checks.add(
@@ -680,7 +680,7 @@ export function createHomebrewValidator(source: {
   /** Catalogs for a scenario; without it, every validation reads the live table. */
   forScenario?: ScenarioCatalogs;
   publishedSpellLists: () => readonly SpellListReference[];
-  /** Drafts included: the gate asks about authorship, not publication. */
+  /** Drafts included: the gate asks about authorship alone. */
   authoredIndex: () => HomebrewAuthoredIndex;
 }) {
   return (type: HomebrewContentType, body: unknown, scenario?: HomebrewValidationScenario): HomebrewValidity => {

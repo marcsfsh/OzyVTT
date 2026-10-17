@@ -106,7 +106,7 @@ function insideTest(
     footprintInTemplate(calibration, area.geometry, shape, spell.area?.widthFeet ?? null, position, sizeCells);
 }
 
-/** The creatures a zone can act on: those in the fight, on the map, not the anchor of an Emanation, and only the
+/** The creatures a zone can act on: those in the fight and on the map, except an Emanation's anchor, and only the
  *  caster's enemies where the spell spares the rest. */
 function exposed(
   state: GameState,

@@ -70,7 +70,7 @@ export function turnLabel(state: GameState): string {
 export function applyTimelineRestore(state: GameState, snapshot: GameState, cursor: number | null) {
   const currentActorIds = new Set(state.actors.map((actor) => actor.id));
   const snapshotActors = new Map(snapshot.actors.map((actor) => [actor.id, actor]));
-  // Defense in depth: roster removal is refused while rewound, but filter anyway rather than corrupt state.
+  // Defense in depth: roster removal is refused while rewound, but filter anyway so state can't be corrupted.
   const initiative = snapshot.combat.initiative.filter((entry) => currentActorIds.has(entry.actorId));
   if (initiative.length === 0) throw new CommandRejectedError("That turn references combatants that no longer exist.");
   const turnActorId =
@@ -110,7 +110,7 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
 }
 
 /** A scene swap or replay launch invalidates the snapshots, which belonged to the fight that parked. The
- *  resumed fight gets a fresh baseline, so Previous restores it rather than only moving the turn pointer,
+ *  resumed fight gets a fresh baseline, so Previous restores it and does more than move the turn pointer,
  *  which made the next Next tick durations and roll Recharge a second time. */
 export function restartTimeline(state: GameState, timeline: TimelineOps) {
   timeline.truncateAll();

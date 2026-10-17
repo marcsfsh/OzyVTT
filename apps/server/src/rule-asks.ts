@@ -27,7 +27,7 @@ export function findRuleAsk(state: GameState, askId: string): PendingRuleAsk | n
 }
 
 /** Removes one parked ask. Missing is a rejection, so a GM answering an expired ask (fight ended, scene
- *  changed, already answered) is told rather than believing it ran. */
+ *  changed, already answered) is told so, and never believes it ran. */
 export function clearRuleAsk(state: GameState, askId: string): PendingRuleAsk {
   const ask = findRuleAsk(state, askId);
   if (!ask) throw new CommandRejectedError("That question is no longer waiting. The fight moved on.");
@@ -43,7 +43,7 @@ export function clearRuleAsk(state: GameState, askId: string): PendingRuleAsk {
  * - `expectedRevision` is stripped: the parked value is stale by the time the GM answers, so every
  *   Allow would 409. Idempotency comes from the commandId instead.
  * - `commandId` becomes the ask's server-minted id, so a duplicated `rules.answer` returns the stored
- *   outcome instead of firing the action twice.
+ *   outcome, and the action fires once.
  * - The override waives only the family the GM was asked about, plus any an earlier Allow on this ask
  *   already covered, so allowing one kind of block never waves another through.
  */
@@ -75,8 +75,8 @@ export function allowCovers(ask: PendingRuleAsk, rule: RuleId): boolean {
 }
 
 /** Re-asks a command an Allow let past one block only for it to hit a block of another family: a new ask about
- *  the new block, carrying the families already allowed so the next Allow adds to them. The fresh id means a
- *  retried answer to the old ask finds nothing, rather than running the command on an Allow the GM never gave. */
+ *  the new block, with the families already allowed so the next Allow adds to them. The fresh id means a
+ *  retried answer to the old ask finds nothing and can't run the command on an Allow the GM never gave. */
 export function reaskRuleAsk(
   state: GameState,
   ask: PendingRuleAsk,

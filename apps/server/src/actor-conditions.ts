@@ -128,8 +128,8 @@ function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetC
     };
     events.push({ kind: "condition", text: `${actor.name} stood up (${cost} ft of movement).`, actorId: actor.id });
     // Assisted mode (and a strict turn already covered by a GM Allow) narrates the violation as a
-    // "Rules note", the movement family's convention, rather than passing silently. An explicit
-    // `override` on this command is audited by the caller instead.
+    // "Rules note", the movement family's convention, so it never passes silently. An explicit
+    // `override` on this command is audited by the caller.
     if (blocked && !waived) events.push({ kind: "condition", text: `Rules note: ${violation}`, actorId: actor.id });
   }
   return events;
@@ -173,7 +173,7 @@ export function setCondition(
   // Lowering Exhaustion is taking some of it off.
   if (scope.role === "player" && conditionId === "exhaustion" && level !== undefined && level < previousExhaustion)
     checkPlayerRemoval(state, actor, conditionId, options, events);
-  // Immunity: skip with narration rather than reject (SRD condition immunity). Innate and item-granted
+  // Immunity: skip with narration and refuse nothing (SRD condition immunity). Innate and item-granted
   // immunities read the same; without a catalog only innate ones apply.
   const written = applyCondition(actor, conditionId, {
     level,

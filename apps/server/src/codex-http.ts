@@ -262,7 +262,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return false;
   };
 
-  /** Every write. A player session gets 403, not 401: they are authenticated, and they are refused. */
+  /** Every write. A player session gets 403 (a missing sign-in gets 401): players are signed in, and they are refused. */
   const requireWrite = (request: Request, response: Response, next: NextFunction) => {
     const principal = principalFor(request, response, options, "codex:write");
     // Idempotency runs inside the guard, so it is always after authorization.
@@ -584,7 +584,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
       store.setMarkerRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed)
     )
   }));
-  // `isParty: false` clears only this pin, not whichever pin holds the flag.
+  // `isParty: false` clears only this pin, whichever pin holds the flag.
   write("put", CODEX_PATHS.markerParty, (request) => {
     const markerId = pathParam(request, "id");
     const { isParty } = MarkerPartySchema.parse(request.body);

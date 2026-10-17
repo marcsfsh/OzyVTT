@@ -29,7 +29,7 @@ export function endZonesOfCast(state: GameState, castId: string): void {
   for (const zone of state.combat.spellZones) if (zone.castId === castId) endZone(state, zone.id);
 }
 
-/** Counts damage a zone dealt toward the cap its spell prints, ending it there (SRD Guardian of Faith: "The guardian
+/** Counts damage a zone dealt toward the cap its spell prints, and ends it there (SRD Guardian of Faith: "The guardian
  *  vanishes when it has dealt a total of 60 damage"). */
 export function countZoneDamage(
   state: GameState,

@@ -107,7 +107,7 @@ export class CombatLogStore {
     this.database = database;
   }
 
-  /** Appends one feed line and returns it with its id, evicting beyond the newest CAP rows. With `roll`,
+  /** Appends one feed line and returns it with its id, and evicts beyond the newest CAP rows. With `roll`,
    *  the roll's visibility and initiator ride the row so the read filter can decide. */
   append(
     entry: Readonly<{
@@ -167,8 +167,8 @@ export class CombatLogStore {
     return rows.map((row) => toStoredRow(row).entry);
   }
 
-  /** The recent feed, oldest first, projected for one reader. `limit` counts rows before filtering, keeping
-   *  the visibility rule in code rather than SQL. */
+  /** The recent feed, oldest first, projected for one reader. `limit` counts rows before filtering, which keeps
+   *  the visibility rule in code and out of SQL. */
   list(includeGmOnly: boolean, limit = 250, sessionId?: string): readonly CombatLogEntry[] {
     const rows = this.requireDatabase()
       .prepare(`SELECT ${SELECT_COLUMNS} FROM combat_log WHERE (? = 1 OR gm_only = 0) ORDER BY id DESC LIMIT ?`)

@@ -60,7 +60,7 @@ export function homebrewIdProblem(id: string, type: HomebrewContentType): string
   return null;
 }
 
-/** Throws rather than logs: an id that escapes this is a campaign that will not load on restart. */
+/** Throws, since an id that escapes this is a campaign that will not load on restart. */
 export function assertMintable(id: string, type: HomebrewContentType): string {
   const problem = homebrewIdProblem(id, type);
   if (problem) throw new Error(`Homebrew id "${id}" ${problem}.`);
@@ -78,7 +78,7 @@ function isOpaqueMonsterId(id: string): boolean {
 export function isMintedHomebrewId(id: string, type: HomebrewContentType): boolean {
   if (!id.startsWith(HOMEBREW_ID_PREFIX) || id.length > HOMEBREW_ID_MAX_LENGTH || !SLUG_LEGAL.test(id)) return false;
   if (type === "monster") return isOpaqueMonsterId(id);
-  // Test the whole opaque shape, not the `hb-m-` prefix (a class named "M" mints `hb-m-copy-60a055`).
+  // Test the whole opaque shape. The `hb-m-` prefix alone would match a class named "M" (`hb-m-copy-60a055`).
   if (isOpaqueMonsterId(id)) return false;
   const suffix = id.slice(id.lastIndexOf("-") + 1);
   return (
@@ -91,7 +91,7 @@ export function isMintedHomebrewId(id: string, type: HomebrewContentType): boole
 /** `isTaken` must include soft-deleted rows, or a dead record's identity could be reused. Slug length fits the suffix. */
 export function mintHomebrewId(type: HomebrewContentType, name: string, isTaken: (id: string) => boolean): string {
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    // Widen the random suffix after five collisions rather than looping forever on a wedged generator.
+    // Widen the random suffix after five collisions, so a wedged generator can't loop forever.
     const suffixLength = type === "monster" ? 12 : attempt < 5 ? 6 : 8;
     const candidate =
       type === "monster"

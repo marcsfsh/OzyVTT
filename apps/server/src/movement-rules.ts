@@ -98,7 +98,7 @@ export type MovementRulesOutcome = Readonly<{
 /** A move spends movement only on the mover's own turn in combat, with movement rules on. While a wait-mode
  *  fight gathers initiative no turn has begun, so tokens are still being positioned. */
 /** SRD Ready: a Readied creature may "move up to your Speed in response" to its trigger, with its Reaction, off its
- *  own turn. Counted like any move (unless the movement rules are off), but against its Speed, not the turn's. */
+ *  own turn. Counted like any move (unless the movement rules are off), against its Speed and apart from the turn's. */
 function readiedMove(state: GameState, mover: GameState["actors"][number], mode: MoveMode): boolean {
   return (
     turnsRunning(state) &&

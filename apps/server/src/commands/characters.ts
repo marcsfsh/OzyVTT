@@ -36,7 +36,7 @@ import { defineCommand } from "./pipeline.js";
 
 // The character builder and the sheet-import queue.
 
-/** Mirrors `GameStateSchema`'s cap so the refusal is a sentence rather than a Zod failure mid-transaction. */
+/** Mirrors `GameStateSchema`'s cap so the refusal is a sentence and never a Zod failure mid-transaction. */
 const MAX_STORED_DEFINITIONS = 100;
 
 /** A player building their own character: the table's policy, one character each, and a daily cap. */
@@ -256,7 +256,7 @@ export const characterCommands = [
         const catalog = kit.catalogFor(principal);
         const { actorId: _actorId, ...build } = request;
         const previous = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
-        // The name stays the live actor's: a rebuild changes what a character can do, not who they are.
+        // The name stays the live actor's: a rebuild changes what a character can do, and who they are stays the same.
         const { input, thrown } = settleBuilderDice(
           state,
           { ...build, name: actor.name },

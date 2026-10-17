@@ -240,7 +240,7 @@ export function startEncounter(
     actorIds.add(entry.actorId);
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!actor) throw new CommandRejectedError("One of the selected combatants no longer exists.");
-    // An archived character is out of play; enforced here, not just by the picker.
+    // An archived character is out of play; enforced here as well as by the picker.
     assertNotArchived(state, entry.actorId);
     actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
     const tieBreaker = actor.initiative ?? 0;
@@ -521,8 +521,8 @@ export function rollSelfInitiative(
   return roll.total;
 }
 
-/** The GM settles every pending player roll, beginning a wait-mode fight. The provisional rolls made at the
- *  start already followed the rules and are in the feed, so they stand rather than being rolled again. */
+/** The GM settles every pending player roll, and a wait-mode fight begins. The provisional rolls made at the
+ *  start already followed the rules and are in the feed, so they stand and are never rolled again. */
 export function rollRemainingInitiative(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before rolling Initiative.");
   if (state.combat.pendingInitiative.length === 0) return;
@@ -671,7 +671,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
   events?.push(...ending);
-  // A new round sorts the whole order again, settling any mid-round score change.
+  // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
   const nextActorId = wraps
     ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId

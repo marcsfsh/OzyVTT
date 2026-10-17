@@ -40,7 +40,7 @@ export type AudioAssetMetadata = Readonly<{
 
 /** 50 MB holds about 50 minutes of 128 kbps MP3 or 5 minutes of CD-quality WAV. The upload sits in the GM
  *  laptop's memory while it is checked, and the table screen downloads it over Wi-Fi before it plays, so a
- *  bigger file buys a long wait at the table rather than better sound. */
+ *  bigger file buys a long wait at the table and no better sound. */
 export const AUDIO_MAX_BYTES = 50 * 1024 * 1024;
 /** Longer than any session; a larger figure is a header lying about its length. */
 const MAX_DURATION_MS = 12 * 60 * 60 * 1_000;

@@ -59,7 +59,7 @@ function nonNegativeInteger(value: number, label: string, maximum: number) {
   return value;
 }
 
-/** Clips a finite segment to an axis-aligned viewport using Liang–Barsky. */
+/** Clips a finite segment to an axis-aligned viewport with Liang-Barsky. */
 function clipSegment(start: ImagePoint, end: ImagePoint, viewport: ImageViewport) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;

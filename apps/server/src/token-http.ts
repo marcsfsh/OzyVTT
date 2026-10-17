@@ -53,7 +53,7 @@ function publicToken(metadata: MapAssetMetadata, entry: TokenCatalogEntry) {
   };
 }
 
-/** HTTP for uploaded token images, mirroring the map router. The GM uploads and manages; content is
+/** HTTP for uploaded token images, built like the map router. The GM uploads and manages; content is
  *  readable by anyone who can already see a token referencing it (a public actor for a player, a
  *  presented token for a viewer). Mounted before the /api/v1 catch-all. */
 export function createTokenRouter(options: TokenRouterOptions) {
@@ -158,7 +158,7 @@ export function createTokenRouter(options: TokenRouterOptions) {
       typeof request.query.definitionId === "string" && DEFINITION_ID.test(request.query.definitionId)
         ? request.query.definitionId
         : null;
-    // The per-definition memory is GM prep, not a player's business.
+    // The per-definition memory is GM prep and stays hidden from players.
     const rememberedAssetId =
       principal.role === "gm" && definitionId ? options.catalog.recallForDefinition(definitionId) : null;
     return sendData(response, 200, { tokens, rememberedAssetId });

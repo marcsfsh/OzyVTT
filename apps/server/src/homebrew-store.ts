@@ -215,7 +215,7 @@ export class HomebrewStore implements HomebrewContentSource {
     this.database?.close();
     this.database = undefined;
     this.revisionValue = -1;
-    // Dropped rather than left to the revision gate: a reopened store's counter could coincide with a
+    // Dropped here, ahead of the revision gate: a reopened store's counter could coincide with a
     // cached revision from the previous handle.
     this.slices = undefined;
     this.monsters = undefined;
@@ -316,7 +316,7 @@ export class HomebrewStore implements HomebrewContentSource {
     return { gm: freezeSlice(gm), player: freezeSlice(player) };
   }
 
-  /** Every monster row, ignoring `state` and `deleted_at` - see `monsterForInstance`. */
+  /** Every monster row, whatever its `state` and `deleted_at`. See `monsterForInstance`. */
   private buildMonsterIndex(): Map<string, ActorDefinition> {
     const byId = new Map<string, ActorDefinition>();
     const rows = this.requireDatabase()
@@ -386,7 +386,7 @@ export class HomebrewStore implements HomebrewContentSource {
       : undefined;
     const pageWhere = [...where];
     const pageParameters = [...parameters];
-    // The cursor is opaque, so an unresolvable one restarts from the top rather than failing.
+    // The cursor is opaque, so an unresolvable one restarts from the top.
     if (anchor && cursorId) {
       pageWhere.push("(LOWER(name), id) > (?, ?)");
       pageParameters.push(anchor.sort_key, cursorId);
@@ -539,7 +539,7 @@ export class HomebrewStore implements HomebrewContentSource {
     return this.get(id)!;
   }
 
-  /** Drops a published record's pending edits, leaving the live body as it is. A no-op without any. */
+  /** Drops a published record's pending edits. The live body stays as it is. A no-op without any. */
   discardPending(id: string, expectedRev: number | undefined): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.requireRow(id, expectedRev);
@@ -570,7 +570,7 @@ export class HomebrewStore implements HomebrewContentSource {
     return { id, deletedAt: stamp };
   }
 
-  /** Clears `deleted_at`, returning the record to whatever `state`/`visibleToPlayers` it had. */
+  /** Clears `deleted_at`. The record goes back to whatever `state`/`visibleToPlayers` it had. */
   restore(id: string): HomebrewRecordRow {
     const database = this.requireDatabase();
     this.requireRow(id, undefined);
@@ -943,7 +943,7 @@ function likeEscape(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
-/** Opaque to clients. Carries only the last row's id, keeping it under the contract's 200-character cap. */
+/** Opaque to clients. Carries only the last row's id, so it stays under the contract's 200-character cap. */
 function encodeCursor(id: string): string {
   return Buffer.from(id, "utf8").toString("base64url");
 }

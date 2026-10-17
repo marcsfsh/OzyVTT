@@ -257,7 +257,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     };
     const resisted = (adjustment: DamageApplication["parts"][number]["adjustment"]) =>
       adjustment === "resistance" || adjustment === "resistance-and-vulnerability";
-    // SRD 5.2.1 Petrified: resistance to all damage (its poison immunity is to the condition, not the damage).
+    // SRD 5.2.1 Petrified: resistance to all damage, poison included (its immunity is to the Poisoned condition).
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
@@ -526,7 +526,7 @@ function drainDamage(
 }
 
 /**
- * Hit points lost rather than damage taken (an infernal wound: "the target loses 5 (1d10) Hit Points"): no type, no
+ * Hit points lost with no damage taken (an infernal wound: "the target loses 5 (1d10) Hit Points"): no type, no
  * defence, no Temporary Hit Points and no Concentration save, since none of those meet damage that isn't dealt. A
  * creature it drops to 0 falls as damage would drop it, with no overflow to kill it outright. Returns what it lost.
  */
@@ -580,7 +580,7 @@ export function applyDamageDetailed(
   const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
   const isPlayerCharacter = actor.kind === "player-character";
   // What its stat block does as the damage lands: Acid or Fire stops a troll's Regeneration, and Undead Fortitude may
-  // leave a zombie at 1 Hit Point instead of 0.
+  // leave a zombie at 1 Hit Point.
   if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
   if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     undeadFortitude(
@@ -777,13 +777,13 @@ function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNa
   return events;
 }
 
-/** Temporary hit points replace rather than stack (choosing the higher is left to the table). */
+/** New temporary hit points replace the old ones and don't stack (choosing the higher is left to the table). */
 export function setTemporaryHp(state: GameState, actorId: string, amount: number, scope: Initiator) {
   const actor = adjustableActor(state, actorId, scope);
   actor.hp.temporary = amount;
 }
 
-/** GM correction: set current HP (clamped), running the same zero-HP transitions. Raising a dead creature's hit
+/** GM correction: set current HP (clamped), through the same zero-HP transitions. Raising a dead creature's hit
  *  points would revive it, which is Revive's job, so that is refused. */
 export function setCurrentHp(state: GameState, actorId: string, current: number, scope: Initiator): EffectNarration[] {
   requireGm(scope, "Only the GM can set hit points directly.");
@@ -812,7 +812,7 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
 }
 
 /**
- * SRD "Dead": the one way back. The GM applies the revival (Revivify, Raise Dead, a story), naming the hit points it
+ * SRD "Dead": the one way back. The GM applies the revival (Revivify, Raise Dead, a story) and names the hit points it
  * gives. The dying state and the Unconscious it brought end, a creature that died with Exhaustion comes back one
  * level lower, and it is no longer attuned to any magic item. Other conditions stay.
  */

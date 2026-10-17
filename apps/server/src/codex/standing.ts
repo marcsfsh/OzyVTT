@@ -65,7 +65,7 @@ export function listStanding(db: CodexDb): CodexStanding[] {
   ).map(toStanding);
 }
 
-/** One faction's standing, or null when none was ever set (which reads as Neutral, not as an error). */
+/** One faction's standing, or null when none was ever set (which reads as Neutral, and is no error). */
 export function getStanding(db: CodexDb, factionPageId: string): CodexStanding | null {
   if (!isId(factionPageId)) return null;
   const row = db.database
@@ -83,7 +83,7 @@ export function setStanding(db: CodexDb, factionPageId: string, value: number, r
   const page = getPage(db, pageId);
   if (!page) throw new CodexNotFoundError("That faction page no longer exists.");
   const existing = getStanding(db, pageId);
-  // A faction page is needed to start tracking, not to keep tracking, so a retyped page's standing stays editable.
+  // A faction page is needed to start tracking and never to keep tracking, so a retyped page's standing stays editable.
   if (!existing && page.entityType !== "faction")
     throw new CodexValidationError("Standing is tracked against a faction. Pick a faction page.");
   const next = standingValue(value);

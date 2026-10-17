@@ -85,7 +85,7 @@ export function getCalendar(db: CodexDb): CodexCalendar {
 
 /**
  * Leaf write: replaces the calendar and recomputes every dated record's instant and label from its raw date.
- * Pages are selected by having a date, not by type, so a later type change finds them current.
+ * Pages are selected by having a date, whatever their type, so a later type change finds them current.
  */
 export function writeCalendar(db: CodexDb, calendar: CodexCalendar): void {
   const { database } = db;

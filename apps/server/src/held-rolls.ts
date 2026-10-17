@@ -20,7 +20,7 @@ import { CommandRejectedError } from "./game-store.js";
 
 const HELD_LIMIT = 100;
 
-/** An attack's key names the attacker rather than one roll, so its die belongs to the turn it was thrown in; every
+/** An attack's key names the attacker, so its die belongs to the turn it was thrown in; every
  *  other key names one pending roll (a save, a death save, a reaction, a check), which keeps its die until answered. */
 const turnScoped = (key: string) => key.startsWith("attack:");
 
@@ -33,7 +33,7 @@ export function heldRollFor(state: GameState, key: string): HeldRoll | undefined
   return held;
 }
 
-/** Holds a roll's dice under its key, replacing an earlier hold of the same key; the oldest go once the list is full. */
+/** Holds a roll's dice under its key, over any earlier hold of that key. The oldest go once the list is full. */
 export function holdRoll(
   state: GameState,
   held: Omit<HeldRoll, "round" | "turnActorId" | "createdAt" | "rollId" | "typed" | "others"> &
