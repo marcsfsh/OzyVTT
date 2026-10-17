@@ -147,7 +147,7 @@ const subclassesOf = (offers: readonly BuilderOffer[], picks: Picks, startingCla
   );
 
 /** A stored ledger's subclass rows; a row naming no class is the starting class's. */
-const subclassesInLedger = (rows: readonly CharacterChoice[], startingClassId?: string): DraftSubclasses =>
+export const subclassesInLedger = (rows: readonly CharacterChoice[], startingClassId?: string): DraftSubclasses =>
   subclassesBy(
     rows.filter((row) => row.kind === "subclass").map((row) => ({ classId: row.classId ?? null, id: row.id })),
     startingClassId

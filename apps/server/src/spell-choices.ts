@@ -31,7 +31,7 @@ export type SpellChoiceDeps = Readonly<{ library: ContentView; policy: BuilderPo
 const WIZARD = "wizard";
 /** SRD Wizard: "It starts with six level 1 Wizard spells", and "Whenever you gain a Wizard level after 1, add two". */
 const BOOK_AT_FIRST_LEVEL = 6;
-const BOOK_PER_LEVEL = 2;
+export const BOOK_PER_LEVEL = 2;
 /** SRD "Copying a Spell into the Book": for each level of the spell. */
 const COPY_HOURS_PER_LEVEL = 2;
 const COPY_GP_PER_LEVEL = 50;

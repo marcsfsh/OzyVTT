@@ -240,6 +240,7 @@ export const GAME_PATHS = {
   characterGiveItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/give`,
   characterRecoverAmmunition: `${API_NAMESPACE}/game/actors/{actorId}/inventory/recover-ammunition`,
   characterSetCurrency: `${API_NAMESPACE}/game/actors/{actorId}/currency`,
+  characterNextLevel: `${API_NAMESPACE}/game/actors/{actorId}/next-level`,
   characterSetIdentity: `${API_NAMESPACE}/game/actors/{actorId}/identity`,
   characterSetProficiencies: `${API_NAMESPACE}/game/actors/{actorId}/proficiencies`,
   characters: `${API_NAMESPACE}/game/characters`,

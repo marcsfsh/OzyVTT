@@ -504,6 +504,18 @@ export const ActorMovementReplySchema = z.strictObject({
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;
 
+/** What `character:next-level` answers: the level a character's next level-up reaches, the class it goes to (the one
+ *  the Level page offers first), and short plain lines for what it brings. */
+export const NextLevelReplySchema = z.strictObject({
+  level: z.number().int().min(2).max(20),
+  classId: z.string(),
+  className: z.string(),
+  classLevel: z.number().int().min(1).max(20),
+  lines: z.array(z.string())
+});
+export type NextLevelReply = Wire<z.infer<typeof NextLevelReplySchema>>;
+export type NextLevelResult = MutationResult & Partial<NextLevelReply>;
+
 /** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
  *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */
 export const VisionPreviewReplySchema = z.strictObject({

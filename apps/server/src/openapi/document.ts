@@ -1133,6 +1133,25 @@ export const openApiDocument = {
         }
       }
     },
+    [GAME_PATHS.characterNextLevel]: {
+      get: {
+        operationId: "getCharacterNextLevel",
+        security: gameSecurityWithPlayer("game:read"),
+        description:
+          "What a character's next level brings, as short plain lines for the sheet: the Proficiency Bonus when it rises, the features it gains, the picks it asks for, its spell slots, prepared spells and cantrips, a Wizard's two spellbook spells and the Hit Points it adds. Read from the character builder's own survey at the next level against the character's choices ledger. The level goes to the class the Level page offers first, the class of the last level taken, which the reply names. The GM may ask about any character; a player session only about their claimed character, and only while the table's builder policy lets players build. A character at the table's highest level, or one not built here, is refused with a 409.",
+        parameters: [uuidParam("actorId")],
+        responses: {
+          "200": {
+            description: "What the next level brings",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/CharacterNextLevelResponse" } } }
+          },
+          "401": apiError,
+          "403": apiError,
+          "404": apiError,
+          "409": apiError
+        }
+      }
+    },
     [GAME_PATHS.characterDraft]: {
       get: {
         operationId: "getCharacterDraft",
@@ -2524,6 +2543,7 @@ export const openApiDocument = {
       },
       ActorAvailableActionsResponse: envelopeSchema("#/components/schemas/ActorAvailableActionsData"),
       ActorMovementResponse: envelopeSchema("#/components/schemas/ActorMovementData"),
+      CharacterNextLevelResponse: envelopeSchema("#/components/schemas/CharacterNextLevelData"),
       VisionPreviewResponse: envelopeSchema("#/components/schemas/VisionPreviewData"),
       CharacterDraftResponse: envelopeSchema("#/components/schemas/CharacterDraftData"),
       BuilderOffersDraft: {

@@ -25,6 +25,7 @@ import type {
   ActorActionsAvailabilityResult,
   ActorAddResult,
   ActorMovementResult,
+  NextLevelResult,
   AnnotationAddResult,
   CharacterDraftResult,
   CheckRollResult,
@@ -656,6 +657,8 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ActorActionsAvailabilityResult) => void
   ) => void;
   "actor:movement": (payload: { actorId: string }, acknowledgement: (result: ActorMovementResult) => void) => void;
+  /** What a character's next level brings; only when the caller may level that character. */
+  "character:next-level": (payload: { actorId: string }, acknowledgement: (result: NextLevelResult) => void) => void;
   "turn:use": (
     payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void

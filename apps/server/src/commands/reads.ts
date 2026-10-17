@@ -19,6 +19,7 @@ import {
   ActorAvailableActionsSchema,
   ActorMovementSchema,
   BuilderOffersSchema,
+  CharacterNextLevelSchema,
   ContentActionsSchema,
   VisionPreviewSchema
 } from "@vtt/domain/commands";
@@ -27,6 +28,7 @@ import { partyViewerIds } from "../vision/audience.js";
 import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
+import { nextLevelOf } from "../next-level.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
@@ -221,6 +223,34 @@ export const gameReads = [
         resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
         catalog: kit.equipmentCatalog()
       });
+    }
+  },
+
+  {
+    event: "character:next-level",
+    path: GAME_PATHS.characterNextLevel,
+    scope: "game:read",
+    schema: CharacterNextLevelSchema,
+    malformed: "The next-level lookup is malformed.",
+    // Answered only to someone who may level the character: the GM always, a player their own while the table's
+    // builder is open, as `character.rebuild` checks.
+    run: (principal, input, kit) => {
+      const state = kit.read();
+      const actorId = (input as z.output<typeof CharacterNextLevelSchema>).actorId;
+      if (!isGmGrade(principal) && state.builderPolicy.playerBuilder !== "open")
+        throw new GameAccessDeniedError("Your GM builds the characters at this table.");
+      // One answer for a missing character and someone else's, so a player can't probe which ids exist.
+      requireActorAccess(
+        initiatorOf(principal),
+        state,
+        actorId,
+        "edit",
+        "You can only read your own character's next level."
+      );
+      const actor = state.actors.find((candidate) => candidate.id === actorId);
+      if (!actor) throw new GameNotFoundError("That character no longer exists.");
+      const definition = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
+      return nextLevelOf(actor, definition, kit.catalogFor(principal), state.builderPolicy);
     }
   },
 

@@ -1583,6 +1583,13 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "actions[].damageTypes":
       "The damage types the caster picks one of when it resolves (Chromatic Orb), sent as the resolve's `damageType`; null when the action deals its own"
   },
+  CharacterNextLevelData: {
+    level: "The character level the next level-up reaches",
+    classId: "The class that level goes to: the class of the last level taken, which the Level page offers first",
+    classLevel: "That class's own level after the level-up",
+    lines:
+      "Short plain lines in order: the Proficiency Bonus when it rises, each feature gained, each pick no feature names, spell slots, prepared spells and cantrips, a Wizard's spellbook spells, and the Hit Points the level adds (the die plus today's Constitution modifier and per-level riders, or the average)"
+  },
   BuilderOffersData: {
     "offers[].key": "Stable key the draft's answers are filed under",
     "offers[].unresolvable": "Why nothing can be picked here yet; such an offer may be left open",

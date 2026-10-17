@@ -498,6 +498,8 @@ export const ReactionDismissSchema = z
 export const ActorAvailableActionsSchema = z.object({ actorId: z.uuid() }).strict();
 /** The movement read: how much of this turn's movement a combatant has left. */
 export const ActorMovementSchema = z.object({ actorId: z.uuid() }).strict();
+/** The next-level read: what a character's next level brings. Nothing mutates. */
+export const CharacterNextLevelSchema = z.object({ actorId: z.uuid() }).strict();
 export const ContentActionsSchema = z
   .object({
     definitionId: z
