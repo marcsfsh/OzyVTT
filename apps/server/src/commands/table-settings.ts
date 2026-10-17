@@ -66,7 +66,7 @@ export const tableSettingCommands = [
     type: "rules.set-policy",
     operationId: "setRulesPolicy",
     description:
-      "Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. The `slots` family ships as `assisted` so slot tracking advises rather than blocks until a GM opts in.",
+      "Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
     summary:
       "Set the table's standing rules policy - the dial and per-family exceptions every new fight starts from (GM).",
     schema: RulesSetPolicySchema,

@@ -576,8 +576,8 @@ export const RuleExceptionsSchema = z.object({
 });
 export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
 
-/** `slots` defaults to "assisted" regardless of the dial; the GM opts into strict slot tracking. */
-export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = { slots: "assisted" };
+/** Every family follows the dial (the campaign's Enforce, Advise or Off) until the GM turns one off. */
+export const DEFAULT_RULE_EXCEPTIONS: RuleExceptions = {};
 
 /** Closed list: `rules.answer` replays the parked payload under GM authority. */
 export const AskableCommandSchema = z.enum([

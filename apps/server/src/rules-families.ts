@@ -50,7 +50,7 @@ const RULE_FAMILIES = {
   // A Two-Handed weapon can't swing while a Shield takes one hand.
   "attack.two-handed": "economy",
   // No spellcasting in armor the caster isn't trained with: what the character can do at all, not a spent slot
-  // (the slots family is advisory by default, and this rule is not).
+  // (the GM can stop policing slots, and this rule stays).
   "spell.untrained-armor": "economy",
   // A Spell Scroll in a spell the reader's lists don't have is unintelligible.
   "spell.scroll-unreadable": "economy",
