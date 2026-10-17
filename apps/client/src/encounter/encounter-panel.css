@@ -161,10 +161,17 @@
   flex: 1 1 auto;
   margin-top: 0;
 }
-.player-foot-hp {
-  flex: none;
+/* The bar's readouts, after its buttons: the character's hit points and this turn's movement. */
+.economy-status {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+.economy-hp {
   color: var(--text-dim);
   font: 700 var(--fs-sm) / 1 var(--font-numeric);
+  white-space: nowrap;
 }
 .player-turn {
   display: flex;

@@ -179,6 +179,18 @@ describe("a player's panel", () => {
       expect(document.getElementById(tab.getAttribute("aria-controls")!)?.getAttribute("role")).toBe("tabpanel");
   });
 
+  it("on their turn: the slots and End turn in one row, with the HP after them", () => {
+    render(
+      <ToastProvider>
+        <EncounterPanel role="player" state={playerView(true)} phone slots={slots} />
+      </ToastProvider>
+    );
+    const bar = screen.getByRole("group", { name: "Your turn resources" });
+    const order = [...bar.querySelectorAll("button, .economy-status")].map((element) => element.textContent);
+    // The readouts come last, so End turn wraps with the buttons and the bar keeps two rows on a phone.
+    expect(order).toEqual(["Action", "Bonus", "Reaction", "End turn", "HP 37/44"]);
+  });
+
   it("while someone else acts: their HP and Reaction in the bar, who acts left to the header, and no End turn", () => {
     render(
       <ToastProvider>

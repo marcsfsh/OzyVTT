@@ -13,12 +13,25 @@ type GmProps = Readonly<{
   phone?: boolean;
   slots?: GmPanelSlots;
 }>;
-type PlayerProps = Readonly<{ role: "player"; state: PlayerView; phone?: boolean; slots?: PlayerPanelSlots }>;
+type PlayerProps = Readonly<{
+  role: "player";
+  state: PlayerView;
+  phone?: boolean;
+  slots?: PlayerPanelSlots;
+  onSheetShown?: (shown: boolean) => void;
+}>;
 
 /** The table's panel: the GM runs the fight from it; a player follows it and acts on their turn. */
 export function EncounterPanel(props: GmProps | PlayerProps) {
   if (props.role === "player")
-    return <PlayerEncounterPanel state={props.state} phone={props.phone} slots={props.slots} />;
+    return (
+      <PlayerEncounterPanel
+        state={props.state}
+        phone={props.phone}
+        slots={props.slots}
+        onSheetShown={props.onSheetShown}
+      />
+    );
   return (
     <GmEncounterPanel
       state={props.state}
