@@ -1,0 +1,79 @@
+/* The Table tab's sound control: one row at the top of the GM's sidebar. Self-contained, so the table's layout
+   doesn't depend on it: it never grows past one row plus a wrapped slider on the narrowest phone. */
+.now-playing {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  min-width: 0;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+}
+/* A table screen waiting for its tap is the one thing here worth a warning edge. */
+.now-playing.is-waiting {
+  border-color: var(--caution);
+}
+.now-playing-what {
+  flex: 1 1 8rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.now-playing-what:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+/* Two classes on each line: the app's base `button span` rule would otherwise restyle them. */
+.now-playing-what .now-playing-title,
+.now-playing-what .now-playing-screen {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+}
+.now-playing-what .now-playing-title {
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.25 var(--font-body);
+}
+.now-playing-what .now-playing-title span {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  color: inherit;
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.now-playing-what .now-playing-screen {
+  overflow: hidden;
+  color: var(--text-muted);
+  font: 600 var(--fs-xs) / 1.25 var(--font-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.now-playing-title svg,
+.now-playing-screen svg {
+  flex: none;
+}
+.now-playing.is-waiting .now-playing-what .now-playing-screen {
+  color: var(--caution-hi);
+}
+.now-playing .sound-level {
+  flex: 1 1 7rem;
+  max-width: 12rem;
+}
+.now-playing .nh-slider-input {
+  min-width: 4rem;
+}

@@ -200,6 +200,9 @@ export function pathForGmTab(tab: GmTab): string {
   return GM_TAB_PATHS[tab];
 }
 
+/** The sound board: the Shared screen tab's second view, beside the display controls. */
+export const SOUND_BOARD_PATH = `${GM_TAB_PATHS.viewer}/sound`;
+
 /** Retired addresses, redirected so old bookmarks land. */
 const RETIRED_PATHS: Readonly<Record<string, string>> = { "/encounter": "/table", "/setup": "/settings" };
 
@@ -260,6 +263,9 @@ export function isKnownPath(path: string): boolean {
   if (segments[0] === "me") return segments.length === 1;
   // `/settings/api` is the only two-segment settings address.
   if (segments[0] === "settings") return segments.length === 1 || (segments.length === 2 && segments[1] === "api");
+  // The Shared screen tab is the display controls or, at `/sound`, the sound board.
+  if (segments[0] === "viewer-controls")
+    return segments.length === 1 || (segments.length === 2 && segments[1] === "sound");
   // A replay id is the archive's integer row id, so a non-numeric second segment is genuinely unknown.
   if (segments[0] === "replays")
     return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));

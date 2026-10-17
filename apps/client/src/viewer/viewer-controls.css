@@ -25,12 +25,19 @@
   margin: var(--space-1) 0 0;
   font-family: var(--font-display);
 }
-.viewer-controls-heading > strong {
+.viewer-controls-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: end;
+  gap: var(--space-2) var(--space-4);
+}
+.viewer-controls-status > strong {
   color: var(--text-muted);
   font-size: 0.85rem;
   white-space: nowrap;
 }
-.viewer-controls-heading > strong.online {
+.viewer-controls-status > strong.online {
   color: var(--cyan-hi);
 }
 
@@ -277,8 +284,8 @@
   .viewer-controls-heading {
     display: block;
   }
-  .viewer-controls-heading > strong {
-    display: block;
+  .viewer-controls-status {
+    justify-content: start;
     margin-top: var(--space-2);
   }
   .viewer-control-actions {
