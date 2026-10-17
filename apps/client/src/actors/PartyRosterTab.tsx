@@ -2,12 +2,20 @@ import { useRef, useState } from "react";
 import { rosterActors, type ActorDefinition, type GmActor, type GmView, type PendingImport } from "@vtt/domain";
 import { Avatar, Badge, Button, Eyebrow, Modal, RevealSwitch, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
+import { JoinAddress } from "../components/JoinAddress";
+import { navigate } from "../router";
 import { CharacterSheet } from "../encounter/CharacterSheet";
 import { PdfImportModal } from "./PdfImportModal";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
+import { identityOf, ledgerOf } from "../builder/level-ledger";
 import { CLAIM_WORD, claimStateOf, classLine, presenceDot } from "./actor-display";
 import { command } from "../lib/command";
+import { useForceRelease } from "./useForceRelease";
 import "./party-roster.css";
+
+/** Never claimed and never in a fight: a character the GM made and can take back without archiving it first. */
+export const neverPlayed = (actor: GmActor) =>
+  actor.firstClaimedAt === undefined && actor.lastUsedAt === undefined && actor.ownerSessionId === null;
 
 /**
  * The GM's Roster tab: create, import, approve, archive, restore and delete characters.
@@ -16,8 +24,9 @@ import "./party-roster.css";
  */
 export function PartyRosterTab({
   state,
+  token,
   onCreateCharacter
-}: Readonly<{ state: GmView; onCreateCharacter?: () => void }>) {
+}: Readonly<{ state: GmView; token: string; onCreateCharacter?: () => void }>) {
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const [previewImportId, setPreviewImportId] = useState<string | null>(null);
   const [pdfImportOpen, setPdfImportOpen] = useState(false);
@@ -25,11 +34,13 @@ export function PartyRosterTab({
   const [busy, setBusy] = useState(false);
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const { confirm, dialog } = useConfirm();
+  const forceRelease = useForceRelease();
   const { toast } = useToast();
   // `rosterActors` drops a launched replay's clones, which the server deletes when the replay ends.
   const pcs = rosterActors(state.actors).filter((actor) => actor.kind === "player-character");
   const active = pcs.filter((actor) => !actor.archived);
   const archived = pcs.filter((actor) => actor.archived);
+  const samples = pcs.filter((actor) => actor.sample);
   const sheetActor = sheetActorId ? (pcs.find((actor) => actor.id === sheetActorId) ?? null) : null;
   /**
    * Read defensively: the first `state:updated` a signing-in GM receives can still be the
@@ -40,6 +51,11 @@ export function PartyRosterTab({
   const previewImport = previewImportId ? (pendingImports.find((entry) => entry.id === previewImportId) ?? null) : null;
   const definitionOf = (actor: GmActor): ActorDefinition | undefined =>
     definitions.find((entry) => entry.id === actor.definitionId)?.definition;
+  /** Built here, so the Level flow can read it back; an imported or hand-made sheet is edited instead. */
+  const levelable = (actor: GmActor) => {
+    const definition = definitionOf(actor);
+    return identityOf(definition) !== null && ledgerOf(definition) !== null;
+  };
 
   const setArchived = async (actor: GmActor, next: boolean) => {
     setBusy(true);
@@ -62,19 +78,11 @@ export function PartyRosterTab({
     if (!result.ok) toast(result.message ?? "That change was rejected.", { tone: "error" });
   };
 
-  const forceRelease = async (actor: GmActor) => {
-    const result = await command("character:force-release", { actorId: actor.id, expectedRevision: state.revision });
-    toast(
-      result.ok ? `${actor.name} is available again.` : (result.message ?? "The player claim could not be released."),
-      { tone: result.ok ? "success" : "error" }
-    );
-  };
-
-  /** Permanent and confirmed; Archive is the reversible alternative. */
+  /** Permanent and confirmed; Archive is the reversible alternative for a character who has been played. */
   const remove = async (actor: GmActor) => {
     const ok = await confirm({
       title: `Delete ${actor.name}?`,
-      body: `Their sheet, claim history, and token are gone. This cannot be undone.`,
+      body: `${actor.name}'s sheet and token go for good. This cannot be undone.`,
       confirmLabel: "Delete",
       danger: true
     });
@@ -84,6 +92,27 @@ export function PartyRosterTab({
     setBusy(false);
     toast(result.ok ? `${actor.name} was deleted.` : (result.message ?? "That character could not be deleted."), {
       tone: result.ok ? "success" : "error"
+    });
+  };
+
+  /** Each sample the server lets go; one a player holds, or one in a fight, stays and is named. */
+  const removeSamples = async () => {
+    const ok = await confirm({
+      title: "Remove the sample characters?",
+      body: `${samples.map((actor) => actor.name).join(", ")} go for good, sheets included. Characters you made stay.`,
+      confirmLabel: "Remove samples",
+      danger: true
+    });
+    if (!ok) return;
+    setBusy(true);
+    const kept: string[] = [];
+    for (const actor of samples) {
+      const result = await command("actor:remove", { actorId: actor.id });
+      if (!result.ok) kept.push(`${actor.name}: ${result.message ?? "refused"}`);
+    }
+    setBusy(false);
+    toast(kept.length === 0 ? "The sample characters are gone." : `Some samples stayed. ${kept.join(" ")}`, {
+      tone: kept.length === 0 ? "success" : "error"
     });
   };
 
@@ -148,9 +177,9 @@ export function PartyRosterTab({
         <div className="nh-card-thumb party-card-thumb">
           <Avatar name={actor.name} size="lg" presence={actor.presence ? presenceDot(actor.presence) : undefined} />
         </div>
-        {isArchived && (
+        {(isArchived || actor.sample) && (
           <span className="nh-card-status">
-            <Badge>Archived</Badge>
+            {isArchived ? <Badge>Archived</Badge> : <Badge tone="info">Sample</Badge>}
           </span>
         )}
         <div className="nh-card-body">
@@ -174,15 +203,28 @@ export function PartyRosterTab({
           <Button variant="secondary" disabled={busy} onClick={() => setSheetActorId(actor.id)}>
             View sheet
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => setArchived(actor, !isArchived)}>
-            {isArchived ? "Restore" : "Archive"}
-          </Button>
-          {!isArchived && claim === "claimed" && (
-            <Button variant="secondary" disabled={busy} onClick={() => forceRelease(actor)}>
-              Force release claim
+          {!isArchived && levelable(actor) && (
+            <Button variant="secondary" disabled={busy} onClick={() => navigate(`/characters/${actor.id}/level`)}>
+              Level up or down
+            </Button>
+          )}
+          {/* A character never played is deleted outright; one that has been is archived first. */}
+          {!isArchived && !neverPlayed(actor) && (
+            <Button variant="secondary" disabled={busy} onClick={() => setArchived(actor, true)}>
+              Archive
             </Button>
           )}
           {isArchived && (
+            <Button variant="secondary" disabled={busy} onClick={() => setArchived(actor, false)}>
+              Restore
+            </Button>
+          )}
+          {!isArchived && claim === "claimed" && (
+            <Button variant="secondary" disabled={busy} onClick={() => void forceRelease.release(actor)}>
+              Force release claim
+            </Button>
+          )}
+          {(isArchived || neverPlayed(actor)) && (
             <Button variant="destructive" disabled={busy} onClick={() => remove(actor)}>
               Delete
             </Button>
@@ -224,6 +266,18 @@ export function PartyRosterTab({
       </div>
 
       <div className="party-roster-body scroll-y frame-fill">
+        <JoinAddress token={token} />
+        {samples.some((actor) => !actor.archived) && (
+          <div className="party-samples" role="note">
+            <p>
+              {samples.map((actor) => actor.name).join(", ")} are sample characters to try the table with. Remove them
+              once your own party is ready.
+            </p>
+            <Button variant="secondary" disabled={busy} onClick={() => void removeSamples()}>
+              Remove sample characters
+            </Button>
+          </div>
+        )}
         {pendingImports.length > 0 && (
           <div className="party-queue">
             <h3 className="party-section-head">Waiting for approval</h3>
@@ -318,6 +372,7 @@ export function PartyRosterTab({
         onImported={(name) => toast(`${name} joined the roster — ready to claim.`, { tone: "success" })}
       />
       {dialog}
+      {forceRelease.dialog}
     </section>
   );
 }

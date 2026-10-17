@@ -7,6 +7,7 @@ import { PartyStrip } from "../actors/PartyStrip";
 import { DicePanel } from "../dice/DicePanel";
 import { DockAccordion } from "../encounter/DockAccordion";
 import { DOCK_POSITIONS, EncounterPanel, type DockPosition } from "../encounter/EncounterPanel";
+import { JoinAddress } from "../components/JoinAddress";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import type { MapSelection } from "../maps/MapManager";
 import { ReplayShelf } from "../replay/ReplayShelf";
@@ -31,12 +32,14 @@ export type GmTable = Readonly<{
   onViewAllScenes: () => void;
   onBackToLive: () => void;
   onMakeLive: (sceneId: string) => void;
+  /** Opens a map's grid calibration, from the staging banner when the scene's map has none. */
+  onSetGrid: (mapId: string) => void;
   viewerPreview: Readonly<{ on: boolean; onToggle: () => void }>;
 }>;
 
 type TableViewProps = Readonly<
   { token: string; onOpenLog: () => void } & (
-    { role: "gm"; state: GmView; gm: GmTable } | { role: "player"; state: PlayerView; onLeave: () => void }
+    { role: "gm"; state: GmView; gm: GmTable } | { role: "player"; state: PlayerView }
   )
 >;
 
@@ -122,6 +125,8 @@ export function TableView(props: TableViewProps) {
         }
       : undefined;
   const staged = gm?.stagedScene ?? null;
+  const stagedMap = staged ? gm?.mapLibrary.find((map) => map.id === staged.mapAssetId) : undefined;
+  const stagedNeedsGrid = stagedMap !== undefined && !stagedMap.calibration && !stagedMap.scale;
   const activeScene =
     props.role === "gm"
       ? (props.state.combat.scenes?.find((scene) => scene.id === props.state.combat.activeSceneId) ?? null)
@@ -157,8 +162,16 @@ export function TableView(props: TableViewProps) {
         {staged ? (
           <>
             <div className="scene-preview-banner" role="status">
-              Staging <strong>{staged.name}</strong> — GM only. Drag tokens from the tray to place them, then use the
-              map buttons to go back or make it live.
+              <span>
+                Staging <strong>{staged.name}</strong>. Only you see it. Place tokens from the tray, then press Make
+                live on the map.
+                {stagedNeedsGrid && " This map has no grid yet, so tokens won't snap to squares."}
+              </span>
+              {stagedNeedsGrid && gm && (
+                <Button variant="secondary" size="sm" onClick={() => gm.onSetGrid(staged.mapAssetId)}>
+                  Set the grid
+                </Button>
+              )}
             </div>
             <EncounterMap
               assetId={staged.mapAssetId}
@@ -187,14 +200,15 @@ export function TableView(props: TableViewProps) {
             {!state.combat.active && state.combat.mapAssetId && (
               <p className="table-status">
                 {role === "gm"
-                  ? "Scene is live — add who's in it and start the fight from the panel below."
+                  ? "The scene is live. Choose who is in the fight under The fight, then start it."
                   : "Waiting for the GM to start the fight."}
               </p>
             )}
-            {!state.combat.active && !state.combat.mapAssetId && (
+            {/* An unclaimed player sees the picker first; this line is about a fight they have no part in yet. */}
+            {!state.combat.active && !state.combat.mapAssetId && (role === "gm" || playerHasClaimed) && (
               <p className="table-status">
                 {role === "gm"
-                  ? "No fight running yet. Start one from the panel below."
+                  ? "No fight running yet. Set one up under The fight."
                   : "No fight running yet. The GM will start one when everyone's ready."}
               </p>
             )}
@@ -226,8 +240,10 @@ export function TableView(props: TableViewProps) {
                 healthDisplay={props.role === "gm" ? props.state.combat.healthDisplay : undefined}
                 state={state}
               />
-            ) : (
-              <div className="empty map-empty-hero scanlines">
+            ) : props.role === "player" && !playerHasClaimed ? null : (
+              /* No map yet. The GM's box is the first evening's start: the scene, and the address players open. A
+                 player who has not claimed anyone sees the picker instead, above the fold. */
+              <div className={`empty map-empty-hero scanlines${gm ? " map-empty-hero--gm" : ""}`}>
                 <div className="empty-atmos" aria-hidden="true">
                   <span className="home-hero-bloom" />
                   <span className="home-hero-grid grid-floor" />
@@ -235,14 +251,15 @@ export function TableView(props: TableViewProps) {
                 <strong>No map loaded yet</strong>
                 <span>
                   {role === "gm"
-                    ? "Prepare a scene from the Scenes tab - pick a map and who's in it, then go live."
-                    : "The GM will load the battle map when combat begins."}
+                    ? "Prepare a scene: pick a map and who is in it, then make it live."
+                    : "The GM shows the battle map when the fight starts."}
                 </span>
                 {gm && (
                   <Button variant="secondary" className="empty-scene-prep" onClick={gm.onPrepareScene}>
                     <IconScene /> Prepare a scene
                   </Button>
                 )}
+                {gm && <JoinAddress token={token} layout="hero" />}
               </div>
             )}
           </>
@@ -289,13 +306,6 @@ export function TableView(props: TableViewProps) {
           nothing is shared. */}
         {props.role === "player" && !state.combat.active && (
           <ReplayShelf token={token} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />
-        )}
-        {props.role === "player" && (
-          <section className="gm-session-controls">
-            <Button variant="secondary" onClick={props.onLeave}>
-              Leave table
-            </Button>
-          </section>
         )}
       </div>
     </div>

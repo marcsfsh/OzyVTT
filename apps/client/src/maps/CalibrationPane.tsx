@@ -57,7 +57,8 @@ export function CalibrationPane({
   gmToken,
   folderNames,
   onSaved,
-  onShowRail
+  onShowRail,
+  next
 }: Readonly<{
   map: MapAsset;
   previewUrl: string | null;
@@ -67,6 +68,8 @@ export function CalibrationPane({
   onSaved: (mapId: string) => Promise<void>;
   /** Below 850px: back to the rail of maps. */
   onShowRail: () => void;
+  /** Where the GM goes once the grid is set, as the done state's primary ("Back to the table"). */
+  next?: Readonly<{ label: string; go: () => void }>;
 }>) {
   const [points, setPoints] = useState<Point[]>([]);
   const [pendingArea, setPendingArea] = useState<Area | null>(null);
@@ -87,6 +90,8 @@ export function CalibrationPane({
   /** The wizard's 30-minute TTL ran out: an explicit, recoverable state with one way back, rather
       than a silent re-measure that would discard the GM's placement. */
   const [expired, setExpired] = useState(false);
+  /** The saved result, shown until the GM moves on or calibrates again: a reset to step 1 read as "nothing saved". */
+  const [done, setDone] = useState<string | null>(null);
   const { prompt, dialog } = usePrompt();
   const { toast } = useToast();
   const squareMode = map.kind === "battlemap" && battlemapMode === "square";
@@ -213,28 +218,27 @@ export function CalibrationPane({
       if (!wizardId) throw new Error("Start grid calibration first.");
       acceptWizardData(await request<WizardReply>(`/calibration/wizards/${wizardId}/actions`, action));
     });
-  /** A finished calibration lands back on the library with the map still selected and a toast; the
-      pane resets to the mode step, the honest start for calibrating it again. */
+  /** A finished calibration says so in the pane and offers the next step; calibrating again starts from the mode
+      step. */
   const finished = (message: string) => {
     restartCalibration();
     setPoints([]);
     setRawStep(0);
-    onShowRail();
-    toast(message, { tone: "success" });
+    setDone(message);
   };
   const completeWizard = () =>
     runWizard(async () => {
       if (!wizardId) throw new Error("Start grid calibration first.");
       await request(`/calibration/wizards/${wizardId}/complete`, {});
       await onSaved(map.id);
-      finished("Grid calibration saved.");
+      finished(`The grid for ${map.name} is set. Tokens on it snap to its squares.`);
     });
   const saveScale = () =>
     run(async () => {
       if (points.length < 2) throw new Error("Choose two points with a known real-world distance.");
       await request("/scale", { start: points[0], end: points[1], knownDistance, unit }, "PUT");
       await onSaved(map.id);
-      finished("Map scale saved.");
+      finished(`The scale for ${map.name} is set. Rulers and moves on it measure in ${unit}.`);
     });
 
   // The step index, from local UI state only. `maxStep` is the furthest the flow accepts: past the
@@ -278,6 +282,19 @@ export function CalibrationPane({
 
   /** One primary per step, and the secondary that belongs beside it. */
   const actions = (() => {
+    if (done)
+      return {
+        primary: next ? (
+          <Button variant="primary" onClick={next.go}>
+            {next.label}
+          </Button>
+        ) : null,
+        secondary: (
+          <Button variant="secondary" onClick={() => setDone(null)}>
+            Set it again
+          </Button>
+        )
+      };
     if (expired)
       return {
         primary: (
@@ -442,17 +459,19 @@ export function CalibrationPane({
         </div>
       </div>
 
-      <Steps
-        className="map-steps"
-        steps={stepItems}
-        current={step}
-        maxSelectable={maxStep}
-        onStepSelect={goToStep}
-        ariaLabel="Grid calibration"
-      />
+      {!done && (
+        <Steps
+          className="map-steps"
+          steps={stepItems}
+          current={step}
+          maxSelectable={maxStep}
+          onStepSelect={goToStep}
+          ariaLabel="Grid calibration"
+        />
+      )}
       {/* The one live status region on this surface; errors go to the toast. */}
-      <p className="map-step-note" id="map-step-note" role="status">
-        {instruction}
+      <p className={`map-step-note${done ? " is-done" : ""}`} id="map-step-note" role="status">
+        {done ?? instruction}
       </p>
 
       {/* The canvas: mounted once, never inside a step panel, never unmounted, and the pane's only
@@ -526,7 +545,7 @@ export function CalibrationPane({
       </div>
 
       <div className="map-step-body scroll-y">
-        {expired ? (
+        {done ? null : expired ? (
           <ExpiredNotice />
         ) : step === 0 ? (
           <ModeStep
@@ -542,7 +561,7 @@ export function CalibrationPane({
             }}
           />
         ) : step === 1 ? (
-          <MarkStep squareMode={squareMode} points={points} crosshair={crosshair} onCrosshairChange={setCrosshair} />
+          <MarkStep squareMode={squareMode} crosshair={crosshair} onCrosshairChange={setCrosshair} />
         ) : step === 2 ? (
           squareMode ? (
             <TuneGridStep

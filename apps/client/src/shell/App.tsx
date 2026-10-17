@@ -127,6 +127,7 @@ export function App() {
             onOpenLog={openLog}
             onSignOut={() => void session.signOutGm()}
             onRevokeAll={() => void session.revokeAllGmSessions()}
+            onChangePassword={session.changeGmPassword}
           />
         )}
         {shell?.role === "player" && (

@@ -136,3 +136,24 @@
     flex: 1 1 auto;
   }
 }
+
+/* The sample party's note: what the samples are, and the one action that clears them. */
+.party-samples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 1.6rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.party-samples p {
+  flex: 1 1 18rem;
+  margin: 0;
+  color: var(--text-dim);
+}
+.party-roster-body > .join-address {
+  margin-bottom: var(--space-4);
+}

@@ -45,7 +45,7 @@ export function MapUploadForm({
       toast(
         data.duplicate
           ? "That image was already uploaded; the existing map is selected."
-          : "Map uploaded — set its grid below.",
+          : "Map uploaded. Set its grid below.",
         { tone: "success" }
       );
     } catch (error) {
@@ -113,9 +113,12 @@ export function MapUploadForm({
               <option key={folder} value={folder} />
             ))}
           </datalist>
-          <Button variant="primary" type="submit" disabled={busy || !file}>
-            Upload map
-          </Button>
+          {/* The one primary moves here once a file is chosen; before that, "Add map…" is it. */}
+          {file && (
+            <Button variant="primary" type="submit" disabled={busy}>
+              Upload map
+            </Button>
+          )}
         </div>
       </form>
     </>

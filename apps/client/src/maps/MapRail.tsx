@@ -97,7 +97,7 @@ export function MapRail({
         </ul>
         {filteredMaps.length === 0 && (
           <p className="map-list-empty">
-            {maps.length === 0 ? "No maps yet — add one above." : "No maps match this filter."}
+            {maps.length === 0 ? "No maps yet. Add one above." : "No maps match this filter."}
           </p>
         )}
       </div>

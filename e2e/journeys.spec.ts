@@ -3,6 +3,7 @@
  * viewport, so the first one meets a server with no GM password.
  */
 import { randomUUID } from "node:crypto";
+import type { Page } from "@playwright/test";
 import {
   GM_PASSWORD,
   PARTY,
@@ -13,6 +14,7 @@ import {
   expectPageFits,
   fillIn,
   joinAndClaim,
+  openGmSection,
   pinchDuringDrag,
   positionOf,
   press,
@@ -23,26 +25,137 @@ import {
 
 const MAP_NAME = "Smoke cavern";
 
-test("the GM sets a password on a fresh server, then signs in with it", async ({ open }) => {
+/** Where an image point of the calibration preview is on screen: the preview svg maps image pixels to the page. */
+async function onPreview(page: Page, point: { x: number; y: number }) {
+  return page.locator(".map-preview svg").evaluate((svg: SVGSVGElement, { x, y }) => {
+    const matrix = svg.getScreenCTM()!;
+    return { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f };
+  }, point);
+}
+
+test("the first evening: the GM password, the join address, a player, the table screen and a live scene", async ({
+  open,
+  hasTouch
+}) => {
+  // The GM password, set once on the host.
   const gm = await open("/");
   await expectPageFits(gm);
   await press(gm.getByRole("button", { name: "Enter as GM" }));
   await expect(gm.getByRole("heading", { name: "Set up the GM password" })).toBeVisible();
+  await fillIn(gm.getByPlaceholder("GM password"), "short");
+  await press(gm.getByRole("button", { name: "Set GM password" }));
+  await expect(gm.getByText("Use a GM password of at least 12 characters.")).toBeVisible();
+  // The label on the sun frame is readable: light ink on the dark plate.
+  const label = await gm
+    .getByRole("button", { name: "Set GM password" })
+    .evaluate((button) => getComputedStyle(button).color);
+  expect(label, "primary label colour").not.toBe("rgb(4, 20, 28)");
+  await press(gm.getByRole("button", { name: "Show password" }));
+  await expect(gm.getByPlaceholder("GM password")).toHaveAttribute("type", "text");
   await fillIn(gm.getByPlaceholder("GM password"), GM_PASSWORD);
   await press(gm.getByRole("button", { name: "Set GM password" }));
   await expect(gm.getByText("GM password set. Enter it to begin.")).toBeVisible();
+  // The rejected attempt's error went when the next one started.
+  await expect(gm.getByText("Use a GM password of at least 12 characters.")).toBeHidden();
   await expectPageFits(gm);
 
   await fillIn(gm.getByPlaceholder("GM password"), "not-the-password");
   await press(gm.getByRole("button", { name: "Enter table" }));
-  await expect(gm.getByText("Invalid GM password.")).toBeVisible();
+  await expect(gm.getByText("That is not the GM password. Check it and try again.")).toBeVisible();
+  await press(gm.getByRole("button", { name: "Forgot the password" }));
+  const reset = gm.getByRole("dialog", { name: "Reset the GM password" });
+  await expect(reset.getByText("data/auth.json")).toBeVisible();
   await expectPageFits(gm);
-
+  await press(reset.getByRole("button", { name: "Close" }));
   await fillIn(gm.getByPlaceholder("GM password"), GM_PASSWORD);
   await press(gm.getByRole("button", { name: "Enter table" }));
-  await expect(gm.getByRole("tablist", { name: "GM sections" })).toBeVisible();
+  await expect(gm.getByRole("tab", { name: "Table", selected: true })).toBeVisible();
+  // A reload keeps the GM signed in.
+  await gm.reload();
   await expect(gm.getByRole("tab", { name: "Table", selected: true })).toBeVisible();
   await expectPageFits(gm);
+
+  // The address players open, from the Table's empty state, with Copy and a QR code drawn here.
+  const join = gm.getByRole("region", { name: "Join address" });
+  await expect(join.getByText("Players join at")).toBeVisible();
+  // One network address shows as text; several as a choice, the first already chosen.
+  const choice = join.getByRole("combobox", { name: "Join address" });
+  const address = (await choice.isVisible()) ? await choice.inputValue() : await join.locator("code").textContent();
+  expect(address).toMatch(/^http:\/\/[\d.]+:\d+$/);
+  await gm.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await press(join.getByRole("button", { name: "Copy" }));
+  await expect(gm.getByText("Join address copied.")).toBeVisible();
+  expect(await gm.evaluate(() => navigator.clipboard.readText())).toBe(address);
+  if (hasTouch) await press(join.getByRole("button", { name: "Show QR code" }));
+  await expect(join.getByRole("img", { name: `QR code for ${address}` })).toBeVisible();
+  await expectPageFits(gm);
+
+  // A player opens that address, sees who each character is, claims one and lands on My character.
+  const player = await open(address!);
+  await press(player.getByRole("button", { name: "Join as Player" }));
+  await expect(player.getByRole("heading", { name: "Choose your character" })).toBeVisible();
+  // The later journeys play the other two.
+  const card = player.getByRole("listitem").filter({ hasText: PARTY[2] });
+  await expect(card.getByText(/^Elf Wizard 7 · HP \d+$/)).toBeVisible();
+  await expectPageFits(player);
+  await press(card.getByRole("button", { name: "Claim" }));
+  await press(player.getByRole("dialog", { name: `Claim ${PARTY[2]}?` }).getByRole("button", { name: "Claim" }));
+  await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
+  await expectPageFits(player);
+
+  // The table screen shows a code, and the GM types it: nothing is typed with a remote.
+  const screen = await open("/viewer.html");
+  await expect(screen.getByRole("heading", { name: "Pair this screen" })).toBeVisible();
+  const code = (await screen.locator(".viewer-screen-code").textContent())!.replace(/\D/g, "");
+  expect(code).toMatch(/^\d{6}$/);
+  await openGmSection(gm, "Shared screen");
+  await fillIn(gm.getByLabel("Code on the screen"), code);
+  await fillIn(gm.getByLabel("Screen name"), "Living room TV");
+  await press(gm.getByRole("button", { name: "Pair screen" }));
+  await expect(gm.getByText("Living room TV is paired. It shows the table in a moment.")).toBeVisible();
+  await expect(screen.getByRole("heading", { name: "Pair this screen" })).toBeHidden();
+  await expect(gm.getByText("1 connected")).toBeVisible();
+  await expectPageFits(gm);
+
+  // A scene on a new map. The map has no grid, which the picker and the staging banner say, with the way to set it.
+  await press(gm.getByRole("tab", { name: "Table" }));
+  await press(gm.getByRole("button", { name: "Prepare a scene" }));
+  const newScene = gm.getByRole("dialog", { name: "New scene" });
+  await press(newScene.getByRole("button", { name: "Pick a map" }));
+  const chooser = gm.waitForEvent("filechooser");
+  await press(newScene.getByRole("button", { name: /Upload a map/ }));
+  await (await chooser).setFiles({ name: `${MAP_NAME}.png`, mimeType: "image/png", buffer: battleMap() });
+  await expect(gm.getByText("Map uploaded.")).toBeVisible();
+  await expect(newScene.getByText(/has no grid yet/)).toBeVisible();
+  await expect(newScene.getByRole("button", { name: "Set the grid" })).toBeVisible();
+  await press(newScene.getByRole("button", { name: "Prepare scene" }));
+  const banner = gm.getByRole("status").filter({ hasText: "Staging" });
+  await expect(banner).toContainText("This map has no grid yet");
+  await expectPageFits(gm);
+  await press(banner.getByRole("button", { name: "Set the grid" }));
+
+  // The grid: a printed square grid, a 3 x 3 drag from one intersection to the opposite one, then confirm.
+  await expect(gm.getByRole("region", { name: `Calibrate ${MAP_NAME}` })).toBeVisible();
+  await press(gm.getByRole("button", { name: "Continue" }));
+  const from = await onPreview(gm, { x: 64, y: 64 });
+  const to = await onPreview(gm, { x: 256, y: 256 });
+  await drag(gm, gm.locator(".map-preview"), { x: to.x - from.x, y: to.y - from.y }, from);
+  await press(gm.getByRole("button", { name: "Measure this area" }));
+  await press(gm.getByRole("button", { name: "Looks right" }));
+  await press(gm.getByRole("button", { name: "Confirm grid" }));
+  await expect(gm.getByText(`The grid for ${MAP_NAME} is set. Tokens on it snap to its squares.`)).toBeVisible();
+  await expectPageFits(gm);
+
+  // Back to the staged scene, now with a grid, and live: the table screen shows it.
+  await press(gm.getByRole("button", { name: "Back to the table" }));
+  await expect(banner).not.toContainText("no grid");
+  await press(gm.getByRole("button", { name: "Make live" }));
+  await expect(
+    gm.getByText("The scene is live. Choose who is in the fight under The fight, then start it.")
+  ).toBeVisible();
+  await expect(screen.getByRole("img", { name: MAP_NAME })).toBeVisible();
+  await expectPageFits(gm);
+  await expectPageFits(screen);
 });
 
 test("a player joins and claims a character", async ({ open }) => {
@@ -77,8 +190,10 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   const gm = await open("/");
   await signInAsGm(gm);
 
-  // A scene with a freshly uploaded battle map, made live.
-  await press(gm.getByRole("button", { name: "Prepare a scene" }));
+  // A scene with a freshly uploaded battle map, made live. From Scenes, since an earlier journey may have left a
+  // scene live on the Table.
+  await press(gm.getByRole("tab", { name: "Scenes" }));
+  await press(gm.getByRole("button", { name: "New scene" }).first());
   const newScene = gm.getByRole("dialog", { name: "New scene" });
   await press(newScene.getByRole("button", { name: "Pick a map" }));
   const chooser = gm.waitForEvent("filechooser");
@@ -153,7 +268,7 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
   }
 });
 
-test("the GM pairs the table viewer and presents the map", async ({ open, request }) => {
+test("the GM presents a map on a paired table screen", async ({ open, request }) => {
   // Start from a paused presentation of an uploaded map, whichever journeys ran before this one.
   await ensureGmPassword(request);
   const { token } = (await (await request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json())
@@ -175,23 +290,22 @@ test("the GM pairs the table viewer and presents the map", async ({ open, reques
   });
   expect(pause.ok(), await pause.text()).toBe(true);
 
+  // A screen paired through the API: the first evening pairs one through the app.
   const viewer = await open("/viewer.html");
-  await expect(viewer.getByRole("heading", { name: "Pair this screen" })).toBeVisible();
+  const pairing = await request.post("/api/v1/viewer/pairings", { headers, data: {} });
+  const code = (await pairing.json()).data.pairing.code as string;
+  expect((await viewer.request.post("/api/v1/viewer/pairings/exchange", { data: { code, name: "Den TV" } })).ok()).toBe(
+    true
+  );
+  await viewer.reload();
+  await expect(viewer.getByRole("heading", { name: "Presentation paused" })).toBeVisible();
   await expectPageFits(viewer);
 
   const gm = await open("/");
   await signInAsGm(gm);
-  await press(gm.getByRole("tab", { name: "Shared screen" }));
+  await openGmSection(gm, "Shared screen");
   await expect(gm.getByRole("heading", { name: "Table viewer" })).toBeVisible();
-  await press(gm.getByRole("button", { name: "Create pairing code" }));
-  const code = (await gm.getByRole("status").filter({ hasText: "Pairing code" }).locator("strong").textContent())!;
-  await expectPageFits(gm);
-
-  await fillIn(viewer.getByLabel("Display name"), "Living room TV");
-  await fillIn(viewer.getByLabel("Pairing code"), code);
-  await press(viewer.getByRole("button", { name: "Pair viewer" }));
-  await expect(viewer.getByRole("heading", { name: "Presentation paused" })).toBeVisible();
-  await expect(gm.getByText("1 connected")).toBeVisible();
+  await expect(gm.getByText("Den TV", { exact: false }).first()).toBeVisible();
 
   await press(gm.getByRole("button", { name: `Present ${MAP_NAME}` }));
   await expect(viewer.getByRole("img", { name: MAP_NAME })).toBeVisible();
@@ -220,7 +334,7 @@ test("the GM plays music on the table screen and sees that the room hears it", a
 
   const gm = await open("/");
   await signInAsGm(gm);
-  await press(gm.getByRole("tab", { name: "Shared screen" }));
+  await openGmSection(gm, "Shared screen");
   await press(gm.getByRole("button", { name: "Sound" }));
   await expect(gm.getByRole("heading", { name: "Sound", level: 2 })).toBeVisible();
   await expectPageFits(gm);
@@ -259,7 +373,7 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await expect.poll(() => music.evaluate((element: HTMLAudioElement) => element.paused)).toBe(false);
 
   // Leave the board silent for whatever runs next.
-  await press(gm.getByRole("tab", { name: "Shared screen" }));
+  await openGmSection(gm, "Shared screen");
   await press(gm.getByRole("button", { name: "Stop all" }));
   await expect(music).toHaveCount(0);
 });

@@ -39,8 +39,26 @@ npm run start
 ```
 
 This builds the client and serves everything on port 3001. Players join at
-`http://HOST-IP:3001`. On Windows, allow Node.js on private networks only. Never expose the port
-to the internet; use a VPN for remote players.
+`http://HOST-IP:3001`: once you are signed in as the GM, the Table, the Roster and Settings show
+that address with a Copy button and a QR code, drawn on your own device. On Windows, allow Node.js
+on private networks only. Never expose the port to the internet; use a VPN for remote players.
+
+## The GM password
+
+Set it the first time you open the app, on the computer that runs OzyVTT (it is refused from any
+other device). After that, sign in from any device on the network. A reload or a second tab stays
+signed in; tick "Keep me signed in on this computer" to stay signed in after the browser closes,
+until the 12-hour sign-in runs out. Change the password under Settings; that signs out every other
+GM browser.
+
+If you forget it, reset it on the computer that runs OzyVTT:
+
+1. Stop OzyVTT.
+2. Delete `data/auth.json` (or `auth.json` in your `DATA_DIR`).
+3. Start OzyVTT again, open it on that computer, and set a new password.
+
+The campaign stays as it was. Every sign-in ends, so players join again and claim their
+characters.
 
 `data/` holds the GM password hash and all campaign data. It is git-ignored, so back it up
 separately. A `data/` directory from a build before the October 2026 cleanup is refused at startup;
@@ -63,17 +81,19 @@ move it aside to start fresh.
 
 The smoke suite (`e2e/`) starts its own servers on ports 3201 and 3202 (set `SMOKE_PORT` to move
 them), each against a fresh temporary data directory, and runs the first-evening journeys at a
-390x844 touch phone and a 1280x800 laptop: GM setup and sign-in, a player claiming a character, a
-fight on a new scene, pairing the table viewer, and playing music on it. It needs Chromium once:
-`npx playwright install chromium`.
+390x844 touch phone and a 1280x800 laptop: the first evening (GM setup, the join address, a player
+claiming a character, pairing the table screen, uploading a map, setting its grid and making the
+scene live), a player claiming a character, a fight on a new scene, presenting a map on the table
+screen, and playing music on it. It needs Chromium once: `npx playwright install chromium`.
 
 ## Running a fight
 
 1. As GM, open **Scenes**, add a scene, and upload its battlemap.
-2. For a printed grid, drag diagonally across a 3x3 block of squares to set the scale. For a
-   gridless map, mark two points and enter the distance between them.
-3. Under **Table viewer**, open the second-screen address on the TV and pair it with the code
-   shown to the GM. Select the map and click **Present**.
+2. Press **Set the grid** (or open **Manage maps**). For a printed grid, drag diagonally across a
+   3x3 block of squares to set the scale. For a gridless map, mark two points and enter the
+   distance between them.
+3. Under **Shared screen**, open the address it shows on the TV. The TV shows a six-digit code:
+   type it under **Pair a table screen**. Select the map and click **Present**.
 4. Pick combatants and start the encounter. Blank initiative scores are rolled on the server.
 5. Drag tokens onto the map. Players move only their own character; the GM moves anything.
    GM-only combatants never appear on player screens or the table viewer.

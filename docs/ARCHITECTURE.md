@@ -86,26 +86,39 @@ Socket.IO over the same origin as HTTP. Server-to-client events come in two kind
 - **GM-only channels** go to GM sockets alone: `sound:changed` carries the sound board and the table
   screens' sound state. A player's socket is never sent it.
 
-On connect the server sends a full projected snapshot. The client keeps its token in
-`localStorage` and passes it in `socket.auth`, so reconnects resume without a new join. Presence
-holds a dropped session as "reconnecting" for about 8 seconds before "offline".
+On connect the server sends a full projected snapshot. The client passes its token in `socket.auth`,
+so reconnects resume without a new join. A player's token is kept in `localStorage`; the GM's in the
+tab's `sessionStorage` (a reload resumes), in `localStorage` only when the GM ticks "Keep me signed in
+on this computer", and a new tab asks the open ones over a `BroadcastChannel` (`lib/gm-token.ts`).
+A socket whose session is revoked or runs out gets `session:ended` and is dropped, and a join with a
+dead token is refused (ADR-0025). Presence holds a dropped session as "reconnecting" for about 8
+seconds before "offline".
 
 ## Identity and roles
 
 - **GM.** The first GM password can only be set from loopback (`POST /api/v1/host/setup`). It is
   stored as a bcrypt hash in `data/auth.json` with a random token secret. GM tokens are
-  HMAC-signed, expire after 12 hours, and can be revoked singly or all at once. The host routes
+  HMAC-signed, expire after 12 hours, and can be revoked singly or all at once. Changing the
+  password (Settings) ends every GM session issued before it. The host routes
   (`host-http.ts`) are the one part of `/api/v1` without open CORS, so a web page can't relay password
   guesses.
 - **Player.** No password. Joining issues a signed 30-day token. A player claims one
   player-character at a time; the claim sets that character's `ownerSessionId`. A player may
-  act only on the character they own: move it, roll for it, level it, set its token image.
+  act only on the character they own: move it, roll for it, level it, set its token image. The
+  GM can force-release a claim (asked twice for a character in the running fight); the player is
+  told on their own devices (`claim:released`).
 - **Integration credential.** A GM-minted, scoped bearer token for the HTTP API (ADR-0016).
-- **Table viewer.** A pairing code exchanged for an HttpOnly cookie. It can only read the
-  presentation projection.
+- **Table viewer.** The screen shows a six-digit code and the GM types it; the screen's own secret,
+  in a cookie, then collects an HttpOnly viewer cookie (ADR-0026). It can only read the presentation
+  projection.
 
 Role comes from the signed token, never from network position. Archived characters cannot be
 claimed, staged or added to a fight.
+
+Every HTTP route and the socket handshake read the caller through one helper (`request-auth.ts`,
+ADR-0025): 401 for no credential or one that is malformed, expired or revoked, and 403 only for a
+valid credential without the role or scope. `credential-walk.test.ts` walks every mounted route with
+four credentials and pins the answers.
 
 ## Projections: the security boundary
 
@@ -115,7 +128,8 @@ audience. There are four:
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
   get only `public` actors, a health band instead of exact HP, and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
-  owner identity, GM notes and hidden turns are removed.
+  owner identity, GM notes and hidden turns are removed. An unclaimed character carries its
+  species and class line for the claim picker, since any player could claim it and read its sheet.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. Only public actors with a position become tokens; annotations
   are public and unexpired; initiative appears only during combat; nothing is shown while
@@ -242,6 +256,9 @@ names no family is the GM's own ruling on the whole command.
   is parked on the server (`character-drafts.ts`), one per player session and one for the GM, beside
   the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
   imported as an actor definition.
+- A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
+  same builder from a fixed seed, so they level like any built character. Each is marked `sample`
+  (GM-only) and the Roster can remove the set.
 
 ## Sound
 

@@ -204,6 +204,26 @@
   font-size: var(--fs-sm);
   line-height: 1.4;
 }
+/* Saved: the line says what is now true, in the confirm colour with its check. */
+.map-step-note.is-done {
+  border-left-color: var(--success);
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.map-step-note.is-done::before {
+  content: "Done. ";
+  font-weight: 700;
+  color: var(--cyan-hi);
+}
+/* The crosshair's look, folded away under the drag hint. */
+.crosshair-details summary {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 
 /* The canvas column: `flex-basis: 0` takes the leftover height, and the min-height floor keeps it on
    screen even while the column shrinks. The floor must not be below the column's own content
