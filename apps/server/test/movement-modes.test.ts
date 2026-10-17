@@ -44,7 +44,19 @@ const DEFINITIONS: Record<string, ActorDefinition> = {
     token: { disposition: "friendly" },
     extensions: {},
     character: { features: [{ id: "roving", kind: "class", sourceId: "ranger" }] }
-  } as unknown as ActorDefinition
+  } as unknown as ActorDefinition,
+  ...Object.fromEntries(
+    ["Flyby", "Agile", "Abduct", "Swarm", "Air Form"].map((trait) => [
+      trait,
+      {
+        actions: [],
+        token: { disposition: "hostile" },
+        extensions: {
+          "open5e.srd-2024": { speeds: { walk: 30, fly: 60 }, traits: [{ name: trait, description: "." }] }
+        }
+      } as unknown as ActorDefinition
+    ])
+  )
 };
 
 function game(
@@ -303,5 +315,42 @@ describe("dragging a grappled creature", () => {
     grapple(state, HERO, RAT);
     expect(dragCostsExtra(state, HERO, [RAT])).toBe(false);
     expect(dragCostsExtra(state, HERO, [ORC])).toBe(true);
+  });
+});
+
+describe("stat-block traits that change how a creature moves", () => {
+  /** The orc, given a stat block with one trait, moves on its own turn. */
+  const withTrait = (trait: string, positions: Readonly<Record<string, { x: number; y: number }>>) => {
+    const state = game(positions, { turn: ORC });
+    state.actors.find((actor) => actor.id === ORC)!.definitionId = trait;
+    return state;
+  };
+
+  it("lets a Flyby creature fly out of an enemy's reach without provoking, but not walk out", () => {
+    const flying = withTrait("Flyby", { [HERO]: cell(0, 0), [ORC]: cell(1, 0) });
+    expect(move(flying, ORC, cell(1, 0), cell(4, 0), { mode: "fly" }).prompts).toEqual([]);
+    const walking = withTrait("Flyby", { [HERO]: cell(0, 0), [ORC]: cell(1, 0) });
+    expect(move(walking, ORC, cell(1, 0), cell(4, 0)).prompts.map((prompt) => prompt.actorId)).toEqual([HERO]);
+  });
+
+  it("lets an Agile creature move out of reach without provoking at all", () => {
+    const state = withTrait("Agile", { [HERO]: cell(0, 0), [ORC]: cell(1, 0) });
+    expect(move(state, ORC, cell(1, 0), cell(4, 0)).prompts).toEqual([]);
+  });
+
+  it("lets a bugbear move what it grapples at no extra cost (Abduct)", () => {
+    const state = withTrait("Abduct", { [HERO]: cell(0, 0), [ORC]: cell(1, 0) });
+    expect(dragCostsExtra(state, ORC, [HERO], resolveDefinition)).toBe(false);
+    expect(dragCostsExtra(state, ORC, [HERO])).toBe(true);
+  });
+
+  it("lets an air elemental stop in a creature's space, and anyone stop in a swarm's", () => {
+    const air = withTrait("Air Form", { [HERO]: cell(3, 0), [ORC]: cell(1, 0) });
+    expect(() => move(air, ORC, cell(1, 0), cell(3, 0))).not.toThrow();
+    const plain = game({ [HERO]: cell(3, 0), [ORC]: cell(1, 0) }, { turn: ORC });
+    expect(blockedBy(() => move(plain, ORC, cell(1, 0), cell(3, 0)))).toBe("movement.occupied");
+    const swarm = game({ [HERO]: cell(0, 0), [ORC]: cell(3, 0) });
+    swarm.actors.find((actor) => actor.id === ORC)!.definitionId = "Swarm";
+    expect(() => move(swarm, HERO, cell(0, 0), cell(3, 0))).not.toThrow();
   });
 });

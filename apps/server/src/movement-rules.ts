@@ -3,6 +3,7 @@ import type { MoveMode } from "@vtt/domain/commands";
 import type { ActorDefinition } from "@vtt/schemas";
 import { footprintOrigin } from "@vtt/rules-5e";
 import { RulesBlockedError } from "./game-store.js";
+import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
@@ -133,7 +134,9 @@ export function movementStatus(
     enforcement: effectiveModeFor(state.combat, "movement.exceeds-speed"),
     ...(modes.length > 0 ? { modes } : {}),
     ...(actor?.conditions.some((condition) => condition.id === "prone") ? { crawling: true } : {}),
-    ...(actor && dragCostsExtra(state, actor.id, grappledBy(state, actor.id)) ? { dragging: true } : {})
+    ...(actor && dragCostsExtra(state, actor.id, grappledBy(state, actor.id), input.resolveDefinition)
+      ? { dragging: true }
+      : {})
   };
 }
 
@@ -149,8 +152,17 @@ export function grappledBy(state: GameState, grapplerId: string): readonly strin
 const SIZE_RANK: Readonly<Record<string, number>> = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gargantuan: 5 };
 
 /** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
- *  unless you are Tiny or two or more sizes smaller than it." */
-export function dragCostsExtra(state: GameState, grapplerId: string, grappledIds: readonly string[]): boolean {
+ *  unless you are Tiny or two or more sizes smaller than it." A bugbear's Abduct: it "needn't spend extra movement to
+ *  move a creature it is grappling". */
+export function dragCostsExtra(
+  state: GameState,
+  grapplerId: string,
+  grappledIds: readonly string[],
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined
+): boolean {
+  const grappler = state.actors.find((actor) => actor.id === grapplerId);
+  const definition = grappler?.definitionId ? resolveDefinition?.(grappler.definitionId) : undefined;
+  if (holdsFeature(definition, "abduct", "Abduct")) return false;
   const rank = (actorId: string) =>
     SIZE_RANK[state.actors.find((actor) => actor.id === actorId)?.size ?? "medium"] ?? SIZE_RANK.medium!;
   return grappledIds.some((actorId) => {
@@ -236,15 +248,25 @@ function cellsAt(calibration: SquareGridCalibration, position: Point, sizeCells:
   return cells;
 }
 
+/** Traits that let a creature end its move in another's space ("The elemental can enter a creature's space and stop
+ *  there"); a swarm's works both ways ("The swarm can occupy another creature's space and vice versa"). */
+const SHARES_SPACE = ["Air Form", "Fire Form", "Water Form", "Swarm"] as const;
+const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInput, swarmOnly = false): boolean => {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
+  return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
+};
+
 /** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
  *  the refusal can't give one away; neither do the creatures the mover drags. */
 function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point): boolean {
-  if (!input.calibration) return false;
+  if (!input.calibration || sharesSpace(state, input.actorId, input)) return false;
   const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
   const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
   return state.combat.tokens.some((token) => {
     if (token.actorId === input.actorId || !token.position || input.dragging?.actorIds.includes(token.actorId))
       return false;
+    if (sharesSpace(state, token.actorId, input, true)) return false;
     if (state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
       if (mine.has(cell)) return true;
@@ -300,7 +322,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   const options: MovementCostOptions = {
     extraPerStep,
     carried: input.dragging?.actorIds ?? [],
-    resolveDefinition: input.resolveDefinition
+    resolveDefinition: input.resolveDefinition,
+    ...(sharesSpace(state, actorId, input) ? { passesCreatures: true } : {})
   };
   const straight = (): MovementCost | null => {
     const distance = input.distance(from, to);
@@ -359,6 +382,10 @@ function openOpportunityAttacks(
 ): void {
   const { actorId } = input;
   if (mover.visibility === "gm-only" || mover.effects.some((effect) => effect.tags.includes("disengaged"))) return;
+  // "The rat doesn't provoke Opportunity Attacks when it moves out of an enemy's reach"; Flyby, when it flies out.
+  const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
+  if (holdsFeature(moverDefinition, "agile", "Agile")) return;
+  if ((input.mode ?? "walk") === "fly" && holdsFeature(moverDefinition, "flyby", "Flyby")) return;
   for (const entry of state.combat.initiative) {
     if (entry.actorId === actorId || state.combat.pendingReactions.length >= 20) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
