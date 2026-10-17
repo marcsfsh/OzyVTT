@@ -56,8 +56,9 @@ export const fighter: ClassMechanicsModule = {
           }
         ]
       }
-      // Not modeled: Heroic Warrior (no Heroic Inspiration on the actor) and Survivor (Bloodied regen,
-      // death-save advantage has no reader). Additional Fighting Style's choice is already on the record.
+      // Heroic Warrior is applied at the start of the Champion's turn (`turn-boundaries.ts`), by its feature id.
+      // Not modeled: Survivor (Bloodied regen, death-save advantage has no reader). Additional Fighting Style's
+      // choice is already on the record.
     }
   }
 };

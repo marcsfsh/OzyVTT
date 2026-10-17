@@ -57,6 +57,8 @@ export const RollRecordSchema = z.object({
   ),
   modifiers: z.array(z.object({ value: z.number().int().nonnegative(), sign: z.union([z.literal(1), z.literal(-1)]) })),
   total: z.number().int(),
+  /** The d20 was typed from a physical die rather than thrown by the server. */
+  typed: z.literal(true).optional(),
   createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
@@ -261,6 +263,35 @@ export const PendingSaveSchema = z
   })
   .strict();
 export type PendingSave = z.infer<typeof PendingSaveSchema>;
+
+/**
+ * Dice thrown before they count, held so a second look at the same roll returns the same dice (ADR-0012): a previewed
+ * save, death save, attack or opportunity attack. GM-only; the player saw the dice in the roll itself.
+ */
+export const HeldRollSchema = z
+  .object({
+    /** What the dice belong to: `save:<saveId>`, `death-save:<actorId>`, `attack:<actorId>` or
+     *  `reaction:<reactionId>`. */
+    key: z.string().min(1).max(200),
+    actorId: z.uuid(),
+    /** The d20 faces thrown so far, in order. */
+    faces: z.array(z.number().int().min(1).max(20)).min(1).max(2),
+    /** The roll's other dice as thrown (Bless's d4), kept with the d20s. */
+    others: z
+      .array(z.object({ sides: z.number().int().min(2).max(100), face: z.number().int().min(1).max(100) }).strict())
+      .max(20)
+      .default([]),
+    /** The roll the faces were recorded under. */
+    rollId: z.uuid().nullable().default(null),
+    /** Typed from a physical die rather than thrown by the server. */
+    typed: z.boolean().default(false),
+    /** The round and turn they were thrown in: a die held for one turn's attack is not reused on a later turn. */
+    round: z.number().int().nonnegative(),
+    turnActorId: z.uuid().nullable(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type HeldRoll = z.infer<typeof HeldRollSchema>;
 
 /** An attack a reaction (Parry, Shield) may still turn into a miss, held at the roll until the prompt is answered and
  * then replayed with the same die. The economy it spent was committed when it rolled. GM-only. */
@@ -762,9 +793,11 @@ export const BuilderPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).default("open"),
     /** Whether players may roll a random character; "gm-only" by default because it fills a roster slot in one tap. */
     playerRandom: z.enum(["open", "gm-only"]).default("gm-only"),
-    /** Whether players may type what their own dice showed for rolled ability scores and hit points. Closed by
-     *  default: a player's rolls are then thrown by the server (the GM may always type). */
-    typedRolls: z.enum(["open", "gm-only"]).default("gm-only"),
+    /** The table's one setting for typed dice (ADR-0012): whether players may type what their physical dice show, for
+     *  every roll (checks, saves, attacks, damage, death saves, initiative, and rolled scores and hit points in the
+     *  builder). Open by default, for tables that roll physical dice; "gm-only" refuses a player's typed faces and the
+     *  server throws them. The GM may always type. */
+    typedRolls: z.enum(["open", "gm-only"]).default("open"),
     /** A table rule raising a rolled hit-point level to the class average; "none" is the SRD (the roll stands). */
     hitPointRollFloor: z.enum(["none", "average"]).default("none")
   })
@@ -823,6 +856,8 @@ export const GameStateSchema = z.object({
   /** Table defaults for staging new combatants. GM-set, GM-read. */
   stagingDefaults: StagingDefaultsSchema.prefault({}),
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */
-  partyVisibility: PartyVisibilitySchema.default("name-and-class")
+  partyVisibility: PartyVisibilitySchema.default("name-and-class"),
+  /** Dice thrown before they count (see HeldRollSchema). GM-only. */
+  heldRolls: z.array(HeldRollSchema).max(100).default([])
 });
 export type GameState = z.infer<typeof GameStateSchema>;

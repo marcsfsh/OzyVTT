@@ -12,6 +12,7 @@ import { mapCommands } from "./map.js";
 import { createCommandRunner, runRead, type AnyCommand, type ReadSpec, type SocketEventOf } from "./pipeline.js";
 import { reactionCommands } from "./reactions.js";
 import { gameReads, viewFor } from "./reads.js";
+import { rollCommands } from "./rolls.js";
 import { rulingCommands } from "./rulings.js";
 import { saveCommands } from "./saves.js";
 import { sceneCommands } from "./scenes.js";
@@ -31,6 +32,7 @@ export const gameCommands: readonly AnyCommand[] = [
   ...characterSheetCommands,
   ...actionCommands,
   ...saveCommands,
+  ...rollCommands,
   ...reactionCommands,
   ...effectCommands,
   ...rulingCommands,

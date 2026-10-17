@@ -204,8 +204,9 @@ export type DeathSaveResult = MutationResult & {
     dead: boolean;
     regainedConsciousness: boolean;
     /** false = previewed only (pips unchanged, awaiting confirmation); true = applied. */ committed: boolean;
-    /** The d20 mode when adv/disadv was chosen; absent for a plain roll. */ rollMode?:
+    /** The d20 mode when it had Advantage or Disadvantage; absent for a plain roll. */ rollMode?:
       "advantage" | "disadvantage" | "normal";
+    /** What gave the death save Advantage or Disadvantage. */ rollModeSources?: ActionRollMode;
   }>;
 };
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
@@ -214,6 +215,7 @@ export type SaveAnswerResult = MutationResult & {
     success: boolean;
     total: number;
     dc: number;
+    /** The d20 that counted; absent when no die was rolled. */ natural?: number;
     appliedDamage: number;
     conditionApplied: boolean;
     committed: boolean;

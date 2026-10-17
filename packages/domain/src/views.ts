@@ -52,6 +52,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
       string,
       number
     >;
+    /** Whether the character holds Heroic Inspiration. Same gate as `actionUses`. */ heroicInspiration?: boolean;
     /** Picks re-made on a rest, keyed by offer key (Circle of the Land's land type). Same gate as `actionUses`. */ choiceOverrides?: Record<
       string,
       { id: string; per: "short-rest" | "long-rest" }

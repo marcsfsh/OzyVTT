@@ -223,6 +223,7 @@ export const GAME_PATHS = {
   rulesPolicy: `${API_NAMESPACE}/game/rules/policy`,
   actionUse: `${API_NAMESPACE}/game/actions/use`,
   saveRoll: `${API_NAMESPACE}/game/saves/roll`,
+  actorHeroicInspiration: `${API_NAMESPACE}/game/actors/{actorId}/heroic-inspiration`,
   rulesAsk: `${API_NAMESPACE}/game/rules/ask`,
   rulesAnswer: `${API_NAMESPACE}/game/rules/answer`,
   stagingDefaults: `${API_NAMESPACE}/game/table/staging-defaults`,
@@ -527,6 +528,11 @@ export const GAME_COMMANDS = {
   "rules.set-policy": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesPolicy },
   "action.use": { scope: "combat:write", method: "post", path: GAME_PATHS.actionUse },
   "save.roll": { scope: "combat:write", method: "post", path: GAME_PATHS.saveRoll },
+  "actor.set-heroic-inspiration": {
+    scope: "actor:write",
+    method: "post",
+    path: GAME_PATHS.actorHeroicInspiration
+  },
   "rules.ask": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAsk },
   "rules.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAnswer },
   "table.set-staging-defaults": { scope: "combat:write", method: "post", path: GAME_PATHS.stagingDefaults },

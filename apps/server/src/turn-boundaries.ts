@@ -1,6 +1,7 @@
 import type { AbilityId, GameState } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
+import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
@@ -40,6 +41,7 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
  * damage opens next, a success ending the effect (Searing Smite).
  */
 export function startOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+  heroicWarrior(state, actorId, events, deps);
   const inFight = new Set(state.combat.initiative.map((entry) => entry.actorId));
   for (const bearer of state.actors) {
     if (!inFight.has(bearer.id)) continue;
@@ -61,6 +63,16 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
         );
     }
   }
+}
+
+/** SRD Champion, Heroic Warrior: "During combat, you can give yourself Heroic Inspiration whenever you start your turn
+ *  without it." Taking it costs nothing, so it is given. */
+function heroicWarrior(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || actor.heroicInspiration || actor.hp.current <= 0 || !actor.definitionId) return;
+  if (!holdsFeature(deps.resolveDefinition(actor.definitionId), "heroic-warrior", "Heroic Warrior")) return;
+  actor.heroicInspiration = true;
+  events.push({ kind: "effect", text: `${actor.name} gains Heroic Inspiration (Heroic Warrior).`, actorId });
 }
 
 /** A defeated creature, or a character already dead, takes no more turn-start damage; a dying one does (SRD: damage

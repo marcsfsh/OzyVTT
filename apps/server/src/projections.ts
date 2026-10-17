@@ -386,6 +386,7 @@ const PLAYER_ACTOR_FIELDS = {
   healthDisplay: "derived",
   replaySceneId: "derived",
   actionUses: "derived",
+  heroicInspiration: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
   spellSlots: "derived",
@@ -442,7 +443,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | claimStatus, presence, healthDisplay    |  Y   |  Y  |       Y        |     Y      |          Y          |
  * | classLine                               |  -   |  -  |       Y        |     Y      |          Y          |
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
- * | actionUses, hitDice                     |  Y   |  -  |       -        |     -      |          Y          |
+ * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
@@ -498,6 +499,7 @@ export function projectPlayerView(
         const {
           ownerSessionId,
           actionUses,
+          heroicInspiration,
           choiceOverrides,
           hitDice,
           spellSlots,
@@ -538,7 +540,7 @@ export function projectPlayerView(
           ...(replaySceneId !== undefined ? { replaySceneId } : {}),
           ...(classLine !== null ? { classLine } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
-          ...(resourcesVisible ? { actionUses: { ...actionUses } } : {}),
+          ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
           // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
           ...(resourcesVisible
             ? {

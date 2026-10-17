@@ -665,8 +665,8 @@ describe("public game API over /api/v1", () => {
       maxLevel: 20,
       playerBuilder: "open",
       playerRandom: "gm-only",
-      // Players' rolls are thrown by the server, and a rolled level counts as rolled (SRD).
-      typedRolls: "gm-only",
+      // Players may type what their physical dice show until the GM closes it, and a rolled level counts as rolled.
+      typedRolls: "open",
       hitPointRollFloor: "none"
     });
 
@@ -700,8 +700,7 @@ describe("public game API over /api/v1", () => {
       maxLevel: 20,
       playerBuilder: "open",
       playerRandom: "gm-only",
-      // Players' rolls are thrown by the server, and a rolled level counts as rolled (SRD).
-      typedRolls: "gm-only",
+      typedRolls: "open",
       hitPointRollFloor: "none"
     });
   });

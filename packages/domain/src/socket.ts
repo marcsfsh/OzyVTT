@@ -49,6 +49,7 @@ import type {
   ActorRestSchema,
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
+  ActorSetHeroicInspirationSchema,
   ActorSpendHitDiceSchema,
   AddCombatantSchema,
   AnnotationAddSchema,
@@ -262,8 +263,18 @@ export interface ClientToServerEvents {
   "save:roll": (
     payload: CommandPayload<typeof SaveRollSchema>,
     acknowledgement: (
-      result: MutationResult & { route?: "answered" | "loose"; saveId?: string; rollId?: string }
+      result: MutationResult & {
+        route?: "answered" | "loose";
+        saveId?: string;
+        rollId?: string;
+        outcome?: SaveAnswerResult["outcome"];
+      }
     ) => void
+  ) => void;
+  /** GM: give or take a character's Heroic Inspiration. */
+  "actor:set-heroic-inspiration": (
+    payload: CommandPayload<typeof ActorSetHeroicInspirationSchema>,
+    acknowledgement: (result: MutationResult) => void
   ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */
   "rules:ask": (

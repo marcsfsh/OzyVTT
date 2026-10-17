@@ -3,15 +3,14 @@ import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
   collectRiders,
-  d20TestFormula,
   diceRiders,
   diceRiderTerms,
   halveDamageParts,
-  parseDiceFormula,
+  otherDiceOf,
   rescaleDamageParts,
-  resolveDice,
   sumRiders,
   type AggregatedRollMode,
+  type DiceResolution,
   type RandomSource
 } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -19,6 +18,7 @@ import { CommandRejectedError } from "./game-store.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
+import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -56,6 +56,8 @@ export type SaveOutcome = Readonly<{
   success: boolean;
   total: number;
   dc: number;
+  /** The d20 that counted; absent when no die was rolled (an automatic failure, the GM's typed total). */
+  natural?: number;
   appliedDamage: number;
   conditionApplied: boolean;
   committed: boolean;
@@ -111,6 +113,18 @@ export function saveRiderDiceTerms(derivation: EquipmentDerivation, ability: Abi
 export function saveRiderBonusForAnySave(derivation: EquipmentDerivation): number {
   const momentary = collectRiders(derivation.carriers, { ...derivation.context, moment: "on-saving-throw" });
   return derivation.saveBonus + sumRiders(momentary, "save-bonus");
+}
+
+/** The dice riders add to a saving throw that names no ability, such as a death save (Bless's d4). */
+export function saveRiderDiceTermsForAnySave(derivation: EquipmentDerivation): string {
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  const atSave = collectRiders(derivation.carriers, { ...derivation.context, moment: "on-saving-throw" });
+  return diceRiderTerms(diceRiders([...standing, ...atSave], "save-bonus"));
+}
+
+/** Advantage and Disadvantage on a saving throw that names no ability (a death save): riders on every save. */
+export function anySaveRollSources(derivation: EquipmentDerivation): RollModeClaims {
+  return rollModeClaims(derivation, ["save"], "on-saving-throw");
 }
 
 const ABILITIES: readonly AbilityId[] = ["str", "dex", "con", "int", "wis", "cha"];
@@ -307,9 +321,10 @@ export function applyFailureEffect(
   ];
 }
 
-function recordSaveRoll(
+/** Records a save roll in the shared history, attributed to the creature saving; a hidden creature's stays GM-only. */
+export function recordSaveRoll(
   state: GameState,
-  resolution: ReturnType<typeof resolveDice>,
+  resolution: DiceResolution,
   base: Readonly<{
     id: string;
     commandId: string;
@@ -320,6 +335,7 @@ function recordSaveRoll(
     actorId: string;
     visibility: "public" | "gm-only";
     createdAt: string;
+    typed?: boolean;
   }>
 ) {
   recordRollInHistory(state, {
@@ -336,6 +352,7 @@ function recordSaveRoll(
     normalizedFormula: resolution.expression.normalized,
     ...rolledTerms(resolution),
     total: resolution.total,
+    ...(base.typed ? { typed: true as const } : {}),
     createdAt: base.createdAt
   });
 }
@@ -358,9 +375,13 @@ export function shownRollMode(
   };
 }
 
-/** Answers a pending save (roll or typed total) and auto-applies it: fail takes full damage and the
- *  condition; success takes half if the action says so. The structured-save exception to
- *  propose-then-apply (ADR-0008). GM any save; a player only their own character's. */
+/** How a pending save is answered beyond its method: a typed d20 (`face`), or a reroll of the held die. */
+export type SaveAnswerOptions = Readonly<{ face?: number; reroll?: boolean }>;
+
+/** Answers a pending save (a roll, a typed d20, or the GM's typed total) and auto-applies it: fail takes full damage
+ *  and the condition; success takes half if the action says so. The structured-save exception to propose-then-apply
+ *  (ADR-0008). GM any save; a player only their own character's. A preview holds its die (ADR-0012), so a later
+ *  preview or the confirm uses the same one. */
 export function answerSave(
   state: GameState,
   commandId: string,
@@ -372,60 +393,86 @@ export function answerSave(
   deps: SaveAnswerDependencies,
   legendaryResistance = false,
   explicitRollMode?: "advantage" | "disadvantage" | "normal",
-  damageOverride?: number
+  damageOverride?: number,
+  options: SaveAnswerOptions = {}
 ): { outcome: SaveOutcome; events: EffectNarration[] } {
   // A save owed outside a fight (a concentration check after a trap) is answered the same way.
   const pending = state.combat.pendingSaves.find((entry) => entry.id === saveId);
   if (!pending) throw new CommandRejectedError("That saving throw was already answered or dismissed.");
   const target = adjustableActor(state, pending.targetActorId, scope);
   if (!ABILITIES.includes(pending.ability)) throw new CommandRejectedError("That saving throw has an unknown ability.");
+  // A player's typed damage stands in for dice, so it follows the table's setting for typed dice.
+  if (damageOverride !== undefined && scope.role !== "gm" && state.builderPolicy.typedRolls !== "open")
+    throw new CommandRejectedError("At this table the server rolls the dice. Ask the GM to change the damage.");
+  const heldKey = `save:${saveId}`;
 
   let total: number;
+  let natural: number | null = null;
   let autoFailed: string | null = null;
   let rollMode: AggregatedRollMode | undefined;
   if (method === "manual") {
-    // The manual total is the GM escape hatch and bypasses auto-fail (a table may rule an exception).
+    // The GM's typed total is a ruling, so it stands as given (a table may rule an exception to an auto-fail). A
+    // player types the face their die shows instead, and the server adds the bonus.
+    requireGm(scope, "Type the d20 your die shows; the server adds your bonus.");
     if (manualTotal === undefined || !Number.isInteger(manualTotal) || manualTotal < -20 || manualTotal > 60)
       throw new CommandRejectedError("Enter the rolled save total (a whole number from -20 to 60).");
     total = manualTotal;
   } else if ((pending.ability === "str" || pending.ability === "dex") && autoFailsPhysicalSaves(target) !== null) {
-    // SRD: Paralyzed/Petrified/Stunned/Unconscious auto-fail Str/Dex saves; no die is rolled.
+    // SRD: Paralyzed/Petrified/Stunned/Unconscious auto-fail Str/Dex saves; no die is rolled, typed or not.
     autoFailed = autoFailsPhysicalSaves(target);
     total = 0;
   } else {
     const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
     const derivation = deriveEquipment(target, definition, deps.catalog);
-    // Exhaustion (-2 x level, SRD 5.2.1) and item save bonuses come through `saveTotalFor`, shared with
-    // the sheet's chip; cover's per-save bonus is added on top.
+    // Exhaustion (-2 x level, SRD 5.2.1) and item save bonuses come through `saveTotalFor`, shared with the sheet's
+    // chip; cover's per-save bonus is added on top.
     const modifier = saveTotalFor(definition, target, pending.ability, derivation) + pending.saveBonus;
     // A save that ends effects when failed is a concentration check.
     const sources = saveRollSources(target, pending.ability, derivation, pending.endsEffects !== undefined);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
-    // An explicit choice (the answerer's button, or a forced "normal") wins over detected sources.
-    const mode = explicitRollMode ?? aggregated.mode;
-    // Bless's d4 rolls into the save itself, so a preview's total is the one Confirm sends.
-    const formula = d20TestFormula(mode, modifier) + saveRiderDiceTerms(derivation, pending.ability);
-    const resolution = resolveDice(parseDiceFormula(formula), deps.random);
-    if (mode !== "normal")
-      rollMode = {
-        mode,
-        advantage: mode === "advantage" ? (aggregated.advantage.length > 0 ? aggregated.advantage : ["Chosen"]) : [],
-        disadvantage:
-          mode === "disadvantage" ? (aggregated.disadvantage.length > 0 ? aggregated.disadvantage : ["Chosen"]) : []
-      };
-    // The save roll lands in the shared history attributed to the target; hidden targets stay GM-only.
-    recordSaveRoll(state, resolution, {
-      id: deps.newRollId(),
-      commandId,
-      sessionId: deps.sessionId,
-      role: deps.role,
-      label: target.name,
-      saveLabel: `${pending.ability.toUpperCase()} save`,
-      actorId: target.id,
-      visibility: target.visibility === "gm-only" ? "gm-only" : "public",
-      createdAt: deps.now()
-    });
-    total = resolution.total;
+    // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
+    const forced = scope.role === "gm" ? explicitRollMode : undefined;
+    const mode = forced ?? aggregated.mode;
+    // Bless's d4 rolls into the save itself, and is held with its d20s.
+    const test = rollHeldTest(
+      state,
+      heldKey,
+      target,
+      scope,
+      mode,
+      modifier,
+      saveRiderDiceTerms(derivation, pending.ability),
+      options,
+      deps.random
+    );
+    rollMode = test.typed ? undefined : shownRollMode(aggregated, forced);
+    natural = test.natural;
+    const rollId = deps.newRollId();
+    // A second look at held dice records nothing new; the dice already sit in the history.
+    if (test.fresh)
+      recordSaveRoll(state, test.resolution, {
+        id: rollId,
+        commandId,
+        sessionId: deps.sessionId,
+        role: deps.role,
+        label: target.name,
+        saveLabel: `${pending.ability.toUpperCase()} save`,
+        actorId: target.id,
+        visibility: target.visibility === "gm-only" ? "gm-only" : "public",
+        createdAt: deps.now(),
+        typed: test.typed
+      });
+    if (commit) releaseHeldRoll(state, heldKey);
+    else
+      holdRoll(state, {
+        key: heldKey,
+        actorId: target.id,
+        faces: test.faces,
+        others: otherDiceOf(test.resolution),
+        rollId: test.fresh ? rollId : (state.heldRolls.find((entry) => entry.key === heldKey)?.rollId ?? null),
+        typed: test.typed
+      });
+    total = test.resolution.total;
   }
 
   let success = autoFailed === null && total >= pending.dc;
@@ -511,6 +558,7 @@ export function answerSave(
         conditionApplied: outcomeCondition,
         committed: false,
         autoFailed,
+        ...(natural !== null ? { natural } : {}),
         ...(rollMode ? { rollMode } : {}),
         ...(weighed && weighed.parts.length > 0 ? { parts: weighed.parts } : {}),
         ...(weighed?.flatReduction ? { flatReduction: weighed.flatReduction } : {})
@@ -603,6 +651,7 @@ export function answerSave(
       success,
       total,
       dc: pending.dc,
+      ...(natural !== null ? { natural } : {}),
       appliedDamage,
       conditionApplied,
       committed: true,
@@ -625,4 +674,5 @@ export function dismissSave(state: GameState, saveId: string, scope: Initiator) 
   if (!state.combat.pendingSaves.some((entry) => entry.id === saveId))
     throw new CommandRejectedError("That saving throw was already answered or dismissed.");
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
+  releaseHeldRoll(state, `save:${saveId}`);
 }

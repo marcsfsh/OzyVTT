@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 11 GameState fields · 96 commands · 214 HTTP paths
+- 12 GameState fields · 97 commands · 215 HTTP paths
 
 ## GameState shape
 
@@ -17,6 +17,7 @@ single JSON blob the server persists and projects per role.
 - `builderPolicy`
 - `combat`
 - `definitions`
+- `heldRolls`
 - `partyVisibility`
 - `pendingImports`
 - `revision`
@@ -50,6 +51,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `damage`, `
 | `actor.set-armor-class` | `actor:write` |
 | `actor.set-condition` | `actor:write` |
 | `actor.set-health-display` | `actor:write` |
+| `actor.set-heroic-inspiration` | `actor:write` |
 | `actor.set-hp` | `actor:write` |
 | `actor.set-sheet-preview` | `actor:write` |
 | `actor.set-size` | `actor:write` |
@@ -228,6 +230,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/game/actors/{actorId}/finish-preparing`
 - `POST /api/v1/game/actors/{actorId}/heal`
 - `POST /api/v1/game/actors/{actorId}/health-display`
+- `POST /api/v1/game/actors/{actorId}/heroic-inspiration`
 - `POST /api/v1/game/actors/{actorId}/hp`
 - `POST /api/v1/game/actors/{actorId}/identity`
 - `POST /api/v1/game/actors/{actorId}/inventory`

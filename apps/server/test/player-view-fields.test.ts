@@ -72,6 +72,7 @@ const COMMON = [
 const PARTY = ["armorClass", "initiative", "speedFeet", "definitionId"];
 const OWNER = [
   "actionUses",
+  "heroicInspiration",
   "choiceOverrides",
   "hitDice",
   "spellSlots",

@@ -336,7 +336,8 @@ export const ActionResolveSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(60)
       .optional(),
-    /** Explicit GM roll-mode choice; wins over the engine's advantage/disadvantage aggregation. */
+    /** The GM's choice of roll mode, which wins over the engine's count of Advantage and Disadvantage. Ignored from a
+     *  player: the rules decide. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** Bypass a rules-mode rejection; the reason is audited in the combat log and journal (ADR-0020). */
     override: RulesOverrideSchema.optional(),
@@ -346,14 +347,23 @@ export const ActionResolveSchema = z
     cover: z.enum(["half", "three-quarters", "total"]).optional(),
     /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
     note: z.string().trim().min(1).max(100).optional(),
-    /** false previews the attack roll only (no damage/riders/economy) for re-roll or confirm; the confirm passes `attackNatural`. Non-attack actions ignore it. */
+    /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
+     *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
+     *  ignore it. */
     commit: z.boolean().default(true),
-    /** Apply this exact d20 face for the attack instead of rolling - confirming a preview, or a hand-rolled die. */
+    /** A typed d20: the face a physical die shows (the one that counts, under Advantage or Disadvantage). A player may
+     *  type one only while the table lets players type their dice, and not for an attack whose die the server threw. */
     attackNatural: z.number().int().min(1).max(20).optional(),
-    /** Hand-entered final attack total, used verbatim vs AC; pair with `critical` for a nat 20. */
+    /** GM only: a hand-entered final attack total, used verbatim vs AC; pair with `critical` for a nat 20 or `fumble`
+     *  for a nat 1. */
     attackTotal: z.number().int().min(-50).max(100).optional(),
-    /** Declares a natural 20 (critical hit) for the hand-entered-total path, where the natural die can't be inferred. */
+    /** GM only: declares a natural 20 (critical hit) for the hand-entered-total path. */
     critical: z.boolean().optional(),
+    /** GM only: declares a natural 1 (a miss whatever the total) for the hand-entered-total path. */
+    fumble: z.boolean().optional(),
+    /** With `commit: false`, throw the held attack d20 again: a player spends Heroic Inspiration to reroll one die (the
+     *  lowest); the GM rerolls freely. */
+    reroll: z.boolean().optional(),
     /** The skill a check action is made with: Influence (Deception, Intimidation, Performance, Persuasion or Animal
      *  Handling), Search (Insight, Medicine, Perception or Survival) or Study (Arcana, History, Investigation, Nature or
      *  Religion). */
@@ -380,6 +390,9 @@ export const ActionResolveSchema = z
   })
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, {
     error: "Supply either a natural d20 or a final total, not both."
+  })
+  .refine((payload) => !(payload.critical === true && payload.fumble === true), {
+    error: "A roll is a natural 20 or a natural 1, not both."
   });
 // The message `save.answer` surfaces for out-of-bounds hand-entered damage (it reports the zod issue's own text).
 const SAVE_DAMAGE_BOUND = "Enter the damage as a whole number from 0 to 1000.";
@@ -387,9 +400,20 @@ export const SaveAnswerSchema = z
   .object({
     commandId: z.uuid(),
     saveId: z.uuid(),
+    /** "roll": the server throws the d20 (or takes `face`) and adds the save's modifier. "manual": GM only, `total` is
+     *  the final total as the GM rules it. */
     method: z.enum(["roll", "manual"]),
+    /** GM only, with `method: "manual"`: the final total, used as given. */
     total: z.number().int().min(-20).max(60).optional(),
+    /** A typed d20 for `method: "roll"`: the face a physical die shows (the one that counts). A player may type one only
+     *  while the table lets players type their dice, and not once the server has thrown this save's die. */
+    face: z.number().int().min(1).max(20).optional(),
+    /** The GM's choice of roll mode, which wins over the engine's count. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** With `commit: false`, throw the held d20 again: a player spends Heroic Inspiration to reroll one die (the
+     *  lowest); the GM rerolls freely. */
+    reroll: z.boolean().optional(),
+    /** false previews: the d20 is thrown and held, so a later preview or the confirm uses the same die. */
     commit: z.boolean().default(true),
     legendaryResistance: z.boolean().default(false),
     /** Hand-entered damage, applied before success halving with the proposal's types kept; a player may amend only their own character's save. */ damageOverride:
@@ -423,10 +447,14 @@ export const ReactionAnswerSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(120)
       .optional(),
-    /** Opportunity attacks (leaves-reach): false previews the swing (roll only, nothing applied) so the answerer can re-roll adv/disadv or confirm; the confirm passes attackNatural. */ commit:
-      z.boolean().default(true),
+    /** A strike (an opportunity attack, Retaliation): false previews the swing (roll only, nothing applied). The server
+     *  holds the previewed d20, so the confirm uses it. */ commit: z.boolean().default(true),
+    /** The GM's choice of roll mode for the strike. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** A typed d20 for the strike (see `action.resolve`). */
     attackNatural: z.number().int().min(1).max(20).optional(),
+    /** With `commit: false`, throw the held strike d20 again: Heroic Inspiration for a player, free for the GM. */
+    reroll: z.boolean().optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -511,15 +539,20 @@ export const EffectEndSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Death save. `commit: false` previews without touching pips; `commit: true` with the shown (or a
- *  physical) `naturalRoll` applies it; `commit: true` alone rolls and applies. */
+/** Death save. `commit: false` previews without touching pips, and the server holds the die; `commit: true` applies
+ *  the held die, or rolls and applies when none is held. */
 export const DeathSaveRollSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
     commit: z.boolean().default(true),
+    /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** A typed d20: the face a physical die shows. A player may type one only while the table lets players type their
+     *  dice, and not once the server has thrown this death save's die. */
     naturalRoll: z.number().int().min(1).max(20).optional(),
+    /** With `commit: false`, throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
+    reroll: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -562,9 +595,25 @@ export const SaveRollSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     ability: AbilitySchema,
+    /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
-    /** A hand-entered final total (the off-screen die), used verbatim instead of rolling. */
+    /** A typed d20: the face a physical die shows (see `save.answer`). */
+    face: z.number().int().min(1).max(20).optional(),
+    /** GM only: a hand-entered final total, used as given. */
     total: z.number().int().min(-50).max(100).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((payload) => payload.face === undefined || payload.total === undefined, {
+    error: "Supply either a typed d20 or a final total, not both."
+  });
+
+/** The GM gives or takes a character's Heroic Inspiration. */
+export const ActorSetHeroicInspirationSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    has: z.boolean(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -940,7 +989,7 @@ export const BuilderSetPolicySchema = z
     playerBuilder: z.enum(["open", "gm-only"]).optional(),
     /** Whether players may roll a random character themselves; omitted keeps the stored setting. */
     playerRandom: z.enum(["open", "gm-only"]).optional(),
-    /** Whether players may type their own dice for rolled scores and hit points; omitted keeps the stored setting. */
+    /** Whether players may type what their physical dice show, for every roll they make; omitted keeps the stored setting. */
     typedRolls: z.enum(["open", "gm-only"]).optional(),
     /** Whether a rolled hit-point level is raised to the average; omitted keeps the stored setting. */
     hitPointRollFloor: z.enum(["none", "average"]).optional(),
