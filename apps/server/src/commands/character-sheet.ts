@@ -8,6 +8,7 @@ import {
   CharacterGiveItemSchema,
   CharacterRecoverAmmunitionSchema,
   CharacterSetCurrencySchema,
+  CharacterSetFavouritesSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterFinishPreparingSchema,
@@ -22,6 +23,7 @@ import { recoverAmmunition } from "../ammunition.js";
 import type { EffectNarration } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
 import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
+import { setFavourites } from "../option-uses.js";
 import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
 import { addToSpellbook, swapClassSpell } from "../spell-choices.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
@@ -313,6 +315,25 @@ export const characterSheetCommands = [
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "inventory");
         setCurrency(state, request.actorId, request.currency);
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "character.set-favourites",
+    operationId: "setFavourites",
+    description:
+      "Pins options to a character's turn card on the sheet, in order: up to 8 ids, each an option the character has now and one that belongs on the turn list (an `actions[]` entry of `GET /game/actors/{actorId}/available-actions` without `passive`). An empty list clears the pins. The pins reach only the character's owner and the GM. The GM may pin for any character; a player session only for their claimed character.",
+    summary: "Pin options to a character's turn card (the GM for anyone; a player for their own claimed character).",
+    schema: CharacterSetFavouritesSchema,
+    malformed: "The favourites command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
+        const actor = state.actors.find((candidate) => candidate.id === request.actorId);
+        const definition = actor?.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+        setFavourites(state, request.actorId, request.optionIds, { definition, catalog: kit.equipmentCatalog() });
       });
     }
   }),

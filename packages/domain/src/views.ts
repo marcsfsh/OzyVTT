@@ -90,6 +90,9 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     preparation?: Actor["preparation"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];
+    /** The options pinned to the sheet's turn card and how often each option resolved. Your own claimed character
+     *  only, at every `partyVisibility` tier. */ favouriteOptionIds?: Actor["favouriteOptionIds"];
+    optionUseCounts?: Actor["optionUseCounts"];
     /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{
       style: "bar" | "ring" | "aura";
     }>;

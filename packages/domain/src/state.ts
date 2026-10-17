@@ -34,7 +34,11 @@ export const PendingImportSchema = z
 export type PendingImport = z.infer<typeof PendingImportSchema>;
 
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
-export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "healing", "manual"]);
+/** What a roll was for. `builder` marks the rolls the character builder makes itself (Hit Points for new levels, a
+ *  set of ability scores), which a sheet's latest-roll line leaves out; only the builder records one. */
+export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "healing", "manual", "builder"]);
+/** The purposes a free `dice.roll` may carry: every one but the builder's. */
+export const TableRollPurposeSchema = RollPurposeSchema.exclude(["builder"]);
 export const RollRecordSchema = z.object({
   id: z.uuid(),
   commandId: z.uuid(),
@@ -66,6 +70,7 @@ export const RollRecordSchema = z.object({
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
 export type RollPurpose = z.infer<typeof RollPurposeSchema>;
+export type TableRollPurpose = z.infer<typeof TableRollPurposeSchema>;
 export type RollRecord = z.infer<typeof RollRecordSchema>;
 export type PlayerRollRecord = Omit<RollRecord, "initiatorSessionId">;
 

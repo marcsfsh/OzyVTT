@@ -968,6 +968,18 @@ export function makeHitDicePool(entries: readonly HitDiceEntry[]): HitDicePool |
   return entries.length === 0 ? null : (HitDicePoolSchema.parse(entries) as HitDicePool);
 }
 
+/** An option on a character's action list (`item-greatsword`, `spell-fireball`, `dash`), as the availability read
+ *  names it. */
+export const OptionIdSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(160);
+/** How many options a character may pin to the sheet's turn card. */
+export const MAX_FAVOURITE_OPTIONS = 8;
+/** How many options a character's use counts keep; the least used gives way to a new one. */
+export const MAX_COUNTED_OPTIONS = 32;
+export const MAX_OPTION_USE_COUNT = 100_000;
+
 export const ActorSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1).max(120),
@@ -1112,7 +1124,23 @@ export const ActorSchema = z.object({
   replaySceneId: z.uuid().optional(),
   /** The GM shared this archived character's sheet with players as a read-only keepsake. The flag itself is
    * stripped from player projections; players get only the id-and-name `PlayerView.archivedCharacters`. */
-  sheetPreview: z.boolean().default(false)
+  sheetPreview: z.boolean().default(false),
+  /** The options the owner pinned to the sheet's turn card, in order: ids from the character's action list. Owner and
+   *  GM only. */
+  favouriteOptionIds: z
+    .array(OptionIdSchema)
+    .max(MAX_FAVOURITE_OPTIONS)
+    .refine((ids) => new Set(ids).size === ids.length, "Each option may be pinned once.")
+    .optional(),
+  /** How many times each option resolved for this character, which fills the turn card before anything is pinned.
+   *  The server writes it and keeps it to a bounded number of ids. Owner and GM only. */
+  optionUseCounts: z
+    .record(OptionIdSchema, z.number().int().min(1).max(MAX_OPTION_USE_COUNT))
+    .refine(
+      (counts) => Object.keys(counts).length <= MAX_COUNTED_OPTIONS,
+      `At most ${MAX_COUNTED_OPTIONS} options are counted.`
+    )
+    .optional()
 });
 
 export type Actor = z.infer<typeof ActorSchema>;

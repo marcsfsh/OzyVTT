@@ -7,6 +7,7 @@ import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome 
 import type { ActionResolution } from "@vtt/domain";
 import { withoutSourceName } from "../hidden-source.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
+import { countOptionUse } from "../option-uses.js";
 import { defineCommand } from "./pipeline.js";
 
 // Answers to what a hit leaves open: reaction prompts (ADR-0020) and the GM's damage proposals.
@@ -120,6 +121,7 @@ export const reactionCommands = [
         // A typed die must be one the table takes, and not one typed over the strike's thrown die.
         if (attackNatural !== undefined && reroll !== true)
           requireTypedDie(draft, initiator, heldRollFor(draft, reactionHoldKey(reactionId)), attackNatural);
+        const prompt = draft.combat.pendingReactions.find((entry) => entry.id === reactionId);
         outcome = answerReaction(
           draft,
           commandId,
@@ -147,6 +149,14 @@ export const reactionCommands = [
             ...(hitOptions ? { hitOptions } : {})
           }
         );
+        // The reaction taken counts toward the sheet's most-used options: the strike's own action, or the prompt's.
+        const strike = outcome.kind === "leaves-reach" || outcome.kind === "damaged-by-creature";
+        const counted = strike
+          ? outcome.resolution?.preview
+            ? undefined
+            : outcome.resolution?.actionId
+          : prompt?.actionId;
+        if (outcome.used && counted) countOptionUse(draft, outcome.actorId, counted);
       });
       if (duplicate || !outcome) return;
       kit.publishRolls(state, commandId);

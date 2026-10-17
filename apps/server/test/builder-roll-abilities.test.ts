@@ -64,7 +64,7 @@ describe("builder.roll-abilities", () => {
     expect(body.data.dice[0]).toHaveLength(4);
 
     const roll = server.store.snapshot.rolls.find((entry) => entry.id === body.data.rollId)!;
-    expect(roll).toMatchObject({ label: "Ability scores", purpose: "manual", visibility: "public", actorId: null });
+    expect(roll).toMatchObject({ label: "Ability scores", purpose: "builder", visibility: "public", actorId: null });
     expect(roll.dice).toHaveLength(24);
   });
 
@@ -328,9 +328,24 @@ describe("a player's rolled dice are the table's", () => {
       (entry) => entry.actorId === actorId && entry.label?.startsWith("Hit points")
     )!;
     expect(feed.dice).toHaveLength(2);
+    // The builder's own roll, which the sheet's latest-roll line leaves out.
+    expect(feed.purpose).toBe("builder");
     const definition = server.store.snapshot.definitions.find((entry) => entry.id === `import-${actorId}`)!.definition;
     const rows = definition.character!.choices!.filter((row) => row.kind === "hp-roll");
     expect(rows.map((row) => row.payload?.roll)).toEqual(feed.dice.map((die) => die.face));
+  });
+
+  it("keeps the builder's purpose for the builder's own rolls", async () => {
+    const { base, gmToken, playerToken } = await boot();
+    for (const token of [gmToken, playerToken]) {
+      const free = await post(base, GAME_PATHS.rolls, token, {
+        commandId: randomUUID(),
+        formula: "1d10",
+        purpose: "builder",
+        visibility: "public"
+      });
+      expect(free.status).toBe(400);
+    }
   });
 
   it("lets players type their own dice by default, and the GM always", async () => {

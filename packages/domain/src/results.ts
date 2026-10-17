@@ -342,9 +342,19 @@ export const ActionAvailabilitySchema = z.strictObject({
   /** The conditions its caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s `conditionId`. */
   conditionChoices: z.array(SaveConditionSchema).optional(),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
-  checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional()
+  checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional(),
+  /** The weapon mastery property this character uses with this swing (Graze on Borin's Greatsword): present only when
+   *  the character chose the weapon's kind under Weapon Mastery. */
+  mastery: z.strictObject({ id: z.string(), name: z.string() }).optional(),
+  /** Why it can't be used now, in one short sentence ("Not prepared."); present exactly when `available` is false. */
+  reason: z.string().optional(),
+  /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
+   *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
+   *  (a spell area's later save). */
+  passive: z.enum(["rider", "rest", "automatic"]).optional()
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
+export type PassiveOption = NonNullable<ActionAvailability["passive"]>;
 /** A roll's mode as the rules count it, with what grants each side, so the sheet can say why before the roll. */
 const RollModeSummarySchema = z.strictObject({
   mode: z.enum(["advantage", "disadvantage", "normal"]),
@@ -413,9 +423,19 @@ const ActorDerivedSheetSchema = z.strictObject({
   /** What standing `spell-save-dc` riders add to the bearer's spell save DC, and so to every action that uses it. */
   spellSaveDcBonus: z.number().int(),
   /** How many items the bearer can attune to at once: 3, or 4 with Use Magic Device. */
-  attunementSlots: z.number().int().min(1).max(10)
+  attunementSlots: z.number().int().min(1).max(10),
+  /** The weapon kinds chosen under Weapon Mastery, in the order chosen, each with the property it grants and the SRD
+   *  text of what that property does. Empty for a sheet that records no such choice. */
+  weaponMasteries: z.array(
+    z.strictObject({
+      weaponId: z.string(),
+      weaponName: z.string(),
+      mastery: z.strictObject({ id: z.string(), name: z.string(), description: z.string() })
+    })
+  )
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
+export type DerivedWeaponMastery = ActorDerivedSheet["weaponMasteries"][number];
 /** A pick this character may re-make on a rest (Circle of the Land's land after a Long Rest), with its options and
  *  the answer in force. */
 const RechoiceSchema = z.strictObject({
@@ -489,6 +509,18 @@ export const ActorMovementReplySchema = z.strictObject({
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;
+
+/** What `character:next-level` answers: the level a character's next level-up reaches, the class it goes to (the one
+ *  the Level page offers first), and short plain lines for what it brings. */
+export const NextLevelReplySchema = z.strictObject({
+  level: z.number().int().min(2).max(20),
+  classId: z.string(),
+  className: z.string(),
+  classLevel: z.number().int().min(1).max(20),
+  lines: z.array(z.string())
+});
+export type NextLevelReply = Wire<z.infer<typeof NextLevelReplySchema>>;
+export type NextLevelResult = MutationResult & Partial<NextLevelReply>;
 
 /** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
  *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */

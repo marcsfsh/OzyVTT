@@ -8,11 +8,11 @@ import {
   BuilderAbilityMethodSchema,
   EncounterTokenPositionSchema,
   PartyVisibilitySchema,
-  RollPurposeSchema,
   RollVisibilitySchema,
   RuleExceptionsSchema,
   RuleFamilySchema,
-  RuleModeSchema
+  RuleModeSchema,
+  TableRollPurposeSchema
 } from "./state.js";
 import {
   AbilitySchema,
@@ -22,6 +22,8 @@ import {
   DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
+  MAX_FAVOURITE_OPTIONS,
+  OptionIdSchema,
   ProficienciesSchema
 } from "@vtt/schemas";
 import { MAX_SOUND_EFFECTS, MAX_SOUND_LAYERS, MAX_SOUND_TRACKS, SoundVolumeSchema } from "./sound.js";
@@ -498,6 +500,8 @@ export const ReactionDismissSchema = z
 export const ActorAvailableActionsSchema = z.object({ actorId: z.uuid() }).strict();
 /** The movement read: how much of this turn's movement a combatant has left. */
 export const ActorMovementSchema = z.object({ actorId: z.uuid() }).strict();
+/** The next-level read: what a character's next level brings. Nothing mutates. */
+export const CharacterNextLevelSchema = z.object({ actorId: z.uuid() }).strict();
 export const ContentActionsSchema = z
   .object({
     definitionId: z
@@ -1201,6 +1205,18 @@ export const CharacterGiveItemSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The options a character pins to the sheet's turn card, in order. An empty list clears them. */
+export const CharacterSetFavouritesSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    optionIds: z
+      .array(OptionIdSchema)
+      .max(MAX_FAVOURITE_OPTIONS, `Pin at most ${MAX_FAVOURITE_OPTIONS} options.`)
+      .refine((ids) => new Set(ids).size === ids.length, "Each option may be pinned once."),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetCurrencySchema = z
   .object({
     commandId: z.uuid(),
@@ -1419,7 +1435,7 @@ export const DiceRollSchema = z
   .object({
     commandId: z.uuid(),
     formula: z.string().min(1).max(160),
-    purpose: RollPurposeSchema,
+    purpose: TableRollPurposeSchema,
     visibility: RollVisibilitySchema,
     label: z.string().min(1).max(80).optional(),
     actorId: z.uuid().optional(),

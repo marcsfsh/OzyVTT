@@ -562,7 +562,10 @@ const PLAYER_ACTOR_FIELDS = {
   firstClaimedAt: "never",
   sample: "never",
   archived: "never",
-  sheetPreview: "never"
+  sheetPreview: "never",
+  // The owner's own turn-card pins and use counts: never another player's, whatever the party tier.
+  favouriteOptionIds: "derived",
+  optionUseCounts: "derived"
 } as const satisfies Record<keyof Actor, "table" | "party" | "derived" | "never">;
 
 type FieldsFor<Audience> = {
@@ -612,6 +615,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
+ * | favouriteOptionIds, optionUseCounts     |  Y   |  -  |       -        |     -      |          -          |
  * | notes, ownerSessionId, conditionImmunities, legendary, lastUsedAt, firstClaimedAt, sample, archived,          |
  * | sheetPreview, lastLongRestAt: never, at any tier.                                                              |
  *
@@ -682,7 +686,9 @@ export function projectPlayerView(
           preparation,
           inventory,
           currency,
-          replaySceneId
+          replaySceneId,
+          favouriteOptionIds,
+          optionUseCounts
         } = source;
         const mine = ownerSessionId !== null && ownerSessionId === playerSessionId;
         // Another player's claimed character: the only thing `partyVisibility` governs.
@@ -747,6 +753,9 @@ export function projectPlayerView(
                 currency: { ...currency }
               }
             : {}),
+          // The turn card's pins and counts are the owner's alone, so even the top party tier leaves them out.
+          ...(mine && favouriteOptionIds ? { favouriteOptionIds: [...favouriteOptionIds] } : {}),
+          ...(mine && optionUseCounts ? { optionUseCounts: { ...optionUseCounts } } : {}),
           ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
         };
       }),

@@ -56,7 +56,8 @@ const PURPOSE_LABELS: Readonly<Record<RollRecord["purpose"], string>> = {
   check: "a check",
   damage: "damage",
   healing: "healing",
-  manual: "a roll"
+  manual: "a roll",
+  builder: "a character builder roll"
 };
 
 /** Whether a roll's feed row is GM-only: `gm-only` by definition, and `blind` is hidden even from its

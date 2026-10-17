@@ -25,6 +25,7 @@ import type {
   ActorActionsAvailabilityResult,
   ActorAddResult,
   ActorMovementResult,
+  NextLevelResult,
   AnnotationAddResult,
   CharacterDraftResult,
   CheckRollResult,
@@ -87,6 +88,7 @@ import type {
   CharacterRebuildSchema,
   CharacterResolveImportSchema,
   CharacterSetCurrencySchema,
+  CharacterSetFavouritesSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
@@ -627,6 +629,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CharacterSetCurrencySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** Pin options to the sheet's turn card. The GM for anyone; a player for their own claimed character. */
+  "character:set-favourites": (
+    payload: CommandPayload<typeof CharacterSetFavouritesSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   // `classes[].hitDie` lets an identity edit rebuild the multiclass hit-dice pool (Fighter 3 / Wizard 2 is 3d10 + 2d6).
   "character:set-identity": (
     payload: CommandPayload<typeof CharacterSetIdentitySchema>,
@@ -662,6 +669,8 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ActorActionsAvailabilityResult) => void
   ) => void;
   "actor:movement": (payload: { actorId: string }, acknowledgement: (result: ActorMovementResult) => void) => void;
+  /** What a character's next level brings; only when the caller may level that character. */
+  "character:next-level": (payload: { actorId: string }, acknowledgement: (result: NextLevelResult) => void) => void;
   "turn:use": (
     payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void

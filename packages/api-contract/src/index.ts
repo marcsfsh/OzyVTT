@@ -241,6 +241,8 @@ export const GAME_PATHS = {
   characterGiveItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/give`,
   characterRecoverAmmunition: `${API_NAMESPACE}/game/actors/{actorId}/inventory/recover-ammunition`,
   characterSetCurrency: `${API_NAMESPACE}/game/actors/{actorId}/currency`,
+  characterSetFavourites: `${API_NAMESPACE}/game/actors/{actorId}/favourites`,
+  characterNextLevel: `${API_NAMESPACE}/game/actors/{actorId}/next-level`,
   characterSetIdentity: `${API_NAMESPACE}/game/actors/{actorId}/identity`,
   characterSetProficiencies: `${API_NAMESPACE}/game/actors/{actorId}/proficiencies`,
   characters: `${API_NAMESPACE}/game/characters`,
@@ -649,6 +651,7 @@ export const GAME_COMMANDS = {
     path: GAME_PATHS.characterRecoverAmmunition
   },
   "character.set-currency": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetCurrency },
+  "character.set-favourites": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetFavourites },
   "character.set-identity": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetIdentity },
   "character.set-proficiencies": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetProficiencies },
   "character.create": { scope: "actor:write", method: "post", path: GAME_PATHS.characters },

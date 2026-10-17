@@ -71,6 +71,7 @@ function derivedSheet(over: Partial<ActorDerivedSheet> = {}): ActorDerivedSheet 
     defences: { resistances: [], immunities: [], vulnerabilities: [] },
     spellSaveDcBonus: 0,
     attunementSlots: 3,
+    weaponMasteries: [],
     ...over
   };
 }

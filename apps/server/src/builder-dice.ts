@@ -184,7 +184,8 @@ export function recordHitPointRoll(
     initiatorLabel: roll.gm ? "GM" : "A player",
     label: roll.label,
     actorId: roll.actorId,
-    purpose: "manual",
+    // The builder's own roll, which a sheet's latest-roll line leaves out.
+    purpose: "builder",
     visibility: "public",
     formula,
     normalizedFormula: formula,

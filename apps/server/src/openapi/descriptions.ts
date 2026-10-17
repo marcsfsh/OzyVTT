@@ -1551,7 +1551,17 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "derived.spellSaveDcBonus":
       "What standing spell-save-dc riders (an item, a feat) add to the bearer's spell save DC, and so to every action that uses it. A printed DC is not raised.",
     "derived.attunementSlots": "How many items the character can attune to at once: 3, or 4 with Use Magic Device",
+    "derived.weaponMasteries":
+      "The weapon kinds the character chose under Weapon Mastery, in the order chosen, whether or not it carries one. Empty for a sheet that records no such choice (an import).",
+    "derived.weaponMasteries[].weaponId": "The weapon kind, a catalog id such as greatsword",
+    "derived.weaponMasteries[].mastery": "The mastery property the kind grants, with the SRD text of what it does",
     "actions[].available": "Whether strict mode would allow resolving this action right now",
+    "actions[].reason":
+      'Why it can\'t be used now, in one short sentence for the sheet ("Not prepared.", "No level 2 spell slots left.", "You used your Bonus Action this turn."). Present exactly when `available` is false. The character comes first (Stunned, 0 Hit Points), then the option itself, then the turn, then targeting; `violations` keeps the full account. A hint only: resolution checks again.',
+    "actions[].passive":
+      "Present when the option belongs off a turn list: rider (it changes a roll, a hit or a cast and is chosen with it: Savage Attacker, Sneak Attack, Metamagic, Indomitable), rest (it is used when a rest ends: Arcane Recovery) or automatic (the server runs it: a spell area's later save). Absent for everything a creature takes on a turn.",
+    "actions[].mastery":
+      "The weapon mastery property this swing carries (Graze on a Greatsword), present only when the character chose the weapon's kind under Weapon Mastery",
     "actions[].violations[].rule":
       "Machine-readable rule id, e.g. economy.action-used, feature.requires-effect, condition.incapacitated",
     "actions[].usesRemaining": "Limited-use spending left; null when the action has no use limit",
@@ -1572,6 +1582,13 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "Darts the action makes, each dealing its damage to a target the caller assigns (Magic Missile, read from a scroll or cast from a wand); null otherwise",
     "actions[].damageTypes":
       "The damage types the caster picks one of when it resolves (Chromatic Orb), sent as the resolve's `damageType`; null when the action deals its own"
+  },
+  CharacterNextLevelData: {
+    level: "The character level the next level-up reaches",
+    classId: "The class that level goes to: the class of the last level taken, which the Level page offers first",
+    classLevel: "That class's own level after the level-up",
+    lines:
+      "Short plain lines in order: the Proficiency Bonus when it rises, each feature gained, each pick no feature names, spell slots, prepared spells and cantrips, a Wizard's spellbook spells, and the Hit Points the level adds (the die plus today's Constitution modifier and per-level riders, or the average)"
   },
   BuilderOffersData: {
     "offers[].key": "Stable key the draft's answers are filed under",
