@@ -16,6 +16,7 @@ import type {
 } from "@vtt/domain";
 import type { CodexStore } from "../codex-store.js";
 import {
+  orderPlayerAttached,
   orderPlayerChronicle,
   orderPlayerTimeline,
   projectPlayerCalendar,
@@ -176,10 +177,10 @@ export class PlayerCodexReads {
     if (markerId && !isMarkerVisible(this.#store, markerId)) return null;
     if (pageId && !isPageVisible(this.#store, pageId)) return null;
     const context = this.#journalContext;
-    // A pin's or page's entries come in creation order, which no hidden session moves.
+    // A pin's or page's entries come in the order players could first read them.
     const rows =
       markerId || pageId
-        ? this.#store.listEntriesFor({ markerId, pageId })
+        ? orderPlayerAttached(this.#store.listEntriesFor({ markerId, pageId }))
         : orderPlayerTimeline(this.#store.listTimeline(), context);
     return { entries: rows.map((row) => projectPlayerJournalEntry(row, context)).filter((entry) => entry !== null) };
   }
@@ -265,7 +266,7 @@ export class PlayerCodexReads {
  * built from those, so it cannot change while they stay the same:
  *
  * - A page's Connections panel: from the graph's edges, the titles and the player text of both ends.
- * - A page's or a pin's journal: the shown entries with that attachment, in creation order.
+ * - A page's or a pin's journal: the shown entries with that attachment, in first-shown order.
  * - A page's pins: the shown pins whose page links name it.
  * - One pin, session or quest: the same projection as its row in the list.
  * - Search: each hit's title, text and reveal state, ranked on its own title.

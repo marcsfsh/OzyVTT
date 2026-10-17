@@ -1225,8 +1225,8 @@ describe("Codex chronicle: the projection layer, on its own", () => {
     // `payload` is a downtime's who/activity/days, never GM-only `applied`.
     expect(Object.keys(projected).sort()).toEqual([
       "calendarInstant",
-      "createdAt",
       "fired",
+      "firstShownAt",
       "id",
       "inWorldDate",
       "inWorldLabel",
@@ -1801,6 +1801,115 @@ describe("CodexStore playerUpdatedAt: the date only the player half moves", () =
 
     await pages.initialize();
     expect(pages.getPage(page.id)!.playerUpdatedAt).toBe("2026-06-30T12:00:00.000Z");
+  });
+});
+
+// `firstShownAt` replaces `createdAt` in the player shapes. Every write dates what it first lets players read, and
+// a record from before the date existed takes its `createdAt` only if players can read it today.
+describe("CodexStore firstShownAt: when players could first read a record", () => {
+  let shownDirectory: string;
+  let clock: number;
+  let shown: CodexStore;
+
+  beforeEach(async () => {
+    shownDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-first-shown-"));
+    clock = Date.parse("2026-07-01T00:00:00.000Z");
+    shown = new CodexStore(join(shownDirectory, "vtt.sqlite"), () => clock);
+    await shown.initialize();
+  });
+  afterEach(async () => {
+    shown.close();
+    await rm(shownDirectory, { recursive: true, force: true });
+  });
+
+  const later = () => {
+    clock += 60_000;
+    return new Date(clock).toISOString();
+  };
+  /** A page and an entry of each reveal state, plus a revealed standing record its hidden faction still gates. */
+  const seed = () => {
+    const shownPage = shown.createPage({ title: "Vallaki", revealedToPlayers: true });
+    const hiddenPage = shown.createPage({ title: "The Cult", entityType: "faction" });
+    const shownEntry = shown.createEntry({ playerText: "We arrived.", revealedToPlayers: true, sessionId: null });
+    const hiddenEntry = shown.createEntry({ playerText: "Prep.", sessionId: null });
+    shown.setStanding(hiddenPage.id, 10, "");
+    const gated = shown.listTimeline().find((entry) => entry.kind === "standing")!;
+    shown.setEntryRevealed(gated.id, true);
+    return { shownPage, hiddenPage, shownEntry, hiddenEntry, gated };
+  };
+
+  it("dates a record created revealed at its creation, and leaves one players cannot read undated", () => {
+    const { shownPage, hiddenPage, shownEntry, hiddenEntry, gated } = seed();
+    expect(shownPage.firstShownAt).toBe(shownPage.createdAt);
+    expect(shownEntry.firstShownAt).toBe(shownEntry.createdAt);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(gated.id)!.firstShownAt, "revealed, but its faction is hidden").toBeNull();
+  });
+
+  it("dates a record at the write that first lets players read it, and never moves the date after", () => {
+    const { hiddenPage, hiddenEntry, gated } = seed();
+    const revealed = later();
+    shown.setEntryRevealed(hiddenEntry.id, true);
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBe(revealed);
+
+    const factionShown = later();
+    shown.setPageRevealed(hiddenPage.id, true);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBe(factionShown);
+    expect(shown.getEntry(gated.id)!.firstShownAt, "its faction's reveal let players read it").toBe(factionShown);
+
+    later();
+    shown.setEntryRevealed(hiddenEntry.id, false);
+    shown.setPageRevealed(hiddenPage.id, false);
+    shown.updateEntry(hiddenEntry.id, { playerText: "Prep, redone." });
+    later();
+    shown.setEntryRevealed(hiddenEntry.id, true);
+    shown.setPageRevealed(hiddenPage.id, true);
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBe(revealed);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBe(factionShown);
+  });
+
+  it("dates what players can read today by its creation when an older database opens", async () => {
+    const { shownPage, hiddenPage, shownEntry, hiddenEntry, gated } = seed();
+    shown.close();
+    // The file as the release before this column left it.
+    const raw = new DatabaseSync(join(shownDirectory, "vtt.sqlite"));
+    raw.exec(
+      "ALTER TABLE codex_pages DROP COLUMN first_shown_at; ALTER TABLE codex_journal DROP COLUMN first_shown_at;"
+    );
+    raw.prepare("DELETE FROM migrations WHERE store = 'codex' AND version = 3").run();
+    raw.close();
+
+    await shown.initialize();
+    expect(shown.getPage(shownPage.id)!.firstShownAt).toBe(shownPage.createdAt);
+    expect(shown.getEntry(shownEntry.id)!.firstShownAt).toBe(shownEntry.createdAt);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(gated.id)!.firstShownAt).toBeNull();
+  });
+
+  it("keeps the date through a backup, and dates an older backup as the migration does", () => {
+    const { shownPage, hiddenPage, hiddenEntry, gated } = seed();
+    later();
+    shown.setEntryRevealed(hiddenEntry.id, true);
+    const firstShown = shown.getEntry(hiddenEntry.id)!.firstShownAt!;
+    expect(firstShown).not.toBe(shown.getEntry(hiddenEntry.id)!.createdAt);
+
+    later();
+    const bundle = shown.exportBundle();
+    shown.importBundle(bundle);
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt, "a restore is not a reveal").toBe(firstShown);
+    expect(shown.getPage(shownPage.id)!.firstShownAt).toBe(shownPage.createdAt);
+
+    const older = {
+      ...bundle,
+      pages: bundle.pages.map(({ firstShownAt: _dropped, ...rest }) => rest),
+      journal: bundle.journal.map(({ firstShownAt: _dropped, ...rest }) => rest)
+    };
+    shown.importBundle(older);
+    expect(shown.getEntry(hiddenEntry.id)!.firstShownAt).toBe(shown.getEntry(hiddenEntry.id)!.createdAt);
+    expect(shown.getPage(hiddenPage.id)!.firstShownAt).toBeNull();
+    expect(shown.getEntry(gated.id)!.firstShownAt).toBeNull();
   });
 });
 
@@ -2791,7 +2900,7 @@ describe("Codex journal: the unrevealed-session number gate, on its own", () => 
     const projected = projectPlayerJournalEntry(entry, playerSessionNumbers())!;
     // The exact key set: the fields are nulled, never dropped, so one response shape serves both roles.
     expect(Object.keys(projected).sort()).toEqual([
-      "createdAt",
+      "firstShownAt",
       "id",
       "inWorldLabel",
       "kind",

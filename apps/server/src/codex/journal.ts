@@ -90,7 +90,7 @@ export type EntryFields = Readonly<{
 }>;
 
 const JOURNAL_COLUMNS =
-  "j.id, j.kind, j.player_text, j.gm_text, j.revealed, j.attach_marker_id, j.attach_page_id, j.source_encounter_id, j.session_id, j.deleted_session_number, s.session_number AS live_session_number, j.real_date, j.in_world_year, j.in_world_month, j.in_world_day, j.in_world_label, j.calendar_instant, j.sort_key, j.tags_json, j.payload_json, j.created_at, j.updated_at";
+  "j.id, j.kind, j.player_text, j.gm_text, j.revealed, j.attach_marker_id, j.attach_page_id, j.source_encounter_id, j.session_id, j.deleted_session_number, s.session_number AS live_session_number, j.real_date, j.in_world_year, j.in_world_month, j.in_world_day, j.in_world_label, j.calendar_instant, j.sort_key, j.tags_json, j.payload_json, j.created_at, j.updated_at, j.first_shown_at";
 /** Always with `JOURNAL_COLUMNS`: without the join every entry would show only the left-behind number. */
 const JOURNAL_FROM = "codex_journal j LEFT JOIN codex_sessions s ON s.id = j.session_id";
 type JournalRowRaw = {
@@ -116,6 +116,7 @@ type JournalRowRaw = {
   payload_json: string | null;
   created_at: string;
   updated_at: string;
+  first_shown_at: string | null;
 };
 
 function toEntry(row: JournalRowRaw): CodexJournalEntry {
@@ -142,7 +143,8 @@ function toEntry(row: JournalRowRaw): CodexJournalEntry {
     tags: parseStringArray(row.tags_json),
     payload: payloadOf(kind, row.payload_json),
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    firstShownAt: row.first_shown_at
   };
 }
 function entryRow(db: CodexDb, entryId: string): JournalRowRaw | undefined {
@@ -155,13 +157,20 @@ function entryRow(db: CodexDb, entryId: string): JournalRowRaw | undefined {
 export function insertEntry(
   db: CodexDb,
   entry: EntryFields &
-    Readonly<{ id: string; deletedSessionNumber: number | null; sortKey: number; createdAt: string; updatedAt: string }>
+    Readonly<{
+      id: string;
+      deletedSessionNumber: number | null;
+      sortKey: number;
+      createdAt: string;
+      updatedAt: string;
+      firstShownAt: string | null;
+    }>
 ): void {
   const entryTags = tags(entry.tags);
   const date = entry.dated.date;
   db.database
     .prepare(
-      "INSERT INTO codex_journal (id, kind, player_text, gm_text, revealed, attach_marker_id, attach_page_id, source_encounter_id, session_id, deleted_session_number, real_date, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO codex_journal (id, kind, player_text, gm_text, revealed, attach_marker_id, attach_page_id, source_encounter_id, session_id, deleted_session_number, real_date, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, sort_key, tags_json, payload_json, created_at, updated_at, first_shown_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .run(
       entry.id,
@@ -184,7 +193,8 @@ export function insertEntry(
       JSON.stringify(entryTags),
       entry.payload === null ? null : JSON.stringify(entry.payload),
       entry.createdAt,
-      entry.updatedAt
+      entry.updatedAt,
+      entry.firstShownAt
     );
   indexEntry(db, entry.id, entry.playerText, entry.gmText, entryTags);
   rebuildLinks(db, "journal", entry.id, entry.playerText, entry.gmText ?? "");
@@ -196,7 +206,16 @@ export function writeEntry(db: CodexDb, fields: EntryFields): string {
   const now = stamp(db);
   const sortKey =
     ((db.database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
-  insertEntry(db, { ...fields, id: entryId, deletedSessionNumber: null, sortKey, createdAt: now, updatedAt: now });
+  // The write dates it if players can read it.
+  insertEntry(db, {
+    ...fields,
+    id: entryId,
+    deletedSessionNumber: null,
+    sortKey,
+    createdAt: now,
+    updatedAt: now,
+    firstShownAt: null
+  });
   return entryId;
 }
 
@@ -494,24 +513,27 @@ export function downtimeCharacterPageIds(db: CodexDb): string[] {
 type ChronicleSortKey = Readonly<{
   calendarInstant: number | null;
   sessionNumber: number | null;
-  createdAt: string;
+  /** Creation time for the GM, first-shown time for a player. */
+  time: string;
   id: string;
 }>;
-function chronicleSortKey(
-  record: CodexChronicleSource,
-  sessionNumberOf: (entry: CodexJournalEntry) => number | null
-): ChronicleSortKey {
+/** What a reader places a record by: the session number it gives an entry, and the time it gives any record. */
+export type ChronicleOrderBasis = Readonly<{
+  sessionNumberOf: (entry: CodexJournalEntry) => number | null;
+  timeOf: (record: CodexChronicleSource) => string;
+}>;
+function chronicleSortKey(record: CodexChronicleSource, basis: ChronicleOrderBasis): ChronicleSortKey {
   return record.kind === "entry"
     ? {
         calendarInstant: record.entry.calendarInstant,
-        sessionNumber: sessionNumberOf(record.entry),
-        createdAt: record.entry.createdAt,
+        sessionNumber: basis.sessionNumberOf(record.entry),
+        time: basis.timeOf(record),
         id: record.entry.id
       }
     : {
         calendarInstant: record.page.calendarInstant,
         sessionNumber: null,
-        createdAt: record.page.createdAt,
+        time: basis.timeOf(record),
         id: record.page.id
       };
 }
@@ -524,15 +546,15 @@ function compareChronicle(a: ChronicleSortKey, b: ChronicleSortKey): number {
   if (unsessioned !== 0) return unsessioned;
   if (a.sessionNumber !== null && b.sessionNumber !== null && a.sessionNumber !== b.sessionNumber)
     return a.sessionNumber - b.sessionNumber;
-  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
+  if (a.time !== b.time) return a.time < b.time ? -1 : 1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-/** The chronicle's order. Each entry is placed by the session number `sessionNumberOf` gives it. */
+/** The chronicle's order, with each record placed by the session number and time `basis` gives it. */
 export function chronicleOrder(
-  sessionNumberOf: (entry: CodexJournalEntry) => number | null
+  basis: ChronicleOrderBasis
 ): (a: CodexChronicleSource, b: CodexChronicleSource) => number {
-  return (a, b) => compareChronicle(chronicleSortKey(a, sessionNumberOf), chronicleSortKey(b, sessionNumberOf));
+  return (a, b) => compareChronicle(chronicleSortKey(a, basis), chronicleSortKey(b, basis));
 }
 
 /** Entries and dated event pages in one order. Ungated by design; `projectPlayerChronicleRecord` gates. */
@@ -541,5 +563,10 @@ export function listChronicle(db: CodexDb): CodexChronicleSource[] {
     ...listTimeline(db).map((entry) => ({ kind: "entry", entry }) as const),
     ...listDatedEventPages(db).map((page) => ({ kind: "event", page }) as const)
   ];
-  return records.sort(chronicleOrder((entry) => entry.sessionNumber));
+  return records.sort(
+    chronicleOrder({
+      sessionNumberOf: (entry) => entry.sessionNumber,
+      timeOf: (record) => (record.kind === "entry" ? record.entry.createdAt : record.page.createdAt)
+    })
+  );
 }

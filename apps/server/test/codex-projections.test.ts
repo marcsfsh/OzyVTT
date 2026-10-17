@@ -6,6 +6,7 @@ import {
   projectGmStanding,
   projectPlayerCalendar,
   projectPlayerChronicleRecord,
+  projectPlayerJournalEntry,
   projectPlayerMarker,
   projectPlayerPage,
   projectPlayerPageMarker,
@@ -58,6 +59,7 @@ function entryRow(overrides: Partial<CodexJournalEntry> & { kind: CodexJournalKi
     payload: null,
     createdAt: "2026-07-29T00:00:00.000Z",
     updatedAt: "2026-07-29T00:00:00.000Z",
+    firstShownAt: "2026-07-30T00:00:00.000Z",
     ...overrides
   };
 }
@@ -486,6 +488,7 @@ function pageRow(overrides: Partial<CodexPage> = {}): CodexPage {
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-30T00:00:00.000Z",
     playerUpdatedAt: "2026-07-02T00:00:00.000Z",
+    firstShownAt: "2026-07-03T00:00:00.000Z",
     ...overrides
   };
 }
@@ -540,5 +543,42 @@ describe("page projection: no folder and no GM edit time reach a player", () => 
   it("projects nothing at all for a hidden page", () => {
     expect(projectPlayerPage(pageRow({ revealedToPlayers: false }))).toBeNull();
     expect(projectPlayerPageSummary(pageRow({ revealedToPlayers: false }))).toBeNull();
+  });
+});
+
+// A record's creation time would tell players when the GM prepared it, so the player shapes leave it out and
+// carry the moment players could first read the record.
+describe("journal and chronicle projection: the first-shown date", () => {
+  it("carries `firstShownAt` and no `createdAt` on a player entry and both kinds of chronicle row", () => {
+    const entry = entryRow({ kind: "note", revealedToPlayers: true });
+    const event = pageRow({
+      entityType: "event",
+      inWorldLabel: "Hammer 10, 1492 DR",
+      calendarInstant: 9,
+      inWorldDate: { year: 1492, month: 0, day: 10 }
+    });
+    const projected = [
+      projectPlayerJournalEntry(entry, playerContext())!,
+      projectPlayerChronicleRecord({ kind: "entry", entry }, playerContext())!,
+      projectPlayerChronicleRecord({ kind: "event", page: event }, playerContext())!
+    ];
+    expect(projected.map((row) => row.firstShownAt)).toEqual([
+      "2026-07-30T00:00:00.000Z",
+      "2026-07-30T00:00:00.000Z",
+      "2026-07-03T00:00:00.000Z"
+    ]);
+    for (const row of projected) {
+      expect(Object.keys(row)).not.toContain("createdAt");
+      expect(JSON.stringify(row)).not.toContain("2026-07-29");
+      expect(JSON.stringify(row)).not.toContain("2026-07-01");
+    }
+  });
+
+  it("projects nothing for a revealed record that has no first-shown date, which it would only lack by a bug", () => {
+    const entry = entryRow({ kind: "note", revealedToPlayers: true, firstShownAt: null });
+    expect(projectPlayerJournalEntry(entry, playerContext())).toBeNull();
+    expect(projectPlayerChronicleRecord({ kind: "entry", entry }, playerContext())).toBeNull();
+    const event = pageRow({ entityType: "event", calendarInstant: 9, firstShownAt: null });
+    expect(projectPlayerChronicleRecord({ kind: "event", page: event }, playerContext())).toBeNull();
   });
 });

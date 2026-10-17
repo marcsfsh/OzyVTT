@@ -50,7 +50,7 @@ export type CodexPageUpdateInput = Omit<CodexPageCreateInput, "title" | "reveale
   Readonly<{ title?: string }>;
 
 const SUMMARY_COLUMNS =
-  "id, title, entity_type, fields_json, folder, tags_json, revealed, banner_asset_id, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, rev, created_at, updated_at, player_updated_at";
+  "id, title, entity_type, fields_json, folder, tags_json, revealed, banner_asset_id, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, rev, created_at, updated_at, player_updated_at, first_shown_at";
 const PAGE_COLUMNS = `${SUMMARY_COLUMNS}, gm_fields_json, player_body, gm_body`;
 type SummaryRowRaw = {
   id: string;
@@ -70,6 +70,7 @@ type SummaryRowRaw = {
   created_at: string;
   updated_at: string;
   player_updated_at: string;
+  first_shown_at: string | null;
 };
 type PageRowRaw = SummaryRowRaw & { gm_fields_json: string; player_body: string; gm_body: string };
 
@@ -93,7 +94,8 @@ function toSummary(row: SummaryRowRaw): CodexPageSummary {
     rev: row.rev,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    playerUpdatedAt: row.player_updated_at
+    playerUpdatedAt: row.player_updated_at,
+    firstShownAt: row.first_shown_at
   };
 }
 function toPage(row: PageRowRaw): CodexPage {
@@ -118,7 +120,7 @@ function sealedFields(
 export function insertPage(db: CodexDb, page: CodexPage): void {
   db.database
     .prepare(
-      `INSERT INTO codex_pages (${PAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO codex_pages (${PAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       page.id,
@@ -138,6 +140,7 @@ export function insertPage(db: CodexDb, page: CodexPage): void {
       page.createdAt,
       page.updatedAt,
       page.playerUpdatedAt,
+      page.firstShownAt,
       JSON.stringify(page.gmFields),
       page.playerBody,
       page.gmBody
@@ -184,7 +187,9 @@ export function createPage(db: CodexDb, input: CodexPageCreateInput): CodexPage 
     rev: 1,
     createdAt: now,
     updatedAt: now,
-    playerUpdatedAt: now
+    playerUpdatedAt: now,
+    // The write dates it if it is created revealed.
+    firstShownAt: null
   };
   write(db, () => {
     insertPage(db, page);

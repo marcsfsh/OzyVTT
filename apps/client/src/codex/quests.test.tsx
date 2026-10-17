@@ -626,7 +626,7 @@ describe("A quest-history row a player reads (5d)", () => {
     calendarInstant: null,
     sessionId: null,
     sessionNumber: null,
-    createdAt: "2026-07-31T00:00:00.000Z",
+    firstShownAt: "2026-07-31T00:00:00.000Z",
     payload: { questId, status }
   });
 

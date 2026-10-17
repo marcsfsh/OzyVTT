@@ -243,7 +243,7 @@ describe("the player's lists filter in place too", () => {
         calendarInstant: null,
         sessionId: null,
         sessionNumber: null,
-        createdAt: "2026-07-31T00:00:00.000Z"
+        firstShownAt: "2026-07-31T00:00:00.000Z"
       },
       {
         id: "j2",
@@ -257,7 +257,7 @@ describe("the player's lists filter in place too", () => {
         calendarInstant: null,
         sessionId: null,
         sessionNumber: null,
-        createdAt: "2026-07-31T00:00:00.000Z"
+        firstShownAt: "2026-07-31T00:00:00.000Z"
       }
     ]);
     renderPlayer("/codex/journal");

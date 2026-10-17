@@ -81,7 +81,9 @@ export const CodexPageSummarySchema = z.strictObject({
   /** Moves on every save. */
   updatedAt: timestamp(),
   /** Moves only when something a player can see changes, so it is the one edit time players get. */
-  playerUpdatedAt: timestamp()
+  playerUpdatedAt: timestamp(),
+  /** When players could first read the page; null until then. Never moves after, through a hide or a re-reveal. */
+  firstShownAt: timestamp().nullable()
 });
 export type CodexPageSummary = Wire<z.infer<typeof CodexPageSummarySchema>>;
 export const CodexPageSchema = CodexPageSummarySchema.extend({
@@ -341,12 +343,15 @@ export const CodexJournalEntrySchema = z.strictObject({
   /** Kind-specific structured data; null for kinds without one. */
   payload: CodexJournalPayloadSchema,
   createdAt: timestamp(),
-  updatedAt: timestamp()
+  updatedAt: timestamp(),
+  /** When players could first read the entry; null until then. Never moves after, through a hide or a re-reveal. */
+  firstShownAt: timestamp().nullable()
 });
 export type CodexJournalEntry = Wire<z.infer<typeof CodexJournalEntrySchema>>;
 /**
  * Only when revealed. `sessionId` and `sessionNumber` are both null unless the session is revealed, since
- * either half says the session exists.
+ * either half says the session exists. No `createdAt`, which would tell players when the GM wrote the entry;
+ * `firstShownAt` is when they could first read it.
  */
 export const PlayerCodexJournalEntrySchema = z.strictObject({
   id: z.uuid(),
@@ -357,7 +362,7 @@ export const PlayerCodexJournalEntrySchema = z.strictObject({
   realDate: z.string().nullable(),
   inWorldLabel: z.string().nullable(),
   tags: tags(),
-  createdAt: timestamp()
+  firstShownAt: timestamp()
 });
 export type PlayerCodexJournalEntry = Wire<z.infer<typeof PlayerCodexJournalEntrySchema>>;
 
@@ -389,7 +394,10 @@ export const CodexChronicleRecordSchema = z.strictObject({
   updatedAt: timestamp()
 });
 export type CodexChronicleRecord = Wire<z.infer<typeof CodexChronicleRecordSchema>>;
-/** No GM text, attachments, encounter id or proposed date. `fired` is measured against the published date. */
+/**
+ * No GM text, attachments, encounter id or proposed date. `fired` is measured against the published date. No
+ * `createdAt`, which would tell players when the GM wrote the record; `firstShownAt` is when they could first read it.
+ */
 export const PlayerCodexChronicleRecordSchema = z.strictObject({
   kind: CodexChronicleKindSchema,
   id: z.uuid(),
@@ -405,7 +413,7 @@ export const PlayerCodexChronicleRecordSchema = z.strictObject({
   tags: tags(),
   fired: z.boolean(),
   payload: PlayerCodexJournalPayloadSchema,
-  createdAt: timestamp()
+  firstShownAt: timestamp()
 });
 export type PlayerCodexChronicleRecord = Wire<z.infer<typeof PlayerCodexChronicleRecordSchema>>;
 

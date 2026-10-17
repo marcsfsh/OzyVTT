@@ -416,7 +416,7 @@ describe("The player's chronicle and the player's clock", () => {
     tags: [],
     payload: null,
     fired: false,
-    createdAt: "2026-07-20T00:00:00.000Z",
+    firstShownAt: "2026-07-20T00:00:00.000Z",
     ...over
   });
 

@@ -158,10 +158,14 @@ audience. There are four:
   the GM's private filing (a player's `folder` filter on the page list is ignored). A page's
   `updatedAt` moves on every save, so it stays with the GM too; players get `playerUpdatedAt`,
   which moves only when the title, kind, player text, shared fields, tags, banner, an event page's
-  date or the reveal flag changes. The order and length of a player's lists come from what the
-  player can read too: a player's search ranks each hit on its own title and is capped after the
-  player gates (the GM's keeps relevance ranking, since the GM reads every row anyway), a player's
-  journal places an entry by the session number the player receives, a page's mentions
+  date or the reveal flag changes. A record's `createdAt` would tell players when the GM prepared
+  it, so the player shapes of journal entries and chronicle rows leave it out and carry
+  `firstShownAt`: the moment players could first read the record, set by that write
+  (`codex/first-shown.ts` runs in every Codex write) and never moved after, through a hide or a
+  re-reveal. The order and length of a player's lists come from what the player can read too: a
+  player's search ranks each hit on its own title and is capped after the player gates (the GM's
+  keeps relevance ranking, since the GM reads every row anyway), a player's journal places an
+  entry by the session number the player receives and then by `firstShownAt`, a page's mentions
   keep a fixed order, a hidden page never takes a revealed page's title for `[[links]]`, and a
   GM-layer connection never folds away a player-layer mention. A hidden record is a 404, never a
   403, and ETags are computed after every gate. A GM's ETag carries the store revision; a player's

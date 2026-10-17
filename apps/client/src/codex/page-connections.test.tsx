@@ -111,7 +111,8 @@ const summary = (
   rev: 1,
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
-  playerUpdatedAt: "2026-07-28T00:00:00.000Z"
+  playerUpdatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 });
 const full = (row: CodexPageSummary): CodexPage => ({ ...row, playerBody: "", gmBody: "", gmFields: {} });
 
@@ -138,6 +139,7 @@ const ENTRY = (over: Partial<CodexJournalEntry> = {}): CodexJournalEntry => ({
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 

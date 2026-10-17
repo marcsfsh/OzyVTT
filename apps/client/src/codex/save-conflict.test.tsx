@@ -48,6 +48,7 @@ const page: CodexPage = {
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
   playerUpdatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null,
   playerBody: "Fog.",
   gmBody: ""
 };

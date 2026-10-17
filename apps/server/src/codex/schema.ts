@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { migrate, type Migration } from "../database.js";
+import { backfillFirstShown } from "./first-shown.js";
 
 /**
  * The Codex tables. Records keep both layers in one row (`player_*` and `gm_*` columns plus `revealed`); only
@@ -223,6 +224,18 @@ export const CODEX_MIGRATIONS: readonly Migration[] = [
         ALTER TABLE codex_pages ADD COLUMN player_updated_at TEXT NOT NULL DEFAULT '';
         UPDATE codex_pages SET player_updated_at = updated_at;
       `)
+  },
+  {
+    // When players could first read a page or an entry, which they get in place of `createdAt`. A record they
+    // can read today starts from `createdAt`, which they could already read, so the upgrade shows them nothing new.
+    version: 3,
+    up: (database) => {
+      database.exec(`
+        ALTER TABLE codex_pages ADD COLUMN first_shown_at TEXT;
+        ALTER TABLE codex_journal ADD COLUMN first_shown_at TEXT;
+      `);
+      backfillFirstShown(database);
+    }
   }
 ];
 

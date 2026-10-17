@@ -131,7 +131,7 @@ describe("codex HTTP viewer-safety boundary", () => {
     // The exact projected key set (a substring search for the id could hit a uuid containing "42"), so any
     // new field fails here.
     expect(Object.keys(playerTimeline.data.entries[0]).sort()).toEqual([
-      "createdAt",
+      "firstShownAt",
       "id",
       "inWorldLabel",
       "kind",
@@ -1127,8 +1127,8 @@ describe("codex chronicle HTTP boundary", () => {
     // GM's clock; `payload` is who/activity/days only; `proposedDate` is GM prep and excluded.
     expect(Object.keys(playerRows[0]).sort()).toEqual([
       "calendarInstant",
-      "createdAt",
       "fired",
+      "firstShownAt",
       "id",
       "inWorldDate",
       "inWorldLabel",

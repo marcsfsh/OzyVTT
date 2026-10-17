@@ -25,8 +25,10 @@ afterEach(async () => {
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "vtt-codex-gm-only-"));
   // A clock that moves on every read, so a write that stamps a time can always be told from one that does not.
+  // `stopClock` holds it at one moment, so a test can say exactly when a write happened.
   let clock = Date.parse("2026-08-01T00:00:00.000Z");
-  const store = new CodexStore(join(directory, "vtt.sqlite"), () => (clock += 1000));
+  let stopped: number | null = null;
+  const store = new CodexStore(join(directory, "vtt.sqlite"), () => stopped ?? (clock += 1000));
   const assets = new MapAssetStore(join(directory, "codex-assets"));
   await store.initialize();
   await assets.initialize();
@@ -49,7 +51,10 @@ async function fixture() {
     store.close();
     await rm(directory, { recursive: true, force: true });
   });
-  return { base: `http://127.0.0.1:${port}/api/v1/codex`, store };
+  const stopClock = (at: string) => {
+    stopped = Date.parse(at);
+  };
+  return { base: `http://127.0.0.1:${port}/api/v1/codex`, store, stopClock };
 }
 
 /** A fixed request id, so a 404's body is the same bytes on every read. */
@@ -515,5 +520,83 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
       edit();
       expect(changes.next(), name).toBe(index + 1);
     });
+  });
+});
+
+// A record's creation time would tell players when the GM prepared it. Players get the moment they could first
+// read it, which a hide and a re-reveal never move.
+describe("Codex first-shown dates: players learn when a record was shown to them", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const at = (start: string, days: number) => new Date(Date.parse(start) + days * DAY).toISOString();
+  type Shown = { id: string; firstShownAt?: string; createdAt?: string };
+  const shownIn = async (base: string, path: string, key: "entries" | "records", token = PLAYER_TOKEN) => {
+    const answer = await read(base, path, token);
+    expect(answer.status, path).toBe(200);
+    return { rows: JSON.parse(answer.body).data[key] as Shown[], body: answer.body };
+  };
+
+  it("dates an entry and an event page prepared hidden and edited for days at their reveal", async () => {
+    const { base, store, stopClock } = await fixture();
+    const start = "2026-08-01T09:00:00.000Z";
+    stopClock(start);
+    const entry = store.createEntry({ playerText: "The order meets at midnight.", sessionId: null });
+    const event = store.createPage({
+      title: "Night of Lanterns",
+      entityType: "event",
+      playerBody: "The lamps went out.",
+      inWorldDate: { year: 1, month: 0, day: 3 }
+    });
+    for (let day = 1; day <= 5; day += 1) {
+      stopClock(at(start, day));
+      store.updateEntry(entry.id, { playerText: `The order meets at midnight. Draft ${day}.` });
+      store.updatePage(event.id, { playerBody: `The lamps went out. Draft ${day}.` }, undefined, "gm");
+    }
+    const reveal = at(start, 6);
+    stopClock(reveal);
+    store.setEntryRevealed(entry.id, true);
+    store.setPageRevealed(event.id, true);
+
+    for (const token of [PLAYER_TOKEN, PREVIEW_TOKEN]) {
+      const journal = await shownIn(base, "/journal", "entries", token);
+      const timeline = await shownIn(base, "/timeline", "records", token);
+      expect(journal.rows.find((row) => row.id === entry.id)?.firstShownAt).toBe(reveal);
+      expect(timeline.rows.find((row) => row.id === entry.id)?.firstShownAt).toBe(reveal);
+      expect(timeline.rows.find((row) => row.id === event.id)?.firstShownAt).toBe(reveal);
+      // Nothing a player reads says when the GM started, or worked on, either record.
+      for (const { body } of [journal, timeline]) {
+        expect(body).not.toContain('"createdAt"');
+        for (let day = 0; day <= 5; day += 1) expect(body).not.toContain(at(start, day));
+      }
+    }
+
+    // A hide and a re-reveal days later keep the first date.
+    stopClock(at(start, 7));
+    store.setEntryRevealed(entry.id, false);
+    store.setPageRevealed(event.id, false);
+    stopClock(at(start, 9));
+    store.setEntryRevealed(entry.id, true);
+    store.setPageRevealed(event.id, true);
+    const again = await shownIn(base, "/timeline", "records");
+    expect(again.rows.find((row) => row.id === entry.id)?.firstShownAt).toBe(reveal);
+    expect(again.rows.find((row) => row.id === event.id)?.firstShownAt).toBe(reveal);
+  });
+
+  it("dates a standing record by its faction's reveal when the faction is shown later", async () => {
+    const { base, store, stopClock } = await fixture();
+    const start = "2026-08-01T09:00:00.000Z";
+    stopClock(start);
+    const faction = store.createPage({ title: "Lantern Order", entityType: "faction" });
+    store.setStanding(faction.id, 20, "Helped the guild");
+    const record = store.listTimeline().find((row) => row.kind === "standing")!;
+    // Revealed, but still gated by its hidden faction, so no player can read it yet.
+    stopClock(at(start, 2));
+    store.setEntryRevealed(record.id, true);
+    expect((await shownIn(base, "/journal", "entries")).rows).toEqual([]);
+
+    const factionShown = at(start, 4);
+    stopClock(factionShown);
+    store.setPageRevealed(faction.id, true);
+    const journal = await shownIn(base, "/journal", "entries");
+    expect(journal.rows.find((row) => row.id === record.id)?.firstShownAt).toBe(factionShown);
   });
 });

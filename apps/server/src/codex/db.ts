@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { transaction } from "../database.js";
+import { stampFirstShown } from "./first-shown.js";
 
 /** The connection and clock every Codex module works through. */
 export type CodexDb = Readonly<{ database: DatabaseSync; now: () => number }>;
@@ -26,12 +27,14 @@ export function bumpRevision(db: CodexDb): void {
 }
 
 /**
- * One Codex write: `work` and a revision bump in one transaction. The leaf writes the aggregate modules export
- * open no transaction of their own, so several compose inside one `write`.
+ * One Codex write: `work`, the first-shown date of whatever it let players read, and a revision bump, in one
+ * transaction. The leaf writes the aggregate modules export open no transaction of their own, so several compose
+ * inside one `write`.
  */
 export function write<T>(db: CodexDb, work: () => T): T {
   return transaction(db.database, () => {
     const result = work();
+    stampFirstShown(db.database, stamp(db));
     bumpRevision(db);
     return result;
   });

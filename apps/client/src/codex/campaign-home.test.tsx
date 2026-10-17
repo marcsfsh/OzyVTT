@@ -119,7 +119,8 @@ const summary = (
   rev: 1,
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
-  playerUpdatedAt: "2026-07-28T00:00:00.000Z"
+  playerUpdatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 });
 const PAGES = [summary("p1", "Strahd", "character", ["villain"]), summary("p2", "Barovia", "location")];
 
@@ -222,7 +223,7 @@ const PLAYER_ENTRY: PlayerCodexChronicleRecord = {
   tags: [],
   payload: null,
   fired: false,
-  createdAt: "2026-07-20T00:00:00.000Z"
+  firstShownAt: "2026-07-20T00:00:00.000Z"
 };
 const PLAYER_OLDER: PlayerCodexChronicleRecord = {
   ...PLAYER_ENTRY,
@@ -230,7 +231,7 @@ const PLAYER_OLDER: PlayerCodexChronicleRecord = {
   text: "They left Daggerford.",
   sessionId: null,
   sessionNumber: 1,
-  createdAt: "2026-07-01T00:00:00.000Z"
+  firstShownAt: "2026-07-01T00:00:00.000Z"
 };
 /** A revealed dated `event` page on the same chronicle. */
 const PLAYER_EVENT: PlayerCodexChronicleRecord = {
@@ -247,7 +248,7 @@ const PLAYER_EVENT: PlayerCodexChronicleRecord = {
   tags: [],
   payload: null,
   fired: false,
-  createdAt: "2026-07-10T00:00:00.000Z"
+  firstShownAt: "2026-07-10T00:00:00.000Z"
 };
 const playerDefaults = () => {
   playerListPages.mockResolvedValue(PLAYER_PAGES);

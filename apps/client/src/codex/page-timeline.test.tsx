@@ -39,6 +39,7 @@ const entry = (over: Partial<CodexJournalEntry>): CodexJournalEntry => ({
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 
