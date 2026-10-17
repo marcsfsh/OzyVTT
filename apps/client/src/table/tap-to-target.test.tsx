@@ -23,6 +23,7 @@ vi.mock("../scene/gridPreview", async (original) => ({
   useMapCalibration: () => GRID
 }));
 
+import { touchMoveCancelled } from "../../test/drag-surface";
 import { ActionTargetPicker } from "../encounter/ActionTargetPicker";
 import { beginTargeting, clearTargeting, useTargeting } from "../encounter/targeting";
 import { EncounterMap } from "../scene/EncounterMap";
@@ -165,5 +166,18 @@ describe("tap-to-target for a player", () => {
     // The caster's own token is never a target.
     expect(document.querySelector(`[data-token-id="${LYRA}"]`)!.getAttribute("aria-label")).not.toContain("target");
     act(() => clearTargeting());
+  });
+
+  // A pan or a token drag that lifts mid-motion would otherwise start a browser fling, and the tap after it only
+  // stops the fling. `drag-surfaces.test.tsx` checks the other drag surfaces.
+  it("cancels a finger's movement on the map's stage, so a drag never becomes a scroll", () => {
+    render(
+      <ToastProvider>
+        <Table />
+      </ToastProvider>
+    );
+    const stage = document.querySelector(".encounter-map-stage")!;
+    expect(touchMoveCancelled(stage)).toBe(true);
+    expect(touchMoveCancelled(stage.querySelector(`[data-token-id="${GOBLIN_A}"]`)!)).toBe(true);
   });
 });

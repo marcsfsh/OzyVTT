@@ -1,6 +1,7 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useId, useRef, useState } from "react";
 import { cx } from "./util";
+import { useDragSurface } from "./dragSurface";
 import { Button } from "./Button";
 import { Menu, MenuItem } from "./Menu";
 import { IconChevron, IconDrag, IconPlus, IconTrash } from "./icons";
@@ -57,6 +58,7 @@ export function RowEditor<T>({
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const dragRef = useRef<{ from: number; over: number } | null>(null);
+  const gripSurface = useDragSurface<HTMLSpanElement>();
 
   const full = max != null && rows.length >= max;
   const labelOf = (row: T, index: number) => rowLabel?.(row, index) || `Row ${index + 1}`;
@@ -148,6 +150,7 @@ export function RowEditor<T>({
                   {reorderable && rows.length > 1 && (
                     /* Not a <button>: Enter would do nothing. Keyboard reorder is Move up / Move down in the menu. */
                     <span
+                      ref={gripSurface}
                       className="nh-roweditor-grip tap-target"
                       aria-hidden="true"
                       onPointerDown={(event) => onGripDown(event, index)}

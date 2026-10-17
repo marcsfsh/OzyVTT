@@ -12,7 +12,8 @@ import {
   IconPencil,
   IconCopy,
   IconPlay,
-  IconTrash
+  IconTrash,
+  useDragSurface
 } from "@vtt/ui";
 import type { MapSelection } from "../maps/MapManager";
 import { command } from "../lib/command";
@@ -138,6 +139,7 @@ export function SceneGallery({
     void command("scene:reorder", { order }).then(report("The scenes could not be reordered."));
   };
   const galleryRef = useRef<HTMLUListElement>(null);
+  const gripSurface = useDragSurface<HTMLButtonElement>();
   const drag = useRef<{ id: string; order: string[]; start: string; commit: (order: string[]) => void } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOrder, setDragOrder] = useState<readonly string[] | null>(null);
@@ -276,6 +278,7 @@ export function SceneGallery({
                   <div className="nh-card-tools">
                     {scenes.length > 1 && (
                       <button
+                        ref={gripSurface}
                         type="button"
                         className="scene-card-grip"
                         aria-label={`Drag to reorder ${scene.name}`}

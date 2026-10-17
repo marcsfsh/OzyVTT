@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconX } from "@vtt/ui";
+import { IconX, useDragSurface } from "@vtt/ui";
 import { apiRequest } from "../lib/api";
 import "./viewer-preview.css";
 
@@ -42,6 +42,7 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
   const [drag, setDrag] = useState<DragGesture | null>(null);
   const [session, setSession] = useState<"pending" | "ready" | "error">("pending");
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const dragSurface = useDragSurface<HTMLDivElement>();
 
   // Set the preview cookie before loading the iframe, so it authenticates without pairing.
   useEffect(() => {
@@ -97,7 +98,7 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
     >
-      <div className="viewer-preview-titlebar" onPointerDown={beginDrag("move")}>
+      <div ref={dragSurface} className="viewer-preview-titlebar" onPointerDown={beginDrag("move")}>
         <strong>Viewer preview</strong>
         <span className="viewer-preview-hint">What players see</span>
         <button type="button" className="viewer-preview-action" onClick={popOut}>
@@ -128,7 +129,7 @@ export function ViewerPreviewPanel({ gmToken, onClose }: Readonly<{ gmToken: str
         {/* Keeps the iframe from capturing pointer events while dragging. */}
         {drag && <div className="viewer-preview-dragmask" aria-hidden="true" />}
       </div>
-      <div className="viewer-preview-resize" aria-hidden="true" onPointerDown={beginDrag("resize")} />
+      <div ref={dragSurface} className="viewer-preview-resize" aria-hidden="true" onPointerDown={beginDrag("resize")} />
     </div>
   );
 }

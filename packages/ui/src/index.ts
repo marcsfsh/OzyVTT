@@ -40,6 +40,7 @@ export { FieldGrid } from "./primitives/FieldGrid";
 export { NumberField } from "./primitives/NumberField";
 export { TagInput, slugify, type TagInputProps } from "./primitives/TagInput";
 export { RowEditor } from "./primitives/RowEditor";
+export { useDragSurface } from "./primitives/dragSurface";
 export { Checklist, type ChecklistItem } from "./primitives/Checklist";
 export { SaveState, type SaveStatus } from "./primitives/SaveState";
 

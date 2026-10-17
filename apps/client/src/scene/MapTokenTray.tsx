@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
 import type { EncounterToken, GmActor, PlayerActor } from "@vtt/domain";
+import { useDragSurface } from "@vtt/ui";
 import { initialsOf } from "./tokenGlyph";
 
 /**
@@ -23,6 +24,7 @@ export function MapTokenTray({
   busy: boolean;
   placeAtCenter: (actorId: string) => void;
 }>) {
+  const tokenSurface = useDragSurface<HTMLButtonElement>();
   return (
     <div className={`encounter-token-tray${dragging ? " receiving" : ""}`} ref={trayRef} aria-label="Staging tray">
       <div>
@@ -43,6 +45,7 @@ export function MapTokenTray({
           return (
             <button
               key={encounterToken.actorId}
+              ref={tokenSurface}
               data-token-id={encounterToken.actorId}
               className={`tray-token ${actor.kind}${gmOnly ? " hidden" : ""}`}
               disabled={busy}

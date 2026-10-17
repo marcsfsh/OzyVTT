@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, IconChevronLeft, Select, Steps, useToast } from "@vtt/ui";
+import { Button, IconChevronLeft, Select, Steps, useDragSurface, useToast } from "@vtt/ui";
 import { clampPoint, GridOverlay, imagePointFromClient, type OverlayLine } from "../scene/mapImage";
 import { usePrompt } from "../components/feedback";
 import { ApiError, apiRequest } from "../lib/api";
@@ -101,9 +101,9 @@ export function CalibrationPane({
     const point = imagePointFromClient(zoom.svgRef.current, clientX, clientY);
     return point ? clampPoint(point, map.width, map.height) : null;
   };
+  const previewSurface = useDragSurface(zoom.previewRef);
   const gesture = useGridAreaGesture({
     map,
-    surface: zoom.previewRef,
     placing: squareMode && !wizard,
     busy,
     pendingArea,
@@ -480,7 +480,7 @@ export function CalibrationPane({
         drag target, never a scroller. */}
       <div className="map-canvas-col">
         <div
-          ref={zoom.previewRef}
+          ref={previewSurface}
           className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""} ${pendingArea ? (gesture.areaAction === "resize" ? "resizing" : "movable") : ""}`}
           onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint}
           {...gesture.handlers}
