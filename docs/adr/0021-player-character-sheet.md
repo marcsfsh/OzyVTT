@@ -62,7 +62,7 @@ ability-only`. The builder later _fills the same fields_; no consumer changes. (
 
 **Amendment (v6, 2026-07-23): a slice of "rules auto-derivation" ships in the play sheet.**
 Originally this ADR parked all auto-derivation (incl. AC-from-armor) for the builder. In
-response to direct GM feedback, the play sheet now derives two things from equipped gear, using
+response to direct GM feedback, the play sheet now derives two things from equipped gear with
 the stats the SRD catalog already vendors (weapon `damageDice`/range; armor `acBase`/dex rules),
 stored additively on the inventory item: **(a) Armor Class**, server-authoritative via
 `armorClassFromEquipment()` in `@vtt/rules-5e`, recomputed in `instantiate` and on

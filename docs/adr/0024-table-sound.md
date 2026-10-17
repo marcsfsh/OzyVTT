@@ -33,7 +33,7 @@ dragging; and browsers refuse to start sound until a person has touched the page
     still go in the game command table, so both transports, the GM-only gate, the OpenAPI document and the app map
     come from one definition; they write the sound store and leave the game revision alone.
 - **Who moves the playlist on.**
-  - The table screen, reporting when a track ends. Rejected: two screens disagree, and with no screen nothing moves.
+  - The table screen reports when a track ends. Rejected: two screens disagree, and with no screen nothing moves.
   - **The server, from each file's length (chosen).** The length is read from the file at upload, which the upload
     check walks anyway, and one timer hands over to the next track.
 - **How the screen plays.**
@@ -117,4 +117,4 @@ crossfade hand-over, pause, projection contents, scene sound, deletion), `sound-
 commands, the game revision untouched, the feed and file access of a table screen, late join, screen status,
 automatic hand-over, scene sound on going live); `apps/client/src/viewer/sound-engine.test.ts` (waiting for a tap,
 joining mid-track, loops, crossfade, pause, drift, late effects, unplayable files) and `sound/sound-board.test.tsx`;
-the smoke journey in `e2e/journeys.spec.ts` at 390x844 with touch and 1280x800, playing a real WAV on a paired screen.
+the smoke journey in `e2e/journeys.spec.ts` at 390x844 with touch and 1280x800, which plays a real WAV on a paired screen.

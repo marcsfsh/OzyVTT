@@ -36,7 +36,7 @@ This is the statement the ADR promised. It binds every `/api/v1` surface, the ta
    There is no third shape. Only non-JSON answers stand outside it: binary asset content and the viewer's
    Server-Sent Events stream.
 2. **Request correlation.** Every `/api/v1` router echoes a caller-supplied UUID-v4 `X-Request-Id` on the
-   response header and in the error body, minting one when the caller sends none. A value that is not a
+   response header and in the error body, and the server mints one when the caller sends none. A value that is not a
    UUID v4 is replaced with a minted one.
 3. **Idempotency is per surface, and the API does not pretend otherwise.** _Game_ writes accept a
    `commandId` (UUID) and execute it exactly once; a retry replays the stored outcome with

@@ -75,7 +75,7 @@ JSON in `sources/authored/`), and a test checks the committed bundles match byte
 Content is inert JSON validated by `@vtt/schemas` before anything consumes it (ADR-0007);
 the ETL runs at development time, never at runtime, so the LAN service makes no network
 calls. Bundles are loaded server-side (`src/index.ts` loaders); clients receive content only
-through server projections/commands, preserving server authority and viewer safety. No
+through server projections/commands, which keeps the server's authority and the viewer's safety. No
 device-specific behavior.
 
 ## Migration / reversibility
