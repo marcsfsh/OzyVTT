@@ -7,6 +7,7 @@ import {
   addCombatant,
   endEncounter,
   nextInitiativeTurn,
+  removeCombatant,
   rollRemainingInitiative,
   rollSelfInitiative,
   setInitiativeScore,
@@ -23,6 +24,7 @@ import {
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
   InitiativeSwapSchema,
+  RemoveCombatantSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema
@@ -219,6 +221,56 @@ export const encounterCommands = [
         )
       );
       if (!duplicate) kit.publishRolls(state, commandId);
+    }
+  }),
+
+  defineCommand({
+    type: "encounter.remove-combatant",
+    operationId: "removeEncounterCombatant",
+    description:
+      "Takes a combatant out of the running fight (GM-grade only): its initiative entry, token and prompts go, the turn moves on first when it was its turn, and what it sustains ends - its grapples and Concentration, what lasts until its next turn, and a creature it swallowed climbs out of the corpse with the movement the stat block names, landing Prone. It stays on the roster.",
+    summary: "Take a combatant out of the running fight, ending what it holds (GM).",
+    schema: RemoveCombatantSchema,
+    malformed: "The remove-combatant command is malformed.",
+    gmOnly: "Only the GM can take a combatant out of the fight.",
+    async run({ request, executeTimeline }, kit) {
+      const { actorId } = request;
+      let outcome: TimelineOutcome | undefined;
+      const effectEvents: EffectNarration[] = [];
+      const { state, duplicate } = await executeTimeline((draft, timeline) => {
+        if (draft.combat.historyCursor !== null)
+          throw new CommandRejectedError(
+            "Finish reviewing the combat history before taking a combatant out of the fight."
+          );
+        const gathering = draft.combat.playerInitiativeMode === "wait" && draft.combat.pendingInitiative.length > 0;
+        // Its turn ends first, recorded like any other, so Previous can bring it back.
+        if (draft.combat.turnActorId === actorId && draft.combat.initiative.length > 1 && !gathering)
+          outcome = planNextTurn(draft, timeline, false, (advancing) =>
+            nextInitiativeTurn(advancing, effectEvents, {
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(advancing, definitionId),
+              catalog: kit.equipmentCatalog(),
+              rollDie: (sides) => kit.context.random(sides),
+              newId: kit.context.newId,
+              now: () => new Date().toISOString()
+            })
+          );
+        else if (draft.combat.turnActorId === actorId && gathering) {
+          const order = draft.combat.initiative.filter((entry) => entry.actorId !== actorId);
+          if (order[0]) draft.combat = { ...draft.combat, turnActorId: order[0].actorId };
+        }
+        effectEvents.push(
+          ...removeCombatant(draft, actorId, (definitionId) => kit.resolveDefinitionIn(draft, definitionId))
+        );
+      });
+      if (duplicate) return;
+      if (outcome) kit.context.logTimelineOutcome(outcome, state);
+      kit.publishNarrations(effectEvents);
+      kit.context.appendLog({
+        kind: "encounter",
+        text: `${kit.actorName(actorId)} left the fight.`,
+        actorIds: [actorId],
+        gmOnly: kit.actorHidden(actorId)
+      });
     }
   }),
 

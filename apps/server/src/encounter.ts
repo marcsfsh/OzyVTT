@@ -11,7 +11,14 @@ import { CommandRejectedError } from "./game-store.js";
 import { aggregateRollMode } from "@vtt/rules-5e";
 import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
-import { expireEffectsAtTurnStart, type EffectNarration } from "./effects.js";
+import {
+  endConcentrationSustainedBy,
+  endEffect,
+  endEffectsSustainedBy,
+  expireEffectsAtTurnStart,
+  type EffectNarration
+} from "./effects.js";
+import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
@@ -275,6 +282,58 @@ export function startEncounter(
     historyDirty: false
   };
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
+}
+
+/**
+ * The GM takes a combatant out of a running fight (it fled, was dismissed, or lies dead and is in the way): its
+ * initiative entry, token and prompts go, and what it sustains ends - its grapples and Concentration, what lasts only
+ * until its next turn, and a creature it swallowed climbs out. The caller advances the turn first when it is this
+ * combatant's (so the history records the boundary).
+ */
+export function removeCombatant(
+  state: GameState,
+  actorId: string,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): EffectNarration[] {
+  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before taking a combatant out of it.");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || !state.combat.initiative.some((entry) => entry.actorId === actorId))
+    throw new CommandRejectedError("That combatant is not in this encounter.");
+  if (state.combat.initiative.length === 1)
+    throw new CommandRejectedError("It is the last combatant - end the encounter instead.");
+  if (state.combat.turnActorId === actorId)
+    throw new CommandRejectedError("Advance past its turn before taking it out of the fight.");
+  const events: EffectNarration[] = [
+    ...releaseSwallowedBy(state, actorId, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined),
+    ...endEffectsSustainedBy(state, actorId),
+    ...endConcentrationSustainedBy(state, actorId)
+  ];
+  // Its turns won't come again, so what lasts until one of them (a Help, Vex, a "until the end of its next turn")
+  // ends now.
+  for (const bearer of state.actors)
+    for (const effect of [...bearer.effects])
+      if (
+        effect.sourceActorId === actorId &&
+        bearer.id !== actorId &&
+        (effect.duration.type === "until-source-next-turn" || effect.duration.type === "until-source-turn-end") &&
+        bearer.effects.some((candidate) => candidate.id === effect.id)
+      )
+        events.push(...endEffect(state, bearer.id, effect.id));
+  const others = (id: string | null | undefined) => id !== actorId;
+  state.combat = {
+    ...state.combat,
+    initiative: state.combat.initiative.filter((entry) => others(entry.actorId)),
+    tokens: state.combat.tokens.filter((token) => others(token.actorId)),
+    pendingInitiative: state.combat.pendingInitiative.filter(others),
+    reactionsUsed: state.combat.reactionsUsed.filter(others),
+    legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, actorId),
+    // Its own reactions go, and so do opportunity attacks against it; damage it dealt stays owed.
+    pendingReactions: state.combat.pendingReactions.filter(
+      (prompt) => others(prompt.actorId) && !(prompt.kind === "leaves-reach" && prompt.targetActorId === actorId)
+    ),
+    pendingSaves: state.combat.pendingSaves.filter((save) => others(save.targetActorId))
+  };
+  return events;
 }
 
 /** Drops a new combatant into a running encounter: rolls (or takes) its initiative, re-sorts, and places its

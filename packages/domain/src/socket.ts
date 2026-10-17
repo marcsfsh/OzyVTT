@@ -51,6 +51,7 @@ import type {
   ActorSetArmorClassSchema,
   ActorSpendHitDiceSchema,
   AddCombatantSchema,
+  RemoveCombatantSchema,
   AnnotationAddSchema,
   AnnotationClearSchema,
   AnnotationColorSetSchema,
@@ -517,6 +518,10 @@ export interface ClientToServerEvents {
   ) => void;
   "encounter:add-combatant": (
     payload: CommandPayload<typeof AddCombatantSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "encounter:remove-combatant": (
+    payload: CommandPayload<typeof RemoveCombatantSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:set": (

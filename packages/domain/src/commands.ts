@@ -138,6 +138,14 @@ export const AddCombatantSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** Takes a combatant out of the running fight (GM): its initiative entry and token go, and what it sustains ends. */
+export const RemoveCombatantSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** `joinEncounter` lands the new combatant in the running fight (roster + initiative + tray token) in one command; ignored when no fight is running. */
 export const ActorAddFromDefinitionSchema = z
   .object({

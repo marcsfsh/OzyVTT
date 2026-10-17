@@ -162,6 +162,7 @@ export const GAME_PATHS = {
   encounterStart: `${API_NAMESPACE}/game/encounter/start`,
   encounterEnd: `${API_NAMESPACE}/game/encounter/end`,
   encounterCombatants: `${API_NAMESPACE}/game/encounter/combatants`,
+  encounterCombatantRemove: `${API_NAMESPACE}/game/encounter/combatants/{actorId}/remove`,
   initiativeSet: `${API_NAMESPACE}/game/initiative/set`,
   initiativeSwap: `${API_NAMESPACE}/game/initiative/swap`,
   initiativeRollSelf: `${API_NAMESPACE}/game/initiative/roll-self`,
@@ -492,6 +493,11 @@ export const GAME_COMMANDS = {
   "encounter.start": { scope: "combat:write", method: "post", path: GAME_PATHS.encounterStart },
   "encounter.end": { scope: "combat:write", method: "post", path: GAME_PATHS.encounterEnd },
   "encounter.add-combatant": { scope: "combat:write", method: "post", path: GAME_PATHS.encounterCombatants },
+  "encounter.remove-combatant": {
+    scope: "combat:write",
+    method: "post",
+    path: GAME_PATHS.encounterCombatantRemove
+  },
   "initiative.set": { scope: "combat:write", method: "post", path: GAME_PATHS.initiativeSet },
   "initiative.swap": { scope: "combat:write", method: "post", path: GAME_PATHS.initiativeSwap },
   "initiative.next": { scope: "combat:write", method: "post", path: GAME_PATHS.initiativeNext },
