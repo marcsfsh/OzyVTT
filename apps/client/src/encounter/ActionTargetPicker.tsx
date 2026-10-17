@@ -46,6 +46,8 @@ export function ActionTargetPicker({
   const skillCatalog = useSkillCatalog();
   const group = useId();
   const ready = targetingReady(picking);
+  // Placing a spell's lingering area (Moonbeam) rolls nothing: Place sets it on the map.
+  const placingZone = picking.placeZoneId !== undefined;
   const skillName = (id: string) => skillCatalog.items.find((skill) => skill.id === id)?.name ?? id;
   const darts = picking.darts;
   const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
@@ -53,14 +55,18 @@ export function ActionTargetPicker({
     <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
       {picking.mode === "none" ? (
         <p className="action-targeting-head">
-          <strong>{picking.action.name}</strong> - choose the skill, then Roll.
+          <strong>{picking.action.name}</strong> -{" "}
+          {picking.action.checkSkills?.length ? "choose the skill, then Roll." : "no target to choose. Roll to use it."}
         </p>
       ) : picking.mode === "template" ? (
         <p className="action-targeting-head">
           <strong>{picking.action.name}</strong> - place the{" "}
           {picking.action.area ? areaWords(picking.action.area) : "area"} on the map
-          {picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught
-          automatically.
+          {placingZone
+            ? picking.template?.placed
+              ? " (placed - Place to set it there)."
+              : ", then Place."
+            : `${picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.`}
         </p>
       ) : (
         <>
@@ -177,7 +183,7 @@ export function ActionTargetPicker({
           Back
         </Button>
         <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
-          Roll {picking.action.name}
+          {placingZone ? "Place" : `Roll ${picking.action.name}`}
         </button>
       </div>
       {mayType && ready && picking.mode === "single" && picking.action.attackBonus !== null && (

@@ -42,6 +42,15 @@ const SCORCHING_RAY = {
   spellSlot: { level: 2 },
   spellId: "scorching-ray"
 };
+const FIRE_BOLT = {
+  id: "spell-fire-bolt",
+  name: "Fire Bolt",
+  activation: "action" as const,
+  description: "A test action.",
+  attack: { bonus: 7, rangeFeet: 120 },
+  damage: [{ formula: "2d10", type: "fire" }],
+  spellId: "fire-bolt"
+};
 const WIZARD: ActorDefinition = ActorDefinitionSchema.parse({
   schemaId: "vtt.actor-monster",
   schemaVersion: 1,
@@ -53,7 +62,7 @@ const WIZARD: ActorDefinition = ActorDefinitionSchema.parse({
   armorClass: 12,
   hitPoints: { maximum: 30 },
   speedFeet: 30,
-  actions: [FIREBALL, SCORCHING_RAY]
+  actions: [FIREBALL, SCORCHING_RAY, FIRE_BOLT]
 });
 
 function fight(): GameState {
@@ -188,6 +197,31 @@ describe("readying a spell", () => {
       level: 3
     });
     expect(effectOf("40000000-0000-4000-8000-0000000000b2").readiedSpell).toBeUndefined();
+  });
+
+  it("readies an attack spell with no target, which is aimed when it is released", () => {
+    const state = fight();
+    const deps = {
+      random: () => 3,
+      newRollId: nextId,
+      gmSessionId: "30000000-0000-4000-8000-00000000000b",
+      now: () => "2026-10-17T00:00:00.000Z",
+      definition: WIZARD,
+      resolveDefinition: (id: string) => (id === "def-wren" ? WIZARD : undefined),
+      catalog
+    };
+    const bolt = (targetIds: string[], extra: Record<string, unknown> = {}) =>
+      resolveDefinitionAction(
+        state,
+        FIRE_BOLT,
+        { actorId: WREN, targetIds, commandId: nextId(), commit: true, ...extra },
+        deps
+      );
+    bolt([], { ready: true });
+    expect(names(state)).toEqual(["Concentrating on Fire Bolt (readied)", "Readied: Fire Bolt"]);
+    brutesTurn(state);
+    expect(bolt([BRUTE]).attack?.targetName).toBe("Brute");
+    expect(state.combat.reactionsUsed).toContain(WREN);
   });
 
   it("dissipates when its Concentration breaks, leaving nothing to release", () => {

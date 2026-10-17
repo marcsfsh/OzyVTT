@@ -58,7 +58,9 @@ describe("taking a combatant out of the fight from its row", () => {
     await user.click(screen.getByRole("button", { name: "Take out of fight" }));
     expect(command).not.toHaveBeenCalled();
     const confirm = screen.getByRole("alertdialog", { name: "Take Purple Worm out of the fight" });
-    expect(confirm.textContent).toContain("Take Purple Worm out of the fight?");
+    expect(confirm.textContent).toContain(
+      "Take Purple Worm out of the fight? Purple Worm's turn and token are removed, and anything Purple Worm is grappling or concentrating on ends."
+    );
     await user.click(screen.getByRole("button", { name: "Take out" }));
     await waitFor(() =>
       expect(command).toHaveBeenCalledWith("encounter:remove-combatant", { actorId: WORM, expectedRevision: 7 })

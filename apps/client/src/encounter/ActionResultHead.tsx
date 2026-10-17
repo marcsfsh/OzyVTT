@@ -26,6 +26,16 @@ export function ActionResultHead({ result, children }: Readonly<{ result: Action
   );
 }
 
+/** A check action's roll (Hide, Search, Influence): its total and d20, and how it went against a DC when it has one. */
+export function CheckOutcome({ check }: Readonly<{ check: NonNullable<ActionResolution["check"]> }>) {
+  return (
+    <p className="action-outcome">
+      {check.skill}: <strong>{check.total}</strong> (d20 {check.naturalRoll})
+      {check.dc === null ? "" : ` vs DC ${check.dc} - ${check.success ? "success" : "failure"}`}.
+    </p>
+  );
+}
+
 /** The hit points an action restored: the roll, and what each target regained (capped at its maximum). */
 /** "Bran regains 7 hit points. Ysolde regains 0 hit points." for a heal's targets. */
 export const regainedText = (targets: NonNullable<ActionResolution["healing"]>["targets"]) =>

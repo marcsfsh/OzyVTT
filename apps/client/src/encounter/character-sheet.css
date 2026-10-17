@@ -1203,12 +1203,6 @@ span.roll-mode-tag {
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.sheet-feedback {
-  min-height: 1.1rem;
-  margin: var(--space-2) 0 0;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
 
 /* Sheet workspace: unified header, pinned rolls bar, scrolling pane.
    Direct-child selectors only: the equipment picker and spell-rules card render inside the sheet's

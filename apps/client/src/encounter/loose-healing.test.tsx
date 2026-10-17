@@ -223,7 +223,7 @@ describe("the heal picker", () => {
         onClose={() => {}}
       />
     );
-    expect(screen.getByText("Who regains hit points? Pick up to 2.")).toBeTruthy();
+    expect(screen.getByText("Choose up to 2 creatures to regain hit points.")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Bryn" }));
     expect((screen.getByRole("button", { name: "Cato" }) as HTMLButtonElement).disabled).toBe(true);
     await user.click(screen.getByRole("button", { name: "Heal" }));
