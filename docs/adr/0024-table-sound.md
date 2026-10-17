@@ -117,4 +117,4 @@ crossfade hand-over, pause, projection contents, scene sound, deletion), `sound-
 commands, the game revision untouched, the feed and file access of a table screen, late join, screen status,
 automatic hand-over, scene sound on going live); `apps/client/src/viewer/sound-engine.test.ts` (waiting for a tap,
 joining mid-track, loops, crossfade, pause, drift, late effects, unplayable files) and `sound/sound-board.test.tsx`;
-the smoke journey `e2e/sound.spec.ts` at 390x844 with touch and 1280x800, playing a real WAV on a paired screen.
+the smoke journey in `e2e/journeys.spec.ts` at 390x844 with touch and 1280x800, playing a real WAV on a paired screen.

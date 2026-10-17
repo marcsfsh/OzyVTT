@@ -266,3 +266,24 @@ export function battleMap(width = 700, height = 500): Buffer {
     chunk("IEND", Buffer.alloc(0))
   ]);
 }
+
+/** A WAV of a soft 440 Hz tone, built here so the suite carries no binary. */
+export function toneWav(seconds: number, sampleRate = 22_050): Buffer {
+  const samples = Math.round(seconds * sampleRate);
+  const file = Buffer.alloc(44 + samples * 2);
+  file.write("RIFF", 0, "latin1");
+  file.writeUInt32LE(36 + samples * 2, 4);
+  file.write("WAVEfmt ", 8, "latin1");
+  file.writeUInt32LE(16, 16);
+  file.writeUInt16LE(1, 20);
+  file.writeUInt16LE(1, 22);
+  file.writeUInt32LE(sampleRate, 24);
+  file.writeUInt32LE(sampleRate * 2, 28);
+  file.writeUInt16LE(2, 32);
+  file.writeUInt16LE(16, 34);
+  file.write("data", 36, "latin1");
+  file.writeUInt32LE(samples * 2, 40);
+  for (let index = 0; index < samples; index++)
+    file.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * index) / sampleRate) * 6_000), 44 + index * 2);
+  return file;
+}
