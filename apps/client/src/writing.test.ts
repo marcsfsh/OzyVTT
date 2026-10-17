@@ -1,7 +1,8 @@
 /**
- * The Writing section of docs/DESIGN.md as test failures: every string a person can read, in the client, the UI kit,
- * the server and the shared packages, against the rules in `writing-rules.ts`. What a regex can't judge ("X, not Y",
- * a clause tacked on with "-ing", a three-part series) is left to review.
+ * The Writing section of docs/DESIGN.md as test failures, in two scans. The first holds every string a person can read
+ * in the client, the UI kit, the server and the shared packages to the rules in `writing-rules.ts`. The second bans the
+ * em dash, the en dash and curly quotes anywhere in the repository's code, comments, tests and docs. What a regex can't
+ * judge ("X, not Y", a clause tacked on with "-ing", a three-part series) is left to review.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -151,5 +152,55 @@ describe("The writing rules, on every string a person reads", () => {
       expect(excused, `exemption ${JSON.stringify(`${file} :: ${text}`)} excuses nothing: delete it`).toBe(true);
       expect(why.length, `exemption ${JSON.stringify(text)} has no reason`).toBeGreaterThan(40);
     }
+  });
+});
+
+/** Directories the repository-wide scan leaves out, each with its reason. */
+const QUOTED: ReadonlyArray<readonly [prefix: string, why: string]> = [
+  ["packages/content-srd-5.2.1/sources/", "SRD 5.2.1 and Open5e source text, quoted as published"],
+  ["packages/content-srd-5.2.1/bundles/", "built from the SRD sources, so it quotes them"],
+  ["packages/dndbeyond-pdf/test/fixtures/", "form fields read out of real D&D Beyond PDFs"]
+];
+
+const SKIPPED_DIRS = /\/(node_modules|dist|data|test-results|playwright-report)$/;
+const TEXT_FILE = /\.(ts|tsx|mts|mjs|js|json|md|css|html|yml)$/;
+/** The em dash, the en dash and curly quotes. Code that must match one writes the escape (`\u2014`). */
+const BANNED = /[\u2013\u2014\u2018\u2019\u201c\u201d]/;
+
+describe("The banned characters, anywhere in the repository", () => {
+  const files = [
+    ...["README.md", "CLAUDE.md"],
+    ...["apps", "packages", "docs", "e2e"].flatMap((root) =>
+      walk(
+        root,
+        (path) => TEXT_FILE.test(path),
+        (path) => SKIPPED_DIRS.test(path) || QUOTED.some(([prefix]) => `${path}/`.startsWith(prefix))
+      )
+    )
+  ];
+
+  it("walks the code, the docs and the tests", () => {
+    for (const anchor of [
+      "docs/DESIGN.md",
+      "apps/server/src/server.ts",
+      "packages/ui/src/index.ts",
+      "e2e/journeys.spec.ts"
+    ])
+      expect(files).toContain(anchor);
+  });
+
+  it("has no em dash, en dash or curly quote in code, comments, tests or docs", () => {
+    const hits: string[] = [];
+    for (const file of files) {
+      const lines = readFileSync(`${REPO}/${file}`, "utf8").split("\n");
+      lines.forEach((line, index) => {
+        if (BANNED.test(line)) hits.push(`${file}:${index + 1}  ${line.trim().slice(0, 120)}`);
+      });
+    }
+    expect(
+      hits,
+      "Use a colon, a full stop or `·` for a dash, a plain hyphen for a range (5-6), and straight quotes. " +
+        "Code that has to match one of these characters writes its escape."
+    ).toEqual([]);
   });
 });

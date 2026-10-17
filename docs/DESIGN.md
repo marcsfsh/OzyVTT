@@ -146,3 +146,8 @@ Say what the control does or what belongs in the field, and nothing else.
 - Straight quotes and apostrophes. No emojis.
 - Rules words follow SRD 5.2.1: "level 3 spell slot", "Bonus Action", "saving throw".
 - The same rules apply to code comments.
+
+`apps/client/src/writing.test.ts` checks the rules a pattern can find on every string a person reads, in the client,
+the UI kit, the server messages and the OpenAPI descriptions. It also fails on an em dash, an en dash or a curly quote
+anywhere in the code, comments, tests and docs; code that has to match one writes its escape (`\u2014`). Each exemption
+in that file carries its reason. Contrasts, "-ing" clauses and three-part series are left to review.
