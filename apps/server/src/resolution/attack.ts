@@ -13,7 +13,7 @@ import {
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
 import { criticalThreshold } from "../effective-actions.js";
-import { endEffect } from "../effects.js";
+import { endEffect, STEADY_AIM_TAG } from "../effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
@@ -413,6 +413,19 @@ export function spendDistraction(ctx: ResolveContext): void {
   if (!distraction) return;
   endEffect(state, target.id, distraction.id);
   effectsEnded.push({ actorId: target.id, actorName: target.name, name: distraction.name });
+}
+
+/** Steady Aim gives Advantage on the next attack roll this turn: the roll spends it, hit or miss, while the Speed 0 it
+ *  holds lasts until the turn ends. */
+export function spendSteadyAim(ctx: ResolveContext): void {
+  const { attacker, attack } = ctx;
+  if (attack === null) return;
+  const aiming = (effect: LiveActor["effects"][number]) =>
+    effect.tags.includes(STEADY_AIM_TAG) && effect.modifiers.length > 0;
+  if (!attacker.effects.some(aiming)) return;
+  attacker.effects = attacker.effects.map((effect) =>
+    aiming(effect) ? { ...effect, name: `${effect.name} (Speed 0)`, modifiers: [] } : effect
+  );
 }
 
 /** The attack roll spends what lasts only until the next attack roll against its bearer (Guiding Bolt's light), hit

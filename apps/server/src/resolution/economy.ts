@@ -5,7 +5,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
-import { HASTED_TAG, hasEffectTag, RAGING_TAG, READIED_TAG } from "../effects.js";
+import { HASTED_TAG, hasEffectTag, RAGING_TAG, READIED_TAG, RECKLESS_TAG, STEADY_AIM_TAG } from "../effects.js";
 import { ammunitionFor, ammunitionLabel, launcherKind } from "../ammunition.js";
 import { armorTrainingGaps, type EquipmentCatalog } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
@@ -58,6 +58,8 @@ export type EconomyPlan = Readonly<{
   magicAction: boolean;
   /** It is Action Surge, which gives one additional action this turn. */
   surge: boolean;
+  /** The turn's uses key of a feature used once per turn beside a pool of its own (Stunning Strike), or null. */
+  oncePerTurn?: string | null;
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -142,7 +144,10 @@ export function evaluateActionEconomy(
   checkAmmunition(evaluation, catalog);
   if (!asHitRider) checkTakenAlone(evaluation);
   const spendUse = checkLimitedUse(evaluation);
+  const oncePerTurn = checkOncePerTurn(evaluation);
   const surge = checkActionSurge(evaluation);
+  checkRecklessAttack(evaluation);
+  checkSteadyAim(evaluation);
   // A later ray of a spell already cast this action spends no further slot; it rolls at the first ray's.
   const continued = continuedSpellSlot(evaluation);
   const slots = checkActionSlots(evaluation);
@@ -168,7 +173,8 @@ export function evaluateActionEconomy(
       spendSpellSlot,
       castLevel: spendSpellSlot?.level ?? continued,
       magicAction: evaluation.onOwnTurn && isMagicAction(action),
-      surge
+      surge,
+      oncePerTurn
     },
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
@@ -235,6 +241,47 @@ function checkActionSurge({ state, attacker, action, onOwnTurn, violations }: Ev
       message: `${attacker.name} has already used Action Surge this turn - only once on a turn.`
     });
   return true;
+}
+
+/** SRD Reckless Attack: "When you make your first attack roll on your turn, you can decide to attack recklessly", so
+ *  it is decided on the creature's own turn, before any attack roll it has made there. Keyed by its effect's tag. */
+function checkRecklessAttack({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  if (!state.combat.active || !action.grants?.tags.includes(RECKLESS_TAG)) return;
+  if (!onOwnTurn)
+    violations.push({
+      rule: "economy.not-your-turn",
+      message: `${action.name} is decided with an attack roll on ${attacker.name}'s own turn.`
+    });
+  else if (state.combat.turn.attackRolled === true)
+    violations.push({
+      rule: "attack.after-first-roll",
+      message: `${attacker.name} has already made an attack roll this turn - ${action.name} is decided with the first.`
+    });
+}
+
+/** SRD Steady Aim: "You can use this feature only if you haven't moved during this turn." Keyed by its effect's tag. */
+function checkSteadyAim({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  if (!onOwnTurn || !action.grants?.tags.includes(STEADY_AIM_TAG)) return;
+  if (state.combat.turn.movementUsedFeet > 0)
+    violations.push({
+      rule: "movement.already-moved",
+      message: `${attacker.name} has moved this turn - ${action.name} is only for a creature that hasn't.`
+    });
+}
+
+/** "Once per turn" beside a pool of its own (Stunning Strike spends a Focus Point), counted in the turn's uses, which
+ *  start afresh with each turn. Keyed by id, so sheets built earlier get it. */
+const ONCE_PER_TURN: ReadonlySet<string> = new Set(["stunning-strike"]);
+
+function checkOncePerTurn({ state, attacker, action, violations }: Evaluation): string | null {
+  if (!state.combat.active || !ONCE_PER_TURN.has(action.id)) return null;
+  const key = `${attacker.id}:${action.id}`;
+  if ((state.combat.turn.turnUses[key] ?? 0) > 0)
+    violations.push({
+      rule: "feature.once-per-turn",
+      message: `${attacker.name} has already used ${action.name} this turn - once per turn.`
+    });
+  return key;
 }
 
 /**
@@ -1262,6 +1309,13 @@ export function commitEconomy({
         ...state.combat,
         turn: { ...state.combat.turn, spellSlotCasters: [...casters, attacker.id] }
       };
+  }
+  if (plan.oncePerTurn) {
+    const key = plan.oncePerTurn;
+    state.combat = {
+      ...state.combat,
+      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+    };
   }
   if (plan.spendUse) {
     if (plan.spendUse.per === "turn") {

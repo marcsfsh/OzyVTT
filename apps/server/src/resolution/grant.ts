@@ -1,12 +1,27 @@
 import { abilityModifier } from "@vtt/rules-5e";
 import type { Modifier } from "@vtt/schemas";
-import { addEffect, HASTED_TAG, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
+import {
+  addEffect,
+  HASTED_TAG,
+  makeEffect,
+  RECKLESS_TAG,
+  STEADY_AIM_TAG,
+  turnEndDuration,
+  type EffectNarration
+} from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import type { LiveActor, ResolveContext } from "./context.js";
 
 /** A grant keyed on these tags measures its recipient when it lands, as Dash does: Mage Armor's AC, Haste's Speed. */
 const MAGE_ARMOR_TAG = "mage-armor";
+
+/** Reckless Attack's Advantage is on attack rolls using Strength. A sheet built before that gate was authored carries
+ *  the roll mode ungated, so it is narrowed as it lands. */
+function strengthAttacksOnly(modifier: Modifier): Modifier {
+  if (modifier.type !== "roll-mode" || modifier.roll !== "attack" || (modifier.when?.length ?? 0) > 0) return modifier;
+  return { ...modifier, when: [{ type: "on-attack-roll" }, { type: "ability-is", abilities: ["str"] }] };
+}
 
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally; Bless on each creature it targets): replace-on-
  *  refresh, ending when the granter drops to 0 HP, and with the cast's Concentration when it has one (`castId`, so
@@ -41,6 +56,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   // Haste doubles Speed: the creature's Speed now, added while it lasts.
   const speedNow = grant.tags.includes(HASTED_TAG) ? (currentSpeedFeet(recipient, derivation) ?? 0) : 0;
   const hasteSpeed: Modifier[] = speedNow > 0 ? [{ type: "speed", amount: Math.min(60, speedNow) }] : [];
+  // Steady Aim lasts until the end of the turn it is taken on and holds Speed at 0 meanwhile; its Advantage goes with
+  // the next attack roll (`spendSteadyAim`). A sheet built earlier says "until your next turn".
+  const steadyAim = grant.tags.includes(STEADY_AIM_TAG);
+  const modifiers = grant.tags.includes(RECKLESS_TAG) ? grant.modifiers.map(strengthAttacksOnly) : grant.modifiers;
   // Mage Armor: base AC 13 + Dexterity for a creature wearing no armor, a shield still adding to it.
   let armorClassBonus = grant.armorClassBonus;
   if (grant.tags.includes(MAGE_ARMOR_TAG)) {
@@ -64,15 +83,16 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       sourceName: attacker.name,
       sourceActionId: action.id,
       startedRound: state.combat.round,
-      duration:
-        grant.duration.type === "rounds"
+      duration: steadyAim
+        ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+        : grant.duration.type === "rounds"
           ? { type: "rounds", remaining: grant.duration.rounds }
           : grant.duration.type === "until-source-turn-end"
             ? turnEndDuration(state, "until-source-turn-end", attacker.id)
             : grant.duration,
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
-      modifiers: [...grant.modifiers, ...hasteSpeed],
+      modifiers: [...modifiers, ...hasteSpeed],
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
       concentration: grant.concentration,
@@ -81,6 +101,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // A Concentration spell's effects end with the caster's Concentration on that cast.
       ...(ctx.castId !== null ? { castId: ctx.castId } : {}),
       ...(armorClassBonus !== undefined ? { armorClassBonus } : {}),
+      ...(steadyAim ? { speedZero: true } : {}),
       ...grantedMovement
     }),
     replaced,

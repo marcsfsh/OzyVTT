@@ -43,8 +43,8 @@ export const rogue: ClassMechanicsModule = {
     },
 
     /**
-     * Advantage until the start of the Rogue's next turn rather than "your next attack roll this turn"
-     * (same simplification as Help). "Only if you haven't moved" and "Speed is 0" stay prose.
+     * The engine reads the `steady-aim` tag: refused once the Rogue has moved this turn, the effect lasts until the
+     * end of the turn with Speed 0, and the next attack roll spends its Advantage.
      */
     "steady-aim": {
       actions: [

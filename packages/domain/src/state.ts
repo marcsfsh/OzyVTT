@@ -551,6 +551,9 @@ const sceneCombatShape = {
       spellSlotCasters: z.array(z.uuid()).max(200).optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
+      /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
+       *  bookkeeping, never projected. */
+      attackRolled: z.boolean().optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
        *  fire again in it. Engine bookkeeping, never projected. */

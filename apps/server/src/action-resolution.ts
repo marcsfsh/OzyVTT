@@ -12,14 +12,19 @@ import { hitRiderOf } from "./resolution/hit-riders.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
 import { useUpConsumable } from "./resolution/consumables.js";
-import { rollAttack, spendDistraction, spendUntilAttacked } from "./resolution/attack.js";
+import { rollAttack, spendDistraction, spendSteadyAim, spendUntilAttacked } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { applyHealing } from "./resolution/heal.js";
-import { recordCleaveOpening, recordLightAttack, recordLoadingShot } from "./resolution/extra-attacks.js";
+import {
+  recordAttackRoll,
+  recordCleaveOpening,
+  recordLightAttack,
+  recordLoadingShot
+} from "./resolution/extra-attacks.js";
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
@@ -57,6 +62,7 @@ export function resolveDefinitionAction(
     spendSap(ctx);
     spendDistraction(ctx);
     spendUntilAttacked(ctx);
+    spendSteadyAim(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
@@ -66,6 +72,7 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     recordLightAttack(ctx);
     recordLoadingShot(ctx);
+    recordAttackRoll(ctx);
     releaseHideAndReady(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
@@ -98,6 +105,7 @@ export function resolveDefinitionAction(
   useUpConsumable(ctx);
   recordLightAttack(ctx);
   recordLoadingShot(ctx);
+  recordAttackRoll(ctx);
   recordCleaveOpening(ctx);
   releaseHideAndReady(ctx);
   return resolutionOf(ctx);

@@ -789,7 +789,18 @@
        {
         "type": "roll-mode",
         "roll": "attack",
-        "mode": "advantage"
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
        },
        {
         "type": "roll-mode",

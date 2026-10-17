@@ -10,7 +10,8 @@ import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
-import { startEncounter } from "../src/encounter.js";
+import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { currentSpeedFeet } from "../src/speed.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { asiRows } from "./asi-rows.js";
@@ -556,6 +557,33 @@ describe("Rogue - the flat grants and the pick", () => {
     resolve(built, "steady-aim", [], []);
     const granted = built.hero.effects.find((effect) => effect.tags.includes("steady-aim"));
     expect(granted?.modifiers).toEqual([{ type: "roll-mode", roll: "attack", mode: "advantage" }]);
+  });
+
+  it("spends Steady Aim's Advantage on the next attack roll, and holds Speed at 0 until the turn ends", () => {
+    const built = table(rogueInput(11));
+    resolve(built, "steady-aim", [], []);
+    const aiming = () => built.hero.effects.find((effect) => effect.tags.includes("steady-aim"));
+    // "Your Speed is 0 until the end of the current turn", and the Advantage is for this turn only.
+    expect(aiming()).toMatchObject({
+      speedZero: true,
+      duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+    });
+    expect(currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, built.catalog))).toBe(0);
+    const swung = swing(built, "item-shortsword", [4, 15, 3]);
+    expect(swung.rollMode).toMatchObject({ mode: "advantage" });
+    expect(swung.attack!.naturalRoll).toBe(15);
+    // The roll spent the Advantage; Speed 0 stays to the end of the turn.
+    expect(aiming()).toMatchObject({ name: "Steady Aim (Speed 0)", modifiers: [], speedZero: true });
+    nextInitiativeTurn(built.state);
+    expect(aiming()).toBeUndefined();
+  });
+
+  it("refuses Steady Aim once the Rogue has moved this turn", () => {
+    const built = table(rogueInput(11));
+    built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, movementUsedFeet: 10 } };
+    expect(() => resolve(built, "steady-aim", [], [])).toThrowError(
+      /has moved this turn - Steady Aim is only for a creature that hasn't/
+    );
   });
 
   it("makes the Thief's Fast Hands a Bonus Action", () => {

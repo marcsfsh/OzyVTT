@@ -40,6 +40,8 @@ describe("rule families", () => {
       ["movement.stand-up-cost", "movement"],
       // Standing spends movement, which only your own turn has.
       ["movement.stand-up-off-turn", "movement"],
+      // Steady Aim, only before moving: what the turn's movement has done.
+      ["movement.already-moved", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
@@ -58,6 +60,8 @@ describe("rule families", () => {
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
+      // Reckless Attack after the turn's first attack roll: what this turn has done.
+      ["attack.after-first-roll", "economy"],
       // A Loading weapon fires once per action: what this action has already done.
       ["attack.loading", "economy"],
       // Running out of ammunition: what the character carries, like the hands rule.

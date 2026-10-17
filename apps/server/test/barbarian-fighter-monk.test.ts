@@ -402,14 +402,18 @@ describe("Barbarian: Feral Instinct changes the initiative die", () => {
   });
 });
 
+/** "Attack rolls using Strength": the gate Reckless Attack's own Advantage carries. */
+const STRENGTH_ATTACKS = [{ type: "on-attack-roll" }, { type: "ability-is", abilities: ["str"] }];
+
 describe("Barbarian: Reckless Attack is an effect the table can see and swing under", () => {
-  it("puts a real effect on the actor and makes the next attack roll with advantage", () => {
+  it("puts a real effect on the actor and makes the next attack roll using Strength with advantage", () => {
     const built = onTheTable(build(barbarianInput()));
     use(built, "reckless-attack");
     const effect = built.hero.effects.find((entry) => entry.tags.includes("reckless-attack"))!;
     expect(effect).toBeDefined();
+    // SRD 2024: "Advantage on attack rolls using Strength", and every attack roll against you.
     expect(effect.modifiers).toEqual([
-      { type: "roll-mode", roll: "attack", mode: "advantage" },
+      { type: "roll-mode", roll: "attack", mode: "advantage", when: STRENGTH_ATTACKS },
       { type: "roll-mode", roll: "incoming-attack", mode: "advantage" }
     ]);
     expect(effect.duration).toEqual({ type: "until-source-next-turn" });
@@ -425,6 +429,77 @@ describe("Barbarian: Reckless Attack is an effect the table can see and swing un
     const swung = use(bare, "item-greataxe", [IDS.foe], [3, 8]);
     expect(swung.rollMode).toBeUndefined();
     expect(swung.attack!.naturalRoll).toBe(3);
+  });
+
+  it("gives a bow shot, which uses Dexterity, no Advantage", () => {
+    const built = onTheTable(build(barbarianInput()));
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      {
+        id: "shortbow",
+        name: "Shortbow",
+        quantity: 1,
+        equipped: true,
+        attuned: false,
+        category: "weapon",
+        weapon: {
+          category: "simple",
+          damageDice: "1d6",
+          damageType: "piercing",
+          rangeFeet: 80,
+          longRangeFeet: 320,
+          melee: false,
+          properties: ["ammunition", "two-handed"]
+        }
+      },
+      { id: "arrows-20", name: "Arrows (20)", quantity: 1, equipped: false, attuned: false, category: "ammunition" }
+    ];
+    use(built, "reckless-attack");
+    const shot = use(built, "item-shortbow", [IDS.foe], [3, 4]);
+    expect(shot.rollMode).toBeUndefined();
+    expect(shot.attack!.naturalRoll).toBe(3);
+  });
+
+  it("narrows a sheet built before the gate to attacks using Strength as it lands", () => {
+    const built = onTheTable(build(barbarianInput()));
+    const older = built.definition.actions.map((action) =>
+      action.id === "reckless-attack"
+        ? {
+            ...action,
+            grants: {
+              ...action.grants!,
+              modifiers: [
+                { type: "roll-mode" as const, roll: "attack" as const, mode: "advantage" as const },
+                { type: "roll-mode" as const, roll: "incoming-attack" as const, mode: "advantage" as const }
+              ]
+            }
+          }
+        : action
+    );
+    use({ ...built, definition: { ...built.definition, actions: older } }, "reckless-attack");
+    expect(built.hero.effects.find((entry) => entry.tags.includes("reckless-attack"))!.modifiers[0]).toEqual({
+      type: "roll-mode",
+      roll: "attack",
+      mode: "advantage",
+      when: STRENGTH_ATTACKS
+    });
+  });
+
+  it("is decided with the first attack roll on the Barbarian's turn, not after it or off the turn", () => {
+    const swungFirst = onTheTable(build(barbarianInput()));
+    use(swungFirst, "item-greataxe", [IDS.foe], [3, 8]);
+    expect(() => use(swungFirst, "reckless-attack")).toThrowError(
+      /Ozar has already made an attack roll this turn - Reckless Attack is decided with the first/
+    );
+    const offTurn = onTheTable(build(barbarianInput()));
+    nextInitiativeTurn(offTurn.state); // the foe's turn
+    expect(() => use(offTurn, "reckless-attack")).toThrowError(
+      /Reckless Attack is decided with an attack roll on Ozar's own turn/
+    );
+    // The turn after, a fresh first roll.
+    nextInitiativeTurn(offTurn.state);
+    use(offTurn, "reckless-attack");
+    expect(offTurn.hero.effects.some((entry) => entry.tags.includes("reckless-attack"))).toBe(true);
   });
 });
 
@@ -1457,6 +1532,22 @@ describe("Incapacitated: feature activations are refused too", () => {
     setCondition(built.state, IDS.foe, "stunned", false, undefined, { role: "gm" });
     foe.hp.current = 0;
     expect(check().map((violation) => violation.rule)).toEqual(["condition.down"]);
+  });
+});
+
+describe("Monk: Stunning Strike once per turn", () => {
+  it("refuses a second Stunning Strike on the same turn, and allows one on the next", () => {
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "stunning-strike", [IDS.foe]);
+    expect(() => use(built, "stunning-strike", [IDS.foe])).toThrowError(
+      /Shan has already used Stunning Strike this turn - once per turn/
+    );
+    // Only the first spent a Focus Point.
+    expect(built.hero.actionUses["focus-points"]).toBe(1);
+    // Once per turn, whoever's turn it is: the foe's turn is another.
+    nextInitiativeTurn(built.state);
+    use(built, "stunning-strike", [IDS.foe]);
+    expect(built.hero.actionUses["focus-points"]).toBe(2);
   });
 });
 

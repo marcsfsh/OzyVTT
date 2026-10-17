@@ -33,6 +33,10 @@ export const KNOCKED_OUT_TAG = "knocked-out";
 export const READIED_TAG = "readied";
 /** Haste on its target: doubled Speed, an additional action each turn, and lethargy when it ends. */
 export const HASTED_TAG = "hasted";
+/** Reckless Attack: decided with the Barbarian's first attack roll on its turn. */
+export const RECKLESS_TAG = "reckless-attack";
+/** Steady Aim: taken before moving, Advantage on the next attack roll this turn, Speed 0 until the turn ends. */
+export const STEADY_AIM_TAG = "steady-aim";
 
 /** What an effect must name; every other field takes `EffectInstanceSchema`'s default. */
 export type EffectSpec = Pick<EffectInstance, "id" | "name" | "duration"> & Partial<EffectInstance>;

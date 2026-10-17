@@ -12,6 +12,8 @@ const RULE_FAMILIES = {
   "movement.stand-up-cost": "movement",
   // Standing spends movement, which a creature has only on its own turn.
   "movement.stand-up-off-turn": "movement",
+  // Steady Aim is only for a creature that hasn't moved this turn.
+  "movement.already-moved": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
@@ -32,6 +34,8 @@ const RULE_FAMILIES = {
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",
+  // Reckless Attack is decided with the first attack roll on the Barbarian's turn.
+  "attack.after-first-roll": "economy",
   // A Loading weapon fires once per action, however many attacks the action allows.
   "attack.loading": "economy",
   "attack.no-ammunition": "economy",
