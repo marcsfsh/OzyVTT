@@ -93,7 +93,22 @@ export {
   IconLocate,
   IconWait,
   IconLog,
-  IconMore
+  IconMore,
+  IconCheck,
+  IconDie,
+  IconInfo,
+  // The character sheet's tabs, menu and live states.
+  IconBolt,
+  IconBag,
+  IconPage,
+  IconMoon,
+  IconLevelUp,
+  IconUser,
+  IconCog,
+  IconPin,
+  IconList,
+  IconSkull,
+  IconConcentration
 } from "./primitives/icons";
 export { Combobox } from "./primitives/Combobox";
 export { MarkdownEditor } from "./primitives/MarkdownEditor";

@@ -96,6 +96,18 @@ describe("Modal", () => {
     );
     expect(screen.getByRole("dialog", { name: "Search the Codex" })).toBeInTheDocument();
   });
+
+  it("rests on the bottom edge as a drawer, which slides up instead of growing in", () => {
+    render(
+      <Modal open onClose={() => {}} align="bottom" title="Wand of Web">
+        <p>Body</p>
+      </Modal>
+    );
+    const drawer = screen.getByRole("dialog", { name: "Wand of Web" });
+    expect(drawer.className).toContain("nh-modal--bottom");
+    expect(drawer.className).toContain("anim-sheet");
+    expect(drawer.className).not.toContain("anim-dialog");
+  });
 });
 
 describe("MarkdownEditor — the [[ ]] autocomplete", () => {
