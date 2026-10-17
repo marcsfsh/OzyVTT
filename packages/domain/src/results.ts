@@ -208,6 +208,15 @@ export type DeathSaveResult = MutationResult & {
       "advantage" | "disadvantage" | "normal";
   }>;
 };
+/** Outcome of giving aid to a creature at 0 hit points: stabilized, woken from a knock-out, or neither (a failed
+ *  check). `check` is the Wisdom (Medicine) roll when first aid was the method. */
+export type StabilizeResult = MutationResult & {
+  stabilize?: Readonly<{
+    stabilized: boolean;
+    woke: boolean;
+    check: Readonly<{ natural: number; total: number; dc: number }> | null;
+  }>;
+};
 /** Outcome of answering a pending save; applied damage/condition already happened server-side when present. */
 export type SaveAnswerResult = MutationResult & {
   outcome?: {
@@ -263,6 +272,8 @@ export const ActionAvailabilitySchema = z.strictObject({
   usesLimit: z.number().int().nullable(),
   usesPer: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
   usesPool: z.string().nullable(),
+  /** How many uses one activation spends when it is more than one, or `chosen` when the user picks it each time. */
+  useCost: z.union([z.number().int(), z.literal("chosen")]).nullable(),
   requiresEffectTag: z.string().nullable(),
   multiattack: z.array(z.strictObject({ actionId: z.string(), count: z.number().int() })).nullable(),
   reaction: ActionReactionSchema.nullable(),
@@ -318,11 +329,23 @@ const ActorDerivedSheetSchema = z.strictObject({
   attunementSlots: z.number().int().min(1).max(10)
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
-/** What `actor:available-actions` answers: the table's rules mode, each action's availability, and the sheet. */
+/** A pick this character may re-make on a rest (Circle of the Land's land after a Long Rest), with its options and
+ *  the answer in force. */
+const RechoiceSchema = z.strictObject({
+  offer: z.string(),
+  label: z.string(),
+  per: z.enum(["short-rest", "long-rest"]),
+  options: z.array(z.strictObject({ id: z.string(), name: z.string() })),
+  chosen: z.string().nullable()
+});
+export type Rechoice = Wire<z.infer<typeof RechoiceSchema>>;
+/** What `actor:available-actions` answers: the table's rules mode, each action's availability, the sheet, and the
+ *  picks the character may re-make on a rest. */
 export const AvailableActionsReplySchema = z.strictObject({
   rulesMode: z.enum(["strict", "assisted", "freeform"]),
   actions: z.array(ActionAvailabilitySchema),
-  derived: ActorDerivedSheetSchema
+  derived: ActorDerivedSheetSchema,
+  rechoices: z.array(RechoiceSchema)
 });
 export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;

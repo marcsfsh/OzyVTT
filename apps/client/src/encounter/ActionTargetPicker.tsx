@@ -1,6 +1,13 @@
 import { useId } from "react";
 import { Button, Select, Stepper } from "@vtt/ui";
-import { clearTargeting, setDamageType, setTargetDarts, toggleTarget, type TargetingSession } from "./targeting";
+import {
+  clearTargeting,
+  setDamageType,
+  setTargetDarts,
+  setTargetingSpend,
+  toggleTarget,
+  type TargetingSession
+} from "./targeting";
 
 /**
  * Choosing who an action targets: one (radio) or several (checkboxes), or, for an area, where to drag
@@ -68,6 +75,20 @@ export function ActionTargetPicker({
             ))}
           </ul>
         </>
+      )}
+      {/* An action whose user picks its cost (Lay on Hands): how much of the pool goes into it. The server refuses
+          more than is left. */}
+      {picking.action.useCost === "chosen" && (
+        <Stepper
+          label="Points to spend"
+          value={picking.spend ?? 1}
+          onChange={setTargetingSpend}
+          min={1}
+          max={picking.action.usesLimit ?? 100}
+          disabled={busy}
+          aria-label={`How much of ${picking.action.name} to spend`}
+          className="action-targeting-spend"
+        />
       )}
       {picking.action.damageTypes && (
         <label className="action-damage-type">

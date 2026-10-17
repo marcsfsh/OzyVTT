@@ -115,12 +115,13 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * The use pool only, read off the printed column (2 -> 3 -> 4). Known Beast forms (needs a creature
-     * catalog with CR and Fly Speed filters), the temporary HP, form replacement and the Short Rest
-     * partial recovery stay prose.
+     * The use pool, read off the printed column (2 -> 3 -> 4), one use of which comes back on a Short Rest.
+     * Known Beast forms (needs a creature catalog with CR and Fly Speed filters), the temporary HP and form
+     * replacement stay prose.
      */
     "wild-shape": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest" },
+      modifiers: [{ type: "short-rest-regain", poolId: "wild-shape", amount: 1 }],
       actions: [
         {
           id: "wild-shape",
@@ -273,11 +274,11 @@ export const druid: ClassMechanicsModule = {
       /**
        * "Choose one type of land": four inline options, each granting that land's level-3 spells always
        * prepared; the table's later rows are staged features (`subclassStages`), which read this answer back,
-       * as Nature's Ward does. A re-choice on a Long Rest moves Nature's Ward's Resistance but not the spells,
-       * which are baked into the sheet: a different land's spells come with a rebuild.
+       * as Nature's Ward does.
        */
       "circle-of-the-land-spells": {
-        // Re-chosen on every Long Rest: the override lives in `actor.choiceOverrides` and the next Long Rest clears it.
+        // Re-chosen after each Long Rest: the new land replaces the ledger answer and the sheet is rebuilt, so the
+        // land's spells and Nature's Ward follow it.
         replaces: [{ offer: "feature:circle-of-the-land-spells", when: "long-rest", amount: 1 }],
         choice: {
           kind: "land",

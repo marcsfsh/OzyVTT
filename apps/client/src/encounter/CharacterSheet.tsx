@@ -13,7 +13,9 @@ import { ConditionEditor } from "./conditions";
 import { SavePrompt } from "./SavePrompt";
 import { RichText } from "./RichText";
 import { DicePanel } from "../dice/DicePanel";
-import { useRollPreference } from "../dice/roll-preference";
+import { rollModeOf, useRollPreference } from "../dice/roll-preference";
+import { DyingTracker } from "./DyingTracker";
+import { isKnockedOut, partyHelpers, StabilizeControl } from "./StabilizeControl";
 import { summaryOfOwnAction } from "./PlayerActionRunner";
 import { beginTargeting, setTargetingResult, useTargeting } from "./targeting";
 import { formatChallenge, titleCase } from "./format";
@@ -25,6 +27,7 @@ import { SheetActions } from "./SheetActions";
 import { SheetIdentityEditor } from "./SheetIdentityEditor";
 import { SheetInventory } from "./SheetInventory";
 import { SheetProficiencies } from "./SheetProficiencies";
+import { SheetPools } from "./SheetPools";
 import { SheetRest } from "./SheetRest";
 import { SheetSpells } from "./SheetSpells";
 import { SheetVitals } from "./SheetVitals";
@@ -83,7 +86,17 @@ export function CharacterSheet({
 }>) {
   const [feedback, setFeedback] = useState("");
   const { toast } = useToast();
-  const { definitionId, definition, serverActions, derived, showEdited } = useSheetDefinition(actor, role, setFeedback);
+  // The GM's state carries every stored sheet (a built character's), which stays current when the sheet is rebuilt.
+  const liveDefinition =
+    role === "gm" && state && "definitions" in state && "definitionId" in actor
+      ? state.definitions.find((entry) => entry.id === actor.definitionId)?.definition
+      : undefined;
+  const { definitionId, definition, serverActions, derived, rechoices, showEdited } = useSheetDefinition(
+    actor,
+    role,
+    setFeedback,
+    liveDefinition
+  );
   // On the player's own turn, targeted stat-block actions resolve through the shared structured flow
   // (pick target -> roll -> resolve). Combat context is the `combat` prop when embedded in the
   // initiative panel, else derived from the player's `state`, so it works from any sheet surface.
@@ -289,11 +302,62 @@ export function CharacterSheet({
           ))}
         </div>
       )}
-      {actor.kind === "player-character" && (
+      {/* Dying or knocked out outside a fight: the death saves, and for the GM the aid that ends it. In a fight
+        both live on the turn order. */}
+      {!inFight && (actor.deathSaves || isKnockedOut(actor)) && (
+        <div className="sheet-dying-block">
+          {actor.deathSaves ? (
+            <DyingTracker
+              actorId={actor.id}
+              name={actor.name}
+              deathSaves={actor.deathSaves}
+              canRoll
+              onFeedback={setFeedback}
+              rollMode={rollModeOf(rollInput)}
+              isActingTurn={false}
+              aid={
+                role === "gm" && state ? (
+                  <StabilizeControl
+                    targetId={actor.id}
+                    targetName={actor.name}
+                    helpers={partyHelpers(state as GmView, actor.id)}
+                    gm
+                    onFeedback={setFeedback}
+                  />
+                ) : undefined
+              }
+            />
+          ) : (
+            role === "gm" &&
+            state && (
+              <StabilizeControl
+                targetId={actor.id}
+                targetName={actor.name}
+                helpers={partyHelpers(state as GmView, actor.id)}
+                gm
+                knockedOut
+                onFeedback={setFeedback}
+              />
+            )
+          )}
+        </div>
+      )}
+      {/* The GM rests monsters and NPCs too (a Long Rest re-arms Legendary Resistance and per-day uses), without
+          Hit Dice to spend. */}
+      {(actor.kind === "player-character" || role === "gm") && (
         <div className="sheet-rest-block">
           <span className="sheet-section-label">Rest</span>
-          <SheetRest actorId={actor.id} hitDice={"hitDice" in actor ? actor.hitDice : null} onFeedback={setFeedback} />
+          <SheetRest
+            actorId={actor.id}
+            role={role}
+            hitDice={actor.kind === "player-character" && "hitDice" in actor ? actor.hitDice : null}
+            asked={state?.rest?.requests.includes(actor.id) ?? false}
+            onFeedback={setFeedback}
+          />
         </div>
+      )}
+      {actor.actionUses && (role === "gm" || actor.kind === "player-character") && (
+        <SheetPools actorId={actor.id} role={role} actions={serverActions} spent={actor.actionUses} />
       )}
 
       {definition && (
@@ -320,6 +384,7 @@ export function CharacterSheet({
             spellSaveDcBonus={derived?.spellSaveDcBonus ?? 0}
             policeSlots={slotsPoliced}
             canPrepare={role === "gm" || Boolean(actor.preparation)}
+            rechoices={rechoices}
             castSpellAction={castSpellAction}
             routeSpell={(spell) => {
               const structured = structuredAttacks

@@ -302,6 +302,30 @@ describe("reading a scroll outside a fight", () => {
     expect(inventory(IDS.wizard).some((row) => row.id === "spell-scroll-2")).toBe(false);
     expect(await log()).toContain("Ilyana fails to cast Meteor Swarm from the scroll, and the scroll is lost.");
   });
+
+  it("ends the reader's Short Rest when the spell is not a cantrip, as casting it does", async () => {
+    // SRD Short Rest: "A Short Rest is stopped by ... Casting a spell other than a cantrip".
+    const table = tableOf({ [IDS.wizard]: wizardInput(), [IDS.fighter]: fighterInput() }, false);
+    write(table, IDS.wizard, scrollOf("fire-bolt"));
+    write(table, IDS.wizard, secondScroll("magic-missile"));
+    const { server, gmToken, post, log, close } = await serve(table);
+    cleanups.push(close);
+    const members = () => server.store.snapshot.rest.shortRest?.actorIds;
+    const rest = await post(GAME_PATHS.restParty, gmToken, {
+      commandId: randomUUID(),
+      kind: "short",
+      actorIds: [IDS.wizard, IDS.fighter]
+    });
+    expect(rest.status).toBe(200);
+    const read = (actionId: string) =>
+      post(GAME_PATHS.actionUse, gmToken, { commandId: randomUUID(), actorId: IDS.wizard, actionId });
+
+    expect((await read(READ)).status).toBe(200);
+    expect(members()).toEqual([IDS.wizard, IDS.fighter]);
+    expect((await read("item-spell-scroll-2-read")).status).toBe(200);
+    expect(members()).toEqual([IDS.fighter]);
+    expect(await log()).toContain("Ilyana cast Magic Missile, which ends their Short Rest without its benefits.");
+  });
 });
 
 it("derives the read action only for a scroll that bears a spell", () => {

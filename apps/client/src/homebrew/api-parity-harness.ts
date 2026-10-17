@@ -457,6 +457,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].useCost",
+    types: ACTION_CARRIERS,
+    reason:
+      "how many uses one activation spends (Lay on Hands' points, its 5-point cure) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsConditions",
+    types: ACTION_CARRIERS,
+    reason:
+      "conditions an action ends on its target (Lay on Hands' cure) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].legendary.cost",
     types: ACTION_CARRIERS,
     reason: "the per-round pool cost — the record has actionsPerRound, the action has no cost",

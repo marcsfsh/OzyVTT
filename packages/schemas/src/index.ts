@@ -411,6 +411,16 @@ export const ModifierSchema = z.discriminatedUnion("type", [
       ...riderGate
     })
     .strict(),
+  /** A pool a Short Rest refills beyond its own recharge: `amount` expended uses back ("you regain one expended use
+   *  when you finish a Short Rest", Rage), or every one when absent (Font of Inspiration). Read when the rest ends. */
+  z
+    .object({
+      type: z.literal("short-rest-regain"),
+      poolId: RiderSlugSchema,
+      amount: z.number().int().min(1).max(20).optional(),
+      ...riderGate
+    })
+    .strict(),
   // ---- rolls ----
   /** `dice` rolls with the attack on top of `amount` (Bless's 1d4); a leading minus takes them off (Bane). */
   z
@@ -988,6 +998,9 @@ export const ActorSchema = z.object({
     .optional(),
   /** Short-rest healing pool (SRD Hit Point Dice); null = not modeled. Reaches players only on their own claimed character. */
   hitDice: HitDicePoolSchema.default(null),
+  /** The game hour (`rest.clockHours`) this creature's last Long Rest ended; null before its first. Another may start
+   * 16 hours later (SRD Resting). GM-only: a refused rest explains the wait. */
+  lastLongRestAt: z.number().int().min(0).max(10_000_000).nullable().default(null),
   /** Per-token health-display override; absent = inherit `combat.healthDisplay`. Audience-gated in the player/viewer projections. */
   healthDisplay: HealthDisplaySchema.optional(),
   /** Epoch ms when this actor last entered a fight; powers the scene-setup "Recent" list. GM-only, stripped from the player projection. */
@@ -1069,11 +1082,14 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   armorClassBonus: z.number().int().min(1).max(10).optional()
 }).strict();
 
+/** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
+export const MAX_ACTION_USES = 100;
+
 /** Limited uses. "turn"/"encounter"/rests reset as named; "recharge" on a start-of-turn d6 >= `recharge`.
  * `pool` shares one counter across actions (Sneak Attack once per turn regardless of weapon). */
 export const ActionUsesSchema = z
   .object({
-    limit: z.number().int().min(1).max(20),
+    limit: z.number().int().min(1).max(MAX_ACTION_USES),
     per: z.enum(["turn", "encounter", "long-rest", "short-rest", "recharge"]),
     pool: z
       .string()
@@ -1260,10 +1276,17 @@ export const ActionSchema = z.object({
       /** The roll is one pool divided among the targets (Preserve Life), not regained by each. */
       divided: z.literal(true).optional(),
       /** No target is healed past this fraction of its maximum (Preserve Life: half). */
-      upToFractionOfMaximum: z.number().min(0.1).max(1).optional()
+      upToFractionOfMaximum: z.number().min(0.1).max(1).optional(),
+      /** The formula is regained once for each use spent (Lay on Hands: 1 hit point per point of its pool). */
+      perUse: z.literal(true).optional()
     })
     .strict()
     .optional(),
+  /** How many of its uses one activation spends: a fixed number (Lay on Hands' 5 points to cure a poison), or
+   *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
+  useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
+  /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
+  endsConditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
   /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
    *  The resolve's targets assign them in order, a target named twice taking two. */
   darts: z.number().int().min(2).max(20).optional(),

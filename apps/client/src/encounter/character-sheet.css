@@ -45,6 +45,11 @@
 .sheet-hp-meter {
   margin: 0.3rem 0 0.1rem;
 }
+.sheet-vital-note {
+  margin: 0.3rem 0 0;
+  color: var(--danger-text);
+  font-size: var(--fs-sm);
+}
 /* `.sheet-vital` is `isolation: isolate` (it keeps its `z-index: -1` backing layer inside), which
    traps the open combobox list's z-index inside the chip, so later positioned elements cover it and
    steal taps. The chip is lifted while a list is open instead; 3 clears `.sheet-float-resize` (2). */
@@ -66,6 +71,7 @@
   margin-top: 0;
 }
 .sheet-rest-block,
+.sheet-dying-block,
 .sheet-saves-owed {
   margin-top: 0.85rem;
 }
@@ -91,7 +97,46 @@
 }
 .sheet-rest-buttons {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
+}
+.sheet-pools-block {
+  margin-top: 0.85rem;
+}
+.sheet-pools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sheet-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.7rem;
+}
+.sheet-pool-name {
+  color: var(--text);
+  font-weight: 700;
+}
+.sheet-pool-count {
+  color: var(--text-dim);
+  font: 700 var(--fs-sm) var(--font-numeric);
+}
+.sheet-pool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.sheet-rest-asked {
+  color: var(--cyan-hi);
+  font-size: var(--fs-sm);
+  font-weight: 700;
 }
 .sheet-settings-label {
   color: var(--text-muted);
@@ -814,6 +859,23 @@
 }
 .sheet-prepare-step button {
   min-height: 44px;
+}
+/* A pick re-made after a Long Rest (a Land Druid's land): its name, then the choice, wrapping on a phone. */
+.sheet-rechoice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0.4rem 0;
+}
+.sheet-rechoice > span {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.sheet-rechoice > :last-child {
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: 16rem;
 }
 .sheet-spell-group-head {
   display: flex;

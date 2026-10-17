@@ -1,4 +1,12 @@
-import type { Actor, ActorDerivedSheet, DamageApplication, DerivedDefence, GameState, HealthBand } from "@vtt/domain";
+import {
+  isDead,
+  type Actor,
+  type ActorDerivedSheet,
+  type DamageApplication,
+  type DerivedDefence,
+  type GameState,
+  type HealthBand
+} from "@vtt/domain";
 import {
   adjustDamageParts,
   collectRiders,
@@ -26,10 +34,13 @@ import {
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
+  reduceExhaustion,
   removeConditionDirect,
   type EffectNarration
 } from "./effects.js";
+import { reconcileEquipment } from "./inventory.js";
 import { offerDamageReaction } from "./damage-reactions.js";
+import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
@@ -351,8 +362,9 @@ export function applyDamageDetailed(
   // SRD Knocking Out a Creature: a melee attack that would drop it to 0 can leave it at 1 HP and Unconscious instead.
   const knockedOut = input.nonlethal === true && !wasAtZero && actor.hp.current === 0 && damageToHp > 0;
   if (knockedOut) actor.hp.current = 1;
-  // Sleep, Turn Undead and the like end the moment the bearer takes any damage.
-  if (totalAdjusted > 0) events.push(...endEffectsOnDamage(state, actor));
+  // Sleep, Turn Undead and the like end the moment the bearer takes any damage, and so does a Short Rest.
+  if (totalAdjusted > 0)
+    events.push(...endEffectsOnDamage(state, actor), ...leaveShortRest(state, new Set([actor.id]), "took damage"));
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
@@ -485,9 +497,14 @@ export function applyDamage(state: GameState, actorId: string, amount: number, s
   applyDamageDetailed(state, actorId, { amount }, scope);
 }
 
-/** Healing caps at maximum and never restores temp HP; healing from 0 clears dying and Unconscious (not Prone). */
+/** Why a dead creature's hit points can't go up. */
+export const deadCantHealLine = (name: string) => `${name} is dead and can't regain hit points until revived.`;
+
+/** Healing caps at maximum and never restores temp HP; healing from 0 clears dying and Unconscious (not Prone). The
+ *  dead regain nothing (SRD "Dead"): the line says so, and only a revival brings them back. */
 export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
+  if (isDead(actor)) return [{ kind: "condition", text: deadCantHealLine(actor.name), actorId }];
   const before = actor.hp.current;
   const wasDying = actor.hp.current <= 0 && actor.deathSaves !== null;
   actor.hp.current = Math.min(actor.hp.maximum, actor.hp.current + amount);
@@ -525,10 +542,13 @@ export function setTemporaryHp(state: GameState, actorId: string, amount: number
   actor.hp.temporary = amount;
 }
 
-/** GM correction: set current HP (clamped), running the same zero-HP transitions. */
+/** GM correction: set current HP (clamped), running the same zero-HP transitions. Raising a dead creature's hit
+ *  points would revive it, which is Revive's job, so that is refused. */
 export function setCurrentHp(state: GameState, actorId: string, current: number, scope: Initiator): EffectNarration[] {
   requireGm(scope, "Only the GM can set hit points directly.");
   const actor = adjustableActor(state, actorId, scope);
+  if (current > 0 && isDead(actor))
+    throw new CommandRejectedError(`${actor.name} is dead - revive them to give them hit points again.`);
   const before = actor.hp.current;
   actor.hp.current = Math.max(0, Math.min(actor.hp.maximum, current));
   const events: EffectNarration[] = [];
@@ -548,6 +568,45 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
   }
   events.push(...wakeOnHealing(state, actor, before));
   return events;
+}
+
+/**
+ * SRD "Dead": the one way back. The GM applies the revival (Revivify, Raise Dead, a story), naming the hit points it
+ * gives. The dying state and the Unconscious it brought end, a creature that died with Exhaustion comes back one
+ * level lower, and it is no longer attuned to any magic item. Other conditions stay.
+ */
+export function reviveActor(
+  state: GameState,
+  actorId: string,
+  hitPoints: number,
+  scope: Initiator,
+  deps: Readonly<{
+    resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+    catalog?: EquipmentCatalog;
+  }>
+): EffectNarration[] {
+  requireGm(scope, "Only the GM can revive a creature.");
+  const actor = adjustableActor(state, actorId, scope);
+  if (!isDead(actor)) throw new CommandRejectedError(`${actor.name} isn't dead.`);
+  actor.hp.current = Math.max(1, Math.min(actor.hp.maximum, hitPoints));
+  actor.deathSaves = null;
+  if (!actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious")))
+    removeConditionDirect(actor, "unconscious");
+  reduceExhaustion(actor);
+  if (actor.inventory.some((item) => item.attuned)) {
+    actor.inventory = actor.inventory.map((item) => (item.attuned ? { ...item, attuned: false } : item));
+    // Attunement feeds stored AC and slot maxima, so the loadout is reconciled as an inventory write would be.
+    const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+    reconcileEquipment(actor, definition, { catalog: deps.catalog, role: "gm" });
+  }
+  const regained = actor.hp.current;
+  return [
+    {
+      kind: "condition",
+      text: `${actor.name} returns to life with ${regained} ${regained === 1 ? "hit point" : "hit points"}.`,
+      actorId
+    }
+  ];
 }
 
 /** The GM sets a creature's hit point maximum. Current HP never exceeds it. A character's sheet sets the

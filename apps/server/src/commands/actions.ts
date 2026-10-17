@@ -28,6 +28,7 @@ import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
 import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
+import { leaveShortRest } from "../short-rest-interruptions.js";
 import { ammunitionLabel, shotFrom, spendPiece } from "../ammunition.js";
 import { checkRollMode } from "../ability-checks.js";
 import { exhaustionPenalty } from "../condition-rules.js";
@@ -35,6 +36,7 @@ import { checkRiderBonus, deriveEquipment, sourceItemOf } from "../equipment-der
 import { SCROLL_UNREADABLE, scrollCheckRoll, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { castSlotLevel } from "../resolution/economy.js";
 import { withChosenDamageType } from "../resolution/validate.js";
+import { useCostOf, withChosenCost } from "../use-cost.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, principalTag, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -102,8 +104,10 @@ export const actionCommands = [
         const statBlockAction = effectiveActions(definition, attacker, kit.equipmentCatalog()).find(
           (candidate) => candidate.id === actionId
         );
-        const action = statBlockAction ?? builtinAction(actionId);
-        if (!action) throw new CommandRejectedError("That action is not on the stat block.");
+        const listed = statBlockAction ?? builtinAction(actionId);
+        if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
+        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
+        const action = withChosenCost(listed, request.spend);
         let resolvedTargetIds: readonly string[];
         if (template) {
           if (action.attack)
@@ -276,6 +280,7 @@ export const actionCommands = [
         includeDamage,
         override,
         slotLevel,
+        spend: chosenSpend,
         damageType,
         expectedRevision
       } = request;
@@ -294,6 +299,7 @@ export const actionCommands = [
           ...(rollMode ? { rollMode } : {}),
           ...(withOverride && override ? { override } : {}),
           ...(slotLevel === undefined ? {} : { slotLevel }),
+          ...(chosenSpend === undefined ? {} : { spend: chosenSpend }),
           ...(damageType === undefined ? {} : { damageType }),
           ...(expectedRevision === undefined ? {} : { expectedRevision })
         });
@@ -303,8 +309,9 @@ export const actionCommands = [
 
       const definition = actor.definitionId ? kit.resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
       const available = effectiveActions(definition, actor, kit.equipmentCatalog());
-      const listed = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
-      if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
+      const found = available.find((candidate) => candidate.id === actionId) ?? builtinAction(actionId);
+      if (!found) throw new CommandRejectedError("That action is not on the stat block.");
+      const listed = withChosenCost(found, chosenSpend);
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
       const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;
       const spell = listed.spellId ? kit.equipmentCatalog().spellRecord?.(listed.spellId) : undefined;
@@ -442,6 +449,9 @@ export const actionCommands = [
           }).events;
         }
         spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
+        // Casting a spell other than a cantrip stops a Short Rest.
+        if (spell && spell.level > 0)
+          narrations = [...narrations, ...leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)];
         // A potion drunk or a flask thrown outside a fight is used up all the same.
         const consumable = consumableRowFor(action, live.inventory, kit.equipmentCatalog());
         if (consumable) live.inventory = withOneUsedUp(live.inventory, consumable.id);
@@ -526,8 +536,13 @@ export const actionCommands = [
         });
       // Rolls narrate themselves; a use with nothing to roll, or one that cost a charge, says so.
       if (plan.length === 0 || spend.spent || usedUp) {
+        const cost = useCostOf(action);
         const left =
-          spend.usesLeft === null ? "" : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
+          spend.usesLeft === null
+            ? ""
+            : cost > 1
+              ? ` (${cost} spent, ${spend.usesLeft} left)`
+              : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
         kit.context.appendLog({
           kind: "action",
           text: `${kit.actorName(actorId)} uses ${action.name}${left}.`,

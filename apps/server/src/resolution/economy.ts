@@ -20,6 +20,7 @@ import {
   type RuleId
 } from "../rules-families.js";
 import { laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
@@ -36,8 +37,12 @@ export type EconomyPlan = Readonly<{
   instance: Readonly<{ actorId: string; components: Record<string, number>; slotLevel?: number }> | null;
   /** The same for a compound bonus action (Flurry of Blows). */
   bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
-  /** Limited-use spend to record, keyed per scope. */
-  spendUse: Readonly<{ key: string; per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge" }> | null;
+  /** Limited-use spend to record, keyed per scope: `amount` uses of it (one, or the action's cost). */
+  spendUse: Readonly<{
+    key: string;
+    per: "turn" | "encounter" | "long-rest" | "short-rest" | "recharge";
+    amount: number;
+  }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions). */
   spendLegendary: Readonly<{ cost: number }> | null;
   /** Spell slot the action spends from the bearer's own pools: a spell slot, or a Pact Magic slot (`pact`). */
@@ -354,8 +359,14 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   const limit = useLimitFor(siblings, action);
   const spent =
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
-  if (spent >= limit) violations.push({ rule: "feature.no-uses-remaining", message: noUsesRemaining(action, limit) });
-  return { key, per: uses.per };
+  // Some activations spend several (Lay on Hands' 5-point cure, or the points its user chose).
+  const cost = useCostOf(action);
+  if (spent + cost > limit)
+    violations.push({
+      rule: "feature.no-uses-remaining",
+      message: spent >= limit ? noUsesRemaining(action, limit) : notEnoughUses(action.name, limit - spent, cost)
+    });
+  return { key, per: uses.per, amount: cost };
 }
 
 /** Why a limited-use action is refused, in and out of a fight. */
@@ -970,13 +981,16 @@ export function commitEconomy({
         ...state.combat,
         turn: {
           ...state.combat.turn,
-          turnUses: { ...state.combat.turn.turnUses, [key]: (state.combat.turn.turnUses[key] ?? 0) + 1 }
+          turnUses: {
+            ...state.combat.turn.turnUses,
+            [key]: (state.combat.turn.turnUses[key] ?? 0) + plan.spendUse.amount
+          }
         }
       };
     } else {
       attacker.actionUses = {
         ...attacker.actionUses,
-        [plan.spendUse.key]: (attacker.actionUses[plan.spendUse.key] ?? 0) + 1
+        [plan.spendUse.key]: (attacker.actionUses[plan.spendUse.key] ?? 0) + plan.spendUse.amount
       };
     }
   }

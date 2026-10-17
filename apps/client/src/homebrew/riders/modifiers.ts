@@ -36,6 +36,7 @@ const MODIFIER_LABELS: Readonly<
   darkvision: ["The character", "Darkvision"],
   sense: ["The character", "Another sense"],
   "resource-bonus": ["The character", "A limited-use pool"],
+  "short-rest-regain": ["The character", "Uses back on a short rest"],
   "attunement-slots": ["The character", "Attunement slots"]
 };
 
@@ -87,6 +88,8 @@ function blankModifier(type: string): Draft {
     case "spell-slot":
       return { type, level: 1, amount: 1 };
     case "resource-bonus":
+      return { type, poolId: "", amount: 1 };
+    case "short-rest-regain":
       return { type, poolId: "", amount: 1 };
     case "attunement-slots":
       return { type, amount: 1 };
@@ -252,6 +255,15 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       visibleWhen: hasType("damage-reduction")
     },
     {
+      key: "amount",
+      label: "Uses back",
+      kind: "number",
+      min: 1,
+      max: 20,
+      visibleWhen: hasType("short-rest-regain"),
+      help: "Leave it empty to give every spent use back."
+    },
+    {
       key: "maximum",
       label: "Raises the cap to",
       kind: "number",
@@ -365,6 +377,14 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       validate: slugValidate,
       visibleWhen: hasType("resource-bonus"),
       help: "The shared-pool name a feature already uses. One more of whatever that pool counts."
+    },
+    {
+      key: "poolId",
+      label: "Which pool",
+      placeholder: "rage",
+      validate: slugValidate,
+      visibleWhen: hasType("short-rest-regain"),
+      help: "The shared-pool name a feature already uses. It still comes back in full on a long rest."
     },
     {
       key: "threshold",

@@ -334,6 +334,7 @@ function instantiate(
     speedFeet: definition.speedFeet,
     ...(definition.legendary ? { legendary: { ...definition.legendary } } : {}),
     hitDice: seedHitDice(definition),
+    lastLongRestAt: null,
     spellSlots: seedSpellSlots(definition, derivation.spellSlots),
     pactSlots: seedPactSlots(definition),
     preparedSpellIds: seedPreparedSpellIds(definition),
@@ -675,6 +676,17 @@ export function removeActor(state: GameState, actorId: string) {
       tokens: state.combat.tokens.filter((token) => token.actorId !== actorId)
     };
   }
+  // Nor does a removed character wait for a rest.
+  const shortRest = state.rest.shortRest;
+  const members = shortRest?.actorIds.filter((id) => id !== actorId) ?? [];
+  state.rest = {
+    ...state.rest,
+    requests: state.rest.requests.filter((id) => id !== actorId),
+    shortRest:
+      shortRest && members.length > 0
+        ? { actorIds: members, done: shortRest.done.filter((id) => id !== actorId) }
+        : null
+  };
 }
 
 /** Definition lookup for sheets/actions: imported stat blocks first, then the bundled content. */

@@ -40,6 +40,7 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     usesPer: action.uses?.per ?? null,
     usesRecharge: action.uses?.recharge ?? null,
     usesPool: action.uses?.pool ?? null,
+    ...(action.useCost !== undefined ? { useCost: action.useCost } : {}),
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack
       ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count }))
@@ -51,7 +52,9 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
-      : {})
+      : {}),
+    // So does a touch that ends a condition (Lay on Hands' cure).
+    ...(action.endsConditions && !action.healing ? { targeting: "single" as const } : {})
   };
 }
 
@@ -115,6 +118,7 @@ export function PlayerActionRunner({
   // server's word on it (a scroll of Detect Magic is a tap, a potion picks its drinker).
   const isTargetlessOwn = (action: ContentActionSummary) => {
     if (action.targeting === "none") return true;
+    // A touch that ends a condition picks who it touches.
     if (action.targeting === "single" || action.targeting === "multi") return false;
     const healing = healingOf(action);
     if (healing) return healing.self === true;

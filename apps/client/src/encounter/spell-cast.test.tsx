@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { ActorDefinition, GmActor } from "@vtt/domain";
+import type { ActorDefinition, GmActor, Rechoice } from "@vtt/domain";
 
 vi.mock("../socket", () => ({
   socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connected: true, timeout: () => ({ emit: vi.fn() }) }
@@ -240,6 +240,61 @@ describe("the prepare step after a Long Rest", () => {
     mountCleric(null, false);
     expect((screen.getByRole("button", { name: "Prepare" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Cast" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  // SRD Circle of the Land Spells: "Whenever you finish a Long Rest, choose one type of land".
+  const land: Rechoice = {
+    offer: "feature:circle-of-the-land-spells",
+    label: "Circle of the Land Spells",
+    per: "long-rest",
+    options: [
+      { id: "arid", name: "Arid Land" },
+      { id: "polar", name: "Polar Land" }
+    ],
+    chosen: "polar"
+  };
+  const mountDruid = (canPrepare: boolean) => {
+    const edit = vi.fn(() => Promise.resolve({ ok: true }));
+    const onFeedback = vi.fn();
+    render(
+      <SheetSpells
+        actor={
+          {
+            ...actor,
+            preparedSpellIds: [],
+            preparation: canPrepare ? { changesLeft: null } : null
+          } as unknown as GmActor
+        }
+        definition={cleric}
+        busy={false}
+        edit={edit as unknown as SheetEdit}
+        rolls={{ rollFlat: vi.fn() } as unknown as SheetRolls}
+        onFeedback={onFeedback}
+        routeSpell={() => false}
+        castSpellAction={vi.fn()}
+        canPrepare={canPrepare}
+        rechoices={[land]}
+      />
+    );
+    return { edit, onFeedback };
+  };
+
+  it("chooses a Land Druid's land in the step, which the server makes into the land's spells", async () => {
+    const { edit, onFeedback } = mountDruid(true);
+    const picker = screen.getByRole("combobox", { name: "Circle of the Land Spells" }) as HTMLSelectElement;
+    expect(picker.value).toBe("polar");
+    fireEvent.change(picker, { target: { value: "arid" } });
+    expect(edit).toHaveBeenLastCalledWith("actor:rechoose", {
+      actorId: actor.id,
+      offer: "feature:circle-of-the-land-spells",
+      id: "arid"
+    });
+    await vi.waitFor(() => expect(onFeedback).toHaveBeenLastCalledWith("Circle of the Land Spells: Arid Land."));
+  });
+
+  it("keeps the land fixed outside the step", () => {
+    mountDruid(false);
+    expect(screen.queryByRole("combobox", { name: "Circle of the Land Spells" })).toBeNull();
   });
 });
 

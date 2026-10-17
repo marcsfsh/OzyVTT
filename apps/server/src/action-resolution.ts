@@ -19,7 +19,7 @@ import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { readScroll } from "./resolution/scroll.js";
-import { applyHealing } from "./resolution/heal.js";
+import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { recordCleaveOpening, recordLightAttack, recordLoadingShot } from "./resolution/extra-attacks.js";
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
@@ -92,6 +92,7 @@ export function resolveDefinitionAction(
   startConcentration(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
+  applyConditionCures(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
@@ -257,6 +258,7 @@ export function actionAvailability(
       usesLimit: action.uses ? useLimitFor(siblings, action) : null,
       usesPer: action.uses?.per ?? null,
       usesPool: action.uses?.pool ?? null,
+      useCost: action.useCost ?? null,
       requiresEffectTag: action.requiresEffectTag ?? null,
       multiattack: action.multiattack
         ? action.multiattack.map((component) => ({ actionId: component.actionId, count: component.count }))

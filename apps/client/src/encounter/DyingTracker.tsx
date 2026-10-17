@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { type DeathSaveResult, type DeathSaves } from "@vtt/domain";
 import { command } from "../lib/command";
 import { RollControls, type DieMode } from "./RollControls";
@@ -18,7 +18,8 @@ export function DyingTracker({
   canRoll,
   onFeedback,
   rollMode,
-  isActingTurn
+  isActingTurn,
+  aid
 }: Readonly<{
   actorId: string;
   name: string;
@@ -27,6 +28,8 @@ export function DyingTracker({
   onFeedback: (text: string) => void;
   rollMode: "auto" | "manual";
   isActingTurn: boolean;
+  /** What someone else can do for the creature while it is dying (stabilize it). */
+  aid?: ReactNode;
 }>) {
   const [busy, setBusy] = useState(false);
   // A rolled-but-unapplied preview; Confirm applies the pips.
@@ -117,6 +120,7 @@ export function DyingTracker({
           }
         />
       )}
+      {!deathSaves.stable && !dead && aid}
     </div>
   );
 }

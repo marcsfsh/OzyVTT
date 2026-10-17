@@ -1,0 +1,227 @@
+import { useState } from "react";
+import { gameClockLabel, isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
+import { Badge, Button, Modal, Stepper, useToast } from "@vtt/ui";
+import { command } from "../lib/command";
+import "./rest.css";
+
+const NO_REST = { clockHours: 0, requests: [] as readonly string[], shortRest: null };
+
+/** Why a character can't rest now, as a short note on its row; null when nothing stands in the way. The server
+ *  decides: the note only says what it will say. */
+function restNote(state: GmView, actor: GmActor): string | null {
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id)) return "In the fight";
+  if (isDead(actor)) return "Dead";
+  if (actor.hp.current < 1) return "0 HP";
+  const wait = longRestWait(actor.lastLongRestAt ?? null, state.rest?.clockHours ?? 0);
+  return wait > 0 ? `Long rest in ${wait} h` : null;
+}
+
+/**
+ * The GM's rests: game time and passing it, players' Long Rest requests, and resting the party together. A Short
+ * Rest stays open while each player spends Hit Dice on their own device, until the GM finishes it.
+ */
+export function PartyRest({ state }: Readonly<{ state: GmView }>) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [hours, setHours] = useState(8);
+  const [unpicked, setUnpicked] = useState<ReadonlySet<string>>(new Set());
+  const { toast } = useToast();
+  // Read defensively: the first state a signing-in GM receives can still be player-shaped.
+  const rest = state.rest ?? NO_REST;
+  const party = rosterActors(state.actors).filter((actor) => actor.kind === "player-character" && !actor.archived);
+  const byId = (actorId: string) => state.actors.find((actor) => actor.id === actorId);
+  const requests = rest.requests.map(byId).filter((actor): actor is GmActor => actor !== undefined);
+  const shortRest = rest.shortRest;
+  const picked = party.filter((actor) => !unpicked.has(actor.id));
+
+  const send = async (run: () => Promise<Readonly<{ ok: boolean; message?: string }>>, success: string) => {
+    setBusy(true);
+    const result = await run();
+    setBusy(false);
+    toast(result.ok ? success : (result.message ?? "That was refused."), { tone: result.ok ? "success" : "error" });
+    return result.ok;
+  };
+  const toggle = (actorId: string) =>
+    setUnpicked((current) => {
+      const next = new Set(current);
+      if (next.has(actorId)) next.delete(actorId);
+      else next.add(actorId);
+      return next;
+    });
+  const startRest = (kind: "short" | "long") =>
+    send(
+      () => command("rest:party", { kind, actorIds: picked.map((actor) => actor.id) }),
+      kind === "long"
+        ? "The party finished a long rest. 8 hours passed."
+        : "The short rest is open on each player's device."
+    );
+
+  const label = shortRest ? "Short rest open" : "Rest";
+  return (
+    <>
+      <Button className="party-rest-open" onClick={() => setOpen(true)} aria-haspopup="dialog">
+        {label}
+        {requests.length > 0 && (
+          <Badge tone="info" solid>
+            {requests.length} asked
+          </Badge>
+        )}
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Rest"
+        size="md"
+        footer={
+          shortRest ? (
+            <>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() =>
+                  void send(() => command("rest:finish", { apply: false }), "The short rest was called off.")
+                }
+              >
+                Call off
+              </Button>
+              <Button
+                variant="primary"
+                disabled={busy}
+                onClick={() =>
+                  void send(() => command("rest:finish", { apply: true }), "The short rest is over. An hour passed.")
+                }
+              >
+                Finish short rest
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button disabled={busy || picked.length === 0} onClick={() => void startRest("short")}>
+                Short rest
+              </Button>
+              <Button disabled={busy || picked.length === 0} onClick={() => void startRest("long")}>
+                Long rest
+              </Button>
+            </>
+          )
+        }
+      >
+        <div className="party-rest">
+          <section className="party-rest-section" aria-label="Game time">
+            <span className="party-rest-heading">Game time</span>
+            <p className="party-rest-clock">{gameClockLabel(rest.clockHours)}</p>
+            <div className="party-rest-row">
+              <Stepper value={hours} onChange={setHours} min={1} max={72} disabled={busy} aria-label="Hours to pass" />
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  void send(() => command("time:pass", { hours }), `${hours} ${hours === 1 ? "hour" : "hours"} passed.`)
+                }
+              >
+                Pass {hours} {hours === 1 ? "hour" : "hours"}
+              </Button>
+            </div>
+            <p className="party-rest-hint">A long rest can start 16 hours after a character's last one ends.</p>
+          </section>
+
+          {requests.length > 0 && (
+            <section className="party-rest-section" aria-label="Long rest requests">
+              <span className="party-rest-heading">Asked for a long rest</span>
+              <ul className="party-rest-list">
+                {requests.map((actor) => (
+                  <li key={actor.id} className="party-rest-request">
+                    <span className="party-rest-name">{actor.name}</span>
+                    <span className="party-rest-note">{restNote(state, actor)}</span>
+                    <span className="party-rest-actions">
+                      <Button
+                        disabled={busy}
+                        onClick={() =>
+                          void send(
+                            () => command("rest:answer", { actorId: actor.id, approve: true }),
+                            `${actor.name} finished a long rest.`
+                          )
+                        }
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() =>
+                          void send(
+                            () => command("rest:answer", { actorId: actor.id, approve: false }),
+                            `Turned down ${actor.name}'s long rest.`
+                          )
+                        }
+                      >
+                        Turn down
+                      </Button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {shortRest ? (
+            <section className="party-rest-section" aria-label="Short rest under way">
+              <span className="party-rest-heading">Short rest under way</span>
+              <ul className="party-rest-list">
+                {shortRest.actorIds.map((actorId) => {
+                  const actor = byId(actorId);
+                  if (!actor) return null;
+                  const done = shortRest.done.includes(actorId);
+                  return (
+                    <li key={actorId} className="party-rest-member is-static">
+                      <span className="party-rest-name">{actor.name}</span>
+                      <span className="party-rest-note">
+                        {actor.hp.current}/{actor.hp.maximum} HP
+                        {actor.hitDice && ` · Hit Dice ${actor.hitDice.remaining}/${actor.hitDice.maximum}`}
+                      </span>
+                      <Badge tone={done ? "success" : "neutral"}>{done ? "Done" : "Choosing"}</Badge>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="party-rest-hint">
+                Each player spends Hit Dice on their own device. Finishing passes an hour.
+              </p>
+            </section>
+          ) : (
+            <section className="party-rest-section" aria-label="Rest the party">
+              <span className="party-rest-heading">Rest the party</span>
+              {party.length === 0 ? (
+                <p className="party-rest-hint">No characters yet.</p>
+              ) : (
+                <ul className="party-rest-list">
+                  {party.map((actor) => {
+                    const note = restNote(state, actor);
+                    return (
+                      <li key={actor.id}>
+                        <label className="party-rest-member">
+                          <input
+                            type="checkbox"
+                            checked={!unpicked.has(actor.id)}
+                            disabled={busy}
+                            onChange={() => toggle(actor.id)}
+                          />
+                          <span className="party-rest-name">{actor.name}</span>
+                          <span className="party-rest-note">
+                            {actor.hp.current}/{actor.hp.maximum} HP{note ? ` · ${note}` : ""}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <p className="party-rest-hint">
+                A long rest happens at once and passes 8 hours. A short rest opens on each player&apos;s device.
+              </p>
+            </section>
+          )}
+        </div>
+      </Modal>
+    </>
+  );
+}

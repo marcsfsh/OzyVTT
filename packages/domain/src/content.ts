@@ -492,6 +492,8 @@ export type ContentActionSummary = Readonly<{
   /** d6 threshold for usesPer "recharge" ("Recharge 5-6" → 5); rolled automatically at the start of the owner's turn. */ usesRecharge:
     number | null;
   usesPool: string | null;
+  /** Uses one activation spends when it is more than one, or `chosen` when the user picks it (Lay on Hands). */ useCost?:
+    number | "chosen";
   requiresEffectTag: string | null;
   multiattack: ReadonlyArray<{ actionId: string; count: number }> | null;
   grants: boolean;

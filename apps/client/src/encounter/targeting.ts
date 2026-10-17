@@ -29,6 +29,8 @@ export type TargetingSession = Readonly<{
   template: TargetingTemplate | null;
   /** The spell slot a spell is cast with, sent with every resolve of this session. */
   slotLevel?: number;
+  /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
+  spend?: number;
   /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
   darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
   /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
@@ -69,7 +71,9 @@ export function beginTargeting(
   const dartTotal = dartsAtSlot ?? action.darts;
   const slot = {
     ...(slotLevel !== undefined ? { slotLevel } : {}),
-    ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {})
+    ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {}),
+    // A picked cost starts at one; the picker raises it.
+    ...(action.useCost === "chosen" ? { spend: 1 } : {})
   };
   if (area) {
     // Map the SRD area shape onto a drawable annotation shape (sphere/emanation → circle, cube → square).
@@ -140,6 +144,12 @@ export function setTemplatePlacement(origin: AnnotationPoint, target: Annotation
     emit();
   }
 }
+/** How much of its pool the action being targeted spends (Lay on Hands' points). */
+export function setTargetingSpend(spend: number) {
+  if (!session || session.action.useCost !== "chosen") return;
+  session = { ...session, spend };
+  emit();
+}
 export function clearTargeting() {
   if (session !== null || blockedPrompt !== null) {
     session = null;
@@ -186,7 +196,7 @@ export function resolveTargeting(
   opts: ResolveOptions = {}
 ) {
   if (!session || busy) return;
-  const { attackerId, action, mode, selected, template, slotLevel, darts, damageType } = session;
+  const { attackerId, action, mode, selected, template, slotLevel, spend, darts, damageType } = session;
   // A single-target attack previews first (commit: false) so the result card can offer Adv/Disadv, a
   // typed d20 and Confirm. Templates, multi-target and save/utility actions resolve straight through.
   // An explicit `commit` in opts wins (the Confirm tap).
@@ -201,6 +211,7 @@ export function resolveTargeting(
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(spend !== undefined ? { spend } : {}),
     ...(damageType !== undefined ? { damageType } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})

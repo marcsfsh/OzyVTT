@@ -129,6 +129,12 @@ export type PlayerCombatView = Readonly<{
 }>;
 /** An archived, public character the GM shared for preview: id and name only. */
 export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;
+/** The player's own characters' part of resting: which of them asked for a Long Rest, and the party's Short Rest when
+ *  one of them is in it, cut down to them. The game clock stays with the GM; a refused rest explains the wait. */
+export type PlayerRestView = Readonly<{
+  requests: readonly string[];
+  shortRest: Readonly<{ actorIds: readonly string[]; done: readonly string[] }> | null;
+}>;
 export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;
   actors: PlayerActor[];
@@ -136,6 +142,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
   /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;
+  /** Long Rest requests and the party's Short Rest, for the player's own characters only. */ rest: PlayerRestView;
 };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */

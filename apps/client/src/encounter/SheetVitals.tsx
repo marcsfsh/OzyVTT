@@ -4,6 +4,7 @@ import { Button, Input, Meter } from "@vtt/ui";
 import { command } from "../lib/command";
 import { HpAdjust } from "./HpAdjust";
 import { signed } from "./format";
+import { isDeadOnSheet } from "./mortality";
 import type { SrdExtension } from "./sheet-extension";
 
 /** HP with its tracker, AC, initiative and speeds, the numbers read most often mid-fight. */
@@ -23,6 +24,7 @@ export function SheetVitals({
   const [editingAc, setEditingAc] = useState(false);
   const hp = actor.hp;
   const exactHp = "kind" in hp ? (hp.kind === "exact" ? hp : null) : hp;
+  const dead = isDeadOnSheet(actor);
   const speeds = extension.speeds
     ? (["walk", "swim", "fly", "climb", "burrow"] as const)
         .flatMap((mode) => {
@@ -49,11 +51,20 @@ export function SheetVitals({
           </strong>
         </div>
         {exactHp && <Meter className="sheet-hp-meter" tone="health" value={exactHp.current} max={exactHp.maximum} />}
-        <HpAdjust
-          actor={actor}
-          controls={role === "gm" ? ["damage", "heal", "temp", "set"] : ["damage", "heal", "temp"]}
-          onFeedback={onFeedback}
-        />
+        {/* The dead regain nothing until revived, and only the GM revives. */}
+        {dead ? (
+          role === "gm" ? (
+            <HpAdjust actor={actor} controls={["revive"]} onFeedback={onFeedback} />
+          ) : (
+            <p className="sheet-vital-note">Dead. Only a revival brings them back - ask the GM.</p>
+          )
+        ) : (
+          <HpAdjust
+            actor={actor}
+            controls={role === "gm" ? ["damage", "heal", "temp", "set"] : ["damage", "heal", "temp"]}
+            onFeedback={onFeedback}
+          />
+        )}
       </div>
       {role === "gm" ? (
         <button
