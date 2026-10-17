@@ -24,6 +24,7 @@
 | [020](0020-combat-rules-engine.md)              | Accepted                                       | Server-owned combat rules: validated action resolution with rules modes + audited overrides, action instances, persistent effects, typed damage, and the dying state                                          |
 | [021](0021-player-character-sheet.md)           | Accepted                                       | Interactive player character sheet (builder-ready): the play sheet ships. The guided builder was deferred and **has since shipped** — see [its closing record](0021-player-character-sheet-closing-record.md) |
 | [022](0022-manual-fog-of-war.md)                | Accepted                                       | Manual GM-painted fog as ordered rect strokes over the scene boundary — presentation only, never the security boundary                                                                                        |
+| [026](0026-homebrew-creation-wizards.md)        | Accepted                                       | Homebrew is made step by step in a wizard per type, over the same draft the full editor edits: borrowed editor fields, a few composers, and the editor's own publish checklist placed on the steps            |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 

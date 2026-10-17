@@ -226,6 +226,13 @@ names no family is the GM's own ruling on the whole command.
   separately and merged at build time.
 - The GM authors homebrew in the app. It is stored in its own store (`homebrew-store.ts`),
   validated against the same schemas, and served through `homebrew-http.ts`.
+- New homebrew opens in a step-by-step wizard (`apps/client/src/homebrew/wizard/`, ADR-0026). A
+  wizard is data over the same draft the full editor edits: its questions are the editor's own
+  fields in plainer words, and a few composers keep derived values in step, such as a monster's
+  Proficiency Bonus, XP and Hit Points or a spell's upcast rows and healing sentence. `RecordDetail`
+  owns the draft, autosave and publish for both views, and the review step places the editor's
+  publish checklist on the step that answers each item. The monster wizard compares its numbers with
+  the SRD stat blocks of its CR, read from the bundle by `content:monster-benchmarks`.
 - Characters are built server-side (`character-build.ts`) from content and the choices made in
   the guided builder. What a build may pick is one survey (`character-offers.ts`): a create
   validates against it, the random generator answers it, and the builder is served it for each
