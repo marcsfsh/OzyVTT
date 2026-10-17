@@ -22,6 +22,8 @@ interface SegmentedControlProps {
   ariaLabel: string;
   size?: "sm" | "md";
   className?: string;
+  /** Every option off at once; say why beside the control. */
+  disabled?: boolean;
 }
 
 /** Inline "pick exactly one" control for filters and mode switches (a
@@ -33,7 +35,8 @@ export function SegmentedControl({
   onChange,
   ariaLabel,
   size = "md",
-  className
+  className,
+  disabled = false
 }: SegmentedControlProps) {
   return (
     <div
@@ -48,6 +51,7 @@ export function SegmentedControl({
           className="nh-segmented-option tap-target interactive"
           aria-pressed={value === option.value}
           aria-label={option.ariaLabel}
+          disabled={disabled}
           title={option.title}
           onClick={() => onChange(option.value)}
         >

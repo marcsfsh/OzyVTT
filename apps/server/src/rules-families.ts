@@ -85,7 +85,7 @@ const RULE_FAMILIES = {
   "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction, not an economy one.
   "condition.charmed-charmer": "targeting",
-  // Spellcasting is its own family, so "Don't police spell slots or prepared spells" relaxes these and nothing else.
+  // Spellcasting is its own family, so turning off "Check spell slots and prepared spells" relaxes these alone.
   "slots.none-remaining": "slots",
   "slots.below-spell-level": "slots",
   "slots.one-per-turn": "slots",
