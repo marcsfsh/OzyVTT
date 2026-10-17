@@ -1,6 +1,6 @@
 // Prose several Codex writes share.
 const CODEX_COMMAND_ID =
-  "Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400 rather than a replay; answering the earlier response would silently skip the later write.";
+  "Optional idempotency key, unique to ONE request: resend the same id to retry that request safely and the stored outcome is replayed verbatim with `x-idempotent-replay: true`. Reusing an id for a DIFFERENT request is a 400, since answering with the earlier response would silently skip the later write.";
 const JOURNAL_SESSION_ID =
   "File this entry under a session BY ID. Omitted on a create auto-files it under the ACTIVE session; explicit `null` files it under none; an id naming no session is a 404. `sessionNumber` is NOT accepted on any write; the number is a display value the server resolves from the linked record, so a body carrying one is a 400 with the key named in `details.issues`.";
 const CODEX_TAGS =
@@ -20,7 +20,7 @@ const REVEALED_SUBSET = "Filtered to the revealed subset.";
 
 // Prose the content catalogs share.
 const CHOICE_CATALOG =
-  'An open catalog slug supplying the options instead of (or beside) `from`: the same grammar a feature\'s `fromCatalog` uses, resolved by the same function on both sides. Species language choices use "standard-languages"; null when `from` names the options outright';
+  'An open catalog slug that supplies the options, alone or beside `from`: the same grammar a feature\'s `fromCatalog` uses, resolved by the same function on both sides. Species language choices use "standard-languages"; null when `from` names the options outright';
 const ATTRIBUTION =
   "The bundle's canonical CC BY 4.0 statement. ADR-0015 requires it on any surface that displays this content";
 const CASTER_PROGRESSION = "How this class's levels count toward the shared multiclass caster level";
@@ -77,10 +77,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "archiveSchemaVersion 3 (additive over 1 and 2): { archiveSchemaVersion, startedAt, endedAt, turnCount, turns[{index,kind,label,revision,at,state}], log[], journal[{seq,commandId,type,actorId,principal,payload,revision,at}], finalState, postEncounterState, rolls[], definitions[{id,source,definition}], attribution }"
   },
   PlayerSessionIssued: {
-    token: "Bearer token for player-limited calls; long-lived, not individually revocable (LAN trust)."
+    token: "Bearer token for player-limited calls; long-lived, with no per-token revocation (LAN trust)."
   },
   HomebrewValidationIssue: {
-    path: 'Field path into the authored record, e.g. ["levelTable", 3, "spellSlots"]: the offending field, machine-addressable, so a form editor can point at it instead of parsing prose',
+    path: 'Field path into the authored record, e.g. ["levelTable", 3, "spellSlots"]: the offending field, machine-addressable, so a form editor can point at it with no prose to parse',
     recordId:
       "Which record in a pack the issue belongs to; null for a single-record publish. Present-but-null, so a consumer never branches on key presence"
   },
@@ -88,7 +88,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "Whether a record may be published, and why not. Carried on every single-record read so the GM's library can say \"3 drafts can't publish yet\" without a round-trip per record."
   },
   HomebrewRecord: {
-    "": "The AUTHORED CONTENT ONLY. `state`, `visibleToPlayers`, and `deletedAt` are row state and live on HomebrewRecordDocument, which is what stops an imported pack from inheriting the exporting table's visibility policy. One branch per `HomebrewContentType`, discriminated by the body's own `type`. A field with a server-side default is optional on the wire, and an optional field is absent rather than null."
+    "": "The AUTHORED CONTENT ONLY. `state`, `visibleToPlayers`, and `deletedAt` are row state and live on HomebrewRecordDocument, which is what stops an imported pack from inheriting the exporting table's visibility policy. One branch per `HomebrewContentType`, discriminated by the body's own `type`. A field with a server-side default is optional on the wire, and an unset optional field is left out entirely."
   },
   HomebrewClassRecord: {
     "": "A character class. The heaviest of the nine: a full 20-row printed table plus every feature it can grant. Duplicating an SRD class (`POST /content/{id}/duplicate` with `wizard`) is what makes that tractable to author.",
@@ -122,7 +122,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     subclassLevel: "The class level this subclass is taken at; omitted inherits the parent class's"
   },
   HomebrewSpeciesRecord: {
-    "": "A playable species. NOTE the deliberate absence of required ability bonuses: SRD 5.2.1 puts ability increases on the BACKGROUND. `abilityBonuses` exists anyway as optional data so a 2014-style or homebrew species can still carry them, and the builder applies whatever a record declares instead of assuming an edition.",
+    "": "A playable species. NOTE the deliberate absence of required ability bonuses: SRD 5.2.1 puts ability increases on the BACKGROUND. `abilityBonuses` exists anyway as optional data so a 2014-style or homebrew species can still carry them, and the builder applies whatever a record declares and assumes no edition.",
     id: "The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write, because a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas",
     source:
       'Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same',
@@ -183,7 +183,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     castingOptions: "Per-slot-level upcast scaling; the sheet applies the row matching the chosen cast level"
   },
   HomebrewEquipmentRecord: {
-    "": 'Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item, or a homebrew kind nobody has invented yet. It has no `summary` or `attribution`, and an undeclared key is refused. `slot` is now the mechanical hook (`category` stays the open display slug), so a homebrew `category: "relic"` with `slot: "armor"` does derive AC. Every rider below lives on the CATALOG record and never on the carried inventory row: an owner is handed their whole inventory verbatim in their projection, so a rider mirrored onto that row would reach the player the instant they picked the item up, which is what makes hiding a cursed item\'s mechanics structural rather than a deletion someone has to remember.',
+    "": 'Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item, or a homebrew kind nobody has invented yet. It has no `summary` or `attribution`, and an undeclared key is refused. `slot` is now the mechanical hook (`category` stays the open display slug), so a homebrew `category: "relic"` with `slot: "armor"` does derive AC. Every rider below lives on the CATALOG record and never on the carried inventory row: an owner is handed their whole inventory verbatim in their projection, so a rider mirrored onto that row would reach the player the instant they picked the item up, which is what makes hiding a cursed item\'s mechanics structural, with no deletion for someone to remember.',
     id: "The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write, because a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas",
     source:
       'Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same',
@@ -197,7 +197,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     appliesTo:
       'Makes the item a TEMPLATE (the SRD\'s "Weapon, +1 (Any Simple or Martial)"). `label` is the printed wording the chooser shows; `baseIds` the RESOLVED weapon/armor ids the player may pick from; publish refuses an id the merged catalog cannot resolve, a category other than weapon, armor or ammunition, and fixed stats alongside a template. The picked base\'s stats are copied onto the inventory row by the SERVER at set-inventory; the row records the pick as `baseId`. Magic AMMUNITION names the gear table\'s ammunition ("Any Ammunition": Arrows, Crossbow Bolts...): its pick copies no stats and says which launchers fire it.',
     rarity:
-      'Display and filtering only ("uncommon", "legendary"). An OPEN slug: rarity is identity, not a mechanical hook',
+      'Display and filtering only ("uncommon", "legendary"). An OPEN slug: rarity is identity and drives no mechanics',
     attunement: "Attunement requirement and its advisory class/species restriction",
     cursed:
       "A cursed item cannot be voluntarily removed once attuned, and its magic half is withheld from the player until attunement. It MUST require attunement, because a curse you can drop by taking the hat off is not a curse, and requiring attunement gives the hiding rule one well-defined boundary: hidden until attuned, fully visible after, because by then the player has learned it and hiding further would only make their own sheet lie to them",
@@ -217,7 +217,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     spellScroll:
       "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`",
     grantsFeatIds:
-      "Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional (nothing ever grants an item back), so a cycle cannot be drawn rather than merely being checked for",
+      "Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional (nothing ever grants an item back), so a cycle cannot be drawn, and no check for one is needed",
     tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
     actions: "Rollable actions this adds to the sheet (Second Wind, Channel Divinity, Breath Weapon)",
     effects:
@@ -235,20 +235,20 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     consumesSpellSlot: "Whether casting it also spends one of the bearer's own spell slots"
   },
   ItemAttunement: {
-    "": 'Attunement. `restrictedTo` matches class ids or a species id and is ADVISORY: shown on the sheet ("Requires attunement by a cleric"), never a block: it is an open slug set, blocking on a fuzzy match would be wrong, and a GM handing a player a restricted item on purpose is a normal table event rather than an error to refuse.',
+    "": 'Attunement. `restrictedTo` matches class ids or a species id and is ADVISORY: shown on the sheet ("Requires attunement by a cleric"), never a block: it is an open slug set, blocking on a fuzzy match would be wrong, and a GM handing a player a restricted item on purpose is a normal table event, with nothing to refuse.',
     restrictedTo: "Class or species ids the item is meant for. Advisory only"
   },
   HomebrewMonsterRecord: {
     "": "A creature stat block: an ActorDefinition, the same shape `actor.import-definition` and the bundled bestiary use. Note `source` here is bundle PROVENANCE (`{name, version, externalId}`), deliberately NOT the srd/homebrew discriminator the other eight carry: that name was already taken, and a sibling key meaning the same thing twice is worse than deriving homebrew-ness from the row (which is what the merge does). The row's id becomes `source.externalId`.",
     id: "The row's id. NOT part of ActorDefinitionSchema; the server stamps it into the stored body so the merged bestiary can resolve the record back to its row",
     schemaVersion: "ADR-0007 integer schema version; discoverable at /system/version",
-    source: "Bundle provenance, not the content discriminator",
+    source: "Bundle provenance. It plays no part in telling SRD content from homebrew",
     "hitPoints.formula":
       'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)',
     token: "The battlemap PIECE: disposition and grid footprint. Nothing to do with credentials",
     extensions:
       'Free-form passthrough an importer may carry. One bag is read: publishing needs `extensions["open5e.srd-2024"]` to hold a numeric `challengeRating` (0.125 for CR 1/8) and a non-empty `type` ("dragon"), because the bestiary lists, sorts and searches by them. Example: `{"open5e.srd-2024": {"challengeRating": 5, "type": "giant"}}`. Everything else is carried and never read',
-    conditionImmunities: "Reference-level for now: displayed, not yet enforced on actor.set-condition",
+    conditionImmunities: "Reference-level for now: displayed, and actor.set-condition does not enforce it yet",
     legendary:
       "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a Long Rest",
     character:
@@ -260,7 +260,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     startingCurrency: "Immutable starting coins; the character half, see `character`"
   },
   HomebrewSpellListRecord: {
-    "": 'A spell list as a membership OVERLAY, never an edit to the generated spell bundle: `basedOn` expands existing lists, `add` layers ids on top, and `remove` always wins. That is what keeps "the Wizard list plus my three spells" ONE row instead of 221. A list resolving to ZERO spells is a hard character-creation rejection downstream, so publish-time validation refuses an empty one.',
+    "": 'A spell list as a membership OVERLAY, never an edit to the generated spell bundle: `basedOn` expands existing lists, `add` layers ids on top, and `remove` always wins. That is what keeps "the Wizard list plus my three spells" ONE row where a copy would take 221. A list resolving to ZERO spells is a hard character-creation rejection downstream, so publish-time validation refuses an empty one.',
     id: "The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write, because a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas",
     source:
       'Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same',
@@ -280,13 +280,13 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": 'A named starting-equipment bundle ("A: chain mail and a martial weapon", "C: 155 gp"). The chosen option\'s id is what lands in the character\'s choice ledger, so the items must be RESOLVABLE; a label alone can be displayed but never turned into inventory.'
   },
   ClassLevelRow: {
-    "": "ONE row of a class's 20-level table. `features` lists the ids granted at that level, resolved against the owning record's own `features[]`. The optional columns carry whatever the printed table carries. Omit a column this class does not have rather than sending zeroes.",
+    "": "ONE row of a class's 20-level table. `features` lists the ids granted at that level, resolved against the owning record's own `features[]`. The optional columns carry whatever the printed table carries. Omit a column this class does not have; zeroes would be read as printed values.",
     spellSlots: "Nine counts, index 0 = level 1 slots. Omitted on a non-caster row",
     pactSlots: "Warlock Pact Magic: one uniform slot level with its own count",
     preparedFormula:
       'The prepared-spell rule as data ("<ability> modifier + <class> level") so a homebrew class prints its own wording',
     classResources:
-      "Named per-level resources (Rage 3, Ki 5, Sneak Attack 3d6, Second Wind 3). A PRINTED COLUMN, not a namespace: the live pool the engine spends is `actor.actionUses[uses.pool ?? action.id]`, and an id here reaches it only by matching a `uses.pool` on the same class. Mark a column that is genuinely only ink with `display: true`",
+      "Named per-level resources (Rage 3, Ki 5, Sneak Attack 3d6, Second Wind 3). A PRINTED COLUMN. The live pool the engine spends is `actor.actionUses[uses.pool ?? action.id]`, and an id here reaches it only by matching a `uses.pool` on the same class. Mark a column that is genuinely only ink with `display: true`",
     "classResources[].amount": "A count, or a dice string",
     "classResources[].display": "This column is ink only: no live pool answers to this id, and none is expected to"
   },
@@ -319,7 +319,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     mastery:
       "The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks THIS weapon through Weapon Mastery.",
     properties:
-      "The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` lets a melee weapon be thrown at range, and `reach` makes its reach 10 feet instead of 5; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible, but only the nine SRD ones have readers, and an unknown slug is inert rather than an error. Omit to record nothing; an empty array says the weapon has none."
+      "The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` lets a melee weapon be thrown at range, and `reach` makes its reach 10 feet; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible, but only the nine SRD ones have readers, and an unknown slug is inert and raises no error. Omit to record nothing; an empty array says the weapon has none."
   },
   EquipmentArmor: {
     "": "Body armor carries its full base AC (11-18); a shield carries its +2 bonus."
@@ -333,7 +333,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     choices:
       "SEVERAL picks, when one record promises more than one: Magic Initiate's \"two cantrips ... and one level 1 spell\", Deft Explorer's Expertise plus two languages. Mutually exclusive with `choice`, which stays the way almost every record is authored",
     extraPicks:
-      'Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class\'s list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2',
+      'Budgets this raises, where the player picks the outcome: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class\'s list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2',
     replaces:
       'Picks this lets the character RE-MAKE later: "whenever you finish a Long Rest, choose one type of land". Not a budget increase: it edits an answer. A level-up clause rewrites the choices ledger; a rest clause is runtime state on the actor, cleared by the matching rest',
     tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
@@ -350,11 +350,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   FeatureChoice: {
     "": "A pick a feature asks for, in three increasing richnesses: `fromCatalog` (an open catalog slug resolved at pick time), `from` (explicit ids whose mechanics live elsewhere or nowhere), or `options` (the ids WITH their mechanics inline, for options that exist only here: Divine Order's two sacred roles, Giant Ancestry's six boons). `options` and `from` are mutually exclusive: after parsing, `from` always holds the canonical id list, derived from `options` when they were authored.",
     kind: "Open slug the wizard renders generically: fighting-style, skill, expertise, subclass, asi, feat, spell, cantrip, language, tool, or anything homebrew invents",
-    from: 'Explicit option ids. Must name at least one; an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list',
+    from: "Explicit option ids. Must name at least one; an empty list is an authoring mistake. Omit the field entirely when `fromCatalog` or `options` supplies the list",
     fromCatalog: "An open catalog slug resolved at pick time (skills, feats, wizard-spells)",
     maxSpellLevel: "Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only)",
     minSpellLevel:
-      'Floor on a spell pick\'s level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell", not "6 or lower"; both bounds at 6 make the pick exact',
+      'Floor on a spell pick\'s level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell"; both bounds at 6 make the pick exact',
     fromPicks:
       'THE OPTIONS ARE THE CHARACTER\'S OWN EARLIER ANSWERS: "choose one of your known Warlock cantrips that deals damage". `offer` names the budget holding them, in the same key namespace extraPicks uses; `where` is a CLOSED predicate slug, never an expression. Resolves to a non-empty list or DEFERS, exactly as an unresolvable fromCatalog does.',
     maximum:
@@ -363,16 +363,16 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     options: "Options carrying their own mechanics. Mutually exclusive with `from`"
   },
   FeatureOption: {
-    "": 'ONE pickable option that carries its OWN mechanics: structurally a HomebrewFeature minus `replacesFeatureId`, with identical rider fields and identical meanings. That is the point: a chosen option is interpreted by the very same code path that interprets a class feature, so "Divine Order: Protector" carries its Martial-weapon and Heavy-armor training itself instead of being a bare id string nothing downstream can read.',
+    "": 'ONE pickable option that carries its OWN mechanics: structurally a HomebrewFeature minus `replacesFeatureId`, with identical rider fields and identical meanings. That is the point: a chosen option is interpreted by the very same code path that interprets a class feature, so "Divine Order: Protector" carries its Martial-weapon and Heavy-armor training itself, so it is never a bare id string nothing downstream can read.',
     requires:
-      'This option is legal only when an EARLIER answer says so: "the option you chose for Blessed Strikes grows more powerful". `offer` is the same offer-key namespace `extraPicks` uses. When gating leaves exactly as many legal options as the capacity, the survivors are ADOPTED and no pick is rendered: the answer is a consequence, not a choice.',
+      'This option is legal only when an EARLIER answer says so: "the option you chose for Blessed Strikes grows more powerful". `offer` is the same offer-key namespace `extraPicks` uses. When gating leaves exactly as many legal options as the capacity, the survivors are ADOPTED and no pick is rendered: the answer is a consequence of the gating.',
     level:
       'The class level this option may first be chosen at: an invocation\'s "Prerequisite: Level 5+ Warlock". A build below it is not offered the option',
     choice: "A SECOND-ORDER pick this option owes once chosen, from a list of its own",
     choices:
       "SEVERAL second-order picks (Pact of the Tome asks for three cantrips AND two rituals). Mutually exclusive with `choice`",
     extraPicks:
-      'Budgets this raises rather than outcomes it grants: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class\'s list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2',
+      'Budgets this raises, where the player picks the outcome: "you know one extra cantrip from the Cleric spell list", "one additional skill from your class\'s list". The printed level row and every grant are SUMMED, so two features each granting +1 yield +2',
     replaces:
       'Picks this lets the character RE-MAKE later: "whenever you finish a Long Rest, choose one type of land". Not a budget increase: it edits an answer. A level-up clause rewrites the choices ledger; a rest clause is runtime state on the actor, cleared by the matching rest',
     tags: "Open grouping slugs for the sheet (spellcasting, fighting-style, channel-divinity)",
@@ -393,20 +393,20 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     amount:
       'How many extra picks, as a flat number. Additive across every source that names the same budget. Exactly one of `amount` and `scaling` is authored, because a defaulted amount beside a scaling rule would be indistinguishable from an authored one, and "the flat amount was silently ignored" is the failure this vocabulary exists to end',
     scaling:
-      "How many extra picks, read off the class table's own printed column instead of a constant. The budget then follows the column at every level"
+      "How many extra picks, read off the class table's own printed column. The budget then follows the column at every level"
   },
   ExtraPickScaling: {
     "": "A pick budget that FOLLOWS A PRINTED COLUMN: the same fourth way `HomebrewFeatureUses` scales a feature's uses, applied to capacity. `class-resource-growth` yields how far the named `classResources` column has grown above its first printed value at this character's level, so the feature's own `choose` plus the growth is the printed total: Eldritch Invocations runs 1 -> 10 and Weapon Mastery 3 -> 6 (Fighter) and 2 -> 4 (Barbarian). Repeat grants cannot express these, because the column steps at levels where the SRD prints no feature heading to carry a grant at all.",
     id: "The `classResources.id` of the printed column (eldritch-invocations, weapon-mastery)"
   },
   FeatureOptionChoice: {
-    "": "THE TERMINAL of the feature/choice/option cycle. Identical to HomebrewFeatureChoice except that it HAS NO `options` KEY AT ALL, so the recursion is bounded by the schema rather than by a promise in prose: an option's own pick may name ids or a catalog slug, and can never open a third level.",
+    "": "THE TERMINAL of the feature/choice/option cycle. Identical to HomebrewFeatureChoice except that it HAS NO `options` KEY AT ALL, so the schema itself bounds the recursion: an option's own pick may name ids or a catalog slug, and can never open a third level.",
     kind: "Open slug the wizard renders generically: fighting-style, skill, expertise, subclass, asi, feat, spell, cantrip, language, tool, or anything homebrew invents",
-    from: 'Explicit option ids. Must name at least one; an empty list is an authoring mistake, not "no options offered". Omit the field entirely when `fromCatalog` or `options` supplies the list',
+    from: "Explicit option ids. Must name at least one; an empty list is an authoring mistake. Omit the field entirely when `fromCatalog` or `options` supplies the list",
     fromCatalog: "An open catalog slug resolved at pick time (skills, feats, wizard-spells)",
     maxSpellLevel: "Ceiling on a spell pick's level (Magic Initiate: 0, cantrips only)",
     minSpellLevel:
-      'Floor on a spell pick\'s level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell", not "6 or lower"; both bounds at 6 make the pick exact',
+      'Floor on a spell pick\'s level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell"; both bounds at 6 make the pick exact',
     fromPicks:
       'THE OPTIONS ARE THE CHARACTER\'S OWN EARLIER ANSWERS: "choose one of your known Warlock cantrips that deals damage". `offer` names the budget holding them, in the same key namespace extraPicks uses; `where` is a CLOSED predicate slug, never an expression. Resolves to a non-empty list or DEFERS, exactly as an unresolvable fromCatalog does.',
     maximum:
@@ -499,7 +499,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   FeatureSave: {
     "": "A save a feature forces. `ability` is what the TARGET rolls; `dc` is how the number is derived; the outcome fields are a stat block's.",
-    dc: "Three forms, all of them data rather than a formula language (ADR-0008): the character's own spell save DC, a printed constant, or the SRD's \"DC 8 plus your <ability> modifier and Proficiency Bonus\" wording as three bounded fields.",
+    dc: "Three forms, all of them plain data with no formula language (ADR-0008): the character's own spell save DC, a printed constant, or the SRD's \"DC 8 plus your <ability> modifier and Proficiency Bonus\" wording as three bounded fields.",
     successDamage: 'The damage a successful save takes: "half" (Fireball) or "none" (Sacred Flame)',
     failureConditions:
       "Every condition a failed save imposes (Turn Undead: Frightened and Incapacitated); empty for none. Exhaustion is not offered: it stacks by level"
@@ -510,7 +510,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     ability: "Whose modifier is added: the CASTER's ability. The target's roll does not change it"
   },
   FeatureUses: {
-    "": 'Uses a feature gets back on a rest, as DATA rather than a formula language. Either `limit` or `scaling` must be present. The `per` vocabulary is deliberately NARROWER than an action\'s: there is no "recharge", because a recharge roll belongs to a stat block, not a character feature.',
+    "": 'Uses a feature gets back on a rest, as DATA with no formula language. Either `limit` or `scaling` must be present. The `per` vocabulary is deliberately NARROWER than an action\'s: there is no "recharge", because a recharge roll belongs to a stat block.',
     limit: "A flat count",
     scaling: "The four ways 5e actually scales a feature's uses.",
     pool: "Shares ONE counter across every feature carrying the same pool id"
@@ -522,7 +522,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "Uses equal to an ability modifier, floored at `minimum`."
   },
   FeatureUsesScalingClassResource: {
-    "": 'Read the count straight off THIS class table\'s printed column, by `classResources.id`. The one the other three cannot say: Rage, Bardic Inspiration and Channel Divinity step on a schedule that is neither the proficiency bonus nor an ability modifier, and re-typing the printed column into a `by-level` table beside the column it duplicates is the second copy that drifts. A resource whose printed amount is a DICE STRING (Sneak Attack "3d6") is damage, not a count of uses, and resolves to no uses at all.'
+    "": 'Read the count straight off THIS class table\'s printed column, by `classResources.id`. The one the other three cannot say: Rage, Bardic Inspiration and Channel Divinity step on a schedule that is neither the proficiency bonus nor an ability modifier, and re-typing the printed column into a `by-level` table beside the column it duplicates is the second copy that drifts. A resource whose printed amount is a DICE STRING (Sneak Attack "3d6") is damage and resolves to no uses at all.'
   },
   FeatureUsesScalingByLevel: {
     "": "A printed per-level column."
@@ -534,7 +534,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     when: 'The condition the TEN LIST FIELDS above apply under: every one except `spells`, which cannot be gated: a granted spell is baked into the sheet\'s spell list, its prepared count and its cantrip action when the character is BUILT, so nothing would re-read the gate. A block carrying both `when` and `spells` is refused, naming the spells that would have been lost. Omitted = unconditional, which is what every record written before this field meant. Only the two trigger kinds a derivation can answer are allowed: static gates (attuned, while-armored, while-unarmored, while-shield, while-character-is, while-proficient-with) and dynamic gates (while-effect-tag, while-hp-at-or-below, while-condition). A moment or a filter is refused: a grant is collected before any roll starts, so a gate it cannot evaluate would silently mean "always"'
   },
   Modifier: {
-    "": "THE rider vocabulary: what a feature, a feat, a chosen option, a magic ITEM and a live EFFECT contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a SIGNED integer, so a curse is this vocabulary with a negative number rather than a second one, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an ITEM refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an EFFECT refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `darkvision`, `sense`, `spell-slot`), which an effect that ends could never give back."
+    "": "THE rider vocabulary: what a feature, a feat, a chosen option, a magic ITEM and a live EFFECT contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a SIGNED integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an ITEM refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an EFFECT refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `darkvision`, `sense`, `spell-slot`), which an effect that ends could never give back."
   },
   ModifierAbilityScore: {
     "": "Raise (or lower) one ability score, optionally past the usual cap. REFUSED on an item: an ability score cascades into AC, saves, skills, spell DC, hit points and initiative, and every one of those reads the baked `abilityScores`, so layering one score means layering the whole sheet.",
@@ -555,7 +555,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
   },
   ModifierArmorClass: {
-    "": 'A flat AC rider, read live from every carrier (a feature or feat as much as an item), so it follows the armor worn now. `whileArmored` is the ONE bounded condition the SRD\'s printed bonuses need (the Defense fighting style reads "While you\'re wearing Light, Medium, or Heavy armor"); it is a boolean, not a condition language, and defaults to the unconditional bonus every earlier record meant. `when: [{"type": "while-armored"}]` now says the same thing in the general vocabulary; the boolean STAYS because shipped bundles author it, and a collector normalises it into that trigger.',
+    "": 'A flat AC rider, read live from every carrier (a feature or feat as much as an item), so it follows the armor worn now. `whileArmored` is the ONE bounded condition the SRD\'s printed bonuses need (the Defense fighting style reads "While you\'re wearing Light, Medium, or Heavy armor"); it is a plain boolean with no condition language, and defaults to the unconditional bonus every earlier record meant. `when: [{"type": "while-armored"}]` now says the same thing in the general vocabulary; the boolean STAYS because shipped bundles author it, and a collector normalises it into that trigger.',
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
@@ -665,14 +665,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
   },
   ModifierExtraDamage: {
-    "": 'Extra TYPED damage, in one of the 13 SRD damage types. An attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a type. TWO independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the BEARER\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage"): a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with NEITHER is refused at publish rather than stored to silently add nothing, and so is one gated on a moment the damage roll never collects (only `on-hit`, `on-critical-hit` and `on-damage-roll` are). `doubleOnCritical` defaults true because a Critical Hit rolls the attack\'s other damage dice twice too (SRD 5.2.1 "Critical Hits": "If the attack involves other damage dice, such as from the Rogue\'s Sneak Attack feature, you also roll those dice twice"); set it false only where a rule says otherwise. An ability modifier is never doubled at all.',
+    "": 'Extra TYPED damage, in one of the 13 SRD damage types. An attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a type. TWO independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the BEARER\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage"): a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with NEITHER is refused at publish, so none is stored to silently add nothing, and so is one gated on a moment the damage roll never collects (only `on-hit`, `on-critical-hit` and `on-damage-roll` are). `doubleOnCritical` defaults true because a Critical Hit rolls the attack\'s other damage dice twice too (SRD 5.2.1 "Critical Hits": "If the attack involves other damage dice, such as from the Rogue\'s Sneak Attack feature, you also roll those dice twice"); set it false only where a rule says otherwise. An ability modifier is never doubled at all.',
     formula: 'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)',
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
   },
   ModifierRollMode: {
-    "": 'Advantage or disadvantage on a NAMED roll: one branch with a `mode` field rather than two per roll kind. It feeds the same aggregation that already implements 5e cancellation (any advantage plus any disadvantage is normal) and labels each source on the roll card, so a curse is `mode: "disadvantage"` and needs no separate machinery. `concentration` is the Constitution save that keeps a spell going; `incoming-attack` is attacks made against the bearer (Dodge).',
+    "": 'Advantage or disadvantage on a NAMED roll: one branch per roll kind, with a `mode` field. It feeds the same aggregation that already implements 5e cancellation (any advantage plus any disadvantage is normal) and labels each source on the roll card, so a curse is `mode: "disadvantage"` and needs no separate machinery. `concentration` is the Constitution save that keeps a spell going; `incoming-attack` is attacks made against the bearer (Dodge).',
     when: "AND-list of at most four triggers gating this rider, with at most ONE moment. Absent or empty = always. A filter with no moment is rejected: it has nothing to narrow",
     scope:
       'What the rider attaches to. Omitted = derived: on an item with a weapon block the attack/damage/crit family means "with this weapon", everything else means the bearer. On a non-item carrier "this-item" resolves to "bearer"'
@@ -701,7 +701,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     recharge: 'The d6 threshold, e.g. 5 for "Recharge 5-6"'
   },
   EffectGrant: {
-    "": "An effect a feature or action grants, in the SAME vocabulary the live rules engine already resolves on an actor, reused rather than re-invented, so a homebrew Rage behaves exactly like the bundled one.",
+    "": "An effect a feature or action grants, in the SAME vocabulary the live rules engine already resolves on an actor, reused as it is, so a homebrew Rage behaves exactly like the bundled one.",
     duration: "How long the effect lasts.",
     modifiers:
       "What the effect does while it lasts, gates included, in the shared rider vocabulary. Refused here: every modifier the sheet or the actor stores (ability-score, hit-points-per-level, armor-class, initiative, unarmored-defense, darkvision, sense, spell-slot), which an effect that ends could not give back.",
@@ -731,7 +731,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "What happens when the effect ends: a homebrew curse that leaves a level of Exhaustion behind."
   },
   RiderTrigger: {
-    "": "WHEN a rider applies. Twenty-eight named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is DATA, not an expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at one moment, not two."
+    "": "WHEN a rider applies. Twenty-eight named triggers in four KINDS, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain DATA with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   },
   RiderTriggerAttuned: {
     "": "STATIC GATE. The bearer is attuned. Redundant (and harmless) when the item's own `attunement.required` is already true."
@@ -746,7 +746,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": 'STATIC GATE. The bearer is wielding a shield, or, with `wielding: false`, is NOT, which is how the Dueling-style "only while not holding a shield" is said without a NOT operator.'
   },
   RiderTriggerWhileCharacterIs: {
-    "": 'STATIC GATE. The bearer is one of these classes or species. TWO lists in ONE trigger so "Paladin or Cleric" is a single entry rather than an OR; at least one id must be named.'
+    "": 'STATIC GATE. The bearer is one of these classes or species. TWO lists in ONE trigger so "Paladin or Cleric" is a single entry with no OR; at least one id must be named.'
   },
   RiderTriggerWhileProficientWith: {
     "": "STATIC GATE. The bearer is proficient with any of the named weapons, armor, tools, or skills."
@@ -814,7 +814,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   HomebrewUsages: {
     safeToDelete:
-      "False when removing this record would break a published one (`dependents.ifRemoved`). Characters never count: a built character carries a flattened, self-contained ActorDefinition, so the usage list is context, not a blocker",
+      "False when removing this record would break a published one (`dependents.ifRemoved`). Characters never count: a built character carries a flattened, self-contained ActorDefinition, so the usage list is context and blocks nothing",
     dependents:
       "Published records that publish now and would not: `ifRemoved` once this one is removed or unpublished, `ifUpdated` once its pending edits go live. A warning to show before the action, never a refusal"
   },
@@ -822,7 +822,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "A published record another record's removal or edit would break: enough to name it and open it."
   },
   HomebrewPack: {
-    "": "The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One FLAT record array rather than a by-type object: the body already carries `type`, so a by-type map would duplicate the discriminator for nothing. No checksum field by design.",
+    "": "The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One FLAT record array: the body already carries `type`, so a by-type map would duplicate the discriminator for nothing. No checksum field by design.",
     records: "Authored bodies only: no state, visibility, deletion, or revision"
   },
   HomebrewPackImport: {
@@ -856,9 +856,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     who: "Who spent the time. May be empty: downtime is often party-wide with nobody in particular to name.",
     activity:
       "What they did. May be empty, for the same reason as `who`: the record's prose carries it when the fields do not.",
-    days: "The time cost in in-world days. Ten years is already well past the point where a GM would set a date instead of counting days.",
+    days: "The time cost in in-world days. Ten years is already well past the point where a GM would set a date and stop counting days.",
     characterPageId:
-      "Which character PAGE this downtime belongs to, so the tracker totals a person rather than a spelling of their name. Optional; `who` remains the free-text fallback for anyone with no page, and both may coexist. An id naming no page is a **404**. The page's TYPE is deliberately NOT enforced (a GM may track downtime for an NPC or a hireling), which is the opposite of the standing rule, because standing is *about* a faction while downtime is about someone the GM happens to have a record for."
+      "Which character PAGE this downtime belongs to, so the tracker totals one person's downtime whatever spelling of the name `who` carries. Optional; `who` remains the free-text fallback for anyone with no page, and both may coexist. An id naming no page is a **404**. The page's TYPE is deliberately NOT enforced (a GM may track downtime for an NPC or a hireling), which is the opposite of the standing rule, because standing is *about* a faction while downtime is about someone the GM happens to have a record for."
   },
   CodexMilestoneInput: {
     "": 'The milestone facts themselves. Exactly two: the spec says "milestone / level history … no XP arithmetic", so there is no XP total, no threshold and no next level.',
@@ -868,7 +868,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   CodexQuestObjective: {
     "": "One tickable step of a quest. Deliberately exactly two keys: a shape richer than `{ text, done }` (assignees, due dates, sub-objectives) is unapproved scope. The text is PLAYER-FACING: it lives beside `playerBody`, never beside `gmBody`, so a GM-only detail belongs in the quest's GM body and never in an objective.",
-    text: "What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after \"Add item\", and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state, not a malformed one. The server accepts it; this says so rather than publishing a rule it does not enforce."
+    text: "What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after \"Add item\", and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state. The server accepts it; this says so, and publishes no rule it does not enforce."
   },
   CodexPageCreateRequest: {
     inWorldDate: "The in-world date that places an `event` page on the chronicle. Omit for undated.",
@@ -944,7 +944,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     commandId: CODEX_COMMAND_ID
   },
   CodexDowntimeCreateRequest: {
-    "": "Everything `CodexJournalCreateRequest` accepts, plus the required `downtime` facts. Omitting `inWorldDate`, OR sending it as null, dates the record at the GM's current campaign date, the rule an auto-logged battle already follows, so downtime lands where it happened rather than at the bottom of the timeline. This differs deliberately from every other journal route, where a null clears the date: downtime that happened at no point in time is not downtime.",
+    "": "Everything `CodexJournalCreateRequest` accepts, plus the required `downtime` facts. Omitting `inWorldDate`, OR sending it as null, dates the record at the GM's current campaign date, the rule an auto-logged battle already follows, so downtime lands where it happened in the timeline. This differs deliberately from every other journal route, where a null clears the date: downtime that happened at no point in time is not downtime.",
     sessionId: JOURNAL_SESSION_ID,
     commandId: CODEX_COMMAND_ID
   },
@@ -999,14 +999,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "revisionHistory.enabled":
       "Whether a page save may write a new revision at all. Default `true`: every existing codex upgrades with history on, exactly as it was.",
     "revisionHistory.windowMinutes":
-      'Coalescing window. A save whose page already has a checkpoint younger than this writes no new one, so at most this much authoring can be lost. Measured against WHEN THE CHECKPOINTED CONTENT WAS AUTHORED, not when its row was written, which is what makes the guarantee hold across an idle gap as well as during continuous work. `0` keeps every save; the 10080 ceiling is one week of minutes, past which the window stops coalescing a work session and starts meaning "keep almost nothing", which `enabled: false` already says more honestly. The owner\'s default is 90.',
+      'Coalescing window. A save whose page already has a checkpoint younger than this writes no new one, so at most this much authoring can be lost. Measured against WHEN THE CHECKPOINTED CONTENT WAS AUTHORED (the time its row was written plays no part), which is what makes the guarantee hold across an idle gap as well as during continuous work. `0` keeps every save; the 10080 ceiling is one week of minutes, past which the window stops coalescing a work session and starts meaning "keep almost nothing", which `enabled: false` already says more honestly. The owner\'s default is 90.',
     "": "Every codex-wide setting a caller may SET. Identical to `CodexSettings` except that the server-computed usage figures are absent: sending `versionCount` or `versionBytes` is a 400, because they are facts about a table the caller cannot see. Both groups are REQUIRED: this replaces the settings wholesale, so an omitted group would silently reset a setting the caller never mentioned.",
     commandId: CODEX_COMMAND_ID
   },
   CodexRevisionsDeleteRequest: {
-    "": "Which revisions to delete, by age. Required rather than defaulted: the destructive route must not have a meaning when the body is silent.",
+    "": "Which revisions to delete, by age. Required, with no default: the destructive route must not have a meaning when the body is silent.",
     olderThanDays:
-      "Delete every revision authored more than this many days ago. **`0` deletes them all**: arithmetic, not a magic value, since nothing is younger than zero days old. A negative or fractional value is a 400 rather than a clamp, because this destroys data. The 36500 ceiling (100 years) is a guard, not a policy: a larger value pushes the cutoff date out of the representable range, which would turn a silly request into a 500."
+      "Delete every revision authored more than this many days ago. **`0` deletes them all**: plain arithmetic, since nothing is younger than zero days old. A negative or fractional value is a 400 and is never clamped, because this destroys data. The 36500 ceiling (100 years) is a guard: a larger value pushes the cutoff date out of the representable range, which would turn a silly request into a 500."
   },
   CodexImportRequest: {
     codex: "The export's `codex` bundle, verbatim.",
@@ -1045,7 +1045,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     body: "The page's `playerBody`."
   },
   CodexConnection: {
-    "": "One edge in the codex graph, GM view. ONE shape for both origins: a connection the GM declared and a connection derived from `[[wiki link]]` text differ by an `origin` attribute, not by being two systems with two panels and two edge kinds.",
+    "": "One edge in the codex graph, GM view. ONE shape for both origins: a connection the GM declared and a connection derived from `[[wiki link]]` text differ only by an `origin` attribute, in one system with one panel and one edge kind.",
     id: "Null exactly when `origin` is `mention`: a derived edge has no row of its own, so it is deleted by editing the text that produced it.",
     fromKind: "Which record the connection comes FROM. Session, quest and journal bodies join the graph.",
     toPageId:
@@ -1102,21 +1102,21 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   CodexMilestonePayload: {
     "": "What a MILESTONE record carries beyond its prose: the level the party reached, and why. Identical for both audiences: a party knows its own level, and a revealed milestone with its two facts removed would be a dated row that says nothing. There is no GM-only half here at all; a milestone needing one writes it in the record's `gmText`, like every other journal row. No XP: progression is milestone-based by design and this record carries no arithmetic.",
     level:
-      "The level REACHED, not a step. A delta would make the party's current level a sum over the whole timeline that a single deleted record silently changes.",
+      "The level REACHED. A delta would make the party's current level a sum over the whole timeline that a single deleted record silently changes.",
     reason:
       'Why, in one line ("cleared the crypt"). May be empty; the record\'s own prose carries it when this does not.'
   },
   CodexStandingPayload: {
     "": "What a STANDING record carries: which faction, how much it MOVED, and why. The GM's shape. `delta` and not the resulting value, deliberately: the `codex_standing` table says where things stand and this says what happened, so a deleted record cannot leave a history that no longer adds up to the table.",
     factionPageId:
-      "The faction page this record is about. A plain id with no foreign key behind it: deleting a faction page removes its standing ROW but must leave its history standing, so a reader resolves this defensively: a missing page is a name it cannot show, not an error.",
+      "The faction page this record is about. A plain id with no foreign key behind it: deleting a faction page removes its standing ROW but must leave its history standing, so a reader resolves this defensively: a missing page is a name it cannot show, and raises no error.",
     delta: 'How far the standing moved, signed. `-15` reads "fell fifteen".',
     reason: "Why, in one line. May be empty."
   },
   CodexQuestHistoryPayload: {
-    "": "a quest CHANGED STATE. The quest record says where a quest stands; this says what happened, exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status; a quest entering the log is an event, whether or not the party has begun it) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show rather than an error; the history outlives the quest.",
+    "": "a quest CHANGED STATE. The quest record says where a quest stands; this says what happened, exactly as a `standing` record does beside the standing table. Written automatically, in the same transaction as the quest write, when a quest is CREATED (its initial status; a quest entering the log is an event, whether or not the party has begun it) and whenever a PATCH changes its status. Editing a quest's prose writes nothing. There is no cached title: readers resolve `questId` against the live quest, so a renamed quest reads correctly and a deleted one is a name they cannot show and raises no error; the history outlives the quest.",
     status:
-      'The status REACHED, not a delta: the fact a GM states and the one a reader wants. A `failed` -> `active` transition records `active`; a reader words it as "reopened".'
+      'The status REACHED: the fact a GM states and the one a reader wants. A `failed` -> `active` transition records `active`; a reader words it as "reopened".'
   },
   CodexDowntimePlayerPayload: {
     "": "A revealed downtime record as a PLAYER sees it: the campaign facts, and `applied` allow-listed away.",
@@ -1191,11 +1191,11 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "The player half of the kind's structured facts: downtime without `applied`, a milestone's `{ level, reason }` unchanged, a standing change with `factionPageId` nulled unless that faction page is revealed."
   },
   CodexSession: {
-    "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record, like a page's `playerBody`/`gmBody`: `recapBody` is the player-facing half and `prepBody` is the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused rather than silently making a group ambiguous.",
+    "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record, like a page's `playerBody`/`gmBody`: `recapBody` is the player-facing half and `prepBody` is the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused, so no group silently turns ambiguous.",
     sessionNumber:
       '"Session 12": the session\'s DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID and resolve this live, so renumbering a session relabels every one of its entries with no journal write.',
     realDate:
-      "The real-world date the group played, as the GM typed it. Free text, not a calendar instant; a session sits on the real calendar, never the world's, which is why sessions are their own route and not rows on `/codex/timeline`.",
+      "The real-world date the group played, as the GM typed it. Free text with no calendar instant; a session sits on the real calendar, never the world's, which is why sessions are their own route, apart from `/codex/timeline`.",
     attendees: "Who was at the table. GM-only; absent from a player projection.",
     sceneIds:
       "the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-ONLY, ALWAYS: stricter than the session's own reveal, because a revealed session publishes its RECAP and tonight's planned fights are spoilers even then.",
@@ -1242,9 +1242,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     tags: "the `CodexSessionPlayer.tags` rule verbatim: tags are single-layer, and the quest's own reveal flag remains the whole predicate."
   },
   CodexStanding: {
-    "": "Where the party stands with ONE faction, GM view. Four facts, and what is absent is the point: no HISTORY (every change writes a `kind='standing'` chronicle record instead, so the timeline is the one history in this codex rather than a second one), no `rev` (a standing is a number set in one action; there is no draft to go stale), and no cached faction TITLE (the live page is the one name, so a rename cannot leave a stale copy behind). A player projection of a revealed standing is exactly `factionPageId` and `value`, and only when the faction page is revealed too.",
+    "": "Where the party stands with ONE faction, GM view. Four facts, and what is absent is the point: no HISTORY (every change writes a `kind='standing'` chronicle record, so the timeline is the one history in this codex), no `rev` (a standing is a number set in one action; there is no draft to go stale), and no cached faction TITLE (the live page is the one name, so a rename cannot leave a stale copy behind). A player projection of a revealed standing is exactly `factionPageId` and `value`, and only when the faction page is revealed too.",
     factionPageId:
-      "The faction page. UNIQUE across standings (one row per faction), which is why every standing route is addressed by this id rather than by `id`.",
+      "The faction page. UNIQUE across standings (one row per faction), which is why every standing route is addressed by this id.",
     value:
       "SIGNED: -100 hostile, 0 neutral, +100 allied. Signed because a faction can be actively against the party, which an unsigned favour scale cannot say. The WORD a reader shows beside the bar is a presentation of this number and is deliberately not stored.",
     revealedToPlayers:
@@ -1287,14 +1287,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   CodexSearchData: {
     hits: "The one ranked result list, all record kinds.",
     truncated:
-      'The result list was CUT at the cap. Narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference. Measured by asking the index for one row past the cap, so it can distinguish "exactly 50 matches" from "50 and more". For a player it reports whether the SEARCH was cut, before their own reveal gates removed anything, so it stays true rather than becoming a count of what they may see.'
+      'The result list was CUT at the cap. Narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference. Measured by asking the index for one row past the cap, so it can distinguish "exactly 50 matches" from "50 and more". For a player it reports whether the SEARCH was cut, before their own reveal gates removed anything, so it stays true and never turns into a count of what they may see.'
   },
   CodexRevisionHistorySettings: {
-    "": "How much page version history the codex keeps, and what keeping it costs. The two knobs are exactly `CodexRevisionHistoryInput`'s; the two usage figures are server-computed and READ-ONLY, and they are a superset here rather than a second object because a settings screen wants the cost beside the control that changes it.",
+    "": "How much page version history the codex keeps, and what keeping it costs. The two knobs are exactly `CodexRevisionHistoryInput`'s; the two usage figures are server-computed and READ-ONLY, and they ride along here in one object because a settings screen wants the cost beside the control that changes it.",
     enabled: "Whether a page save may write a new revision at all.",
     windowMinutes: "Coalescing window in minutes; `0` keeps every save. See `CodexRevisionHistoryInput.windowMinutes`.",
     versionCount:
-      "How many revision rows exist, across the WHOLE codex rather than one page: the same set `DELETE /codex/page-revisions` operates on. Read-only: it is a fact about the table, so it is never accepted on a write.",
+      "How many revision rows exist, across the WHOLE codex: the same set `DELETE /codex/page-revisions` operates on. Read-only: it is a fact about the table, so it is never accepted on a write.",
     versionBytes:
       "Roughly how much TEXT that history holds: the summed length of the content columns a revision duplicates from its page (both bodies, both field maps, the title and the tags). Deliberately APPROXIMATE and deliberately not disk usage or the export's serialized size; it exists to be compared against itself before and after a trim, and a figure precise enough to invite comparison against the sqlite file's size would be a figure that disagrees with it. Render it as \"about 8.0 MB of text\". Read-only, like `versionCount`."
   },
@@ -1323,10 +1323,10 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": 'One reveal surface\'s report. ALWAYS present, empty ones included with `revealed: 0` and `rows: []`, because "nothing is revealed here" and "this did not load" must not look the same.',
     revealed:
       "How many records of this kind the party can CURRENTLY SEE, which is not always the same as how many carry a reveal flag. A marker flagged revealed on a hidden map is not counted, because the player-facing marker read does not return it either.",
-    total: 'How many exist at all, so "3 of 40" reads as deliberate rather than as an empty screen.'
+    total: 'How many exist at all, so "3 of 40" reads as deliberate.'
   },
   CodexRevealAudit: {
-    "": "Everything the party can currently see across every reveal surface in the Codex. A READ-ONLY AGGREGATION of the existing player projections; it restates no visibility rule and writes nothing, which is why it agrees with the player-facing endpoints exactly rather than approximately.",
+    "": "Everything the party can currently see across every reveal surface in the Codex. A READ-ONLY AGGREGATION of the existing player projections; it restates no visibility rule and writes nothing, which is why it agrees with the player-facing endpoints exactly.",
     sections: "All eight surfaces, in a fixed order, always all present.",
     revealed: "Total records the party can see, across every surface.",
     total: "Total records that exist, across every surface."
@@ -1396,7 +1396,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     grantedAtLevels:
       "Every level at which the owning class's table grants this feature: the authoritative repeat count. A feature granted at 4, 8, 12 and 16 asks its choice FOUR times and the server's capacity is choose x grants, so a client that ignores this offers too few picks and the build is rejected at creation. Empty when no class level table grants the feature (species traits, feats, subclass features).",
     extraPicks:
-      "Budgets this feature RAISES rather than picks it asks for. Travels although riders do not, because it is an input to picking: a wizard that ignores it caps the player at the printed level row and the extra pick the text promised is unselectable."
+      "Budgets this feature RAISES, each named by its offer key; the picks it asks for itself are in `choices`. Travels although riders do not, because it is an input to picking: a wizard that ignores it caps the player at the printed level row and the extra pick the text promised is unselectable."
   },
   ContentFeatureChoice: {
     "": "One pick a feature asks for. Options arrive either as plain ids in `from`, as an open catalog slug in `fromCatalog`, or as inline `options` carrying their own name and any second-order pick.",
@@ -1405,9 +1405,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     maxSpellLevel:
       "Ceiling on a spell pick's level (Evocation Savant: 2; Magic Initiate: 0, i.e. cantrips only). null when the pick has no ceiling. A picker that ignores it offers spells the server then rejects",
     minSpellLevel:
-      'Floor on a spell pick\'s level (Mystic Arcanum: 6, so the level-6 arcanum is EXACTLY a level-6 spell rather than "6 or lower"). null when the pick has no floor',
+      "Floor on a spell pick's level (Mystic Arcanum: 6, so the level-6 arcanum is EXACTLY a level-6 spell). null when the pick has no floor",
     fromPicks:
-      'The options are the character\'s OWN earlier answers rather than a catalog: "choose one of your known Warlock cantrips that deals damage". null for every ordinary pick.',
+      'The options are the character\'s OWN earlier answers, with no catalog: "choose one of your known Warlock cantrips that deals damage". null for every ordinary pick.',
     "fromPicks.offer": 'The budget whose answers are the option list ("class-cantrips", "feature:<id>")',
     "fromPicks.where": "Closed predicate narrowing those answers; null means all of them",
     options:
@@ -1416,7 +1416,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   ContentFeatureOption: {
     "": "One inline option of a feature's pick. Carries its authored name (an id alone would force the client to titleize) and any SECOND-ORDER pick it owes: Cleric Divine Order's Thaumaturge grants an extra cantrip, so choosing it opens another choice. Riders stay server-side.",
     requires:
-      'The earlier answer that makes this option legal, or null when it is always offerable. "The option you chose for Blessed Strikes grows more powerful": the later feature\'s options are gated on a pick already in the ledger. When gating leaves exactly as many legal options as the capacity, the answer is a CONSEQUENCE rather than a choice and neither side renders a pick for it.',
+      'The earlier answer that makes this option legal, or null when it is always offerable. "The option you chose for Blessed Strikes grows more powerful": the later feature\'s options are gated on a pick already in the ledger. When gating leaves exactly as many legal options as the capacity, the answer is a CONSEQUENCE of the gating and neither side renders a pick for it.',
     "requires.offer": 'The offer key holding the earlier answer ("feature:blessed-strikes", or a named budget)',
     choices:
       "Every nested pick this option owes, in authored order. Bounded at one level: a nested pick never carries its own options.",
@@ -1428,12 +1428,12 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     offer: "The offer key whose capacity this raises",
     amount: "How many extra picks, as a flat number; null when `scaling` states it instead",
     scaling:
-      "The budget follows a printed class-table column instead of a constant: Eldritch Invocations 1 -> 10, Weapon Mastery 3 -> 6. Resolved against the same level table on both sides. Null for a flat grant."
+      "The budget follows a printed class-table column: Eldritch Invocations 1 -> 10, Weapon Mastery 3 -> 6. Resolved against the same level table on both sides. Null for a flat grant."
   },
   ContentClassesData: {
     "classes[].hitDie": "The multiclass hit-dice pool keys on this",
     "classes[].statPriority":
-      "All six abilities, best first: the random generator's core input, as data rather than a hardcoded table",
+      "All six abilities, best first: the random generator's core input, as data with no hardcoded table",
     "classes[].skillChoiceCount": "How many entries of skillChoices the character picks at level 1",
     "classes[].armorProficiencies": "Granted armor training, as open slugs (light, medium, heavy, shields)",
     "classes[].weaponProficiencies": "Granted weapon training: a group (simple, martial) or a single weapon id",
@@ -1488,7 +1488,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "species[].languageChoices.fromCatalog": CHOICE_CATALOG,
     "species[].lineages": "Lineages/subraces; each one's traits are also folded into features",
     "species[].features":
-      "Species traits plus every lineage's traits. NOTE: SRD 5.2.1 puts ability increases on the BACKGROUND, not the species"
+      "Species traits plus every lineage's traits. NOTE: SRD 5.2.1 puts ability increases on the BACKGROUND"
   },
   ContentBackgroundsData: {
     "backgrounds[].abilityOptions":
@@ -1516,7 +1516,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   ActorAvailableActionsData: {
     derived:
-      "DISPLAY ONLY, and the sheet's single source for every number beside a roll button. Derived from the actor's LIVE loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts: a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this REQUEST rather than the broadcast game-state projection on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see.",
+      "DISPLAY ONLY, and the sheet's single source for every number beside a roll button. Derived from the actor's LIVE loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts: a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this REQUEST, outside the broadcast game-state projection, on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see.",
     "derived.armorClass": "Live AC, already reconciled against worn armour and item riders",
     "derived.initiative": "Live initiative bonus including item riders",
     "derived.abilities[].check":
@@ -1583,7 +1583,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     abilities:
       "For a draft that sent `sheet`: how that sheet's ability scores were made, which a rebuild re-sends as the scores the character already has. The ledger's own record, or for a sheet built before the ledger kept one, the base scores and background increase that rebuild its totals exactly. Null when not asked, or when nothing reproduces them.",
     "abilities.derived":
-      "True when worked out from the sheet's totals rather than read from its ledger. A rebuild may re-send these whatever ability methods the table allows today."
+      "True when worked out from the sheet's totals; false when read from its ledger. A rebuild may re-send these whatever ability methods the table allows today."
   },
   MapAssetMetadata: {
     folder: MAP_FOLDER
