@@ -1,6 +1,9 @@
 import type { Actor, GameState } from "@vtt/domain";
 import { normalizeDamageType, parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition, TraitMechanic } from "@vtt/schemas";
+import { holdsFeature } from "./class-features.js";
+import { isIncapacitated } from "./condition-rules.js";
+import { areAllies } from "./creature-sides.js";
 import { addEffect, makeEffect, turnEndDuration, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { createPendingSaves, rollSaveAtOnce } from "./saving-throws.js";
@@ -34,6 +37,39 @@ export function traitOf<Kind extends TraitMechanic["kind"]>(
   return traitMechanicsOf(definition).find(
     (trait): trait is Extract<TraitMechanic, { kind: Kind }> => trait.kind === kind
   );
+}
+
+/**
+ * SRD Aura of Authority (the hobgoblin captain): "While in a 10-foot Emanation originating from the hobgoblin, the
+ * hobgoblin and its allies have Advantage on attack rolls and saving throws, provided the hobgoblin doesn't have the
+ * Incapacitated condition." The roll's source, or null. A hidden captain never gives a visible creature Advantage,
+ * which would reveal it.
+ */
+export function auraOfAuthority(
+  state: GameState,
+  creature: Actor,
+  deps: Readonly<{
+    resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+    distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  }>
+): Readonly<{ source: string; label: string }> | null {
+  for (const captain of state.actors) {
+    if (captain.hp.current <= 0 || isIncapacitated(captain)) continue;
+    if (captain.visibility !== "public" && creature.visibility === "public") continue;
+    const definition = captain.definitionId ? deps.resolveDefinition?.(captain.definitionId) : undefined;
+    if (!holdsFeature(definition, "aura-of-authority", "Aura of Authority")) continue;
+    if (captain.id !== creature.id) {
+      if (!state.combat.initiative.some((entry) => entry.actorId === captain.id)) continue;
+      if (!areAllies(captain, creature, deps.resolveDefinition)) continue;
+      const apart = deps.distanceFeet?.(captain.id, creature.id) ?? null;
+      if (apart === null || apart > 10.5) continue;
+    }
+    return {
+      source: "aura-of-authority",
+      label: captain.id === creature.id ? "Aura of Authority" : `${captain.name}'s Aura of Authority`
+    };
+  }
+  return null;
 }
 
 type WeighedPart = Readonly<{ type: string; adjusted: number }>;

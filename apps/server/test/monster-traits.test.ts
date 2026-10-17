@@ -766,3 +766,53 @@ describe("what a hit or a failed save leaves behind", () => {
     expect(actor(state, IDS.hero).conditions.map((condition) => condition.id)).toEqual(["blinded"]);
   });
 });
+
+describe("Advantage from being Bloodied, a hurt target or a captain nearby", () => {
+  /** The foe attacks the hero with one of its actions, a preview showing what shaped the roll. */
+  function foePreview(state: GameState, slug: string, actionId: string, positions?: Positions) {
+    state.combat = { ...state.combat, turnActorId: IDS.foe };
+    const action = monster(slug).actions.find((candidate) => candidate.id === actionId)!;
+    return resolveDefinitionAction(
+      state,
+      action,
+      { actorId: IDS.foe, targetIds: [IDS.hero], commandId: nextId(), commit: false },
+      { ...resolveDeps([4, 17], monster(slug)), ...(positions ? { distanceFeet: distanceBy(positions) } : {}) }
+    );
+  }
+
+  it("gives a Bloodied berserker Advantage on attack rolls and saving throws", () => {
+    expect(foePreview(game("berserker"), "berserker", "greataxe").rollMode).toBeUndefined();
+    const bloodied = game("berserker", { foeHp: 30 });
+    expect(foePreview(bloodied, "berserker", "greataxe").rollMode?.advantage).toEqual(["Bloodied Frenzy (Bloodied)"]);
+    bloodied.combat = { ...bloodied.combat, turnActorId: IDS.hero };
+    heroUses(bloodied, SHOVE_SAVE);
+    const [pending] = pendingOn(bloodied, IDS.foe);
+    const { outcome } = answerSave(bloodied, nextId(), pending!.id, "roll", undefined, false, GM, saveDeps([3, 18]));
+    expect(outcome.rollMode?.advantage).toEqual(["Bloodied Frenzy (Bloodied)"]);
+  });
+
+  it("gives a sahuagin Advantage against a creature that doesn't have all its Hit Points", () => {
+    expect(foePreview(game("sahuagin-warrior"), "sahuagin-warrior", "claw").rollMode).toBeUndefined();
+    const state = game("sahuagin-warrior");
+    actor(state, IDS.hero).hp.current = 29;
+    expect(foePreview(state, "sahuagin-warrior", "claw").rollMode?.advantage).toEqual([
+      "Blood Frenzy (target is hurt)"
+    ]);
+  });
+
+  it("gives a hobgoblin within 10 feet of its captain Advantage on attack rolls", () => {
+    const state = game("hobgoblin-warrior", { foe2: "hobgoblin-captain" });
+    const near = foePreview(state, "hobgoblin-warrior", "longsword", {
+      [IDS.hero]: [0, 0],
+      [IDS.foe]: [5, 0],
+      [IDS.foe2]: [15, 0]
+    });
+    expect(near.rollMode?.advantage).toEqual(["Hobgoblin Captain 2's Aura of Authority"]);
+    const far = foePreview(game("hobgoblin-warrior", { foe2: "hobgoblin-captain" }), "hobgoblin-warrior", "longsword", {
+      [IDS.hero]: [0, 0],
+      [IDS.foe]: [5, 0],
+      [IDS.foe2]: [20, 0]
+    });
+    expect(far.rollMode).toBeUndefined();
+  });
+});

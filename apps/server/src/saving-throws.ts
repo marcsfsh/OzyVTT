@@ -24,7 +24,7 @@ import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
 import { areAllies } from "./creature-sides.js";
 import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
-import { AURA_IMMUNE_TAG, traitActionId } from "./statblock-traits.js";
+import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -219,6 +219,24 @@ export function saveModifierFor(definition: ActorDefinition | undefined, ability
       return fromExtension;
   }
   return scoreModifier(definition.abilityScores[ability]);
+}
+
+/** Stat-block traits that give every save Advantage: the berserker's Bloodied Frenzy ("While Bloodied, ... Advantage on
+ *  attack rolls and saving throws") and an allied hobgoblin captain's Aura of Authority within 10 feet. */
+function traitSaveClaims(
+  state: GameState,
+  target: Actor,
+  definition: ActorDefinition | undefined,
+  deps: Pick<SaveAnswerDependencies, "resolveDefinition" | "distanceFeet">
+): Array<{ source: string; label: string }> {
+  const bloodied = target.hp.current > 0 && target.hp.current * 2 <= target.hp.maximum;
+  const authority = auraOfAuthority(state, target, deps);
+  return [
+    ...(bloodied && holdsFeature(definition, "bloodied-frenzy", "Bloodied Frenzy")
+      ? [{ source: "bloodied-frenzy", label: "Bloodied Frenzy (Bloodied)" }]
+      : []),
+    ...(authority ? [authority] : [])
+  ];
 }
 
 /** SRD Magic Resistance: "Advantage on saving throws against spells and other magical effects"; Greater Magic
@@ -558,6 +576,7 @@ export function answerSave(
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
+    sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
     const forced = scope.role === "gm" ? explicitRollMode : undefined;

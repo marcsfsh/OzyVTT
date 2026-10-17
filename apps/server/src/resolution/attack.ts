@@ -40,6 +40,7 @@ import { areAllies, areEnemies } from "../creature-sides.js";
 import { holdsFeature } from "../class-features.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
+import { auraOfAuthority } from "../statblock-traits.js";
 import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
@@ -242,11 +243,23 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
   }
 }
 
-/** SRD Pack Tactics: Advantage on an attack roll against a creature "if at least one of the [attacker's] allies is
- *  within 5 feet of the creature and the ally doesn't have the Incapacitated condition", read from the tokens. Where
- *  the map can't measure, the GM's roll mode decides. */
+/** Stat-block traits that give an attack roll Advantage: Bloodied Fury and Frenzy, Blood Frenzy, an ally's Aura of
+ *  Authority, and Pack Tactics ("if at least one of the [attacker's] allies is within 5 feet of the creature and the ally
+ *  doesn't have the Incapacitated condition"), read from the tokens. Where the map can't measure, the GM's roll mode
+ *  decides. */
 function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeClaims): void {
   const { state, attacker, deps } = ctx;
+  const bloodied = attacker.hp.current > 0 && attacker.hp.current * 2 <= attacker.hp.maximum;
+  // SRD Bloodied Fury (boars) and Bloodied Frenzy (the berserker): "While Bloodied, ... Advantage on attack rolls".
+  for (const name of ["Bloodied Fury", "Bloodied Frenzy"])
+    if (bloodied && holdsFeature(deps.definition, name.toLowerCase().replace(" ", "-"), name))
+      sources.advantage.push({ source: "bloodied-fury", label: `${name} (Bloodied)` });
+  // SRD Blood Frenzy (the sahuagin): "Advantage on attack rolls against any creature that doesn't have all its Hit
+  // Points."
+  if (target.hp.current < target.hp.maximum && holdsFeature(deps.definition, "blood-frenzy", "Blood Frenzy"))
+    sources.advantage.push({ source: "blood-frenzy", label: "Blood Frenzy (target is hurt)" });
+  const authority = auraOfAuthority(state, attacker, deps);
+  if (authority) sources.advantage.push(authority);
   if (!deps.distanceFeet || !holdsFeature(deps.definition, "pack-tactics", "Pack Tactics")) return;
   for (const entry of state.combat.initiative) {
     const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
