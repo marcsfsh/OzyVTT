@@ -243,7 +243,7 @@ export class PlayerCodexReads {
     const context = this.#journalContext;
     return capSearch(
       this.#store
-        .searchMatches("player", query)
+        .searchPlayerMatches(query)
         .map((ref) => searchRecord(this.#store, ref))
         .filter((record) => record !== null)
         .map((record) => projectPlayerSearchHit(record, context))

@@ -19,7 +19,7 @@ import * as quests from "./codex/quests.js";
 import * as receipts from "./codex/receipts.js";
 import * as revisions from "./codex/revisions.js";
 import { migrateCodex } from "./codex/schema.js";
-import { searchAll, searchMatches, type CodexSearchRef, type CodexSearchRefs } from "./codex/search.js";
+import { searchAll, searchPlayerMatches, type CodexSearchRef, type CodexSearchRefs } from "./codex/search.js";
 import * as sessions from "./codex/sessions.js";
 import * as settings from "./codex/settings.js";
 import * as standing from "./codex/standing.js";
@@ -183,9 +183,9 @@ export class CodexStore {
   searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRefs {
     return searchAll(this.#db, audience, query, kinds);
   }
-  /** Every match, ranked and uncapped, for a caller that gates hits after the index and caps what is left. */
-  searchMatches(audience: "player" | "gm", query: string): CodexSearchRef[] {
-    return searchMatches(this.#db, audience, query);
+  /** Every match a player may see, ranked and uncapped, for a caller that gates hits and caps what is left. */
+  searchPlayerMatches(query: string): CodexSearchRef[] {
+    return searchPlayerMatches(this.#db, query);
   }
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
     return this.searchAll(audience, query, ["page"]).hits.map((hit) => ({ pageId: hit.id }));

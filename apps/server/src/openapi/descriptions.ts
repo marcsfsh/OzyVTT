@@ -1298,7 +1298,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed."
   },
   CodexSearchData: {
-    hits: "The one ranked result list, all record kinds. A title equal to the query comes first, then a title holding every query word, then the rest, and each tier is ordered by kind, title and id. A hit's place depends on its own title alone, so records a player cannot see never move it.",
+    hits: "The one ranked result list, all record kinds. A title equal to the query comes first for both roles. After it, a GM's hits are ranked by relevance (bm25, the title weighted 10x). A player's come by tier: a title holding every query word, then the rest, each tier ordered by kind, title and id. A player hit's place depends on its own title alone, so records a player cannot see never move it.",
     truncated:
       'The result list was CUT at the cap. Narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference, and it tells "exactly 50 matches" from "50 and more". A player\'s list is counted after every player gate, so a record they cannot see never takes a place under the cap or sets this flag.'
   },
