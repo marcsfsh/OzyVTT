@@ -528,7 +528,7 @@ function compareChronicle(a: ChronicleSortKey, b: ChronicleSortKey): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-/** The chronicle's order, placing each entry by the session number `sessionNumberOf` gives it. */
+/** The chronicle's order. Each entry is placed by the session number `sessionNumberOf` gives it. */
 export function chronicleOrder(
   sessionNumberOf: (entry: CodexJournalEntry) => number | null
 ): (a: CodexChronicleSource, b: CodexChronicleSource) => number {

@@ -3198,8 +3198,8 @@ describe("codex commandId idempotency", () => {
 });
 
 // A page's folder path is the GM's private filing (a folder can be named for the villains), and its `updatedAt`
-// moves on a GM-only save. Neither reaches anyone but the GM: not a player, not the GM's preview session (a real
-// player session), and not the table screen, which is no Codex reader at all.
+// moves on a GM-only save, so only the GM receives them. This reads as a player and as the GM's preview session,
+// which is a real player session, and checks that the table screen's credential reads no Codex at all.
 describe("a page's folder and GM edit time reach no player, preview or table screen", () => {
   it("leaves both off every player read of the page, and ignores a player's folder filter", async () => {
     const { base, store } = await fixture();

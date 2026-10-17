@@ -397,7 +397,7 @@ describe("realtime presence, reconnect, and convergence", () => {
 // A scope word would tell the table which part of the codex the GM is editing, so this pins the whole
 // key set. Observed on a player's socket, the recipient the rule protects.
 describe("codex:changed on the wire (socket half)", () => {
-  it("emits a bare revision counter to every socket, players included, and nothing else", async () => {
+  it("emits a bare revision counter, to a player too, and nothing else", async () => {
     const server = await startTestServer();
     try {
       await bootstrapGm(server.url);

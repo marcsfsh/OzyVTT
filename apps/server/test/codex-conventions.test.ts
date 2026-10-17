@@ -289,7 +289,7 @@ describe("codex conditional reads (weak ETag + 304)", () => {
   });
 
   // The store revision moves on every write, GM-only ones included, so a player tag built from it would tell the
-  // table that the GM had just saved something. A player's tag fingerprints what that player receives instead.
+  // table that the GM had just saved something. A player's tag fingerprints what that player receives.
   it("keeps a player's tag through a GM-only write, and moves it when the player's answer changes", async () => {
     const { base } = await fixture();
     const created = await body(

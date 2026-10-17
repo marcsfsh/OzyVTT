@@ -151,8 +151,8 @@ export function indexEntry(
 /**
  * Every match in one audience's index, ranked, with no cap. Only known kinds are asked for, so a cap counts rows a
  * caller can use. Ranking: a title equal to the query, then a title holding every query word, then the rest;
- * within a tier by kind, title and id. Each row is ranked on its own title, never on bm25: bm25 weighs a word by
- * how many rows hold it, hidden rows included, so a GM's hidden prep would reorder a player's hits.
+ * within a tier by kind, title and id. Each row is ranked on its own title alone. bm25 would weigh a word by how
+ * many rows hold it, hidden rows included, and so let a GM's hidden prep reorder a player's hits.
  */
 export function searchMatches(
   db: CodexDb,
