@@ -2,6 +2,7 @@ import type { PendingSave } from "@vtt/domain";
 import type { ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
+import { addEffect, makeEffect } from "../effects.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
@@ -190,6 +191,10 @@ export function failureEffectFor(
   };
 }
 
+/** SRD Power Word Stun: a target over its hit-point gate isn't Stunned - "Otherwise, its Speed is 0 until the start
+ *  of your next turn". */
+const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"]);
+
 /**
  * A save action parks one pending save per target; the outcome auto-applies (see saving-throws.ts). When the
  * action also attacks, the save is the hit's rider (a ghoul's paralysing claw): it is owed only on a hit, and
@@ -210,6 +215,27 @@ export function parkActionSave(ctx: ResolveContext): void {
     saving = [];
     for (const target of targets) {
       if (target.hp.current > threshold) {
+        if (action.spellId !== undefined && SPEED_ZERO_OVER_THE_GATE.has(action.spellId)) {
+          addEffect(
+            state,
+            target.id,
+            makeEffect({
+              id: `${input.commandId}:${target.id}:speed`,
+              name: action.name,
+              sourceActorId: attacker.id,
+              sourceName: attacker.name,
+              sourceActionId: action.id,
+              startedRound: state.combat.round,
+              duration: { type: "until-source-next-turn" },
+              speedZero: true
+            })
+          );
+          ctx.tableNarration.push({
+            kind: "effect",
+            text: `${target.name}'s Speed is 0 until the start of ${attacker.name}'s next turn.`,
+            actorIds: [target.id]
+          });
+        }
         ctx.warnings.push(
           `${target.name} has more than ${threshold} hit points - ${action.name} doesn't affect it that way.`
         );
