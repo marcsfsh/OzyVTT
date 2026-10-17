@@ -1,0 +1,60 @@
+/* The join address: the label, the address and its actions, and the QR code beside them (below on a phone). */
+.join-address {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+  text-align: left;
+}
+.join-address-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.join-address-label {
+  font: 600 var(--fs-sm) / 1.2 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.join-address-url {
+  font: 600 var(--fs-body) / 1.3 var(--font-mono);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.join-address-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.join-address-hint,
+.join-address-missing {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.join-address-qr {
+  flex: none;
+  width: 9.5rem;
+}
+.join-address--hero .join-address-qr {
+  width: 11rem;
+}
+
+/* On the GM's empty Table the address sits under the scene button, read left to right. */
+.map-empty-hero .join-address {
+  justify-self: center;
+  width: min(100%, 34rem);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+/* On a phone the box grows to hold the address; the frame scrolls if the screen is short. */
+@media (max-width: 979px) {
+  .table-layout .map-empty-hero.map-empty-hero--gm {
+    flex: 0 0 auto;
+    padding: var(--space-4);
+  }
+}
