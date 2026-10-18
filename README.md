@@ -95,10 +95,13 @@ screen, and playing music on it. It needs Chromium once: `npx playwright install
 
 ## Running a fight
 
-1. As GM, open **Scenes**, add a scene, and upload its battlemap.
-2. Press **Set the grid** (or open **Manage maps**). For a printed grid, drag diagonally across a
-   3x3 block of squares to set the scale. For a gridless map, mark two points and enter the
-   distance between them.
+1. As GM, open **Scenes** and press **New scene**. Pick its battle map or upload one, then work
+   through the steps: tokens and monsters, walls and light, sound, and **Make live**. The
+   Scenes front page lists what still needs you, and **See as** shows a scene the way the table
+   screen or one player would get it.
+2. A map with no grid says so: press **Set the grid** (or open the map under **Maps**). For a
+   printed grid, drag diagonally across a 3x3 block of squares to set the scale. For a gridless
+   map, mark two points and enter the distance between them.
 3. Under **Shared screen**, open the address it shows on the TV. The TV shows a six-digit code:
    type it under **Pair a table screen**. Select the map and click **Present**.
 4. Pick combatants and start the encounter. Blank initiative scores are rolled on the server.
