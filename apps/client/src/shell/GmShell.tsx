@@ -140,8 +140,8 @@ export function GmShell({
     return scene ? sceneActions.makeLive(scene) : false;
   };
 
-  // The map library loads with the GM session (refreshed when returning to Table or Scenes, and after a change in
-  // Scenes), so starting a fight or the shared screen never needs a visit to the library.
+  // The map library loads on each tab that picks a map (Table, Scenes and Shared screen) and after a change in Scenes.
+  // A tab change cancels the load in flight, so the tab it lands on has to start its own.
   const loadMaps = useCallback(
     (isCancelled: () => boolean = () => false) =>
       listMaps(token)
@@ -161,7 +161,7 @@ export function GmShell({
     [token]
   );
   useEffect(() => {
-    if (gmTab !== "table" && gmTab !== "scenes") return;
+    if (gmTab !== "table" && gmTab !== "scenes" && gmTab !== "viewer") return;
     let cancelled = false;
     void loadMaps(() => cancelled);
     return () => {
