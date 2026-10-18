@@ -206,7 +206,7 @@ const BANNED = /[\u2013\u2014\u2018\u2019\u201c\u201d]/;
 
 describe("The banned characters, anywhere in the repository", () => {
   const files = [
-    ...["README.md", "CLAUDE.md"],
+    ...["README.md", "CLAUDE.md", "Dockerfile", "docker-compose.yml", ".dockerignore", ".env.example"],
     ...["apps", "packages", "docs", "e2e", ".claude", ".github"].flatMap((root) =>
       walk(
         root,

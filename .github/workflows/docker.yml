@@ -1,0 +1,88 @@
+name: Docker image
+
+# Publishes ghcr.io/marcsfsh/ozyvtt: `latest` and `main` follow main, and a tag like v1.2.3 publishes 1.2.3 and 1.2.
+# A pull request that touches what the image is built from builds and starts it without publishing.
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - docker-compose.yml
+      - package.json
+      - package-lock.json
+      - apps/server/**
+      - packages/**
+      - .github/workflows/docker.yml
+
+concurrency:
+  group: docker-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/marcsfsh/ozyvtt
+
+jobs:
+  image:
+    name: Build, start and publish the image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ozyvtt:check
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The image has to start and answer before it is published.
+      - name: Start it and wait for an answer
+        run: |
+          docker run -d --name ozyvtt-check -p 3001:3001 -e JOIN_URL=http://192.168.1.50:3001 ozyvtt:check
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/api/v1/host/setup; then exit 0; fi
+            sleep 2
+          done
+          docker logs ozyvtt-check
+          exit 1
+
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - if: github.event_name != 'pull_request'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - if: github.event_name != 'pull_request'
+        name: Publish
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

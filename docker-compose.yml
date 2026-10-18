@@ -1,0 +1,24 @@
+# Hosting with one command: `docker compose up -d` pulls the published image and starts it, and
+# `docker compose up -d --build` builds it from this checkout instead. README.md, "Hosting with Docker", has the rest.
+services:
+  ozyvtt:
+    image: ghcr.io/marcsfsh/ozyvtt:latest
+    build: .
+    container_name: ozyvtt
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      # The address players open: this computer's address on the home network and the port above, such as
+      # http://192.168.1.50:3001. Set JOIN_URL in the .env file beside this one.
+      JOIN_URL: ${JOIN_URL:-}
+    volumes:
+      - ozyvtt-data:/data
+    # On Linux, host networking is simpler: the join address and the first GM password then work as they do outside
+    # Docker. Uncomment the line below and delete `ports` above.
+    # network_mode: host
+
+volumes:
+  # Named outright, so `docker run -v ozyvtt-data:/data` and Compose share one volume.
+  ozyvtt-data:
+    name: ozyvtt-data

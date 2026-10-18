@@ -42,9 +42,10 @@ Node 24+. Run from the repo root.
   temporary directories.
 - A schema change is a new numbered migration in the owning store. Never edit a shipped migration:
   tests start from empty databases, so they pass while every existing campaign breaks.
-- The GM hosts on Windows with `npm run start`. Keep scripts and paths portable: no
+- The GM hosts on Windows with `npm run start`, or in Docker. Keep scripts and paths portable: no
   POSIX-only shell syntax or inline `VAR=value` in npm scripts, `node:path` for file paths, and no
-  two file names that differ only in case.
+  two file names that differ only in case. A new package the server imports at runtime also needs
+  its `COPY` lines in the `Dockerfile`.
 - Copy, server messages, OpenAPI descriptions and code comments follow the Writing section of
   `docs/DESIGN.md`. `apps/client/src/writing.test.ts` checks what a pattern can find.
 

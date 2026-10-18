@@ -36,8 +36,8 @@ npm install
 npm run dev
 ```
 
-The server reads `PORT` and `DATA_DIR` from the environment or from a `.env` file in the repo root;
-`.env.example` lists them.
+The server reads `PORT`, `DATA_DIR` and `JOIN_URL` from the environment or from a `.env` file in
+the repo root; `.env.example` lists them.
 
 Open `http://localhost:5173`. Vite also prints a network address such as
 `http://192.168.1.50:5173` for other devices on the LAN.
@@ -52,6 +52,8 @@ This builds the client and serves everything on port 3001. Players join at
 `http://HOST-IP:3001`: once you are signed in as the GM, the Table, the Roster and Settings show
 that address with a Copy button and a QR code, drawn on your own device. On Windows, allow Node.js
 on private networks only. Never expose the port to the internet; use a VPN for remote players.
+
+To host it in Docker instead, see [Hosting with Docker](#hosting-with-docker).
 
 ## The GM password
 
@@ -75,20 +77,80 @@ elsewhere; a relative path is read from `apps/server`. It is git-ignored, so bac
 data directory from a build before the October 2026 cleanup is refused at startup; move it aside to
 start fresh.
 
+## Hosting with Docker
+
+The image `ghcr.io/marcsfsh/ozyvtt` holds the server and the built client, so the computer that
+hosts needs Docker alone (Docker Desktop on Windows or macOS). `latest` follows `main`; a release
+tag such as `v1.2.0` also publishes `1.2.0`.
+
+1. Start it. From a checkout, `docker compose up -d` uses `docker-compose.yml`. Without one:
+
+   ```bash
+   docker run -d --name ozyvtt --restart unless-stopped -p 3001:3001 \
+     -v ozyvtt-data:/data -e JOIN_URL=http://192.168.1.50:3001 ghcr.io/marcsfsh/ozyvtt:latest
+   ```
+
+2. Set the GM password on the computer that runs Docker. A browser there reaches the container
+   through Docker's network, which the first-password page refuses, so set it from inside:
+
+   ```bash
+   docker exec -it ozyvtt npm run gm-password
+   ```
+
+3. Open `http://localhost:3001` and sign in as the GM.
+
+**The data volume.** Everything the campaign holds is in `/data` in the container: the database,
+the GM password hash, and every uploaded map, token, Codex image and sound. It lives in the
+`ozyvtt-data` volume, which outlasts the container, a restart and an update. To bring a campaign
+from `npm run start`, stop OzyVTT and copy its data folder into the volume before the first start:
+
+```bash
+docker run --rm -v ozyvtt-data:/data -v "$PWD/apps/server/data:/from" busybox \
+  sh -c "cp -a /from/. /data/ && chown -R 1000:1000 /data"
+```
+
+Back it up the same way in reverse:
+`docker run --rm -v ozyvtt-data:/data -v "$PWD:/backup" busybox tar czf /backup/ozyvtt-data.tgz -C /data .`
+
+**The port.** The server listens on 3001 in the container. To serve another port, change the left
+side of the mapping (`-p 8080:3001`, or `"8080:3001"` in `docker-compose.yml`) and use it in
+`JOIN_URL`.
+
+**The join address.** In a container the server only sees Docker's network, so it can't find the
+address players should open. Set `JOIN_URL` to this computer's address on the home network and the
+port (`ipconfig` on Windows shows the address); in a checkout, put `JOIN_URL=...` in the `.env` file
+beside `docker-compose.yml`. Separate several addresses with commas. The Table, the Roster and
+Settings then show it with its QR code. On Linux, host networking is simpler: use `--network host`
+(or `network_mode: host` in the Compose file) with no port mapping and no `JOIN_URL`. The server
+then lists the computer's own addresses, and a browser on that computer can set the GM password at
+`http://localhost:3001`.
+
+**Updating.** `docker compose pull` and then `docker compose up -d`. Without Compose, pull the
+image, remove the container with `docker rm -f ozyvtt` and run it again. The volume keeps the
+campaign either way.
+
+**Resetting the GM password.** `docker exec ozyvtt rm /data/auth.json`, then
+`docker restart ozyvtt` and `docker exec -it ozyvtt npm run gm-password`.
+
+While the repository is private, so is the image: sign in with `docker login ghcr.io` and a GitHub
+token that has `read:packages`, or make the package public in its settings on GitHub. If players
+can't connect on Windows, allow Docker Desktop through the firewall on private networks.
+
 ## Commands
 
-| Command           | What it does                                                                                                                                              |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`     | Client on `:5173` and the server on `:3001`, both reloading on change.                                                                                    |
-| `npm run check`   | Typecheck every workspace and the smoke suite.                                                                                                            |
-| `npm test`        | Run every workspace's tests.                                                                                                                              |
-| `npm run build`   | Build the client.                                                                                                                                         |
-| `npm run smoke`   | Run the browser smoke tests against the built client (`npm run build` first).                                                                             |
-| `npm run start`   | Build, then serve on `:3001`.                                                                                                                             |
-| `npm run map`     | Regenerate `docs/app-map.md`, `docs/srd-coverage.md` and the actor JSON Schema after changing state, commands, HTTP paths, the actor schema or the rules. |
-| `npm run content` | Rebuild the SRD content bundles from their sources, in dependency order.                                                                                  |
-| `npm run lint`    | Run ESLint.                                                                                                                                               |
-| `npm run format`  | Format with Prettier.                                                                                                                                     |
+| Command               | What it does                                                                                                                                              |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`         | Client on `:5173` and the server on `:3001`, both reloading on change.                                                                                    |
+| `npm run check`       | Typecheck every workspace and the smoke suite.                                                                                                            |
+| `npm test`            | Run every workspace's tests.                                                                                                                              |
+| `npm run build`       | Build the client.                                                                                                                                         |
+| `npm run smoke`       | Run the browser smoke tests against the built client (`npm run build` first).                                                                             |
+| `npm run start`       | Build, then serve on `:3001`.                                                                                                                             |
+| `npm run gm-password` | Set the first GM password from the computer that runs OzyVTT, while it is running.                                                                        |
+| `npm run map`         | Regenerate `docs/app-map.md`, `docs/srd-coverage.md` and the actor JSON Schema after changing state, commands, HTTP paths, the actor schema or the rules. |
+| `npm run content`     | Rebuild the SRD content bundles from their sources, in dependency order.                                                                                  |
+| `npm run lint`        | Run ESLint.                                                                                                                                               |
+| `npm run format`      | Format with Prettier.                                                                                                                                     |
 
 The smoke suite (`e2e/`) starts its own servers on ports 3201 and 3202 (set `SMOKE_PORT` to move
 them), each against a fresh temporary data directory, and runs the first-evening journeys at a
