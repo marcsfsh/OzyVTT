@@ -23,7 +23,6 @@ import type {
   CodexPageSummary,
   CodexQuest,
   CodexQuestStatus,
-  CodexRevealAudit,
   CodexSearchResult,
   CodexPrepSectionInput,
   CodexSession,
@@ -528,10 +527,4 @@ export const standingApi = {
       method: "POST",
       body: { revealed }
     }).then((data) => data.standing)
-};
-
-// ----- The reveal audit -----
-
-export const revealAuditApi = {
-  get: (token: string) => request<{ audit: CodexRevealAudit }>(token, "/reveal-audit").then((data) => data.audit)
 };

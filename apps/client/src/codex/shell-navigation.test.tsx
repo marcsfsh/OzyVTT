@@ -5,85 +5,19 @@ import userEvent from "@testing-library/user-event";
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 vi.mock("./atlas/AtlasMap", () => ({ AtlasMap: () => <div data-testid="map-surface" /> }));
 
-const listPages = vi.fn();
-const getPage = vi.fn();
-const createPreviewSession = vi.fn();
-
-vi.mock("./api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./api")>();
-  return {
-    ...actual,
-    codexApi: {
-      ...actual.codexApi,
-      listPages: (...a: unknown[]) => listPages(...a),
-      listFolders: async () => [],
-      listConnections: async () => [],
-      party: async () => null,
-      getPage: (...a: unknown[]) => getPage(...a),
-      getSettings: async () => ({ autosave: { enabled: true, intervalSeconds: 1 } }),
-      search: async () => ({ hits: [], truncated: false }),
-      markersForPage: async () => [],
-      exportBundle: async () => ({ version: 1, pages: [], counts: {} }),
-      createPreviewSession: (...a: unknown[]) => createPreviewSession(...a)
-    },
-    playerCodexApi: {
-      ...actual.playerCodexApi,
-      listPages: async () => [],
-      listMaps: async () => [],
-      chronicle: async () => [],
-      listConnections: async () => [],
-      calendar: async () => null,
-      sessions: async () => [],
-      quests: async () => [],
-      standing: async () => [],
-      party: async () => null
-    },
-    journalApi: { ...actual.journalApi, chronicle: async () => [], forPage: async () => [] },
-    atlasApi: { ...actual.atlasApi, listMaps: async () => [], listAssets: async () => [], listMarkers: async () => [] },
-    calendarApi: {
-      ...actual.calendarApi,
-      get: async () => ({
-        yearName: "DR",
-        months: [{ name: "Hammer", days: 30 }],
-        weekdays: [],
-        currentInstant: 0,
-        publishedInstant: 0
-      })
-    },
-    sessionApi: { ...actual.sessionApi, list: async () => ({ sessions: [], activeSessionId: null }) },
-    questApi: { ...actual.questApi, list: async () => [] },
-    standingApi: { ...actual.standingApi, list: async () => [] }
-  };
-});
+vi.mock("./api", async (actual) => (await import("../../test/codex-fakes")).fakeApiModule(await actual()));
+vi.mock("./api-records", async () => (await import("../../test/codex-fakes")).fakeRecordsModule());
 
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { setViewport } from "../../test/viewport";
 import { CodexShell } from "./CodexShell";
 import { CODEX_BAR } from "./routes";
+import { ACTORS, api, page, records, resetFakes, summary } from "../../test/codex-fakes";
 
-const PAGE = {
-  id: "p1",
-  title: "Strahd",
-  entityType: "character" as const,
-  fields: {},
-  folder: null,
-  tags: ["villain"],
-  revealedToPlayers: false,
-  bannerAssetId: null,
-  inWorldLabel: null,
-  calendarInstant: null,
-  inWorldDate: null,
-  rev: 1,
-  createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
-};
-
-const ACTORS = [
-  { id: "a-lyra", name: "Lyra Emberwise", kind: "player-character" },
-  { id: "a-old", name: "Old Tam", kind: "player-character", archived: true },
-  { id: "a-wolf", name: "Wolf", kind: "monster" }
-];
+const listPages = api.codexApi.listPages;
+const getPage = records.pageRecordApi.get;
+const createPreviewSession = api.codexApi.createPreviewSession;
 
 const renderShell = (at: string) =>
   (goTo(at), render)(
@@ -94,9 +28,9 @@ const renderShell = (at: string) =>
 
 beforeEach(() => {
   localStorage.clear();
-  listPages.mockResolvedValue([PAGE]);
-  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", blocks: [] }, connections: [] });
-  createPreviewSession.mockResolvedValue("preview-token");
+  resetFakes();
+  listPages.mockResolvedValue([summary()]);
+  getPage.mockResolvedValue({ page: page(), connections: [] });
 });
 
 const bar = () => within(screen.getByRole("navigation", { name: "Codex sections" }));

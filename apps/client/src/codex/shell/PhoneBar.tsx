@@ -18,10 +18,13 @@ export const PhoneBarContext = createContext<PhoneBarSlot | null>(null);
 
 export function CodexPhoneBar({
   title,
+  content,
   onBack,
   actions
 }: Readonly<{
-  title: ReactNode;
+  title?: ReactNode;
+  /** In place of the title: a search box, say. */
+  content?: ReactNode;
   /** Shows Back at the start of the bar. */
   onBack?: () => void;
   /** Controls at the end of the bar. */
@@ -38,7 +41,7 @@ export function CodexPhoneBar({
           <IconChevronLeft />
         </IconButton>
       )}
-      <h2 className="cx-phonebar-title">{title}</h2>
+      {content ?? <h2 className="cx-phonebar-title">{title}</h2>}
       {actions && <div className="cx-phonebar-actions">{actions}</div>}
     </>,
     slot.target

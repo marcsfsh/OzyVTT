@@ -1,0 +1,225 @@
+/* Relationships: the picker and the view switch over the view, the focus page's ties beside it. */
+
+.cx-rel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cx-rel-picker {
+  width: min(22rem, 100%);
+}
+.cx-rel-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cx-rel-main {
+  min-height: 0;
+  padding: var(--space-3);
+}
+.cx-rel.is-phone {
+  display: block;
+}
+.cx-rel-phonebody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+
+/* The web: the centre ringed in cyan, Hidden lines and pages dashed violet. */
+.cx-web {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 24rem;
+}
+.cx-web-edge line {
+  stroke: var(--indigo);
+  stroke-width: 2;
+}
+.cx-web-edge.is-hidden line {
+  stroke: var(--rim-gm);
+  stroke-dasharray: 6 5;
+}
+.cx-web-edgelabel {
+  fill: var(--text-dim);
+  font: 600 12px var(--font-label);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4;
+}
+.cx-web-node circle {
+  fill: var(--surface-2);
+  stroke: var(--line-raised);
+  stroke-width: 2;
+}
+.cx-web-node.is-centre circle {
+  stroke: var(--cyan);
+  stroke-width: 3;
+}
+.cx-web-node.is-hidden circle {
+  stroke: var(--rim-gm);
+  stroke-dasharray: 4 4;
+}
+.cx-web-label {
+  fill: var(--text);
+  font: 700 13px var(--font-body);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4;
+}
+.cx-web a {
+  cursor: pointer;
+}
+.cx-web a:focus-visible .cx-web-node circle {
+  stroke: var(--focus-ring-color);
+  stroke-width: 4;
+}
+
+/* The factions grid: its own sideways scroller, the chosen faction's row edged in cyan. */
+.cx-grid-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--line-strong);
+}
+.cx-grid {
+  border-collapse: collapse;
+  min-width: 100%;
+  font: 600 var(--fs-xs) / 1.25 var(--font-body);
+}
+.cx-grid th,
+.cx-grid td {
+  min-width: 7.5rem;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-align: center;
+}
+.cx-grid th {
+  color: var(--text-dim);
+  font-family: var(--font-label);
+}
+.cx-grid tbody th {
+  text-align: start;
+}
+.cx-grid td.has-tie {
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-1));
+}
+.cx-grid td.is-hidden {
+  outline: 1px dashed var(--rim-gm);
+  outline-offset: -4px;
+  color: var(--violet-hi);
+}
+.cx-grid-self {
+  background: var(--surface-2);
+}
+.cx-grid tr.is-focus th,
+.cx-grid tr.is-focus td {
+  box-shadow:
+    inset 0 2px 0 var(--cyan),
+    inset 0 -2px 0 var(--cyan);
+}
+.cx-grid tr.is-focus th {
+  color: var(--cyan-hi);
+}
+.cx-grid-party.is-hidden {
+  color: var(--violet-hi);
+}
+.cx-grid-adjust {
+  min-height: var(--tap-min);
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* Over time: a Before lane, then each tie as a bar to today, with a diamond on when it was learned. */
+.cx-time {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 34rem;
+}
+.cx-rel.is-phone .cx-time {
+  min-width: 0;
+}
+.cx-time-axis {
+  position: relative;
+  height: 1.5rem;
+  margin-left: 14rem;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.5rem var(--font-label);
+  text-transform: uppercase;
+}
+.cx-time-before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  text-align: center;
+}
+.cx-time-today {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--cyan-hi);
+}
+.cx-time-row {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0;
+  min-height: 3rem;
+}
+.cx-time-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: var(--space-2);
+  color: var(--text-dim);
+  font: 500 var(--fs-2xs) / 1.3 var(--font-body);
+}
+.cx-time-name b {
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+.cx-time-track {
+  position: relative;
+  height: 1.75rem;
+}
+.cx-time-bar {
+  position: absolute;
+  top: 0.55rem;
+  height: 0.65rem;
+  background: var(--indigo);
+}
+.cx-time-row.is-hidden .cx-time-bar {
+  background: transparent;
+  border: 1px dashed var(--rim-gm);
+}
+.cx-time-learned {
+  position: absolute;
+  top: 0.35rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--cyan);
+  color: transparent;
+  font-size: 0;
+}
+@media (max-width: 760px) {
+  .cx-time-axis {
+    margin-left: 0;
+  }
+  .cx-time-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
