@@ -7,6 +7,7 @@ import {
   IconCheck,
   IconEye,
   IconEyeOff,
+  IconMore,
   IconPencil,
   IconPlus,
   Input,
@@ -18,7 +19,7 @@ import {
 import { pageLinkKey, type CodexQuestStatus } from "@vtt/domain";
 import { playerCodexApi, questApi } from "../api";
 import { questRecordApi } from "../api-records";
-import type { CodexBlock, CodexQuest, CodexQuestObjective, PlayerCodexQuest } from "../contract";
+import type { CodexBlock, CodexQuest, CodexQuestObjective, PlayerCodexQuest } from "@vtt/domain";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { EntityIcon } from "../icons";
 import { usePageLinks } from "../pageLinks";
@@ -33,6 +34,7 @@ import { WhoSeesItMenu } from "../shared/WhoSeesIt";
 import { HIDDEN, sinceLabel, type Audience } from "../shared/audience";
 import { createQuest } from "../creates";
 import { useCodexQuery } from "../useCodexQuery";
+import { useConfirm } from "../../components/feedback";
 import { gmDocument, playerDocument } from "../page/document";
 import { DocText } from "../page/pageParts";
 import { linksSentence, stampOf } from "../shared/reveals";
@@ -96,7 +98,11 @@ function QuestList({
   onPicked?: () => void;
 }>) {
   const { query, setFilter } = useCodexShell();
-  const statuses = (query.get("status") ?? "active").split(",").filter(Boolean);
+  // "none" is no status chosen, which lists every quest. A quest's own status (an older address) reads as its group.
+  const statuses = (query.get("status") ?? "active")
+    .split(",")
+    .filter((value) => value && value !== "none")
+    .map((value) => STATUS_GROUP[value as CodexQuestStatus] ?? value);
   const audiences = (query.get("who") ?? "").split(",").filter(Boolean);
   const [text, setText] = useState("");
   const listed = quests.filter(
@@ -159,7 +165,7 @@ function QuestList({
               {gm && quest.revealedToPlayers === false && (
                 <span className="cx-meta-hidden">
                   <IconEyeOff />
-                  <span className="nh-sr-only">Hidden</span>
+                  Hidden
                 </span>
               )}
             </button>
@@ -172,7 +178,14 @@ function QuestList({
 
 /** What the list shows, in words: "Active quests", or "Every quest" with no status chosen. */
 function statusSummary(status: string | null): string {
-  const chosen = (status ?? "active").split(",").filter((value) => value !== "none" && value);
+  const chosen = [
+    ...new Set(
+      (status ?? "active")
+        .split(",")
+        .filter((value) => value !== "none" && value)
+        .map((value) => STATUS_GROUP[value as CodexQuestStatus] ?? value)
+    )
+  ];
   if (chosen.length === 0 || chosen.length === STATUS_CHIPS.length) return "Every quest";
   return `${chosen.map((value) => STATUS_CHIPS.find((chip) => chip.value === value)?.label ?? value).join(" and ")} quests`;
 }
@@ -264,6 +277,7 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
   const followLink = usePageLinks(feeds.pages, gm.quickCreate);
   const knownTitles = useMemo(() => new Set(feeds.pages.map((page) => pageLinkKey(page.title))), [feeds.pages]);
   const editing = query.get("mode") === "edit";
+  const { confirm, dialog } = useConfirm();
 
   const run = async (write: () => Promise<CodexQuest>, failure: string) => {
     setBusy(true);
@@ -275,6 +289,23 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
       setError(cause instanceof Error ? cause.message : failure);
     } finally {
       setBusy(false);
+    }
+  };
+  const remove = async () => {
+    if (!quest) return;
+    const ok = await confirm({
+      title: "Delete quest",
+      body: `Delete "${quest.title}"? This cannot be undone.`,
+      confirmLabel: "Delete",
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      await questApi.remove(token, id);
+      void feeds.questFeed.reload();
+      go(pathForSection("quests"));
+    } catch {
+      setError("Couldn't delete that quest.");
     }
   };
   const objectivesWrite = (objectives: readonly CodexQuestObjective[], extra?: Readonly<{ text: string }>) =>
@@ -335,7 +366,13 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
         onReveal={() => setRevealing(item.block)}
         onHide={() => void setBlockAudience(item.block, HIDDEN)}
       >
-        <CodexMarkdown text={item.block.text} token={token} onNavigate={followLink} knownTitles={knownTitles} />
+        <CodexMarkdown
+          text={item.block.text}
+          token={token}
+          onNavigate={followLink}
+          knownTitles={knownTitles}
+          onCreate={followLink}
+        />
       </HiddenBlock>
     );
   const reveal = (
@@ -487,19 +524,29 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
           <IconPencil /> Edit
         </Button>
       )}
+      <Menu icon align="end" label="More" trigger={<IconMore />}>
+        <MenuItem tone="danger" onClick={() => void remove()}>
+          Delete quest
+        </MenuItem>
+      </Menu>
     </>
   );
-  const overlays = revealing && (
-    <RevealPanel
-      title={revealing.title}
-      party={party}
-      busy={busy}
-      error={error}
-      preview={<CodexMarkdown text={revealing.text} token={token} audience="player" knownTitles={knownTitles} />}
-      links={linksSentence(revealing.text, feeds.pages)}
-      onCancel={() => setRevealing(null)}
-      onReveal={(next) => void setBlockAudience(revealing, next)}
-    />
+  const overlays = (
+    <>
+      {dialog}
+      {revealing && (
+        <RevealPanel
+          title={revealing.title}
+          party={party}
+          busy={busy}
+          error={error}
+          preview={<CodexMarkdown text={revealing.text} token={token} audience="player" knownTitles={knownTitles} />}
+          links={linksSentence(revealing.text, feeds.pages)}
+          onCancel={() => setRevealing(null)}
+          onReveal={(next) => void setBlockAudience(revealing, next)}
+        />
+      )}
+    </>
   );
 
   if (editing)

@@ -15,9 +15,9 @@ import {
 } from "@vtt/ui";
 import { pageLinkKey } from "@vtt/domain";
 import { useConfirm } from "../../components/feedback";
-import { codexApi } from "../api";
+import { codexApi, standingApi } from "../api";
 import { pageRecordApi } from "../api-records";
-import type { CodexBlock, CodexPage, CodexPageConnection } from "../contract";
+import type { CodexBlock, CodexPage, CodexPageConnection } from "@vtt/domain";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { RevisionHistory } from "../RevisionHistory";
 import { PageTimeline } from "../PageTimeline";
@@ -147,6 +147,20 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
 
   const setPageRevealed = async (revealed: boolean) => {
     setError(null);
+    // A standing is shown only while its faction page is, so hiding the page hides the standing too: ask first.
+    if (!revealed && page?.entityType === "faction") {
+      const standing = await standingApi.list(token).catch(() => []);
+      const shown = standing.some((row) => row.factionPageId === id && row.revealedToPlayers);
+      if (
+        shown &&
+        !(await confirm({
+          title: "Hide this faction page",
+          body: "Your standing with them stops being shown to players as well. A standing is only shown while its faction page is.",
+          confirmLabel: "Hide page"
+        }))
+      )
+        return;
+    }
     try {
       await codexApi.revealPage(token, id, revealed);
       await read.reload();
@@ -339,7 +353,13 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
           onReveal={() => setRevealing(block)}
           onHide={() => void setAudience(block, { audience: "hidden", characterIds: [] })}
         >
-          <CodexMarkdown text={block.text} token={token} onNavigate={followLink} knownTitles={knownTitles} />
+          <CodexMarkdown
+            text={block.text}
+            token={token}
+            onNavigate={followLink}
+            knownTitles={knownTitles}
+            onCreate={followLink}
+          />
         </HiddenBlock>
       </div>
     );

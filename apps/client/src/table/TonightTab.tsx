@@ -46,7 +46,7 @@ export function untilLabel(instant: number | null, calendar: GmCodexCalendar | n
 /**
  * The table's Tonight tab: the active session's live board, built from its prep. The scenes with the current one,
  * the cast, the secrets and clues to tick (a tick that links something players can't read offers to reveal it),
- * the clocks, the quests, the encounters to make live, and a line to log what happens. GM only: every read and
+ * the clocks, the quests, the fights to make live, and a line to log what happens. GM only: every read and
  * write here is a GM route.
  */
 export function TonightTab({
@@ -59,7 +59,7 @@ export function TonightTab({
   token: string;
   /** The party's characters, for revealing a block to some of them. */
   party?: readonly PartyCharacter[];
-  /** The table's prepared scenes, which the board's encounters name. */
+  /** The table's prepared scenes, which the board's fights name. */
   scenes?: readonly Scene[];
   liveSceneId?: string | null;
   onMakeLive?: (sceneId: string) => void;
@@ -259,8 +259,8 @@ function LiveBoard({
       )}
 
       {encounters.length > 0 && (
-        <section className="tonight-section" aria-label="Encounters">
-          <h3 className="tonight-eyebrow">Encounters</h3>
+        <section className="tonight-section" aria-label="Fights">
+          <h3 className="tonight-eyebrow">Fights</h3>
           <ul className="tonight-rows">
             {encounters.map((scene) => (
               <li key={scene.id} className="tonight-row">
@@ -460,8 +460,8 @@ function Clues({
                 <div className="tonight-offer" role="group" aria-label="Reveal what this clue links">
                   <p>
                     {offered.link.blockId
-                      ? `This clue links the hidden block ${offered.blockTitle?.trim() || "with no title"}. Reveal it now?`
-                      : `This clue links ${offered.linkTitle ?? "a record"}, which players can't read yet. Show it to them now?`}
+                      ? `This clue links the hidden block ${offered.blockTitle?.trim() || "with no title"}. Reveal it to:`
+                      : `This clue links ${offered.linkTitle ?? "a record"}, which players can't read yet.`}
                   </p>
                   <div className="tonight-offer-actions">
                     <Button
@@ -470,7 +470,7 @@ function Clues({
                       disabled={busy}
                       onClick={() => void reveal(offered, EVERYONE)}
                     >
-                      {offered.link.blockId ? "Everyone" : "Show to players"}
+                      {offered.link.blockId ? "Everyone" : "Show it to players"}
                     </Button>
                     {offered.link.blockId && (
                       <Button

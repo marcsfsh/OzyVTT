@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "@vtt/ui";
-import type { CodexSearchHit } from "@vtt/domain";
 import { CommandPalette } from "./CommandPalette";
 import { NotFoundView } from "../components/NotFoundView";
 import { navigate, replaceQuery, useRoute } from "../router";
@@ -125,7 +124,7 @@ export function PlayerCodex({ token, embedded = false }: Readonly<{ token: strin
             <CommandPalette
               gmToken={token}
               player
-              onOpenHit={(hit: CodexSearchHit) => go(pathForHit(hit))}
+              onOpenHit={(hit) => go(pathForHit(hit))}
               onNavigate={go}
               onClose={() => setPaletteOpen(false)}
             />

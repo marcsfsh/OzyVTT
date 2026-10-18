@@ -267,13 +267,13 @@ describe("The board", () => {
     expect(clocks.getByText("The Black Gull sails.").closest("li")).toHaveTextContent("Hidden");
   });
 
-  it("lists the quests and the encounters, and makes an encounter live", async () => {
+  it("lists the quests and the fights, and makes a fight live", async () => {
     const user = userEvent.setup();
     const onMakeLive = renderTonight();
     expect(
       within(await screen.findByRole("region", { name: "Quests" })).getByText("The Black Gull")
     ).toBeInTheDocument();
-    const encounters = within(screen.getByRole("region", { name: "Encounters" }));
+    const encounters = within(screen.getByRole("region", { name: "Fights" }));
     expect(encounters.getByText("The roof").closest("li")).toHaveTextContent("Live");
     await user.click(encounters.getByRole("button", { name: "Make live" }));
     expect(onMakeLive).toHaveBeenCalledWith("fight-1");
@@ -289,7 +289,7 @@ describe("Ticking a clue", () => {
 
     await waitFor(() => expect(live.tick).toHaveBeenCalledWith("gm", "s6", "c1", true));
     const offer = within(await screen.findByRole("group", { name: "Reveal what this clue links" }));
-    expect(offer.getByText("This clue links the hidden block The debt. Reveal it now?")).toBeInTheDocument();
+    expect(offer.getByText("This clue links the hidden block The debt. Reveal it to:")).toBeInTheDocument();
     // Nothing is revealed by the tick itself.
     expect(reads.setPageBlockAudience).not.toHaveBeenCalled();
 
@@ -345,11 +345,9 @@ describe("Ticking a clue", () => {
     renderTonight();
     await user.click(await (await loadedClues()).findByRole("checkbox", { name: /The ledger is in the tower/ }));
     const offer = within(await screen.findByRole("group", { name: "Reveal what this clue links" }));
-    expect(
-      offer.getByText("This clue links Harbour Ledger, which players can't read yet. Show it to them now?")
-    ).toBeInTheDocument();
+    expect(offer.getByText("This clue links Harbour Ledger, which players can't read yet.")).toBeInTheDocument();
     expect(offer.queryByRole("button", { name: "Choose characters" })).toBeNull();
-    await user.click(offer.getByRole("button", { name: "Show to players" }));
+    await user.click(offer.getByRole("button", { name: "Show it to players" }));
     await waitFor(() => expect(reads.revealPage).toHaveBeenCalledWith("gm", "p-ledger", true));
   });
 

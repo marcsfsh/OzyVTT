@@ -3,7 +3,7 @@ import { Alert, Button, IconChevronRight, IconSparkle, Skeleton, cx } from "@vtt
 import type { CodexRecordKind } from "@vtt/domain";
 import { sessionApi } from "../api";
 import { findApi } from "../api-records";
-import type { CodexHome, CodexRevealCheckRow, CodexSearchType } from "../contract";
+import type { CodexHome, CodexRevealCheckRow, CodexSearchType } from "@vtt/domain";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { clocksOf, nextSessionCard } from "./rules";
 import { deadlineStateLabel } from "../chronicle";
@@ -255,7 +255,9 @@ export function GmHome() {
   );
   const firstPage = home && pageRevealed + pageHidden === 0 && (
     <Card title="Make your first page" icon="scroll">
-      <p className="cx-hint">Pages hold the people and places of your world. Players see none of it until you reveal it.</p>
+      <p className="cx-hint">
+        Pages hold the people and places of your world. Players see none of it until you reveal it.
+      </p>
       <div className="cx-card-row">
         <Button size="sm" variant="primary" onClick={() => gm.quickCreate({})}>
           New page

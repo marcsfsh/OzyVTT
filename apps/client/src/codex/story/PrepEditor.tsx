@@ -16,7 +16,7 @@ import {
 } from "@vtt/ui";
 import type { CodexEntityType, CodexQuestStatus } from "@vtt/domain";
 import { newId } from "../../lib/ids";
-import { codexApi, questApi } from "../api";
+import { pageRecordApi, questRecordApi } from "../api-records";
 import { CodexEditor } from "../CodexEditor";
 import { EntityIcon, CodexIcon } from "../icons";
 import {
@@ -92,7 +92,8 @@ export function useBlockTitles(token: string, prep: readonly CodexPrepSection[])
       records.split(",").map(async (key) => {
         const [kind, id] = key.split(":") as ["page" | "quest", string];
         try {
-          const record = kind === "page" ? (await codexApi.getPage(token, id)).page : await questApi.get(token, id);
+          const record =
+            kind === "page" ? (await pageRecordApi.get(token, id)).page : await questRecordApi.get(token, id);
           return record.blocks.map((block) => [block.id, block.title] as const);
         } catch {
           return [];
@@ -495,7 +496,7 @@ function LinkDialog({
   const readBlocks = useCallback(async () => {
     if (!kind || !id) return [];
     const record =
-      kind === "page" ? (await codexApi.getPage(context.token, id)).page : await questApi.get(context.token, id);
+      kind === "page" ? (await pageRecordApi.get(context.token, id)).page : await questRecordApi.get(context.token, id);
     // A clue reveals a block, so only a block someone can't read yet is offered; a record without one links whole.
     return record.blocks.filter((block) => block.audience !== "everyone");
   }, [kind, id, context.token]);

@@ -15,7 +15,7 @@ import {
 } from "@vtt/ui";
 import type { CodexEntityType, CodexRecordKind } from "@vtt/domain";
 import { findApi } from "../api-records";
-import type { CodexSearchHit, CodexSearchType, PlayerCodexSearchHit } from "../contract";
+import type { CodexSearchHit, CodexSearchType, PlayerCodexSearchHit } from "@vtt/domain";
 import { entityDef } from "../entities";
 import { CodexIcon, EntityIcon } from "../icons";
 import { pathForHit } from "../routes";
@@ -289,17 +289,16 @@ export function SearchView() {
         </Button>
       </div>
       <div className="cx-search-results scroll-y">
-        {result.error && (
+        {result.error ? (
           <Alert tone="danger" title="Search failed">
             {result.error}
           </Alert>
-        )}
-        {result.loading && !result.data ? (
+        ) : result.loading && !result.data ? (
           <div className="cx-search-loading">
             <Skeleton variant="text" />
             <Skeleton variant="text" />
           </div>
-        ) : hits.length === 0 && !result.error ? (
+        ) : hits.length === 0 ? (
           <p className="cx-hint cx-search-empty">Nothing matches. Change the words or the filters.</p>
         ) : (
           <table className="cx-table">
@@ -551,6 +550,8 @@ function PhoneSearch({
         {result.error && <Alert tone="danger">{result.error}</Alert>}
         {result.loading && hits.length === 0 ? (
           <Skeleton variant="text" />
+        ) : hits.length === 0 && !result.error ? (
+          <p className="cx-hint">Nothing matches. Change the words or the kind.</p>
         ) : (
           <ul className="cx-hitlist">
             {hits.map((hit) => (

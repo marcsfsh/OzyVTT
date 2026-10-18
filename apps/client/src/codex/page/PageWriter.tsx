@@ -16,11 +16,11 @@ import {
   cx
 } from "@vtt/ui";
 import { useConfirm } from "../../components/feedback";
-import { calendarApi, codexApi, CONNECTION_LABEL_MAX, uploadCodexAsset } from "../api";
+import { calendarApi, codexApi, uploadCodexAsset } from "../api";
 import { pageRecordApi } from "../api-records";
-import type { CodexBlock, CodexPage, CodexPageConnection } from "../contract";
+import type { CodexBlock, CodexPage, CodexPageConnection } from "@vtt/domain";
 import { CodexImage } from "../CodexImage";
-import { ENTITY_DEFS, ENTITY_TYPE_LIST, CONNECTION_LABEL_SUGGESTIONS, entityDef, type EntityType } from "../entities";
+import { ENTITY_DEFS, ENTITY_TYPE_LIST, entityDef, type EntityType } from "../entities";
 import { dateDraftOf, dateOfDraft, InWorldDateFields, type DateDraft } from "../InWorldDateFields";
 import { PageTimeline } from "../PageTimeline";
 import { RevisionHistory } from "../RevisionHistory";
@@ -29,13 +29,13 @@ import { atlasPath, journalEntryPath, relationshipsPath } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex } from "../shell/context";
 import { FieldAudienceToggle } from "../shared/WhoSeesIt";
-import { PagePicker } from "../shared/PagePicker";
 import type { Audience } from "../shared/audience";
 import { useCodexQuery } from "../useCodexQuery";
 import { DocEditor } from "./DocEditor";
 import { draftDocument, saveShape, type DraftItem } from "./document";
 import { KindChip, PageCrumbs } from "./pageParts";
-import { relationshipGroups, type AnyPageConnection } from "./MetaPanel";
+import type { AnyPageConnection } from "./MetaPanel";
+import { RelationshipEditor } from "./RelationshipEditor";
 
 type WriterDraft = DateDraft &
   Readonly<{
@@ -71,8 +71,6 @@ function serialize(draft: WriterDraft): string {
     blocks: shape.blocks.map((block) => [block.key, block.title.trim(), block.text.trim(), block.anchor])
   });
 }
-
-const LABEL_CHIPS = CONNECTION_LABEL_SUGGESTIONS.slice(0, 6);
 
 /**
  * The page in writing: the document with its hidden blocks in place, and beside it the fields, each with Who sees it
@@ -208,11 +206,16 @@ export function PageWriter({
     const lost = entityDef(draft.entityType)
       .fields.filter((field) => !keepKeys.has(field.key) && (draft.fields[field.key] ?? "").trim())
       .map((field) => field.label);
+    // A kind-changing save keeps a version on the server, so the promise holds unless the GM turned history off.
+    const historyOn = feeds.settingsFeed.data?.revisionHistory.enabled ?? true;
+    const recovery = historyOn
+      ? "They will be removed. You can restore them from Version history."
+      : "They will be removed. Version history is off, so this cannot be undone.";
     const ok = await confirm({
       title: `Change kind to ${ENTITY_DEFS[nextType].label}?`,
       body:
         lost.length > 0
-          ? `These ${ENTITY_DEFS[draft.entityType].label} fields hold text that ${ENTITY_DEFS[nextType].label} does not use: ${lost.join(", ")}. They will be removed. You can restore them from Version history.`
+          ? `These ${ENTITY_DEFS[draft.entityType].label} fields hold text that ${ENTITY_DEFS[nextType].label} does not use: ${lost.join(", ")}. ${recovery}`
           : `Its fields become ${ENTITY_DEFS[nextType].label} fields. Nothing you have written is lost.`,
       confirmLabel: "Change kind"
     });
@@ -525,144 +528,5 @@ export function PageWriter({
       </div>
       {overlays}
     </div>
-  );
-}
-
-/**
- * A page's relationships in writing: each declared one with its own Everyone or Hidden switch and Remove, and Add a
- * relationship with a label, a page and who sees it. A mention is written in the text, so it is changed there.
- */
-function RelationshipEditor({
-  pageId,
-  pageTitle,
-  connections,
-  pages,
-  onChanged,
-  onOpen
-}: Readonly<{
-  pageId: string;
-  pageTitle: string;
-  connections: readonly CodexPageConnection[];
-  pages: ReadonlyArray<Readonly<{ id: string; title: string; entityType: EntityType }>>;
-  onChanged: () => void;
-  onOpen: (kind: AnyPageConnection["otherKind"], id: string) => void;
-}>) {
-  const { token } = useCodexShell();
-  const [label, setLabel] = useState("");
-  const [target, setTarget] = useState<string | null>(null);
-  const [hidden, setHidden] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const groups = relationshipGroups(connections, pageTitle);
-
-  const run = async (write: () => Promise<unknown>, failure: string) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await write();
-      onChanged();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : failure);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const add = () =>
-    target &&
-    void run(async () => {
-      await codexApi.addConnection(token, pageId, {
-        toPageId: target,
-        label: label.trim() || null,
-        layer: hidden ? "gm" : "player"
-      });
-      setTarget(null);
-      setLabel("");
-      setHidden(false);
-    }, "Couldn't add that relationship.");
-
-  return (
-    <section className="cx-writerel" aria-label="Relationships">
-      <Eyebrow>Relationships</Eyebrow>
-      {groups.map((group) => (
-        <div key={group.heading} className="cx-meta-group">
-          <span className="cx-meta-key">{group.heading}</span>
-          {group.rows.map((row) => {
-            const connection = row as CodexPageConnection;
-            return (
-              <div key={`${row.otherId}:${row.direction}`} className="cx-writerel-row">
-                <button type="button" className="cx-meta-link" onClick={() => onOpen(row.otherKind, row.otherId)}>
-                  <span className="cx-meta-link-title">{row.otherTitle}</span>
-                </button>
-                {connection.id && (
-                  <>
-                    <FieldAudienceToggle
-                      field={`${group.heading} ${row.otherTitle}`}
-                      hidden={connection.layer === "gm"}
-                      disabled={busy}
-                      onChange={(next) =>
-                        void run(
-                          () => codexApi.updateConnection(token, connection.id!, { layer: next ? "gm" : "player" }),
-                          "Couldn't change who sees that relationship."
-                        )
-                      }
-                    />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy}
-                      aria-label={`Remove ${group.heading} ${row.otherTitle}`}
-                      onClick={() =>
-                        void run(
-                          () => codexApi.removeConnection(token, connection.id!),
-                          "Couldn't remove that relationship."
-                        )
-                      }
-                    >
-                      Remove
-                    </Button>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-      <div className="cx-writerel-add">
-        <Eyebrow>Add a relationship</Eyebrow>
-        <div className="cx-filterchips" role="group" aria-label="Label">
-          {LABEL_CHIPS.map((chip) => (
-            <button
-              key={chip}
-              type="button"
-              className={cx("cx-filterchip", "interactive", label === chip && "is-on")}
-              aria-pressed={label === chip}
-              onClick={() => setLabel(label === chip ? "" : chip)}
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
-        <Input
-          aria-label="Label"
-          placeholder="Or write a label"
-          value={label}
-          maxLength={CONNECTION_LABEL_MAX}
-          onChange={(event) => setLabel(event.target.value)}
-        />
-        <div className="cx-writerel-target">
-          <PagePicker
-            label="To"
-            pages={pages.filter((candidate) => candidate.id !== pageId)}
-            value={target}
-            onChange={setTarget}
-          />
-          <FieldAudienceToggle field="the new relationship" hidden={hidden} onChange={setHidden} />
-        </div>
-        <Button size="sm" disabled={!target || busy} onClick={add}>
-          Add
-        </Button>
-        {error && <Alert tone="danger">{error}</Alert>}
-      </div>
-    </section>
   );
 }

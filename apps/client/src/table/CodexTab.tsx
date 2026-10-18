@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Input, Skeleton, cx } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
 import { findApi, pageRecordApi } from "../codex/api-records";
-import type { CodexBlock, CodexPage, CodexSearchHit, PlayerCodexBlock, PlayerCodexSearchHit } from "../codex/contract";
+import type { CodexBlock, CodexPage, CodexSearchHit, PlayerCodexBlock, PlayerCodexSearchHit } from "@vtt/domain";
 import { CodexMarkdown } from "../codex/CodexMarkdown";
 import { entityDef } from "../codex/entities";
 import { EntityIcon } from "../codex/icons";
@@ -232,20 +232,20 @@ export function CodexTab({
       ) : (
         <>
           {recent.length > 0 && (
-            <div className="cx-meta-chips" role="list" aria-label="Recent pages">
+            <ul className="cx-meta-chips" aria-label="Recent pages">
               {recent.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  role="listitem"
-                  className={cx("cx-tag", "interactive", row.id === openId && "is-on")}
-                  aria-current={row.id === openId ? "true" : undefined}
-                  onClick={() => open(row)}
-                >
-                  {row.title}
-                </button>
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    className={cx("cx-tag", "interactive", row.id === openId && "is-on")}
+                    aria-current={row.id === openId ? "true" : undefined}
+                    onClick={() => open(row)}
+                  >
+                    {row.title}
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
           {openId ? (
             role === "gm" ? (

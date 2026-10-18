@@ -90,11 +90,24 @@ export function PagesIndex() {
     .filter((row) => !needle || row.title.toLowerCase().includes(needle))
     .slice()
     .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+  const savedFolders = gm?.feeds.folders;
   const folders = useMemo(() => {
-    const counts = new Map<string, number>();
+    // An empty folder the GM made still lists, at a count of none.
+    const counts = new Map<string, number>((savedFolders ?? []).map((path) => [path, 0]));
     for (const row of rows) if (row.folder) counts.set(row.folder, (counts.get(row.folder) ?? 0) + 1);
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [rows]);
+  }, [rows, savedFolders]);
+  const [newFolder, setNewFolder] = useState<string | null>(null);
+  const createFolder = async (name: string) => {
+    setNewFolder(null);
+    if (!name.trim() || !gm) return;
+    try {
+      await codexApi.createFolder(token, name.trim());
+      void gm.feeds.list.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't make that folder.");
+    }
+  };
 
   const renameFolder = async (from: string, to: string) => {
     setRenaming(null);
@@ -178,19 +191,15 @@ export function PagesIndex() {
           onChange={(event) => setFilterText(event.target.value)}
         />
         {tags.length > 0 && (
-          <div className="cx-meta-chips" role="list" aria-label="Tags">
+          <ul className="cx-meta-chips" aria-label="Tags">
             {tags.map(([tag]) => (
-              <button
-                key={tag}
-                type="button"
-                role="listitem"
-                className="cx-tag interactive"
-                onClick={() => go(tagPath(tag))}
-              >
-                #{tag}
-              </button>
+              <li key={tag}>
+                <button type="button" className="cx-tag interactive" onClick={() => go(tagPath(tag))}>
+                  #{tag}
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
         {error && <Alert tone="danger">{error}</Alert>}
         <div className="cx-index-groups">{KIND_GROUPS.map(groupRow)}</div>
@@ -219,9 +228,9 @@ export function PagesIndex() {
                     </span>
                   </span>
                   {gm && row.revealedToPlayers === false && (
-                    <span className="cx-meta-hidden" title="Hidden">
+                    <span className="cx-meta-hidden">
                       <IconEyeOff />
-                      <span className="nh-sr-only">Hidden</span>
+                      Hidden
                     </span>
                   )}
                 </button>
@@ -234,10 +243,36 @@ export function PagesIndex() {
             Search with filters and sorting
           </Button>
         )}
-        {gm && folders.length > 0 && (
+        {gm && (
           <section className="cx-index-folders" aria-label="Folders">
             <Eyebrow>Folders</Eyebrow>
             <p className="cx-hint">Your own filing. Players never see it.</p>
+            {newFolder === null ? (
+              <Button size="sm" variant="ghost" onClick={() => setNewFolder("")}>
+                <IconPlus /> New folder
+              </Button>
+            ) : (
+              <form
+                className="cx-folderrow"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void createFolder(newFolder);
+                }}
+              >
+                <Input
+                  aria-label="New folder name"
+                  value={newFolder}
+                  autoFocus
+                  onChange={(event) => setNewFolder(event.target.value)}
+                />
+                <Button size="sm" type="submit" disabled={!newFolder.trim()}>
+                  Make folder
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setNewFolder(null)}>
+                  Cancel
+                </Button>
+              </form>
+            )}
             {folders.map(([path, count]) =>
               renaming?.from === path ? (
                 <form
@@ -272,8 +307,15 @@ export function PagesIndex() {
                     {path}
                   </button>
                   <span className="cx-grouprow-count">{count}</span>
-                  <Menu icon align="end" label={`Folder ${path}`} trigger={<IconMore />}>
-                    <MenuItem onClick={() => setRenaming({ from: path, to: path })}>Rename</MenuItem>
+                  <Menu icon align="end" label={`Actions for ${path}`} trigger={<IconMore />}>
+                    <MenuItem onClick={() => gm?.quickCreate({ folder: path })}>New page here</MenuItem>
+                    <MenuItem onClick={() => setNewFolder(`${path}/`)}>New subfolder</MenuItem>
+                    <MenuItem onClick={() => setRenaming({ from: path, to: path })}>Rename folder</MenuItem>
+                    {path.includes("/") && (
+                      <MenuItem onClick={() => void renameFolder(path, path.slice(path.lastIndexOf("/") + 1))}>
+                        Move to top level
+                      </MenuItem>
+                    )}
                     <MenuItem tone="danger" onClick={() => void deleteFolder(path, count)}>
                       Delete folder
                     </MenuItem>

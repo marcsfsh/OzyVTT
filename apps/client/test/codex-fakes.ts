@@ -10,7 +10,7 @@ import type {
   PlayerCodexPage,
   PlayerCodexQuest,
   PlayerCodexSearchHit
-} from "../src/codex/contract";
+} from "@vtt/domain";
 
 /**
  * One set of fakes for every Codex read and write, so a test mocks the whole API surface the same way and sets only

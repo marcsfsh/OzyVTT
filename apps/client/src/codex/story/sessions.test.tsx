@@ -32,9 +32,12 @@ vi.mock("../api", async (importOriginal) => {
       remove: api.remove
     },
     journalApi: { ...actual.journalApi, chronicle: api.chronicle },
-    calendarApi: { ...actual.calendarApi, get: api.calendar },
-    codexApi: { ...actual.codexApi, getPage: api.getPage }
+    calendarApi: { ...actual.calendarApi, get: api.calendar }
   };
+});
+vi.mock("../api-records", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api-records")>();
+  return { ...actual, pageRecordApi: { ...actual.pageRecordApi, get: api.getPage } };
 });
 vi.mock("../prep/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../prep/api")>();

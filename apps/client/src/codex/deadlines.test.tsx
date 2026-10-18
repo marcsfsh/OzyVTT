@@ -1,8 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
 
-import { CampaignHome } from "./CampaignHome";
 import {
   CHRONICLE_KIND_META,
   campaignDeadlines,
@@ -13,10 +10,7 @@ import {
 import { CODEX_ICONS } from "./icons";
 import type { CodexChronicleRecord } from "@vtt/domain";
 
-/**
- * The chronicle's reading rules for deadlines and downtime, and the Campaign dashboard's deadlines card. How
- * Story shows them is in `story/chronicle.test.tsx`.
- */
+/** The chronicle's reading rules for deadlines and downtime. How Story shows them is in `story/chronicle.test.tsx`. */
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord => ({
   kind: "entry",
@@ -73,76 +67,6 @@ describe("A new kind reads by icon AND word", () => {
     // Distinct labels, or colour would be the only difference.
     const labels = Object.values(CHRONICLE_KIND_META).map((meta) => meta.label);
     expect(new Set(labels).size).toBe(labels.length);
-  });
-});
-
-describe("The Campaign dashboard's deadlines card", () => {
-  const CARDS = [
-    { id: "d2", summary: "The comet fell.", when: "Hammer 1, 1492 DR", fired: true },
-    { id: "d1", summary: "The duke's ultimatum expires.", when: "Hammer 10, 1492 DR", fired: false }
-  ];
-
-  it("lists what has passed and what is coming, each saying which, and opens the record", async () => {
-    const onOpenEntry = vi.fn();
-    const user = userEvent.setup();
-    render(
-      <CampaignHome
-        pages={[]}
-        deadlines={CARDS}
-        onOpenEntry={onOpenEntry}
-        onPickType={vi.fn()}
-        onPickTag={vi.fn()}
-        onOpenPage={vi.fn()}
-        onOpenMap={vi.fn()}
-      />
-    );
-
-    const card = within(screen.getByRole("navigation", { name: "Deadlines" }));
-    const rows = card.getAllByRole("button").map((row) => row.textContent ?? "");
-    // Passed first: the clock finished it, and it needs the GM's attention.
-    expect(rows[0]).toContain("The comet fell.");
-    expect(rows[0]).toContain("Passed");
-    expect(rows[1]).toContain("The duke's ultimatum expires.");
-    expect(rows[1]).toContain("Approaching");
-
-    await user.click(card.getByText("The duke's ultimatum expires."));
-    expect(onOpenEntry).toHaveBeenCalledWith("d1");
-  });
-
-  it("renders no card at all when there are no deadlines", () => {
-    render(
-      <CampaignHome
-        pages={[
-          { id: "p1", title: "Strahd", entityType: "character", tags: [], playerUpdatedAt: "2026-07-28T00:00:00.000Z" }
-        ]}
-        onOpenEntry={vi.fn()}
-        onPickType={vi.fn()}
-        onPickTag={vi.fn()}
-        onOpenPage={vi.fn()}
-        onOpenMap={vi.fn()}
-      />
-    );
-    expect(screen.queryByRole("navigation", { name: "Deadlines" })).not.toBeInTheDocument();
-  });
-});
-
-describe("The deadlines card takes the tap route a stacked control needs", () => {
-  it("a deadline card row is the dashboard's own row chassis, not a new control", () => {
-    render(
-      <CampaignHome
-        pages={[]}
-        deadlines={[{ id: "d1", summary: "The duke's ultimatum expires.", when: "Hammer 10, 1492 DR", fired: false }]}
-        onOpenEntry={vi.fn()}
-        onPickType={vi.fn()}
-        onPickTag={vi.fn()}
-        onOpenPage={vi.fn()}
-        onOpenMap={vi.fn()}
-      />
-    );
-    // Reuses the row class that carries the floor, with no bespoke one.
-    expect(within(screen.getByRole("navigation", { name: "Deadlines" })).getByRole("button")).toHaveClass(
-      "codex-campaign-recentitem"
-    );
   });
 });
 

@@ -1,6 +1,6 @@
 import { Eyebrow, IconEyeOff, Skeleton, cx } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
-import type { CodexPageConnection, PlayerCodexPageConnection } from "../contract";
+import type { CodexPageConnection, PlayerCodexPageConnection } from "@vtt/domain";
 import { entityDef } from "../entities";
 import { CodexIcon, EntityIcon } from "../icons";
 import { MiniMap } from "../shared/MiniMap";
@@ -72,9 +72,9 @@ function ConnectionButton({
       )}
       <span className="cx-meta-link-title">{row.otherTitle}</span>
       {hidden && (
-        <span className="cx-meta-hidden" title="Hidden">
+        <span className="cx-meta-hidden">
           <IconEyeOff />
-          <span className="nh-sr-only">Hidden</span>
+          Hidden
         </span>
       )}
     </button>
@@ -119,7 +119,7 @@ export function FieldList({ fields }: Readonly<{ fields: readonly MetaField[] }>
             {field.hidden && (
               <span className="cx-meta-hidden">
                 <IconEyeOff />
-                <span className="nh-sr-only">Hidden</span>
+                Hidden
               </span>
             )}
           </dt>
@@ -145,7 +145,16 @@ export function OnTheAtlas({
   if (pins.loading) return <Skeleton variant="block" height="4rem" />;
   const markers = pins.data?.markers ?? [];
   const maps = pins.data?.maps ?? [];
-  if (pins.error || markers.length === 0) return null;
+  if (pins.error)
+    return (
+      <section className="cx-meta-section" aria-label="On the atlas">
+        <Eyebrow>On the atlas</Eyebrow>
+        <p className="cx-hint" role="alert">
+          {pins.error}
+        </p>
+      </section>
+    );
+  if (markers.length === 0) return null;
   const first = markers[0];
   const map = maps.find((candidate) => candidate.id === first.mapId);
   return (
@@ -179,7 +188,7 @@ export function OnTheAtlas({
             {hidden && (
               <span className="cx-meta-hidden">
                 <IconEyeOff />
-                <span className="nh-sr-only">Hidden</span>
+                Hidden
               </span>
             )}
           </button>
@@ -215,12 +224,14 @@ export function MentionedOn({
 export function TagChips({ tags, onPick }: Readonly<{ tags: readonly string[]; onPick: (tag: string) => void }>) {
   if (tags.length === 0) return null;
   return (
-    <div className="cx-meta-chips" role="list" aria-label="Tags">
+    <ul className="cx-meta-chips" aria-label="Tags">
       {tags.map((tag) => (
-        <button key={tag} type="button" role="listitem" className="cx-tag interactive" onClick={() => onPick(tag)}>
-          #{tag}
-        </button>
+        <li key={tag}>
+          <button type="button" className="cx-tag interactive" onClick={() => onPick(tag)}>
+            #{tag}
+          </button>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

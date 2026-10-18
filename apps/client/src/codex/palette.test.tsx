@@ -32,6 +32,13 @@ const playerSessions = vi.fn();
 const playerQuests = vi.fn();
 const playerStanding = vi.fn();
 
+// The palette and the tag view search through the record API; each call reads as (token, words) here.
+vi.mock("./api-records", () => ({
+  findApi: {
+    search: (token: string, params: { q: string }) => search(token, params.q),
+    searchAsPlayer: (token: string, params: { q: string }) => playerSearch(token, params.q)
+  }
+}));
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {

@@ -16,7 +16,7 @@ import {
   cx
 } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
-import type { CodexBlock } from "../contract";
+import type { CodexBlock } from "@vtt/domain";
 import { entityDef } from "../entities";
 import { EntityIcon } from "../icons";
 import { HiddenBlock } from "../shared/HiddenBlock";

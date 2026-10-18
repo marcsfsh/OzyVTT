@@ -14,7 +14,7 @@ import {
 } from "@vtt/ui";
 import type { CodexQuestStatus } from "@vtt/domain";
 import { questRecordApi } from "../api-records";
-import type { CodexBlock, CodexQuest } from "../contract";
+import type { CodexBlock, CodexQuest } from "@vtt/domain";
 import { useCodexAutosave } from "../autosave";
 import { EntityIcon } from "../icons";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER } from "../quests";

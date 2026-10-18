@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
@@ -14,15 +14,13 @@ vi.mock("./api", async (importOriginal) => {
   };
 });
 
-import { ToastProvider } from "@vtt/ui";
-import type { CodexPageSummary, CodexQuest, CodexSession } from "@vtt/domain";
+import type { CodexPageSummary, CodexSession } from "@vtt/domain";
 import { goTo } from "../../test/route";
 import { usePageLinks } from "./pageLinks";
-import { QuestsView } from "./QuestsView";
 import { renderGmStory } from "./story/harness";
 import { GmSessionsSection } from "./story/sections";
 
-// A `[[link]]` in a quest or a session body works as one in a page body does: it goes to the page of that title, and
+// A `[[link]]` in a session body works as one in a page body does: it goes to the page of that title, and
 // one no page has offers to create the page.
 
 const page = (id: string, title: string): CodexPageSummary => ({
@@ -47,23 +45,7 @@ const page = (id: string, title: string): CodexPageSummary => ({
 });
 const PAGES = [page("p1", "Vallaki")];
 const BODY = "Meet Ismark in [[Vallaki]], then ride to [[Wave Echo Cave]].";
-const AUTOSAVE = { enabled: false, intervalSeconds: 1 };
 
-const QUEST: CodexQuest = {
-  id: "q1",
-  title: "The Sunless Crown",
-  status: "active",
-  playerBody: BODY,
-  blocks: [],
-  objectives: [],
-  entityIds: [],
-  revealedToPlayers: false,
-  tags: [],
-  rev: 3,
-  createdAt: "2026-07-01T00:00:00.000Z",
-  updatedAt: "2026-07-02T00:00:00.000Z",
-  firstShownAt: null
-};
 const SESSION = {
   id: "s1",
   sessionNumber: 3,
@@ -93,31 +75,7 @@ async function followBoth(field: HTMLElement) {
 
 beforeEach(() => goTo("/codex"));
 
-describe("a link in a quest or session body", () => {
-  it("in a quest, offers to create a page no one has made, and follows one that exists", async () => {
-    const follow = vi.fn();
-    render(
-      <ToastProvider>
-        <QuestsView
-          gmToken="gm"
-          quests={[QUEST]}
-          pages={PAGES}
-          loading={false}
-          error={null}
-          openQuestId="q1"
-          onOpenQuest={vi.fn()}
-          onChanged={vi.fn()}
-          onOpenPage={vi.fn()}
-          onFollowLink={follow}
-          autosave={AUTOSAVE}
-        />
-      </ToastProvider>
-    );
-    const body = screen.getByRole("textbox", { name: "Player-visible notes" }).closest(".codex-editor-surface");
-    await followBoth(body as HTMLElement);
-    expect(follow.mock.calls).toEqual([["Wave Echo Cave"], ["Vallaki"]]);
-  });
-
+describe("a link in a session body", () => {
   it("in a session's recap, the same", async () => {
     const view = renderGmStory(GmSessionsSection, "/codex/sessions/s1", { sessions: [SESSION], pages: PAGES });
     const recap = (await screen.findByRole("textbox", { name: "Recap for players" })).closest(".codex-editor-surface");
