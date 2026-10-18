@@ -1208,6 +1208,28 @@ export const openApiDocument = {
         }
       }
     },
+    [GAME_PATHS.scenePreview]: {
+      get: {
+        operationId: "previewScene",
+        security: gameSecurity("scene:read"),
+        description:
+          "What one audience would receive of a prepared or live scene if it were live now: with no `actorId` the shared screen (`screen`: its encounter and turn order, as the presentation carries them), with a party character's `actorId` the player who holds that character (`player`: the combat of their projection and the creatures it names). The same projections build it over a copy of the state, so fog, dynamic vision and hidden creatures apply as they will; nothing is changed. GM-grade only.",
+        parameters: [
+          uuidParam("sceneId"),
+          { name: "actorId", in: "query", required: false, schema: { type: "string", format: "uuid" } }
+        ],
+        responses: {
+          "200": {
+            description: "What that audience would receive",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ScenePreviewResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "403": apiError,
+          "404": apiError
+        }
+      }
+    },
     [SESSION_PATHS.player]: {
       post: {
         operationId: "issuePlayerSession",
@@ -2815,6 +2837,7 @@ export const openApiDocument = {
       ActorMovementResponse: envelopeSchema("#/components/schemas/ActorMovementData"),
       CharacterNextLevelResponse: envelopeSchema("#/components/schemas/CharacterNextLevelData"),
       VisionPreviewResponse: envelopeSchema("#/components/schemas/VisionPreviewData"),
+      ScenePreviewResponse: envelopeSchema("#/components/schemas/ScenePreviewData"),
       CharacterDraftResponse: envelopeSchema("#/components/schemas/CharacterDraftData"),
       BuilderOffersDraft: {
         type: "object",

@@ -320,6 +320,7 @@ export const GAME_PATHS = {
   sceneCombatants: `${API_NAMESPACE}/game/scenes/{sceneId}/combatants`,
   sceneDuplicate: `${API_NAMESPACE}/game/scenes/{sceneId}/duplicate`,
   sceneReorder: `${API_NAMESPACE}/game/scenes/reorder`,
+  scenePreview: `${API_NAMESPACE}/game/scenes/{sceneId}/preview`,
   fogEnabled: `${API_NAMESPACE}/game/fog/enabled`,
   fogPaint: `${API_NAMESPACE}/game/fog/paint`,
   fogReset: `${API_NAMESPACE}/game/fog/reset`,

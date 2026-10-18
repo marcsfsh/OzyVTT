@@ -21,6 +21,7 @@ import {
   BuilderOffersSchema,
   CharacterNextLevelSchema,
   ContentActionsSchema,
+  ScenePreviewSchema,
   VisionPreviewSchema
 } from "@vtt/domain/commands";
 import { srdMonsterBenchmarks } from "../monster-benchmarks.js";
@@ -28,6 +29,7 @@ import { partyViewerIds } from "../vision/audience.js";
 import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
+import { previewScene } from "../scene-preview.js";
 import { nextLevelOf } from "../next-level.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
@@ -302,6 +304,25 @@ export const gameReads = [
         actorIds: [...perceived]
       };
     }
+  },
+
+  {
+    event: "scene:preview",
+    path: GAME_PATHS.scenePreview,
+    scope: "scene:read",
+    gmOnly: "Only the GM can preview a scene.",
+    schema: ScenePreviewSchema,
+    malformed: "The scene preview is malformed.",
+    httpInput: ({ params, query }) => ({
+      sceneId: params.sceneId,
+      ...(typeof query.actorId === "string" ? { actorId: query.actorId } : {})
+    }),
+    // The GM's own look: the projections run over a copy where the scene is live, and nothing is committed.
+    run: (_principal, input, kit) =>
+      previewScene(kit.read(), input as z.output<typeof ScenePreviewSchema>, {
+        content: kit.sightContent(),
+        playerView: (state, sessionId) => kit.context.playerView(state, sessionId)
+      })
   },
 
   {
