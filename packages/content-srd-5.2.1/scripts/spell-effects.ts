@@ -1132,15 +1132,23 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
 };
 
 /** Areas the text gives no template shape for (a wall, a thing placed at a point), so the GM can place them on the
- *  map: a straight wall as a 5-foot-wide Line (a ringed one is the GM's to draw), and a sphere, guardian or pack as the
- *  circle its later area reaches around its point. */
+ *  map: a straight wall as a Line as long and thick as the text's (5 feet wide when thinner; a ringed or bent one is
+ *  the GM's to draw), and a sphere, guardian, pack or cloud as the circle it covers around its point. */
 const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "blade-barrier": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "guardian-of-faith": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "Spreading to a radius of 300 feet": the creatures under the cloud.
+  "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
+  // "Up to 300 feet long, 300 feet high, and 50 feet thick."
+  tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
-  "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 }
+  // Ten 10-foot panels in a row; the text's "radius of up to 10 feet" names the dome, which the GM draws.
+  "wall-of-ice": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 },
+  // "Up to 50 feet long, 15 feet high, and 1 foot thick."
+  "wind-wall": { shape: "line", sizeFeet: 50, widthFeet: 5 }
 };
 
 /** The area a spell's cast covers, for the map template: the reviewed one, else what the text names. */
@@ -1236,7 +1244,9 @@ const UPCAST_CORRECTIONS: Readonly<Record<string, Readonly<Record<number, Upcast
   // +2d6 for each slot level above 6; the source prints +1d6.
   "wall-of-ice": { 7: { roll: "12d6" }, 8: { roll: "14d6" }, 9: { roll: "16d6" } },
   // +10 Hit Points for each slot level above 6; the source prints no amounts.
-  heal: { 7: { roll: "80" }, 8: { roll: "90" }, 9: { roll: "100" } }
+  heal: { 7: { roll: "80" }, 8: { roll: "90" }, 9: { roll: "100" } },
+  // The Healing Light's 4d12 gains 1d12 for each slot level above 7; the source prints the increase alone.
+  "conjure-celestial": { 8: { roll: "5d12" }, 9: { roll: "6d12" } }
 };
 
 /** One spell's higher-slot and cantrip rows with the reviewed corrections, sorted as the source sorts them. */
