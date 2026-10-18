@@ -233,7 +233,7 @@ test("the GM runs a fight on a new scene and the player moves their token", asyn
     await expect(remove).toBeHidden();
   }
   await press(gm.getByRole("button", { name: "Add monsters" }));
-  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the SRD bestiary" });
+  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the bestiary" });
   await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), "Goblin Minion");
   await press(bestiary.getByRole("listitem").filter({ hasText: "Goblin Minion" }).getByRole("button", { name: "Add" }));
   await expect(bestiary.getByText("Goblin Minion is in the staging tray.")).toBeVisible();
@@ -400,7 +400,7 @@ test("a player takes a turn on a phone: a tile, its cast, a target and the roll"
     await expect(remove).toBeHidden();
   }
   await press(gm.getByRole("button", { name: "Add monsters" }));
-  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the SRD bestiary" });
+  const bestiary = gm.getByRole("dialog", { name: "Add monsters from the bestiary" });
   await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), "Goblin Minion");
   await press(bestiary.getByRole("listitem").filter({ hasText: "Goblin Minion" }).getByRole("button", { name: "Add" }));
   await expect(bestiary.getByText("Goblin Minion is in the staging tray.")).toBeVisible();
