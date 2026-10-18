@@ -4,9 +4,9 @@ import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 // jsdom can't render the real surface; the mock keeps the contract under test: which map and which pin.
-vi.mock("./MapSurface", () => ({
-  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) => (
-    <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
+vi.mock("./atlas/AtlasMap", () => ({
+  AtlasMap: (props: { assetId: string; selectedPinId: string | null }) => (
+    <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedPinId ?? ""} />
   )
 }));
 
@@ -178,12 +178,9 @@ describe("Journal entry → its marker", () => {
     // The pin's map, where the default would be wrong.
     const surface = await screen.findByTestId("map-surface");
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
-    expect(
-      within(screen.getByRole("navigation", { name: "Map path" })).getByRole("button", { name: "Barovia" })
-    ).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Map path" })).getByText("Barovia")).toBeInTheDocument();
     // The pin is selected: its inspector is open.
-    expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
+    expect(await screen.findByRole("region", { name: "Pin: Old Svalich Road" })).toBeInTheDocument();
     expect(surface).toHaveAttribute("data-selected", "k1");
   });
 

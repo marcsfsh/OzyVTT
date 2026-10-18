@@ -72,9 +72,8 @@ describe("The canonical glossary", () => {
   it("sees the object-literal copy the old scanner was blind to", () => {
     // Object-key strings (e.g. `useConfirm` title/body) must be scanned; named so a narrowing fails here.
     const at = (file: string, text: string) => strings.some((entry) => entry.file === file && entry.text === text);
-    expect(at("MarkerInspector.tsx", "Delete pin")).toBe(true);
-    expect(at("MarkerInspector.tsx", "Delete this pin? This cannot be undone.")).toBe(true);
-    expect(at("AtlasView.tsx", 'Delete map "${currentMap.name}"? Its pins are removed.')).toBe(true);
+    expect(at("PagesView.tsx", "Delete folder")).toBe(true);
+    expect(at("PagesView.tsx", 'Delete the folder "${path}"?${note}')).toBe(true);
     expect(
       strings.some(
         (entry) => entry.file === "StandingAdjuster.tsx" && entry.text.startsWith("Optional. Players never see")

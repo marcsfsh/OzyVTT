@@ -2,13 +2,11 @@ import { useCallback, useMemo, useState } from "react";
 import { Input, useToast } from "@vtt/ui";
 import { formatWorldDate, type PlayerCodexPageSummary, type PlayerCodexStanding } from "@vtt/domain";
 import { codexApi, playerCodexApi } from "../api";
-import { AtlasView } from "../AtlasView";
 import { CalendarView, PlayerCalendarView } from "../CalendarView";
 import { CampaignHome } from "../CampaignHome";
 import { DowntimeView } from "../DowntimeView";
 import { JournalView } from "../JournalView";
 import { PagesView } from "../PagesView";
-import { PlayerAtlas } from "../PlayerAtlas";
 import { PlayerJournal } from "../PlayerJournal";
 import { PlayerPages } from "../PlayerPages";
 import { PlayerQuests } from "../PlayerQuests";
@@ -264,50 +262,6 @@ export function PlayerPagesLegacy() {
         onOpen={go}
         onFollowLink={followLink}
         knownTitles={knownTitles}
-      />
-    </Legacy>
-  );
-}
-
-export function GmAtlasLegacy() {
-  const { token, recordId, query, go, setQuery } = useCodexShell();
-  const gm = useGmCodex();
-  return (
-    <Legacy>
-      <AtlasView
-        gmToken={token}
-        scenes={gm.scenes}
-        actors={gm.actors}
-        activeSceneId={gm.activeSceneId}
-        onActivateScene={gm.onActivateScene}
-        onOpenReplay={gm.onOpenReplay}
-        mapId={recordId}
-        pinId={query.get("pin")}
-        filter={query.get("q") ?? ""}
-        tagFilter={query.get("tag")}
-        autosave={gm.autosave}
-        onQuickCreate={gm.quickCreate}
-        onNavigate={go}
-        onReplaceQuery={setQuery}
-      />
-    </Legacy>
-  );
-}
-
-export function PlayerAtlasLegacy() {
-  const { token, recordId, query, go, setQuery, setFilter } = useCodexShell();
-  const { feeds } = usePlayerCodex();
-  return (
-    <Legacy>
-      <PlayerAtlas
-        token={token}
-        maps={feeds.maps}
-        pages={feeds.pages}
-        mapId={recordId}
-        query={query}
-        onFilterChange={setFilter}
-        onQueryChange={setQuery}
-        onOpen={go}
       />
     </Legacy>
   );

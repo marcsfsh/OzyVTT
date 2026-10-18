@@ -5,6 +5,7 @@ import { playerCodexApi } from "../api";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { atlasPath, pagePath } from "../routes";
 import { useCodexQuery } from "../useCodexQuery";
+import { CodexPhoneBar } from "../shell/PhoneBar";
 import { AtlasMap } from "./AtlasMap";
 import { AtlasCrumbs, LayerChips, LayersMenu, MapsInside, PinFilter, PinTable } from "./AtlasPanel";
 import { ATLAS_PHONE_QUERY } from "./AtlasView";
@@ -129,10 +130,11 @@ export function PlayerAtlas({
   if (phone)
     return (
       <div className="atlas is-phone">
-        <div className="atlas-topbar">
-          <AtlasCrumbs chain={chain} onEnter={enter} />
-          <LayersMenu layers={layers} onToggle={toggleLayer} gm={false} />
-        </div>
+        <CodexPhoneBar
+          title={currentMap?.name ?? "Atlas"}
+          onBack={chain.length > 1 ? () => enter(chain[chain.length - 2].id) : undefined}
+          actions={<LayersMenu layers={layers} onToggle={toggleLayer} gm={false} />}
+        />
         <SegmentedControl
           ariaLabel="Atlas view"
           className="atlas-phoneswitch"

@@ -3,9 +3,9 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-vi.mock("./MapSurface", () => ({
-  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) => (
-    <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
+vi.mock("./atlas/AtlasMap", () => ({
+  AtlasMap: (props: { assetId: string; selectedPinId: string | null }) => (
+    <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedPinId ?? ""} />
   )
 }));
 

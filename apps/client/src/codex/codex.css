@@ -821,14 +821,6 @@
   font-size: var(--fs-sm);
   margin: 0;
 }
-.codex-page-timeline-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
 .codex-page-timeline-item {
   display: flex;
   flex-direction: column;
@@ -1307,41 +1299,6 @@
   gap: var(--space-3);
 }
 
-/* Codex blocks inside the `Drawer` body; the drawer itself is not restyled. */
-.codex-console {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: flex-start;
-}
-.codex-console-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-.codex-console-attendees {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
-/* This panel is likely open while screen-sharing, so the secret block must read as GM-only at a glance. */
-.codex-console-prep {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
-  padding: var(--space-3);
-  width: 100%;
-}
-.codex-console-empty {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: flex-start;
-  color: var(--text-muted);
-}
-
 /* ----- Quests: the quest log destination ----- */
 
 /* Reuses the notebook chassis and the session log's exit row. */
@@ -1694,7 +1651,6 @@
   }
 }
 
-/* ----- Atlas ----- */
 .codex-root {
   display: flex;
   flex-direction: column;
@@ -1761,29 +1717,6 @@
   gap: var(--space-2);
   padding: var(--space-3);
 }
-
-/* The Atlas fills its region like the graph: chrome rows on top, the map takes the rest. */
-.codex-atlas {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  height: 100%;
-  min-height: 0;
-}
-.codex-atlas-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.codex-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-wrap: wrap;
-  min-width: 0;
-}
 /* Grows to 44px: the crumbs are too close together (and wrap) for an ::after hit area. */
 .codex-crumb {
   min-height: var(--tap-min);
@@ -1809,233 +1742,6 @@
 .codex-crumb-sep {
   color: var(--text-muted);
 }
-.codex-atlas-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-/* Drill-down chips: the maps nested under the current one. */
-.codex-atlas-descend {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-top: calc(-1 * var(--space-1));
-}
-.codex-descend-label {
-  font-family: var(--font-label);
-  font-size: var(--fs-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-/* Grows to 44px: the 8px gap and wrapping rows leave no budget for an ::after hit area. */
-.codex-descend-chip {
-  min-height: var(--tap-min);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  color: var(--text);
-  cursor: pointer;
-  font-family: var(--font-label);
-  font-weight: 700;
-  font-size: var(--fs-sm);
-  padding: var(--space-1) var(--space-3);
-  border-radius: 0;
-}
-.codex-descend-chip:hover {
-  background: var(--surface-3);
-  border-color: var(--cyan);
-}
-/* Selection owns the edge, hover owns the fill: the map you are currently in. */
-.codex-descend-chip.is-current {
-  border-color: var(--magenta);
-  color: var(--text);
-}
-.codex-descend-arrow {
-  color: var(--cyan);
-  font-weight: 700;
-}
-/* "Players can't see this map yet": an SVG glyph, never an emoji, so it takes a token colour. */
-.codex-descend-lock {
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-dim);
-  font-size: 1em;
-}
-
-/* The party pin's text half, in the atlas chrome. */
-.codex-atlas-party {
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--cyan) 40%, var(--line));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--cyan) 8%, transparent);
-}
-.codex-atlas-partytext {
-  flex: 1 1 auto;
-  min-width: 0;
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-
-.codex-atlas-body {
-  display: flex;
-  gap: var(--space-3);
-  align-items: stretch;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-.codex-mapsurface {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  border: var(--rim-w) solid var(--rim-color);
-  border-radius: 0;
-  overflow: hidden;
-  background: var(--void);
-  touch-action: none;
-}
-.codex-mapsurface.is-placing {
-  cursor: crosshair;
-}
-.codex-map-svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.codex-map-status {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-muted);
-}
-.codex-map-error {
-  color: var(--danger);
-}
-.codex-place-hint {
-  position: absolute;
-  left: 50%;
-  bottom: var(--space-3);
-  transform: translateX(-50%);
-  background: var(--overlay);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--fs-sm);
-  pointer-events: none;
-}
-
-.codex-marker {
-  cursor: pointer;
-}
-.codex-marker-bg {
-  fill: var(--surface-1);
-  stroke: currentColor;
-  stroke-width: 1.5;
-}
-.codex-marker-ico {
-  fill: currentColor;
-}
-.codex-marker.is-selected .codex-marker-bg {
-  stroke-width: 2.5;
-}
-.codex-marker.is-hidden {
-  opacity: 0.55;
-}
-.codex-marker.is-hidden .codex-marker-bg {
-  stroke-dasharray: 3 2;
-}
-.codex-marker-label {
-  fill: var(--text);
-  paint-order: stroke;
-  stroke: var(--void);
-  stroke-width: 3px;
-  stroke-linejoin: round;
-  font-family: var(--font-label);
-  font-weight: 700;
-}
-/* The party ring is a scanning aid only; the "The party is here" label and the `<title>` carry the meaning. */
-.codex-marker-partyring {
-  fill: none;
-  stroke: var(--cyan);
-  stroke-width: 2.5;
-  stroke-dasharray: 6 4;
-  opacity: 0.9;
-}
-.codex-marker-partylabel {
-  fill: var(--cyan);
-  paint-order: stroke;
-  stroke: var(--void);
-  stroke-width: 3px;
-  stroke-linejoin: round;
-  font-family: var(--font-label);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-/* Laid out like `.codex-atlas-nestrow`. The `Switch`'s 11px overhang fits the 12px gap. */
-.codex-marker-party {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-/* The inspector scrolls inside the body height beside the map. */
-.codex-inspector {
-  flex: 0 0 300px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-height: 0;
-  position: relative;
-  border: 1px solid transparent;
-  padding: var(--space-3);
-}
-/* Wraps so the reveal switch and ⋯ drop to their own line and the inspector never scrolls sideways. */
-.codex-inspector-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  row-gap: var(--space-1);
-}
-.codex-inspector-head > :first-child {
-  flex: 1 1 8rem;
-  min-width: 0;
-}
-.codex-inspector-head-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.codex-inspector-foot {
-  border-top: 1px solid var(--line);
-  padding-top: var(--space-2);
-}
-.codex-map-settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.codex-atlas-nestrow {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: var(--space-3);
-}
 .codex-inspector-hint {
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -2049,48 +1755,6 @@
   cursor: pointer;
   text-decoration: underline;
   font: inherit;
-}
-/* A marker's linked pages and scenes. */
-.codex-marker-links {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.codex-marker-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-/* 44px min-height in a stacked list. */
-.codex-marker-link-open {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  text-align: left;
-  border: 1px solid transparent;
-  color: var(--text);
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-}
-.codex-marker-link-open:hover {
-  border-color: var(--cyan);
-}
-.codex-marker-link-name {
-  flex: 1;
-  min-width: 0;
-}
-.codex-marker-submap {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-.codex-marker-submap > :first-child {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 /* Icon picker */
@@ -2158,50 +1822,6 @@
 .codex-icon-svg {
   width: 100%;
   height: 100%;
-}
-
-/* Asset picker */
-.codex-asset-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--space-2);
-}
-.codex-asset-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid transparent;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-}
-.codex-asset-card:hover::before,
-.codex-asset-card:focus-visible::before {
-  border-color: var(--magenta);
-}
-.codex-asset-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Stacked on a phone: the map keeps a rem floor and the inspector takes an equal share and scrolls inside. */
-@media (max-width: 760px) {
-  .codex-atlas-body {
-    flex-direction: column;
-  }
-  .codex-mapsurface {
-    flex: 1 1 auto;
-    min-height: 12rem;
-  }
-  .codex-inspector {
-    flex: 1 1 auto;
-    flex-basis: auto;
-    min-height: 8rem;
-  }
 }
 
 /* Once the bar wraps, the legend's `margin-left: auto` would strand it mid-row. */
@@ -2640,7 +2260,6 @@
 }
 /* Filling sections cover the horizon with opaque panels, so they skip the reserve. */
 .codex-shell-content:has(> .codex-workspace),
-.codex-shell-content:has(> .codex-atlas),
 .codex-shell-content:has(> .codex-graph) {
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
 }
@@ -2822,10 +2441,6 @@
 
 .codex-navdrawer .nh-drawer-body {
   padding: var(--space-2);
-}
-/* The prep drawer never covers the whole screen, so closing it stays obvious on a phone. */
-.codex-prepdrawer {
-  width: min(420px, 85vw);
 }
 
 .codex-topbar {
@@ -3320,57 +2935,6 @@
   font-family: var(--font-numeric);
 }
 
-/* The Atlas pin filter, and the pins it dims. */
-.codex-atlas-filter {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.codex-atlas-filter > :first-child {
-  flex: 1 1 12rem;
-  min-width: 0;
-}
-.codex-atlas-filtercount {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-.codex-atlas-upload {
-  margin-block-end: var(--space-3);
-}
-.codex-marker.is-dimmed {
-  opacity: 0.3;
-}
-
-/* The pin inspector's Appearance disclosure. */
-.codex-marker-appearance {
-  border: 1px solid transparent;
-}
-.codex-marker-appearance-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--tap-min);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  font: 600 var(--fs-sm) / 1.2 var(--font-body);
-}
-.codex-marker-appearance[open] .codex-marker-appearance-summary {
-  border-block-end: 1px solid var(--line);
-}
-.codex-marker-appearance > .codex-iconpicker {
-  padding: var(--space-3);
-}
-
-/* The player's pin details: a side panel, a bottom sheet on a phone. */
-.codex-pindetails {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  border: 1px solid transparent;
-  padding: var(--space-3);
-}
-
 /* A drawn dot: the `●` character may be missing from the body font. */
 .codex-campaign-partyreveal {
   margin: 0;
@@ -3474,17 +3038,12 @@
 .codex-main-empty,
 .codex-editor-center,
 .codex-editor-context,
-.codex-inspector,
 .codex-dashcard,
 .codex-calendar-clocks,
 .codex-calendar-day,
 .codex-downtime-section,
-.codex-pindetails,
 .codex-campaign-typecard,
-.codex-asset-card,
 .codex-quest-link-open,
-.codex-marker-link-open,
-.codex-marker-appearance,
 .codex-icon-btn,
 .codex-sidebar-search,
 .codex-settings-danger,
@@ -3500,17 +3059,12 @@
 .codex-main-empty::before,
 .codex-editor-center::before,
 .codex-editor-context::before,
-.codex-inspector::before,
 .codex-dashcard::before,
 .codex-calendar-clocks::before,
 .codex-calendar-day::before,
 .codex-downtime-section::before,
-.codex-pindetails::before,
 .codex-campaign-typecard::before,
-.codex-asset-card::before,
 .codex-quest-link-open::before,
-.codex-marker-link-open::before,
-.codex-marker-appearance::before,
 .codex-icon-btn::before,
 .codex-sidebar-search::before,
 .codex-settings-danger::before,
@@ -3538,20 +3092,15 @@
 .codex-main-empty,
 .codex-editor-center,
 .codex-editor-context,
-.codex-inspector,
 .codex-dashcard,
 .codex-calendar-clocks,
 .codex-calendar-day,
-.codex-downtime-section,
-.codex-pindetails {
+.codex-downtime-section {
   --material-fill: var(--material-lip), var(--material-plate);
 }
 /* Nested: rim and bezel over a flat plate, no texture. */
 .codex-campaign-typecard,
-.codex-asset-card,
 .codex-quest-link-open,
-.codex-marker-link-open,
-.codex-marker-appearance,
 .codex-icon-btn,
 .codex-sidebar-search,
 .codex-settings-danger,

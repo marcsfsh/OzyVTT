@@ -4,9 +4,9 @@ import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 // jsdom can't render the real surface; the mock keeps the contract under test: which map and which pin.
-vi.mock("./MapSurface", () => ({
-  MapSurface: (props: { assetId: string; selectedMarkerId: string | null }) => (
-    <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedMarkerId ?? ""} />
+vi.mock("./atlas/AtlasMap", () => ({
+  AtlasMap: (props: { assetId: string; selectedPinId: string | null }) => (
+    <div data-testid="map-surface" data-asset={props.assetId} data-selected={props.selectedPinId ?? ""} />
   )
 }));
 
@@ -286,8 +286,7 @@ describe("Page → its connections, in one place", () => {
     await waitFor(() => expect(surface).toHaveAttribute("data-asset", "a1"));
     // The pin itself, with its inspector open.
     await waitFor(() => expect(surface).toHaveAttribute("data-selected", "k1"));
-    expect(await screen.findByRole("complementary", { name: "Pin" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Label")).toHaveValue("Old Svalich Road");
+    expect(await screen.findByRole("region", { name: "Pin: Old Svalich Road" })).toBeInTheDocument();
   });
 
   it("Show in graph lands on the Graph WITH this entity's node focused", async () => {

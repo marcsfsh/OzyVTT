@@ -22,7 +22,6 @@ vi.mock("./lib/api", async (original) => ({
 }));
 
 import { touchMoveCancelled } from "../test/drag-surface";
-import { MapSurface } from "./codex/MapSurface";
 import { AtlasMap } from "./codex/atlas/AtlasMap";
 import { TemplateEditor } from "./codex/templates/TemplateEditor";
 import { ConnectionGraph } from "./codex/RelationshipGraph";
@@ -98,21 +97,6 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
         dragging={false}
         busy={false}
         placeAtCenter={() => {}}
-      />
-    )
-  },
-  {
-    selector: ".codex-mapsurface",
-    ui: () => (
-      <MapSurface
-        token="gm"
-        assetId={MAP_ID}
-        markers={[]}
-        placing={false}
-        selectedMarkerId={null}
-        onBackgroundClick={() => {}}
-        onMarkerClick={() => {}}
-        onMarkerDragEnd={() => {}}
       />
     )
   },

@@ -29,6 +29,7 @@ import { DEFAULT_COLOR, DEFAULT_ICON, CodexIcon } from "../icons";
 import { CODEX_ROOT, atlasPath, pagePath } from "../routes";
 import type { QuickCreateRequest } from "../QuickCreate";
 import { useCodexQuery } from "../useCodexQuery";
+import { CodexPhoneBar } from "../shell/PhoneBar";
 import { AtlasMap, type MapMenuItem, type MapPoint } from "./AtlasMap";
 import { AtlasCrumbs, LayerChips, LayersMenu, MapsInside, PinFilter, PinTable } from "./AtlasPanel";
 import { factionGround, peopleAtPins, useAtlasLayers } from "./layers";
@@ -319,7 +320,8 @@ export function AtlasView({
     try {
       const { marker } = await partyApi.set(gmToken, { mapId: mapIdForParty, x: point.x, y: point.y });
       await pinFeed.reload();
-      toast(`The party is on ${mapName(marker.mapId) ?? "this map"}.`, { tone: "success" });
+      const where = mapName(marker.mapId) ?? "this map";
+      toast(`The party is on ${where}.`, { tone: "success" });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Couldn't set the party's position.");
     }
@@ -603,10 +605,11 @@ export function AtlasView({
   if (phone)
     return (
       <div className="atlas is-phone">
-        <div className="atlas-topbar">
-          <AtlasCrumbs chain={chain} onEnter={enterMap} />
-          <LayersMenu layers={layers} onToggle={toggleLayer} gm />
-        </div>
+        <CodexPhoneBar
+          title={currentMap?.name ?? "Atlas"}
+          onBack={chain.length > 1 ? () => enterMap(chain[chain.length - 2].id) : undefined}
+          actions={<LayersMenu layers={layers} onToggle={toggleLayer} gm />}
+        />
         <SegmentedControl
           ariaLabel="Atlas view"
           className="atlas-phoneswitch"

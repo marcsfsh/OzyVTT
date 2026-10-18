@@ -4,8 +4,9 @@ import { CodexSettingsView } from "../CodexSettings";
 import { TagView } from "../TagView";
 import type { CodexSection } from "../routes";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "./context";
+import { GmAtlasSection, PlayerAtlasSection } from "../atlas/sections";
+import { GmTemplatesSection } from "../templates/sections";
 import {
-  GmAtlasLegacy,
   GmHomeLegacy,
   GmPagesLegacy,
   GmQuestsLegacy,
@@ -13,7 +14,6 @@ import {
   GmSessionsLegacy,
   GmStoryLegacy,
   GmTimelineLegacy,
-  PlayerAtlasLegacy,
   PlayerHomeLegacy,
   PlayerPagesLegacy,
   PlayerQuestsLegacy,
@@ -104,11 +104,6 @@ function GmSettings() {
   );
 }
 
-/** Prep templates: the GM's library and editor. */
-function GmTemplates() {
-  return <p className="cx-empty">Prep templates open here.</p>;
-}
-
 export const CODEX_SECTIONS: Readonly<Record<CodexSection, CodexSectionEntry>> = {
   // ----- The shell and the page -----
   home: { gm: GmHomeLegacy, player: PlayerHomeLegacy },
@@ -121,9 +116,9 @@ export const CODEX_SECTIONS: Readonly<Record<CodexSection, CodexSectionEntry>> =
   settings: { gm: GmSettings, player: null },
 
   // ----- The atlas, the story, sessions and templates -----
-  atlas: { gm: GmAtlasLegacy, player: PlayerAtlasLegacy },
+  atlas: { gm: GmAtlasSection, player: PlayerAtlasSection },
   story: { gm: GmStoryLegacy, player: PlayerStoryLegacy },
   timeline: { gm: GmTimelineLegacy, player: PlayerTimelineLegacy },
   sessions: { gm: GmSessionsLegacy, player: PlayerSessionsLegacy },
-  templates: { gm: GmTemplates, player: null }
+  templates: { gm: GmTemplatesSection, player: null }
 };
