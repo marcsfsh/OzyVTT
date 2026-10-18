@@ -122,6 +122,46 @@ next to it.
 - Feedback is a toast. Destructive actions are labelled and confirmed.
 - Icons are SVG. Never render an emoji or a text symbol such as `⚠` as an icon.
 
+## Page patterns
+
+The owner chose these across the reviews of the sheet, the battlemap, the Codex and the homebrew mockups. A new page
+or an overhaul builds from them. A page that needs something else says why in its ADR.
+
+- Sections go in a bar. A page with several areas lists them in a section bar at the top, with the search box
+  (Ctrl K) and the view's one primary action at its right end. A phone lists the same sections in a tab bar at the
+  bottom, under the thumb, and keeps the app's own tabs at the top. Navigation never uses a fixed left rail or a page
+  tree. The table's tool rail holds tools, and a tool's options open in a column beside it.
+- A record reads as one document. The middle of the page shows the record the way the people who use it will see it:
+  a Codex page as players read it, a stat block as the table prints it, a scene as its map. A metadata panel on the
+  right answers what the GM asks about it: its state, who sees it, where it is used, what it links to and its history.
+  On a phone the panel's content follows the document, and a detail opens in a sheet from the bottom.
+- A preview is the real thing. It renders with the component the real page uses, at that page's proportions, so what
+  the GM checks is what people get. See as players switches the page in place to what Everyone or one chosen
+  character receives, through the server's read for that audience.
+- Lists are tables. A table's columns are what matters for that kind of record. The type is a dropdown of checkboxes,
+  every type ticked by default, where tabs would otherwise go. Filters open as a flyout from a Filters button, close
+  out of the way and leave chips that show what is filtered. Sort opens a dialog that sorts by several columns in
+  order, as a spreadsheet does, and a Modified filter takes any date range. On a phone a table becomes a list with
+  the two facts that matter most on each row, under the same dropdowns.
+- Making something is a set of steps. A new record lists its steps down the left, each marked done, current or
+  missing something. Its questions fill the middle and its preview is pinned on the right. The same outline is the
+  full editor afterwards, so there is one set of questions to learn. While a record is open, the list it came from
+  folds into a flyout that the GM can open again. On a phone the steps are a strip across the top, and the preview is
+  a bar over the bottom tabs that opens full screen.
+- Who sees it. An audience control offers Hidden, Everyone and, where the server supports it, chosen characters. It
+  sits inline with the title or the field it governs, and its label sits under the switch so the switch stays put
+  when the label changes. Hidden is violet with the crossed eye and the word Hidden. Revealed content says who it is
+  revealed to.
+- A front page starts with what needs the GM, each line carrying its action. Recent changes come next, with who sees
+  each one, and then a way to start each kind of thing.
+- Decisions the GM owes wait in one Needs you list, each with its buttons, and each view has one primary action.
+- Time is a timeline. History is a list of versions with Compare and Restore, and a save conflict shows both sides
+  and keeps both by default.
+- A lookup across two sets is a grid: rows against columns with a mark in each cell, such as factions against
+  factions or records against characters.
+- A map is present without taking over. Anything placed on a map has two ways in: a button and then a click on the
+  map, or a right-click at the spot, which is a long press on a phone.
+
 ## The character sheet
 
 ADR-0030 records the layout and which views come from which mockup. A change to the sheet keeps these:
