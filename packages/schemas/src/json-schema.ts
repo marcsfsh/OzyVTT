@@ -19,7 +19,8 @@ function closeObjects(node: unknown): unknown {
  */
 export function renderActorDefinitionJsonSchema(): string {
   const generated = z.toJSONSchema(ActorDefinitionSchema, { io: "input", reused: "ref", unrepresentable: "any" });
-  const { $schema: dialect, ...body } = generated;
+  // The document's own description below replaces the schema's.
+  const { $schema: dialect, description: _described, ...body } = generated;
   const document = {
     $schema: dialect,
     $id: "https://vtt.local/schemas/actor-definition.v1.schema.json",

@@ -13,7 +13,6 @@ export const SYSTEM_PATHS = {
 /** Served separately from SYSTEM_PATHS: it documents the whole contract and is no system operation of its own. */
 export const OPENAPI_DOCUMENT_PATH = `${API_NAMESPACE}/openapi.json` as const;
 
-/** GM-authorized credential management; an integration token can't reach it. `{id}` is OpenAPI-style; the Express router substitutes `:id`. */
 /** The host's own GM account: first-run password setup (from the host machine only), sign-in and sign-out.
  *  Same-origin only: open CORS here would let any web page relay password guesses. */
 export const HOST_NAMESPACE = `${API_NAMESPACE}/host` as const;
@@ -27,6 +26,7 @@ export const HOST_PATHS = {
   joinUrls: `${HOST_NAMESPACE}/gm/join-urls`
 } as const;
 
+/** GM-authorized credential management; an integration token can't reach it. `{id}` is OpenAPI-style; the Express router substitutes `:id`. */
 export const INTEGRATION_CREDENTIAL_PATHS = {
   collection: `${API_NAMESPACE}/gm/integration-credentials`,
   rotate: `${API_NAMESPACE}/gm/integration-credentials/{id}/rotate`,
@@ -34,20 +34,30 @@ export const INTEGRATION_CREDENTIAL_PATHS = {
   audit: `${API_NAMESPACE}/gm/integration-credentials/{id}/audit`
 } as const;
 
-/** Documentation-only paths for `map-http.ts`, kept so the OpenAPI document matches the running routes. The router
- * keeps its own literal paths because it templates `:id` (Express style). */
+/** The map library (`map-http.ts`): images, their filing, and grid calibration. `{id}` is OpenAPI style; routers
+ * mount it as Express's `:id` through `expressPath`. */
 export const MAP_ASSET_PATHS = {
   collection: `${API_NAMESPACE}/map-assets`,
+  foldersRename: `${API_NAMESPACE}/map-assets/folders/rename`,
   byId: `${API_NAMESPACE}/map-assets/{id}`,
   content: `${API_NAMESPACE}/map-assets/{id}/content`,
+  grid: `${API_NAMESPACE}/map-assets/{id}/grid`,
   scale: `${API_NAMESPACE}/map-assets/{id}/scale`,
   calibrationWizards: `${API_NAMESPACE}/map-assets/{id}/calibration/wizards`,
   calibrationWizardActions: `${API_NAMESPACE}/map-assets/{id}/calibration/wizards/{wizardId}/actions`,
   calibrationWizardComplete: `${API_NAMESPACE}/map-assets/{id}/calibration/wizards/{wizardId}/complete`
 } as const;
 
-/** Documentation-only paths for `sound-http.ts`: the GM's library of uploaded sound files (ADR-0024). See the note on
- * MAP_ASSET_PATHS. */
+/** Token images (`token-http.ts`). See the note on MAP_ASSET_PATHS. */
+export const TOKEN_ASSET_PATHS = {
+  collection: `${API_NAMESPACE}/token-assets`,
+  foldersRename: `${API_NAMESPACE}/token-assets/folders/rename`,
+  foldersVisibility: `${API_NAMESPACE}/token-assets/folders/visibility`,
+  byId: `${API_NAMESPACE}/token-assets/{id}`,
+  content: `${API_NAMESPACE}/token-assets/{id}/content`
+} as const;
+
+/** The GM's library of uploaded sound files (`sound-http.ts`, ADR-0024). See the note on MAP_ASSET_PATHS. */
 export const SOUND_ASSET_PATHS = {
   collection: `${API_NAMESPACE}/sound-assets`,
   byId: `${API_NAMESPACE}/sound-assets/{id}`,
@@ -59,7 +69,7 @@ export const VIEWER_SESSION_COOKIE = "vtt_viewer_session";
 /** Holds a table screen's open pairing request until the GM lets it in; scoped to the screen-pairing routes. */
 export const VIEWER_PAIRING_COOKIE = "vtt_viewer_pairing";
 
-/** Documentation-only path constants for `viewer-http.ts`'s router. See the note on MAP_ASSET_PATHS. */
+/** The table screen (`viewer-http.ts`). See the note on MAP_ASSET_PATHS. */
 export const VIEWER_PATHS = {
   pairings: `${API_NAMESPACE}/viewer/pairings`,
   pairingsExchange: `${API_NAMESPACE}/viewer/pairings/exchange`,
@@ -440,7 +450,12 @@ export const ApiErrorEnvelopeSchema = z
         code: ApiErrorCodeSchema,
         message: z.string().min(1).max(500),
         requestId: z.uuid(),
-        details: z.record(z.string(), z.unknown()).optional(),
+        details: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            "Facts about the error. On a refused game command or read, `reason` is a stable code for why, finer than `code` and safe to branch on (the message may be reworded): not_joined, validation_failed, forbidden, not_found, stale_revision, needs_confirm, refused, history_review, scene_room_full or internal_error; a rules-mode block's reason is the blocking rule's id (`details.blocked.rule`)."
+          ),
         retryAfterSeconds: z.number().int().positive().optional(),
         currentRevision: z.number().int().nonnegative().optional()
       })
@@ -518,14 +533,17 @@ export const CreateIntegrationCredentialRequestSchema = z
 export const IntegrationCredentialIssuedSchema = z
   .object({
     credential: IntegrationCredentialMetadataSchema,
-    token: z.string().min(1)
+    token: z
+      .string()
+      .min(1)
+      .describe("Shown exactly once; the server stores only a salted hash and cannot redisplay it.")
   })
   .strict();
 
 export const RotateIntegrationCredentialRequestSchema = z
   .object({
     /** Omit to keep the current expiration; pass null to clear it; pass a timestamp to set a new one. */
-    expiresAt: TimestampSchema.nullable().optional()
+    expiresAt: TimestampSchema.nullable().optional().describe("Omit to keep the current expiration; null clears it.")
   })
   .strict();
 
@@ -751,10 +769,15 @@ export type GameCommandType = keyof typeof GAME_COMMANDS;
  * it to retry safely; omit it and the server mints one. */
 export const GameCommandEnvelopeSchema = z
   .object({
-    type: GameCommandTypeSchema,
+    type: GameCommandTypeSchema.describe("A cataloged command type, e.g. encounter.start or actor.apply-damage"),
     commandId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional(),
-    payload: z.record(z.string(), z.unknown()).default({})
+    payload: z
+      .record(z.string(), z.unknown())
+      .default({})
+      .describe(
+        "The command's Socket.IO payload shape, minus commandId/expectedRevision (carried at the envelope level)"
+      )
   })
   .strict();
 
@@ -763,9 +786,16 @@ export const GameMutationAcceptedSchema = z
   .object({
     commandId: z.uuid(),
     revision: z.number().int().nonnegative(),
-    duplicate: z.boolean()
+    duplicate: z
+      .boolean()
+      .describe(
+        "True when this commandId was already processed; the stored outcome's revision is returned and nothing re-executed."
+      )
   })
-  .catchall(z.unknown());
+  .catchall(z.unknown())
+  .describe(
+    "Commands append extras: rollId/hiddenFromRoller (dice), actorId (adds/imports), annotationId, resolution (action.resolve), outcome (save.answer), type (tunnel)."
+  );
 
 export const GameViewKindSchema = z.enum(["gm", "player"]);
 /** The projection envelope for GET /game. `game` is the full GM view or the player-safe view: shapes owned by @vtt/domain and not duplicated here. */
@@ -773,19 +803,41 @@ export const GameSnapshotSchema = z
   .object({
     view: GameViewKindSchema,
     revision: z.number().int().nonnegative(),
-    game: z.record(z.string(), z.unknown())
+    game: z
+      .record(z.string(), z.unknown())
+      .describe(
+        "GmView (full state + presence + turnHistory) or PlayerView (visibility-filtered actors with banded monster HP, filtered rolls/annotations/saves), exactly what the same principal receives over Socket.IO."
+      )
   })
   .strict();
 
+/** A roll as the log carries it: the domain's `RollRecord` without the session that rolled it. */
+export const LoggedRollSchema = z.record(z.string(), z.unknown());
 /** `kind` stays an open string so a new log kind is an additive change. */
 export const GameLogEntrySchema = z
   .object({
     id: z.number().int().positive(),
     at: TimestampSchema,
-    kind: z.string().min(1).max(40),
+    kind: z
+      .string()
+      .min(1)
+      .max(40)
+      .describe(
+        "damage, heal, save, action, condition, reaction, turn, encounter, scene, history, roll, movement, effect, death-save or override; the list grows over time"
+      ),
     text: z.string(),
     gmOnly: z.boolean(),
-    revision: z.number().int().nonnegative()
+    revision: z.number().int().nonnegative(),
+    actorId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("The character or monster the line is about. A line about the whole table has none."),
+    roll: LoggedRollSchema.optional().describe("The roll behind a `roll` line."),
+    private: z
+      .boolean()
+      .optional()
+      .describe("True only on a roll the reader made for their own eyes. It is worked out for each reader.")
   })
   .strict();
 export const GameLogSchema = z.object({ entries: z.array(GameLogEntrySchema) }).strict();
@@ -807,12 +859,21 @@ export const EncounterArchiveSummarySchema = z
     endedAt: TimestampSchema,
     turnCount: z.number().int().nonnegative(),
     /** Has the GM shared this record with players? False until the GM does. */
-    playerVisible: z.boolean(),
+    playerVisible: z.boolean().describe("Whether the GM has shared this record with players. False until shared"),
     /** The GM's own name for the replay; null until the GM gives one. A player sees it on a shared replay. */
-    name: z.string().min(1).max(80).nullable(),
+    name: z
+      .string()
+      .min(1)
+      .max(80)
+      .nullable()
+      .describe("The GM's own name for the replay, or null; a player sees it on a shared replay"),
     /** The live scene the fight was on, when it had one. GM-only: a player's list leaves it out, as their view
      *  of the table never names scenes. */
-    sceneName: z.string().nullable().optional()
+    sceneName: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("The live scene the fight was on, or null. GM-grade callers only; a player's list leaves it out")
   })
   .strict();
 export const EncounterArchiveListSchema = z.object({ encounters: z.array(EncounterArchiveSummarySchema) }).strict();
@@ -821,20 +882,34 @@ export const EncounterArchiveVisibilitySchema = z
   .strict();
 /** Renames a replay; null (or an empty name) takes the GM's name away again. */
 export const EncounterArchiveNameRequestSchema = z.object({ name: z.string().trim().max(80).nullable() }).strict();
+/** Shares a replay with players, or takes it back. Keys beside `playerVisible` are ignored. */
+export const EncounterArchiveVisibilityRequestSchema = z.object({
+  playerVisible: z.boolean().describe("True shares this fight with players; false hides it again, as it starts.")
+});
 export const EncounterArchiveNameSchema = z
   .object({ id: z.number().int().positive(), name: z.string().min(1).max(80).nullable() })
   .strict();
 /** `document` is the stored archive JSON verbatim (archiveSchemaVersion 3); its full shape is documented in apps/server/src/encounter-archive.ts. */
 export const EncounterArchiveDocumentSchema = z
-  .object({ id: z.number().int().positive(), document: z.record(z.string(), z.unknown()) })
+  .object({
+    id: z.number().int().positive(),
+    document: z
+      .record(z.string(), z.unknown())
+      .describe(
+        "archiveSchemaVersion 3 (additive over 1 and 2): { archiveSchemaVersion, startedAt, endedAt, turnCount, turns[{index,kind,label,revision,at,state}], log[], journal[{seq,commandId,type,actorId,principal,payload,revision,at}], finalState, postEncounterState, rolls[], definitions[{id,source,definition}], attribution }"
+      )
+  })
   .strict();
 /** What `POST /encounters/{id}/launch` returns: the new live scene and the combatants it cloned. */
 export const EncounterArchiveLaunchSchema = z
   .object({
+    commandId: z.uuid(),
     revision: z.number().int().nonnegative(),
     duplicate: z.boolean(),
-    sceneId: z.string(),
-    actorIds: z.array(z.string())
+    sceneId: z.string().describe("The new live scene holding the restored moment"),
+    actorIds: z
+      .array(z.string())
+      .describe("The cloned combatants, so a client can offer to remove them with the replay scene")
   })
   .strict();
 export const EncounterArchiveDeletedSchema = z
@@ -842,7 +917,15 @@ export const EncounterArchiveDeletedSchema = z
   .strict();
 
 /** Issued by POST /sessions/player: the same open, LAN-trust join the socket performs. */
-export const PlayerSessionIssuedSchema = z.object({ token: z.string().min(1), sessionId: z.uuid() }).strict();
+export const PlayerSessionIssuedSchema = z
+  .object({
+    token: z
+      .string()
+      .min(1)
+      .describe("Bearer token for player-limited calls; long-lived, with no per-token revocation (LAN trust)."),
+    sessionId: z.uuid()
+  })
+  .strict();
 
 export const GameMutationAcceptedResponseSchema = successEnvelopeSchema(GameMutationAcceptedSchema);
 export const GameSnapshotResponseSchema = successEnvelopeSchema(GameSnapshotSchema);
@@ -878,16 +961,22 @@ export const HomebrewContentTypeSchema = z.enum([
 export const HomebrewContentStateSchema = z.enum(["draft", "published"]);
 /** A persisted homebrew id (`hb-<slug>-<6 hex>`). Capped at 60, below the content id's 80: persisted ActorDefinition ids cap at 60,
  * and a longer one would fail `GameStateSchema.parse` on the next boot. */
-const HomebrewIdSchema = z
+export const HomebrewIdSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
   .max(60);
 /** The offending field, machine-addressable, so a form editor can point at it with no prose to parse. */
 export const HomebrewValidationIssueSchema = z
   .object({
-    path: z.array(z.union([z.string(), z.number().int()])),
+    path: z
+      .array(z.union([z.string(), z.number().int()]))
+      .describe(
+        'Field path into the authored record, e.g. ["levelTable", 3, "spellSlots"]: the offending field, machine-addressable, so a form editor can point at it with no prose to parse'
+      ),
     message: z.string().min(1).max(500),
-    recordId: HomebrewIdSchema.nullable()
+    recordId: HomebrewIdSchema.nullable().describe(
+      "Which record in a pack the issue belongs to; null for a single-record publish. Present-but-null, so a consumer never branches on key presence"
+    )
   })
   .strict();
 /** `warnings` never block publishing: an open slug the SRD does not know, which is legal but often a typo. */
@@ -897,7 +986,10 @@ export const HomebrewValiditySchema = z
     issues: z.array(HomebrewValidationIssueSchema),
     warnings: z.array(HomebrewValidationIssueSchema)
   })
-  .strict();
+  .strict()
+  .describe(
+    "Whether a record may be published, and why not. Carried on every single-record read so the GM's library can say \"3 drafts can't publish yet\" without a round-trip per record."
+  );
 /** The authored content body only, never row state. Opaque until each type's authored shape lands; see the HomebrewRecord component. */
 export const HomebrewRecordSchema = z.record(z.string(), z.unknown());
 export const HomebrewRecordDocumentSchema = z
@@ -905,38 +997,62 @@ export const HomebrewRecordDocumentSchema = z
     id: HomebrewIdSchema,
     type: HomebrewContentTypeSchema,
     state: HomebrewContentStateSchema,
-    visibleToPlayers: z.boolean(),
-    deletedAt: TimestampSchema.nullable(),
+    visibleToPlayers: z.boolean().describe("Publishing does not reveal: this is the separate, deliberate second step"),
+    deletedAt: TimestampSchema.nullable().describe(
+      "Soft delete; a deleted row leaves every merged catalog at once and is restorable"
+    ),
     rev: z.number().int().nonnegative(),
     createdAt: TimestampSchema,
     updatedAt: TimestampSchema,
     validity: HomebrewValiditySchema,
     /** A published record has edits that are not live yet; `record` and `validity` describe them. */
-    pendingChanges: z.boolean(),
+    pendingChanges: z
+      .boolean()
+      .describe(
+        "A published record has edits that are not live yet. `record` and `validity` describe the pending body; the catalogs still serve the live one until /publish"
+      ),
     record: HomebrewRecordSchema
   })
-  .strict();
+  .strict()
+  .describe(
+    "One stored row: the authored body plus the three orthogonal row-state fields. `state` is set only by /publish and /unpublish, `visibleToPlayers` only by /visibility, `deletedAt` only by DELETE and /restore. A player sees a record only when it is published and visible and not deleted, and even then only through the merged CONTENT_PATHS catalogs, never through this component."
+  );
 /** The flat, NON-polymorphic list row: a name and a badge, so the union stays out of the library's hot path. */
 export const HomebrewRecordSummarySchema = z
   .object({
     id: HomebrewIdSchema,
     type: HomebrewContentTypeSchema,
     name: z.string().min(1).max(120),
-    source: z.literal("homebrew"),
+    source: z
+      .literal("homebrew")
+      .describe(
+        'Always "homebrew" on this surface; the field exists so a summary and a merged-catalog row read the same'
+      ),
     state: HomebrewContentStateSchema,
     visibleToPlayers: z.boolean(),
     deletedAt: TimestampSchema.nullable(),
     rev: z.number().int().nonnegative(),
     updatedAt: TimestampSchema,
     valid: z.boolean(),
-    usageCount: z.number().int().nonnegative()
+    usageCount: z.number().int().nonnegative().describe("How many characters took this record; 0 is the common case")
   })
-  .strict();
+  .strict()
+  .describe(
+    "The flat, deliberately non-polymorphic list row: a name and a badge. Carries `valid` alone (the issue list costs a GET), so listing a 300-record library never ships a 20-row level table."
+  );
 export const HomebrewContentListSchema = z
   .object({
     records: z.array(HomebrewRecordSummarySchema),
-    nextCursor: z.string().max(200).nullable(),
-    total: z.number().int().nonnegative()
+    nextCursor: z
+      .string()
+      .max(200)
+      .nullable()
+      .describe("Opaque keyset cursor. Never construct or parse one. null means this was the last page"),
+    total: z
+      .number()
+      .int()
+      .nonnegative()
+      .describe("How many rows match the filter. `limit` and `cursor` do not change it")
   })
   .strict();
 export const HomebrewContentSchema = z.object({ record: HomebrewRecordDocumentSchema }).strict();
@@ -950,20 +1066,26 @@ export const HomebrewUsageSchema = z
     kind: z
       .string()
       .regex(/^[a-z0-9-]+$/)
-      .max(60),
+      .max(60)
+      .describe("How the record is used: open slug (character-choice, class, species, ...), never a closed enum"),
     detail: z.string().max(300).nullable()
   })
   .strict();
 /** A published record that is publishable now and would stop being so. */
 export const HomebrewDependentSchema = z
   .object({ id: HomebrewIdSchema, type: HomebrewContentTypeSchema, name: z.string().min(1).max(120) })
-  .strict();
+  .strict()
+  .describe("A published record another record's removal or edit would break: enough to name it and open it.");
 export const HomebrewUsagesSchema = z
   .object({
     id: HomebrewIdSchema,
     usages: z.array(HomebrewUsageSchema),
     /** False when removing this record would break a published one; built characters never break. */
-    safeToDelete: z.boolean(),
+    safeToDelete: z
+      .boolean()
+      .describe(
+        "False when removing this record would break a published one (`dependents.ifRemoved`). Characters never count: a built character carries a flattened, self-contained ActorDefinition, so the usage list is context and blocks nothing"
+      ),
     dependents: z
       .object({
         /** Broken by removing or unpublishing this record. */
@@ -972,6 +1094,9 @@ export const HomebrewUsagesSchema = z
         ifUpdated: z.array(HomebrewDependentSchema)
       })
       .strict()
+      .describe(
+        "Published records that publish now and would not: `ifRemoved` once this one is removed or unpublished, `ifUpdated` once its pending edits go live. A warning to show before the action, never a refusal"
+      )
   })
   .strict();
 /** The GM-to-GM interchange format: authored bodies only, so an import can never inherit the exporter's visibility policy. */
@@ -982,9 +1107,12 @@ export const HomebrewPackSchema = z
     name: z.string().min(1).max(120),
     attribution: z.string().max(400).nullable(),
     exportedAt: TimestampSchema,
-    records: z.array(HomebrewRecordSchema)
+    records: z.array(HomebrewRecordSchema).describe("Authored bodies only: no state, visibility, deletion, or revision")
   })
-  .strict();
+  .strict()
+  .describe(
+    "The GM-to-GM interchange format (ADR-0007 schemaId + integer schemaVersion). One flat record array: the body already carries `type`, so a by-type map would duplicate the discriminator for nothing. No checksum field by design."
+  );
 export const HomebrewPackExportSchema = z.object({ pack: HomebrewPackSchema }).strict();
 export const HomebrewPackImportSchema = z
   .object({
@@ -1005,7 +1133,11 @@ export const HomebrewPackImportSchema = z
           id: HomebrewIdSchema,
           /** srd-collision: outside `hb-`, the bundle's namespace; homebrew-collision: an existing row or an
            *  earlier record in this pack holds it; foreign-shape: an `hb-` id not shaped as this table mints. */
-          reason: z.enum(["srd-collision", "homebrew-collision", "foreign-shape"])
+          reason: z
+            .enum(["srd-collision", "homebrew-collision", "foreign-shape"])
+            .describe(
+              "Why the id changed. srd-collision: outside `hb-`, the bundle's namespace, always re-minted. homebrew-collision: an existing row or an earlier record in the pack holds it; follows onIdCollision. foreign-shape: an `hb-` id this table would not mint for that type, always re-minted"
+            )
         })
         .strict()
     ),
@@ -1017,25 +1149,94 @@ export const HomebrewPackImportSchema = z
     ),
     dryRun: z.boolean()
   })
-  .strict();
-export const HomebrewCreateRequestSchema = z.object({ record: HomebrewRecordSchema }).strict();
+  .strict()
+  .describe(
+    "The import plan or its result: byte-for-byte the same report either way, which is what makes `dryRun` trustworthy."
+  );
+export const HomebrewCreateRequestSchema = z
+  .object({ record: HomebrewRecordSchema })
+  .strict()
+  .describe(
+    "The authored body only. Row state is never client-supplied: a new record is always a draft, invisible to players."
+  );
 export const HomebrewUpdateRequestSchema = z
-  .object({ record: HomebrewRecordSchema, expectedRev: z.number().int().nonnegative().optional() })
+  .object({
+    record: HomebrewRecordSchema,
+    expectedRev: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe("Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on.")
+  })
+  .strict()
+  .describe("Replaces the whole authored body and touches no row state.");
+export const HomebrewDuplicateRequestSchema = z
+  .object({
+    name: z.string().min(1).max(120).optional().describe("Name for the copy; omitted derives one server-side.")
+  })
   .strict();
-export const HomebrewDuplicateRequestSchema = z.object({ name: z.string().min(1).max(120).optional() }).strict();
 export const HomebrewStateChangeRequestSchema = z
-  .object({ expectedRev: z.number().int().nonnegative().optional() })
+  .object({
+    expectedRev: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe("Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on.")
+  })
   .strict();
 export const HomebrewVisibilityRequestSchema = z
-  .object({ visibleToPlayers: z.boolean(), expectedRev: z.number().int().nonnegative().optional() })
+  .object({
+    visibleToPlayers: z.boolean(),
+    expectedRev: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe("Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on.")
+  })
   .strict();
 export const HomebrewPackImportRequestSchema = z
   .object({
     pack: HomebrewPackSchema,
-    onIdCollision: z.enum(["remint", "overwrite"]).default("remint"),
-    dryRun: z.boolean().default(false)
+    onIdCollision: z
+      .enum(["remint", "overwrite"])
+      .default("remint")
+      .describe(
+        "How to resolve a collision with an existing homebrew id; an SRD collision is always re-minted regardless."
+      ),
+    dryRun: z
+      .boolean()
+      .default(false)
+      .describe("Run the whole collision + rewrite + re-validate pass and return the identical report without writing.")
   })
   .strict();
+
+/** Query booleans arrive as text; the two spellings a browser or curl sends are accepted. */
+const QueryBooleanSchema = z.enum(["true", "false", "1", "0"]).transform((value) => value === "true" || value === "1");
+/** `GET /homebrew/content`. Unknown keys are dropped: a stray query parameter does not refuse a read. */
+export const HomebrewListQuerySchema = z.object({
+  type: HomebrewContentTypeSchema.optional().describe("One type. Omit it for every type."),
+  state: HomebrewContentStateSchema.optional(),
+  visibleToPlayers: QueryBooleanSchema.optional(),
+  q: z.string().max(120).optional().describe("Part of a name, matched without regard to case."),
+  includeDeleted: QueryBooleanSchema.optional().describe("Lists soft-deleted records too. Default false."),
+  limit: z.coerce.number().int().min(1).max(200).optional().describe("Records per page, 1 to 200. Default 50."),
+  cursor: z
+    .string()
+    .max(200)
+    .optional()
+    .describe("The `nextCursor` of the page before. Opaque: pass it back as it came.")
+});
+/** `GET /homebrew/packs/export`. */
+export const HomebrewPackExportQuerySchema = z.object({
+  type: HomebrewContentTypeSchema.optional().describe("Only records of this type."),
+  id: z
+    .union([z.string().max(60), z.array(z.string().max(60)).max(500)])
+    .optional()
+    .describe("Only these records. Repeat it for several: `?id=a&id=b`. Omit it for every published record.")
+});
 
 export const HomebrewContentListResponseSchema = successEnvelopeSchema(HomebrewContentListSchema);
 export const HomebrewContentResponseSchema = successEnvelopeSchema(HomebrewContentSchema);

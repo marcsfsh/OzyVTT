@@ -1322,19 +1322,27 @@ export const BuilderOffersSchema = z
     backgroundId: BuilderContentIdSchema.optional(),
     classId: BuilderContentIdSchema.optional(),
     level: z.number().int().min(1).max(20),
-    classLevels: ClassLevelsSchema.optional(),
+    classLevels: ClassLevelsSchema.optional().describe(
+      "A multiclass draft: the class each level went to, in order. Index 0 is level 1 and is `classId`; absent for one class."
+    ),
     picks: z
       .record(OfferKeySchema, z.array(BuilderContentIdSchema).max(40))
       .refine((picks) => Object.keys(picks).length <= 200)
-      .optional(),
+      .optional()
+      .describe("Offer key to the option ids chosen for it."),
     asiIncreases: z
       .record(
         OfferKeySchema,
         z.array(z.object({ ability: AbilitySchema, amount: z.number().int().min(1).max(2) }).strict()).max(2)
       )
       .refine((increases) => Object.keys(increases).length <= 40)
-      .optional(),
-    choices: z.array(CharacterChoiceSchema).max(200).optional(),
+      .optional()
+      .describe("Offer key to the +2 split, for an Ability Score Improvement answered with `asi`."),
+    choices: z
+      .array(CharacterChoiceSchema)
+      .max(200)
+      .optional()
+      .describe("A stored choice ledger, read back onto the offers it answers."),
     sheet: z
       .object({
         level: z.number().int().min(1).max(20),
@@ -1351,11 +1359,17 @@ export const BuilderOffersSchema = z
       })
       .strict()
       .optional()
+      .describe(
+        "With `choices`: the stored sheet's own level and ability scores, so the reply's `abilities` can say how those scores were made."
+      )
   })
   .strict()
   .refine(
     (draft) => !(draft.picks && draft.choices),
     "Send the answers as picks or as a ledger, and only one of the two."
+  )
+  .describe(
+    "A character-builder draft: the identity chosen so far, and the answers by offer key or as a stored ledger, one of the two."
   );
 
 /** Level up/down or respec: `CharacterCreateSchema` minus the name, plus the actor. Fully re-validated. */

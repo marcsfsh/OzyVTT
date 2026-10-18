@@ -4,13 +4,13 @@ import { z } from "zod";
 import * as bundle from "@vtt/content-srd-5.2.1";
 import { ModifierSchema, RiderTriggerSchema } from "@vtt/schemas";
 import * as contract from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 
 /**
- * The components generated from Zod (`src/openapi/components.ts`) must accept what the server really sends and
- * parses: each payload is parsed through its Zod schema first, so every `.default()` is filled in, and then
- * validated against the component with Ajv. `@vtt/content-srd-5.2.1` is a dev dependency only: `apps/client`
- * imports this package and the SRD bundle must never reach a browser.
+ * The components the route registry (`@vtt/api-contract/routes`) generates from Zod must accept what the server
+ * really sends and parses: each payload is parsed through its Zod schema first, so every `.default()` is filled in,
+ * and then validated against the component with Ajv. The SRD bundle is imported here, in a server test, because
+ * the client imports only the contract's root entry and the bundle must never reach a browser.
  */
 
 const components = (openApiDocument as unknown as { components: { schemas: Record<string, Record<string, unknown>> } })
@@ -443,8 +443,12 @@ describe("generated OpenAPI components", () => {
   });
 
   it("keeps a fixture for every homebrew shape, so a new component cannot land uncompiled", () => {
+    // A query schema becomes parameters, so only the shapes that are components need a fixture.
     const missing = pairs
-      .filter((pair) => pair.base.startsWith("Homebrew") && FIXTURES[pair.base] === undefined)
+      .filter(
+        (pair) =>
+          pair.base.startsWith("Homebrew") && components[pair.base] !== undefined && FIXTURES[pair.base] === undefined
+      )
       .map((pair) => pair.base);
     expect(missing).toEqual([]);
     expect(pairs.filter((pair) => pair.base.startsWith("Homebrew")).length).toBeGreaterThanOrEqual(23);

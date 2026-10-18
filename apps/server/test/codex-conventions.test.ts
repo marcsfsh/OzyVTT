@@ -6,7 +6,7 @@ import express from "express";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CODEX_PATHS } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";

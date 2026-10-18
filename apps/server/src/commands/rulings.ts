@@ -28,7 +28,7 @@ export const rulingCommands = [
     type: "rules.ask",
     operationId: "askTheGm",
     description:
-      "Asks the GM to allow a command the rules engine blocked. Send the ORIGINAL request as `payload`; the server revalidates it with that command's own schema and re-runs it under YOUR authority with no override, so an action that would now succeed succeeds (`ran: true`) and nothing is parked. A still-blocked command is parked as one question per character (a second replaces the first, up to ten at the table) and the response carries `askId` plus the `blocked` details. Player sessions may ask only about their own claimed character.",
+      "Asks the GM to allow a command the rules engine blocked. Send the original request as `payload`; the server revalidates it with that command's own schema and re-runs it under your authority with no override, so an action that would now succeed succeeds (`ran: true`) and nothing is parked. A still-blocked command is parked as one question per character (a second replaces the first, up to ten at the table) and the response carries `askId` plus the `blocked` details. Player sessions may ask only about their own claimed character.",
     summary:
       "Ask the GM to allow a blocked command; it re-runs first and is parked only if it still blocks (GM anyone; a player their own claimed character).",
     schema: RulesAskSchema,
@@ -84,7 +84,7 @@ export const rulingCommands = [
     type: "rules.answer",
     operationId: "answerRulesAsk",
     description:
-      "Answers a parked question in one tap (GM-grade only). `allow: true` re-runs the parked command under GM authority with an injected override of the asked rule's FAMILY only (the `reason` is optional and the audit line falls back to \"GM override\"), and the rules engine remembers that family for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against CURRENT state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. A replay stopped by a block of ANOTHER family does not ride the same Allow: the question is re-asked about that block under a fresh `askId` (the reply carries `blocked`), and the next Allow covers both families. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
+      "Answers a parked question in one tap (GM-grade only). `allow: true` re-runs the parked command under GM authority with an injected override of the asked rule's family only (the `reason` is optional and the audit line falls back to \"GM override\"), and the rules engine remembers that family for the rest of that character's turn, so the same kind of block stops re-prompting. The replay runs against current state and passes full validation, so a stale question (the target moved, the target died) fails loudly and stays parked for another look. A replay stopped by a block of another family does not ride the same Allow: the question is re-asked about that block under a fresh `askId` (the reply carries `blocked`), and the next Allow covers both families. `allow: false` clears it and tells the player. A question that no longer exists is a 409.",
     summary: "Allow (re-running the parked command with an override) or decline a parked rules question (GM).",
     schema: RulesAnswerSchema,
     malformed: "The answer is malformed.",

@@ -109,11 +109,8 @@ import {
  * instants were computed against, empty folders, every revision and the settings included).
  */
 
-/**
- * The bundle format version. A fact about the file, so the export route stamps it beside `codex`. Version 2 carries
- * hidden blocks and audiences; a version 1 file restores through the same conversion as migration 4.
- */
-export const CODEX_BUNDLE_VERSION = 2;
+/** The bundle format version lives with the import body that checks it. */
+export { CODEX_BUNDLE_VERSION } from "@vtt/api-contract/schemas";
 
 export type CodexBundle = Readonly<{
   /** Pages and quests carry their blocks in the wire form, stamps labelled; a restore reads the stamps back. */

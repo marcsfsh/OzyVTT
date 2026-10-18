@@ -1,12 +1,17 @@
 import type { DatabaseSync } from "node:sqlite";
-import { z } from "zod";
+import type { z } from "zod";
+import {
+  MapKindSchema,
+  type MapCatalogEntrySchema,
+  type MapKind,
+  type PublicMapAssetSchema
+} from "@vtt/api-contract/schemas";
 import { migrate, openDatabase, type Migration } from "./database.js";
 import { validateSquareGridCalibration, type ImagePoint, type SquareGridCalibration } from "./grid-calibration.js";
 import { validateMapDistanceScale, type MapDistanceScale } from "./map-measurement.js";
 import { InvalidRequestError } from "./invalid-request.js";
 
-const MapKindSchema = z.enum(["battlemap", "regional", "world"]);
-export type MapKind = z.infer<typeof MapKindSchema>;
+export type { MapKind } from "@vtt/api-contract/schemas";
 
 export type StoredGridCalibration = Readonly<{
   calibration: SquareGridCalibration;
@@ -15,37 +20,13 @@ export type StoredGridCalibration = Readonly<{
   verificationErrorPx: number | null;
 }>;
 
-/** A value the document shows only as an object: calibration and scale are versioned with the grid tools. */
-const opaque = <T>() => z.custom<T>((value) => typeof value === "object" && value !== null);
-export const MapCatalogEntrySchema = z.strictObject({
-  assetId: z.uuid(),
-  name: z.string(),
-  kind: MapKindSchema,
-  folder: z.string().nullable(),
-  calibration: opaque<StoredGridCalibration>().nullable(),
-  scale: opaque<MapDistanceScale>().nullable(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime()
-});
-export type MapCatalogEntry = Readonly<z.infer<typeof MapCatalogEntrySchema>>;
+/** The wire shapes document calibration and scale as plain objects; the server holds their real types. */
+type WithGrid<T> = Readonly<
+  Omit<T, "calibration" | "scale"> & { calibration: StoredGridCalibration | null; scale: MapDistanceScale | null }
+>;
+export type MapCatalogEntry = WithGrid<z.infer<typeof MapCatalogEntrySchema>>;
 /** A map image as the map routes report it: the stored file's facts, with its catalog entry's name, filing and grid. */
-export const PublicMapAssetSchema = z.strictObject({
-  id: z.uuid(),
-  name: z.string(),
-  kind: MapCatalogEntrySchema.shape.kind,
-  folder: z.string().nullable(),
-  originalName: z.string(),
-  format: z.string(),
-  mediaType: z.string(),
-  width: z.number().int().min(1),
-  height: z.number().int().min(1),
-  byteLength: z.number().int().min(1),
-  importedAt: z.iso.datetime(),
-  calibration: MapCatalogEntrySchema.shape.calibration,
-  scale: MapCatalogEntrySchema.shape.scale,
-  updatedAt: z.iso.datetime()
-});
-export type PublicMapAsset = Readonly<z.infer<typeof PublicMapAssetSchema>>;
+export type PublicMapAsset = WithGrid<z.infer<typeof PublicMapAssetSchema>>;
 
 type CatalogRow = Readonly<{
   asset_id: string;
@@ -73,9 +54,9 @@ function mapName(value: string) {
 }
 
 function mapKind(value: string): MapKind {
-  if (value !== "battlemap" && value !== "regional" && value !== "world")
+  if (!MapKindSchema.safeParse(value).success)
     throw new InvalidRequestError("Map kind must be battlemap, regional, or world.");
-  return value;
+  return value as MapKind;
 }
 
 /** One flat level of folders: a printable label with no slashes. Empty/undefined means "unfiled". */

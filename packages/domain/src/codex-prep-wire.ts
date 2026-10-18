@@ -1,6 +1,6 @@
 // Session prep's HTTP shapes: the template library and a session's prep sections. Both are GM-only, so there is no
 // player twin of anything here. Kept apart from `codex-wire.ts` so the session shape there can import it without a
-// cycle. Prose for each field lives in the server's `openapi/descriptions.ts`.
+// cycle. Each field's `.describe()` is its prose in the OpenAPI document.
 
 import { z } from "zod";
 import type { Wire } from "./wire.js";
@@ -52,16 +52,22 @@ export const CodexPrepTemplateSectionSchema = z.strictObject({
 });
 export type CodexPrepTemplateSection = Wire<z.infer<typeof CodexPrepTemplateSectionSchema>>;
 
-export const CodexPrepTemplateSchema = z.strictObject({
-  id: z.uuid(),
-  name: z.string().min(1).max(CODEX_PREP_LIMITS.templateName),
-  builtIn: z.boolean(),
-  isDefault: z.boolean(),
-  sections: z.array(CodexPrepTemplateSectionSchema).max(CODEX_PREP_LIMITS.templateSections),
-  rev: z.number().int().min(0),
-  createdAt: timestamp().nullable(),
-  updatedAt: timestamp().nullable()
-});
+export const CodexPrepTemplateSchema = z
+  .strictObject({
+    id: z.uuid(),
+    name: z.string().min(1).max(CODEX_PREP_LIMITS.templateName),
+    builtIn: z
+      .boolean()
+      .describe("The starting template ships with the app and is read-only. Duplicate it to edit a copy."),
+    isDefault: z.boolean().describe("The template a new session copies when it names none."),
+    sections: z.array(CodexPrepTemplateSectionSchema).max(CODEX_PREP_LIMITS.templateSections),
+    rev: z.number().int().min(0).describe("The conflict token for `PATCH`; 0 on the built-in."),
+    createdAt: timestamp().nullable().describe("Null on the built-in."),
+    updatedAt: timestamp().nullable().describe("Null on the built-in.")
+  })
+  .describe(
+    "A reusable plan for session prep: an ordered list of sections, each with a title, a prompt and a type. GM-only."
+  );
 export type CodexPrepTemplate = Wire<z.infer<typeof CodexPrepTemplateSchema>>;
 
 export const CodexPrepTemplateListSchema = z.strictObject({
