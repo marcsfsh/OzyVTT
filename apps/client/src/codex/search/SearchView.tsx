@@ -38,9 +38,7 @@ import {
   modifiedLabel,
   readFilters,
   sortSummary,
-  type SearchFilters,
-  type SortKey,
-  type SortLevel
+  type SearchFilters
 } from "./searchParams";
 import "./search.css";
 
@@ -360,8 +358,17 @@ export function SearchView() {
       {sorting && (
         <SortDialog
           levels={sort}
-          gm={gm}
-          hasQuery={Boolean(filters.q.trim())}
+          keys={[
+            ...(filters.q.trim() ? (["relevance"] as const) : []),
+            "name",
+            "type",
+            "modified",
+            ...(gm ? (["visibility"] as const) : [])
+          ]}
+          labelOf={(key) => SORT_KEY_LABEL[key]}
+          directionLabel={directionLabel}
+          defaultDirection={(key) => (key === "modified" ? "desc" : "asc")}
+          maxLevels={MAX_SORT_LEVELS}
           onCancel={() => setSorting(false)}
           onSort={(levels) => {
             update({ sort: levels });
@@ -373,33 +380,39 @@ export function SearchView() {
   );
 }
 
+/** One level of a sort: a column and its direction. */
+export type SortChoice<K extends string> = Readonly<{ key: K; direction: "asc" | "desc" }>;
+
 /**
  * Sort by several columns in order, as a spreadsheet does: rows sort by the first level, then by each level under it.
+ * The caller names its columns, their words and which way each sorts first, so any table can use it.
  */
-export function SortDialog({
+export function SortDialog<K extends string>({
   levels,
-  gm,
-  hasQuery,
+  keys,
+  labelOf,
+  directionLabel: directionWords,
+  defaultDirection = () => "asc",
+  maxLevels = 4,
   onCancel,
   onSort
 }: Readonly<{
-  levels: readonly SortLevel[];
-  gm: boolean;
-  hasQuery: boolean;
+  levels: readonly SortChoice<K>[];
+  /** The columns that can be sorted on, in the order the dialog offers them. */
+  keys: readonly K[];
+  labelOf: (key: K) => string;
+  /** The words for a direction of a column: "A to Z", "Newest first". */
+  directionLabel: (key: K, direction: "asc" | "desc") => string;
+  /** Which way a column sorts when it is first chosen. */
+  defaultDirection?: (key: K) => "asc" | "desc";
+  maxLevels?: number;
   onCancel: () => void;
-  onSort: (levels: readonly SortLevel[]) => void;
+  onSort: (levels: readonly SortChoice<K>[]) => void;
 }>) {
-  const [draft, setDraft] = useState<readonly SortLevel[]>(levels);
+  const [draft, setDraft] = useState<readonly SortChoice<K>[]>(levels);
   const [selected, setSelected] = useState(0);
-  const keys: SortKey[] = [
-    ...(hasQuery ? (["relevance"] as const) : []),
-    "name",
-    "type",
-    "modified",
-    ...(gm ? (["visibility"] as const) : [])
-  ];
   const unused = keys.find((key) => !draft.some((level) => level.key === key));
-  const set = (index: number, patch: Partial<SortLevel>) =>
+  const set = (index: number, patch: Partial<SortChoice<K>>) =>
     setDraft((current) => current.map((level, at) => (at === index ? { ...level, ...patch } : level)));
   const moveUp = () => {
     if (selected <= 0) return;
@@ -444,14 +457,14 @@ export function SortDialog({
               value={level.key}
               onChange={(event) =>
                 set(index, {
-                  key: event.target.value as SortKey,
-                  direction: event.target.value === "modified" ? "desc" : "asc"
+                  key: event.target.value as K,
+                  direction: defaultDirection(event.target.value as K)
                 })
               }
             >
               {keys.map((key) => (
                 <option key={key} value={key} disabled={key !== level.key && draft.some((other) => other.key === key)}>
-                  {SORT_KEY_LABEL[key]}
+                  {labelOf(key)}
                 </option>
               ))}
             </Select>
@@ -460,11 +473,11 @@ export function SortDialog({
               value={level.direction}
               onChange={(event) => set(index, { direction: event.target.value as "asc" | "desc" })}
             >
-              <option value="asc">{directionLabel(level.key, "asc")}</option>
-              <option value="desc">{directionLabel(level.key, "desc")}</option>
+              <option value="asc">{directionWords(level.key, "asc")}</option>
+              <option value="desc">{directionWords(level.key, "desc")}</option>
             </Select>
             <IconButton
-              label={`Delete this level: ${SORT_KEY_LABEL[level.key]}`}
+              label={`Delete this level: ${labelOf(level.key)}`}
               size="sm"
               disabled={draft.length === 1}
               onClick={(event) => {
@@ -481,10 +494,10 @@ export function SortDialog({
       <div className="cx-dropdown-row">
         <Button
           size="sm"
-          disabled={!unused || draft.length >= MAX_SORT_LEVELS}
+          disabled={!unused || draft.length >= maxLevels}
           onClick={() => {
             if (!unused) return;
-            setDraft((current) => [...current, { key: unused, direction: unused === "modified" ? "desc" : "asc" }]);
+            setDraft((current) => [...current, { key: unused, direction: defaultDirection(unused) }]);
             setSelected(draft.length);
           }}
         >
