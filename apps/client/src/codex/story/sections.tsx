@@ -27,6 +27,7 @@ import {
   StoryBar,
   defaultSessionId,
   sessionFilterCount,
+  useSortedSessions,
   useSessionFilter,
   type ListedSession
 } from "./Sessions";
@@ -566,6 +567,7 @@ export function GmSessionsSection() {
       })),
     [sessions]
   );
+  const sorted = useSortedSessions(listed);
   const selectedId = shell.recordId ?? (shell.phone ? null : defaultSessionId(listed, feeds.activeSessionId));
   const session = sessions.find((each) => each.id === selectedId) ?? null;
   const deadlines = useMemo(
@@ -645,7 +647,7 @@ export function GmSessionsSection() {
               }
             />
             {error && <Alert tone="danger">{error}</Alert>}
-            <SessionRows sessions={listed} selectedId={null} gm onPick={(id) => shell.go(sessionPath(id))} />
+            <SessionRows sessions={sorted} selectedId={null} gm onPick={(id) => shell.go(sessionPath(id))} />
           </div>
         )}
       </div>
