@@ -260,12 +260,16 @@ describe("Which addresses a player may reach (viewer safety)", () => {
   });
 
   /**
-   * `/settings` is shared (a player gets the Mine group) while `/settings/api` is GM-only; a player
-   * asking for it gets the not-found view.
+   * `/settings` and its Device section are shared (a player gets Device alone) while every other section is
+   * GM-only; a player asking for one gets the not-found view.
    */
-  it("keeps /settings shared and /settings/api GM-only", () => {
+  it("keeps /settings and its Device section shared and the other sections GM-only", () => {
     expect(isGmOnlyPath("/settings")).toBe(false);
+    expect(isGmOnlyPath("/settings/device")).toBe(false);
+    for (const section of ["players", "fights", "characters", "access", "api"])
+      expect(isGmOnlyPath(`/settings/${section}`), section).toBe(true);
     expect(isGmOnlyPath("/settings/api")).toBe(true);
+    expect(isGmOnlyPath("/settings/api/listIntegrationCredentials")).toBe(true);
   });
 
   /**
@@ -315,8 +319,13 @@ describe("The addresses D29 added", () => {
     expect(isKnownPath("/builder/new")).toBe(false);
     expect(isKnownPath("/replays/abc")).toBe(false);
     expect(isKnownPath("/settings/table")).toBe(false);
-    // `/settings/api` is the one two-segment settings address; a length check would open all of them.
-    expect(isKnownPath("/settings/api/keys")).toBe(false);
+    // A section by its id, and an operation of the API reference by its operation id; a length check would open
+    // every shape.
+    expect(isKnownPath("/settings/fights")).toBe(true);
+    expect(isKnownPath("/settings/api/listIntegrationCredentials")).toBe(true);
+    expect(isKnownPath("/settings/fights/rules")).toBe(false);
+    expect(isKnownPath("/settings/api/keys/1")).toBe(false);
+    expect(isKnownPath("/settings/api/%20")).toBe(false);
     expect(isKnownPath("/me/anything")).toBe(false);
     // Retired addresses no longer exist, so a stale stored location self-heals.
     expect(isKnownPath("/encounter")).toBe(false);

@@ -209,7 +209,9 @@ describe("typing dice at the table", () => {
   it("tells a player at such a table why there is no choice of how to roll", () => {
     followTable(closedTable);
     render(<SettingsPage role="player" state={null} />, { wrapper: ToastProvider });
-    expect(screen.getByText("At this table the server rolls players' dice. The GM can change that.")).toBeTruthy();
+    expect(
+      screen.getByText("At this table the server rolls players' dice, and only the GM can change that.")
+    ).toBeTruthy();
     expect(screen.queryByRole("group", { name: "How you roll" })).toBeNull();
     followTable(openTable);
   });

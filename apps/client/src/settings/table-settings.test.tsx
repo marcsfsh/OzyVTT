@@ -8,12 +8,13 @@ vi.mock("../socket", () => ({
   socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connected: true, timeout: () => ({ emit: vi.fn() }) }
 }));
 // The fetching neighbours of the table settings, which this test does not read.
-vi.mock("../integrations/IntegrationsPanel", () => ({ IntegrationsPanel: () => null }));
+vi.mock("../integrations/CredentialsTable", () => ({ CredentialsTable: () => null }));
 vi.mock("../components/JoinAddress", () => ({ JoinAddress: () => null }));
 
 import { GameStateSchema, type GmView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
 import { FightMenu } from "../encounter/FightMenu";
+import { goTo } from "../../test/route";
 import { SettingsPage } from "./SettingsPage";
 
 // Settings speak in the positive ("Check movement"), use the same names for the same setting as the fight's options,
@@ -25,12 +26,15 @@ function gmView(change: (state: GmView) => void = () => {}): GmView {
   return state;
 }
 
-const renderSettings = (state: GmView) =>
-  render(
+// The fight's settings are the Fights section, at its own address.
+const renderSettings = (state: GmView) => {
+  goTo("/settings/fights");
+  return render(
     <ToastProvider>
       <SettingsPage role="gm" state={state} gmToken="gm" />
     </ToastProvider>
   );
+};
 
 describe("the rules assistant's checks", () => {
   beforeEach(() => command.mockClear());

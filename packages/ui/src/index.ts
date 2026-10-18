@@ -107,6 +107,8 @@ export {
   IconLevelUp,
   IconUser,
   IconCog,
+  IconKey,
+  IconCode,
   IconPin,
   IconList,
   IconSkull,

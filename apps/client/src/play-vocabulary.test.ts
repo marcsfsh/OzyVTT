@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { citeCopy, looksLikeCode, scanCopy, withoutInterpolations, type CopyString } from "./copy-scan";
 import { CLAIM_WORD } from "./actors/actor-display";
-import { SETTINGS_GROUPS } from "./settings/SettingsPage";
+import { SETTINGS_SECTIONS } from "./settings/sections";
 import { playCopySources, stripComments } from "./convention-sources";
 
 /**
@@ -221,14 +221,21 @@ describe("The structured copy, pinned at its one definition", () => {
     }
   });
 
-  it("names the rules dial Enforce / Advise / Off, and the three settings groups", () => {
+  it("names the rules dial Enforce / Advise / Off, and the Settings sections", () => {
     // The dial's labels are `settings/table-words.ts`'s DIAL_COPY, shared by Settings and the fight's options; the
     // wire values stay strict/assisted/freeform, which is why the RETIRED row above is about copy only.
     const source = readFileSync(`${process.cwd()}/src/settings/table-words.ts`, "utf8");
     expect(source).toMatch(/value: "strict", label: "Enforce"/);
     expect(source).toMatch(/value: "assisted", label: "Advise"/);
     expect(source).toMatch(/value: "freeform", label: "Off"/);
-    expect(SETTINGS_GROUPS.map((group) => group.label)).toEqual(["Mine", "The table", "Players"]);
+    expect(SETTINGS_SECTIONS.map((section) => section.label)).toEqual([
+      "Players",
+      "Fights",
+      "Characters",
+      "Device",
+      "Access",
+      "API"
+    ]);
   });
 
   it("calls the place the Table and never the Encounter", () => {

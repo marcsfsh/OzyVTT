@@ -126,8 +126,8 @@ export function PlayerShell({
           onGoToTable={() => navigate("/table")}
         />
       );
-    /* One Settings component for both roles. `SettingsPage` renders the GM groups only for a GM token,
-       so GM-only controls are absent from a player's tree, and never just hidden. `/settings/api` is GM-only. */
+    /* One Settings component for both roles. A player's page is the Device section alone, so GM-only controls are
+       absent from a player's tree, and never just hidden. Every other section's address is GM-only. */
     case "settings":
       return reachable ? (
         <SettingsPage role="player" state={state} onLeave={onLeave} />

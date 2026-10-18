@@ -8,6 +8,7 @@ import { useSyncExternalStore } from "react";
 // The Codex owns its address space (`codex/routes.ts`) and this module asks it. The import cycle via
 // `withQuery` is safe: neither module calls across it during evaluation.
 import { codexSectionOf, GM_ONLY_SECTIONS, type CodexAddress } from "./codex/routes";
+import { isSettingsSection } from "./settings/sections";
 
 export type Route = Readonly<{
   /** The pathname, always leading-slash, never trailing-slash (except the bare root). */
@@ -191,8 +192,8 @@ export function litPlayerTab(path: string): PlayerTab {
 export function isGmOnlyPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
   if (segments[0] === "codex") return GM_ONLY_SECTIONS.includes((segments[1] ?? "") as CodexAddress);
-  // `/settings` is shared but `/settings/api` is GM-only.
-  if (segments[0] === "settings") return segments[1] === "api";
+  // `/settings` and its Device section are shared; every other section, the API reference among them, is the GM's.
+  if (segments[0] === "settings") return segments[1] !== undefined && segments[1] !== "device";
   const tab = gmTabForPath(path);
   if (tab === null) return false;
   return tab !== "codex" && tab !== "table" && tab !== "settings" && tab !== "replay";
@@ -219,8 +220,13 @@ export function isKnownPath(path: string): boolean {
   if (segments[0] === "scenes") return segments.length === 1 || (segments.length === 2 && segments[1].length > 0);
   // The player's own tab: one segment, nothing under it.
   if (segments[0] === "me") return segments.length === 1;
-  // `/settings/api` is the only two-segment settings address.
-  if (segments[0] === "settings") return segments.length === 1 || (segments.length === 2 && segments[1] === "api");
+  // A section of Settings, or one operation of the API reference by its operation id.
+  if (segments[0] === "settings")
+    return (
+      segments.length === 1 ||
+      (segments.length === 2 && isSettingsSection(segments[1])) ||
+      (segments.length === 3 && segments[1] === "api" && /^[A-Za-z][\w.-]{0,100}$/.test(segments[2]))
+    );
   // The Shared screen tab is the display controls or, at `/sound`, the sound board.
   if (segments[0] === "viewer-controls")
     return segments.length === 1 || (segments.length === 2 && segments[1] === "sound");

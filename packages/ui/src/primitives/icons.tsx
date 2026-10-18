@@ -655,6 +655,24 @@ export function IconUser({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Who may reach the table: the GM password and the credentials. */
+export function IconKey({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M7.5 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM11 12h10M17.5 12v3M20.5 12v3" />
+    </Glyph>
+  );
+}
+
+/** Code: the API reference. */
+export function IconCode({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M8 7 3 12l5 5M16 7l5 5-5 5M13.5 5l-3 14" />
+    </Glyph>
+  );
+}
+
 /** Settings for this device. */
 export function IconCog({ className }: Readonly<{ className?: string }>) {
   return (

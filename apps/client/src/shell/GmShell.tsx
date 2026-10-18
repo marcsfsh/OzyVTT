@@ -31,7 +31,6 @@ import type { Connection } from "./useSession";
 const CodexShell = lazySurface(() => import("../codex/CodexShell").then((m) => m.CodexShell));
 const HomebrewPanel = lazySurface(() => import("../homebrew/HomebrewPanel").then((m) => m.HomebrewPanel));
 const SettingsPage = lazySurface(() => import("../settings/SettingsPage").then((m) => m.SettingsPage));
-const ApiReferencePage = lazySurface(() => import("../integrations/ApiReference").then((m) => m.ApiReferencePage));
 const MapManager = lazySurface(() => import("../maps/MapManager").then((m) => m.MapManager));
 const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList));
 const ViewerControls = lazySurface(() => import("../viewer/ViewerControls").then((m) => m.ViewerControls));
@@ -399,26 +398,21 @@ export function GmShell({
         </Modal>
       )}
 
-      {/* `/settings/api`: the API reference at full pane width. Opening it in a new tab asks for the GM
-        password once, since the GM token is memory-only. The Settings page is two columns at 1280px+. */}
-      {tab("settings") &&
-        (route.path === "/settings/api" ? (
-          <ApiReferencePage gmToken={token} onBack={() => navigate(pathForGmTab("settings"))} />
-        ) : (
-          <SettingsPage
-            role="gm"
-            state={state}
-            gmToken={token}
-            busy={busy}
-            onPreviewPlayers={() => {
-              navigate(pathForGmTab("table"));
-              setShowViewerPreview(true);
-            }}
-            onSignOut={onSignOut}
-            onRevokeAll={() => void revokeAll()}
-            onChangePassword={onChangePassword}
-          />
-        ))}
+      {/* Settings owns its addresses: a section at `/settings/<section>` and an operation of the API reference at
+        `/settings/api/<operation id>`. Opening the reference in a new tab asks for the GM password once, since the GM
+        token is memory-only. */}
+      {tab("settings") && (
+        <SettingsPage
+          role="gm"
+          state={state}
+          gmToken={token}
+          busy={busy}
+          onPreviewPlayers={() => setShowViewerPreview(true)}
+          onSignOut={onSignOut}
+          onRevokeAll={() => void revokeAll()}
+          onChangePassword={onChangePassword}
+        />
+      )}
       {dialog}
     </>
   );

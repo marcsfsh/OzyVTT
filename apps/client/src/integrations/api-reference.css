@@ -1,177 +1,228 @@
+/* The API reference: a toolbar over a table of operations, with the filter flyout over the table's left side; and an
+   operation as one document beside its metadata panel. The table, the toolbar row and the flyout take the Codex's
+   own styles (`cx-table`, `cx-sub`, `cx-flyout`). */
+
 .api-reference {
-  margin-top: var(--space-8);
-  border: 1px solid transparent;
-}
-.api-reference > summary {
+  position: relative;
   display: flex;
-  align-items: baseline;
-  gap: 0.8rem;
-  flex-wrap: wrap;
-  padding: var(--space-4) var(--space-5);
-  cursor: pointer;
-  list-style-position: inside;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
-.api-reference > summary strong {
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-}
-.api-reference > summary span {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-.api-reference-body {
-  padding: 0 var(--space-5) var(--space-5);
-}
-.api-reference-intro {
-  font-size: 0.9rem;
-}
-.api-reference-intro a {
-  color: var(--cyan);
-}
-.api-reference-count {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-}
-.api-reference-error {
-  color: var(--danger-text);
-}
-.api-reference-group {
-  margin-top: var(--space-5);
-}
-.api-reference-group h3 {
-  margin: 0 0 var(--space-2);
-  font-size: 1rem;
-  color: var(--text);
-}
-.api-endpoint-list {
-  display: grid;
-  gap: 0.55rem;
-}
-/* Endpoint rows: a hairline between rows, no per-row fill or card. */
-.api-endpoint {
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-}
-/* A stacked row cannot overhang its neighbours, so its paint reaches the 44px floor. */
-.api-endpoint > summary {
-  list-style: none;
-  cursor: pointer;
+.api-intro summary {
   min-height: var(--tap-min);
-  padding: 0.55rem 0.7rem;
-  display: grid;
-  align-content: center;
-  gap: var(--space-1);
-}
-.api-endpoint > summary::-webkit-details-marker {
-  display: none;
-}
-.api-endpoint[open] > summary {
-  border-bottom: 1px solid var(--line);
-}
-.api-endpoint > summary:hover {
-  background: color-mix(in srgb, var(--text) 5%, transparent);
-}
-.api-endpoint-summary {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
-.api-reference-route {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1.2 var(--font-label);
+  cursor: pointer;
 }
+.api-intro p {
+  max-width: 60rem;
+  margin: 0 0 var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.api-intro a {
+  color: var(--cyan-hi);
+}
+.api-toolbar {
+  flex-wrap: wrap;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.api-find {
+  width: 14rem;
+  margin: 0;
+}
+.api-count {
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1 var(--font-label);
+}
+.api-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+.api-tagmenu {
+  min-width: 16rem;
+  max-height: 26rem;
+}
+/* The results are the reference's one scroller; the flyout covers them from the left while it is open. */
+.api-results {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.api-table .api-path {
+  font: 500 var(--fs-xs) / 1.3 var(--font-mono);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.api-col-summary {
+  width: 40%;
+  color: var(--text-dim);
+}
+.api-col-callers {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.api-scopes {
+  font-family: var(--font-mono);
+}
+
+/* The method as a tag: the hue is the edge, the words are ink. */
 .api-method {
-  font-weight: 800;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-  padding: 0.15rem 0.45rem;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--info) 30%, transparent);
+  display: inline-block;
+  min-width: 4.2em;
+  padding: 2px var(--space-1);
+  border: 1px solid var(--line-raised);
+  border-left: 3px solid var(--info);
+  background: var(--surface-2);
   color: var(--text);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-align: center;
 }
 .api-method-post {
-  background: color-mix(in srgb, var(--success) 25%, transparent);
-  color: var(--text);
-}
-.api-method-delete {
-  background: color-mix(in srgb, var(--danger) 30%, transparent);
-  color: var(--text);
+  border-left-color: var(--success);
 }
 .api-method-put,
 .api-method-patch {
-  background: color-mix(in srgb, var(--caution) 30%, transparent);
-  color: var(--text);
+  border-left-color: var(--caution);
+}
+.api-method-delete {
+  border-left-color: var(--danger);
 }
 .api-path {
-  font-size: 0.83rem;
   color: var(--text);
-  word-break: break-all;
-}
-.api-auth {
-  display: inline-flex;
-  gap: 0.3rem;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-.api-auth em {
-  font-style: normal;
-  font-size: 0.68rem;
-  padding: 0.1rem 0.4rem;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-.api-command-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
-}
-.api-command-table th,
-.api-command-table td {
-  text-align: left;
-  padding: 0.4rem 0.55rem;
-  border-bottom: 1px solid var(--line);
-  vertical-align: top;
-}
-.api-command-table code {
-  color: var(--cyan);
+  font-family: var(--font-mono);
 }
 
-.api-endpoint-body {
-  padding: 0.7rem 0.85rem 0.9rem;
-  display: grid;
-  gap: 0.9rem;
-}
-.api-detail-line {
+/* A phone's list: method and path over the summary. */
+.api-list {
+  display: flex;
+  flex-direction: column;
   margin: 0;
-  font-size: 0.82rem;
+  padding: 0;
+  list-style: none;
+}
+.api-list-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-1);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.api-list-row.is-static {
+  cursor: default;
+}
+.api-list-row:hover,
+.api-list-row:active {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+.api-list-route {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: inherit;
+  font-size: var(--fs-xs);
+}
+.api-list-route .api-path {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.api-list-summary {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* ----- One operation: the document and its metadata panel ----- */
+.api-doc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18rem;
+  align-items: start;
+  gap: var(--space-6);
+}
+.api-doc-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.api-doc-back {
+  align-self: flex-start;
+}
+.api-doc-main h2 {
+  margin: 0;
+  font-size: var(--fs-h2);
+}
+.api-doc-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.api-doc-route .api-path {
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.api-doc-description {
+  max-width: 48rem;
+  margin: 0;
   color: var(--text-dim);
 }
-.api-detail-block h4 {
-  margin: 0 0 0.4rem;
-  font-size: 0.82rem;
+.api-doc-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.api-doc-part h3,
+.api-doc-part h4 {
+  margin: 0;
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+}
+.api-doc-part h4 {
   color: var(--text-muted);
+}
+.api-doc-part p {
+  margin: 0;
 }
 .api-detail-empty {
   margin: 0;
-  font-size: 0.8rem;
   color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+/* A field table scrolls sideways on its own when a phone is too narrow for it. */
+.api-table-scroll {
+  overflow-x: auto;
 }
 .api-field-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
 }
 .api-field-table th,
 .api-field-table td {
-  text-align: left;
-  padding: 0.3rem var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-bottom: 1px solid var(--line);
+  text-align: start;
   vertical-align: top;
 }
 .api-field-table th {
@@ -179,165 +230,105 @@
   font-weight: 600;
 }
 .api-field-table td:first-child code {
-  color: var(--cyan);
+  color: var(--cyan-hi);
 }
 .api-field-table td:nth-child(2) {
   color: var(--text-dim);
-  white-space: nowrap;
-}
-.api-code {
-  margin: 0;
-  padding: 0.7rem 0.8rem;
-  border-radius: 0;
-  background: var(--void);
-  border: 1px solid var(--line);
-  overflow-x: auto;
-}
-.api-code code {
-  font-size: 0.78rem;
-  color: var(--text-dim);
-  white-space: pre;
-}
-.api-code-header {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.4rem;
-}
-.api-code-header h4 {
-  margin: 0;
-}
-.api-code-lang {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-.api-copy {
-  margin-left: auto;
-  min-width: var(--tap-min);
-  min-height: var(--tap-min);
-  padding: var(--space-1) 0.6rem;
-  font-size: 0.72rem;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  background: var(--surface-3);
-  color: var(--text-dim);
-  text-align: center;
-}
-.api-copy:hover {
-  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
-}
-
-.api-reference-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-top: var(--space-4);
-}
-.api-lang-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.api-lang-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-.api-export-spec {
-  margin-left: auto;
-  padding: 0.45rem 0.9rem;
-  text-align: center;
-  white-space: nowrap;
 }
 .api-response {
-  padding: 0.35rem 0 0.35rem 0.6rem;
-  border-left: 2px solid var(--line);
-}
-.api-response + .api-response {
-  margin-top: 0.4rem;
-}
-.api-response-ok {
-  border-left-color: var(--success);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--success);
 }
 .api-response-error {
   border-left-color: var(--danger);
 }
 .api-response p {
-  margin: 0 0 0.3rem;
-  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
 }
 .api-response-code {
-  font-weight: 800;
   color: var(--text);
+  font-weight: 700;
 }
 .api-response-schema {
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-style: normal;
 }
-/* Below 760px nothing in this panel keeps a right-hand column. */
-@media (max-width: 760px) {
-  .api-auth {
-    margin-left: 0;
-    width: 100%;
-  }
-  .api-field-table td:nth-child(2) {
-    white-space: normal;
-  }
-  .api-export-spec {
-    margin-left: 0;
-  }
-}
-
-/* The reference at its own address (`/settings/api`): full pane width, wider than the settings reading
-   measure. `.api-reference-body`'s side padding is dropped because `.pane-frame` supplies the gutter. */
-.api-reference-page-head {
+.api-code-header {
   display: flex;
-  align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
 }
-.api-reference-page-head h2 {
+.api-code-header h3 {
+  flex: 1 1 auto;
+}
+.api-code {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--void);
+  overflow-x: auto;
+}
+.api-code code {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  white-space: pre;
+}
+.api-doc-meta {
+  position: sticky;
+  top: 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--rim-w) solid var(--line-strong);
+  background: var(--surface-2);
+}
+.api-doc-meta dl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   margin: 0;
 }
-.api-reference-page-actions {
+.api-doc-meta dt {
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.api-doc-meta dd {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-left: auto;
+  gap: var(--space-1);
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
 }
-.api-reference-page-body > .api-reference-body {
-  padding-inline: 0;
+.api-meta-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.api-reference-page-body .api-reference-toolbar {
-  margin-top: var(--space-2);
+.api-meta-detail {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
 }
 
-/* Panel material on a backing layer behind the content, since the summary is the control. The edge but
-   no lip: `.api-reference` only renders inside `.settings-group--table`, which already has one. */
-.api-reference {
-  position: relative;
-  isolation: isolate;
-  border-radius: 0;
-  background: none;
-  --material-fill: var(--material-plate);
+/* Below 980px the metadata panel follows the document. */
+@media (max-width: 979px) {
+  .api-doc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .api-doc-meta {
+    position: static;
+  }
 }
-.api-reference::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  box-sizing: border-box;
-  pointer-events: none;
-  border: var(--rim-w) solid var(--rim-color);
-  background: var(--material-fill);
-  background-origin: border-box;
-  background-clip: border-box;
-  outline: 1px solid var(--bezel-color);
-  outline-offset: calc(-1 * var(--bezel-inset));
-  transition:
-    border-color var(--dur-hover),
-    background var(--dur-hover);
+@media (max-width: 650px) {
+  .api-find {
+    flex: 1 1 100%;
+    width: auto;
+  }
 }

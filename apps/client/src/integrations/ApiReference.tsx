@@ -1,68 +1,78 @@
-import { useEffect, useState } from "react";
-import { Button, IconDownload, SegmentedControl } from "@vtt/ui";
+import { useEffect, useId, useMemo, useState } from "react";
+import { Alert, Button, Chip, IconDownload, Input, SegmentedControl, Skeleton } from "@vtt/ui";
+import { Dropdown } from "../codex/shared/Dropdown";
+import { FilterChips, FilterFlyout, FiltersButton } from "../codex/shared/FilterFlyout";
+import { SortDialog, type SortChoice } from "../codex/search/SearchView";
 import { apiRequest, jsonRequest } from "../lib/api";
-import { EndpointDetails } from "./EndpointDetails";
+import { useMediaQuery } from "../lib/useMediaQuery";
+import { SettingsPrimary } from "../settings/SettingRow";
 import {
-  exportSpec,
-  GROUPS,
-  LANGUAGES,
-  METHOD_ORDER,
-  ungrouped,
-  type CatalogCommand,
-  type Language,
-  type OpenApiDocument
-} from "./openapi-model";
+  CALLER_WORDS,
+  DEFAULT_SORT,
+  NO_FILTERS,
+  operationRows,
+  SORT_WORDS,
+  visibleRows,
+  type ApiFilters,
+  type ApiSortKey,
+  type Caller
+} from "./api-rows";
+import { OperationDocument } from "./OperationDocument";
+import { exportSpec, METHOD_ORDER, type CatalogCommand, type OpenApiDocument } from "./openapi-model";
 import "./api-reference.css";
 
 /**
- * The API reference, fetched live from the running server (the OpenAPI document at
- * /api/v1/openapi.json and the command catalog), so it cannot drift from what the server exposes.
- * Each endpoint expands to its full spec, resolved from the document's own component schemas.
+ * The API reference, read live from the running server (the OpenAPI document at /api/v1/openapi.json and the command
+ * catalog), so it can't drift from what the server answers. Operations are a table under a Tag dropdown, filters
+ * that fly out and a sort by several columns; an operation opens as one document beside its metadata, at its own
+ * address. The commands that the live-game tunnel takes are a second table.
  */
 
-/**
- * Two presentations, one body: the Settings page's `<details>` disclosure, and `/settings/api`
- * (GM-only), the same content at full pane width. Opening that address in a new tab asks for the GM
- * password once: the GM token is memory-only, and every alternative (URL, localStorage,
- * `postMessage`) copies a credential somewhere it should not go.
- * Known limitation: it is a very long page with no navigation (no table of contents or filter).
- */
-const API_REFERENCE_PATH = "/settings/api";
+function MethodMark({ method }: Readonly<{ method: string }>) {
+  return <code className={`api-method api-method-${method}`}>{method.toUpperCase()}</code>;
+}
 
-function ApiReferenceBody({ gmToken }: Readonly<{ gmToken: string }>) {
+export function ApiReference({
+  gmToken,
+  openKey,
+  onOpen,
+  onClose
+}: Readonly<{
+  gmToken: string;
+  /** The operation open at this address, or null for the table. */
+  openKey: string | null;
+  onOpen: (key: string) => void;
+  onClose: () => void;
+}>) {
   const [state, setState] = useState<{
     status: "loading" | "ready" | "error";
     document: OpenApiDocument | null;
     commands: readonly CatalogCommand[];
-    message: string;
-  }>({ status: "loading", document: null, commands: [], message: "" });
-  const [language, setLanguage] = useState<Language>("shell");
-
-  /** Bumped by Retry; each value is one load. */
+  }>({ status: "loading", document: null, commands: [] });
   const [attempt, setAttempt] = useState(0);
+  const [view, setView] = useState<"operations" | "commands">("operations");
+  const [filters, setFilters] = useState<ApiFilters>(NO_FILTERS);
+  const [sort, setSort] = useState<readonly SortChoice<ApiSortKey>[]>(DEFAULT_SORT);
+  const [sorting, setSorting] = useState(false);
+  const [flyout, setFlyout] = useState(false);
+  const flyoutId = useId();
+  const phone = useMediaQuery("(max-width: 650px)");
 
-  /** Fetched on mount: both presentations mount this body only when it is about to be read. */
   useEffect(() => {
     let cancelled = false;
-    setState((current) => ({ ...current, status: "loading", message: "" }));
+    setState((current) => ({ ...current, status: "loading" }));
     Promise.all([
       jsonRequest<OpenApiDocument>("/api/v1/openapi.json"),
-      // The catalog is an extra; without it the reference still shows every path.
+      // The catalog is an extra; without it the reference still shows every operation.
       apiRequest<{ commands?: readonly CatalogCommand[] }>("/api/v1/game/commands", { token: gmToken }).catch(() => ({
         commands: []
       }))
     ])
       .then(([document, catalog]) => {
-        if (!cancelled) setState({ status: "ready", document, commands: catalog.commands ?? [], message: "" });
+        if (!cancelled) setState({ status: "ready", document, commands: catalog.commands ?? [] });
       })
       .catch(() => {
-        if (!cancelled)
-          setState({
-            status: "error",
-            document: null,
-            commands: [],
-            message: "The reference could not be loaded from the server."
-          });
+        if (!cancelled) setState({ status: "error", document: null, commands: [] });
       });
     return () => {
       cancelled = true;
@@ -70,196 +80,363 @@ function ApiReferenceBody({ gmToken }: Readonly<{ gmToken: string }>) {
   }, [gmToken, attempt]);
 
   const document = state.document;
-  const components = document?.components?.schemas ?? {};
-  const origin = window.location.origin;
-  const operationCount = document
-    ? Object.values(document.paths).reduce((total, operations) => total + Object.keys(operations).length, 0)
-    : 0;
+  const rows = useMemo(() => (document ? operationRows(document) : []), [document]);
+  const tags = useMemo(() => [...new Set(rows.map((row) => row.tag))], [rows]);
+  const scopes = useMemo(() => [...new Set(rows.flatMap((row) => row.scopes))].sort(), [rows]);
+  const shown = useMemo(() => visibleRows(rows, filters, sort), [rows, filters, sort]);
+  const open = openKey ? rows.find((row) => row.key === openKey) : undefined;
+  const set = (patch: Partial<ApiFilters>) => setFilters((current) => ({ ...current, ...patch }));
+  const filterCount = filters.methods.length + filters.callers.length + filters.scopes.length;
+
+  const primary = document && (
+    <SettingsPrimary>
+      <Button
+        variant="primary"
+        onClick={() => exportSpec(document)}
+        title="The full OpenAPI 3.1 document, for Postman, openapi-generator or any other OpenAPI tool."
+      >
+        <IconDownload /> Download OpenAPI
+      </Button>
+    </SettingsPrimary>
+  );
+
+  if (state.status === "error")
+    return (
+      <div className="api-reference">
+        <Alert tone="danger" title="The reference didn't load">
+          The server didn't send its API document. Check that it is running, then try again.
+        </Alert>
+        <Button variant="secondary" onClick={() => setAttempt((count) => count + 1)}>
+          Try again
+        </Button>
+      </div>
+    );
+  if (!document)
+    return (
+      <div className="api-reference" aria-busy="true">
+        <Skeleton variant="text" />
+        <Skeleton variant="text" />
+        <Skeleton variant="text" />
+      </div>
+    );
+
+  if (openKey)
+    return (
+      <div className="api-reference">
+        {primary}
+        {open ? (
+          <div className="api-results scroll-y">
+            <OperationDocument
+              row={open}
+              components={document.components?.schemas ?? {}}
+              origin={window.location.origin}
+              onBack={onClose}
+            />
+          </div>
+        ) : (
+          <>
+            <Alert tone="info" title="No such operation">
+              This server has no operation called {openKey}.
+            </Alert>
+            <Button variant="secondary" onClick={onClose}>
+              All operations
+            </Button>
+          </>
+        )}
+      </div>
+    );
+
+  const tagsOn = filters.tags ?? tags;
+  const tagMenu = (
+    <Dropdown
+      label={filters.tags ? `Tags: ${filters.tags.length} of ${tags.length}` : `Tags: all ${tags.length}`}
+      panelClassName="api-tagmenu scroll-y"
+    >
+      {() => (
+        <>
+          <div className="cx-dropdown-row">
+            <Button size="sm" variant="ghost" onClick={() => set({ tags: null })}>
+              Select all
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => set({ tags: [] })}>
+              Clear
+            </Button>
+          </div>
+          {tags.map((tag) => (
+            <label key={tag} className="cx-check">
+              <input
+                type="checkbox"
+                checked={tagsOn.includes(tag)}
+                onChange={(event) => {
+                  const next = event.target.checked ? [...tagsOn, tag] : tagsOn.filter((other) => other !== tag);
+                  set({ tags: next.length === tags.length ? null : tags.filter((other) => next.includes(other)) });
+                }}
+              />
+              {tag}
+            </label>
+          ))}
+        </>
+      )}
+    </Dropdown>
+  );
+
+  const chips = [
+    ...filters.methods.map((method) => ({
+      key: `m-${method}`,
+      words: `Method: ${method.toUpperCase()}`,
+      remove: () => set({ methods: filters.methods.filter((other) => other !== method) })
+    })),
+    ...filters.callers.map((caller) => ({
+      key: `c-${caller}`,
+      words: `Who can call: ${CALLER_WORDS[caller]}`,
+      remove: () => set({ callers: filters.callers.filter((other) => other !== caller) })
+    })),
+    ...filters.scopes.map((scope) => ({
+      key: `s-${scope}`,
+      words: `Scope: ${scope}`,
+      remove: () => set({ scopes: filters.scopes.filter((other) => other !== scope) })
+    }))
+  ];
 
   return (
-    <>
-      <div className="api-reference-body">
-        <p className="api-reference-intro">
-          Base URL: <code>{origin}/api/v1</code> · Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> -
-          a credential from above, your GM session, or a player session.
-          {/* `.tap-target` grows the link's hit area to the floor; the paragraph has no other control. */}
-          The machine-readable contract lives at{" "}
+    <div className="api-reference">
+      {primary}
+      <details className="api-intro">
+        <summary>How to call this API</summary>
+        <p>
+          The base address is <code>{window.location.origin}/api/v1</code>. Send{" "}
+          <code>Authorization: Bearer &lt;token&gt;</code> with a credential from Access, your GM session or a player
+          session. The document itself is at{" "}
           <a className="tap-target" href="/api/v1/openapi.json" target="_blank" rel="noreferrer">
             /api/v1/openapi.json
           </a>
           .
         </p>
-        {/* The idempotency and revision rules come from the served contract's description, never restated
-          here, so they cannot diverge per surface. */}
-        {document?.info.description && <p className="api-reference-intro">{document.info.description}</p>}
-        {state.status === "loading" && <p>Loading the contract…</p>}
-        {state.status === "error" && (
-          <p className="api-reference-error">
-            {state.message}{" "}
-            <Button variant="ghost" onClick={() => setAttempt((count) => count + 1)}>
-              Retry
-            </Button>
-          </p>
-        )}
-        {document && (
+        {/* The idempotency and revision rules come from the served contract's description, never restated here. */}
+        {document.info.description && <p>{document.info.description}</p>}
+        <p>Example values are made up. Real ids come from the game state.</p>
+      </details>
+      <div className="cx-sub api-toolbar">
+        <SegmentedControl
+          size="sm"
+          ariaLabel="Show"
+          value={view}
+          onChange={(value) => setView(value as typeof view)}
+          options={[
+            { value: "operations", label: "Operations" },
+            { value: "commands", label: "Commands" }
+          ]}
+        />
+        <Input
+          type="search"
+          className="api-find"
+          aria-label={view === "operations" ? "Find an operation" : "Find a command"}
+          placeholder={view === "operations" ? "Find a path or summary" : "Find a command"}
+          value={filters.text}
+          onChange={(event) => set({ text: event.target.value })}
+        />
+        {view === "operations" && (
           <>
-            <div className="api-reference-toolbar">
-              <div className="api-lang-tabs">
-                <span className="api-lang-label">Language</span>
-                <SegmentedControl
-                  ariaLabel="Example request language"
-                  size="sm"
-                  value={language}
-                  onChange={(value) => setLanguage(value as typeof language)}
-                  options={LANGUAGES.map((entry) => ({ value: entry.id, label: entry.label }))}
-                />
-              </div>
-              <Button
-                variant="secondary"
-                className="api-export-spec"
-                onClick={() => exportSpec(document)}
-                title="Download the full OpenAPI 3.1 document for Postman, openapi-generator or any other OpenAPI tool."
-              >
-                <IconDownload /> Export OpenAPI spec
-              </Button>
-            </div>
-            <p className="api-reference-count">
-              {operationCount} operations across {Object.keys(document.paths).length} paths. Example values are made up.
-              Real ids come from the game state.
-            </p>
-            {GROUPS.map((group) => {
-              const paths = Object.entries(document.paths).filter(([path]) => group.match(path));
-              if (paths.length === 0) return null;
-              return (
-                <section key={group.title} className="api-reference-group">
-                  <h3>{group.title}</h3>
-                  <div className="api-endpoint-list">
-                    {paths.flatMap(([path, operations]) =>
-                      METHOD_ORDER.filter((method) => operations[method]).map((method) => (
-                        <EndpointDetails
-                          key={`${method} ${path}`}
-                          method={method}
-                          path={path}
-                          operation={operations[method]}
-                          components={components}
-                          origin={origin}
-                          language={language}
-                        />
-                      ))
-                    )}
-                  </div>
-                </section>
-              );
-            })}
-            {(() => {
-              const rest = ungrouped(Object.keys(document.paths));
-              if (rest.length === 0) return null;
-              return (
-                <section className="api-reference-group">
-                  <h3>Other</h3>
-                  <div className="api-endpoint-list">
-                    {rest.flatMap((path) =>
-                      METHOD_ORDER.filter((method) => document.paths[path][method]).map((method) => (
-                        <EndpointDetails
-                          key={`${method} ${path}`}
-                          method={method}
-                          path={path}
-                          operation={document.paths[path][method]!}
-                          components={components}
-                          origin={origin}
-                          language={language}
-                        />
-                      ))
-                    )}
-                  </div>
-                </section>
-              );
-            })()}
-            {state.commands.length > 0 && (
-              <section className="api-reference-group">
-                <h3>
-                  Command catalog (typed routes + the <code>POST /game/commands</code> tunnel)
-                </h3>
-                <table className="api-command-table">
-                  <thead>
-                    <tr>
-                      <th>Command type</th>
-                      <th>Scope</th>
-                      <th>What it does</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {state.commands.map((command) => (
-                      <tr key={command.type}>
-                        <td>
-                          <code>{command.type}</code>
-                        </td>
-                        <td>
-                          <code>{command.scope}</code>
-                        </td>
-                        <td>{command.summary}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-            )}
+            {tagMenu}
+            <FiltersButton
+              open={flyout}
+              onToggle={() => setFlyout((current) => !current)}
+              controls={flyoutId}
+              count={filterCount}
+            />
+            <Button size="sm" aria-haspopup="dialog" onClick={() => setSorting(true)}>
+              {`Sort: ${sort.map((level) => SORT_WORDS[level.key]).join(", then ")}`}
+            </Button>
           </>
         )}
-      </div>
-    </>
-  );
-}
-
-/** The Settings-page presentation: the disclosure plus the link to the full-page address. */
-export function ApiReference({ gmToken }: Readonly<{ gmToken: string }>) {
-  const [open, setOpen] = useState(false);
-  return (
-    <details
-      className="api-reference"
-      open={open}
-      onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
-    >
-      <summary>
-        <strong>API reference</strong>
-        <span>Every endpoint this server exposes, read from its own contract. Open one for its full spec.</span>
-      </summary>
-      {/* Mounted only while open, so the fetch happens on first open and a Settings visit costs nothing. */}
-      {open && <ApiReferenceBody gmToken={gmToken} />}
-    </details>
-  );
-}
-
-/**
- * `/settings/api`: the reference at its own address, full width. A heading row with the two doors
- * over one scrolling region. "Open in a new tab" is a plain `target="_blank"` link; the new tab asks
- * for the GM password, and no credential is copied into it.
- */
-export function ApiReferencePage({ gmToken, onBack }: Readonly<{ gmToken: string; onBack: () => void }>) {
-  return (
-    <section
-      className="api-reference-page pane-frame pane-scene scanlines frame-col anim-view"
-      aria-label="API reference"
-    >
-      <div className="pane-sky" aria-hidden="true" />
-      <div className="api-reference-page-head neon-beam">
-        <h2>API reference</h2>
-        <div className="api-reference-page-actions">
-          <Button variant="ghost" onClick={onBack}>
-            Back to Settings
-          </Button>
+        <span className="cx-grow" />
+        <span className="api-count" role="status">
+          {view === "operations" ? `${shown.length} of ${rows.length} operations` : `${state.commands.length} commands`}
+        </span>
+        {!phone && (
           <Button
-            variant="secondary"
+            size="sm"
+            variant="ghost"
             title="The new tab asks for the GM password once and never stores the GM token."
-            onClick={() => window.open(API_REFERENCE_PATH, "_blank", "noopener")}
+            onClick={() => window.open(window.location.pathname, "_blank", "noopener")}
           >
             Open in a new tab
           </Button>
+        )}
+      </div>
+      {view === "operations" && chips.length > 0 && (
+        <div className="api-chips" aria-label="Filters on">
+          {chips.map((chip) => (
+            <Chip key={chip.key} onRemove={chip.remove} removeLabel={`Remove ${chip.words}`}>
+              {chip.words}
+            </Chip>
+          ))}
+          <Button size="sm" variant="ghost" onClick={() => set({ methods: [], callers: [], scopes: [] })}>
+            Clear filters
+          </Button>
         </div>
+      )}
+
+      <div className="api-results scroll-y">
+        {view === "commands" ? (
+          <CommandsTable commands={state.commands} text={filters.text} phone={phone} />
+        ) : shown.length === 0 ? (
+          <p className="settings-empty">No operation matches. Change the words, the tags or the filters.</p>
+        ) : phone ? (
+          <ul className="api-list" aria-label="Operations">
+            {shown.map((row) => (
+              <li key={row.key}>
+                <button type="button" className="api-list-row" onClick={() => onOpen(row.key)}>
+                  <span className="api-list-route">
+                    <MethodMark method={row.method} />
+                    <code className="api-path">{row.path}</code>
+                  </span>
+                  <span className="api-list-summary">{row.summary}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <table className="cx-table api-table">
+            <thead>
+              <tr>
+                <th scope="col">Method</th>
+                <th scope="col">Path</th>
+                <th scope="col">Summary</th>
+                <th scope="col">Tag</th>
+                <th scope="col">Who can call</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((row) => (
+                <tr key={row.key} className="cx-row" onClick={() => onOpen(row.key)}>
+                  <td>
+                    <MethodMark method={row.method} />
+                  </td>
+                  <td>
+                    <button type="button" className="cx-rowlink api-path" onClick={() => onOpen(row.key)}>
+                      {row.path}
+                    </button>
+                  </td>
+                  <td className="api-col-summary">{row.summary}</td>
+                  <td>{row.tag}</td>
+                  <td className="api-col-callers">
+                    {row.callers.map((caller) => CALLER_WORDS[caller]).join(" · ")}
+                    {row.scopes.length > 0 && <span className="api-scopes"> · {row.scopes.join(", ")}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
-      <div className="api-reference-page-body scroll-y frame-fill">
-        <ApiReferenceBody gmToken={gmToken} />
-      </div>
-    </section>
+
+      <FilterFlyout id={flyoutId} open={flyout} title="Filters" onClose={() => setFlyout(false)}>
+        <span className="settings-subhead">Method</span>
+        <FilterChips
+          label="Method"
+          options={METHOD_ORDER.filter((method) => rows.some((row) => row.method === method)).map((method) => ({
+            value: method,
+            label: method.toUpperCase()
+          }))}
+          selected={filters.methods}
+          onChange={(methods) => set({ methods })}
+        />
+        <span className="settings-subhead">Who can call</span>
+        <FilterChips
+          label="Who can call"
+          options={(Object.keys(CALLER_WORDS) as Caller[]).map((caller) => ({
+            value: caller,
+            label: CALLER_WORDS[caller]
+          }))}
+          selected={filters.callers}
+          onChange={(callers) => set({ callers: callers as Caller[] })}
+        />
+        {scopes.length > 0 && (
+          <>
+            <span className="settings-subhead">Scope</span>
+            <FilterChips
+              label="Scope"
+              options={scopes.map((scope) => ({ value: scope, label: scope }))}
+              selected={filters.scopes}
+              onChange={(next) => set({ scopes: next })}
+            />
+          </>
+        )}
+      </FilterFlyout>
+      {sorting && (
+        <SortDialog
+          levels={sort}
+          keys={["tag", "path", "method", "operation"] as const}
+          labelOf={(key) => SORT_WORDS[key]}
+          directionLabel={(key, direction) =>
+            key === "method"
+              ? direction === "asc"
+                ? "GET first"
+                : "DELETE first"
+              : direction === "asc"
+                ? "A to Z"
+                : "Z to A"
+          }
+          onCancel={() => setSorting(false)}
+          onSort={(levels) => {
+            setSort(levels);
+            setSorting(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** The command catalog: the commands the live-game tunnel takes, with the scope each needs. */
+function CommandsTable({
+  commands,
+  text,
+  phone
+}: Readonly<{ commands: readonly CatalogCommand[]; text: string; phone: boolean }>) {
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = commands.filter((command) =>
+    words.every((word) => `${command.type} ${command.scope} ${command.summary}`.toLowerCase().includes(word))
+  );
+  if (commands.length === 0)
+    return <p className="settings-empty">The server sent no command catalog, so only the operations are listed.</p>;
+  if (shown.length === 0) return <p className="settings-empty">No command matches those words.</p>;
+  return phone ? (
+    <ul className="api-list" aria-label="Commands">
+      {shown.map((command) => (
+        <li key={command.type} className="api-list-row is-static">
+          <span className="api-list-route">
+            <code className="api-path">{command.type}</code>
+          </span>
+          <span className="api-list-summary">
+            {command.summary} · <code>{command.scope}</code>
+          </span>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <table className="cx-table api-table">
+      <thead>
+        <tr>
+          <th scope="col">Command</th>
+          <th scope="col">Scope</th>
+          <th scope="col">What it does</th>
+        </tr>
+      </thead>
+      <tbody>
+        {shown.map((command) => (
+          <tr key={command.type}>
+            <td>
+              <code>{command.type}</code>
+            </td>
+            <td>
+              <code>{command.scope}</code>
+            </td>
+            <td>{command.summary}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
