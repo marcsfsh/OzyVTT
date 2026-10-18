@@ -156,6 +156,8 @@ export const CODEX_PATHS = {
   standingReveal: `${API_NAMESPACE}/codex/standing/{factionPageId}/reveal`,
   // GM-only, read-only aggregation of reveal state; each row carries the id its own reveal route takes.
   revealAudit: `${API_NAMESPACE}/codex/reveal-audit`,
+  // GM-only: the sessions and pins that name each table scene.
+  sceneLinks: `${API_NAMESPACE}/codex/scene-links`,
   calendar: `${API_NAMESPACE}/codex/calendar`,
   calendarPublish: `${API_NAMESPACE}/codex/calendar/publish`,
   calendarUnpublish: `${API_NAMESPACE}/codex/calendar/unpublish`,

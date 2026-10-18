@@ -2297,6 +2297,14 @@ export const openApiDocument = {
           'One GM view of everything the party can currently see, across every reveal surface in the Codex: the published campaign date, pages, maps, markers, journal (all six kinds), sessions, quests and standing. GM-only, and READ-ONLY: it is an AGGREGATION of the existing player projections with no visibility rule of its own, so it lists exactly what the corresponding player-facing endpoints would return: a marker flagged revealed on a HIDDEN map is absent here, because the party cannot see it either. Every section is always present, empty ones included with `revealed: 0`, so "nothing is revealed here" cannot be mistaken for "this did not load". Each row carries the id its own kind\'s EXISTING reveal route takes, which is how un-revealing works from this surface: there is deliberately no unreveal route and no bulk operation. Table-side exposure (tokens, fog, the shared viewer) is deliberately out of scope; that system has its own visibility rules, and folding it in would make this the second place that decides what a player can see.'
       })
     },
+    [CODEX_PATHS.sceneLinks]: {
+      get: codexOp("getCodexSceneLinks", codexGmRead, "CodexSceneLinksResponse", {
+        notModified: true,
+        bad: false,
+        description:
+          "The Codex records that name each table scene: the sessions that stage it (on the session itself, or in an Encounters section of its prep) and the atlas pins that link it. A scene the Codex never names is absent. GM-only, as every scene link is; an id the table no longer has is listed as it is."
+      })
+    },
     [CODEX_PATHS.calendar]: {
       get: codexOp("getCodexCalendar", codexRead, "CodexCalendarProjectedResponse", {
         notModified: true,
@@ -3179,6 +3187,11 @@ export const openApiDocument = {
       CodexStandingResponse: envelopeSchema("#/components/schemas/CodexStandingData"),
       CodexRevealAuditData: codexDataObject("audit", { $ref: "#/components/schemas/CodexRevealAudit" }),
       CodexRevealAuditResponse: envelopeSchema("#/components/schemas/CodexRevealAuditData"),
+      CodexSceneLinksData: codexDataObject("links", {
+        type: "array",
+        items: { $ref: "#/components/schemas/CodexSceneLink" }
+      }),
+      CodexSceneLinksResponse: envelopeSchema("#/components/schemas/CodexSceneLinksData"),
       CodexCalendarData: codexDataObject("calendar", { $ref: "#/components/schemas/CodexCalendar" }),
       CodexCalendarResponse: envelopeSchema("#/components/schemas/CodexCalendarData"),
       CodexCalendarCheckData: codexDataObject("moves", codexArrayRef("CodexCalendarMove")),

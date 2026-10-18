@@ -1538,6 +1538,13 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "How many records of this kind the party can CURRENTLY SEE, which is not always the same as how many carry a reveal flag. A marker flagged revealed on a hidden map is not counted, because the player-facing marker read does not return it either.",
     total: 'How many exist at all, so "3 of 40" reads as deliberate.'
   },
+  CodexSceneLink: {
+    "": "One table scene and the Codex records that name it. GM-only.",
+    sceneId: "The table scene's id. It may name a scene the table has since removed.",
+    sessions:
+      "The sessions that stage it: `via: session` when it is on the session itself, `prep` when one of its prep's Encounters sections picks it.",
+    pins: "The atlas pins that link it, with the map each sits on."
+  },
   CodexRevealAudit: {
     "": "Everything the party can currently see across every reveal surface in the Codex. A READ-ONLY AGGREGATION of the existing player projections; it restates no visibility rule and writes nothing, which is why it agrees with the player-facing endpoints exactly.",
     sections: "All eight surfaces, in a fixed order, always all present.",

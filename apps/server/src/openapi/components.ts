@@ -208,6 +208,7 @@ const CODEX_RESPONSES: ReadonlyArray<readonly [string, z.ZodType]> = [
   ["CodexRevealAuditRow", wire.CodexRevealAuditRowSchema],
   ["CodexRevealAuditSection", wire.CodexRevealAuditSectionSchema],
   ["CodexRevealAudit", wire.CodexRevealAuditSchema],
+  ["CodexSceneLink", wire.CodexSceneLinkSchema],
   ["CodexImportCounts", wire.CodexImportCountsSchema],
   ["CodexAsset", wire.CodexAssetSchema]
 ];
