@@ -13,13 +13,24 @@ import {
   cx,
   useDragSurface
 } from "@vtt/ui";
+import { replaceQuery, useRoute } from "../router";
 import { useSoundBoard } from "../sound/sound-data";
 import { useScenes } from "./context";
 import { pathForScene, SCENES_PATHS } from "./routes";
 import { useSceneActions } from "./sceneActions";
 import { tokensLine, factsOf, lightLine, modifiedAt, STATE_LABEL, whenLabel, type SceneFacts } from "./sceneFacts";
-import { DEFAULT_SCENE_SORT, filterScenes, NO_SCENE_FILTERS, sortScenes, type SceneFilters } from "./sceneList";
-import { SceneListToolbar } from "./SceneListToolbar";
+import {
+  DEFAULT_SCENE_SORT,
+  filterScenes,
+  readSceneFilters,
+  readSort,
+  SCENE_SORT_KEYS,
+  sortParam,
+  sortScenes,
+  writeSceneFilters,
+  setOrDelete
+} from "./sceneList";
+import { SceneFiltersFlyout, SceneListToolbar } from "./SceneListToolbar";
 import { MapThumb, StateChip } from "./pieces";
 
 /**
@@ -31,8 +42,11 @@ export function SceneList() {
   const { state, maps, links, go, phone } = useScenes();
   const scenes = state.combat.scenes;
   const board = useSoundBoard();
-  const [filters, setFilters] = useState<SceneFilters>(NO_SCENE_FILTERS);
-  const [sort, setSort] = useState(DEFAULT_SCENE_SORT);
+  // The filters and the sort live in the address, so a filtered list is a link and survives a refresh.
+  const { query } = useRoute();
+  const filters = readSceneFilters(query);
+  const sort = readSort(query, SCENE_SORT_KEYS, DEFAULT_SCENE_SORT);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
   const actions = useSceneActions(scenes, {
     combatActive: state.combat.active,
     onDuplicated: (sceneId) => go(pathForScene(sceneId))
@@ -167,91 +181,102 @@ export function SceneList() {
       {phone && <h2 className="sc-phone-title">Scenes</h2>}
       <SceneListToolbar
         filters={filters}
-        onFilters={setFilters}
+        onFilters={(next) => replaceQuery((params) => writeSceneFilters(params, next))}
         sort={sort}
-        onSort={setSort}
+        onSort={(next) => replaceQuery((params) => setOrDelete(params, "sort", sortParam(next, DEFAULT_SCENE_SORT)))}
         shown={shown.length}
         total={scenes.length}
-        maps={maps ?? []}
+        flyoutOpen={flyoutOpen}
+        onFlyout={setFlyoutOpen}
       />
-      <div className="sc-list-body scroll-y frame-fill">
-        {scenes.length === 0 ? (
-          <div className="sc-empty">
-            <p>No scenes yet. A scene is a map and who is on it, made live when the table is ready.</p>
-            <Button variant="primary" onClick={() => go(SCENES_PATHS.newScene)}>
-              New scene
-            </Button>
-          </div>
-        ) : shown.length === 0 ? (
-          <p className="sc-hint sc-list-none">No scene matches. Change the filters to see more.</p>
-        ) : phone ? (
-          <ul className="sc-rows" ref={(element) => void (listRef.current = element)}>
-            {rows.map((row) => (
-              <li
-                key={row.scene.id}
-                data-scene-id={row.scene.id}
-                className={cx(dragId === row.scene.id && "is-dragging")}
-              >
-                <button type="button" className="sc-row" onClick={() => go(pathForScene(row.scene.id))}>
-                  <MapThumb mapAssetId={row.scene.mapAssetId} />
-                  <span className="sc-row-main">
-                    <strong>{row.scene.name}</strong>
-                    <small>
-                      {STATE_LABEL[row.state]} · {row.map?.name ?? "Map not in the library"}
-                    </small>
-                  </span>
-                </button>
-                {grip(row)}
-                {rowMenu(row)}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <table className="sc-table sc-scenes-table" ref={(element) => void (listRef.current = element)}>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">State</th>
-                <th scope="col">Map</th>
-                <th scope="col">Tokens</th>
-                <th scope="col">Light</th>
-                <th scope="col">Codex</th>
-                <th scope="col">Modified</th>
-                <th scope="col">
-                  <span className="nh-sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+      <div className="sc-list-main">
+        <SceneFiltersFlyout
+          open={flyoutOpen}
+          onClose={() => setFlyoutOpen(false)}
+          filters={filters}
+          onFilters={(next) => replaceQuery((params) => writeSceneFilters(params, next))}
+          maps={maps ?? []}
+          usedMapIds={[...new Set(scenes.map((scene) => scene.mapAssetId))]}
+        />
+        <div className="sc-list-body scroll-y frame-fill">
+          {scenes.length === 0 ? (
+            <div className="sc-empty">
+              <p>No scenes yet. A scene is a map and who is on it, made live when the table is ready.</p>
+              <Button variant="primary" onClick={() => go(SCENES_PATHS.newScene)}>
+                New scene
+              </Button>
+            </div>
+          ) : shown.length === 0 ? (
+            <p className="sc-hint sc-list-none">No scene matches. Change the filters to see more.</p>
+          ) : phone ? (
+            <ul className="sc-rows" ref={(element) => void (listRef.current = element)}>
               {rows.map((row) => (
-                <tr
+                <li
                   key={row.scene.id}
                   data-scene-id={row.scene.id}
-                  className={cx("sc-tr", row.live && "is-live", dragId === row.scene.id && "is-dragging")}
+                  className={cx(dragId === row.scene.id && "is-dragging")}
                 >
-                  <td>
-                    <span className="sc-name-cell">
-                      {grip(row)}
-                      <button type="button" className="sc-rowlink" onClick={() => go(pathForScene(row.scene.id))}>
-                        <MapThumb mapAssetId={row.scene.mapAssetId} />
-                        <b>{row.scene.name}</b>
-                      </button>
+                  <button type="button" className="sc-row" onClick={() => go(pathForScene(row.scene.id))}>
+                    <MapThumb mapAssetId={row.scene.mapAssetId} />
+                    <span className="sc-row-main">
+                      <strong>{row.scene.name}</strong>
+                      <small>
+                        {STATE_LABEL[row.state]} · {row.map?.name ?? "Map not in the library"}
+                      </small>
                     </span>
-                  </td>
-                  <td>
-                    <StateChip facts={row} />
-                  </td>
-                  <td>{row.map?.name ?? "Not in the library"}</td>
-                  <td>{tokensLine(row)}</td>
-                  <td>{lightLine(row)}</td>
-                  <td>{sessionLine(row.scene.id)}</td>
-                  <td className="sc-col-date">{whenLabel(modifiedAt(row.scene))}</td>
-                  <td className="sc-col-menu">{rowMenu(row)}</td>
-                </tr>
+                  </button>
+                  {grip(row)}
+                  {rowMenu(row)}
+                </li>
               ))}
-            </tbody>
-          </table>
-        )}
+            </ul>
+          ) : (
+            <table className="sc-table sc-scenes-table" ref={(element) => void (listRef.current = element)}>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">State</th>
+                  <th scope="col">Map</th>
+                  <th scope="col">Tokens</th>
+                  <th scope="col">Light</th>
+                  <th scope="col">Codex</th>
+                  <th scope="col">Modified</th>
+                  <th scope="col">
+                    <span className="nh-sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr
+                    key={row.scene.id}
+                    data-scene-id={row.scene.id}
+                    className={cx("sc-tr", row.live && "is-live", dragId === row.scene.id && "is-dragging")}
+                  >
+                    <td>
+                      <span className="sc-name-cell">
+                        {grip(row)}
+                        <button type="button" className="sc-rowlink" onClick={() => go(pathForScene(row.scene.id))}>
+                          <MapThumb mapAssetId={row.scene.mapAssetId} />
+                          <b>{row.scene.name}</b>
+                        </button>
+                      </span>
+                    </td>
+                    <td>
+                      <StateChip facts={row} />
+                    </td>
+                    <td>{row.map?.name ?? "Not in the library"}</td>
+                    <td>{tokensLine(row)}</td>
+                    <td>{lightLine(row)}</td>
+                    <td>{sessionLine(row.scene.id)}</td>
+                    <td className="sc-col-date">{whenLabel(modifiedAt(row.scene))}</td>
+                    <td className="sc-col-menu">{rowMenu(row)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
       {actions.dialogs}
     </div>

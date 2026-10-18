@@ -94,7 +94,7 @@ function useAtlasUses(token: string, mapId: string) {
  * its one primary.
  */
 export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
-  const { state, token, maps, reloadMaps, go, narrow, onOpenMap } = useScenes();
+  const { state, token, maps, reloadMaps, go, narrow, phone, onOpenMap } = useScenes();
   const map = maps?.find((candidate) => candidate.id === mapId) ?? null;
   const [showGrid, setShowGrid] = useState(true);
   const [listOpen, setListOpen] = useState(false);
@@ -147,9 +147,11 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
           </Button>
         )}
         <h2 className="sc-scene-title">{map.name}</h2>
-        <span className="sc-kind">{MAP_KIND_LABEL[map.kind]}</span>
+        {!phone && <span className="sc-kind">{MAP_KIND_LABEL[map.kind]}</span>}
         <span className="sc-grow" />
-        {map.calibration && <Switch checked={showGrid} label="Show the grid" onChange={setShowGrid} />}
+        {map.calibration && (
+          <Switch checked={showGrid} label={phone ? "Grid" : "Show the grid"} onChange={setShowGrid} />
+        )}
         <Menu trigger="⋯" label={`${map.name} actions`} align="end" hideCaret>
           <MenuItem icon={<IconMap />} onClick={() => go(pathForMap(map.id, "grid"))}>
             {grid === "none" ? "Set the grid" : "Set the grid again"}

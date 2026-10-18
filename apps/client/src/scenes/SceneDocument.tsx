@@ -3,6 +3,7 @@ import { rosterActors } from "@vtt/domain";
 import {
   Button,
   IconChevronLeft,
+  IconEye,
   IconCopy,
   IconList,
   IconPencil,
@@ -62,7 +63,7 @@ function Section({
  * would receive.
  */
 export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
-  const { state, token, maps, go, narrow } = useScenes();
+  const { state, token, maps, go, narrow, phone } = useScenes();
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId) ?? null;
   const [listOpen, setListOpen] = useState(false);
   const [seeAs, setSeeAs] = useState<SeeAs>("gm");
@@ -100,30 +101,49 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
       <h2 className="sc-scene-title">{scene.name}</h2>
       <StateChip facts={facts} />
       <span className="sc-grow" />
-      <label className="sc-see-as">
-        <span className="sc-see-as-label">See as</span>
-        <Select
-          value={seeAsValue}
-          aria-label="See as"
-          onChange={(event) => {
-            const value = event.target.value;
-            if (value === "gm" || value === "screen") setSeeAs(value);
-            else {
-              const actor = party.find((candidate) => candidate.id === value);
-              if (actor) setSeeAs({ actorId: actor.id, name: actor.name });
-            }
-          }}
-        >
-          <option value="gm">You, the GM</option>
-          <option value="screen">The table screen</option>
-          {party.map((actor) => (
-            <option key={actor.id} value={actor.id}>
-              {actor.name}
-            </option>
-          ))}
-        </Select>
-      </label>
+      {/* A phone has no room for the choice beside the name, so its views are in the menu. */}
+      {!phone && (
+        <label className="sc-see-as">
+          <span className="sc-see-as-label">See as</span>
+          <Select
+            value={seeAsValue}
+            aria-label="See as"
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value === "gm" || value === "screen") setSeeAs(value);
+              else {
+                const actor = party.find((candidate) => candidate.id === value);
+                if (actor) setSeeAs({ actorId: actor.id, name: actor.name });
+              }
+            }}
+          >
+            <option value="gm">You, the GM</option>
+            <option value="screen">The table screen</option>
+            {party.map((actor) => (
+              <option key={actor.id} value={actor.id}>
+                {actor.name}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
       <Menu trigger="⋯" label={`${scene.name} actions`} align="end" hideCaret>
+        {phone && (
+          <>
+            <MenuItem icon={<IconEye />} onClick={() => setSeeAs("screen")}>
+              See as the table screen
+            </MenuItem>
+            {party.map((actor) => (
+              <MenuItem
+                key={actor.id}
+                icon={<IconEye />}
+                onClick={() => setSeeAs({ actorId: actor.id, name: actor.name })}
+              >
+                See as {actor.name}
+              </MenuItem>
+            ))}
+          </>
+        )}
         <MenuItem icon={<IconPencil />} onClick={() => go(pathForScene(scene.id, "map"))}>
           Edit its steps
         </MenuItem>

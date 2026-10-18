@@ -1,4 +1,4 @@
-import { dayRange, type SortLevel } from "../scenes/sceneList";
+import { dayOf, dayRange, setOrDelete, type SortLevel } from "../scenes/sceneList";
 import { gridStateOf, type GridState } from "../scenes/sceneFacts";
 import type { MapAsset, MapKind } from "./map-catalog";
 
@@ -32,6 +32,7 @@ export const NO_MAP_FILTERS: MapFilters = {
 };
 
 export type MapSortKey = "name" | "type" | "grid" | "folder" | "used" | "modified";
+export const MAP_SORT_KEYS: readonly MapSortKey[] = ["name", "type", "grid", "folder", "used", "modified"];
 export const MAP_SORT_LABEL: Readonly<Record<MapSortKey, string>> = {
   name: "Name",
   type: "Type",
@@ -43,13 +44,43 @@ export const MAP_SORT_LABEL: Readonly<Record<MapSortKey, string>> = {
 /** Newest first, since the map just added is usually the one wanted. */
 export const DEFAULT_MAP_SORT: readonly SortLevel<MapSortKey>[] = [{ key: "modified", direction: "desc" }];
 
+/** How many of the flyout's filters are set. The Type and Modified dropdowns count apart. */
 export function activeMapFilterCount(filters: MapFilters): number {
-  return [
-    filters.folders.length > 0,
-    filters.grid !== "any",
-    filters.used !== "any",
-    filters.from !== null || filters.to !== null
-  ].filter(Boolean).length;
+  return [filters.folders.length > 0, filters.grid !== "any", filters.used !== "any"].filter(Boolean).length;
+}
+
+const GRID_FILTERS: readonly MapFilters["grid"][] = ["any", "grid", "scale", "none"];
+const USED_FILTERS: readonly MapFilters["used"][] = ["any", "used", "unused"];
+
+/** The Maps table's filters as its address holds them; `folder=` with no name is the maps in no folder. */
+export function readMapFilters(query: URLSearchParams): MapFilters {
+  const kindText = query.get("type");
+  const grid = query.get("grid");
+  const used = query.get("used");
+  return {
+    kinds:
+      kindText === null
+        ? MAP_KINDS
+        : kindText === "none"
+          ? []
+          : MAP_KINDS.filter((kind) => kindText.split(",").includes(kind)),
+    folders: query.getAll("folder"),
+    grid: GRID_FILTERS.find((value) => value === grid) ?? "any",
+    used: USED_FILTERS.find((value) => value === used) ?? "any",
+    from: dayOf(query.get("from")),
+    to: dayOf(query.get("to"))
+  };
+}
+
+export function writeMapFilters(query: URLSearchParams, filters: MapFilters): void {
+  const kinds = MAP_KINDS.filter((kind) => filters.kinds.includes(kind));
+  setOrDelete(query, "type", kinds.length === MAP_KINDS.length ? null : kinds.length === 0 ? "none" : kinds.join(","));
+  query.delete("folder");
+  for (const folder of filters.folders) query.append("folder", folder);
+  setOrDelete(query, "grid", filters.grid === "any" ? null : filters.grid);
+  setOrDelete(query, "used", filters.used === "any" ? null : filters.used);
+  setOrDelete(query, "from", filters.from);
+  setOrDelete(query, "to", filters.to);
 }
 
 export function filterMaps(

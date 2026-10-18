@@ -5,8 +5,18 @@ import { MapThumb } from "../scenes/pieces";
 import { pathForMap, SCENES_PATHS } from "../scenes/routes";
 import { gridLine, gridStateOf, whenLabel } from "../scenes/sceneFacts";
 import { folderNamesOf, useMapActions } from "./mapActions";
-import { DEFAULT_MAP_SORT, filterMaps, MAP_KIND_LABEL, NO_MAP_FILTERS, sortMaps, type MapFilters } from "./mapList";
-import { MapListToolbar } from "./MapListToolbar";
+import { replaceQuery, useRoute } from "../router";
+import { readSort, setOrDelete, sortParam } from "../scenes/sceneList";
+import {
+  DEFAULT_MAP_SORT,
+  filterMaps,
+  MAP_KIND_LABEL,
+  MAP_SORT_KEYS,
+  readMapFilters,
+  sortMaps,
+  writeMapFilters
+} from "./mapList";
+import { MapFiltersFlyout, MapListToolbar } from "./MapListToolbar";
 import type { MapAsset } from "./map-catalog";
 
 /**
@@ -15,8 +25,11 @@ import type { MapAsset } from "./map-catalog";
  */
 export function MapList() {
   const { state, token, maps, reloadMaps, go, phone } = useScenes();
-  const [filters, setFilters] = useState<MapFilters>(NO_MAP_FILTERS);
-  const [sort, setSort] = useState(DEFAULT_MAP_SORT);
+  // The filters and the sort live in the address, so a filtered list is a link and survives a refresh.
+  const { query } = useRoute();
+  const filters = readMapFilters(query);
+  const sort = readSort(query, MAP_SORT_KEYS, DEFAULT_MAP_SORT);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
   const actions = useMapActions(token, reloadMaps);
   const library = maps ?? [];
   const usedIn = (mapId: string) => state.combat.scenes.filter((scene) => scene.mapAssetId === mapId).length;
@@ -64,86 +77,96 @@ export function MapList() {
       )}
       <MapListToolbar
         filters={filters}
-        onFilters={setFilters}
+        onFilters={(next) => replaceQuery((params) => writeMapFilters(params, next))}
         sort={sort}
-        onSort={setSort}
+        onSort={(next) => replaceQuery((params) => setOrDelete(params, "sort", sortParam(next, DEFAULT_MAP_SORT)))}
         shown={shown.length}
         total={library.length}
-        folders={folders}
+        flyoutOpen={flyoutOpen}
+        onFlyout={setFlyoutOpen}
       />
-      <div className="sc-list-body scroll-y frame-fill">
-        {maps === null ? (
-          <p className="sc-hint sc-list-none">Reading the map library…</p>
-        ) : library.length === 0 ? (
-          <div className="sc-empty">
-            <p>No maps yet. Upload an image, set its grid, and use it in a scene.</p>
-            <Button variant="primary" onClick={() => go(SCENES_PATHS.newMap)}>
-              Add a map
-            </Button>
-          </div>
-        ) : shown.length === 0 ? (
-          <p className="sc-hint sc-list-none">No map matches. Change the filters to see more.</p>
-        ) : phone ? (
-          <ul className="sc-rows">
-            {shown.map((map) => (
-              <li key={map.id}>
-                <button type="button" className="sc-row" onClick={() => go(pathForMap(map.id))}>
-                  <MapThumb mapAssetId={map.id} />
-                  <span className="sc-row-main">
-                    <strong>{map.name}</strong>
-                    <small className={cx(gridStateOf(map) === "none" && "sc-caution")}>
-                      {gridLine(gridStateOf(map), map)} · {MAP_KIND_LABEL[map.kind]}
-                    </small>
-                  </span>
-                </button>
-                {rowMenu(map)}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <table className="sc-table sc-maps-table">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Type</th>
-                <th scope="col">Grid</th>
-                <th scope="col">Size</th>
-                <th scope="col">Folder</th>
-                <th scope="col">Used in</th>
-                <th scope="col">Modified</th>
-                <th scope="col">
-                  <span className="nh-sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((map) => {
-                const uses = usedIn(map.id);
-                return (
-                  <tr key={map.id} className="sc-tr">
-                    <td>
-                      <button type="button" className="sc-rowlink" onClick={() => go(pathForMap(map.id))}>
-                        <MapThumb mapAssetId={map.id} />
-                        <b>{map.name}</b>
-                      </button>
-                    </td>
-                    <td>{MAP_KIND_LABEL[map.kind]}</td>
-                    <td className={cx(gridStateOf(map) === "none" && "sc-caution")}>
-                      {gridLine(gridStateOf(map), map)}
-                    </td>
-                    <td className="tabular">
-                      {map.width} × {map.height}
-                    </td>
-                    <td>{map.folder ?? "None"}</td>
-                    <td>{uses === 0 ? "No scene" : `${uses} ${uses === 1 ? "scene" : "scenes"}`}</td>
-                    <td className="sc-col-date">{whenLabel(map.updatedAt)}</td>
-                    <td className="sc-col-menu">{rowMenu(map)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+      <div className="sc-list-main">
+        <MapFiltersFlyout
+          open={flyoutOpen}
+          onClose={() => setFlyoutOpen(false)}
+          filters={filters}
+          onFilters={(next) => replaceQuery((params) => writeMapFilters(params, next))}
+          folders={folders}
+        />
+        <div className="sc-list-body scroll-y frame-fill">
+          {maps === null ? (
+            <p className="sc-hint sc-list-none">Reading the map library…</p>
+          ) : library.length === 0 ? (
+            <div className="sc-empty">
+              <p>No maps yet. Upload an image, then set its grid so tokens snap to it.</p>
+              <Button variant="primary" onClick={() => go(SCENES_PATHS.newMap)}>
+                Add a map
+              </Button>
+            </div>
+          ) : shown.length === 0 ? (
+            <p className="sc-hint sc-list-none">No map matches. Change the filters to see more.</p>
+          ) : phone ? (
+            <ul className="sc-rows">
+              {shown.map((map) => (
+                <li key={map.id}>
+                  <button type="button" className="sc-row" onClick={() => go(pathForMap(map.id))}>
+                    <MapThumb mapAssetId={map.id} />
+                    <span className="sc-row-main">
+                      <strong>{map.name}</strong>
+                      <small className={cx(gridStateOf(map) === "none" && "sc-caution")}>
+                        {gridLine(gridStateOf(map), map)} · {MAP_KIND_LABEL[map.kind]}
+                      </small>
+                    </span>
+                  </button>
+                  {rowMenu(map)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <table className="sc-table sc-maps-table">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Grid</th>
+                  <th scope="col">Size</th>
+                  <th scope="col">Folder</th>
+                  <th scope="col">Used in</th>
+                  <th scope="col">Modified</th>
+                  <th scope="col">
+                    <span className="nh-sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((map) => {
+                  const uses = usedIn(map.id);
+                  return (
+                    <tr key={map.id} className="sc-tr">
+                      <td>
+                        <button type="button" className="sc-rowlink" onClick={() => go(pathForMap(map.id))}>
+                          <MapThumb mapAssetId={map.id} />
+                          <b>{map.name}</b>
+                        </button>
+                      </td>
+                      <td>{MAP_KIND_LABEL[map.kind]}</td>
+                      <td className={cx(gridStateOf(map) === "none" && "sc-caution")}>
+                        {gridLine(gridStateOf(map), map)}
+                      </td>
+                      <td className="tabular">
+                        {map.width} × {map.height}
+                      </td>
+                      <td>{map.folder ?? "None"}</td>
+                      <td>{uses === 0 ? "No scene" : `${uses} ${uses === 1 ? "scene" : "scenes"}`}</td>
+                      <td className="sc-col-date">{whenLabel(map.updatedAt)}</td>
+                      <td className="sc-col-menu">{rowMenu(map)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
       {actions.dialog}
     </div>

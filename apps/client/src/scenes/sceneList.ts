@@ -1,3 +1,4 @@
+import type { SortDirection, SortLevelOf } from "../codex/shared/SortDialog";
 import type { SceneFacts, SceneState } from "./sceneFacts";
 import { modifiedAt } from "./sceneFacts";
 
@@ -37,7 +38,8 @@ export const NO_SCENE_FILTERS: SceneFilters = {
 };
 
 export type SceneSortKey = "order" | "name" | "state" | "map" | "tokens" | "modified";
-export type SortLevel<Key extends string> = Readonly<{ key: Key; direction: "asc" | "desc" }>;
+export type SortLevel<Key extends string> = SortLevelOf<Key>;
+export const SCENE_SORT_KEYS: readonly SceneSortKey[] = ["order", "name", "state", "map", "tokens", "modified"];
 
 export const SCENE_SORT_LABEL: Readonly<Record<SceneSortKey, string>> = {
   order: "Your order",
@@ -51,7 +53,110 @@ export const SCENE_SORT_LABEL: Readonly<Record<SceneSortKey, string>> = {
 /** The GM's own order first, so the running order of an evening is what the table opens on. */
 export const DEFAULT_SCENE_SORT: readonly SortLevel<SceneSortKey>[] = [{ key: "order", direction: "asc" }];
 
-/** How many filters are set, for the Filters button and the chips. The State dropdown counts apart. */
+/** How a direction reads for a column: words A to Z, dates newest first, the GM's order first to last. */
+export function sortDirectionLabel(key: string, direction: SortDirection): string {
+  if (key === "modified") return direction === "desc" ? "Newest first" : "Oldest first";
+  if (key === "order") return direction === "asc" ? "First to last" : "Last to first";
+  if (key === "tokens" || key === "used") return direction === "asc" ? "Fewest first" : "Most first";
+  if (key === "state") return direction === "asc" ? "Live first" : "Live last";
+  if (key === "grid") return direction === "asc" ? "No grid first" : "Grid set first";
+  return direction === "asc" ? "A to Z" : "Z to A";
+}
+
+/** A column starts newest first when it is a date, and in reading order otherwise. */
+export function firstSortDirection(key: string): SortDirection {
+  return key === "modified" ? "desc" : "asc";
+}
+
+/** "Sort: Name, then Modified". */
+export function sortSummary<Key extends string>(
+  levels: readonly SortLevel<Key>[],
+  label: Readonly<Record<Key, string>>
+): string {
+  return `Sort: ${levels.map((level) => label[level.key]).join(", then ")}`;
+}
+
+/** The sort the address holds (`?sort=name:asc,modified:desc`), or the list's own when it holds none it knows. */
+export function readSort<Key extends string>(
+  query: URLSearchParams,
+  keys: readonly Key[],
+  fallback: readonly SortLevel<Key>[]
+): readonly SortLevel<Key>[] {
+  const levels: SortLevel<Key>[] = [];
+  for (const part of (query.get("sort") ?? "").split(",")) {
+    const [key = "", direction] = part.split(":");
+    if (!keys.includes(key as Key) || levels.some((level) => level.key === key)) continue;
+    levels.push({ key: key as Key, direction: direction === "desc" ? "desc" : "asc" });
+  }
+  return levels.length > 0 ? levels.slice(0, 4) : fallback;
+}
+
+/** The sort as the address writes it, or nothing for the list's own. */
+export function sortParam<Key extends string>(
+  levels: readonly SortLevel<Key>[],
+  fallback: readonly SortLevel<Key>[]
+): string | null {
+  const text = levels.map((level) => `${level.key}:${level.direction}`).join(",");
+  return text === fallback.map((level) => `${level.key}:${level.direction}`).join(",") ? null : text;
+}
+
+/** One of a few words from the address, or the default when it holds another. */
+function oneOf<Value extends string>(value: string | null, allowed: readonly Value[], fallback: Value): Value {
+  return allowed.includes(value as Value) ? (value as Value) : fallback;
+}
+
+/** A `YYYY-MM-DD` day from the address, or nothing. */
+export function dayOf(value: string | null): string | null {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+/** The Scenes table's filters as its address holds them, so a filtered list is a link and survives a refresh. */
+export function readSceneFilters(query: URLSearchParams): SceneFilters {
+  const stateText = query.get("state");
+  const states =
+    stateText === null
+      ? SCENE_STATES
+      : stateText === "none"
+        ? []
+        : SCENE_STATES.filter((state) => stateText.split(",").includes(state));
+  return {
+    states,
+    mapIds: query.getAll("map"),
+    codex: oneOf(query.get("codex"), ["any", "linked", "unlinked"], "any"),
+    waiting: query.get("tray") === "1",
+    vision: oneOf(query.get("vision"), ["any", "on", "off"], "any"),
+    fog: oneOf(query.get("fog"), ["any", "on", "off"], "any"),
+    sound: oneOf(query.get("sound"), ["any", "set", "none"], "any"),
+    from: dayOf(query.get("from")),
+    to: dayOf(query.get("to"))
+  };
+}
+
+/** Writes the filters into the address: a filter left at its default leaves no key behind. */
+export function writeSceneFilters(query: URLSearchParams, filters: SceneFilters): void {
+  const states = SCENE_STATES.filter((state) => filters.states.includes(state));
+  setOrDelete(
+    query,
+    "state",
+    states.length === SCENE_STATES.length ? null : states.length === 0 ? "none" : states.join(",")
+  );
+  query.delete("map");
+  for (const id of filters.mapIds) query.append("map", id);
+  setOrDelete(query, "codex", filters.codex === "any" ? null : filters.codex);
+  setOrDelete(query, "tray", filters.waiting ? "1" : null);
+  setOrDelete(query, "vision", filters.vision === "any" ? null : filters.vision);
+  setOrDelete(query, "fog", filters.fog === "any" ? null : filters.fog);
+  setOrDelete(query, "sound", filters.sound === "any" ? null : filters.sound);
+  setOrDelete(query, "from", filters.from);
+  setOrDelete(query, "to", filters.to);
+}
+
+export function setOrDelete(query: URLSearchParams, key: string, value: string | null): void {
+  if (value === null) query.delete(key);
+  else query.set(key, value);
+}
+
+/** How many of the flyout's filters are set, for the Filters button. The State and Modified dropdowns count apart. */
 export function activeFilterCount(filters: SceneFilters): number {
   return [
     filters.mapIds.length > 0,
@@ -59,9 +164,18 @@ export function activeFilterCount(filters: SceneFilters): number {
     filters.waiting,
     filters.vision !== "any",
     filters.fog !== "any",
-    filters.sound !== "any",
-    filters.from !== null || filters.to !== null
+    filters.sound !== "any"
   ].filter(Boolean).length;
+}
+
+/** What the Modified dropdown says: Any time, Since a day, Until a day, or both. */
+export function modifiedRangeLabel(from: string | null, to: string | null): string {
+  const day = (value: string) =>
+    new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (from && to) return `Modified: ${day(from)} to ${day(to)}`;
+  if (from) return `Modified: since ${day(from)}`;
+  if (to) return `Modified: until ${day(to)}`;
+  return "Modified: any time";
 }
 
 /** The start of a `YYYY-MM-DD` day and the end of another, in local time. */
