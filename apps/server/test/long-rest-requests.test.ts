@@ -74,11 +74,11 @@ describe("the 16-hour rule between Long Rests", () => {
     applyRest(state, TORVA, "long", resolve(state));
     expect(actor(state, TORVA).lastLongRestAt).toBe(30);
     expect(() => applyRest(state, TORVA, "long", resolve(state))).toThrow(
-      "Torva just finished a Long Rest - another can start in 16 hours."
+      "Torva finished a Long Rest moments ago. Another can start in 16 hours."
     );
     passTime(state, 10);
     expect(() => applyRest(state, TORVA, "long", resolve(state))).toThrow(
-      "Torva finished a Long Rest 10 hours ago - another can start in 6 hours."
+      "Torva finished a Long Rest 10 hours ago. Another can start in 6 hours."
     );
     passTime(state, 6);
     applyRest(state, TORVA, "long", resolve(state));
@@ -106,11 +106,11 @@ describe("a player asks for a Long Rest and the GM answers", () => {
     expect(state.rest.requests).toEqual([]);
     expect(() => askForLongRest(state, BRYN, false, PLAYER)).toThrow(GameAccessDeniedError);
     const down = game({ hp: { current: 0, maximum: 75 } });
-    expect(() => askForLongRest(down, TORVA, false, PLAYER)).toThrow(/0 Hit Points - a Long Rest needs at least 1/);
+    expect(() => askForLongRest(down, TORVA, false, PLAYER)).toThrow(/0 Hit Points. A Long Rest needs at least 1/);
     const rested = game({ lastLongRestAt: 0 });
     passTime(rested, 4);
     expect(() => askForLongRest(rested, TORVA, false, PLAYER)).toThrow(
-      "Torva finished a Long Rest 4 hours ago - another can start in 12 hours."
+      "Torva finished a Long Rest 4 hours ago. Another can start in 12 hours."
     );
   });
 
@@ -140,14 +140,14 @@ describe("the GM rests the party", () => {
   it("rests nobody when someone can't, and says who and why", () => {
     const state = game({}, { hp: { current: 0, maximum: 75 } });
     expect(() => startPartyRest(state, [TORVA, BRYN], "long", resolve(state))).toThrow(
-      "Bryn has 0 Hit Points - a Long Rest needs at least 1. Heal them first."
+      "Bryn has 0 Hit Points. A Long Rest needs at least 1. Heal Bryn first."
     );
     expect(actor(state, TORVA).hp.current).toBe(30);
     expect(state.rest.clockHours).toBe(0);
     const early = game({ lastLongRestAt: 0 });
     passTime(early, 9);
     expect(() => startPartyRest(early, [TORVA, BRYN], "long", resolve(early))).toThrow(
-      "Torva finished a Long Rest 9 hours ago - another can start in 7 hours."
+      "Torva finished a Long Rest 9 hours ago. Another can start in 7 hours."
     );
   });
 
@@ -226,7 +226,7 @@ describe("over the API", () => {
     const rest = GAME_PATHS.actorRest.replace("{actorId}", TORVA);
     const long = await post(rest, player, { commandId: randomUUID(), kind: "long" });
     expect(long.status).toBe(403);
-    expect((await long.json()).error.message).toBe("Ask the GM for a Long Rest - they approve it.");
+    expect((await long.json()).error.message).toBe("Ask the GM for a Long Rest. The GM approves it.");
     expect((await post(rest, player, { commandId: randomUUID(), kind: "short" })).status).toBe(200);
 
     const ask = (token: string, actorId: string) =>
@@ -265,7 +265,9 @@ describe("over the API", () => {
     expect(server.store.snapshot.actors[0]).toMatchObject({ hp: { current: 75 }, lastLongRestAt: 0 });
     const again = await ask(player, TORVA);
     expect(again.status).toBe(409);
-    expect((await again.json()).error.message).toBe("Torva just finished a Long Rest - another can start in 16 hours.");
+    expect((await again.json()).error.message).toBe(
+      "Torva finished a Long Rest moments ago. Another can start in 16 hours."
+    );
     expect((await post(GAME_PATHS.timePass, gmToken, { commandId: randomUUID(), hours: 16 })).status).toBe(200);
     expect((await ask(player, TORVA)).status).toBe(200);
   });

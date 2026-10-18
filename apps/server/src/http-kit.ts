@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response, Router } from "express";
 import { z } from "zod";
 import { API_VERSION, type ApiErrorCode } from "@vtt/api-contract";
+import type { ApiRoute } from "@vtt/api-contract/routes";
 import { InvalidRequestError } from "./invalid-request.js";
 
 /**
@@ -35,6 +36,18 @@ export function cookie(request: Request, name: string): string | undefined {
 /** The contract writes `{id}`; Express matches `:id`. */
 export const expressPath = (path: string) => path.replace(/\{(\w+)\}/g, ":$1");
 
+/** Mounts handlers on a registry route's own method and path, so the router and the registry cannot disagree. */
+export function mount(router: Router, route: ApiRoute, ...handlers: RequestHandler[]) {
+  router[route.method](expressPath(route.path), ...handlers);
+}
+
+/** The one 2xx status a route documents for success. */
+export function successStatus(route: ApiRoute): number {
+  const statuses = Object.keys(route.responses).filter((status) => status.startsWith("2"));
+  if (statuses.length !== 1) throw new Error(`${route.operationId} documents ${statuses.length} success statuses.`);
+  return Number(statuses[0]);
+}
+
 /** Express types a parameter `string | string[]`, but a named path segment is always one string. */
 export function pathParam(request: Request, name: string): string {
   const value = request.params[name];
@@ -65,7 +78,7 @@ export function sendData(response: Response, status: number, data: unknown) {
   return response.status(status).json({ ok: true, apiVersion: API_VERSION, data });
 }
 
-/** `details` and `currentRevision` are omitted when absent: the contract makes them optional, not nullable. */
+/** `details` and `currentRevision` are omitted when absent: the contract makes them optional and never null. */
 export function sendFailure(
   response: Response,
   status: number,
@@ -95,7 +108,7 @@ export const issuesOf = (error: z.ZodError) =>
     message: issue.message
   }));
 
-/** A fault, not a refusal: logged in full for the operator and answered with a fixed message, so driver text,
+/** A server fault: logged in full for the operator and answered with a fixed message, so driver text,
  *  file paths and stack details never reach a caller. */
 export function sendInternalError(response: Response, error: unknown, message: string) {
   console.error(message, error);

@@ -38,24 +38,161 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-/* Setup is the quick-start panel (`scenes/ScenePrepPanel`); its lists cap and scroll themselves at
-   every width, so the buttons below stay on screen. */
-@media (min-width: 980px) {
-  /* The panel takes its share of the sidebar's height; its scroller is marked `.scroll-y` in the markup. */
-  .table-sidebar .encounter-panel.setup {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-  }
+/* Inside the table's panel a tab's body is the frame: no margin, padding or plate of its own. */
+.table-panel-body .encounter-panel {
+  margin: 0;
+  padding: 0;
 }
-/* In combat the tracker takes the column's leftover height and scrolls its turn order inside, at
-   every width. */
-.table-sidebar .encounter-panel.combat-active {
+.table-panel-body .encounter-panel::before {
+  display: none;
+}
+/* The GM's Fight tab in a fight: the order on top and Now acting under it, each scrolling by itself. The order takes
+   at most two fifths of the height, so the console keeps the rest. */
+.encounter-fight {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  gap: var(--space-2);
+  flex: 1 1 0;
   min-height: 0;
+}
+/* Focus can scroll a box that hides its overflow, and a row's tools would move the whole section out of place;
+   `clip` cannot be scrolled. */
+.encounter-fight > .encounter-order {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  max-height: 42%;
+  min-height: 0;
+  overflow: clip;
+}
+.encounter-fight .encounter-region {
+  min-height: 2.75rem;
+}
+.encounter-fight > .encounter-acting {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.table-panel-body > .encounter-order {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+.encounter-order-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.encounter-order-head .encounter-place-nudge {
+  margin: 0;
+}
+.encounter-acting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-strong);
+}
+.encounter-acting-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* While a target is chosen, Cancel and Roll stay at the foot of the scrolling console or tab. */
+.encounter-acting-body .action-targeting-buttons,
+.table-panel-body .action-targeting-buttons {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding: var(--space-2) 0;
+  background: var(--surface-1);
+}
+.encounter-acting-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.2 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.encounter-acting-numbers {
+  color: var(--text-dim);
+  font-family: var(--font-numeric);
+  letter-spacing: 0;
+  text-transform: none;
+}
+/* The turn's controls in the panel's footer: Previous, Next turn taking the room, End fight and the fight menu. */
+.table-panel-foot .turn-controls {
+  --control-h: var(--tap-min);
+  display: flex;
+  margin-top: 0;
+}
+.table-panel-foot .turn-controls > .turn-next {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-h);
+}
+.table-panel-foot .turn-controls > .turn-prev {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+}
+.table-panel-foot .turn-controls > .encounter-end {
+  width: auto;
+  margin-top: 0;
+}
+.table-panel-foot .encounter-menu-toggle {
+  flex: none;
+}
+/* A player's footer: who is acting and their HP while they wait, the economy and End turn on their turn. */
+.player-foot {
+  flex-wrap: wrap;
+}
+.player-foot .turn-economy {
+  flex: 1 1 auto;
+  margin-top: 0;
+}
+/* The bar's readouts, after its buttons: the character's hit points and this turn's movement. */
+.economy-status {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+.economy-hp {
+  color: var(--text-dim);
+  font: 700 var(--fs-sm) / 1 var(--font-numeric);
+  white-space: nowrap;
+}
+.player-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.player-turn-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.player-turn-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font: var(--fs-h3) / 1 var(--font-display);
 }
 /* The tracker's scroll region. overscroll-behavior: the page behind is locked. scroll-padding keeps
    an auto-scrolled row off the pinned header. The 5.5rem floor guarantees two rows; where the
@@ -316,7 +453,7 @@
   z-index: 40;
   background: transparent;
 }
-/* `minmax(0, 1fr)`, not `auto` or `1fr` (whose auto minimum is max-content): otherwise the HP editor
+/* `minmax(0, 1fr)`: with `auto` or `1fr` (whose auto minimum is max-content) the HP editor
    row overflows the popover at 375px and pushes buttons off screen. */
 .row-tools-popover {
   position: absolute;
@@ -384,8 +521,8 @@
   color: var(--text);
   font-weight: 700;
 }
-/* Hover comes from the material (rim brightens, cue wedge appears), not the generic
-   `.turn-controls .encounter-primary:hover` fill and glow. */
+/* Hover comes from the material (rim brightens, cue wedge appears). The generic
+   `.turn-controls .encounter-primary:hover` fill and glow stay off here. */
 .encounter-topbar .turn-controls button:hover:not(:disabled) {
   background: none;
   box-shadow: none;
@@ -691,9 +828,6 @@
 .action-result,
 .action-preview,
 .save-prompt,
-.sheet-editor,
-.sheet-vital,
-.sheet-ability,
 .encounter-menu,
 .row-tools-popover {
   position: relative;
@@ -709,9 +843,6 @@
 .action-result::before,
 .action-preview::before,
 .save-prompt::before,
-.sheet-editor::before,
-.sheet-vital::before,
-.sheet-ability::before,
 .encounter-menu::before,
 .row-tools-popover::before {
   content: "";
@@ -739,10 +870,7 @@
 .action-targeting,
 .action-result,
 .action-preview,
-.save-prompt,
-.sheet-editor,
-.sheet-vital,
-.sheet-ability {
+.save-prompt {
   --material-fill: var(--material-plate);
 }
 .encounter-menu,
@@ -778,22 +906,9 @@
 .save-prompt-confirm button,
 .action-preview .save-prompt-manual button,
 .save-die-mode,
-.sheet-roll-chip,
-.sheet-prepare,
-.sheet-toggle-btn,
-.sheet-add-item input,
 .sheet-picker-search,
 .sheet-picker-chip,
 .sheet-picker-add,
-.sheet-coins input,
-.sheet-id-editor input,
-.sheet-ability-rolls button,
-.sheet-spellcast-field,
-.sheet-cast-effect,
-.sheet-cast-select,
-.sheet-cast-slot,
-.sheet-cast-btn,
-.sheet-prep-tag,
 .monster-browser-add,
 .builtin-chip,
 .economy-slot,
@@ -818,22 +933,9 @@
 .save-prompt-confirm button::before,
 .action-preview .save-prompt-manual button::before,
 .save-die-mode::before,
-.sheet-roll-chip::before,
-.sheet-prepare::before,
-.sheet-toggle-btn::before,
-.sheet-add-item input::before,
 .sheet-picker-search::before,
 .sheet-picker-chip::before,
 .sheet-picker-add::before,
-.sheet-coins input::before,
-.sheet-id-editor input::before,
-.sheet-ability-rolls button::before,
-.sheet-spellcast-field::before,
-.sheet-cast-effect::before,
-.sheet-cast-select::before,
-.sheet-cast-slot::before,
-.sheet-cast-btn::before,
-.sheet-prep-tag::before,
 .monster-browser-add::before,
 .builtin-chip::before,
 .economy-slot::before,
@@ -878,18 +980,8 @@
 .save-prompt-confirm button:hover:not(:disabled)::before,
 .save-die-mode:hover:not(:disabled)::before,
 .save-die-mode:focus-visible::before,
-.sheet-roll-chip:hover:not(:disabled)::before,
-.sheet-roll-chip:focus-visible::before,
-.sheet-prepare:hover:not(:disabled)::before,
-.sheet-prepare:focus-visible::before,
-.sheet-toggle-btn:hover:not(:disabled)::before,
-.sheet-toggle-btn:focus-visible::before,
 .sheet-picker-add:hover:not(:disabled)::before,
 .sheet-picker-add:focus-visible::before,
-.sheet-ability-rolls button:hover:not(:disabled)::before,
-.sheet-ability-rolls button:focus-visible::before,
-.sheet-cast-btn:hover:not(:disabled)::before,
-.sheet-cast-btn:focus-visible::before,
 .monster-browser-add:hover:not(:disabled)::before,
 .monster-browser-add:focus-visible::before,
 .builtin-chip:hover:not(:disabled)::before,
@@ -901,18 +993,19 @@
 }
 /* The primary action is the sun frame, as `.nh-btn--primary`: a 3px sunset edge round a dark warm-tinted
    fill, the label in the display face. `.turn-prev` (‹) shares `.encounter-primary` only for its metrics
-   and stays a plain raised control. */
-.encounter-primary:not(.turn-prev) {
+   and stays a plain raised control, and `.is-quiet` steps a primary down while another one leads the view
+   (a roll waiting to be confirmed). */
+.encounter-primary:not(.turn-prev, .is-quiet) {
   color: var(--primary-ink);
   font-family: var(--font-display);
   font-weight: 400;
   letter-spacing: 0.02em;
   text-shadow: var(--primary-ink-shadow);
 }
-.encounter-primary:not(.turn-prev)::before,
-.encounter-primary:not(.turn-prev):hover:not(:disabled)::before,
-.encounter-primary:not(.turn-prev):focus-visible::before,
-.encounter-primary:not(.turn-prev):active:not(:disabled)::before {
+.encounter-primary:not(.turn-prev, .is-quiet)::before,
+.encounter-primary:not(.turn-prev, .is-quiet):hover:not(:disabled)::before,
+.encounter-primary:not(.turn-prev, .is-quiet):focus-visible::before,
+.encounter-primary:not(.turn-prev, .is-quiet):active:not(:disabled)::before {
   border: 3px solid transparent;
   background:
     var(--primary-tint) padding-box,
@@ -920,12 +1013,12 @@
     var(--grad-sun-x) border-box;
   box-shadow: var(--glow-sun);
 }
-.encounter-primary:not(.turn-prev):hover:not(:disabled),
-.encounter-primary:not(.turn-prev):focus-visible,
-.encounter-primary:not(.turn-prev):active:not(:disabled) {
+.encounter-primary:not(.turn-prev, .is-quiet):hover:not(:disabled),
+.encounter-primary:not(.turn-prev, .is-quiet):focus-visible,
+.encounter-primary:not(.turn-prev, .is-quiet):active:not(:disabled) {
   --primary-tint: var(--primary-tint-hover);
 }
-/* Reviewing history, Next turn resumes live play: a cyan edge instead of the sun, since it is a different
+/* Reviewing history, Next turn resumes live play: a cyan edge where the sun would be, since it is a different
    kind of step. */
 .turn-controls .encounter-primary.resume::before,
 .turn-controls .encounter-primary.resume:hover:not(:disabled)::before {
@@ -972,11 +1065,83 @@
 .encounter-primary:not(.turn-prev):disabled::before,
 .turn-controls button:disabled::before,
 .hp-editor > button:disabled::before,
-.sheet-prepare:disabled::before,
 .builtin-chip:disabled::before,
 .legendary-offer:disabled::before,
 .monster-browser-add:disabled::before {
   border-color: transparent;
   background: var(--surface-2);
   box-shadow: none;
+}
+
+/* What a row owes, marked on its name line: a hit waiting to be applied, the dying tally. */
+.initiative-flag {
+  flex: none;
+  padding: 0 var(--space-1);
+  border-left: 3px solid var(--caution);
+  background: color-mix(in srgb, var(--caution) 12%, var(--surface-2));
+  color: var(--caution-hi);
+  font: 600 var(--fs-2xs) / 1.6 var(--font-label);
+  white-space: nowrap;
+}
+.initiative-flag--danger {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-2));
+  color: var(--danger-text);
+}
+.encounter-topbar .encounter-end {
+  flex: none;
+}
+/* On a phone the bar under the thumb keeps Previous, Next turn and the fight menu; ending the fight is in that
+   menu. */
+@media (max-width: 979px) {
+  .table-panel-foot .turn-controls > .encounter-end {
+    display: none;
+  }
+}
+
+/* The action economy as pips: a dark chip with a cyan dot while the slot is there to spend, a hollow dot and struck
+   label once it is spent, so they read as state first and controls second. A disabled pip (Unconscious) dims its
+   label and dot. */
+.economy-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--tap-min);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.economy-slot::after {
+  content: "";
+  order: -1;
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 1px solid var(--cyan);
+  border-radius: var(--radius-pill);
+  background: var(--cyan);
+}
+.economy-slot:not([aria-pressed="true"]) {
+  color: var(--text);
+}
+.economy-slot:not([aria-pressed="true"])::before,
+.economy-slot:not([aria-pressed="true"]):hover:not(:disabled)::before {
+  border-color: var(--line-raised);
+  background: var(--material-fill);
+}
+.economy-slot:not([aria-pressed="true"]):hover:not(:disabled)::before {
+  border-color: var(--cyan);
+}
+.economy-slot[aria-pressed="true"]::after {
+  background: transparent;
+  border-color: var(--line-raised);
+}
+.economy-slot:disabled {
+  color: var(--text-muted);
+}
+.economy-slot:disabled::after {
+  border-color: var(--line-raised);
+  background: var(--track);
+}
+.economy-slot.legendary-pill::after,
+.economy-slot:not([aria-pressed])::after {
+  display: none;
 }

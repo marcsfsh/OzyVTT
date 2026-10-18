@@ -601,7 +601,7 @@ describe("conditions that bring others, and what they do", () => {
   });
 });
 
-describe("the fight's end and a long rest end only what they should", () => {
+describe("the fight's end and a Long Rest end only what they should", () => {
   it("encounter end sweeps turn-measured effects and keeps those that last until ended", () => {
     const state = game();
     addEffect(state, IDS.hero, makeEffect({ id: "blessed", name: "Shrine blessing", duration: { type: "manual" } }));
@@ -610,7 +610,7 @@ describe("the fight's end and a long rest end only what they should", () => {
     expect(actor(state, IDS.hero).effects.map((effect) => effect.id)).toEqual(["blessed"]);
   });
 
-  it("a long rest ends the rester's Concentration on others and keeps a curse", () => {
+  it("a Long Rest ends the rester's Concentration on others and keeps a curse", () => {
     const state = game();
     addEffect(state, IDS.hero, makeEffect({ id: "curse", name: "Cursed", duration: { type: "manual" } }));
     addEffect(
@@ -631,7 +631,7 @@ describe("the fight's end and a long rest end only what they should", () => {
     expect(actor(state, IDS.foe).effects).toEqual([]);
   });
 
-  it("a long rest wakes a knocked-out creature, since its hit points come back", () => {
+  it("a Long Rest wakes a knocked-out creature, since its hit points come back", () => {
     const state = game();
     applyDamageDetailed(state, IDS.hero, { amount: 40, nonlethal: true }, GM, { resolveDefinition });
     expect(actor(state, IDS.hero).effects.map((effect) => effect.name)).toEqual(["Knocked out"]);

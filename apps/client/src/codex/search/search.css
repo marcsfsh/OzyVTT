@@ -1,0 +1,160 @@
+/* Search: the filters over a table of results; on a phone a list under the box. */
+
+.cx-search {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cx-search-box {
+  width: 16rem;
+}
+.cx-search-count {
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1 var(--font-label);
+}
+.cx-search-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-2) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+}
+.cx-search-loading,
+.cx-search-empty {
+  padding: var(--space-4) 0;
+}
+/* Thirteen types are taller than a laptop's results area, so the list scrolls inside its panel. */
+.cx-typemenu {
+  min-width: 14rem;
+  max-height: 26rem;
+}
+
+/* The results table: dense rows, the name a link, the matching line given the room. */
+.cx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 500 var(--fs-sm) / 1.35 var(--font-body);
+}
+.cx-table th {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-align: start;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.cx-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  vertical-align: middle;
+}
+.cx-row {
+  cursor: pointer;
+}
+.cx-row:hover td {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+.cx-rowlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.cx-col-vis {
+  width: 2rem;
+}
+.cx-col-line {
+  width: 55%;
+}
+.cx-col-date {
+  white-space: nowrap;
+}
+.cx-vis {
+  width: 1.1em;
+  height: 1.1em;
+}
+.cx-vis.is-open {
+  color: var(--text-muted);
+}
+.cx-vis.is-hidden {
+  color: var(--violet-hi);
+}
+.cx-matchline {
+  color: var(--text-dim);
+}
+.cx-matchline.is-hidden {
+  color: var(--violet-hi);
+}
+.cx-matchline-icon {
+  width: 1em;
+  height: 1em;
+  margin-right: var(--space-1);
+  vertical-align: -0.12em;
+}
+.cx-mark {
+  padding: 0 2px;
+  background: color-mix(in srgb, var(--cyan) 28%, transparent);
+  color: var(--text);
+}
+
+/* ----- A phone's Search ----- */
+.cx-search.is-phone {
+  display: block;
+}
+.cx-search.is-phone .cx-search-box {
+  flex: 1 1 auto;
+  width: auto;
+}
+.cx-search-phonebody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+.cx-hitlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+}
+.cx-hitrow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.cx-hitrow-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 500 var(--fs-xs) / 1.35 var(--font-body);
+}
+.cx-hitrow-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+.cx-hitrow-kind {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+}

@@ -133,7 +133,7 @@ describe("homebrew usages", () => {
     expect(homebrewUsages(GameStateSchema.parse({ schemaVersion: 1 }), "monster", "hb-m-4f19c8b02de7")).toEqual([]);
   });
 
-  it("emits only usages the contract can carry - every actorId is a real uuid", () => {
+  it("emits only usages the contract can carry: every actorId is a real uuid", () => {
     // `HomebrewUsageSchema.actorId` is a required uuid, so a definition with no actor is skipped rather
     // than sent as a row that would fail the response schema.
     const orphaned = stateWith({ definitions: [{ id: "import-orphan", definition: CHARACTER }], actors: [] });

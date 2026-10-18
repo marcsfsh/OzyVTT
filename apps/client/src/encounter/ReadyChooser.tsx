@@ -1,11 +1,11 @@
 import { useState } from "react";
 import type { ActorDefinition } from "@vtt/domain";
 import { Button, Modal } from "@vtt/ui";
-import "./character-sheet.css";
+import "./pickers.css";
 
 type DefinitionAction = ActorDefinition["actions"][number];
 
-/** A spell this creature could ready: one it casts with an action (SRD Ready), not a ritual or what a spell lets
+/** A spell this creature could ready: one it casts with an action (SRD Ready). A ritual is left out, and so is what a spell lets
  *  its caster do later. */
 export function readyableSpells(definition: ActorDefinition): DefinitionAction[] {
   return definition.actions.filter(
@@ -65,9 +65,9 @@ export function ReadyChooser({
       {picked ? (
         <>
           <p className="spell-choice-ask">
-            {picked.name} is cast now{picked.spellSlot ? ", spending its spell slot," : ""} and held with Concentration
-            until the start of your next turn. When the trigger happens, cast it from your spell list to release it with
-            your Reaction.
+            {picked.name} is cast now{picked.spellSlot ? " with its spell slot" : ""} and held with Concentration until
+            the start of your next turn. When the trigger happens, cast it from your spell list to release it with your
+            Reaction.
           </p>
           {levels.length > 1 && (
             <div className="heal-picker-targets" role="group" aria-label="Spell slot level">

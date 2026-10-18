@@ -219,9 +219,9 @@ const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKin
  * Slugs deliberately not checked:
  *
  *   `tags`, `endsWithTag`, `requiresEffectTag`, `while-effect-tag.tags` - runtime effect tags, in no bundle.
- *   `uses.pool`, `resource-bonus.poolId` - the live `actionUses` key, not a bundle id.
+ *   `uses.pool`, `resource-bonus.poolId`: the live `actionUses` key.
  *   `grants.tools` / `grants.armor` - proficiency groups; no bundle has those ids.
- *   `while-proficient-with.ids` for weapon/armor/tool - groups (the `"skill"` kind is checked).
+ *   `while-proficient-with.ids` for weapon/armor/tool: groups (the `"skill"` kind is checked).
  *   `sense` - no senses model to check against.
  *   `actions[].id`, `multiattack[].actionId` - local to the item's own action list.
  *   `grants.saves` - already a closed zod enum.

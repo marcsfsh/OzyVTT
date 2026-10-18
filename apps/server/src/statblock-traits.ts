@@ -7,6 +7,7 @@ import { areAllies } from "./creature-sides.js";
 import { addEffect, makeEffect, turnEndDuration, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { createPendingSaves, rollSaveAtOnce } from "./saving-throws.js";
+import { hiddenFrom } from "./vision/audience.js";
 
 /**
  * What a stat block's traits do when damage lands (`ActorDefinition.traitMechanics`, read from the trait text when
@@ -14,7 +15,7 @@ import { createPendingSaves, rollSaveAtOnce } from "./saving-throws.js";
  * Undead Fortitude, and a Death Burst. What they do as turns start and end is in `turn-boundaries.ts`.
  */
 
-/** "This trait doesn't function on the troll's next turn": the mark Acid or Fire leaves, lasting through that turn. */
+/** "This trait doesn't function on the troll's next turn": the mark Acid or Fire leaves, which lasts that turn. */
 export const REGENERATION_STOPPED_TAG = "regeneration-stopped";
 /** A creature down at 0 Hit Points that dies only if its next turn starts without regenerating (the troll). */
 export const REGENERATING_AT_ZERO_TAG = "regenerating-at-zero";
@@ -42,8 +43,8 @@ export function traitOf<Kind extends TraitMechanic["kind"]>(
 /**
  * SRD Aura of Authority (the hobgoblin captain): "While in a 10-foot Emanation originating from the hobgoblin, the
  * hobgoblin and its allies have Advantage on attack rolls and saving throws, provided the hobgoblin doesn't have the
- * Incapacitated condition." The roll's source, or null. A hidden captain never gives a visible creature Advantage,
- * which would reveal it.
+ * Incapacitated condition." The roll's source, or null. A captain hidden from the table (the shared check: GM-only, out
+ * of every character's sight or under the fog) never gives a visible creature Advantage, which would reveal it.
  */
 export function auraOfAuthority(
   state: GameState,
@@ -51,13 +52,18 @@ export function auraOfAuthority(
   deps: Readonly<{
     resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
     distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+    catalog?: EquipmentCatalog;
   }>
 ): Readonly<{ source: string; label: string }> | null {
+  const hidden = hiddenFrom(state, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
   for (const captain of state.actors) {
     if (captain.hp.current <= 0 || isIncapacitated(captain)) continue;
-    if (captain.visibility !== "public" && creature.visibility === "public") continue;
     const definition = captain.definitionId ? deps.resolveDefinition?.(captain.definitionId) : undefined;
     if (!holdsFeature(definition, "aura-of-authority", "Aura of Authority")) continue;
+    if (hidden(captain.id) && !hidden(creature.id)) continue;
     if (captain.id !== creature.id) {
       if (!state.combat.initiative.some((entry) => entry.actorId === captain.id)) continue;
       if (!areAllies(captain, creature, deps.resolveDefinition)) continue;
@@ -111,7 +117,7 @@ export function stopRegeneration(
   return [
     {
       kind: "effect",
-      text: `${actor.name} took ${named} damage - its ${regeneration.name} won't work at the start of its next turn.`,
+      text: `${actor.name} took ${named} damage, so its ${regeneration.name} won't work at the start of its next turn.`,
       actorId: actor.id,
       gmOnly: true
     }
@@ -149,7 +155,7 @@ export function holdOnAtZero(
   );
   events.push({
     kind: "condition",
-    text: `${actor.name} drops to 0 HP - it dies only if it starts its turn at 0 HP and doesn't regenerate.`,
+    text: `${actor.name} drops to 0 HP. It dies only if it starts its turn at 0 HP and doesn't regenerate.`,
     actorId: actor.id
   });
   return true;
@@ -196,7 +202,7 @@ export function undeadFortitude(
   if (held) actor.hp.current = 1;
   events.push({
     kind: "condition",
-    text: `${actor.name}'s ${trait.name}: ${trait.ability.toUpperCase()} save ${save.total} (d20 ${save.natural}) vs DC ${dc} - ${held ? "it drops to 1 HP instead" : "it falls"}.`,
+    text: `${actor.name}'s ${trait.name}: ${trait.ability.toUpperCase()} save ${save.total} (d20 ${save.natural}) vs DC ${dc}: ${held ? "it drops to 1 HP" : "it falls"}.`,
     actorId: actor.id
   });
   return held;
@@ -233,7 +239,7 @@ export function deathBurst(
   if (!deps.distanceFeet) {
     events.push({
       kind: "effect",
-      text: `${actor.name} explodes (${burst.name}): each creature within ${burst.rangeFeet} feet makes a DC ${burst.save.dc} ${ability} save - ${total} damage on a failure, ${burst.save.successDamage === "half" ? "half" : "none"} on a success.`,
+      text: `${actor.name} explodes (${burst.name}): each creature within ${burst.rangeFeet} feet makes a DC ${burst.save.dc} ${ability} save: ${total} damage on a failure and ${burst.save.successDamage === "half" ? "half" : "none"} on a success.`,
       actorId: actor.id,
       gmOnly: true
     });

@@ -43,7 +43,7 @@ export type TargetingSession = Readonly<{
   ability?: AbilityId;
   /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
   conditionId?: string;
-  /** The GM places a spell's lingering area rather than resolving an action: the zone it is for. */
+  /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
   placeZoneId?: string;
 }>;
 
@@ -266,7 +266,7 @@ export type ResolveOptions = Readonly<{
   commit?: boolean;
   /** The GM's forced Advantage or Disadvantage for the attack d20; the server ignores a player's. */
   rollMode?: "advantage" | "disadvantage" | "normal";
-  /** The face a physical d20 shows, used instead of the server's throw. */
+  /** The face a physical d20 shows, used in place of the server's throw. */
   attackNatural?: number;
   /** Throw the previewed d20 again: Heroic Inspiration for a player, free for the GM. */
   reroll?: boolean;
@@ -384,12 +384,16 @@ export function resolveActionDirect(
   revision: number | undefined,
   onResult: (ok: boolean, message?: string) => void,
   override?: { reason: string },
-  /** A spell readied rather than cast now, at a chosen slot level. */
-  readied?: Readonly<{ slotLevel?: number }>
+  /** A spell readied to cast later, at a chosen slot level. */
+  readied?: Readonly<{ slotLevel?: number }>,
+  /** A spell with nothing to aim, cast now at a chosen slot level. */
+  cast?: Readonly<{ slotLevel?: number }>
 ) {
   const extra = readied
     ? { ready: true, ...(readied.slotLevel !== undefined ? { slotLevel: readied.slotLevel } : {}) }
-    : {};
+    : cast?.slotLevel !== undefined
+      ? { slotLevel: cast.slotLevel }
+      : {};
   void command("action:resolve", {
     actorId: attackerId,
     actionId,
@@ -403,7 +407,7 @@ export function resolveActionDirect(
     } else if (response.blocked?.overridable)
       blockedPrompt = {
         blocked: response.blocked,
-        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed, readied),
+        retry: (confirmed) => resolveActionDirect(attackerId, actionId, undefined, onResult, confirmed, readied, cast),
         asked: { type: "action.resolve", payload: { commandId: newId(), actorId: attackerId, actionId, ...extra } }
       };
     emit();

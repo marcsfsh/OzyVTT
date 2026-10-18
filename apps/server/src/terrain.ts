@@ -1,6 +1,15 @@
 import type { CombatState, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { footprintCenter, footprintOrigin, movementPath, pointInRects, spacePassage } from "@vtt/rules-5e";
+import {
+  footprintCenter,
+  footprintOrigin,
+  footprintStepBlocked,
+  movementPath,
+  pointInRects,
+  segmentsMeet,
+  spacePassage,
+  wallCrossing
+} from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
 import { areAllies } from "./creature-sides.js";
 import { holdsFeature } from "./class-features.js";
@@ -8,14 +17,16 @@ import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
 import { mapDistance } from "./movement-narration.js";
+import { revealedRegion } from "./fog.js";
 import { intersectRegions, subtractRect, unionRect, type Rect } from "./rect-region.js";
 import type { TokenMapGeometry } from "./token-placement.js";
+import { blocksMovement } from "./vision/sight.js";
 
 /** Difficult terrain (SRD 5.2.1): the GM paints it per scene; entering a cell whose centre lies in it costs
  *  double. Stored as disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
 
 const MAX_TERRAIN_RECTS = 1000;
-const LIVE_REFUSAL = "That scene is live - edit its terrain on the table.";
+const LIVE_REFUSAL = "That scene is live. Edit its terrain on the table.";
 
 export function paintTerrain(
   state: GameState,
@@ -30,7 +41,7 @@ export function paintTerrain(
   const difficult =
     input.op === "difficult" ? unionRect(slice.layer.difficult, rect) : subtractRect(slice.layer.difficult, rect);
   if (difficult.length > MAX_TERRAIN_RECTS)
-    throw new CommandRejectedError("The terrain is too finely cut up - clear it and mark it again in larger areas.");
+    throw new CommandRejectedError("The terrain is too finely cut up. Clear it and mark it again in larger areas.");
   slice.write({ difficult });
 }
 
@@ -39,24 +50,17 @@ export function resetTerrain(state: GameState, sceneId: string | undefined) {
   slice.write({ difficult: [] });
 }
 
-/** The area players can see through the fog: everything when fog is off, else the reveals and hides in order
- *  over a map that starts hidden. */
-function revealedRegion(fog: CombatState["fog"]): readonly Rect[] | "everything" {
-  if (!fog.enabled) return "everything";
-  let region: Rect[] = [];
-  for (const shape of fog.shapes) {
-    const rect = { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
-    region = shape.op === "reveal" ? unionRect(region, rect) : subtractRect(region, rect);
-  }
-  return region;
-}
-
-/** Terrain as players and the table screen get it: only what the fog reveals, so unrevealed ground keeps its
- *  layout. Difficult terrain under the fog is still charged when someone walks into it. */
-export function visibleTerrain(combat: Pick<CombatState, "fog" | "terrain">): CombatState["terrain"] {
+/** Terrain as players and the table screen get it: only what the fog reveals, and with dynamic vision only what the
+ *  party has seen (`seen`, disjoint rects), so unrevealed ground keeps its layout. Difficult terrain out of sight is
+ *  still charged when someone walks into it. */
+export function visibleTerrain(
+  combat: Pick<CombatState, "fog" | "terrain">,
+  seen?: readonly Rect[]
+): CombatState["terrain"] {
   const revealed = revealedRegion(combat.fog);
   const difficult = combat.terrain.difficult.map((rect) => ({ ...rect }));
-  return { difficult: revealed === "everything" ? difficult : intersectRegions(difficult, revealed) };
+  const unfogged = revealed === "everything" ? difficult : intersectRegions(difficult, revealed);
+  return { difficult: seen === undefined ? unfogged : intersectRegions(unfogged, seen) };
 }
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -68,7 +72,7 @@ export type MovementCost = Readonly<{
   /** The mover's centre at each step, start to end, in image pixels; a straight segment sampled every half cell on
    *  a gridless map. Opportunity attacks are read along it; absent, at its two ends. */
   path?: readonly Point[];
-  /** No way there: creatures the mover can't pass close it off (SRD "Moving around Other Creatures"). */
+  /** No way there: walls, or creatures the mover can't pass (SRD "Moving around Other Creatures"), close it off. */
   blocked?: true;
 }>;
 
@@ -78,18 +82,31 @@ export type MovementCostOptions = Readonly<{
   /** Creatures that move with the mover (those it drags), whose spaces are no obstacle. */
   carried?: readonly string[];
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
+  /** With dynamic vision on, whether the mover perceives a creature; one it doesn't is no obstacle to its path, as a
+   *  hidden one isn't, so a refusal can't give it away. Every creature counts when absent. */
+  perceives?: (actorId: string) => boolean;
   /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
   passesCreatures?: boolean;
   /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
   halvedAt?: (position: Point, sizeCells: number) => boolean;
 }>;
 
+/** The movement-blocking walls of the live scene (walls, closed doors, windows) in grid units, while its dynamic
+ *  vision is on; none otherwise. */
+export function movementWalls(state: GameState, calibration: NonNullable<TokenMapGeometry["calibration"]>) {
+  const vision = state.combat.vision;
+  if (!vision.enabled) return [];
+  return vision.walls
+    .filter(blocksMovement)
+    .map((wall) => ({ a: imageToGrid(calibration, wall.a), b: imageToGrid(calibration, wall.b) }));
+}
+
 /**
  * What a move costs the mover. On a calibrated grid: the cheapest path between the two snapped positions, with
  * painted terrain difficult and other creatures' spaces open, difficult or closed as the SRD's "Moving around Other
  * Creatures" says (`spacePassage`; allies by `areAllies`), so walking round a patch costs only the steps taken.
- * Hidden creatures never count, because a player's preview can't know they're there. A scaled gridless map measures
- * straight; an unmeasurable map returns null.
+ * Hidden creatures never count, because a player's preview can't know they're there. With dynamic vision on, walls,
+ * closed doors and windows bar the way too. A scaled gridless map measures straight; an unmeasurable map returns null.
  */
 export function movementCost(
   state: GameState,
@@ -102,6 +119,8 @@ export function movementCost(
   const extra = Math.max(0, options.extraPerStep ?? 0);
   const calibration = geometry.calibration;
   if (!calibration) {
+    // No cells to path round a wall on a gridless map: a straight move through one is barred.
+    if (straightThroughWall(state, from, to)) return { feet: 0, difficultFeet: 0, path: [], blocked: true };
     const straight = mapDistance(geometry, from, to);
     return straight
       ? { feet: straight.value * (1 + extra), difficultFeet: 0, path: sampled(from, to, straight.value) }
@@ -115,6 +134,7 @@ export function movementCost(
     if (token.actorId === actorId || !token.position || options.carried?.includes(token.actorId)) continue;
     const occupant = state.actors.find((candidate) => candidate.id === token.actorId);
     if (!mover || !occupant || occupant.visibility === "gm-only") continue;
+    if (options.perceives && !options.perceives(occupant.id)) continue;
     const printed = spacePassage({
       ally: areAllies(mover, occupant, options.resolveDefinition),
       incapacitated: isIncapacitated(occupant),
@@ -135,6 +155,7 @@ export function movementCost(
       for (let row = 0; row < token.sizeCells; row++) cells.add(`${origin.column + column},${origin.row + row}`);
   }
   const terrain = state.combat.terrain.difficult;
+  const crosses = wallCrossing(movementWalls(state, calibration));
   const halvedAt = options.halvedAt;
   const path = movementPath({
     from: footprintOrigin(imageToGrid(calibration, from), sizeCells),
@@ -149,6 +170,7 @@ export function movementCost(
       const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
+    isStepOpen: (stepFrom, stepTo) => !footprintStepBlocked(stepFrom, stepTo, sizeCells, crosses),
     extraPerStep: extra,
     ...(halvedAt
       ? {
@@ -170,6 +192,15 @@ export function movementCost(
     difficultFeet: path.difficultSteps * calibration.distancePerCell,
     path: path.steps.map((step) => gridToImage(calibration, footprintCenter(step, sizeCells)))
   };
+}
+
+function straightThroughWall(state: GameState, from: Point, to: Point): boolean {
+  const vision = state.combat.vision;
+  if (!vision.enabled) return false;
+  const grid = (point: Point) => ({ column: point.x, row: point.y });
+  return vision.walls
+    .filter(blocksMovement)
+    .some((wall) => segmentsMeet(grid(from), grid(to), grid(wall.a), grid(wall.b)));
 }
 
 /** Points along a straight move, every 2.5 feet or so, start and end included. */

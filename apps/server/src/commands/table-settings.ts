@@ -14,7 +14,7 @@ import { defineCommand, type Committed } from "./pipeline.js";
 
 // The GM's table-wide settings. Each change leaves an audit line in the feed.
 
-// GM-only audit line per party-visibility tier. `off` removes the sheet, not the map or turn order.
+// GM-only audit line per party-visibility tier. `off` removes the sheet and leaves the map and turn order.
 const PARTY_VISIBILITY_LOG: Readonly<Record<PartyVisibility, string>> = {
   off: "Players no longer read anything of each other's sheets. Each other's characters stay on the map and in the turn order.",
   "name-and-class": "Players now see each other's name and class.",
@@ -40,14 +40,14 @@ export const tableSettingCommands = [
     description:
       "Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.",
     summary:
-      "Set the LIVE fight's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
+      "Set the live fight's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
     schema: SetRulesModeSchema,
     malformed: "The rules-mode command is malformed.",
     gmOnly: "Only the GM can change the rules mode.",
     async run({ request, execute }, kit) {
       const { mode, exceptions } = request;
       const committed = await execute((state) => {
-        // Omitted exceptions leave the stored ones alone (additive field, not a reset).
+        // Omitted exceptions leave the stored ones alone (an additive field, with no reset).
         state.combat = {
           ...state.combat,
           rulesMode: mode,
@@ -66,9 +66,9 @@ export const tableSettingCommands = [
     type: "rules.set-policy",
     operationId: "setRulesPolicy",
     description:
-      "Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy, not the live fight - use the rules-mode command to change the fight in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
+      "Sets the table's standing rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy. The rules-mode command changes the fight in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
     summary:
-      "Set the table's standing rules policy - the dial and per-family exceptions every new fight starts from (GM).",
+      "Set the table's standing rules policy: the dial and per-family exceptions every new fight starts from (GM).",
     schema: RulesSetPolicySchema,
     malformed: "The rules-policy command is malformed.",
     gmOnly: "Only the GM can set the rules policy.",
@@ -116,7 +116,7 @@ export const tableSettingCommands = [
     type: "table.set-party-visibility",
     operationId: "setPartyVisibility",
     description:
-      "Sets how much a player sees of ANOTHER player's character (GM-grade only): `off` (no party surface - the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card - the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts FIELDS, never combatants, and is applied SERVER-SIDE in the player projection - a withheld field is never sent. A player's own claimed character is unaffected at every tier.",
+      "Sets how much a player sees of another player's character (GM-grade only): `off` (no party surface: the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card, and the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts fields, never combatants, and is applied server-side in the player projection, so a withheld field is never sent. A player's own claimed character is unaffected at every tier.",
     summary:
       "Set how much a player sees of another player's character: nothing, name and class, the full sheet, or the sheet plus live resources (GM).",
     schema: TableSetPartyVisibilitySchema,
@@ -180,7 +180,7 @@ export const tableSettingCommands = [
     type: "encounter.set-health-display",
     operationId: "setHealthDisplay",
     description:
-      "Sets the table-wide default for how token health shows on the map (GM-grade only): `band` a coarse status badge, `bar` a thin HP bar, or `ring` a green-to-red ring; `audience` `gm` keeps a bar/ring on the GM map only, `all` shows it to players and the shared screen. Exact hit points never leave the GM - non-owners see only a coarse band-fraction. A single token can override this via the actor health-display command.",
+      "Sets the table-wide default for how token health shows on the map (GM-grade only): `band` a coarse status badge, `bar` a thin HP bar, or `ring` a green-to-red ring; `audience` `gm` keeps a bar/ring on the GM map only, `all` shows it to players and the shared screen. Exact hit points never leave the GM; non-owners see only a coarse band-fraction. A single token can override this via the actor health-display command.",
     summary:
       "Set the table-wide default for how token health shows on the map: status badge, HP bar, or health ring, for the GM only or everyone (GM).",
     schema: SetHealthDisplaySchema,

@@ -4,7 +4,7 @@ import "./SegmentedControl.css";
 
 export interface SegmentedOption {
   value: string;
-  /** Visible label. Omit for icon-only options — pair it with `ariaLabel`. */
+  /** Visible label. Omit for icon-only options, and pair it with `ariaLabel`. */
   label?: ReactNode;
   icon?: ReactNode;
   /** Per-option accessible name. Required when the option is icon-only so the
@@ -18,22 +18,25 @@ interface SegmentedControlProps {
   options: SegmentedOption[];
   value: string;
   onChange: (value: string) => void;
-  /** Required — the group needs an accessible name. */
+  /** Required: the group needs an accessible name. */
   ariaLabel: string;
   size?: "sm" | "md";
   className?: string;
+  /** Every option off at once; say why beside the control. */
+  disabled?: boolean;
 }
 
 /** Inline "pick exactly one" control for filters and mode switches (a
     role="group" of pressable options). Distinct from Tabs, which switch whole
-    views/panels — reach for this for in-place option toggles. */
+    views/panels. Reach for this for in-place option toggles. */
 export function SegmentedControl({
   options,
   value,
   onChange,
   ariaLabel,
   size = "md",
-  className
+  className,
+  disabled = false
 }: SegmentedControlProps) {
   return (
     <div
@@ -48,6 +51,7 @@ export function SegmentedControl({
           className="nh-segmented-option tap-target interactive"
           aria-pressed={value === option.value}
           aria-label={option.ariaLabel}
+          disabled={disabled}
           title={option.title}
           onClick={() => onChange(option.value)}
         >

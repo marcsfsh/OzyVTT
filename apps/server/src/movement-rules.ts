@@ -52,6 +52,15 @@ export type MovementRulesInput = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so a reach-granting item widens the opportunity-attack trigger. */
   catalog?: EquipmentCatalog;
+  /** With dynamic vision on: whether the mover perceived a creature as it set off. One it didn't is no obstacle and no
+   *  refusal, as a hidden one isn't. Every creature counts when absent. */
+  perceives?: (actorId: string) => boolean;
+  /** With dynamic vision on: whether a creature saw the mover as it set off, which an opportunity attack needs. The
+   *  conditions alone decide (Blinded, Invisible) when absent. */
+  seenBy?: (actorId: string) => boolean;
+  /** The mover was hidden from the table as it set off (the shared check: out of every character's sight or under the
+   *  fog). A player's character can't see it go, and its prompt would point at it, so none opens for one. */
+  moverHiddenFromPlayers?: boolean;
   newPromptId: () => string;
   now: () => number;
   commandId: string;
@@ -89,7 +98,7 @@ export type MovementRulesOutcome = Readonly<{
 /** A move spends movement only on the mover's own turn in combat, with movement rules on. While a wait-mode
  *  fight gathers initiative no turn has begun, so tokens are still being positioned. */
 /** SRD Ready: a Readied creature may "move up to your Speed in response" to its trigger, with its Reaction, off its
- *  own turn. Counted like any move (unless the movement rules are off), but against its Speed, not the turn's. */
+ *  own turn. Counted like any move (unless the movement rules are off), against its Speed and apart from the turn's. */
 function readiedMove(state: GameState, mover: GameState["actors"][number], mode: MoveMode): boolean {
   return (
     turnsRunning(state) &&
@@ -285,6 +294,7 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
       return false;
     if (sharesSpace(state, token.actorId, input, true)) return false;
     if (state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
+    if (input.perceives && !input.perceives(token.actorId)) return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
       if (mine.has(cell)) return true;
     return false;
@@ -325,7 +335,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       state,
       input,
       "movement.off-turn",
-      `It isn't ${mover.name}'s turn - moving now needs the GM's go-ahead.`,
+      `It isn't ${mover.name}'s turn, so moving now needs the GM's go-ahead.`,
       outcome
     );
   // Teleportation spends no movement and provokes nothing, and a player's needs the GM's go-ahead (the spell or
@@ -353,6 +363,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     extraPerStep,
     carried: input.dragging?.actorIds ?? [],
     resolveDefinition: input.resolveDefinition,
+    ...(input.perceives ? { perceives: input.perceives } : {}),
     ...(sharesSpace(state, actorId, input) ? { passesCreatures: true } : {})
   };
   const straight = (): MovementCost | null => {
@@ -365,7 +376,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       state,
       input,
       "movement.blocked-path",
-      `${mover.name} can't get there - other creatures bar the way.`,
+      state.combat.vision.enabled && state.combat.vision.walls.length > 0
+        ? `${mover.name} can't get there. Walls or other creatures bar the way.`
+        : `${mover.name} can't get there. Other creatures bar the way.`,
       outcome
     );
     charge = straight();
@@ -384,7 +397,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       ].filter((part): part is string => part !== null);
       const message =
         budget === 0
-          ? `${mover.name} can't move - its Speed is 0.`
+          ? `${mover.name} can't move while its Speed is 0.`
           : `${mover.name} has ${Math.max(0, Math.round((budget - used) * 10) / 10)} ft of movement left (this move needs ${Math.round(moved * 10) / 10} ft${how.length > 0 ? `, ${how.join(", ")}` : ""}).`;
       // A GM Allow covers the movement family for the rest of the turn, as before.
       police(
@@ -463,7 +476,9 @@ function openOpportunityAttacks(
       )
         left = wasIn;
     }
-    if (left === null || !seesMover(enemy, enemyDefinition, mover, left)) continue;
+    if (left === null) continue;
+    if (input.seenBy ? !input.seenBy(enemy.id) : !seesMover(enemy, enemyDefinition, mover, left)) continue;
+    if (input.moverHiddenFromPlayers === true && enemy.ownerSessionId !== null) continue;
     if (
       state.combat.pendingReactions.some(
         (prompt) => prompt.kind === "leaves-reach" && prompt.actorId === enemy.id && prompt.targetActorId === actorId

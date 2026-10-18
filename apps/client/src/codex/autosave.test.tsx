@@ -70,7 +70,7 @@ describe("Autosave ON", () => {
     await waitFor(() => expect(screen.getByLabelText("Status")).toHaveTextContent("saved"));
   });
 
-  it("debounces — five keystrokes inside the interval are ONE write", async () => {
+  it("debounces: five keystrokes inside the interval are ONE write", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const save = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -102,7 +102,7 @@ describe("Autosave ON", () => {
   });
 
   /** Asserts the overlap directly: while the first write is unresolved, no second write may start. */
-  it("never has two writes in flight — an edit mid-save waits and then re-runs", async () => {
+  it("never has two writes in flight: an edit mid-save waits and then re-runs", async () => {
     let release: (() => void) | null = null;
     const inFlight: string[] = [];
     const save = vi.fn((draft: { text: string }) => {
@@ -175,7 +175,7 @@ describe("Autosave ON", () => {
     await waitFor(() => expect(save).toHaveBeenCalledWith({ text: "ab" }));
   });
 
-  it("registers no navigation guard — nothing is unsaved for long enough to ask about", async () => {
+  it("registers no navigation guard: nothing is unsaved for long enough to ask about", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<Editor settings={ON} save={vi.fn().mockResolvedValue(undefined)} />);
@@ -316,7 +316,7 @@ describe("Autosave OFF", () => {
 });
 
 describe("Disabled", () => {
-  it("does nothing at all — no timer, no guard, never dirty", async () => {
+  it("does nothing at all: no timer, no guard, never dirty", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const save = vi.fn().mockResolvedValue(undefined);
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);

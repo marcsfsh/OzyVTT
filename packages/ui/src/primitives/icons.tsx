@@ -23,7 +23,7 @@ function Glyph({ children, className }: Readonly<{ children: ReactNode; classNam
   );
 }
 
-/** Selection tick — the single "chosen" mark across the system. */
+/** Selection tick: the single "chosen" mark across the system. */
 export function IconCheck({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -41,7 +41,7 @@ export function IconChevron({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/* The horizontal chevrons are drawn rather than rotated, so no call site picks its own transform. */
+/* The horizontal chevrons are drawn in each direction, so no call site picks its own transform. */
 
 /** Back / previous. */
 export function IconChevronLeft({ className }: Readonly<{ className?: string }>) {
@@ -75,7 +75,7 @@ export function IconSearch({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Shuffle / generate — the name generator's action. */
+/** Shuffle / generate: the name generator's action. */
 export function IconShuffle({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -87,7 +87,7 @@ export function IconShuffle({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** A die — the "roll it for me" action. */
+/** A die: the "roll it for me" action. */
 export function IconDie({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -99,7 +99,7 @@ export function IconDie({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Pencil — "edit this section" in the review step. */
+/** Pencil: "edit this section" in the review step. */
 export function IconPencil({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -120,7 +120,7 @@ export function IconWarning({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Info / neutral highlight — low urgency, never an alarm. */
+/** Info / neutral highlight: low urgency, never an alarm. */
 export function IconInfo({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -210,6 +210,67 @@ export function IconPlay({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Pause: hold what is playing where it is. */
+export function IconPause({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M6.2 4.7h4.2v14.6H6.2zM13.6 4.7h4.2v14.6h-4.2z" />
+    </Glyph>
+  );
+}
+
+/** Stop: end what is playing. */
+export function IconStop({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M5.5 5.5h13v13h-13z" />
+    </Glyph>
+  );
+}
+
+/** Skip: on to the next track. */
+export function IconSkip({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M4.6 4.7 15 12 4.6 19.3zM16 4.7h3.4v14.6H16z" />
+    </Glyph>
+  );
+}
+
+/** Sound: a speaker with its waves. */
+export function IconVolume({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.8 8.6h4l5.4-4.4v15.6l-5.4-4.4h-4z" />
+      <path
+        d="M15.2 8.4a4.6 4.6 0 0 1 0 7.2M17.8 5.4a8.6 8.6 0 0 1 0 13.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+      />
+    </Glyph>
+  );
+}
+
+/** No sound: the speaker struck through, for a screen that can't play yet. */
+export function IconVolumeOff({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2.8 8.6h4l5.4-4.4v15.6l-5.4-4.4h-4z" />
+      <path d="M15 8.6 21.4 15M21.4 8.6 15 15" fill="none" stroke="currentColor" strokeWidth="2.6" />
+    </Glyph>
+  );
+}
+
+/** Music: a note, for the playlist. */
+export function IconMusic({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M9 4.6 20.4 2.6v13.1a3.4 3.4 0 1 1-2.8-3.3V7.4l-5.8 1v9.3a3.4 3.4 0 1 1-2.8-3.3z" />
+    </Glyph>
+  );
+}
+
 /** Forward: "this takes you there". Centred on the 24-box so it can be rotated for ← ↑ ↓. */
 export function IconArrow({ className }: Readonly<{ className?: string }>) {
   return (
@@ -277,7 +338,7 @@ export function IconDraw({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/** Fog of war: bands rather than a cloud, since it hides a rectangle of ground. Gaps keep the bands from fusing. */
+/** Fog of war: bands, since it hides a rectangle of ground. Gaps keep the bands from fusing. */
 export function IconFog({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
@@ -294,6 +355,15 @@ export function IconTerrain({ className }: Readonly<{ className?: string }>) {
         fillRule="evenodd"
         d="M3 3h18v18H3zM4.6 4.6v14.8h14.8V4.6zM4.6 10.4 10.4 4.6H13L4.6 13zM4.6 17.4 17.4 4.6h2v2L6.6 19.4h-2zM11 19.4 19.4 11v2.6l-5.8 5.8z"
       />
+    </Glyph>
+  );
+}
+
+/** Wall: courses of brick, for walls, doors and what blocks sight on the map. */
+export function IconWall({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M3 3.4h18v4.4H3zM3 9.4h8.3v4.4H3zM12.7 9.4H21v4.4h-8.3zM3 15.4h18v4.4H3z" />
     </Glyph>
   );
 }
@@ -412,15 +482,12 @@ export function IconSparkle({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/* The theme marks: how much of the disc is dark. */
-const THEME_RING =
-  "M12 2.6a9.4 9.4 0 1 0 0 18.8 9.4 9.4 0 0 0 0-18.8zm0 2.8a6.6 6.6 0 1 1 0 13.2 6.6 6.6 0 0 1 0-13.2z";
-
-export function IconThemeDark({ className }: Readonly<{ className?: string }>) {
+/* The theme marks, one hour each: the moon for Night, the slatted sun going down for Dusk, the sun rising with
+   its rays for Dawn and the full sun for Day. Dusk and Dawn share the horizon line and differ by slat and rays. */
+export function IconThemeNight({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d={THEME_RING} />
-      <path d="M12 2.6a9.4 9.4 0 0 1 0 18.8z" />
+      <path d="M11.12 2.84A9.2 9.2 0 1 0 20.98 13.99A7.6 7.6 0 0 1 11.12 2.84z" />
     </Glyph>
   );
 }
@@ -428,16 +495,249 @@ export function IconThemeDark({ className }: Readonly<{ className?: string }>) {
 export function IconThemeDusk({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d={THEME_RING} />
-      <path d="M12 2.6a9.4 9.4 0 0 0 0 18.8z" />
+      <path d="M4.78 11.9A8.4 8.4 0 0 1 19.22 11.9z" />
+      <path d="M4.05 13.5H19.95A8.4 8.4 0 0 1 20.4 16.2H3.6A8.4 8.4 0 0 1 4.05 13.5z" />
+      <Stroke d="M2.5 20h19" />
     </Glyph>
   );
 }
 
-export function IconThemeLight({ className }: Readonly<{ className?: string }>) {
+export function IconThemeDawn({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d={THEME_RING} />
+      <path d="M6.4 17a5.6 5.6 0 0 1 11.2 0z" />
+      <Stroke d="M12 9.2V7.1M17.52 11.48 19 10M6.48 11.48 5 10M19.68 15.65l2.07-.37M4.32 15.65l-2.07-.37M2.5 20.4h19" />
+    </Glyph>
+  );
+}
+
+export function IconThemeDay({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <circle cx="12" cy="12" r="4.6" />
+      <Stroke d="M19.4 12h2.5M17.23 6.77 19 5M12 4.6V2.1M6.77 6.77 5 5M4.6 12H2.1M6.77 17.23 5 19M12 19.4v2.5M17.23 17.23 19 19" />
+    </Glyph>
+  );
+}
+
+/* Table glyphs, drawn as strokes at the set's line weight. */
+function Stroke({ d }: Readonly<{ d: string }>) {
+  return (
+    <path d={d} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+  );
+}
+
+/** Something waits on you: the GM's queue of decisions. */
+export function IconBell({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4" />
+    </Glyph>
+  );
+}
+
+/** A handle the pointer drags: the divider between two panes. */
+export function IconGrip({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 9h12M6 15h12" />
+    </Glyph>
+  );
+}
+
+/** The table screen. */
+export function IconTv({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M3 5h18v12H3zM8 21h8M12 17v4" />
+    </Glyph>
+  );
+}
+
+/** Aiming at a creature. */
+export function IconTarget({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM12 2v5M12 17v5M2 12h5M17 12h5" />
+    </Glyph>
+  );
+}
+
+/** Find your own token on the map. */
+export function IconLocate({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v4M12 18v4M2 12h4M18 12h4" />
+    </Glyph>
+  );
+}
+
+/** Waiting on someone else. */
+export function IconWait({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 3h12M6 21h12M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9" />
+    </Glyph>
+  );
+}
+
+/** The log of what happened. */
+export function IconLog({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M5 6h14M5 12h14M5 18h9" />
+    </Glyph>
+  );
+}
+
+/** More choices in a menu. */
+export function IconMore({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M5 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM12 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM19 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z" />
+    </Glyph>
+  );
+}
+
+/* ---- Character sheet glyphs: its tabs, its menu and its live states. ---- */
+
+/** What a character can do now: the sheet's Play tab. */
+export function IconBolt({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M13.6 1.8 4.4 13.6h6.2l-1.4 8.6 9.4-12h-6.3z" />
+    </Glyph>
+  );
+}
+
+/** What a character carries: the sheet's Gear tab. */
+export function IconBag({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2" />
+    </Glyph>
+  );
+}
+
+/** Written notes: the sheet's Notes tab. */
+export function IconPage({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M6 3h8l4 4v14H6zM9 11h6M9 15h6" />
+    </Glyph>
+  );
+}
+
+/** A rest. */
+export function IconMoon({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M20.4 14.6A8.6 8.6 0 1 1 9.4 3.6a6.8 6.8 0 0 0 11 11z" />
+    </Glyph>
+  );
+}
+
+/** A level up. */
+export function IconLevelUp({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 20V5M6 11l6-6 6 6" />
+    </Glyph>
+  );
+}
+
+/** A person: a character's own image. */
+export function IconUser({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0" />
+    </Glyph>
+  );
+}
+
+/** Who may reach the table: the GM password and the credentials. */
+export function IconKey({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M7.5 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM11 12h10M17.5 12v3M20.5 12v3" />
+    </Glyph>
+  );
+}
+
+/** Code: the API reference. */
+export function IconCode({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M8 7 3 12l5 5M16 7l5 5-5 5M13.5 5l-3 14" />
+    </Glyph>
+  );
+}
+
+/** Settings for this device. */
+export function IconCog({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 8.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4zM12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+    </Glyph>
+  );
+}
+
+/** Pinned: kept where it is always found. */
+export function IconPin({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M8.6 2.6h6.8l-1.1 6 3.3 3.3H6.4l3.3-3.3z" />
+      <path d="M10.6 11.9h2.8v9.5h-2.8z" />
+    </Glyph>
+  );
+}
+
+/** The whole list. */
+export function IconList({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M9 6h11M9 12h11M9 18h11" />
+      <path d="M3 4.6h2.8v2.8H3zm0 6h2.8v2.8H3zm0 6h2.8v2.8H3z" />
+    </Glyph>
+  );
+}
+
+/** Dying. Always paired with the word. */
+export function IconSkull({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path
+        fillRule="evenodd"
+        d="M12 2.4a8.2 8.2 0 0 0-8.2 8.2v4.3l2.4 1.4v4.9h11.6v-4.9l2.4-1.4v-4.3A8.2 8.2 0 0 0 12 2.4zM8.6 9.3a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8zm6.8 0a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8zM10.6 17.4h1v2h-1zm1.8 0h1v2h-1z"
+      />
+    </Glyph>
+  );
+}
+
+/** Concentration on a spell: rings around a held point. */
+export function IconConcentration({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <Stroke d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
+      <path d="M12 10.6a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 0 0 0-2.8z" />
+    </Glyph>
+  );
+}
+
+/** A front page: where a section starts. */
+export function IconHome({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M12 2 1.8 11.2l1.9 2.1 1.1-1V22h5.4v-6.4h3.6V22h5.4v-9.7l1.1 1 1.9-2.1z" />
+    </Glyph>
+  );
+}
+
+/** A map in the library: three folded panels. */
+export function IconMap({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2 5.2 8.3 3l7.4 2.6L22 3.4v15.4l-6.3 2.2-7.4-2.6L2 20.6zm6.6.9v10.6l6.8 2.4V8.5z" />
     </Glyph>
   );
 }

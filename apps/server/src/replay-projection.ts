@@ -1,6 +1,10 @@
-import type { CombatLogEntry, PlayerCombatView, PlayerHp, PlayerRollRecord } from "@vtt/domain";
+import type { CombatLogEntry, PlayerCombatView, PlayerHp, PlayerRollRecord, RollRecord } from "@vtt/domain";
+import { playerFeedId } from "./combat-log.js";
 import type { EncounterArchiveDocument, EncounterArchiveTurn } from "./encounter-archive.js";
+import type { EncounterArchiveSummary } from "./game-store.js";
 import { conditionLabels, playerHp, playerRoll, projectPlayerCombat } from "./projections.js";
+import { partySight, type AudienceSight } from "./vision/audience.js";
+import type { SightContent } from "./vision/senses.js";
 
 /**
  * The player's replay: a projection built from an explicit allow-list, never a filtered archive. The
@@ -10,9 +14,12 @@ import { conditionLabels, playerHp, playerRoll, projectPlayerCombat } from "./pr
  * Each turn's state is run through the live player projection. Visibility was snapshotted per turn,
  * so a creature revealed on turn 7 stays hidden in turns 0-6 with no separate reveal logic.
  *
- * Stricter than the live feed: `self-only` rolls are dropped (the reader is any player, not the
+ * Stricter than the live feed: `self-only` rolls are dropped (the reader is any player, who may not be the
  * roller), and roll payloads lose `initiatorSessionId`. Archive turn labels can name hidden
  * combatants, so labels are recomputed from each turn's public state.
+ *
+ * With dynamic vision on, each turn is seen through the whole party, as the table screen sees it: a creature no
+ * character perceived then is hidden in that turn, and so are its rolls made during it.
  */
 
 export type PlayerReplayTurnActor = Readonly<{ id: string; name: string; hp: PlayerHp; conditions: readonly string[] }>;
@@ -35,6 +42,30 @@ export type PlayerReplayDocument = Readonly<{
   attribution: string | null;
 }>;
 
+/** A shared replay in a player's list: the GM's name for it, and never the name of the scene it was fought on. */
+export type PlayerArchiveSummary = Readonly<{
+  id: number;
+  archivedAt: string;
+  startedAt: string | null;
+  endedAt: string;
+  turnCount: number;
+  playerVisible: boolean;
+  name: string | null;
+}>;
+
+/** Builds a player's list entry field by field, so a field added to the GM's summary never reaches a player by itself. */
+export function projectPlayerArchiveSummary(entry: EncounterArchiveSummary): PlayerArchiveSummary {
+  return {
+    id: entry.id,
+    archivedAt: entry.archivedAt,
+    startedAt: entry.startedAt,
+    endedAt: entry.endedAt,
+    turnCount: entry.turnCount,
+    playerVisible: entry.playerVisible,
+    name: entry.name
+  };
+}
+
 /** Log rows from this boundary's revision up to the next boundary's; the last turn takes the rest. */
 function logSliceFor(document: EncounterArchiveDocument, turnIndex: number): readonly CombatLogEntry[] {
   const turns = document.turns;
@@ -47,26 +78,50 @@ function logSliceFor(document: EncounterArchiveDocument, turnIndex: number): rea
  *  must also be a public roll, since the reader is never assumed to be the roller. */
 function playerLogRow(entry: CombatLogEntry): CombatLogEntry | null {
   if (entry.gmOnly) return null;
+  // The live feed's opaque id, so the gaps between rows don't count the GM-only ones.
+  const id = playerFeedId(entry.id);
   if (entry.roll) {
     if (entry.roll.visibility !== "public") return null;
-    return { ...entry, roll: playerRoll(entry.roll) };
+    return { ...entry, id, roll: playerRoll(entry.roll) };
   }
-  return entry;
+  return { ...entry, id };
 }
 
 /** The public creatures at this boundary as cards: no notes, owner or definition. */
-function turnActors(turn: EncounterArchiveTurn): readonly PlayerReplayTurnActor[] {
+function turnActors(turn: EncounterArchiveTurn, sight: AudienceSight): readonly PlayerReplayTurnActor[] {
   return turn.state.actors
-    .filter((actor) => actor.visibility === "public")
+    .filter((actor) => actor.visibility === "public" && !sight.hidden.has(actor.id))
     .map((actor) => ({ id: actor.id, name: actor.name, hp: playerHp(actor), conditions: conditionLabels(actor) }));
 }
 
 /** The turn's label, computed from what was public then. */
-function turnLabel(turn: EncounterArchiveTurn): string {
+function turnLabel(turn: EncounterArchiveTurn, sight: AudienceSight): string {
   const actorId = turn.state.combat.turnActorId;
   const actor = actorId === null ? undefined : turn.state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor || actor.visibility !== "public") return "A hidden combatant's turn";
+  if (!actor || actor.visibility !== "public" || sight.hidden.has(actor.id)) return "A hidden combatant's turn";
   return `${actor.name}'s turn`;
+}
+
+/** A turn's combat as the replay shows it. A replay is the fight, so a turn recorded outside one carries no map,
+ *  even where the live table would show players the scene. */
+function replayCombat(state: EncounterArchiveTurn["state"], now: number, content: SightContent, sight: AudienceSight) {
+  const combat = projectPlayerCombat(state, undefined, now, content, sight);
+  return state.combat.active ? combat : { ...combat, mapAssetId: null, tokens: [], annotations: [] };
+}
+
+/** Whether a public roll may be replayed: not one made, during its turn, by a creature the party couldn't perceive. */
+function rollShown(
+  roll: RollRecord,
+  turns: readonly EncounterArchiveTurn[],
+  sights: readonly AudienceSight[]
+): boolean {
+  if (roll.visibility !== "public") return false;
+  if (roll.actorId === null) return true;
+  let index = -1;
+  for (let at = 0; at < turns.length; at++) if (turns[at]!.at <= roll.createdAt) index = at;
+  // Before the first boundary the first turn's sight applies.
+  const sight = sights[Math.max(0, index)];
+  return sight === undefined || !sight.hidden.has(roll.actorId);
 }
 
 /** Builds the player's replay. `now` is injected so annotation expiry is deterministic. There is no
@@ -75,14 +130,16 @@ function turnLabel(turn: EncounterArchiveTurn): string {
 export function projectPlayerReplay(
   id: number,
   document: EncounterArchiveDocument,
-  now = Date.now()
+  now = Date.now(),
+  content: SightContent = {}
 ): PlayerReplayDocument {
+  const sights = document.turns.map((turn) => partySight(turn.state, content));
   const turns = document.turns.map((turn, index): PlayerReplayTurn => ({
     index: turn.index,
     at: turn.at,
-    label: turnLabel(turn),
-    combat: projectPlayerCombat(turn.state, undefined, now),
-    actors: turnActors(turn),
+    label: turnLabel(turn, sights[index]!),
+    combat: replayCombat(turn.state, now, content, sights[index]!),
+    actors: turnActors(turn, sights[index]!),
     log: logSliceFor(document, index).flatMap((entry) => {
       const row = playerLogRow(entry);
       return row ? [row] : [];
@@ -94,8 +151,8 @@ export function projectPlayerReplay(
     endedAt: document.endedAt,
     turnCount: turns.length,
     turns,
-    // Self-only and gm-only rolls are dropped: the reader is any player, not the roller.
-    rolls: (document.rolls ?? []).filter((roll) => roll.visibility === "public").map(playerRoll),
+    // Self-only and gm-only rolls are dropped: the reader is any player, who may not be the roller.
+    rolls: (document.rolls ?? []).filter((roll) => rollShown(roll, document.turns, sights)).map(playerRoll),
     attribution: document.attribution ?? null
     // Not projected: journal (payloads naming hidden combatants), finalState/postEncounterState (full
     // GameStates), definitions (monster stat blocks), and every turn's raw state.
@@ -103,7 +160,7 @@ export function projectPlayerReplay(
 }
 
 /** The battle-map images a shared archive's player replay renders, so the map router can serve them.
- *  Derived from the projected player document, not the stored one, which also references prepared
+ *  Derived from the projected player document. The stored one also references prepared
  *  scenes' maps players must not see. Does not check the shared flag: never call it on an unshared archive. */
 export function playerReplayMapAssetIds(
   id: number,

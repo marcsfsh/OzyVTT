@@ -16,7 +16,7 @@ describe("StableSwap", () => {
     expect(screen.getByText("Shown to players")).toBeInTheDocument();
 
     const ghost = ghostOf(container)!;
-    expect(ghost, "the width reservation is gone — the control will resize when its label changes").not.toBeNull();
+    expect(ghost, "the width reservation is gone, so the control will resize when its label changes").not.toBeNull();
     expect(ghost.getAttribute("data-stable-swap-alt")).toBe("Hidden from players");
     expect(ghost.getAttribute("aria-hidden")).toBe("true");
     // Generated content, never a text node, or every reveal control would contain both states' text.
@@ -66,7 +66,7 @@ describe("Switch with a state-dependent label", () => {
     expect(screen.getByRole("switch")).toHaveAccessibleName("Show this page to players");
   });
 
-  it("stays a plain label when no alternate is given — nothing pays for a reservation it does not need", () => {
+  it("stays a plain label when no alternate is given: nothing pays for a reservation it does not need", () => {
     const { container } = render(<Switch checked={false} onChange={() => {}} label="Auto-stage" />);
     expect(ghostOf(container)).toBeNull();
     expect(container.querySelector(".nh-switch-label")!.textContent).toBe("Auto-stage");

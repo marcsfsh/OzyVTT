@@ -334,7 +334,7 @@ describe("Ammunition", () => {
       "attack.no-ammunition"
     );
     expect(() => write(table, IDS.fighter, edit(table, IDS.fighter, "ammunition-1", { baseId: "longsword" }))).toThrow(
-      'Ammunition, +1 applies to Any Ammunition - "longsword" is not one of the kinds it can be.'
+      'Ammunition, +1 applies to Any Ammunition, and "longsword" is not one of the kinds it can be.'
     );
     write(table, IDS.fighter, edit(table, IDS.fighter, "ammunition-1", { baseId: "arrows-20" }));
     expect(resolveAt(table, IDS.fighter, "item-longbow", [15, 4], {}, 30).attack?.total).toBe(20);

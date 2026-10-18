@@ -1,0 +1,471 @@
+/* Grid calibration: the canvas where the 3 x 3 block or two points are marked, the instruction line, and each step's
+   controls. The map's steps place the canvas beside the questions on a laptop and above them on a phone. */
+
+/* The real input stays in the DOM (the button clicks it) but takes no layout or focus order. 1px
+   width/height is not enough for `type="file"`: Chromium sizes it from its shadow "Choose File"
+   button, so `min-*`, padding and border are zeroed too. */
+.map-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+}
+/* The per-step instruction line, and the surface's only live region. */
+.map-step-note {
+  margin: 0;
+  padding: 0.55rem var(--space-3);
+  border-left: 3px solid var(--magenta);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+/* Saved: the line says what is now true, in the confirm colour with its check. */
+.map-step-note.is-done {
+  border-left-color: var(--success);
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.map-step-note.is-done::before {
+  content: "Done. ";
+  font-weight: 700;
+  color: var(--cyan-hi);
+}
+/* The crosshair's look, folded away under the drag hint. */
+.crosshair-details summary {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* The canvas column: `flex-basis: 0` takes the leftover height, and the min-height floor keeps it on
+   screen even while the column shrinks. The floor must not be below the column's own content
+   (7rem preview + gap + 44px tools row), or the tools row paints outside the column, over the step
+   body, which then wins the hit test. */
+.map-canvas-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 0;
+  min-height: 11rem;
+}
+.map-canvas-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.map-zoom-level {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* The drag surface. `touch-action: none` is unconditional: it is a pointer-capture target, never a
+   scroller. The explicit single grid track avoids a circular percentage max-height against a
+   content-sized row. */
+.map-preview {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  flex: 1 1 0;
+  min-height: 7rem;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--void);
+  cursor: crosshair;
+  line-height: 0;
+  touch-action: none;
+  transition: border-color var(--dur-hover);
+}
+.map-preview.movable {
+  cursor: move;
+}
+.map-preview.resizing {
+  cursor: nwse-resize;
+}
+.map-preview:hover {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+.map-preview:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--focus-ring-color);
+}
+.map-preview p {
+  line-height: 1.5;
+}
+/* Sized from the svg's own attributes and bounded by the canvas, so the box is the image and every
+   click lands on it. */
+.map-preview svg {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  user-select: none;
+}
+/* Calibration grid preview lines: fixed colours, since SVG presentation attributes cannot use var(). */
+.map-preview line {
+  stroke: rgb(45 226 255 / 0.6);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.map-preview line.major {
+  stroke: rgb(255 46 154 / 0.85);
+  stroke-width: 1.5;
+}
+.map-preview .grid-area-preview rect {
+  fill: rgb(255 46 154 / 0.18);
+  stroke: #7cefff;
+  stroke-width: 2.5;
+  stroke-dasharray: 8 5;
+  vector-effect: non-scaling-stroke;
+}
+.map-preview .grid-area-preview line {
+  stroke: #ff2e9a;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.map-preview circle {
+  fill: #2de2ff;
+  stroke: #0a0805;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.map-preview text {
+  fill: #0a0805;
+  font: 700 14px var(--font-numeric);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.grid-crosshair {
+  pointer-events: none;
+}
+.grid-crosshair line {
+  stroke-width: 2.25;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 90%));
+}
+.grid-area-handle {
+  fill: #7cefff;
+  stroke: #0a0805;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The step body is bounded so it cannot push the canvas off screen. `.scroll-y` is in the markup.
+   No floor: in the one-column pane it is the row that yields, and a floor would push the action
+   row off the bottom instead. */
+.map-step-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 40%;
+}
+.map-step-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.map-step-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.map-step-hint strong {
+  color: var(--text);
+}
+/* The action row: one primary per step, pinned to the pane's bottom. */
+.map-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+.map-step-actions .nh-btn {
+  flex: 1 1 10rem;
+  justify-content: center;
+}
+
+.map-mode-choice {
+  gap: var(--space-2);
+}
+
+/* Fields step. Grids size from their own width (`auto-fit` with a real minimum), never the viewport:
+   above 560px the step body is a column of varying width beside the canvas. */
+.grid-detected {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--cyan-hi);
+  font-weight: 700;
+}
+.point-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: end;
+}
+.point-editor fieldset {
+  display: flex;
+  flex: 1 1 11rem;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid transparent;
+}
+.point-editor legend {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.point-editor label {
+  display: flex;
+  flex: 1 1 4rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.point-editor input {
+  width: 100%;
+  min-width: 0;
+}
+/* `.nh-btn` is `white-space: nowrap`; this one holds a sentence and must wrap. */
+.point-editor > .nh-btn {
+  flex: 1 1 100%;
+  white-space: normal;
+}
+.adjustment-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.55rem;
+}
+.adjustment-groups fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem;
+  border: 1px solid transparent;
+}
+.adjustment-groups legend {
+  padding: 0 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.adjustment-groups .nh-btn {
+  justify-content: center;
+  padding-inline: var(--space-2);
+  font-size: var(--fs-sm);
+}
+/* One arrow icon, turned to the direction each nudge moves the overlay. */
+.map-nudge-left {
+  transform: rotate(180deg);
+}
+.map-nudge-up {
+  transform: rotate(-90deg);
+}
+.map-nudge-down {
+  transform: rotate(90deg);
+}
+.wizard-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.65rem;
+}
+.wizard-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+
+.verification-card {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 0.4rem;
+  padding: 0.8rem;
+  border: 1px solid transparent;
+}
+.verification-card strong {
+  font: 400 0.95rem var(--font-display);
+}
+.verification-card p {
+  margin: 0 0 0.3rem;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.verification {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid;
+  font-size: var(--fs-sm);
+}
+.verification.accepted {
+  border-color: var(--success);
+  color: var(--cyan-hi);
+}
+.verification.rejected {
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+.map-review {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+}
+.map-review > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--line);
+}
+.map-review dt {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.map-review dd {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-numeric);
+  font-size: var(--fs-sm);
+}
+
+/* The one recoverable failure: the server's 30-minute wizard TTL, with one way back to the canvas. */
+.map-expired {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.8rem;
+  border-left: 4px solid var(--caution);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.map-expired p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+
+/* Crosshair controls reach the 44px floor by paint: the swatches sit 4px apart, so an overhang would
+   steal neighbours' taps, and the row sits under a drag surface. */
+.crosshair-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.crosshair-label {
+  color: var(--magenta-text);
+  font-weight: 700;
+}
+.crosshair-swatches {
+  display: flex;
+  gap: var(--space-1);
+}
+.crosshair-swatches button {
+  display: grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.crosshair-swatches button::before {
+  content: "";
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--swatch);
+}
+.crosshair-swatches button:hover:not(:disabled)::before {
+  border-color: var(--cyan-hi);
+}
+.crosshair-swatches button[aria-pressed="true"]::before {
+  outline: 2px solid var(--cyan-hi);
+  outline-offset: 1px;
+}
+.crosshair-color,
+.crosshair-opacity {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: var(--tap-min);
+}
+.crosshair-color input {
+  width: 3rem;
+  height: var(--tap-min);
+  margin: 0;
+  padding: 0 0.15rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+}
+.crosshair-opacity input {
+  width: 7rem;
+  height: var(--tap-min);
+  margin: 0;
+}
+.map-point-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.map-point-summary strong {
+  color: var(--text);
+  font-family: var(--font-numeric);
+}
+
+/* On a phone each fieldset of the typed points takes the row, and the instruction line is tighter. */
+@media (max-width: 560px) {
+  .point-editor fieldset {
+    flex: 1 1 100%;
+  }
+  .map-step-note {
+    padding: 0.45rem 0.6rem;
+  }
+}
+/* Severity as a 2px leading rule on a neutral ground. */
+.map-step-note {
+  border-left-width: 2px;
+  border-radius: 0;
+  background: var(--surface-2);
+}
+.map-expired {
+  border-left-width: 2px;
+  border-radius: 0;
+  background: var(--surface-2);
+}

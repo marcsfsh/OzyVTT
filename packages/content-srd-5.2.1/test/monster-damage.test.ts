@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadMonsterDefinitions } from "../src/index.js";
 
 // Every SRD monster's damage checked against its own printed stat block. The checks read the text with their own
-// patterns, not the build's, so a reader bug in the build can't agree with itself.
+// patterns, apart from the build's, so a reader bug in the build can't agree with itself.
 
 const monsters = loadMonsterDefinitions();
 const normal = (formula: string) => formula.replace(/\s+/g, "").replace(/−/g, "-").toLowerCase();
@@ -23,7 +23,7 @@ function printedHit(description: string): Printed[] {
   const body = description.replace(/^.*?Attack Roll:[^.]*?(?:ft|feet)\.(?:\s*or range [^.]*?(?:ft|feet)\.)?\s*/s, "");
   const first = body.split(/(?<=\.)\s/)[0] ?? "";
   const unconditional = first
-    .replace(/[,—]?\s*or \d+(?: \([^)]*\))? [A-Za-z]+ damage (?:if|when) [^—.,]*[—,]?/g, " ")
+    .replace(/[,\u2014]?\s*or \d+(?: \([^)]*\))? [A-Za-z]+ damage (?:if|when) [^\u2014.,]*[\u2014,]?/g, " ")
     .replace(/,?\s*plus \d+(?: \([^)]*\))? [A-Za-z]+ damage (?:if|when) [^.]*/g, "");
   return [...unconditional.matchAll(/(\d+)(?: \((\d+d\d+(?:\s*[+\-−]\s*\d+)?)\))? ([A-Za-z]+) damage/g)].map(
     ([, average, dice, type]) => ({ average: Number(average), formula: dice ?? average, type: type.toLowerCase() })
@@ -130,7 +130,7 @@ describe("SRD monster save damage is what the failure deals at once", () => {
     const roar = action("sphinx-of-valor", "roar");
     expect(roar.damage).toEqual([]);
     expect(roar.save).toMatchObject({ ability: "wis", failureConditions: ["frightened"] });
-    // The Otyugh's save comes after a Long Rest, not on the hit.
+    // The Otyugh's save comes after a Long Rest.
     expect(action("otyugh", "bite").save).toBeUndefined();
   });
 

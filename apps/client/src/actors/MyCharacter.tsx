@@ -8,6 +8,7 @@ import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./ac
 import { command } from "../lib/command";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "../encounter/StabilizeControl";
 import { ShortRestPrompt } from "../rest/ShortRestPrompt";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 import "./my-character.css";
 
 /** Dying and not yet stable: what first aid, a Healer's Kit or Spare the Dying is for. */
@@ -27,7 +28,7 @@ const needsAid = (actor: PlayerActor) =>
 const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet", "sheet-and-resources"];
 
 /**
- * The tier this player was given. Defaults to `name-and-class` rather than the fullest tier, so a
+ * The tier this player was given. Defaults to `name-and-class`, the narrowest tier with a card, so a
  * projection without the field never shows more than the GM opened.
  */
 export function partyVisibilityOf(state: PlayerView): PartyVisibility {
@@ -108,46 +109,20 @@ function PartyMemberSheet({
   );
 }
 
-export function MyCharacter({
-  state,
-  onOpenSheet,
-  onCreateCharacter,
-  onLevel,
-  onGoToTable
-}: Readonly<{
-  state: PlayerView;
-  /** Opens the player's own sheet at `/characters/<id>`. */
-  onOpenSheet: (actorId: string) => void;
-  /** The builder door; the claim screen has its own copy. */
-  onCreateCharacter: () => void;
-  /** Levelling follows the same builder policy as creating. */
-  onLevel: (actorId: string) => void;
-  /** An unclaimed player is sent to the Table, where the claim picker lives. */
-  onGoToTable: () => void;
-}>) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [releasing, setReleasing] = useState(false);
-  const [rolling, setRolling] = useState(false);
+/**
+ * The player's own release verb (play-vocabulary.test.ts pins it here): confirmed, then the claim is given back so
+ * someone else can play the character. The sheet's menu offers it as its last item.
+ */
+export function useReleaseCharacter(state: PlayerView) {
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
-
-  const party = state.actors.filter((actor) => actor.kind === "player-character");
-  const mine = party.find((actor) => actor.claimStatus === "mine") ?? null;
-  const others = party.filter((actor) => actor.id !== mine?.id);
-  const tier = partyVisibilityOf(state);
-  const openable = tier === "full-sheet" || tier === "sheet-and-resources";
-  const openActor = openId ? (others.find((actor) => actor.id === openId) ?? null) : null;
-  const builderOpen = state.builderPolicy.playerBuilder === "open";
-  // The generator is offered only when `playerRandom` is open, unlike the builder door, which is
-  // always shown and explains a closed policy itself.
-  const randomOpen = state.builderPolicy.playerRandom === "open";
-
+  const [releasing, setReleasing] = useState(false);
   const release = async (name: string) => {
     // A character is released, never "left".
     if (
       !(await confirm({
         title: `Release ${name}?`,
-        body: "Someone else will be able to play them.",
+        body: `Someone else will be able to play ${name}.`,
         confirmLabel: "Release"
       }))
     )
@@ -158,131 +133,138 @@ export function MyCharacter({
     if (result.ok) toast(`You released ${name}. Pick another when you're ready.`, { tone: "success" });
     else toast(result.message ?? "Couldn't release the character.", { tone: "error" });
   };
+  return { release, releasing, dialog };
+}
 
+/**
+ * The rest of the party, as the GM's party tier lets this player see it: who plays what, a read-only sheet where the
+ * tier opens one, and outside a fight the aid the player's character can give a dying or knocked-out ally.
+ */
+function PartyList({
+  state,
+  mine,
+  onOpen
+}: Readonly<{ state: PlayerView; mine: PlayerActor | null; onOpen: (actorId: string) => void }>) {
+  const { toast } = useToast();
+  const party = state.actors.filter((actor) => actor.kind === "player-character");
+  const others = party.filter((actor) => actor.id !== mine?.id);
+  const tier = partyVisibilityOf(state);
+  const openable = tier === "full-sheet" || tier === "sheet-and-resources";
+  // `off` removes this party surface, not allies from state: initiative and tokens still need every ally, so
+  // presence in `state.actors` is not permission to list them. Characters nobody has claimed are listed at every tier
+  // where this surface exists.
+  if (tier === "off" || others.length === 0) return <p className="cs-note">No one else is in the party yet.</p>;
   return (
-    <section className="my-character pane-frame pane-scene scanlines frame-col anim-view" aria-label="My character">
-      <div className="pane-sky" aria-hidden="true" />
-      <div className="my-character-head neon-beam">
-        <h2>My character</h2>
-        <div className="my-character-head-actions">
-          {/* Always offered: the route answers with the builder or its policy gate (shell/LayerView.tsx). */}
-          <Button variant="secondary" onClick={onCreateCharacter}>
-            Create a character
-          </Button>
-          {!mine && randomOpen && (
-            <Button variant="secondary" onClick={() => setRolling(true)}>
-              Roll a random one
-            </Button>
-          )}
-          {mine && builderOpen && (
-            <Button variant="secondary" onClick={() => onLevel(mine.id)}>
-              Level up or down…
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="my-character-body scroll-y frame-fill">
-        {/* The party's Short Rest, when the GM opened one with this player's character in it. */}
-        <ShortRestPrompt state={state} />
-        {mine ? (
-          <div className="my-character-card">
-            <Avatar name={mine.name} size="lg" presence={mine.presence ? presenceDot(mine.presence) : undefined} />
-            <div className="my-character-facts">
-              <strong className="my-character-name">{mine.name}</strong>
-              <span className="my-character-line">{classLine(mine.definition) ?? "No class recorded"}</span>
-              <span className="my-character-hp" role="status">
-                HP {hpLabel(mine.hp)}
-              </span>
-            </div>
-            <div className="my-character-doors">
-              <Button variant="primary" onClick={() => onOpenSheet(mine.id)}>
-                My sheet
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={releasing}
-                title={`Release ${mine.name}`}
-                onClick={() => release(mine.name)}
+    <ul className="my-character-party-list">
+      {others.map((actor) => {
+        const line = actor.classLine ?? classLine(actor.definition);
+        const claimed = actor.claimStatus === "claimed";
+        const rowOpenable = openable && claimed;
+        const label = [
+          actor.name,
+          line,
+          claimed && actor.presence ? presenceLabel(actor.presence) : null,
+          claimed ? null : CLAIM_WORD.available
+        ]
+          .filter((part): part is string => Boolean(part))
+          .join(" · ");
+        const body = (
+          <>
+            <Avatar
+              name={actor.name}
+              size="sm"
+              presence={claimed && actor.presence ? presenceDot(actor.presence) : undefined}
+            />
+            <span className="my-character-party-name">{actor.name}</span>
+            <span className="my-character-party-line">{line ?? (claimed ? "None" : CLAIM_WORD.available)}</span>
+          </>
+        );
+        return (
+          <li key={actor.id}>
+            {rowOpenable ? (
+              <button
+                type="button"
+                className="my-character-party-row tap-target interactive"
+                aria-label={`${label}. Open sheet.`}
+                onClick={() => onOpen(actor.id)}
               >
-                Release
-              </Button>
-            </div>
-          </div>
-        ) : (
-          /* Nobody claimed: point at the Table's claim picker rather than duplicating it. */
-          <div className="scene-empty">
-            <p>You haven&rsquo;t claimed a character yet.</p>
-            <Button variant="primary" arrow onClick={onGoToTable}>
-              Go to the table
-            </Button>
-          </div>
-        )}
+                {body}
+              </button>
+            ) : (
+              /* A plain readout, since there is no sheet to open. */
+              <span className="my-character-party-row is-static" role="group" aria-label={label}>
+                {body}
+              </span>
+            )}
+            {/* Outside a fight your character can stabilize a dying ally or wake a knocked-out one; in a fight that
+                happens on the turn order. */}
+            {mine &&
+              !state.combat.active &&
+              (mine.hp.kind !== "exact" || mine.hp.current > 0) &&
+              (needsAid(actor) || isKnockedOut(actor)) && (
+                <StabilizeControl
+                  targetId={actor.id}
+                  targetName={actor.name}
+                  helpers={[aidGiverOf(mine, mine.definition)]}
+                  gm={false}
+                  knockedOut={isKnockedOut(actor)}
+                  onFeedback={(text) => toast(text)}
+                />
+              )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
-        {/* `off` removes this party surface, not allies from state: initiative and tokens still need
-          every ally, so presence in `state.actors` is not permission to list them. Unclaimed
-          characters are listed at every tier where this surface exists. */}
-        {tier !== "off" && others.length > 0 && (
-          <div className="my-character-party">
-            <h3 className="my-character-party-head">The rest of the party</h3>
-            <ul className="my-character-party-list">
-              {others.map((actor) => {
-                const line = actor.classLine ?? classLine(actor.definition);
-                const claimed = actor.claimStatus === "claimed";
-                /* Openable when the tier allows it and the row is someone's character. */
-                const rowOpenable = openable && claimed;
-                const label = `${actor.name}${line ? ` — ${line}` : ""}${claimed && actor.presence ? ` — ${presenceLabel(actor.presence)}` : ""}${claimed ? "" : ` — ${CLAIM_WORD.available}`}`;
-                const body = (
-                  <>
-                    <Avatar
-                      name={actor.name}
-                      size="sm"
-                      presence={claimed && actor.presence ? presenceDot(actor.presence) : undefined}
-                    />
-                    <span className="my-character-party-name">{actor.name}</span>
-                    <span className="my-character-party-line">{line ?? (claimed ? "—" : CLAIM_WORD.available)}</span>
-                  </>
-                );
-                return (
-                  <li key={actor.id}>
-                    {rowOpenable ? (
-                      <button
-                        type="button"
-                        className="my-character-party-row tap-target interactive"
-                        aria-label={`${label}. Open sheet.`}
-                        onClick={() => setOpenId(actor.id)}
-                      >
-                        {body}
-                      </button>
-                    ) : (
-                      /* A plain readout rather than a disabled button when there is no sheet to open. */
-                      <span className="my-character-party-row is-static" role="group" aria-label={label}>
-                        {body}
-                      </span>
-                    )}
-                    {/* Outside a fight your character can stabilize a dying ally or wake a knocked-out one; in a
-                      fight that happens on the turn order. */}
-                    {mine &&
-                      !state.combat.active &&
-                      (mine.hp.kind !== "exact" || mine.hp.current > 0) &&
-                      (needsAid(actor) || isKnockedOut(actor)) && (
-                        <StabilizeControl
-                          targetId={actor.id}
-                          targetName={actor.name}
-                          helpers={[aidGiverOf(mine, mine.definition)]}
-                          gm={false}
-                          knockedOut={isKnockedOut(actor)}
-                          onFeedback={(text) => toast(text)}
-                        />
-                      )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
+/**
+ * The player's "My character" tab. With a character claimed it is that character's sheet, whose menu also holds the
+ * rest of the party, the builder and Release; the party's Short Rest takes the band above the sheet's tabs. Without
+ * one it points at the table's claim picker and the builder.
+ *
+ * Branches on `PlayerView.partyVisibility`, never on which fields arrived (see `partyVisibilityOf`). The tier is
+ * enforced in `projectPlayerView`; this file never filters.
+ */
+export function MyCharacter({
+  state,
+  token,
+  onCreateCharacter,
+  onLevel,
+  onGoToTable
+}: Readonly<{
+  state: PlayerView;
+  /** The player's bearer, which the token image picker needs. */
+  token: string;
+  /** The builder door; the claim screen has its own copy. */
+  onCreateCharacter: () => void;
+  /** Levelling follows the same builder policy as creating. */
+  onLevel: (actorId: string) => void;
+  /** An unclaimed player is sent to the Table, where the claim picker lives. */
+  onGoToTable: () => void;
+}>) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [partyOpen, setPartyOpen] = useState(false);
+  const [rolling, setRolling] = useState(false);
+  const { toast } = useToast();
+  const { release, releasing, dialog } = useReleaseCharacter(state);
 
+  const party = state.actors.filter((actor) => actor.kind === "player-character");
+  const mine = party.find((actor) => actor.claimStatus === "mine") ?? null;
+  const tier = partyVisibilityOf(state);
+  const openActor = openId ? (party.find((actor) => actor.id === openId && actor.id !== mine?.id) ?? null) : null;
+  const builderOpen = state.builderPolicy.playerBuilder === "open";
+  // The generator is offered only when `playerRandom` is open, unlike the builder door, which is always shown and
+  // explains a closed policy itself.
+  const randomOpen = state.builderPolicy.playerRandom === "open";
+
+  const dialogs = (
+    <>
+      {partyOpen && (
+        <Modal open onClose={() => setPartyOpen(false)} size="md" title="The rest of the party">
+          <PartyList state={state} mine={mine} onOpen={(actorId) => setOpenId(actorId)} />
+        </Modal>
+      )}
       {openActor && (
         <PartyMemberSheet
           actor={openActor}
@@ -294,9 +276,67 @@ export function MyCharacter({
         open={rolling}
         maxLevel={state.builderPolicy.maxLevel}
         onClose={() => setRolling(false)}
-        onRolled={() => toast("Rolled up and claimed — it's yours.", { tone: "success" })}
+        onRolled={() => toast("Rolled up and claimed. The character is yours.", { tone: "success" })}
       />
       {dialog}
+    </>
+  );
+
+  if (mine)
+    return (
+      <section className="my-character-sheet anim-view frame-col" aria-label="My character">
+        <CharacterSheet
+          actor={mine}
+          role="player"
+          state={state}
+          presentation="page"
+          token={token}
+          top={<ShortRestPrompt state={state} />}
+          {...(builderOpen ? { onLevel: () => onLevel(mine.id) } : {})}
+          doors={{
+            ...(tier !== "off" ? { party: () => setPartyOpen(true) } : {}),
+            createCharacter: onCreateCharacter,
+            ...(releasing ? {} : { release: { name: mine.name, onSelect: () => void release(mine.name) } })
+          }}
+          onClose={onGoToTable}
+        />
+        {dialogs}
+      </section>
+    );
+
+  return (
+    <section className="my-character pane-frame pane-scene scanlines frame-col anim-view" aria-label="My character">
+      <div className="pane-sky" aria-hidden="true" />
+      <div className="my-character-head neon-beam">
+        <h2>My character</h2>
+        <div className="my-character-head-actions">
+          {/* Always offered: the route answers with the builder or its policy gate (shell/LayerView.tsx). */}
+          <Button variant="secondary" onClick={onCreateCharacter}>
+            Create a character
+          </Button>
+          {randomOpen && (
+            <Button variant="secondary" onClick={() => setRolling(true)}>
+              Roll a random one
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="my-character-body scroll-y frame-fill">
+        {/* Nobody claimed: point at the Table's claim picker, which is the one place to claim. */}
+        <div className="scene-empty">
+          <p>You haven't claimed a character yet.</p>
+          <Button variant="primary" arrow onClick={onGoToTable}>
+            Go to the table
+          </Button>
+        </div>
+        {tier !== "off" && party.length > 0 && (
+          <div className="my-character-party">
+            <h3 className="my-character-party-head">The party</h3>
+            <PartyList state={state} mine={null} onOpen={(actorId) => setOpenId(actorId)} />
+          </div>
+        )}
+      </div>
+      {dialogs}
     </section>
   );
 }

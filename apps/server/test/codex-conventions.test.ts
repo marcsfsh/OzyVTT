@@ -6,11 +6,12 @@ import express from "express";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CODEX_PATHS } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
 import { requestConventions } from "../src/http-kit.js";
+import { credentialPerScope, fixedVerifiers } from "./fixed-verifiers.js";
 
 // The codex router's cross-cutting contract, tested at the HTTP boundary: request-id echo, the
 // 401/403 split, integration-credential scopes, structured validation issues,
@@ -44,10 +45,8 @@ async function fixture() {
     createCodexRouter({
       store,
       assets,
-      authorizeGm: (token) => token === "gm-token",
-      authorizePlayer: (token) => token === "player-token",
       // One credential per scope, so a verifier that ignored `scope` would fail the scope assertions below.
-      verifyIntegration: (token, scope) => (token === `int-${scope}` ? { id: "cred-1", name: "overlay" } : null),
+      verifiers: fixedVerifiers({ gm: ["gm-token"], player: ["player-token"], integration: credentialPerScope }),
       notifyChanged: () => {},
       issuePreviewSession: () => "preview-player-token"
     })
@@ -80,7 +79,7 @@ describe("codex request correlation (X-Request-Id)", () => {
     const ok = await get(base, "/api/v1/codex/pages", { ...GM, "x-request-id": CALLER_ID });
     expect(ok.headers.get("x-request-id")).toBe(CALLER_ID);
 
-    // The error body must echo the caller's request id, not a freshly minted one.
+    // The error body must echo the caller's own request id.
     const failed = await post(base, "/api/v1/codex/pages", { ...GM, "x-request-id": CALLER_ID }, { title: "" });
     expect(failed.status).toBe(400);
     expect((await body(failed)).error.requestId).toBe(CALLER_ID);
@@ -101,15 +100,16 @@ describe("codex request correlation (X-Request-Id)", () => {
   });
 });
 
-// 401 means "no credential"; 403 means "you presented one and were refused". An authenticated player
-// must never be told to sign in, because a retrying client acts on that.
+// 401 means "no live credential: sign in"; 403 means "your valid credential does not reach this" (ADR-0027). An
+// authenticated player must never be told to sign in, because a retrying client acts on that.
 describe("codex 401 vs 403", () => {
-  it("answers 401 only for a missing or unparseable Authorization header", async () => {
+  it("answers 401 for a missing, unparseable or dead credential", async () => {
     const { base } = await fixture();
     for (const headers of [
       ANONYMOUS,
       { ...ANONYMOUS, authorization: "Basic abc123" },
-      { ...ANONYMOUS, authorization: "gm-token" }
+      { ...ANONYMOUS, authorization: "gm-token" },
+      { ...ANONYMOUS, authorization: "Bearer nonsense" }
     ]) {
       const response = await get(base, "/api/v1/codex/pages", headers);
       expect(response.status, JSON.stringify(headers)).toBe(401);
@@ -117,7 +117,7 @@ describe("codex 401 vs 403", () => {
     }
   });
 
-  it("answers 403 to every token that was presented and failed - player, junk, expired-looking, underscoped", async () => {
+  it("answers 403 to every valid credential that does not reach the route: a player, an underscoped credential", async () => {
     const { base } = await fixture();
     const created = await body(await post(base, "/api/v1/codex/pages", GM, { title: "Keep" }));
     const pageId = created.data.page.id as string;
@@ -125,13 +125,6 @@ describe("codex 401 vs 403", () => {
       ["player on a write", PLAYER, "POST", "/api/v1/codex/pages", { title: "Nope" }],
       ["player on a GM-grade read", PLAYER, "GET", "/api/v1/codex/settings", undefined],
       ["player on the reveal audit", PLAYER, "GET", "/api/v1/codex/reveal-audit", undefined],
-      [
-        "junk bearer on a role read",
-        { ...ANONYMOUS, authorization: "Bearer nonsense" },
-        "GET",
-        "/api/v1/codex/pages",
-        undefined
-      ],
       ["codex:read on a write", READ_CREDENTIAL, "PATCH", `/api/v1/codex/pages/${pageId}`, { title: "Mine" }],
       ["codex:write on a read", WRITE_CREDENTIAL, "GET", "/api/v1/codex/pages", undefined]
     ] as const) {
@@ -143,10 +136,10 @@ describe("codex 401 vs 403", () => {
     expect((await body(await get(base, `/api/v1/codex/pages/${pageId}`, GM))).data.page.title).toBe("Keep");
   });
 
-  it("keeps 404-not-403 for a record a player may not see - a different axis, and it does not move", async () => {
+  it("keeps 404-not-403 for a record a player may not see: a different axis, and it does not move", async () => {
     const { base } = await fixture();
     const secret = await body(
-      await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", gmBody: "Meets under the inn." })
+      await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", blocks: [{ text: "Meets under the inn." }] })
     );
     const response = await get(base, `/api/v1/codex/pages/${secret.data.page.id}`, PLAYER);
     expect(response.status).toBe(404);
@@ -160,7 +153,7 @@ describe("codex integration credentials", () => {
     await post(base, "/api/v1/codex/pages", GM, {
       title: "The Cult",
       playerBody: "A rumour.",
-      gmBody: "Meets under the inn."
+      blocks: [{ text: "Meets under the inn." }]
     });
 
     const asCredential = await body(await get(base, "/api/v1/codex/pages", READ_CREDENTIAL));
@@ -170,10 +163,10 @@ describe("codex integration credentials", () => {
     expect(asCredential).toEqual(asGm);
     expect(asCredential.data.pages[0].revealedToPlayers).toBe(false);
 
-    // An unrevealed page: a player would 404 here; the credential reads it whole, `gmBody` included.
+    // An unrevealed page: a player would 404 here; the credential reads it whole, hidden blocks included.
     const pageId = asGm.data.pages[0].id as string;
     const document = await body(await get(base, `/api/v1/codex/pages/${pageId}`, READ_CREDENTIAL));
-    expect(document.data.page.gmBody).toBe("Meets under the inn.");
+    expect(document.data.page.blocks[0].text).toBe("Meets under the inn.");
     expect((await get(base, `/api/v1/codex/pages/${pageId}`, PLAYER)).status).toBe(404);
   });
 
@@ -295,15 +288,42 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     expect((await body(after)).data.pages).toHaveLength(1);
   });
 
+  // The store revision moves on every write, GM-only ones included, so a player tag built from it would tell the
+  // table that the GM had just saved something. A player's tag fingerprints what that player receives.
+  it("keeps a player's tag through a GM-only write, and moves it when the player's answer changes", async () => {
+    const { base } = await fixture();
+    const created = await body(
+      await post(base, "/api/v1/codex/pages", GM, { title: "Keep", playerBody: "Stone.", revealedToPlayers: true })
+    );
+    const id = created.data.page.id as string;
+    const paths = ["/api/v1/codex/pages", `/api/v1/codex/pages/${id}`];
+    const tags = await Promise.all(paths.map(async (path) => (await get(base, path, PLAYER)).headers.get("etag")!));
+
+    await patch(base, `/api/v1/codex/pages/${id}`, GM, { blocks: [{ text: "The vault is under it." }] });
+    await post(base, "/api/v1/codex/pages", GM, { title: "Hidden prep" });
+    for (const [index, path] of paths.entries()) {
+      const conditional = await get(base, path, { ...PLAYER, "if-none-match": tags[index] });
+      expect(conditional.status, `${path} after GM-only writes`).toBe(304);
+    }
+
+    await patch(base, `/api/v1/codex/pages/${id}`, GM, { title: "Keep tower" });
+    for (const [index, path] of paths.entries()) {
+      const conditional = await get(base, path, { ...PLAYER, "if-none-match": tags[index] });
+      expect(conditional.status, `${path} after a player-visible write`).toBe(200);
+      expect(conditional.headers.get("etag")).not.toBe(tags[index]);
+    }
+    for (const tag of tags) expect(tag).toMatch(/^W\/"codex-c[0-9a-f]{16}-player-[0-9a-f]{12}"$/);
+  });
+
   it("tags GM and player reads differently, so one cached answer can never be served to the other role", async () => {
     const { base } = await fixture();
     await post(base, "/api/v1/codex/pages", GM, { title: "Keep" });
     const gmTag = (await get(base, "/api/v1/codex/pages", GM)).headers.get("etag");
     const playerTag = (await get(base, "/api/v1/codex/pages", PLAYER)).headers.get("etag");
     expect(gmTag).not.toBe(playerTag);
-    // Presenting the GM's tag as a player is a cache miss, not a 304 - the bodies genuinely differ.
+    // Presenting the GM's tag as a player is a cache miss: the bodies genuinely differ.
     expect((await get(base, "/api/v1/codex/pages", { ...PLAYER, "if-none-match": gmTag as string })).status).toBe(200);
-    // A credential reads at GM grade, so it shares the GM tag rather than minting a third one.
+    // A credential reads at GM grade, so it shares the GM tag and mints no third one.
     expect((await get(base, "/api/v1/codex/pages", READ_CREDENTIAL)).headers.get("etag")).toBe(gmTag);
   });
 
@@ -317,7 +337,7 @@ describe("codex conditional reads (weak ETag + 304)", () => {
     const pagesTag = (await get(base, "/api/v1/codex/pages", GM)).headers.get("etag") as string;
     const sessionsTag = (await get(base, "/api/v1/codex/sessions", GM)).headers.get("etag") as string;
     expect(sessionsTag, "two endpoints at one revision are two resources").not.toBe(pagesTag);
-    // The other endpoint's tag must be a cache miss, not an empty 304.
+    // The other endpoint's tag must be a cache miss with a body.
     expect((await get(base, "/api/v1/codex/sessions", { ...GM, "if-none-match": pagesTag })).status).toBe(200);
     expect((await get(base, "/api/v1/codex/pages", { ...GM, "if-none-match": sessionsTag })).status).toBe(200);
     // ...and each still 304s against its own.
@@ -422,17 +442,25 @@ describe("codex responses validate against the schemas the document publishes", 
         title: "Barovia",
         entityType: "location",
         playerBody: "A misty valley. See [[The Harpers]].",
-        gmBody: "The mists are alive.",
+        blocks: [{ text: "The mists are alive." }, { title: "Rumour", text: "The burgomaster drinks." }],
         tags: ["valley"],
-        fields: { ruler: "Strahd" },
-        gmFields: { secret: "yes" },
+        fields: { ruler: "Strahd", region: "Svalich Woods" },
+        hiddenFields: ["region"],
         inWorldDate: { year: 1492, month: 0, day: 3 }
       })
     );
     const shownId = shown.data.page.id as string;
     await reveal(`/api/v1/codex/pages/${shownId}/reveal`);
-    await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", gmBody: "Meets under the inn." });
-    await post(base, `/api/v1/codex/pages/${shownId}/connections`, GM, { toPageId: factionId, label: "ally of" });
+    // One block shown to everyone, so the player's `blocks` is non-empty and gets validated.
+    await send(base, "PUT", `/api/v1/codex/pages/${shownId}/blocks/${shown.data.page.blocks[1].id}/audience`, GM, {
+      audience: "everyone"
+    });
+    await post(base, "/api/v1/codex/pages", GM, { title: "The Cult", blocks: [{ text: "Meets under the inn." }] });
+    await post(base, `/api/v1/codex/pages/${shownId}/connections`, GM, {
+      toPageId: factionId,
+      label: "ally of",
+      began: { inWorldDate: { year: 1490, month: 1, day: 2 }, beforeCampaign: false }
+    });
     await post(base, "/api/v1/codex/folders", GM, { path: "Places" });
 
     const map = await body(
@@ -465,20 +493,36 @@ describe("codex responses validate against the schemas the document publishes", 
         sessionNumber: 4,
         realDate: "2026-07-30",
         recapBody: "They reached the gates.",
-        prepBody: "Strahd watches.",
+        prep: [{ type: "text", title: "Prep notes", text: "Strahd watches." }],
         attendees: ["Ana"],
         status: "played"
       })
     );
     const sessionId = session.data.session.id as string;
     await reveal(`/api/v1/codex/sessions/${sessionId}/reveal`);
+    // A live board to read: the session is active, its prep has a clue that was ticked and a line was logged.
+    await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, GM, {});
+    await send(base, "PATCH", `/api/v1/codex/sessions/${sessionId}`, GM, {
+      prep: [
+        { type: "checklist", title: "Clues", items: [{ text: "The mists are alive.", done: true }] },
+        { type: "scenes", title: "Scenes", scenes: [{ title: "The gates" }] }
+      ]
+    });
+    await post(base, `/api/v1/codex/sessions/${sessionId}/log`, GM, { text: "The gates opened." });
+    await post(base, "/api/v1/codex/prep-templates", GM, {
+      name: "Gothic night",
+      sections: [{ title: "Dread", prompt: "Something watches.", type: "text" }]
+    });
 
     const quest = await body(
       await post(base, "/api/v1/codex/quests", GM, {
         title: "Find the amulet",
         playerBody: "Search the crypt.",
-        gmBody: "It is a fake.",
-        objectives: [{ text: "Enter the crypt", done: false }],
+        blocks: [{ text: "It is a fake." }],
+        objectives: [
+          { text: "Enter the crypt", done: false },
+          { text: "Test the amulet", done: false, audience: "hidden" }
+        ],
         entityIds: [shownId]
       })
     );
@@ -545,6 +589,8 @@ describe("codex responses validate against the schemas the document publishes", 
       [CODEX_PATHS.standing, "/api/v1/codex/standing", "standing"],
       [CODEX_PATHS.calendar, "/api/v1/codex/calendar"],
       [CODEX_PATHS.search, "/api/v1/codex/search?q=barovia", "hits"],
+      [CODEX_PATHS.search, "/api/v1/codex/search?sort=type,modified:desc&types=location,quest,session", "hits"],
+      [CODEX_PATHS.home, "/api/v1/codex/home?since=2000-01-01T00:00:00.000Z"],
       // Seeded in `populated()`: the marker is revealed on a revealed map and carries the party flag, so
       // both roles get a non-null body.
       [CODEX_PATHS.markerById, `/api/v1/codex/markers/${markerId}`],
@@ -570,17 +616,24 @@ describe("codex responses validate against the schemas the document publishes", 
   });
 
   it("validates every GM-grade read against its published schema", async () => {
-    const { base, shownId } = await populated();
+    const { base, shownId, sessionId } = await populated();
     for (const [contractPath, url] of [
       [CODEX_PATHS.folders, "/api/v1/codex/folders"],
       [CODEX_PATHS.pageRevisions, `/api/v1/codex/pages/${shownId}/revisions`],
       [CODEX_PATHS.revealAudit, "/api/v1/codex/reveal-audit"],
       [CODEX_PATHS.settings, "/api/v1/codex/settings"],
-      [CODEX_PATHS.export, "/api/v1/codex/export"]
+      [CODEX_PATHS.export, "/api/v1/codex/export"],
+      [CODEX_PATHS.prepTemplates, "/api/v1/codex/prep-templates"],
+      [CODEX_PATHS.board, "/api/v1/codex/board"],
+      [CODEX_PATHS.sessionHappened, `/api/v1/codex/sessions/${sessionId}/happened`]
     ] as const) {
       const response = await get(base, url, GM);
       expect(response.status, `GET ${url}`).toBe(200);
-      check(documentedResponse(contractPath), await body(response), `GET ${url}`);
+      const payload = await body(response);
+      check(documentedResponse(contractPath), payload, `GET ${url}`);
+      // A schema check over an empty board or recap proves nothing.
+      if (contractPath === CODEX_PATHS.board) expect(payload.data.board.checklists[0].items).toHaveLength(1);
+      if (contractPath === CODEX_PATHS.sessionHappened) expect(payload.data.happened.cluesTicked).toHaveLength(1);
     }
   });
 

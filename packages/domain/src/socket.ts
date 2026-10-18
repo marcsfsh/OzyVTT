@@ -7,7 +7,10 @@ import type {
   ContentGlossaryResult,
   ContentEquipmentResult,
   ContentFeatsResult,
+  ContentCompendiumKind,
+  ContentCompendiumResult,
   ContentLanguagesResult,
+  ContentMonsterBenchmarksResult,
   ContentMonstersResult,
   ContentNamesResult,
   ContentSheetResult,
@@ -24,6 +27,7 @@ import type {
   ActorActionsAvailabilityResult,
   ActorAddResult,
   ActorMovementResult,
+  NextLevelResult,
   AnnotationAddResult,
   CharacterDraftResult,
   CheckRollResult,
@@ -36,10 +40,16 @@ import type {
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
+  SampleRemovalResult,
   SceneCreateResult,
-  StabilizeResult
+  StabilizeResult,
+  LightAddResult,
+  VisionPreviewResult,
+  ScenePreviewResult,
+  WallAddResult
 } from "./results.js";
 import type { ClientRole, CombatLogEntry, GmView, PlayerView } from "./views.js";
+import type { SoundBoardResult, SoundBoardView, SoundCommandResult } from "./sound.js";
 
 // Type-only: the payload types are read off the schemas, and the schemas stay on the server's side of the import graph.
 import type {
@@ -51,6 +61,7 @@ import type {
   ActorImportDefinitionSchema,
   ActorRechooseSchema,
   ActorRemoveSchema,
+  CharacterForceReleaseSchema,
   ActorRestSchema,
   ActorReviveSchema,
   ActorSetSpeedSchema,
@@ -80,6 +91,7 @@ import type {
   CharacterRebuildSchema,
   CharacterResolveImportSchema,
   CharacterSetCurrencySchema,
+  CharacterSetFavouritesSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
@@ -154,10 +166,29 @@ import type {
   TokenMoveSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
-  TurnUseSchema
+  TurnUseSchema,
+  DoorSetOpenSchema,
+  LightAddSchema,
+  LightMoveSchema,
+  LightRemoveSchema,
+  SoundArrangeSchema,
+  SoundNextTrackSchema,
+  SoundPauseSchema,
+  SoundPlaySchema,
+  SoundScenePresetSchema,
+  SoundStopSchema,
+  VisionPreviewSchema,
+  ScenePreviewSchema,
+  VisionResetExploredSchema,
+  VisionSetAmbientSchema,
+  VisionSetEnabledSchema,
+  WallAddSchema,
+  WallClearSchema,
+  WallMoveSchema,
+  WallRemoveSchema
 } from "./commands.js";
 
-/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState - presentation only; the roll history is the durable record. */
+/** A brief, ephemeral battlemap notification ("Goblin took 6 damage"). Never stored in GameState; it is presentation only, and the roll history is the durable record. */
 export type TableEvent = Readonly<{
   id: string;
   kind: "damage" | "heal" | "save" | "action" | "condition" | "reaction" | "effect" | "death-save";
@@ -165,7 +196,13 @@ export type TableEvent = Readonly<{
   actorIds: readonly string[];
   at: number;
 }>;
-/** The codex changed. Revision only, so each recipient refetches its own projection without learning what changed. */
+/** Which character the GM released, told to the player who had it so the picker can say why it is back. */
+export type ClaimReleasedEvent = Readonly<{ actorId: string; name: string }>;
+/**
+ * The codex changed. Revision only, so each recipient refetches its own projection without learning what changed.
+ * A GM's device gets the store's revision on every write; a player's gets a count of the changes players can read,
+ * and only when one happens.
+ */
 export type CodexChangedEvent = Readonly<{ codexRevision: number }>;
 /** The homebrew library changed. Revision only: a payload would hand players GM-only drafts. */
 export type HomebrewChangedEvent = Readonly<{ revision: number }>;
@@ -176,6 +213,12 @@ export interface ServerToClientEvents {
   "log:entry": (entry: CombatLogEntry) => void;
   "codex:changed": (event: CodexChangedEvent) => void;
   "homebrew:changed": (event: HomebrewChangedEvent) => void;
+  /** The sound board changed, or a table screen's sound did. Sent to GM sessions only: players learn nothing of it. */
+  "sound:changed": (view: SoundBoardView) => void;
+  /** This socket's session was revoked or ran out. The server disconnects it right after; the client signs in again. */
+  "session:ended": () => void;
+  /** The GM let go of this player's character. Sent only to that player's own devices. */
+  "claim:released": (event: ClaimReleasedEvent) => void;
 }
 export type SessionJoinResult = {
   ok: boolean;
@@ -183,6 +226,8 @@ export type SessionJoinResult = {
   sessionId?: string;
   token?: string;
   message?: string;
+  /** On a refusal: `unauthenticated` when the token sent is malformed, expired or revoked. The client drops it. */
+  code?: string;
 };
 
 /** JSON a caller may build from readonly data: arrays and objects at any depth may be readonly. */
@@ -206,12 +251,17 @@ export interface ClientToServerEvents {
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:force-release": (
-    payload: CommandPayload<typeof ActorRemoveSchema>,
+    payload: CommandPayload<typeof CharacterForceReleaseSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "content:monsters": (
     payload: Record<string, never>,
     acknowledgement: (result: ContentMonstersResult) => void
+  ) => void;
+  /** What the bundled stat blocks of each challenge rating have, for the homebrew monster wizard. */
+  "content:monster-benchmarks": (
+    payload: Record<string, never>,
+    acknowledgement: (result: ContentMonsterBenchmarksResult) => void
   ) => void;
   /** `joinEncounter` also adds the new combatant to the running fight (initiative + tray token) in the same command. Ignored when no fight is running. */
   "actor:add-from-definition": (
@@ -221,6 +271,11 @@ export interface ClientToServerEvents {
   "actor:remove": (
     payload: CommandPayload<typeof ActorRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Removes every sample character the GM may remove; the reply names those removed and those kept, with why. */
+  "actor:remove-samples": (
+    payload: CommandPayload<typeof CommandIdentitySchema>,
+    acknowledgement: (result: SampleRemovalResult) => void
   ) => void;
   "actor:import-definition": (
     payload: CommandPayload<typeof ActorImportDefinitionSchema>,
@@ -250,7 +305,7 @@ export interface ClientToServerEvents {
   ) => void;
   /** The caller's parked character build (one per player session, one for the GM), or null. */
   "character:draft": (payload: Record<string, never>, acknowledgement: (result: CharacterDraftResult) => void) => void;
-  /** Park the caller's in-progress build on the server, replacing any it parked before. */
+  /** Park the caller's in-progress build on the server, over any it parked before. */
   "character:save-draft": (
     payload: CommandPayload<typeof CharacterDraftSaveSchema>,
     acknowledgement: (result: MutationResult & { updatedAt?: string }) => void
@@ -434,6 +489,11 @@ export interface ClientToServerEvents {
   ) => void;
   "content:feats": (payload: Record<string, never>, acknowledgement: (result: ContentFeatsResult) => void) => void;
   "content:names": (payload: Record<string, never>, acknowledgement: (result: ContentNamesResult) => void) => void;
+  /** One kind of the Compendium: the SRD and the homebrew this reader receives. */
+  "content:compendium": (
+    payload: { kind: ContentCompendiumKind },
+    acknowledgement: (result: ContentCompendiumResult) => void
+  ) => void;
   "content:monster-actions": (
     payload: { definitionId: string },
     acknowledgement: (result: ContentActionsResult) => void
@@ -582,6 +642,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CharacterSetCurrencySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** Pin options to the sheet's turn card. The GM for anyone; a player for their own claimed character. */
+  "character:set-favourites": (
+    payload: CommandPayload<typeof CharacterSetFavouritesSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   // `classes[].hitDie` lets an identity edit rebuild the multiclass hit-dice pool (Fighter 3 / Wizard 2 is 3d10 + 2d6).
   "character:set-identity": (
     payload: CommandPayload<typeof CharacterSetIdentitySchema>,
@@ -617,6 +682,8 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ActorActionsAvailabilityResult) => void
   ) => void;
   "actor:movement": (payload: { actorId: string }, acknowledgement: (result: ActorMovementResult) => void) => void;
+  /** What a character's next level brings; only when the caller may level that character. */
+  "character:next-level": (payload: { actorId: string }, acknowledgement: (result: NextLevelResult) => void) => void;
   "turn:use": (
     payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -718,6 +785,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof SceneReorderSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** GM only: what the shared screen or one party character's player would receive if the scene were live now. */
+  "scene:preview": (
+    payload: CommandPayload<typeof ScenePreviewSchema>,
+    acknowledgement: (result: ScenePreviewResult) => void
+  ) => void;
   "fog:set-enabled": (
     payload: CommandPayload<typeof FogSetEnabledSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -736,6 +808,52 @@ export interface ClientToServerEvents {
   ) => void;
   "terrain:reset": (
     payload: CommandPayload<typeof TerrainResetSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:set-enabled": (
+    payload: CommandPayload<typeof VisionSetEnabledSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:set-ambient": (
+    payload: CommandPayload<typeof VisionSetAmbientSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:reset-explored": (
+    payload: CommandPayload<typeof VisionResetExploredSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM only: where one creature, or the whole party, sees now. */
+  "vision:preview": (
+    payload: CommandPayload<typeof VisionPreviewSchema>,
+    acknowledgement: (result: VisionPreviewResult) => void
+  ) => void;
+  "wall:add": (payload: CommandPayload<typeof WallAddSchema>, acknowledgement: (result: WallAddResult) => void) => void;
+  "wall:move": (
+    payload: CommandPayload<typeof WallMoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "wall:remove": (
+    payload: CommandPayload<typeof WallRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "wall:clear": (
+    payload: CommandPayload<typeof WallClearSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "door:set-open": (
+    payload: CommandPayload<typeof DoorSetOpenSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "light:add": (
+    payload: CommandPayload<typeof LightAddSchema>,
+    acknowledgement: (result: LightAddResult) => void
+  ) => void;
+  "light:move": (
+    payload: CommandPayload<typeof LightMoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "light:remove": (
+    payload: CommandPayload<typeof LightRemoveSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (
@@ -777,5 +895,31 @@ export interface ClientToServerEvents {
   "annotation:clear": (
     payload: CommandPayload<typeof AnnotationClearSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: the sound board, with the table screens' sound states. */
+  "sound:board": (payload: Record<string, never>, acknowledgement: (result: SoundBoardResult) => void) => void;
+  "sound:arrange": (
+    payload: CommandPayload<typeof SoundArrangeSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:play": (
+    payload: CommandPayload<typeof SoundPlaySchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:stop": (
+    payload: CommandPayload<typeof SoundStopSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:next-track": (
+    payload: CommandPayload<typeof SoundNextTrackSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:pause": (
+    payload: CommandPayload<typeof SoundPauseSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
+  ) => void;
+  "sound:set-scene-preset": (
+    payload: CommandPayload<typeof SoundScenePresetSchema>,
+    acknowledgement: (result: SoundCommandResult) => void
   ) => void;
 }

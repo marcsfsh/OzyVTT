@@ -14,10 +14,11 @@ projection computed for their role. Nothing is sent as full state and filtered o
 ```
 Player browser ─┐                                  ┌─▶ game store ─────────┐
                 ├─ Socket.IO (game) ─┐             ├─▶ codex store         │
-GM browser ─────┤                    ├─▶ validate ─┼─▶ homebrew store      ├─ data/vtt.sqlite
-                └─ HTTP /api/v1 ─────┘   authorize ├─▶ viewer presentation │
+GM browser ─────┤                    ├─▶ validate ─┼─▶ homebrew store      │
+                └─ HTTP /api/v1 ─────┘   authorize ├─▶ viewer presentation ├─ data/vtt.sqlite
+                                                   ├─▶ sound board         │
                                                    └─▶ combat log ─────────┘
-Table viewer ◀── SSE + cookie, player-safe presentation projection only
+Table viewer ◀── SSE + cookie, player-safe presentation projection only (and what the sound board plays)
 ```
 
 The stores are independent. Each has its own revision counter and its own change notification,
@@ -32,7 +33,7 @@ and a change to one never bumps another. They are constructed together in
 | `apps/client`                | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet). |
 | `packages/domain`            | The wire contract: `GameState`, socket event maps, projection view types, the Codex's HTTP shapes.             |
 | `packages/schemas`           | Zod schemas for actors, effects and the modifier vocabulary, shared by server and content.                     |
-| `packages/api-contract`      | The public HTTP API: path constants, command scopes and the wire schemas both sides share.                     |
+| `packages/api-contract`      | The public HTTP API: path constants, command scopes, wire schemas, the route registry and the OpenAPI builder. |
 | `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                     |
 | `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources.                            |
 | `packages/dndbeyond-pdf`     | Turns a D&D Beyond character-sheet PDF into an actor definition (runs in the browser).                         |
@@ -70,7 +71,9 @@ catalogs, the character builder's offers, action availability, the combat log) a
 `commands/reads.ts`.
 
 Commands run one at a time through a promise queue. Add new capability to the command table,
-never to one transport.
+never to one transport. After each command that commits, the pipeline withdraws any reaction prompt
+whose creature can no longer react (dropped to 0 HP or Incapacitated) by answering it for the table,
+so a held attack finishes without the reaction.
 
 ## Realtime
 
@@ -81,55 +84,149 @@ Socket.IO over the same origin as HTTP. Server-to-client events come in two kind
   belongs to exactly one player; `projectFeedRow` in `combat-log.ts` makes that decision.
 - **Ping channels** carry only a revision: `codex:changed` and `homebrew:changed`. Naming what
   changed would tell players which part of the world the GM is editing, so clients refetch
-  their own projected view instead.
+  their own projected view instead. The GM's devices get `codex:changed` with the Codex store's
+  revision on every write. A player's device gets it only when something it can read changed,
+  with a count of its own audience's changes alone: after each write the server hashes every read
+  of each audience a connected player holds (`playerCodexFingerprint` in `codex/player-reads.ts`;
+  an audience is the set of party characters the session has claimed), so a GM-only write sends
+  players nothing and a block shown to Lyra pings only Lyra's player. A claim or a release
+  changes a socket's audience, and pings it. `homebrew:changed` follows the same rule: the GM's
+  devices get the homebrew store's revision on every write, and a player's device is pinged only
+  when the homebrew its reader receives changed (`HomebrewStore.fingerprintFor`), with a number that
+  grows for that device alone and says nothing of anyone else's changes.
+- **GM-only channels** go to GM sockets alone: `sound:changed` carries the sound board and the table
+  screens' sound state. A player's socket is never sent it.
 
-On connect the server sends a full projected snapshot. The client keeps its token in
-`localStorage` and passes it in `socket.auth`, so reconnects resume without a new join. Presence
-holds a dropped session as "reconnecting" for about 8 seconds before "offline".
+On connect the server sends a full projected snapshot. The client passes its token in `socket.auth`,
+so reconnects resume without a new join. A player's token is kept in `localStorage`; the GM's in the
+tab's `sessionStorage` (a reload resumes), in `localStorage` only when the GM ticks "Keep me signed in
+on this computer", and a new tab asks the open ones over a `BroadcastChannel` (`lib/gm-token.ts`).
+A socket whose session is revoked or runs out gets `session:ended` and is dropped, and a join with a
+dead token is refused (ADR-0027). Presence holds a dropped session as "reconnecting" for about 8
+seconds before "offline".
 
 ## Identity and roles
 
 - **GM.** The first GM password can only be set from loopback (`POST /api/v1/host/setup`). It is
   stored as a bcrypt hash in `data/auth.json` with a random token secret. GM tokens are
-  HMAC-signed, expire after 12 hours, and can be revoked singly or all at once. The host routes
+  HMAC-signed, expire after 12 hours, and can be revoked singly or all at once. Changing the
+  password (Settings) ends every GM session issued before it. The host routes
   (`host-http.ts`) are the one part of `/api/v1` without open CORS, so a web page can't relay password
   guesses.
 - **Player.** No password. Joining issues a signed 30-day token. A player claims one
   player-character at a time; the claim sets that character's `ownerSessionId`. A player may
-  act only on the character they own: move it, roll for it, level it, set its token image.
+  act only on the character they own: move it, roll for it, level it, set its token image. The
+  GM can force-release a claim (asked twice for a character in the running fight); the player is
+  told on their own devices (`claim:released`).
 - **Integration credential.** A GM-minted, scoped bearer token for the HTTP API (ADR-0016).
-- **Table viewer.** A pairing code exchanged for an HttpOnly cookie. It can only read the
-  presentation projection.
+- **Table viewer.** The screen shows a six-digit code and the GM types it; the screen's own secret,
+  in a cookie, then collects an HttpOnly viewer cookie (ADR-0028). It can only read the presentation
+  projection.
 
 Role comes from the signed token, never from network position. Archived characters cannot be
 claimed, staged or added to a fight.
 
+Every HTTP route and the socket handshake read the caller through one helper (`request-auth.ts`,
+ADR-0027): 401 for no credential or one that is malformed, expired or revoked, and 403 only for a
+valid credential without the role or scope. `credential-walk.test.ts` walks every mounted route with
+four credentials and pins the answers.
+
 ## Projections: the security boundary
 
 Every byte that reaches a player or the shared screen goes through a projection built for that
-audience. There are four:
+audience. There are five:
 
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
-  get only `public` actors, a health band instead of exact HP, and owner-only sheet resources
+  get only `public` actors, a health band with no exact HP, and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,
-  owner identity, GM notes and hidden turns are removed.
+  owner identity, GM notes and hidden turns are removed. A live scene's map reaches players before
+  its fight, with the public tokens the GM has placed; the turn order and the tray wait for the
+  fight. A player's reply to an area they aimed names only the creatures they may see. A player's
+  reaction prompt names the attack total it answers only when the attack's own roll is in that
+  player's dice log. An unclaimed character carries its species and class line for the claim
+  picker, since any player could claim it and read its sheet. The options a player pins to the
+  sheet's turn card and how often each option resolved (`favouriteOptionIds`, `optionUseCounts`)
+  reach the owner and the GM only, whatever the party tier.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
-  room that may hold non-players. Only public actors with a position become tokens; annotations
+  room that may hold non-players. It follows the live scene, before and during its fight, unless
+  the GM paused it. Only public actors with a position become tokens; annotations
   are public and unexpired; initiative appears only during combat; nothing is shown while
   paused. The fields that may cross are the `ViewerEncounterScene` and
-  `ViewerPresentationProjection` types.
-- **Codex** (`codex-projections.ts`): a player gets the player half of a revealed record and
-  nothing else. Reveal is a graph: a child never leaks an unrevealed parent or target, and
-  `codex/visibility.ts` resolves a record's neighbours for the projection. Some fields (staged
-  scene ids on markers and sessions) are GM-only even when revealed. A hidden record is a 404,
-  never a 403, and ETags are computed after every gate.
+  `ViewerPresentationProjection` types, plus `sound` (`ViewerSoundProjection`, added by
+  `viewer-coordinator.ts` when the feed is sent): only what is playing, by file id, level and
+  position, never a name, the playlist or the library. The screen may fetch a sound file only
+  while it is in that projection.
+- **Codex** (`codex-projections.ts`): a player gets the parts of a revealed record that reach
+  them and nothing else. Each read is for one reader: the party characters the session has
+  claimed, or the ones the GM's preview names. A page or quest holds player text and hidden
+  blocks; each block, page field and quest objective has an audience (Hidden, Everyone, or some
+  party characters). The server assembles the body a reader gets from the player text and the
+  blocks that reach them, so a block they may not see leaves no trace, and its `[[links]]` stay on
+  the GM layer until it reaches them. A `[[link]]` to a page the reader cannot open reads as plain
+  text in every piece of record text a player receives (bodies, recaps, entries and their details,
+  titles, labels, fields, objectives, search hits and lines, home rows), since the link alone would
+  say the page exists; every player context carries the openable pages for it. A block reaches a
+  reader only once a write has stamped it for their audience, so an unstamped block fails closed.
+  Reveal is a graph: a child never leaks an unrevealed parent or target, and `codex/visibility.ts`
+  resolves a record's neighbours for the projection. Some fields are GM-only even when revealed:
+  staged scene ids on markers and sessions, and a page's folder path, which is the GM's private
+  filing (a player's `folder` filter on the page list is ignored). A page's `updatedAt` moves on
+  every save, so it stays with the GM too; players get `playerUpdatedAt`, which moves only when
+  something that reader can read changes. A record's `createdAt` would tell players when the GM
+  prepared it, so the player shapes leave it out and carry or are ordered by `firstShownAt`: the
+  moment players could first read the record, set by that write (`codex/first-shown.ts` runs in
+  every Codex write) and never moved after, through a hide or a re-reveal. A block's reveal and a
+  connection's learned date are stamped the same way, with the active session and the players'
+  published date. The order and length of a player's lists come from what the player can read
+  too: a player's search is built from that player's own reads, so a hit matches, quotes and ranks
+  only on text that reaches that reader (a block shown to Lyra is found by Lyra's player alone),
+  its modified date is the reader's `playerUpdatedAt` or the record's `firstShownAt`, and it is
+  capped after the gates (the GM's keeps relevance ranking from the index, since the GM reads
+  every row anyway). A player's home lists what is new since their last visit from the same
+  records and dates. Prep templates, session prep, the live board and the GM's home aggregates
+  have no player read at all. A player's journal places an entry by the session number the player
+  receives and then by `firstShownAt`, pins, maps, quests, standing and unnumbered sessions come in
+  first-shown order, a page's mentions keep a fixed order, a hidden page never takes a revealed
+  page's title for `[[links]]`, and a GM-layer connection never folds away a player-layer mention.
+  A hidden record is a 404, never a 403, and ETags are computed after every gate. A GM's ETag
+  carries the store revision; a player's hashes the body they receive, so a GM-only write, or a
+  reveal to another character, leaves it as it was. The GM's preview is a signed player session
+  that reads as everyone or as one party character and only reads: game commands and uploads
+  refuse it.
+- **Homebrew** (`content-library.ts`, `homebrew-store.ts`, `homebrew-player.ts`): every content read is
+  built for one audience (`ContentLibrary.forAudience`). A player session is a reader: the party
+  characters it has claimed, or the ones a Codex preview names. A reader receives a homebrew record
+  only when it is published, not archived, in a pack that is on, and shared with everyone or with one
+  of the reader's characters (`audienceReceives`); a draft is always Hidden. Everything a player gets
+  of homebrew (the builder's catalogs and offers, the gear picker, the spell catalog, the Compendium,
+  next level, spell swaps) is derived from that reader's slice, so a record shown to Lyra leaves no
+  trace in Mirena's reads: no row, no count, no list id in a spell's `classes`, no ping. The GM's
+  catalog is every published record in a pack that is on. Play-time resolution of what a character or
+  a monster already has reads a third audience, `play`, which ignores the pack switch, so a pack
+  switched off takes its records out of every catalog and picker while a character keeps its items
+  and spells. The GM's See as reads one reader's catalog through GM-only routes. Players never get a
+  pack name, an audience or a reveal date.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
-  allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public.
+  allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
+  list of shared replays carries the GM's name for one, never the name of the scene it was fought on.
+
+Sight is part of the boundary (ADR-0023). `vision/audience.ts` decides, per audience, which
+creatures it may know of. A player sees through their own placed characters; the table viewer, a
+spectator and a replay see through the whole party. A creature that isn't a player character is
+hidden from an audience, exactly like a `gm-only` one, when none of its characters perceive it
+(dynamic vision on), or when its whole space lies under the scene's manual fog (fog on). The same
+goes for one staged that way in a prepared scene, and, with the fog on, for one in the fight but not
+yet on the map. Every projection, the feed and toast gate, and a player's target check read that one
+answer (`AudienceSight`). Rules, narration and refusals ask it through `hiddenFrom`, the shared hidden
+check: GM-only, or hidden by sight or the fog, for the table or for one player. A line that would
+name a hidden creature names "A hidden threat", a rule it would bend for a visible creature doesn't
+apply, and a public roll it makes is recorded GM-only. Another player's character out of
+sight keeps its actor but loses its token. An audience's own characters are always sent, and so
+is a creature with any part of its space revealed.
 
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
-of a hidden thing. When in doubt, leave it out. Fog of war is presentation only (ADR-0022);
-hidden things are stripped by the projections regardless of what fog covers.
+of a hidden thing. When in doubt, leave it out.
 
 ## Maps, tokens and the grid
 
@@ -143,6 +240,23 @@ hidden things are stripped by the projections regardless of what fog covers.
   preview that mirrors the server.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
   reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
+- A prepared scene is edited through the same commands as the live table, each with the scene's
+  `sceneId`. Each scene carries when it was made, last changed and last live (`createdAt`,
+  `updatedAt`, `liveAt`), GM-only like the rest of `combat.scenes`; the server stamps a change
+  after each mutation (`stampSceneChanges`). `scene:preview` (GM only, `scene-preview.ts`)
+  answers what the table screen or one party character would get if a scene went live now: it
+  makes the scene live in a copy of the state and runs the real projections over it, and nothing
+  is committed (ADR-0035).
+- Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
+  image-pixel segments, placed and carried lights, and an ambient light level
+  (`vision/edit.ts`). The server builds each viewer's visibility polygon against the walls, cuts it
+  to the creature's senses and the lights (`vision/geometry.ts`, `vision/sight.ts`), and caches
+  polygons by walls, origin and radius. Senses come from stat blocks, species and features, and
+  light from equipped items (`vision/senses.ts`). After every command the server adds what the
+  party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
+  get only polygons and rectangles to paint. While vision is on, walls, closed doors and windows
+  also bar movement, and sight decides an attack's unseen Advantage and Disadvantage and whether
+  Hide is allowed.
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
@@ -151,7 +265,7 @@ hidden things are stripped by the projections regardless of what fog covers.
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. Players and the table screen get only the terrain the
-  fog reveals.
+  fog reveals, and with vision on only what the party has seen.
 
 ## Rules engine
 
@@ -190,7 +304,7 @@ refuses a rider gated on a moment its reader never collects.
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
-it over (`character.give-item`). A long rest gives back the item's printed dice (`charges.regain`), not
+it over (`character.give-item`). A Long Rest gives back the item's printed dice (`charges.regain`), not
 every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
@@ -208,9 +322,15 @@ it Prone, and Fire damage on an oiled creature within the minute deals 5 more. A
 Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
 or out of one.
 
-What a save does is data on the action's save block, not read from its description: `successDamage`
-(half or none) and the `failureCondition` a failed save imposes. They are written where the content
+What a save does is data on the action's save block: `successDamage` (half or none) and the
+`failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
+
+The sheet's turn list reads `actor:available-actions`, which is owner-or-GM only: each option's availability with
+one short sentence for why it can't be used now (`availability-reasons.ts`), a flag on what belongs off a turn list
+(a rider such as Savage Attacker, a rest feature such as Arcane Recovery, a spell area's step the server runs), and the
+mastery property a mastered weapon swing carries (`weapon-masteries.ts`). The server keeps each character's turn-card
+pins (`character.set-favourites`) and counts each option that resolves for it (`option-uses.ts`), a bounded map.
 
 Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
 (`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
@@ -232,7 +352,40 @@ names no family is the GM's own ruling on the whole command.
   the package's `sources/` by `npm run content`. Class and magic-item mechanics are authored
   separately and merged at build time.
 - The GM authors homebrew in the app. It is stored in its own store (`homebrew-store.ts`),
-  validated against the same schemas, and served through `homebrew-http.ts`.
+  validated against the same schemas, and served through `homebrew-http.ts`. A record is named before
+  it is made (its id is minted from the name and never changes), and a duplicate keeps what it was
+  based on (the SRD or homebrew record, its name and when it was copied) for Compare.
+- Who sees a record is its audience: Hidden, Everyone, or chosen party characters, with a stamp each
+  time it reached an audience. A draft is always Hidden, and unpublishing hides. The GM sets it per
+  record or for many records in one write. Every record belongs to a pack: this table's own, or an
+  imported pack with its name, credit and an on or off switch. Import is decided per record (as new,
+  replacing the GM's own draft, skipped, or as a renamed copy) from a dry run that reports each
+  record's kind, clash and problems in names; a published record is never replaced. Export takes a
+  chosen set under a pack name.
+- Every write leaves a history row (`homebrew_record_revisions`) with the device, the event and the
+  fields it changed. History is read and restored over HTTP (a restored version becomes changes not
+  live), and a stale save's 409 carries the fields the stored copy changed since, with both values.
+- The publish gate (`homebrew-validate.ts`) returns sentences a GM reads: `homebrew-issues.ts` turns
+  the schemas' findings into plain words that name the field and its owner, and every reference names
+  a record. The gate reads the table with every pack on and warns when a record needs one from a pack
+  that is off. The GM's Compendium reads (`homebrew-library.ts`) put the SRD's rows beside the
+  homebrew of a kind with the kind's own columns, count by source and kind, and search the homebrew's
+  text. Players read the same kinds, without monsters, through `content:compendium`.
+- The GM's tab is the Compendium (`apps/client/src/compendium/`, ADR-0033): one table per kind with the
+  SRD and the homebrew together, and each record at its own address with Card, Edit, Sharing and History.
+  A record is made and edited in steps (`homebrew/wizard/`, ADR-0026): a wizard is data over the editor's
+  own fields in plainer words, and a few composers keep derived values in step, such as a monster's
+  Proficiency Bonus, XP and Hit Points or a spell's upcast rows. `wizard/steps.ts` gives every field no
+  step asks a home step. `useHomebrewRecord` owns the draft, autosave, Publish and a conflict's merge for
+  every tab, and the review step places the publish checklist on the step that answers each item. The
+  checklist's sentences come from `homebrew-issues.ts` in the content package, the same words the gate
+  sends. The monster wizard compares its numbers with the SRD stat blocks of its CR, read from the bundle
+  by `content:monster-benchmarks`.
+- A preview is the page: `CompendiumCard` draws a draft with the sheet's spell and item cards, the
+  builder's detail and the bestiary's stat block (`encounter/StatBlock.tsx`), fed by
+  `homebrew/summaries.ts`, which a mirror test holds equal to the server's catalog summaries. See as reads
+  the server's own read for Everyone or one character (`see-as/content`). Players read the Compendium in
+  the Codex (`compendium/player/`) over `GET /content/compendium` with their own token.
 - Characters are built server-side (`character-build.ts`) from content and the choices made in
   the guided builder. What a build may pick is one survey (`character-offers.ts`): a create
   validates against it, the random generator answers it, and the builder is served it for each
@@ -240,42 +393,110 @@ names no family is the GM's own ruling on the whole command.
   names the class each level went to (`classLevels`, kept in the choice ledger so a rebuild keeps the
   order); each class's features read that class's own level, and the server checks the SRD
   multiclass prerequisites with the scores of the moment each class is taken. An unfinished build
-  is parked on the server (`character-drafts.ts`), one per player session and one for the GM, beside
-  the game state rather than in it, and read back only by its owner. A D&D Beyond PDF can be
-  imported as an actor definition.
+  is parked on the server (`character-drafts.ts`), one per player session and one for the GM, in its own
+  table beside the game state, and read back only by its owner. A D&D Beyond PDF can be
+  imported as an actor definition. What a character's next level brings is read from the same
+  survey at the next level (`next-level.ts`, `character:next-level`), for whoever may level it.
+  The builder's own rolls carry the purpose `builder`, so a sheet's latest roll leaves them out.
+- A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
+  same builder from a fixed seed, so they level like any built character. Each is marked `sample`
+  (GM-only), and one command (`actor.remove-samples`) removes every sample the roster rules let go and
+  names any a player holds or a fight uses.
+
+## Sound
+
+Music and ambient sound play on the table screen only (ADR-0024); players' devices and the GM's never
+play it. The GM's library is content-addressed files under `data/sound-assets/` with names in its own
+table (`audio-assets.ts`, `sound-catalog.ts`, GM-only routes in `sound-http.ts`); an upload is sniffed
+from its bytes and walked far enough to read its length and refuse a truncated, video or non-sound
+file. The board (`sound-board.ts`, persisted by `sound-store.ts`, run by `sound-service.ts`) is apart
+from the game state so it never bumps the game revision: a playlist the server moves on by itself with
+a crossfade, looping ambient layers, one-shot effects, levels, pause, and a sound per scene that starts
+when the scene goes live. The `sound.*` commands sit in the game command table but write that store.
+The table screen's engine (`viewer/sound-engine.ts`) streams each file through a Web Audio gain, joins
+at the position the feed gives, shows "Tap to turn on sound" until its browser allows sound, and
+reports which of the two it is in for the GM's board.
 
 ## Codex
 
 The worldbuilding Codex has its own store (`codex-store.ts`, a facade over one module per
 aggregate in `apps/server/src/codex/`), router (`codex-http.ts`) and projection module, and does
-not go through the game command pipeline. Every record has a player half, a GM half and a
-reveal flag. Its HTTP shapes are defined once in `packages/domain/src/codex-wire.ts`: a record's GM
-shape is the stored row, its player shape is a separate allow-list type, and the projections and
-the client's reads are typed against both. The GM can preview the player view through
-`POST /api/v1/codex/preview-session`, which mints a real player session. The player calendar and
-the GM calendar are separate clocks; a date reaches players only when it is published.
+not go through the game command pipeline. Every record has a reveal flag and text players read.
+A page or quest keeps what only some readers see as hidden blocks (`codex/blocks.ts`): markdown
+anchored between paragraphs of the player text, each with its own audience and the stamps of when
+it reached each one, stored as a JSON list on the record. A page's fields each have an audience
+too (a per-page list of Hidden keys), and so does each quest objective. The other records keep a
+GM half beside the player half (a session's prep sections, an entry's GM text). Its HTTP shapes
+are defined once in `packages/domain/src/codex-wire.ts` (session prep's in `codex-prep-wire.ts`
+beside it): a record's GM shape is the stored row, its player shape is a separate allow-list
+type, and the projections and the client's reads are typed against both. Every read a player can
+make is built in one place, `PlayerCodexReads` in `codex/player-reads.ts`, for one reader (the
+characters the session has claimed), which the router serves and the players' ping hashes. The GM
+can preview the player view through `POST /api/v1/codex/preview-session`, which mints a real
+player session that reads as everyone or as one party character. The player calendar and the GM
+calendar are separate dates; a date reaches players only when it is published. Codex migration 4
+(`codex/hidden-blocks-migration.ts`) turned the old single GM body into Hidden blocks, one per
+`##` heading after the player text, and migration 5 turned a session's free-text prep into one
+Text section; a version 1 backup restores through the same conversions.
+
+Session prep is a list of typed sections (Text, Checklist, Linked pages, Scenes, Clocks, Quests in
+play, Encounters; `codex/prep.ts`, shapes in `codex-prep-wire.ts`). A session copies its sections
+from a prep template when it is made, from the GM's library of templates or the built-in starting
+template, and owns the copy: editing a template never changes a session, and re-applying one keeps
+what was written in the sections that still match. The live board (`codex/live.ts`) reads the active
+session's prep; its commands tick a clue, set the current scene and log a line as a note filed under
+the session. A tick and the current scene change the prep, so they move the session's `rev`, and an
+editor holding the old one gets a conflict instead of overwriting the tick. Party position is one
+write that moves the party pin to a point on any map, or makes one. Search filters and sorts, and the
+GM's home counts, recent changes and reveal check, are built in `codex/find.ts`; a player's search
+and home are built in `player-reads.ts` from that player's own reads.
+
+The Scenes tab asks the Codex which records point at each table scene: `GET /api/v1/codex/scene-links` (GM only,
+`codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the
+atlas that name it.
+
+The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
+(`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that
+crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
+`codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day.
 
 ## Public HTTP API
 
 `/api/v1` exposes the game commands, the Codex, homebrew and the viewer over versioned
-envelopes, using the same handlers, authorization and projections as the UI. The OpenAPI
-document is assembled in `apps/server/src/openapi/` and served at `/api/v1/openapi.json`. The
-components with a Zod schema behind them (the contract's shapes, the homebrew vocabulary and record
-bodies, the Codex write bodies and records, the content catalogs, the viewer, map, available-actions and
-builder-offer responses, every game command's request body) are generated from it in `components.ts`,
-with their prose in `descriptions.ts`; each game command's operation comes from the command table. Each
-response's TypeScript type is inferred from its schema (`packages/domain/src/codex-wire.ts`, `content.ts`
-and `results.ts`, and the server's viewer and map modules), so a field added to a projection reaches the
-document with it. `document.ts` keeps the structure around them: the response envelopes, the
-role-projected `oneOf` reads, a few small fixed shapes, and the objects it deliberately leaves opaque. Conventions are in
+envelopes, with the same handlers, authorization and projections as the UI. Conventions are in
 ADR-0016; every router builds them from `apps/server/src/http-kit.ts` (bearer tokens, request ids,
 envelopes), and a caught error reaches the caller only as a known refusal, never as raw text.
 
+Every operation is declared once, in the route registry in `packages/api-contract/src/routes/`
+(ADR-0034): its method and path, operation id, tag, summary and description, who may call it and with
+which scope, its path, query and body schemas, and every answer by status. A game command's route is
+generated from its entry in the command table (`gameCommandRoute`), so a command has no separate
+declaration. The routers mount from the registry (`mount` in `http-kit.ts`) and parse each request
+with the route's own schemas, and `apps/server/src/api-routes.ts` builds the OpenAPI 3.1 document
+from the registry alone when the server starts. It is served at `/api/v1/openapi.json`.
+
+Every schema in the document is generated from Zod, and its prose is the Zod schema's `.describe()`.
+The response types are inferred from the same schemas (`packages/domain/src/codex-wire.ts`,
+`content.ts` and `results.ts`, and the contract's `schemas/`), so a field added to a projection
+reaches the document with it. `routes/components.ts` names the components. A response's data must
+have a name there, and a body without one is named after its operation. Tests hold the server to the
+registry. `api-routes.test.ts` fails when Express mounts a route the registry lacks or the reverse, and
+validates real answers against the schema documented for their status. `credential-walk.test.ts`
+checks every route's 401 and 403 against the document, and `codex-queries.test.ts` checks the two
+Codex query strings the server reads by hand.
+
+To add a route, declare it with `defineRoute` in the registry file for its surface, add it to that
+file's route list (`API_ROUTES` gathers them), name its response data in `components.ts`, and mount
+it with `mount(router, routes.name, ...)`, parsing the body with `routes.name.body.schema`.
+
 ## Persistence
 
-All stores share `data/vtt.sqlite` (WAL). Integration credentials have their own SQLite file;
-GM auth is `data/auth.json`; map, token and Codex images are files under `data/`. Paths are
-chosen in `apps/server/src/index.ts`. `data/` is git-ignored.
+Everything is kept in one data directory: `DATA_DIR`, by default `apps/server/data` (a relative `DATA_DIR` is read from
+`apps/server`, and `apps/server/src/index.ts` also reads a `.env` file at the repo root). All stores share `vtt.sqlite`
+(WAL) there. Integration credentials have their own SQLite file; GM auth is `auth.json`; map, token and Codex images
+and the sound library's files are files under it. The directory is git-ignored. Elsewhere in this document, `data/`
+means it. The Docker image sets `DATA_DIR=/data` for a volume, and `JOIN_URL` names the address players open, since a
+container's network interfaces are its own (README.md, "Hosting with Docker").
 
 Every store opens its database and runs its migrations through `apps/server/src/database.ts`. Each
 store's history starts from one baseline migration recorded in the shared `migrations` table; a file
@@ -292,8 +513,63 @@ Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib
 calls through `lib/api.ts`. The table viewer is a separate bundle that never loads the game client.
 Rules checks on the client are hints only; the server decides.
 
+The table (`shell/TableView.tsx`) is a docked workbench (ADR-0025): a header bar over the map with the scene and
+the status line (`table/TableHeader.tsx`), the map's tool rail beside it (`scene/MapRail.tsx`), and one panel
+(`table/TablePanel.tsx`) with Needs you or the player's prompt slot above its tabs and the view's one primary in
+its footer. Nothing floats over the map but tokens and marks; notices land in the status line through
+`ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
+the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
+
+Scenes and maps are prepared on the Scenes tab (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx` draws
+the section bar (or a phone's tab bar) and renders the view the address names (`scenes/routes.ts`): the front page,
+the scene and map tables, a scene or a map as one document, or the steps that make or edit one
+(`scenes/EditorFrame.tsx`). A scene's page and steps are built from the table's parts (`EncounterMap`, `MapRail`,
+`TablePanel`, the tray) and edit the parked scene with its `sceneId`, so the table itself always shows the live
+scene. Placing on any map is a button and then a press on it (`armPlacement` in `scene/tableGeometry.ts`), or the
+spot menu a right-click or long press opens (`scene/MapSpotMenu.tsx`). The grid's calibration keeps its logic in
+`maps/useCalibration.tsx`, which returns its parts (note, body, actions, canvas) for the map's steps to place.
+
+The character sheet lives in `sheet/` (ADR-0030). `CharacterSheet.tsx` is one component for every place it sits: a
+page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the table panel's Me and Sheet tabs. It
+picks a narrow, wide or panel frame from the presentation and the width. Its tabs share one controller
+(`useSheetController.tsx`) that sends every change as a command. `useSheetDefinition.ts` reads
+`actor:available-actions` into the turn's options (`turn-options.ts`) with each row's reason, passive flag and mastery.
+The laptop's list (`ActionList.tsx`) and the phone's turn card (`TurnCard.tsx`) draw the same options, and the table's
+Turn tab runs them through `encounter/PlayerActionRunner.tsx`, which also aims a cast started on the sheet. A cast,
+an item or a spell to copy opens through `SheetDetail.tsx`: where its list was, in a drawer, or in the laptop's right
+column. The sheet notes the ids of the rolls it starts (`sheet-roll-ids.ts`), and its latest-roll line shows only
+those.
+
+The Codex client (ADR-0031) lives in `codex/`. `CodexShell.tsx` (the GM) and `PlayerCodex.tsx` (a player, and the
+GM's preview, which runs on a local route) both draw `shell/CodexFrame.tsx`, the section bar or the phone's tab bar,
+and render the section the address names from `shell/sections.tsx`, each entry a GM view and a player view. Views read
+the shell through context (`shell/context.ts`): the role and token, the address, and for the GM the shared feeds,
+the party and quick create. A player's views read only `playerCodexApi` and the player shapes of `api-records.ts`,
+which holds the record reads and writes (pages and quests with their blocks and audiences, search, home). The views
+live in their own folders (`home/`, `search/`, `page/`, `quests/`, `relationships/`) over the pieces in `shared/`. Who
+sees it, the filter flyout, the dropdown and the Sort dialog are shared with the Compendium, Scenes, Maps and Settings,
+so they live in `@vtt/ui` (`packages/ui/src/records/`).
+A page's editor (`page/DocEditor.tsx`) writes the player text and the hidden blocks in one document;
+`page/document.ts` places blocks by `codexParagraphs` from `@vtt/domain`, the rule the server assembles bodies by.
+The table's Codex tab is `table/CodexTab.tsx`, over the same reads.
+
+Settings (ADR-0036) lives in `settings/`. `sections.ts` declares the sections (Players, Fights, Characters, Device,
+Access and API) with their audience and every setting's label and hint; the page, its search and the tests read it.
+`SettingsPage.tsx` draws the Codex shell's section bar or phone tab bar around the section the address names
+(`/settings/<section>`); a player's page is Device alone, so GM sections never mount for a player. Each section is
+its own component and writes through the same commands as before (`table-writes.ts`). The integration credentials
+(`integrations/CredentialsTable.tsx`) read and write their GM routes. The API reference
+(`integrations/ApiReference.tsx`, an operation at `/settings/api/<operation id>` in `OperationDocument.tsx`) reads the
+OpenAPI document the route registry generates, through `integrations/openapi-model.ts` and `api-rows.ts`: the
+document's tags, in its order, group the table, and an operation's page shows the document's example body where it
+has one.
+
+The themes are Night, Dusk, Dawn and Day (`dark`, `dusk`, `dawn`, `light` on `<html data-theme>`), one token set in
+`packages/ui/src/styles/design-tokens.css`. Each HTML entry sets the stored theme before first paint, and `ThemeSwitch`
+in every app bar and `ThemeToggle` in Settings share `useTheme`, which hears every change on the page.
+
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
-homebrew, settings and the API reference, the character builder and level flow, replays, the map
-library and the shared-screen controls. pdf.js loads with the first imported PDF. The build targets
+the Compendium, settings and the API reference, the character builder and level flow, replays, the map
+library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets
 current phone and laptop browsers (Chrome and Edge 111, Firefox 121, Safari 16.4; `build.target` in
 `apps/client/vite.config.ts`), the floor the stylesheets' `:has()` and `dvh` already set.

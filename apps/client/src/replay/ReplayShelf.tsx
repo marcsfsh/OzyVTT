@@ -1,4 +1,4 @@
-import { dateOnly, useReplays } from "./replays";
+import { replayMeta, replayTitle, useReplays } from "./replays";
 import "./replay.css";
 
 /**
@@ -15,8 +15,8 @@ export function ReplayShelf({ token, onOpen }: Readonly<{ token: string; onOpen:
         {archives.map((archive) => (
           <li key={archive.id}>
             <button type="button" className="replay-shelf-row" onClick={() => onOpen(archive.id)}>
-              <span>{dateOnly(archive.endedAt)}</span>
-              <span className="replay-shelf-meta tabular">{archive.turnCount} turns</span>
+              <span>{replayTitle(archive)}</span>
+              <span className="replay-shelf-meta tabular">{replayMeta(archive)}</span>
             </button>
           </li>
         ))}

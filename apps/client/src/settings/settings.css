@@ -1,286 +1,382 @@
-/* Settings: three stacked groups (one column on a phone), two columns from 1280px.
-   `.settings-page` is the frame and `.settings-body` its one scroll region. The width cap is on the
-   two children because the frame is full-bleed (it paints the sky). */
+/* Settings: the Codex shell's section bar (laptop) or top bar and tab bar (phone) around one scrolling region, which
+   holds the open section: its heading and hint over a panel of rows. The bar and tab bar styles are the Codex
+   shell's (`codex/shell/shell.css`); this file adds what Settings needs on top. */
 
-.settings-page {
-  gap: 1.4rem;
+.settings {
+  flex: 1 1 auto;
 }
-.settings-head,
-.settings-body {
+.settings-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-5) var(--pane-gutter, var(--space-4)) calc(var(--space-10) + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-6);
+}
+/* The API reference's frame: the section fills the region and its results scroll inside it. */
+.settings-content.is-frame {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: var(--space-3);
+}
+.settings-content.is-frame > .settings-section,
+.settings-content.is-frame .settings-panel,
+.settings-content.is-frame .api-reference {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.settings-content.is-frame .api-results {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The view's primary lands here from its section; the slot itself takes no room. */
+.settings-primary-slot {
+  display: contents;
+}
+/* Six sections share the phone's tab bar. Each tab starts from its word's width, so Characters fits beside API. */
+.settings-tabbar {
+  display: flex;
+}
+.settings-tabbar .cx-tabbar-tab {
+  flex: 1 1 auto;
+  min-width: var(--tap-min);
+  padding-inline: 1px;
+}
+.settings-tabbar .cx-tabbar-tab span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+.settings-phonebar .settings-search {
+  flex: 1 1 auto;
+}
+
+/* ----- The search over settings ----- */
+.settings-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.settings-bar .settings-search {
+  width: 15rem;
+}
+.settings-search-icon {
+  position: absolute;
+  left: var(--space-3);
+  width: 1em;
+  height: 1em;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.settings-search .settings-search-input {
   width: 100%;
+  margin: 0;
+  padding-left: calc(var(--space-3) * 2 + 1em);
+}
+.settings-search-kbd {
+  position: absolute;
+  right: var(--space-2);
+  pointer-events: none;
+}
+.settings-search-results {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 30;
+  width: min(24rem, calc(100vw - 2 * var(--space-3)));
+  padding: var(--space-1);
+  border: 1px solid var(--line-raised);
+  background: var(--material-lip), var(--surface-2);
+  box-shadow: var(--shadow-2);
+}
+.settings-phonebar .settings-search-results {
+  left: 0;
+  right: auto;
+}
+.settings-search-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.settings-search-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-3);
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.3 var(--font-label);
+  cursor: pointer;
+}
+.settings-search-option.is-active {
+  background: var(--tab-on);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.settings-search-section {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.settings-search-empty {
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* ----- A section: heading, hint and its panel of rows ----- */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   max-width: 56rem;
   margin-inline: auto;
 }
-.settings-head h2 {
-  margin: 0;
-  font: 700 1.4rem/1.2 var(--font-display);
+.settings-section.is-wide {
+  max-width: none;
 }
-.settings-head p {
-  margin: 0.3rem 0 0;
-  color: var(--text-dim);
-  font-size: 0.92rem;
-}
-.settings-body {
+.settings-section-head {
   display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-}
-
-/* Panel material on a backing layer behind the content. `.settings-group` is outermost and takes the
-   chrome lip; `.settings-exceptions` is nested and gets the edge over a plain plate. No rest glow.
-   The rules switching off `.surface-glass`'s blur and wash here are a backstop. Do not delete the
-   class itself: `/viewer-controls` still uses it. */
-.settings-group,
-.settings-exceptions {
-  position: relative;
-  isolation: isolate;
-  border-radius: 0;
-  background: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-.settings-group::before,
-.settings-exceptions::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  box-sizing: border-box;
-  pointer-events: none;
-  border: var(--rim-w) solid var(--rim-color);
-  background: var(--material-fill);
-  background-origin: border-box;
-  background-clip: border-box;
-  outline: 1px solid var(--bezel-color);
-  outline-offset: calc(-1 * var(--bezel-inset));
-  transition:
-    border-color var(--dur-hover),
-    background var(--dur-hover);
-}
-.settings-group {
-  --material-fill: var(--material-lip), var(--material-plate);
-}
-.settings-exceptions {
-  --material-fill: var(--surface-2);
-}
-/* `.rim-gm` is an inset box-shadow on the element, which the backing layer would paint over, so the
-   GM edge moves onto the layer. */
-.settings-group.rim-gm {
-  box-shadow: none;
-}
-.settings-group.rim-gm::before {
-  box-shadow: inset 3px 0 0 0 var(--rim-gm);
-}
-.settings-group.rim-player {
-  box-shadow: none;
-}
-.settings-group.rim-player::before {
-  box-shadow: inset 3px 0 0 0 var(--rim-player);
-}
-
-.settings-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: var(--space-4) 1.1rem 1.2rem;
-  border: 1px solid transparent;
-}
-.settings-group > .nh-eyebrow {
-  margin-bottom: 0.6rem;
-}
-
-.settings-row {
-  display: flex;
-  gap: var(--space-4);
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.8rem 0;
-  border-top: 1px solid var(--line);
+  gap: var(--space-1) var(--space-3);
 }
-.settings-group > .settings-row:first-of-type {
-  border-top: 0;
-  padding-top: 0.2rem;
+.settings-section-head h2 {
+  margin: 0;
+  font-size: var(--fs-h2);
 }
-.settings-row.stacked {
-  flex-direction: column;
-  align-items: stretch;
+.settings-section-head p {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
 }
-.settings-row-text {
+/* A panel: the plate with the chrome lip along its top. A GM section carries the violet edge (`.rim-gm`). */
+.settings-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  padding: var(--space-1) var(--space-5);
+  border: var(--rim-w) solid var(--rim-color);
+  background: var(--material-lip), var(--material-plate);
+}
+.settings-section.is-wide .settings-panel {
+  padding: var(--space-3) var(--space-4);
+}
+
+/* One setting: the words at the left, the control at the right; a stacked one puts the control under them. */
+.setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-6);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--line);
+  scroll-margin-block: var(--space-6);
+}
+.setting-row:first-child {
+  border-top: 0;
+}
+.setting-row:focus {
+  outline: none;
+}
+.setting-row.is-stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
-.settings-row-title {
-  font-weight: 600;
-  font-size: 0.95rem;
+.setting-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text);
+  font: 700 var(--fs-body) / 1.3 var(--font-label);
 }
-.settings-row-help {
+.setting-hint {
+  margin: 0;
   color: var(--text-dim);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
-.settings-row-control {
+.setting-control {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  align-items: flex-start;
-}
-.settings-row.stacked .settings-row-control {
-  width: 100%;
-}
-.settings-row:not(.stacked) .settings-row-control {
   align-items: flex-end;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.setting-row.is-stacked .setting-control {
+  align-items: stretch;
+}
+.setting-row.is-stacked .setting-control > .nh-btn,
+.setting-row.is-stacked .setting-control > .nh-segmented,
+.setting-row.is-stacked .setting-control > .theme-toggle {
+  align-self: flex-start;
 }
 
 .settings-note {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
+}
+/* What each setting of the rules dial does, one per line. */
+.settings-dial-help {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0;
+  list-style: none;
 }
 .settings-subhead {
-  font: 700 0.78rem/1 var(--font-body);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+/* A nested group inside a row: the plate alone, with no lip. */
+.settings-subpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: var(--rim-w) solid var(--line);
+  background: var(--surface-2);
+}
+.settings-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 .settings-inline {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
   align-items: center;
+  gap: var(--space-2) var(--space-3);
 }
 .settings-inline-label {
   color: var(--text-dim);
-  font-size: 0.85rem;
-}
-
-.settings-exceptions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  width: 100%;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid transparent;
-}
-.settings-exception {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  justify-content: space-between;
+  font-size: var(--fs-sm);
 }
 .settings-methods {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) 1.2rem;
+  gap: var(--space-2) var(--space-6);
 }
-
-.settings-subsection {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--line);
-}
-.settings-session {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-
-/* An empty list says the next thing to do, on the group's own ground. */
 .settings-empty {
   margin: 0;
-  padding: 1.2rem;
-  text-align: center;
+  padding: var(--space-3) 0;
   color: var(--text-dim);
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
 }
-/* Player rows are hairline rules with no fill; `gap: 0` because the rule is the separation. */
-.settings-players {
+
+/* ----- Tables in a section (players, credentials) and their phone lists ----- */
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 500 var(--fs-sm) / 1.35 var(--font-body);
+}
+.settings-table th {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-align: start;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.settings-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  vertical-align: middle;
+}
+.settings-cell-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.settings-cell-actions {
+  text-align: end;
+  white-space: nowrap;
+}
+.settings-cell-actions .nh-btn + .nh-btn {
+  margin-left: var(--space-2);
+}
+.settings-list {
   display: flex;
   flex-direction: column;
-  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.settings-player {
+.settings-list-row {
   display: flex;
-  gap: 0.7rem;
   align-items: center;
-  padding: 0.6rem 0.2rem;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--line);
 }
-.settings-player:last-child {
-  border-bottom: 0;
-}
-.settings-player-text {
+.settings-list-text {
   display: flex;
   flex-direction: column;
-  min-width: 0;
   flex: 1 1 auto;
+  min-width: 0;
 }
-.settings-player-name {
-  font-weight: 600;
+.settings-list-text b {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.settings-player-meta {
+.settings-list-text span {
+  margin: 0;
   color: var(--text-dim);
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
 }
-.settings-player-actions {
+
+/* Changing the GM password: two fields and the Show switch. */
+.settings-password {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.settings-password label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+.settings-password .nh-switch {
+  align-self: flex-start;
+}
+.settings-error {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: var(--fs-sm);
 }
 
-/* From 1280px the GM page uses two columns: The table on the left, Mine and Players on the right.
-   `:has()` limits this to the GM's page (a player only has Mine). */
-@media (min-width: 1280px) {
-  .settings-page:has(.settings-group--table) .settings-head,
-  .settings-page:has(.settings-group--table) .settings-body {
-    max-width: 84rem;
-  }
-  .settings-page:has(.settings-group--table) .settings-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    align-content: start;
-  }
-  .settings-group--table {
-    grid-column: 1;
-    grid-row: 1 / span 2;
-  }
-  .settings-group--mine {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .settings-group--players {
-    grid-column: 2;
-    grid-row: 2;
-  }
-}
-
+/* A phone stacks every row so each control keeps the width for its words. */
 @media (max-width: 650px) {
-  /* Every row stacks on a phone so each control keeps room for its label. */
-  .settings-row {
-    flex-direction: column;
-    align-items: stretch;
+  .settings-content {
+    padding-inline: var(--space-3);
   }
-  .settings-row:not(.stacked) .settings-row-control {
-    align-items: stretch;
+  .setting-row {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .settings-player {
-    flex-wrap: wrap;
+  .setting-control {
+    align-items: flex-start;
   }
-  .settings-player-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  .settings-player-actions > * {
-    flex: 1 1 auto;
+  .settings-panel {
+    padding-inline: var(--space-3);
   }
 }

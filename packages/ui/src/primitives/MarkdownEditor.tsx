@@ -21,7 +21,7 @@ interface MarkdownEditorProps {
   onChange: (next: string) => void;
   ariaLabel: string;
   placeholder?: string;
-  /** Turns markdown into nodes. Omitted hides the Edit/View switch — an editor with no reader. */
+  /** Turns markdown into nodes. Omitted hides the Edit/View switch: an editor with no reader. */
   renderPreview?: (markdown: string) => ReactNode;
   /** `[[` autocomplete for page targets; other target syntaxes still parse and persist. */
   suggest?: (query: string) => readonly MarkdownSuggestion[];
@@ -34,7 +34,7 @@ interface MarkdownEditorProps {
   id?: string;
 }
 
-/** Insert or wrap markdown at the selection, returning the new value + the caret to restore. */
+/** Insert or wrap markdown at the selection, and return the new value + the caret to restore. */
 export function applyMarkdownFormat(
   value: string,
   start: number,

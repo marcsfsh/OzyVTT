@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 /**
@@ -8,23 +8,24 @@ import userEvent from "@testing-library/user-event";
  * state means the plain list). `attendees` stays an array of names. Both fields still accept a new name.
  */
 
-const update = vi.fn();
-const createDowntime = vi.fn();
+const update = vi.hoisted(() => vi.fn());
+const createDowntime = vi.hoisted(() => vi.fn());
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
-    sessionApi: { ...actual.sessionApi, update: (...a: unknown[]) => update(...a) },
-    journalApi: { ...actual.journalApi, createDowntime: (...a: unknown[]) => createDowntime(...a) }
+    journalApi: { ...actual.journalApi, createDowntime, chronicle: vi.fn(async () => []) },
+    calendarApi: { ...actual.calendarApi, get: vi.fn(async () => null) },
+    sessionApi: { ...actual.sessionApi, update }
   };
 });
 
 import { charactersFor } from "./characters";
-import { DowntimeView } from "./DowntimeView";
-import { SessionsView } from "./SessionsView";
-import type { CodexPageSummary, CodexSession, GmCodexCalendar } from "@vtt/domain";
+import { gmRecord, renderGmStory } from "./story/harness";
+import { GmSessionsSection, GmStorySection } from "./story/sections";
+import type { CodexChronicleRecord, CodexPageSummary, CodexSession, GmCodexCalendar } from "@vtt/domain";
 
 const page = (
   id: string,
@@ -35,6 +36,8 @@ const page = (
   title,
   entityType,
   fields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags: [],
   revealedToPlayers: true,
@@ -44,7 +47,9 @@ const page = (
   calendarInstant: null,
   rev: 1,
   createdAt: "2026-08-08T00:00:00.000Z",
-  updatedAt: "2026-08-08T00:00:00.000Z"
+  updatedAt: "2026-08-08T00:00:00.000Z",
+  playerUpdatedAt: "2026-08-08T00:00:00.000Z",
+  firstShownAt: null
 });
 
 // Vallaki is a location and is never offered; Ireena is archived at the table, Ozy is not.
@@ -64,56 +69,52 @@ const CALENDAR: GmCodexCalendar = {
   publishedDate: null
 };
 
-const SESSION: CodexSession = {
+const SESSION = {
   id: "s1",
   sessionNumber: 3,
   tags: [],
   realDate: "2026-07-12",
   attendees: [],
-  prepBody: "",
+  prep: [],
+  prepTemplateId: null,
+  currentSceneId: null,
   recapBody: "",
   revealedToPlayers: false,
   status: "planned",
   sceneIds: [],
   rev: 1,
   createdAt: "2026-07-01T00:00:00.000Z",
-  updatedAt: "2026-07-01T00:00:00.000Z"
+  updatedAt: "2026-07-01T00:00:00.000Z",
+  firstShownAt: null
+} as CodexSession;
+
+/** The session's details dialog, where Who played lives; it saves when it closes. */
+const renderSessions = async (sessions: readonly CodexSession[] = [SESSION]) => {
+  update.mockResolvedValue({ ...SESSION, rev: 2 });
+  renderGmStory(GmSessionsSection, "/codex/sessions/s1", { sessions, pages: PAGES, actors: ACTORS });
+  const user = userEvent.setup();
+  // The options menu is a details and summary pair, so its trigger is found by its name.
+  await user.click(await screen.findByLabelText("Session 3 options"));
+  await user.click(await screen.findByRole("menuitem", { name: "Edit details" }));
+  return user;
 };
+const closeDetails = (user: ReturnType<typeof userEvent.setup>) =>
+  user.click(screen.getByRole("button", { name: "Done" }));
 
-const renderSessions = (over: Partial<React.ComponentProps<typeof SessionsView>> = {}) =>
-  render(
-    <SessionsView
-      gmToken="gm"
-      sessions={[SESSION]}
-      activeSessionId={null}
-      loading={false}
-      error={null}
-      openSessionId="s1"
-      onOpenSession={vi.fn()}
-      onChanged={vi.fn()}
-      autosave={{ enabled: false, intervalSeconds: 1 }}
-      pages={PAGES}
-      actors={ACTORS}
-      {...over}
-    />
-  );
-
-const renderDowntime = (over: Partial<React.ComponentProps<typeof DowntimeView>> = {}) =>
-  render(
-    <DowntimeView
-      gmToken="gm"
-      records={[]}
-      calendar={CALENDAR}
-      pages={PAGES}
-      actors={ACTORS}
-      loading={false}
-      error={null}
-      onChanged={vi.fn()}
-      onOpenEntry={vi.fn()}
-      onOpenPage={vi.fn()}
-      {...over}
-    />
-  );
+/** The chronicle's composer on Downtime, where downtime's Who lives. */
+const renderDowntime = async (records: readonly CodexChronicleRecord[] = []) => {
+  createDowntime.mockResolvedValue({});
+  renderGmStory(GmStorySection, "/codex/story", { records, calendar: CALENDAR, pages: PAGES, actors: ACTORS });
+  return userEvent.setup();
+};
+const openDowntimeComposer = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole("button", { name: "Add to the chronicle" }));
+  await user.click(await screen.findByRole("button", { name: "Downtime" }));
+};
+const listedOptions = async () =>
+  within(await screen.findByRole("listbox"))
+    .getAllByRole("option")
+    .map((option) => option.textContent);
 
 describe("the rule underneath both fields (characters.ts)", () => {
   it("puts archived characters last and leaves the active order alone", () => {
@@ -141,10 +142,9 @@ describe("the rule underneath both fields (characters.ts)", () => {
   });
 });
 
-describe("`5a` — Who played", () => {
+describe("`5a`: Who played", () => {
   it("offers the campaign's characters, archived last and marked", async () => {
-    const user = userEvent.setup();
-    renderSessions();
+    const user = await renderSessions();
 
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     // Scoped to the chooser's listbox: the `<select>` options share the role.
@@ -152,105 +152,84 @@ describe("`5a` — Who played", () => {
     expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Ozy",
       "Ismark",
-      "Ireena — Archived"
+      "Ireena · Archived"
     ]);
   });
 
   it("stores the NAME, not the page id and not the marked-up label", async () => {
-    const user = userEvent.setup();
-    renderSessions();
+    const user = await renderSessions();
 
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     const list = within(await screen.findByRole("listbox", { name: "Who played" }));
-    await user.click(list.getByRole("option", { name: "Ireena — Archived" }));
+    await user.click(list.getByRole("option", { name: "Ireena · Archived" }));
 
     // The stored value is the plain name; `optionLabel` is display only.
     expect(within(document.querySelector(".nh-taginput-tags")!).getByText("Ireena")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(update.mock.calls[0][2].attendees).toEqual(["Ireena"]);
+    await closeDetails(user);
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls.at(-1)![2].attendees).toEqual(["Ireena"]);
   });
 
   it("still takes a guest the campaign has no page for", async () => {
-    const user = userEvent.setup();
-    renderSessions();
+    const user = await renderSessions();
 
     // Unmatched text still commits: the field stays open.
     await user.type(screen.getByRole("combobox", { name: "Who played" }), "Garrett P.{Enter}");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await closeDetails(user);
+    await waitFor(() => expect(update).toHaveBeenCalled());
     // Not slugified.
-    expect(update.mock.calls[0][2].attendees).toEqual(["Garrett P."]);
+    expect(update.mock.calls.at(-1)![2].attendees).toEqual(["Garrett P."]);
   });
 
   it("does not offer a character already listed", async () => {
-    const user = userEvent.setup();
-    renderSessions({ sessions: [{ ...SESSION, attendees: ["Ozy"] }] });
+    const user = await renderSessions([{ ...SESSION, attendees: ["Ozy"] }]);
 
     await user.click(screen.getByRole("combobox", { name: "Who played" }));
     const list = within(await screen.findByRole("listbox", { name: "Who played" }));
-    expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual(["Ismark", "Ireena — Archived"]);
+    expect(list.getAllByRole("option").map((option) => option.textContent)).toEqual(["Ismark", "Ireena · Archived"]);
   });
 });
 
-describe("`5e.3` — downtime's Who", () => {
+describe("`5e.3`: downtime's Who", () => {
   it("offers the same list in the same order, with the same word for archived", async () => {
-    const user = userEvent.setup();
-    renderDowntime();
+    const user = await renderDowntime();
+    await openDowntimeComposer(user);
 
     await user.click(screen.getByRole("combobox", { name: "Who spent the time" }));
-    const options = await screen.findAllByRole("option");
+    const options = within(await screen.findByRole("listbox")).getAllByRole("option");
     expect(options.map((option) => option.textContent)).toEqual(["Ozy", "Ismark", "IreenaArchived"]);
-    // A separate muted `meta` span, not part of the name.
+    // A separate muted `meta` span, outside the name.
     expect(within(options[2]).getByText("Archived")).toHaveClass("nh-combobox-optionmeta");
   });
 
   it("keeps `characterPageId` when an archived character is picked (D12's totals depend on it)", async () => {
-    const user = userEvent.setup();
-    renderDowntime();
+    const user = await renderDowntime();
+    await openDowntimeComposer(user);
 
     await user.click(screen.getByRole("combobox", { name: "Who spent the time" }));
-    await user.click((await screen.findAllByRole("option"))[2]);
+    await user.click(within(await screen.findByRole("listbox")).getAllByRole("option")[2]);
     await user.type(screen.getByLabelText("Activity"), "Resting");
-    await user.click(screen.getByRole("button", { name: "Log downtime" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Add to the chronicle" })).getByRole("button", { name: "Log downtime" })
+    );
 
+    await waitFor(() => expect(createDowntime).toHaveBeenCalled());
     expect(createDowntime.mock.calls[0][1].downtime).toMatchObject({ who: "Ireena", characterPageId: "c1" });
   });
 
   it("marks the archived option on the edit row's link picker too", async () => {
-    const user = userEvent.setup();
-    renderDowntime({
-      records: [
-        {
-          id: "d1",
-          kind: "downtime",
-          title: null,
-          text: "",
-          playerText: "",
-          gmText: "",
-          tags: [],
-          revealedToPlayers: false,
-          sessionId: null,
-          sessionNumber: null,
-          realDate: null,
-          inWorldDate: null,
-          inWorldLabel: "Hammer 3, 1491 DR",
-          calendarInstant: null,
-          proposedDate: null,
-          attachPageId: null,
-          attachMarkerId: null,
-          archiveId: null,
-          createdAt: "2026-08-08T00:00:00.000Z",
-          payload: { who: "ireena", activity: "Resting", days: 3, applied: true, characterPageId: null }
-        }
-      ] as never
-    });
-
-    const history = within(document.querySelector(".codex-downtime-history")!);
-    await user.click(history.getByRole("button", { name: "Edit" }));
-    await user.click(history.getByRole("combobox", { name: "Link to a character page" }));
-    expect((await screen.findAllByRole("option")).map((option) => option.textContent)).toEqual([
-      "Ozy",
-      "Ismark",
-      "IreenaArchived"
+    const user = await renderDowntime([
+      gmRecord({
+        id: "d1",
+        kind: "downtime",
+        text: "",
+        payload: { who: "ireena", activity: "Resting", days: 3, applied: true, characterPageId: null }
+      })
     ]);
+    const card = within(screen.getByRole("region", { name: "Downtime" }));
+    await user.click(card.getByText("Link a row to a character"));
+    await user.click(card.getByRole("button", { name: "Link" }));
+    await user.click(card.getByRole("combobox", { name: "Link to a character page" }));
+    expect(await listedOptions()).toEqual(["Ozy", "Ismark", "IreenaArchived"]);
   });
 });

@@ -16,6 +16,7 @@ vi.mock("../socket", () => {
 import { socket } from "../socket";
 import { ToastProvider } from "@vtt/ui";
 import { RollCallPrompts } from "../encounter/RollCallPrompt";
+import { DicePanel } from "./DicePanel";
 import { RollCallPanel } from "./RollCallPanel";
 
 // The GM calls for a check or a save from the players; each player rolls it from a card that follows them across the
@@ -74,6 +75,28 @@ const gmState = (rollCalls: readonly RollCall[] = []) =>
 
 describe("the GM's call for a roll", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("sits at the top of the GM's dice tab beside rolling, and counts the calls still open", async () => {
+    serve();
+    const user = userEvent.setup();
+    const state = { ...gmState([openCall]), rolls: [], definitions: [] } as unknown as GmView;
+    render(<DicePanel role="gm" state={state} />, { wrapper: ToastProvider });
+    const modes = screen.getByRole("group", { name: "Roll dice or call for a roll" });
+    const call = within(modes).getByRole("button", { name: "Call for a roll · 1 open" });
+    await user.click(call);
+    expect(screen.getByRole("heading", { name: "Call for a roll" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Call for the check" })).toBeTruthy();
+    expect(
+      within(screen.getByRole("list", { name: "Open calls" })).getByText("Wisdom (Perception) check")
+    ).toBeTruthy();
+    await user.click(within(modes).getByRole("button", { name: "Roll dice" }));
+    expect(screen.getByRole("button", { name: "d20" })).toBeTruthy();
+  });
+
+  it("is not offered on a player's dice tab", () => {
+    render(<DicePanel role="player" state={{ rolls: [] } as unknown as PlayerView} />, { wrapper: ToastProvider });
+    expect(screen.queryByText("Call for a roll")).toBeNull();
+  });
 
   it("calls for a skill check from everyone, or a save with its DC from those picked", async () => {
     serve();
@@ -143,7 +166,7 @@ const playerState = (calls: readonly PlayerRollCall[], over: Record<string, unkn
 describe("the player's card for a call", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("rolls the check the GM called for, or takes a typed face", async () => {
+  it("rolls the check the GM called for, and keeps the result until put away", async () => {
     serve({
       "roll-call:answer": {
         ok: true,
@@ -151,40 +174,96 @@ describe("the player's card for a call", () => {
       }
     });
     const user = userEvent.setup();
-    render(<RollCallPrompts state={playerState([playerCall()])} />, { wrapper: ToastProvider });
-    expect(await screen.findByText("The GM calls for a Wisdom (Perception) check")).toBeTruthy();
+    const { rerender } = render(<RollCallPrompts state={playerState([playerCall()])} />, { wrapper: ToastProvider });
+    expect(await screen.findByText("The GM calls for a roll")).toBeTruthy();
+    expect(screen.getByText("Wisdom (Perception) check", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("DC 15")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Roll" }));
+    await user.click(screen.getByRole("button", { name: "Roll Wisdom (Perception) check" }));
     expect(sent("roll-call:answer")).toEqual([{ callId: CALL, actorId: ARIA }]);
-    expect(await screen.findByText("Wisdom (Perception): 17 (d20 12) vs DC 15 - success.")).toBeTruthy();
-    await user.type(screen.getByLabelText("Your d20 for the Wisdom (Perception) check"), "9");
+    expect(await screen.findByText("Wisdom (Perception): 17 (d20 12) vs DC 15 · success.")).toBeTruthy();
+    // The server's view drops the answered call; the card keeps its result until it is put away.
+    rerender(<RollCallPrompts state={playerState([])} />);
+    expect(screen.getByText("Wisdom (Perception): 17 (d20 12) vs DC 15 · success.")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByText("The GM calls for a roll")).toBeNull();
+  });
+
+  it("takes a typed face from a physical die", async () => {
+    serve({
+      "roll-call:answer": {
+        ok: true,
+        check: { label: "Wisdom (Perception)", natural: 9, total: 14, dc: 15, success: false, rollId: "r2" }
+      }
+    });
+    const user = userEvent.setup();
+    render(<RollCallPrompts state={playerState([playerCall()])} />, { wrapper: ToastProvider });
+    await user.type(await screen.findByLabelText("Your d20 for the Wisdom (Perception) check"), "9");
     await user.click(screen.getByRole("button", { name: "Use" }));
     expect(sent("roll-call:answer").at(-1)).toEqual({ callId: CALL, actorId: ARIA, face: 9 });
+    await user.click(await screen.findByRole("button", { name: "Done" }));
   });
 
-  it("shows the answer, rerolls it with Heroic Inspiration, and is put away", async () => {
-    serve();
-    const user = userEvent.setup();
-    const answered = playerCall({
-      entries: [{ actorId: ARIA, answered: true, result: { natural: 4, total: 9, success: false } }]
+  it("rerolls the answer with Heroic Inspiration", async () => {
+    serve({
+      "roll-call:answer": {
+        ok: true,
+        check: { label: "Wisdom (Perception)", natural: 4, total: 9, dc: 15, success: false, rollId: "r3" }
+      }
     });
-    render(<RollCallPrompts state={playerState([answered], { heroicInspiration: true })} />, {
+    const user = userEvent.setup();
+    const { rerender } = render(<RollCallPrompts state={playerState([playerCall()], { heroicInspiration: true })} />, {
       wrapper: ToastProvider
     });
-    expect(screen.getByText("9 (d20 4) · failure")).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: "Roll Wisdom (Perception) check" }));
+    expect(await screen.findByText("Wisdom (Perception): 9 (d20 4) vs DC 15 · failure.")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Reroll · Heroic Inspiration" }));
     expect(sent("check:reroll")).toEqual([{ actorId: ARIA }]);
+    rerender(<RollCallPrompts state={playerState([], { heroicInspiration: true })} />);
     await user.click(screen.getByRole("button", { name: "Done" }));
-    expect(screen.queryByText(/The GM calls for/)).toBeNull();
+    expect(screen.queryByText("The GM calls for a roll")).toBeNull();
   });
 
-  it("keeps a blind call's result with the GM", () => {
-    serve();
-    const blind = playerCall({ dc: null, blind: true, entries: [{ actorId: ARIA, answered: true }] });
+  it("asks for a typed reroll after a typed answer, even on a card mounted again", async () => {
+    serve({
+      "roll-call:answer": {
+        ok: true,
+        check: {
+          label: "Wisdom (Perception)",
+          natural: 9,
+          total: 14,
+          dc: 15,
+          success: false,
+          typed: true,
+          rollId: "r5"
+        }
+      }
+    });
+    const user = userEvent.setup();
+    const { unmount } = render(<RollCallPrompts state={playerState([playerCall()], { heroicInspiration: true })} />, {
+      wrapper: ToastProvider
+    });
+    await user.type(await screen.findByLabelText("Your d20 for the Wisdom (Perception) check"), "9");
+    await user.click(screen.getByRole("button", { name: "Use" }));
+    expect(await screen.findByText("Wisdom (Perception): 14 (d20 9, typed) vs DC 15 · failure.")).toBeTruthy();
+    // The prompt slot drops the card while the server's view no longer holds the call, then mounts the kept one anew.
+    unmount();
+    render(<RollCallPrompts state={playerState([], { heroicInspiration: true })} />, { wrapper: ToastProvider });
+    await user.type(screen.getByLabelText("The rerolled d20"), "17");
+    await user.click(screen.getByRole("button", { name: "Reroll · Heroic Inspiration" }));
+    expect(sent("check:reroll")).toEqual([{ actorId: ARIA, face: 17 }]);
+    await user.click(screen.getByRole("button", { name: "Done" }));
+  });
+
+  it("keeps a blind call's result with the GM", async () => {
+    serve({ "roll-call:answer": { ok: true, hiddenFromRoller: true } });
+    const user = userEvent.setup();
+    const blind = playerCall({ dc: null, blind: true });
     render(<RollCallPrompts state={playerState([blind], { heroicInspiration: true })} />, { wrapper: ToastProvider });
-    expect(screen.getByText("Hidden from you")).toBeTruthy();
-    expect(screen.getByText("Rolled for the GM.")).toBeTruthy();
+    expect(await screen.findByText("The GM keeps the result")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Roll Wisdom (Perception) check" }));
+    expect(await screen.findByText("Rolled for the GM.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Reroll/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Done" }));
   });
 
   it("answers a called save through the save it opened, rolled as it appears", async () => {
@@ -224,9 +303,9 @@ describe("the player's card for a call", () => {
       entries: [{ actorId: ARIA, saveId: SAVE_ID, answered: false }]
     });
     render(<RollCallPrompts state={playerState([call], {}, [save])} />, { wrapper: ToastProvider });
-    expect(screen.getByText("The GM calls for a Dexterity saving throw")).toBeTruthy();
+    expect(screen.getByText("Dexterity saving throw", { selector: "strong" })).toBeTruthy();
     // This browser rolls digitally, so the server throws the die as the card appears; Confirm applies it.
-    expect(await screen.findByText("Rolled 14 (d20 12) - Success")).toBeTruthy();
+    expect(await screen.findByText("Rolled 14 (d20 12) · Success")).toBeTruthy();
     expect(sent("save:answer")).toEqual([{ saveId: SAVE_ID, method: "roll", commit: false }]);
     await user.click(screen.getByRole("button", { name: "Confirm" }));
     expect(sent("save:answer").at(-1)).toEqual({ saveId: SAVE_ID, method: "roll", commit: true });

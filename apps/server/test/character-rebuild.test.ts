@@ -123,7 +123,7 @@ describe("the app remembers hit-point rolls", () => {
     // The client prefills from the stored sheet, which holds the recorded rolls.
     const stored = state.definitions.find((entry) => entry.id === `import-${ACTOR_ID}`)!.definition;
     const upInput = prefillFor(stored, 5, fighter());
-    // The rolls came back out of the ledger, not out of the request the client happened to send.
+    // The rolls came back out of the ledger. The request the client happened to send has no say.
     expect(upInput.hp).toEqual({ mode: "entries", entries: [1, 10, 4, 6] });
     const up = buildCharacterDefinition(upInput, library, policy);
     rebuildActorDefinition(state, ACTOR_ID, up);
@@ -192,7 +192,7 @@ describe("rebuilding a live character", () => {
     startEncounter(state, { mapAssetId: MAP_ID, entries: [{ actorId: ACTOR_ID, score: 20 }] }, () => 1, GEOMETRY);
     expect(() => rebuildActorDefinition(state, ACTOR_ID, built)).toThrow(/End the encounter/i);
 
-    // Park that fight into a scene: it is paused, not over, and still owns this character's economy.
+    // Park that fight into a scene: it is paused and unfinished, and still owns this character's economy.
     createScene(state, { sceneId: SCENE_ID, name: "Ambush", mapAssetId: MAP_ID, combatantIds: [] }, GEOMETRY);
     state.combat = {
       ...state.combat,

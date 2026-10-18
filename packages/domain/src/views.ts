@@ -61,7 +61,9 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     effects: PlayerEffect[];
     claimStatus: "available" | "mine" | "claimed";
     presence: PresenceStatus | null;
-    /** "Fighter 5 / Rogue 2", derived server-side; only on another player's claimed character. */ classLine?: string;
+    /** "Fighter 5 / Rogue 2", derived server-side; on another player's claimed character (the party tier decides),
+     *  and on an unclaimed character for the claim picker. */ classLine?: string;
+    /** "Dwarf", for the claim picker; only on an unclaimed character, which any player could claim and read in full. */ species?: string;
     /** The imported sheet. Your own claimed character always; another player's only at `partyVisibility` `full-sheet` or `sheet-and-resources`. */ definition?: ActorDefinition;
     /** Spent limited-use counts. Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ actionUses?: Record<
       string,
@@ -88,6 +90,9 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     preparation?: Actor["preparation"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];
+    /** The options pinned to the sheet's turn card and how often each option resolved. Your own claimed character
+     *  only, at every `partyVisibility` tier. */ favouriteOptionIds?: Actor["favouriteOptionIds"];
+    optionUseCounts?: Actor["optionUseCounts"];
     /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{
       style: "bar" | "ring" | "aura";
     }>;
@@ -127,10 +132,36 @@ export type PlayerPendingSave = Omit<
   >;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
- *  the attacker's action and how it was rolled. */
-export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack">;
+ *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
+ *  is in the player's own dice log; `lastsUntilNextTurn` says the reactor's reaction lasts (Shield). */
+export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack"> & {
+  attackRoll?: number;
+  lastsUntilNextTurn?: true;
+};
 /** A player's view of their own parked ask. `command` is omitted: its payload can name ids the player may not know. */
 export type PlayerPendingRuleAsk = Omit<PendingRuleAsk, "command">;
+/** A polygon in image pixels as flat pairs: `[x0, y0, x1, y1, ...]`. */
+export type VisionPolygon = readonly number[];
+export type VisionRect = Readonly<{ x: number; y: number; width: number; height: number }>;
+/** A wall, door or window the party has seen. A door carries `open` only while one of your characters sees it, so a
+ *  door opened out of sight tells you nothing. */
+export type PlayerVisionWall = Readonly<{
+  id: string;
+  kind: "wall" | "door" | "window";
+  a: Readonly<{ x: number; y: number }>;
+  b: Readonly<{ x: number; y: number }>;
+  open?: boolean;
+}>;
+/** Dynamic vision as one player gets it (ADR-0023): where their own characters see now, what the party has seen in
+ *  this scene, and the walls in it. Everything else on the map is dark. */
+export type PlayerVision =
+  | Readonly<{ enabled: false }>
+  | Readonly<{
+      enabled: true;
+      visible: readonly VisionPolygon[];
+      explored: readonly VisionRect[];
+      walls: readonly PlayerVisionWall[];
+    }>;
 export type PlayerCombatView = Readonly<{
   active: boolean;
   round: number;
@@ -149,6 +180,8 @@ export type PlayerCombatView = Readonly<{
     movementUsedFeet: number;
     /** The creature has an action beyond its one ready (Action Surge, Haste). */
     extraActionReady?: true;
+    /** The dying character whose turn it is has made this turn's death save. */
+    deathSaveRolled?: true;
   };
   rulesMode: RuleMode;
   /** Per-family overrides of `rulesMode`; no secrets, and the player's sheet needs it to anticipate blocks. */ ruleExceptions: RuleExceptions;
@@ -159,12 +192,13 @@ export type PlayerCombatView = Readonly<{
     "immediate" | "wait";
   underwater: boolean;
   reactionsUsed: readonly string[];
-  /** The fog mask verbatim (geometry only - hidden things are stripped by their own filters). */ fog: CombatState["fog"];
+  /** The fog mask verbatim (geometry only; hidden things are stripped by their own filters). */ fog: CombatState["fog"];
   /** Difficult terrain, clipped to what the fog reveals so unrevealed ground keeps its layout. */ terrain: CombatState["terrain"];
+  /** Dynamic vision: with it on, `tokens` holds only the creatures your characters perceive. */ vision: PlayerVision;
   pendingSaves: readonly PlayerPendingSave[];
   pendingReactions: readonly PlayerPendingReaction[];
   /** The player's own parked Ask-the-GM questions only. */ pendingRuleAsks: readonly PlayerPendingRuleAsk[];
-  /** True while the GM has the table viewing an earlier turn (no labels - those can name hidden combatants). */ rewound: boolean;
+  /** True while the GM has the table viewing an earlier turn (no labels, since those can name hidden combatants). */ rewound: boolean;
 }>;
 /** An archived, public character the GM shared for preview: id and name only. */
 export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;
@@ -196,7 +230,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;
   actors: PlayerActor[];
   rolls: PlayerRollRecord[];
-  /** The GM's builder policy, verbatim (GM-set, player-read - a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
+  /** The GM's builder policy, verbatim (GM-set and player-read: a player's wizard offers exactly these methods). */ builderPolicy: BuilderPolicy;
   /** Archived characters the GM shared for preview (see PlayerArchivedCharacter). Empty by default. */ archivedCharacters: readonly PlayerArchivedCharacter[];
   /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;

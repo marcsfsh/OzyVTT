@@ -181,7 +181,7 @@ describe("a check action's result", () => {
     const card = () => screen.getByRole("status").textContent;
     act(() => setTargetingResult(HIDE));
     expect(card()).toContain("Disadvantage (Chain Mail (Stealth))");
-    expect(card()).toContain("Dexterity (Stealth): 3 (d20 2) vs DC 15 - failure.");
+    expect(card()).toContain("Dexterity (Stealth): 3 (d20 2) vs DC 15 · failure.");
     act(() => setTargetingResult(SEARCHED));
     expect(card()).toContain("Wisdom (Perception): 16 (d20 9).");
   });

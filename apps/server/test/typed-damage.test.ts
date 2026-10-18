@@ -274,7 +274,7 @@ describe("gap 5: Fiendish Resilience is a real resistance, not a visible one", (
     expect(result.detail).toContain("12 fire → 6, resistance: Fiendish Resilience");
   });
 
-  it("stops halving the type it was re-chosen AWAY from - it is one pick, not a collection", () => {
+  it("stops halving the type it was re-chosen AWAY from: it is one pick, not a collection", () => {
     const state = stateWith([], rechosen("fire"));
     expect(hit(state, [{ amount: 12, type: "cold" }], warlock(), catalog).hpLost).toBe(12);
   });
@@ -336,7 +336,7 @@ describe("gap 4: the untyped manual path can name a type", () => {
     expect(manual(stateWith(), { amount: 10, damageType: "  Fire " }).hpLost).toBe(5);
   });
 
-  it("still applies a homebrew type in full - the vocabulary is open, not a gate", () => {
+  it("still applies a homebrew type in full: the vocabulary is open, not a gate", () => {
     expect(isSrdDamageType("fire")).toBe(true);
     expect(isSrdDamageType("untyped")).toBe(false);
     expect(isSrdDamageType("ooze")).toBe(false);
@@ -355,7 +355,7 @@ describe("4b: an amended total keeps its types", () => {
       GM,
       { resolveDefinition: () => definitionOf({ damageResistances: ["fire"] }) }
     );
-    // 12 fire, halved to 6, not 12 untyped landing in full.
+    // 12 fire, halved to 6.
     expect(before - state.actors[0].hp.current).toBe(6);
     expect(damageAdjustmentDetail(outcome.application)).toContain("12 fire → 6, resistance");
   });
@@ -373,7 +373,7 @@ describe("4b: an amended total keeps its types", () => {
       { amount: 5, type: "fire" },
       { amount: 3, type: "cold" }
     ]);
-    // The remainder lands on the largest component rather than vanishing.
+    // The remainder lands on the largest component.
     const odd = rescaleDamageParts(
       [
         { amount: 9, type: "fire" },

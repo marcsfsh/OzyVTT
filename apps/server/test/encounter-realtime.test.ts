@@ -306,7 +306,7 @@ describe("live authoritative encounter workflow", () => {
         slot: "action",
         used: true
       });
-      // Un-marking is a correction, not an event - it must stay silent.
+      // Un-marking is a correction and must stay silent.
       await emitCommand(gmSocket, "turn:use", {
         commandId: "30000000-0000-4000-8000-000000000062",
         slot: "action",
@@ -314,7 +314,7 @@ describe("live authoritative encounter workflow", () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      expect(events.map((event) => event.text)).toContain("Public Hero used a bonus action.");
+      expect(events.map((event) => event.text)).toContain("Public Hero used a Bonus Action.");
       expect(events.map((event) => event.text)).toContain("Public Hero used an action.");
       expect(events.filter((event) => event.text.includes("used an action."))).toHaveLength(1);
     } finally {

@@ -1,6 +1,6 @@
 /**
  * Refreshes content caches when homebrew changes. `homebrew:changed` is a content-free ping, so each
- * warm cache refetches its own audience-filtered view, keeping the old list until the new one lands.
+ * warm cache refetches its own audience-filtered view and keeps the old list until the new one lands.
  * `connect` also refreshes, since a reconnect can change the audience.
  */
 

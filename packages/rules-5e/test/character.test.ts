@@ -10,7 +10,7 @@ import {
   weaponAbilityModifierFrom
 } from "../src/character.js";
 
-describe("weaponAbilityModifierFrom - the ONE rule the server and the sheet both roll off", () => {
+describe("weaponAbilityModifierFrom: the ONE rule the server and the sheet both roll off", () => {
   // Dexterity is the better score here, so Finesse must take it and a Strength weapon must not.
   const str = abilityModifier(12); // +1
   const dex = abilityModifier(18); // +4

@@ -74,21 +74,21 @@
     "name": "Abyssal",
     "source": "srd",
     "table": "rare",
-    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Abyssal means a character can speak, read, and write it."
+    "description": "A rare language. Rare languages are secret or come from another plane of existence, and few people on the Material Plane know them. Knowing Abyssal means a character can speak, read and write it."
   },
   {
     "id": "celestial",
     "name": "Celestial",
     "source": "srd",
     "table": "rare",
-    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Celestial means a character can speak, read, and write it."
+    "description": "A rare language. Rare languages are secret or come from another plane of existence, and few people on the Material Plane know them. Knowing Celestial means a character can speak, read and write it."
   },
   {
     "id": "deep-speech",
     "name": "Deep Speech",
     "source": "srd",
     "table": "rare",
-    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Deep Speech means a character can speak, read, and write it."
+    "description": "A rare language. Rare languages are secret or come from another plane of existence, and few people on the Material Plane know them. Knowing Deep Speech means a character can speak, read and write it."
   },
   {
     "id": "druidic",
@@ -102,7 +102,7 @@
     "name": "Infernal",
     "source": "srd",
     "table": "rare",
-    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Infernal means a character can speak, read, and write it."
+    "description": "A rare language. Rare languages are secret or come from another plane of existence, and few people on the Material Plane know them. Knowing Infernal means a character can speak, read and write it."
   },
   {
     "id": "primordial",
@@ -116,11 +116,11 @@
     "name": "Sylvan",
     "source": "srd",
     "table": "rare",
-    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Sylvan means a character can speak, read, and write it."
+    "description": "A rare language. Rare languages are secret or come from another plane of existence, and few people on the Material Plane know them. Knowing Sylvan means a character can speak, read and write it."
   },
   {
     "id": "thieves-cant",
-    "name": "Thieves’ Cant",
+    "name": "Thieves' Cant",
     "source": "srd",
     "table": "rare",
     "description": "A secret mix of dialect, jargon, and code known to Rogues, used to hide messages in seemingly normal conversation."
@@ -130,6 +130,6 @@
     "name": "Undercommon",
     "source": "srd",
     "table": "rare",
-    "description": "A rare language — secret, or derived from another plane of existence, and less widespread on the Material Plane. Knowing Undercommon means a character can speak, read, and write it."
+    "description": "A rare language. Rare languages are secret or come from another plane of existence, and few people on the Material Plane know them. Knowing Undercommon means a character can speak, read and write it."
   }
 ]

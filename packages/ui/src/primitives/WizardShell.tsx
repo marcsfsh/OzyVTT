@@ -6,7 +6,7 @@ import { Steps, type StepItem } from "./Steps";
 import "./WizardShell.css";
 
 interface WizardShellProps {
-  /** Flow title, e.g. "Create a character". Set in the display face, not the wordmark. */
+  /** Flow title, e.g. "Create a character". Set in the display face, with no wordmark. */
   title: ReactNode;
   eyebrow?: ReactNode;
   steps: StepItem[];
@@ -19,7 +19,7 @@ interface WizardShellProps {
 
   children: ReactNode;
 
-  /** Back is hidden on the first step — omit the handler there. */
+  /** Back is hidden on the first step, so omit the handler there. */
   onBack?: () => void;
   /** An extra action beside Back for another way out of a step (e.g. "Back to review"). It moves, it doesn't commit. */
   footerSecondary?: ReactNode;
@@ -32,7 +32,7 @@ interface WizardShellProps {
   /** Disables both footer actions while a submit is in flight. */
   busy?: boolean;
 
-  /** "Save & close" — parks a server-held draft and leaves. */
+  /** "Save & close": parks a server-held draft and leaves. */
   onSaveAndClose?: () => void;
   saveLabel?: string;
   /** Resume-draft affordance slot: an Alert, a Button, whatever the flow needs. */
@@ -144,7 +144,7 @@ export function WizardShell({
           <aside className="nh-wizard-detail" aria-label={typeof detailTitle === "string" ? detailTitle : "Details"}>
             {onCloseDetail && (
               <Button variant="ghost" size="sm" className="nh-wizard-detail-back" onClick={onCloseDetail}>
-                {/* The disclosure caret, turned a quarter, rather than a "‹" glyph that renders too small. */}
+                {/* The disclosure caret, turned a quarter; a "‹" glyph renders too small. */}
                 <span className="nh-wizard-detail-back-icon" aria-hidden="true">
                   <IconChevron />
                 </span>

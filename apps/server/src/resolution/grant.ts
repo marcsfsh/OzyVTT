@@ -58,7 +58,7 @@ function rageTiming(
 }
 
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally; Bless on each creature it targets): replace-on-
- *  refresh, ending when the granter drops to 0 HP, and with the cast's Concentration when it has one (`castId`, so
+ *  refresh. They end when the granter drops to 0 HP, and with the cast's Concentration when it has one (`castId`, so
  *  `startConcentration` runs first). An `onHit` grant (Guiding Bolt) lands only on a hit. */
 export function applyGrant(ctx: ResolveContext): void {
   const { action, attacker, targets, attack } = ctx;
@@ -199,7 +199,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: [...modifiers, ...hasteSpeed, ...hexDisadvantage, ...enhancedAdvantage, ...chosenResistance],
-      // Greater Invisibility's Invisible condition, ending with the effect.
+      // Greater Invisibility's Invisible condition, which ends with the effect.
       ...(grant.conditions ? { linkedConditionIds: [...grant.conditions] } : {}),
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,

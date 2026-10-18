@@ -5,7 +5,7 @@ import "./Tooltip.css";
 
 interface TooltipProps {
   content: ReactNode;
-  /** The trigger — should be focusable so the tip is keyboard-reachable. */
+  /** The trigger: it should be focusable so the tip is keyboard-reachable. */
   children: ReactNode;
   placement?: "top" | "bottom";
   className?: string;
@@ -13,7 +13,7 @@ interface TooltipProps {
 
 /** Lightweight hover/focus tooltip: surface-2, line border, small text, no glow.
     The bubble stays in the DOM and is linked via aria-describedby. Not a
-    substitute for a visible label on touch — pair icon-only controls with one. */
+    substitute for a visible label on touch, so pair icon-only controls with one. */
 export function Tooltip({ content, children, placement = "top", className }: TooltipProps) {
   const id = useId();
   return (

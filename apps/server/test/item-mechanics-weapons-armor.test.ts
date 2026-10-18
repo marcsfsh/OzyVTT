@@ -197,7 +197,7 @@ describe("Armor of Resistance halves a typed damage total", () => {
     );
     expect(off.actors[0].hp.current, "unequipping must be the un-grant").toBe(18);
 
-    // A type the armor does not resist lands in full: the rider is typed, not blanket.
+    // A type the armor does not resist lands in full: the rider is typed.
     const other = worn();
     applyDamageDetailed(
       other,
@@ -209,7 +209,7 @@ describe("Armor of Resistance halves a typed damage total", () => {
     expect(other.actors[0].hp.current).toBe(18);
   });
 
-  it("applies nothing before attunement - the SRD gates this row behind it", () => {
+  it("applies nothing before attunement: the SRD gates this row behind it", () => {
     const unattuned = stateWith([asPicked("armor-of-resistance", { attuned: false })]);
     expect(
       deriveEquipment(unattuned.actors[0], definition, catalog).damageResistances,
@@ -280,7 +280,7 @@ describe("the shipped +1 weapon record on a bound base weapon block", () => {
     expect(resolution.damageTotal).toBe(11);
   });
 
-  it("(b) on a dagger: finesse travels with the bound block - dex swings it when dex is the better", () => {
+  it("(b) on a dagger: finesse travels with the bound block, dex swings it when dex is the better", () => {
     // A finesse weapon uses `Math.max(str, dex)` (`weaponAbilityModifierFrom`), so proving the finesse
     // property was copied needs a bearer whose Dex wins: STR 10 / DEX 14, prof 2, simple-proficient:
     // to-hit 2 + 2 + 1 = 5, damage "1d4 + 3". Without the property it would print "1d4 + 1".
@@ -309,7 +309,7 @@ describe("the shipped +1 weapon record on a bound base weapon block", () => {
     expect(resolution.damageTotal).toBe(5);
   });
 
-  it("(d) unequipped, the bound row derives no swing at all - the negative control for the +N family", () => {
+  it("(d) unequipped, the bound row derives no swing at all: the negative control for the +N family", () => {
     const definition = definitionOf();
     const state = fight(stateWith([boundTo("weapon-1", "greatsword", { equipped: false })]));
     expect(
@@ -393,7 +393,7 @@ describe("the shipped on-hit dice on a bound melee block", () => {
     }
   });
 
-  it("(d) unattuned, the die and the +1 pair stay off while the swing itself remains - the attunement control", () => {
+  it("(d) unattuned, the die and the +1 pair stay off while the swing itself remains: the attunement control", () => {
     const definition = definitionOf();
     // flame-tongue: the bound swing still derives, but the carrier is inactive, so one damage entry.
     const flameCatalog = catalogOf([shipped("flame-tongue")]);
@@ -452,7 +452,7 @@ describe("the authored riders are present in the shipped bundle", () => {
     expect(shipped("demon-armor").cursed).toBe(true);
   });
 
-  it("pins the re-authored weapon rows BY NAME AND VALUE - and every other weapon row to none", () => {
+  it("pins the re-authored weapon rows BY NAME AND VALUE, and every other weapon row to none", () => {
     // Exactly these weapon rows carry exactly these weapon-scoped riders (by name and value), and any
     // other weapon row carries none. Magic weapon rows still carry no `weapon` block of their own;
     // the swing comes from the base weapon at bind time.

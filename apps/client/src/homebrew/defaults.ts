@@ -91,16 +91,17 @@ const DEFAULTS: Readonly<Record<HomebrewType, () => Draft>> = {
      `FeatReferenceSchema` is `.strict()`. */
   feat: () => ({ ...BASE, category: "general", repeatable: false, feature: blankFeature() }),
 
-  /* `SpellReferenceSchema` fields are `.nullable()`, not `.optional()`: each key is required,
+  /* `SpellReferenceSchema` fields are `.nullable()`: each key is required,
      so the nulls below must stay. */
   spell: () => ({
     source: "homebrew",
     description: "",
     level: 1,
     school: "evocation",
-    castingTime: "1 action",
+    // The SRD's own spellings: the card prints `range.text`, so a range without it would read "Self".
+    castingTime: "Action",
     reactionCondition: null,
-    range: { distance: 60, unit: "feet", text: null },
+    range: { distance: 60, unit: "feet", text: "60 feet" },
     components: { verbal: true, somatic: true, material: false, materialText: null, materialConsumed: false },
     duration: "Instantaneous",
     concentration: false,

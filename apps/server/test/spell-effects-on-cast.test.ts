@@ -134,7 +134,7 @@ describe("Bless", () => {
   it("adds 1d4 to the blessed creature's saving throws", () => {
     const { state, resolve } = fight(wizard);
     resolve("spell-bless", { targetIds: [HERO] });
-    // Dexterity 14, not proficient: +2, and the d4.
+    // Dexterity 14, no proficiency: +2, and the d4.
     expect(save(state, HERO, "dex", [10, 3]).total).toBe(15);
     expect(state.rolls.at(-1)?.formula).toBe("1d20 + 2 + 1d4");
   });
@@ -246,7 +246,7 @@ describe("Hex and Hunter's Mark", () => {
     expect(action("spell-hex-then-move")).toMatchObject({ name: "Hex: move", activation: "bonus-action" });
     heroTurnAgain(state);
     expect(() => resolve("spell-hex-then-move", { targetIds: [FOE2] })).toThrowError(
-      /Hex moves only once its creature drops to 0 Hit Points - Goblin hasn't/
+      /Hex moves only once its creature drops to 0 Hit Points, and Goblin hasn't/
     );
     actorOf(state, FOE).hp = { ...actorOf(state, FOE).hp, current: 0 };
     const moved = resolve("spell-hex-then-move", { targetIds: [FOE2] });

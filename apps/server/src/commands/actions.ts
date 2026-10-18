@@ -1,9 +1,10 @@
-import type { AnnotationPoint, AnnotationShapeKind, RollRecord } from "@vtt/domain";
+import type { AnnotationPoint, AnnotationShapeKind, GameState, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
-import { canPlayerTarget, GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
@@ -33,6 +34,7 @@ import { zoneRowOf } from "../spell-zones.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
 import { applyLooseHealing, looseHealTargets } from "../loose-healing.js";
+import { countOptionUse } from "../option-uses.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -46,7 +48,7 @@ export const actionCommands = [
     type: "action.resolve",
     operationId: "resolveAction",
     description:
-      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (area templates, cover, and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both); rolls are recorded in the shared history and the response carries the `resolution`. An action or Bonus Action off the creature's own turn meets the `economy.not-your-turn` block, except a Readied creature's response, which spends its Reaction.",
+      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (cover and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both). An area catches every combatant under it; for a player it is refused when none they can see is inside, and their reply names only the creatures they can see. Rolls are recorded in the shared history and the response carries the `resolution`. An action or Bonus Action off the creature's own turn meets the `economy.not-your-turn` block, except a Readied creature's response, which spends its Reaction.",
     summary:
       "Run a stat-block action: attack vs AC or save-DC with typed damage (GM anyone; a player their own claimed character).",
     schema: ActionResolveSchema,
@@ -69,11 +71,17 @@ export const actionCommands = [
         fumble
       } = request;
       // A player resolves only for their own claimed character (checked inside the mutation); GM-only
-      // inputs (templates, overrides, cover, applied conditions) are refused or stripped. The note is the Ready
-      // action's trigger, which the table reads in the effect's name, so a player's is kept.
+      // inputs (overrides, cover, applied conditions) are refused or stripped. A player may aim their own area: the
+      // server decides who is under it. The note is the Ready action's trigger, which the table reads in the effect's
+      // name, so a player's is kept.
       const initiator = initiatorOf(principal);
       const isPlayer = initiator.role === "player";
-      if (isPlayer && template) throw new GameAccessDeniedError("Your GM places area templates.");
+      // The creatures a player may not target or be told of: the shared hidden check from this player's own view
+      // (GM-only, out of their characters' sight, under the fog, or not on the map).
+      const hiddenFromPlayer = (state: GameState): ReadonlySet<string> => {
+        const hidden = kit.hiddenFor(initiator, state);
+        return new Set(state.actors.filter((actor) => hidden(actor.id)).map((actor) => actor.id));
+      };
       if (isPlayer && override) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
       // A player types the face their die shows, never a total: the server adds the bonus and reads a 1 or a 20.
       if (isPlayer && (attackTotal !== undefined || critical !== undefined || fumble !== undefined))
@@ -95,10 +103,11 @@ export const actionCommands = [
       // narration.
       let playerDamageApplied: readonly AppliedDamage[] = [];
       const { state, duplicate } = await execute((draft) => {
+        // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
+        // else's get one answer, so a player can't probe which ids exist.
+        requireActorAccess(initiator, draft, actorId, "attack");
         const attacker = draft.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
-        // The action kind is passed for the per-table policy hook (ADR-0021).
-        requireActorAccess(initiator, draft, actorId, "attack");
         const definition = attacker.definitionId ? kit.resolveDefinitionIn(draft, attacker.definitionId) : undefined;
         // Effective actions, so `item-<itemId>` ids resolve and item-raised numbers apply. A stat-block
         // action wins on id collision; builtins cover every combatant.
@@ -122,14 +131,12 @@ export const actionCommands = [
               ? requestedConditionId
               : null;
         let resolvedTargetIds: readonly string[];
+        let originAtCaster = false;
         // The template as the action's area makes it, which the table's drawn shape records.
         let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
           null;
         if (template) {
-          if (action.attack)
-            throw new CommandRejectedError(
-              "Attacks target a single token - pick it directly instead of placing a template."
-            );
+          if (action.attack) throw new CommandRejectedError("Attacks target a single token. Pick the token itself.");
           if (draft.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try again.");
           const calibration = geometry!.calibration!;
@@ -139,6 +146,7 @@ export const actionCommands = [
           const snapped = shapeGeometry(calibration, placed.shape, placed.origin, placed.target);
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
+          originAtCaster = casterOutside;
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
@@ -148,17 +156,26 @@ export const actionCommands = [
           ).filter(
             (id) => (id !== actorId || !casterOutside) && draft.combat.initiative.some((entry) => entry.actorId === id)
           );
-          // A spell that leaves its area behind (Moonbeam, Web, a wall) may be placed where no one stands yet.
-          if (resolvedTargetIds.length === 0 && !(spell && zoneRowOf(spell)))
-            throw new CommandRejectedError("No combatants are inside that area.");
+          // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
+          // player can see, so an empty refusal never tells them a hidden creature is there. A spell that leaves its
+          // area behind (Moonbeam, Web, a wall) may be placed where no one stands yet.
+          const unseen = isPlayer ? hiddenFromPlayer(draft) : new Set<string>();
+          if (!resolvedTargetIds.some((id) => !unseen.has(id)) && !(spell && zoneRowOf(spell)))
+            throw new CommandRejectedError(
+              isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
+            );
         } else {
           resolvedTargetIds = targetIds ?? [];
+          // A player may target only public combatants they can see: resolving against a hidden actor would leak
+          // its name/AC/outcome through the ack (and in direct mode damage it). The refusal is the one a missing
+          // creature gets, at the same point, so it says nothing of what is hidden.
+          if (isPlayer && draft.combat.active && draft.combat.initiative.some((entry) => entry.actorId === actorId)) {
+            const unseen = hiddenFromPlayer(draft);
+            if (resolvedTargetIds.some((targetId) => unseen.has(targetId)))
+              throw new CommandRejectedError("Every target must be in this encounter.");
+          }
         }
-        // A player may target only public combatants: resolving against a hidden actor would leak its
-        // name/AC/outcome through the ack (and in direct mode damage it).
-        if (isPlayer && resolvedTargetIds.some((targetId) => !canPlayerTarget(draft, targetId)))
-          throw new CommandRejectedError("You can only target combatants you can see.");
-        // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, not center-to-center 10.
+        // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
           geometry ? (tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null) : null;
         // The attack's d20 is held between a preview and its confirm, one per creature and turn (ADR-0012), so a
@@ -168,7 +185,7 @@ export const actionCommands = [
           requireTypedDie(draft, initiator, heldRollFor(draft, holdKey), attackNatural);
         // SRD forced movement (Push), snapped like a GM drag; takes no client input. Only `targets[0]` of a hit
         // is pushed, already restricted to public combatants for players. If the map changed since the grid
-        // was fetched, degrade to null ("move the token") rather than throw.
+        // was fetched, degrade to null ("move the token") and never throw.
         const pushToken = (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
           draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null;
         resolution = resolveDefinitionAction(
@@ -217,6 +234,8 @@ export const actionCommands = [
             pushToken
           }
         );
+        // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
+        if (!resolution.preview) countOptionUse(draft, actorId, actionId);
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
@@ -236,7 +255,9 @@ export const actionCommands = [
             },
             action.drain
           );
-        // Record the blast as a public shape; id=commandId keeps re-delivery idempotent.
+        // Record the blast as a shape; id=commandId keeps re-delivery idempotent. A cone or line starts at its caster,
+        // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
+        const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
         if (placed)
           addAnnotation(
             draft,
@@ -246,7 +267,8 @@ export const actionCommands = [
               shape: placed.shape,
               origin: placed.origin,
               target: placed.target,
-              visibility: "public",
+              visibility: fromHiddenCaster ? "gm-only" : "public",
+              reachesPastMap: action.area !== undefined,
               actor: { sessionId: gmSessionId, role: "gm" },
               now: Date.now()
             },
@@ -254,6 +276,8 @@ export const actionCommands = [
           );
       });
       if (duplicate || !resolution) return;
+      // A player's reply names only the creatures they may see; the rest of an area's catch stays with the GM.
+      const reply = isPlayer ? withSeenTargets(resolution, hiddenFromPlayer(state)) : resolution;
       // A preview recorded only the attack die: publish the roll, but hold narration until the resolve is confirmed.
       kit.publishRolls(state, commandId);
       if (!resolution.preview) {
@@ -268,13 +292,13 @@ export const actionCommands = [
         if (resolution.overridden)
           kit.context.appendLog({
             kind: "override",
-            text: `OVERRIDE (${resolution.overridden.rule}): ${kit.actorName(actorId)} used ${resolution.actionName} - ${resolution.overridden.reason}`,
+            text: `OVERRIDE (${resolution.overridden.rule}): ${kit.actorName(actorId)} used ${resolution.actionName} · ${resolution.overridden.reason}`,
             actorIds: [actorId]
           });
         // Builtin check rolls narrate to the table.
         if (resolution.check) {
           const verdict =
-            resolution.check.success === null ? "" : resolution.check.success ? " - success" : " - failure";
+            resolution.check.success === null ? "" : resolution.check.success ? " · success" : " · failure";
           kit.context.appendLog({
             kind: "action",
             text: `${kit.actorName(actorId)} rolled ${resolution.check.total} on ${resolution.check.skill}${resolution.check.dc !== null ? ` vs DC ${resolution.check.dc}` : ""}${verdict}.`,
@@ -292,7 +316,7 @@ export const actionCommands = [
           kit.publishNarrations(outcome.events);
         }
       }
-      return { resolution };
+      return { resolution: reply };
     }
   }),
 
@@ -300,9 +324,9 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      "Uses an action and lets the SERVER decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt - taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running - or with this creature not in the turn order - the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
+      "Uses an action and lets the server decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt, because taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running, or with this creature not in the turn order, the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
-      "Use an action and let the SERVER route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight, where a heal lands on whoever it is given to (GM anyone; a player their own claimed character).",
+      "Use an action and let the server route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight, where a heal lands on whoever it is given to (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
     malformed: "The action command is malformed.",
     // The server picks structured resolve, blocked or loose roll and says so in the reply.
@@ -363,7 +387,7 @@ export const actionCommands = [
       );
 
       // Loose: the server rolls the action's dice, attributed to the character, and spends what the action
-      // costs (an item's charges), touching no combat state. HP only ever moves through the resolver. Only the GM may
+      // costs (an item's charges). Combat state stays as it is; HP only moves through the resolver. Only the GM may
       // force a roll mode.
       const forcedMode = isGmGrade(principal) ? rollMode : undefined;
       const plan = looseRollPlan(action, {
@@ -384,6 +408,8 @@ export const actionCommands = [
       const { state, duplicate } = await execute((draft) => {
         requireActorAccess(initiator, draft, actorId, "attack");
         const live = draft.actors.find((candidate) => candidate.id === actorId)!;
+        // A use outside a fight counts toward the sheet's most-used options too; a refusal below undoes it.
+        countOptionUse(draft, actorId, actionId);
         // A heal lands on whoever it is given to, checked before anything is spent.
         const healTargets = action.healing
           ? looseHealTargets(draft, live, action, targetIds, initiator, spell, castLevel)
@@ -593,9 +619,7 @@ export const actionCommands = [
       // only while the table lets players type their dice.
       const typed = !resolution.terms.some((term) => term.kind === "dice");
       if (typed && !gmGrade && kit.read().builderPolicy.typedRolls !== "open")
-        throw new CommandRejectedError(
-          "At this table the server rolls players' dice. Roll the dice instead of typing them."
-        );
+        throw new CommandRejectedError("At this table the server rolls players' dice. Tap Roll to roll them.");
       const rollId = kit.context.newId();
       const { state, duplicate } = await execute((draft) => {
         // A player's roll with no actorId is attributed to their single claimed character (ambiguous claims

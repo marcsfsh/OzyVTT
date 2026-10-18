@@ -1,12 +1,12 @@
 import { StrictMode, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { ToastProvider } from "@vtt/ui";
+import { ThemeSwitch, ToastProvider } from "@vtt/ui";
 // The global styles load before any component's own stylesheet, as in main.tsx: CSS lands in import order.
 import "@vtt/ui/styles.css";
 import "./styles.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
-import { CharacterSheet } from "./encounter/CharacterSheet";
+import { CharacterSheet } from "./sheet/CharacterSheet";
 import { joinTable, storedPlayerToken } from "./lib/session";
 import { socket } from "./socket";
 import "./encounter/encounter-panel.css";
@@ -42,20 +42,31 @@ function StandaloneSheet() {
   if (status === "denied")
     return (
       <Message>
-        Open your character sheet from the table first, then use <strong>New tab</strong>.
+        Open your character sheet from the table first, then choose <strong>Open in a new tab</strong> in its menu.
       </Message>
     );
   if (!actorId) return <Message>No character was specified for this tab.</Message>;
   if (!state) return <Message>Connecting to the table…</Message>;
   const actor = (state.actors as Array<GmActor | PlayerActor>).find((candidate) => candidate.id === actorId);
   if (!actor)
-    return <Message>That character isn’t available to you. Claim it at the table, then reopen this tab.</Message>;
-  return <CharacterSheet actor={actor} role="player" state={state} standalone onClose={() => window.close()} />;
+    return <Message>That character isn't available to you. Claim it at the table, then reopen this tab.</Message>;
+  return (
+    <div className="cs-standalone">
+      <CharacterSheet
+        actor={actor}
+        role="player"
+        state={state}
+        presentation="page"
+        headerEnd={<ThemeSwitch />}
+        onClose={() => window.close()}
+      />
+    </div>
+  );
 }
 
 function Message({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <div className="sheet-standalone-msg">
+    <div className="cs-standalone-msg">
       <p>{children}</p>
     </div>
   );

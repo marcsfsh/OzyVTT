@@ -10,6 +10,17 @@
   width: min(100vw - 2rem, 24rem);
   pointer-events: none;
 }
+/* On a phone the stack sits at the top edge, under the tab bar, away from the controls a thumb is reaching for. It
+   shows the newest message alone: a second one would hang over the page's own controls. */
+@media (max-width: 760px) {
+  .nh-toast-viewport {
+    top: calc(env(safe-area-inset-top) + 3.75rem);
+    bottom: auto;
+  }
+  .nh-toast-viewport > .nh-toast:not(:last-child) {
+    display: none;
+  }
+}
 /* Severity on a 2px leading rule, never the fill. Material on a backing layer because the toast has its own ✕. */
 .nh-toast {
   position: relative;
@@ -85,4 +96,30 @@
 .nh-toast-close:hover,
 .nh-toast-close:active {
   color: var(--text);
+}
+
+/* The in-flow outlet: one line in a layout's status row, so nothing floats over the page. */
+.nh-toast-outlet {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nh-toast-outlet-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.nh-toast-outlet--success .nh-toast-icon {
+  color: var(--success);
+}
+.nh-toast-outlet--error .nh-toast-icon {
+  color: var(--danger-text);
+}
+.nh-toast-outlet--info .nh-toast-icon {
+  color: var(--info);
 }

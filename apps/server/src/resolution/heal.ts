@@ -6,10 +6,10 @@ import { CommandRejectedError } from "../game-store.js";
 import { endEffect } from "../effects.js";
 import { deadCantHealLine, healActor } from "../hit-points.js";
 import { useCostOf } from "../use-cost.js";
-import { recordRoll, type LiveActor, type ResolveContext } from "./context.js";
+import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Healing (Cure Wounds): rolled once, and every target regains it on the resolve. A willing creature's healing has
- *  nothing to gate, so it applies here instead of waiting on an Apply tap as damage does. Second Wind heals its user;
+ *  nothing to gate, so it applies here with no Apply tap, which damage waits on. Second Wind heals its user;
  *  Preserve Life divides one roll among its targets, none past half its maximum; Lay on Hands regains its formula once
  *  per point spent; False Life's roll is Temporary Hit Points. */
 export function applyHealing(ctx: ResolveContext): void {
@@ -62,12 +62,12 @@ export function applyHealing(ctx: ResolveContext): void {
       text: `${target.name} regains ${regained} ${regained === 1 ? "hit point" : "hit points"} (${action.name}).`,
       actorIds: [target.id]
     });
-    for (const event of events) tableNarration.push({ kind: "heal", text: event.text, actorIds: [event.actorId] });
+    for (const event of events) tableNarration.push(tableLineOf(ctx, event, "heal"));
     // "The wound closes ... after a spell restores Hit Points to the target."
     if (action.spellId !== undefined && regained > 0)
       for (const effect of target.effects.filter((candidate) => candidate.endsOnSpellHealing))
         for (const event of endEffect(state, target.id, effect.id))
-          tableNarration.push({ kind: "heal", text: event.text, actorIds: [event.actorId] });
+          tableNarration.push(tableLineOf(ctx, event, "heal"));
     return { targetId: target.id, targetName: target.name, regained };
   });
   ctx.healing = { total, targets: healed };
@@ -88,7 +88,7 @@ export function healingShares(
   if (!healing.divided) return room.map((space) => Math.min(space, total));
   const shares = targets.map(() => 0);
   let left = total;
-  // Even shares, handing what a full target can't take to the others.
+  // Even shares. What a full target can't take goes to the others.
   for (let open = room.filter((space) => space > 0).length; left > 0 && open > 0;) {
     const each = Math.max(1, Math.floor(left / open));
     open = 0;
@@ -115,13 +115,13 @@ export function applyConditionCures(ctx: ResolveContext): void {
     if (present.length === 0) {
       if (!alone) continue;
       throw new CommandRejectedError(
-        `${target.name} isn't ${cures.map((id) => conditionLabel(id)).join(" or ")} - ${action.name} would do nothing.`
+        `${target.name} isn't ${cures.map((id) => conditionLabel(id)).join(" or ")}, so ${action.name} would do nothing.`
       );
     }
     const picked = action.endsOneCondition ? (input.conditionId ?? present[0]) : undefined;
     if (picked !== undefined && !present.includes(picked))
       throw new CommandRejectedError(
-        `${target.name} isn't ${conditionLabel(picked)} - ${action.name} would do nothing.`
+        `${target.name} isn't ${conditionLabel(picked)}, so ${action.name} would do nothing.`
       );
     for (const id of picked !== undefined ? [picked] : present) {
       // The action is already authorized; it ends the condition whoever imposed it.

@@ -65,7 +65,7 @@ describe("codex calendar arithmetic", () => {
   it("reads a weekday for every date, before year zero too, and none without weekdays", () => {
     expect(weekdayOf(CALENDAR, { year: 0, month: 0, day: 1 })).toBe("Sul");
     expect(weekdayOf(CALENDAR, { year: 0, month: 0, day: 2 })).toBe("Mol");
-    // Instant -1 is the day before Sul, so it wraps to the last weekday rather than indexing at -1.
+    // Instant -1 is the day before Sul, so it wraps to the last weekday.
     expect(weekdayOf(CALENDAR, instantToDate(CALENDAR, -1))).toBe("Zor");
     expect(weekdayOf({ ...CALENDAR, weekdays: [] }, { year: 0, month: 0, day: 1 })).toBeNull();
     expect(weekdayIndex(CALENDAR, instantToDate(CALENDAR, -1))).toBe(CALENDAR.weekdays.length - 1);

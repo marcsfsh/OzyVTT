@@ -69,7 +69,12 @@ export function useGmFeeds(gmToken: string, section: CodexSection | null) {
    * The campaign feed (chronicle, maps, calendar, standing, party pin). Loaded lazily, only for the
    * sections that read it.
    */
-  const needsCampaign = section === "home" || section === "calendar" || section === "downtime" || section === "tags";
+  const needsCampaign =
+    section === "home" ||
+    section === "story" ||
+    section === "timeline" ||
+    section === "tags" ||
+    section === "relationships";
   const loadCampaignFeed = useCallback(async () => {
     const [records, maps, calendar, standing, party] = await Promise.all([
       journalApi.chronicle(gmToken),
@@ -103,7 +108,8 @@ export function useGmFeeds(gmToken: string, section: CodexSection | null) {
                     entityType: page.entityType,
                     revealedToPlayers: page.revealedToPlayers,
                     rev: page.rev,
-                    updatedAt: page.updatedAt
+                    updatedAt: page.updatedAt,
+                    playerUpdatedAt: page.playerUpdatedAt
                   }
                 : row
             )

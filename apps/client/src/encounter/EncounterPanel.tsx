@@ -1,11 +1,8 @@
 import type { GmView, PlayerView } from "@vtt/domain";
-import type { MapSelection } from "../maps/MapManager";
-import type { DockControl } from "./DockPicker";
-import { GmEncounterPanel } from "./GmEncounterPanel";
-import { PlayerEncounterPanel } from "./PlayerEncounterPanel";
+import type { MapSelection } from "../maps/map-catalog";
+import { GmEncounterPanel, type GmPanelSlots } from "./GmEncounterPanel";
+import { PlayerEncounterPanel, type PlayerPanelSlots } from "./PlayerEncounterPanel";
 import "./encounter-panel.css";
-
-export { DOCK_POSITIONS, type DockPosition } from "./DockPicker";
 
 type GmProps = Readonly<{
   role: "gm";
@@ -13,20 +10,36 @@ type GmProps = Readonly<{
   selectedMap: MapSelection | null;
   mapLibrary?: readonly MapSelection[];
   onSelectMap?: (map: MapSelection | null) => void;
-  dock?: DockControl;
+  phone?: boolean;
+  slots?: GmPanelSlots;
 }>;
-type PlayerProps = Readonly<{ role: "player"; state: PlayerView; dock?: DockControl }>;
+type PlayerProps = Readonly<{
+  role: "player";
+  state: PlayerView;
+  phone?: boolean;
+  slots?: PlayerPanelSlots;
+  onSheetShown?: (shown: boolean) => void;
+}>;
 
-/** The table's turn-order panel: the GM runs the fight from it; a player follows it and acts on their turn. */
+/** The table's panel: the GM runs the fight from it; a player follows it and acts on their turn. */
 export function EncounterPanel(props: GmProps | PlayerProps) {
-  if (props.role === "player") return <PlayerEncounterPanel state={props.state} dock={props.dock} />;
+  if (props.role === "player")
+    return (
+      <PlayerEncounterPanel
+        state={props.state}
+        phone={props.phone}
+        slots={props.slots}
+        onSheetShown={props.onSheetShown}
+      />
+    );
   return (
     <GmEncounterPanel
       state={props.state}
       selectedMap={props.selectedMap}
       mapLibrary={props.mapLibrary}
       onSelectMap={props.onSelectMap}
-      dock={props.dock}
+      phone={props.phone}
+      slots={props.slots}
     />
   );
 }

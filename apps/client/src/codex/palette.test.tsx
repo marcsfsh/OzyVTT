@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-vi.mock("./MapSurface", () => ({ MapSurface: () => <div data-testid="map-surface" /> }));
+vi.mock("./atlas/AtlasMap", () => ({ AtlasMap: () => <div data-testid="map-surface" /> }));
 
 const listPages = vi.fn();
 const listFolders = vi.fn();
@@ -32,6 +32,13 @@ const playerSessions = vi.fn();
 const playerQuests = vi.fn();
 const playerStanding = vi.fn();
 
+// The palette and the tag view search through the record API; each call reads as (token, words) here.
+vi.mock("./api-records", () => ({
+  findApi: {
+    search: (token: string, params: { q: string }) => search(token, params.q),
+    searchAsPlayer: (token: string, params: { q: string }) => playerSearch(token, params.q)
+  }
+}));
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
@@ -90,7 +97,7 @@ import { PlayerCodex } from "./PlayerCodex";
 import type { CodexSearchHit } from "@vtt/domain";
 
 /**
- * The Codex command palette. It is Codex-scoped, not app-global; making it global is a separate decision.
+ * The Codex command palette. It is scoped to the Codex; making it global is a separate decision.
  * The player palette searches through `playerCodexApi` and offers no create verbs.
  */
 
@@ -116,7 +123,12 @@ const HIT: CodexSearchHit = {
   title: "Strahd von Zarovich",
   tags: [],
   entityType: "character",
-  mapId: null
+  mapId: null,
+  type: "character",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 
 const palette = () => screen.findByRole("dialog", { name: "Codex command palette" });
@@ -132,7 +144,7 @@ beforeEach(() => {
   listFolders.mockResolvedValue([]);
   listConnections.mockResolvedValue([]);
   party.mockResolvedValue(null);
-  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", gmBody: "", gmFields: {} }, connections: [] });
+  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", blocks: [] }, connections: [] });
   getSettings.mockResolvedValue({ revealWarn: true, autosave: { enabled: true, intervalSeconds: 1 } });
   search.mockResolvedValue({ hits: [], truncated: false });
   playerSearch.mockResolvedValue({ hits: [], truncated: false });
@@ -177,21 +189,19 @@ describe("Opening and closing", () => {
     );
   });
 
-  it("opens from the sidebar's Search row, which announces the shortcut it duplicates", async () => {
+  it("opens from the bar's search box, which announces the shortcut it duplicates", async () => {
     const user = userEvent.setup();
     renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-    const row = within(screen.getByRole("navigation", { name: "Codex sections" })).getByRole("button", {
-      name: /Search/
-    });
+    const row = screen.getByRole("button", { name: /Search the Codex/ });
     expect(row).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K");
     await user.click(row);
     expect(await palette()).toBeInTheDocument();
   });
 });
 
-describe("The scope decision — Codex-only, deliberately", () => {
+describe("The scope decision: Codex-only, deliberately", () => {
   /** Fails if the key listener moves to `main.tsx` or module scope. */
   it("⌘K does nothing when the Codex is not on screen", async () => {
     /** A bare tree is the discriminating case: a global listener would fire regardless of what's rendered. */
@@ -233,32 +243,32 @@ describe("What it can do", () => {
     expect(screen.queryByRole("dialog", { name: "Codex command palette" })).not.toBeInTheDocument();
   });
 
-  it("offers a GO TO verb for every sidebar destination — one list, never two", async () => {
+  it("offers a GO TO verb for every place the shell opens: one list, never two", async () => {
     const user = userEvent.setup();
     renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.keyboard("{Control>}k{/Control}");
     const box = within(await palette());
 
-    // Built from GM_SIDEBAR, so new sections appear automatically.
+    // Built from `codexDestinations`, so new sections appear automatically.
     for (const label of [
       "Home",
+      "Search",
       "Pages",
       "Atlas",
-      "Graph",
+      "Story",
+      "Timeline",
       "Sessions",
       "Quests",
-      "Journal",
-      "Calendar",
-      "Downtime",
-      "Reveal audit",
+      "Relationships",
+      "Prep templates",
       "Backup",
-      "Settings"
+      "Autosave and history"
     ]) {
       expect(box.getByText(`Go to ${label}`)).toBeInTheDocument();
     }
-    // An action, not an address.
-    expect(box.queryByText("Go to Preview as player")).not.toBeInTheDocument();
+    // An action of the GM menu, with no address.
+    expect(box.queryByText(/Go to See as/)).not.toBeInTheDocument();
   });
 
   it("navigates on a goto verb", async () => {
@@ -266,8 +276,8 @@ describe("What it can do", () => {
     renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.keyboard("{Control>}k{/Control}");
-    await user.click(within(await palette()).getByText("Go to Downtime"));
-    await waitFor(() => expect(window.location.pathname).toBe("/codex/downtime"));
+    await user.click(within(await palette()).getByText("Go to Relationships"));
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/relationships"));
   });
 
   it("offers to CREATE the thing you typed, unless a page already has that exact title", async () => {
@@ -278,12 +288,12 @@ describe("What it can do", () => {
     const box = within(await palette());
 
     await user.type(box.getByLabelText("Search the Codex"), "Vallaki");
-    expect(await box.findByText(/New page “Vallaki”/)).toBeInTheDocument();
+    expect(await box.findByText(/New page "Vallaki"/)).toBeInTheDocument();
 
     search.mockResolvedValue({ hits: [HIT], truncated: false });
     await user.clear(box.getByLabelText("Search the Codex"));
     await user.type(box.getByLabelText("Search the Codex"), "Strahd von Zarovich");
-    await waitFor(() => expect(box.queryByText(/New page “Strahd von Zarovich”/)).not.toBeInTheDocument());
+    await waitFor(() => expect(box.queryByText(/New page "Strahd von Zarovich"/)).not.toBeInTheDocument());
   });
 
   it("says when the result list is CLIPPED rather than letting it look complete", async () => {
@@ -312,7 +322,7 @@ describe("What it can do", () => {
   });
 
   /** Asserts the write and then the new record's address; landing on the list is not a create. */
-  it("New session creates a session and opens it — it does not just go to the list", async () => {
+  it("New session creates a session and opens it, beyond going to the list", async () => {
     const user = userEvent.setup();
     renderGm();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
@@ -350,7 +360,8 @@ describe("What it can do", () => {
 
     await user.click(within(await palette()).getByRole("button", { name: "Log downtime" }));
 
-    await waitFor(() => expect(window.location.pathname).toBe("/codex/downtime"));
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/story"));
+    expect(window.location.search).toBe("?kind=downtime");
     expect(createSessionCall).not.toHaveBeenCalled();
     expect(createQuestCall).not.toHaveBeenCalled();
   });
@@ -368,11 +379,11 @@ describe("The player's palette", () => {
     await user.type(within(await palette()).getByLabelText("Search the Codex"), "strahd");
 
     await waitFor(() => expect(playerSearch).toHaveBeenCalledWith("player", "strahd"));
-    // The GM search is never called, not merely filtered.
+    // The GM search is never called at all, and nothing is filtered after.
     expect(search).not.toHaveBeenCalled();
   });
 
-  it("offers no create verbs — a player writes nothing", async () => {
+  it("offers no create verbs: a player writes nothing", async () => {
     const user = userEvent.setup();
     renderPlayer();
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
@@ -384,7 +395,7 @@ describe("The player's palette", () => {
     }
   });
 
-  it("offers no GM-only destination — the palette cannot route around the sidebar", async () => {
+  it("offers no GM-only destination: the palette cannot route around the shell", async () => {
     const user = userEvent.setup();
     renderPlayer();
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
@@ -395,10 +406,10 @@ describe("The player's palette", () => {
       })
     );
 
-    // Built from PLAYER_SIDEBAR, so the palette can't reach a route the nav hides.
-    for (const label of ["Reveal audit", "Backup", "Settings", "Preview as player"]) {
+    // Built from the player's destinations, so the palette can't reach a route the shell hides.
+    for (const label of ["Prep templates", "Backup", "Autosave and history"]) {
       expect(box.queryByText(`Go to ${label}`)).not.toBeInTheDocument();
     }
-    expect(box.getByText("Go to Journal")).toBeInTheDocument();
+    expect(box.getByText("Go to Story")).toBeInTheDocument();
   });
 });

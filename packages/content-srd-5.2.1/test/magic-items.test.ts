@@ -31,7 +31,7 @@ const LADDER_ROWS = [
   "Weapon, +3"
 ];
 
-/** The seven `Rarity Varies` tables, kept as one row each rather than expanded. */
+/** The seven `Rarity Varies` tables, kept as one row each. */
 const VARIES_ROWS = [
   "Belt of Giant Strength",
   "Feather Token",
@@ -125,7 +125,7 @@ describe("the generated magic-item bundle", () => {
         "Mantle of Spell Resistance",
         "Wings of Flying"
       ],
-      // The SRD's one-of-each list caps cloaks and headwear, not robes or lenses, so they wear apart.
+      // The SRD's one-of-each list caps cloaks and headwear and leaves robes and lenses alone, so they wear apart.
       body: [
         "Robe of Eyes",
         "Robe of Scintillating Colors",
@@ -162,19 +162,19 @@ describe("the generated magic-item bundle", () => {
       ],
       belt: ["Belt of Dwarvenkind", "Belt of Giant Strength"]
     });
-    // `Ioun Stone` orbits rather than occupies the head, and horseshoes are worn by a horse.
-    // `Hat of Many Spells` is held, not worn; at `head` it would block a helm (`SLOT_CAPACITY.head` is 1).
+    // `Ioun Stone` orbits the head and takes no slot, and horseshoes are worn by a horse.
+    // `Hat of Many Spells` is held; at `head` it would block a helm (`SLOT_CAPACITY.head` is 1).
     expect(rows.find((row) => row.name === "Hat of Many Spells")!.slot).toBe("wondrous");
     expect(rows.find((row) => row.name === "Ioun Stone")!.slot).toBe("wondrous");
     for (const name of ["Horseshoes of Speed", "Horseshoes of a Zephyr"]) {
       expect(rows.find((row) => row.name === name)!.slot, name).toBe("wondrous");
     }
-    // The one prose-derived slot, asserted so a regression in pass 2 is named rather than silent.
+    // The one prose-derived slot, asserted so a regression in pass 2 is named.
     expect(rows.find((row) => row.name === "Wings of Flying")!.slot).toBe("shoulders");
   });
 
   it("reads the two qualifiers a naive category map gets wrong", () => {
-    // Both qualifiers are printed in the parenthetical rather than in the category word.
+    // Both qualifiers are printed in the parenthetical, after the category word.
     const ammunition = rows
       .filter((row) => row.slot === "ammunition")
       .map((row) => row.name)
@@ -193,14 +193,14 @@ describe("the generated magic-item bundle", () => {
       common: 2,
       artifact: 1
     });
-    // `Horn of Valhalla`'s rung is a d100 roll in its description, so it is `varies` (seven, not six).
+    // `Horn of Valhalla`'s rung is a d100 roll in its description, so it is `varies` (seven rungs).
     expect(rows.find((row) => row.name === "Horn of Valhalla")!.rarity).toBe("varies");
     expect(rows.find((row) => row.name === "Horn of Valhalla")!.description).toContain(
       "Rare (Silver or Brass), Very Rare (Bronze), or Legendary (Iron)"
     );
   });
 
-  it("requires attunement on 142 rows - the source's 140, plus the two extra Wand of the War Mage tiers", () => {
+  it("requires attunement on 142 rows: the source's 140, plus the two extra Wand of the War Mage tiers", () => {
     expect(rows.filter((row) => row.attunement?.required === true)).toHaveLength(142);
     // The restriction clause is parsed into slugs, display-only and never enforced.
     expect(rows.find((row) => row.name === "Wand of the War Mage, +1")!.attunement).toEqual({
@@ -224,7 +224,7 @@ describe("the generated magic-item bundle", () => {
     expect(rows.filter((row) => row.weightLb !== null)).toEqual([]);
   });
 
-  it("carries no mechanics the overlay did not author - the ETL itself emits none", () => {
+  it("carries no mechanics the overlay did not author: the ETL itself emits none", () => {
     /**
      * Every rider in the generated bundle must come from `scripts/item-mechanics/items.ts`; one
      * hand-edited into `magic-items.v1.json` would be destroyed by the next build.
@@ -257,7 +257,7 @@ describe("the generated magic-item bundle", () => {
     expect(rows.find((row) => row.name === "Wand of the War Mage, +1")!.description).toBe(
       "Wand, Uncommon (Requires Attunement by a Spellcaster). While holding this wand, you gain a bonus to spell attack rolls determined by the wand's rarity. In addition, you ignore Half Cover when making a spell attack roll."
     );
-    // The ladder's own rarity per tier, not the printed three-rung line.
+    // The ladder's own rarity per tier, over the printed three-rung line.
     expect(rows.find((row) => row.name === "Wand of the War Mage, +3")!.description).toContain("Wand, Very Rare (");
     // `Armor of Resistance`'s d10 table rides in its text via `tableAsText`.
     expect(rows.find((row) => row.name === "Armor of Resistance")!.description).toContain("1d10 1: Damage Type Acid");
@@ -269,7 +269,7 @@ describe("the generated magic-item bundle", () => {
     expect(cut).toEqual([]);
     const textOf = (name: string) => rows.find((row) => row.name === name)!.description!;
     // The GM rolls on these tables from the text, so the final rows must be there.
-    expect(textOf("Wand of Wonder")).toContain("98–00: The creature closest to the chosen point of origin");
+    expect(textOf("Wand of Wonder")).toContain("98\u201300: The creature closest to the chosen point of origin");
     expect(textOf("Mysterious Deck")).toContain("You draw no more cards.");
     expect(textOf("Mysterious Deck")).toContain("Void");
     // Spot-checks mechanics that a lower cap would cut.
@@ -572,7 +572,7 @@ describe("the eligibility column", () => {
       Trident: ["trident"],
       Warhammer: ["warhammer"]
     });
-    // Every resolved id is a row of the base bundle it points into - the cross-bundle half.
+    // Every resolved id is a row of the base bundle it points into: the cross-bundle half.
     const weaponIds = new Set(loadWeapons().map((weapon) => weapon.id));
     const armorIds = new Set(loadArmor().map((piece) => piece.id));
     const ammunitionIds = new Set(

@@ -12,7 +12,7 @@ import type { MoveMode } from "./movePreview";
 import type { Point } from "./useMapView";
 
 /**
- * Everything the map sends: token moves, annotations, fog and terrain. Each family has its own busy flag, and
+ * Everything the map sends: token moves, annotations, fog, terrain and vision. Each family has its own busy flag, and
  * a refusal lands on the map's feedback line. Moves and fog target the privately staged scene while
  * the GM arranges one (`sceneId`), else the live table.
  */
@@ -60,6 +60,7 @@ export function useMapCommands({
   const [annotationBusy, setAnnotationBusy] = useState<string | null>(null);
   const [fogBusy, setFogBusy] = useState(false);
   const [terrainBusy, setTerrainBusy] = useState(false);
+  const [visionBusy, setVisionBusy] = useState(false);
   const [blockedMove, setBlockedMove] = useState<BlockedMove | null>(null);
   const scene = sceneId !== undefined ? { sceneId } : {};
 
@@ -118,7 +119,7 @@ export function useMapCommands({
       !result.ok
         ? (result.message ?? "That question could not be sent.")
         : result.ran
-          ? "That worked this time - no question needed."
+          ? "That worked this time. No question was needed."
           : ASKED
     );
   };
@@ -273,6 +274,70 @@ export function useMapCommands({
       "The terrain could not be cleared."
     );
 
+  const runVision = (run: () => Promise<MutationResult>, failure: string, done?: string) => {
+    setVisionBusy(true);
+    void run().then((result) => {
+      setVisionBusy(false);
+      setMessage(result.ok ? (done ?? "") : (result.message ?? failure));
+    });
+  };
+  const setVisionEnabled = (enabled: boolean) =>
+    runVision(
+      () => command("vision:set-enabled", { enabled, ...scene, expectedRevision: revision }),
+      "Vision could not be switched."
+    );
+  const setAmbient = (ambient: "bright" | "dim" | "dark") =>
+    runVision(
+      () => command("vision:set-ambient", { ambient, ...scene, expectedRevision: revision }),
+      "The light could not be changed."
+    );
+  const addWall = (kind: "wall" | "door" | "window", a: Point, b: Point) => {
+    if (Math.hypot(a.x - b.x, a.y - b.y) < 4) {
+      setMessage(`Drag along the map to draw a ${kind}.`);
+      return;
+    }
+    runVision(
+      () => command("wall:add", { kind, points: [a, b], ...scene, expectedRevision: revision }),
+      `The ${kind} could not be drawn.`
+    );
+  };
+  const removeWall = (wallId: string) =>
+    runVision(
+      () => command("wall:remove", { wallId, ...scene, expectedRevision: revision }),
+      "That could not be removed."
+    );
+  const clearWalls = () =>
+    runVision(() => command("wall:clear", { ...scene, expectedRevision: revision }), "The walls could not be removed.");
+  /** A player opens a door beside their character; the server checks it is. */
+  const setDoorOpen = (wallId: string, open: boolean) =>
+    runVision(
+      () => command("door:set-open", { wallId, open, ...scene, expectedRevision: revision }),
+      open ? "The door could not be opened." : "The door could not be closed.",
+      open ? "Door opened." : "Door closed."
+    );
+  const addLight = (position: Point, light: Readonly<{ brightFeet: number; dimFeet: number }>) =>
+    runVision(
+      () =>
+        command("light:add", {
+          position,
+          brightFeet: light.brightFeet,
+          dimFeet: light.dimFeet,
+          ...scene,
+          expectedRevision: revision
+        }),
+      "The light could not be placed."
+    );
+  const removeLight = (lightId: string) =>
+    runVision(
+      () => command("light:remove", { lightId, ...scene, expectedRevision: revision }),
+      "That light could not be removed."
+    );
+  const forgetExplored = () =>
+    runVision(
+      () => command("vision:reset-explored", { ...scene, expectedRevision: revision }),
+      "What the party has seen could not be forgotten."
+    );
+
   return {
     message,
     setMessage,
@@ -299,7 +364,17 @@ export function useMapCommands({
     hideAllFog,
     terrainBusy,
     paintTerrain,
-    clearAllTerrain
+    clearAllTerrain,
+    visionBusy,
+    setVisionEnabled,
+    setAmbient,
+    addWall,
+    removeWall,
+    clearWalls,
+    setDoorOpen,
+    addLight,
+    removeLight,
+    forgetExplored
   };
 }
 

@@ -31,6 +31,7 @@ import {
   type HitDie
 } from "@vtt/rules-5e";
 import type { BuilderCatalogs } from "../content/catalogs";
+import { withArticle } from "@vtt/domain";
 
 /**
  * The character builder's draft model and payload assembly (pure, no React, no socket).
@@ -255,7 +256,7 @@ const kindNoun = (kind: string) =>
         ? "language"
         : "option";
 
-/** The built-in "raise two points instead of taking a feat" row id the server understands. */
+/** The built-in "raise two points in place of a feat" row id the server understands. */
 export const ASI_SHORTHAND = "asi";
 
 /** An offer is satisfied when exactly filled, or deferred because its catalog is empty. */
@@ -281,6 +282,20 @@ export const ABILITY_LABELS: Readonly<Record<Ability, string>> = {
   wis: "Wisdom",
   cha: "Charisma"
 };
+
+const ORDINAL_WORDS = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth"] as const;
+
+/**
+ * The accessible name of one ability-increase picker in a row of them: "Ability to raise by 2", and "First ability to
+ * raise by 1", "Second ability to raise by 1" when two or more pickers raise by the same amount.
+ */
+export function increaseLabel(amounts: readonly number[], index: number): string {
+  const amount = amounts[index];
+  const same = amounts.filter((each) => each === amount).length;
+  if (same < 2) return `Ability to raise by ${amount}`;
+  const rank = amounts.slice(0, index).filter((each) => each === amount).length;
+  return `${ORDINAL_WORDS[rank] ?? `Ability ${rank + 1}:`} ability to raise by ${amount}`;
+}
 
 /** Assign-mode methods hand out a fixed pool; point buy spends against a budget. */
 export const isAssignMethod = (method: BuilderAbilityMethod) => method !== "point-buy";
@@ -369,7 +384,7 @@ export type AbilityCapBreach = Readonly<{
   total: number;
   /** The ASI offer whose increase broke the ceiling; null when the background's own spread did. */
   offerKey: string | null;
-  /** Said in the player's words, naming the ability and both ways out. */
+  /** Said in the player's words, and names the ability and both ways out. */
   reason: string;
 }>;
 
@@ -382,7 +397,7 @@ export type AbilityCapPreview = Readonly<{
 
 /**
  * Walks the ability scores in the server's order and reports the first increase past its ceiling. An input
- * check, not a game outcome: the background spread, each ASI and each feat's ability pick reject above the
+ * check with no game outcome: the background spread, each ASI and each feat's ability pick reject above the
  * ceiling (20, or an Epic Boon's 30), level by level, while species increases clamp. The server recomputes all
  * of it.
  */
@@ -403,7 +418,7 @@ export function abilityCapPreview(
       ability,
       total: scores[ability],
       offerKey,
-      reason: `${ABILITY_LABELS[ability]} would be ${scores[ability]} - no ability may go above ${maximum} here. ${fix}`
+      reason: `${ABILITY_LABELS[ability]} would be ${scores[ability]}, and no ability may go above ${maximum} here. ${fix}`
     };
   };
 
@@ -521,7 +536,7 @@ export function buildCreatePayload(draft: BuilderDraft, choices: readonly Charac
 }
 
 // Roster capacity: the table stores at most 100 sheets and 200 combatants (`actor-roster.ts`), so
-// the wizard warns as it fills and blocks once full, rather than failing at Create.
+// the wizard warns as it fills and blocks once full, so Create never fails on it.
 
 export const DEFINITION_LIMIT = 100;
 export const ACTOR_LIMIT = 200;
@@ -598,7 +613,7 @@ export function stepBlockedReason(
     offersForStep(offers, owner).find((offer) => !offerFilled(offer, draft));
   /**
    * One template for "this pick is not answered yet". The label is printed as the content prints it,
-   * unquoted, matching the heading it points at.
+   * unquoted, as in the heading it points at.
    */
   const pickReason = (offer: BuilderOffer) => {
     // Offers on one step can share a label (six "Ability Score Improvement"s), so stamp the level
@@ -608,9 +623,12 @@ export function stepBlockedReason(
     const chosen = (draft.picks[offer.key] ?? []).length;
     if (offer.kind === "asi-or-feat" && chosen === offer.capacity)
       return `Split the +2 from ${named} across your abilities.`;
-    return offer.capacity === 1
-      ? `Choose your ${named} to continue.`
-      : `Choose ${offer.capacity} for ${named} to continue — ${chosen} of ${offer.capacity} so far.`;
+    if (offer.capacity === 1) return `Choose your ${named} to continue.`;
+    const left = offer.capacity - chosen;
+    if (chosen === 0) return `Choose ${offer.capacity} for ${named} to continue.`;
+    return left > 0
+      ? `Choose ${left} more for ${named} to continue. ${chosen} of ${offer.capacity} are chosen.`
+      : `Choose ${offer.capacity} for ${named} to continue. ${chosen} are chosen.`;
   };
   /**
    * A pick already held from another source. Options are not filtered, so a pick made before the
@@ -623,7 +641,7 @@ export function stepBlockedReason(
         const held = offer.unavailable[id];
         if (!held) continue;
         const name = offer.options.find((option) => option.id === id)?.name ?? titleize(id);
-        return `"${name}" is ${held} — pick a different ${kindNoun(offer.kind)}.`;
+        return `"${name}" is ${held}. Pick a different ${kindNoun(offer.kind)}.`;
       }
     }
     return null;
@@ -669,7 +687,7 @@ export function stepBlockedReason(
                 ? ` Take ${record.name} to level ${record.subclassLevel - 1} to continue.`
                 : ` Drop to level ${record.subclassLevel - 1} to continue.`
               : "";
-          return `No ${record.name} subclasses are available yet - a level ${record.subclassLevel} ${record.name} must have one.${escape}`;
+          return `No ${record.name} subclasses are available yet, and a level ${record.subclassLevel} ${record.name} must have one.${escape}`;
         }
       }
       const conflict = heldConflict("features");
@@ -683,8 +701,8 @@ export function stepBlockedReason(
           context.classRecord;
         const label = owner?.subclassLabel ?? "subclass";
         return multiclass && owner
-          ? `Choose a ${owner.name} ${label.toLowerCase()} to continue.`
-          : `Choose a ${label} to continue.`;
+          ? `Choose ${withArticle(`${owner.name} ${label.toLowerCase()}`)} to continue.`
+          : `Choose ${withArticle(label)} to continue.`;
       }
       // An ASI past 20 is chosen here but only visible once scores exist, so both steps guard the cap
       // with the same sentence.
@@ -693,12 +711,12 @@ export function stepBlockedReason(
     }
     case "abilities": {
       if (!policy.allowedAbilityMethods.includes(draft.abilityMethod))
-        return "Your GM does not allow that ability method — pick another.";
+        return "Your GM does not allow that ability method. Pick another.";
       const base = baseScoresOf(draft);
       const missing = ABILITIES.filter((ability) => base[ability] == null);
       if (missing.length > 0) return `Assign a score to ${ABILITY_LABELS[missing[0]]} to continue.`;
       if (draft.abilityMethod === "point-buy" && !isPointBuyLegal(ABILITIES.map((ability) => base[ability]!))) {
-        return "That spread is over the 27-point budget — lower a score to continue.";
+        return "That spread is over the 27-point budget. Lower a score to continue.";
       }
       if (draft.abilityMethod === "standard-array") {
         const sorted = ABILITIES.map((ability) => base[ability]!)
@@ -716,7 +734,7 @@ export function stepBlockedReason(
         if (check.ok) {
           const outside = ABILITIES.find((ability) => base[ability]! < check.minimum || base[ability]! > check.maximum);
           if (outside)
-            return `A ${formula} roll produces ${check.minimum}-${check.maximum} — ${ABILITY_LABELS[outside]} ${base[outside]} is outside that. Re-roll it or correct the value.`;
+            return `A ${formula} roll produces ${check.minimum}-${check.maximum}, and ${ABILITY_LABELS[outside]} ${base[outside]} is outside that. Re-roll it or correct the value.`;
         }
       }
       const options = context.background?.abilityOptions ?? null;
@@ -727,7 +745,7 @@ export function stepBlockedReason(
           .sort((left, right) => right - left)
           .join("/");
         if (!options.spreads.some((legal) => [...legal].sort((left, right) => right - left).join("/") === spread)) {
-          return `${context.background!.name} allows ${options.spreads.map((legal) => `+${legal.join("/+")}`).join(" or ")} — adjust the split.`;
+          return `${context.background!.name} allows ${options.spreads.map((legal) => `+${legal.join("/+")}`).join(" or ")}. Adjust the split.`;
         }
         if (new Set(draft.backgroundBonus.map((entry) => entry.ability)).size !== draft.backgroundBonus.length) {
           return "Each background increase must go to a different ability.";
@@ -746,7 +764,7 @@ export function stepBlockedReason(
           const die = context.levelDice[index + 1] ?? context.hitDie;
           const faces = die ? hitDieFaces(die) : 12;
           if (entry < 1 || entry > faces)
-            return `A ${die ?? "d12"} roll is 1-${faces} - fix the level ${index + 2} entry.`;
+            return `A ${die ?? "d12"} roll is 1-${faces}. Fix the level ${index + 2} entry.`;
         }
       }
       return null;

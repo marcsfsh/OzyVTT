@@ -18,10 +18,13 @@ import {
   MAP_ASSET_PATHS,
   OPENAPI_DOCUMENT_PATH,
   SESSION_PATHS,
+  SOUND_ASSET_PATHS,
   SYSTEM_PATHS,
+  TOKEN_ASSET_PATHS,
   VIEWER_PATHS
 } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
+import { gameCommands } from "../src/commands/index.js";
 
 const requestId = "f84d13cb-a7da-4ef2-9f2f-53d38e49d862";
 
@@ -29,13 +32,16 @@ describe("the OpenAPI document", () => {
   it("keeps OpenAPI system, document, and credential paths, versions, scopes, and component references aligned", () => {
     expect(openApiDocument.openapi).toBe("3.1.0");
     expect(openApiDocument.info.version).toBe(API_VERSION);
-    expect(openApiDocument.servers[0].url).toBe(API_NAMESPACE);
+    // Every path already starts with the namespace, so the server URL is the host's root.
+    expect(openApiDocument.servers[0]?.url).toBe("/");
 
     const declaredPaths = [
       ...Object.values(SYSTEM_PATHS),
       OPENAPI_DOCUMENT_PATH,
       ...Object.values(INTEGRATION_CREDENTIAL_PATHS),
       ...Object.values(MAP_ASSET_PATHS),
+      ...Object.values(TOKEN_ASSET_PATHS),
+      ...Object.values(SOUND_ASSET_PATHS),
       ...Object.values(VIEWER_PATHS),
       ...Object.values(GAME_PATHS),
       ...Object.values(CONTENT_PATHS),
@@ -48,7 +54,7 @@ describe("the OpenAPI document", () => {
     ];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     for (const path of Object.values(SYSTEM_PATHS))
-      expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(
+      expect(openApiDocument.paths[path]?.get?.responses["200"]?.content?.["application/json"]?.schema.$ref).toMatch(
         /^#\/components\/schemas\//
       );
   });
@@ -73,6 +79,7 @@ describe("the OpenAPI document", () => {
     // Content is the one map-asset read open to a GM, an authorized player or a paired viewer session.
     expect(openApiDocument.paths[MAP_ASSET_PATHS.content].get.security).toEqual([
       { gmAuth: [] },
+      { playerAuth: [] },
       { viewerCookieAuth: [] }
     ]);
     expect(openApiDocument.paths[MAP_ASSET_PATHS.calibrationWizards].post.security).toEqual([{ gmAuth: [] }]);
@@ -126,6 +133,16 @@ describe("the OpenAPI document", () => {
       [CODEX_PATHS.calendar, "put"],
       [CODEX_PATHS.settings, "put"],
       [CODEX_PATHS.pageRevisionsCollection, "delete"],
+      [CODEX_PATHS.party, "post"],
+      [CODEX_PATHS.prepTemplates, "post"],
+      [CODEX_PATHS.prepTemplateById, "patch"],
+      [CODEX_PATHS.prepTemplateById, "delete"],
+      [CODEX_PATHS.prepTemplateDuplicate, "post"],
+      [CODEX_PATHS.prepTemplateDefault, "post"],
+      [CODEX_PATHS.sessionApplyTemplate, "post"],
+      [CODEX_PATHS.sessionLog, "post"],
+      [CODEX_PATHS.sessionTick, "post"],
+      [CODEX_PATHS.sessionCurrentScene, "post"],
       [CODEX_ASSET_PATHS.collection, "post"]
     ] as const) {
       expect(paths[path][method].security, `${method} ${path}`).toEqual(write);
@@ -135,6 +152,7 @@ describe("the OpenAPI document", () => {
       [CODEX_PATHS.pages, "get"],
       [CODEX_PATHS.pageById, "get"],
       [CODEX_PATHS.search, "get"],
+      [CODEX_PATHS.home, "get"],
       [CODEX_PATHS.connections, "get"],
       [CODEX_PATHS.maps, "get"],
       [CODEX_PATHS.mapMarkers, "get"],
@@ -148,13 +166,16 @@ describe("the OpenAPI document", () => {
     ] as const) {
       expect(paths[path][method].security, `${method} ${path}`).toEqual(roleRead);
     }
-    // GM-grade reads: organizational, historical and backup surfaces have no player branch.
+    // GM-grade reads: organizational, historical and backup surfaces, and session prep, have no player branch.
     for (const path of [
       CODEX_PATHS.folders,
       CODEX_PATHS.pageRevisions,
       CODEX_PATHS.revealAudit,
       CODEX_PATHS.settings,
-      CODEX_PATHS.export
+      CODEX_PATHS.export,
+      CODEX_PATHS.prepTemplates,
+      CODEX_PATHS.board,
+      CODEX_PATHS.sessionHappened
     ]) {
       expect(paths[path].get.security, `get ${path}`).toEqual(gmRead);
     }
@@ -187,17 +208,17 @@ describe("the OpenAPI document", () => {
     // Asset paths are walked too, so the upload route's 403 stays documented.
     for (const path of [...Object.values(CODEX_PATHS), ...Object.values(CODEX_ASSET_PATHS)]) {
       for (const [method, op] of Object.entries(paths[path])) {
-        // The binary asset-content route answers 403 before any existence check, so it has no 401; pinned below.
-        if (path === CODEX_ASSET_PATHS.content) continue;
-        // 401 is "no credential"; 403 is "presented one and was refused". Every route accepts a bearer token.
+        // 401 is "no live credential"; 403 is "a valid one without the role" (ADR-0027). Every route accepts a
+        // bearer token.
         expect(Object.keys(op.responses), `${method} ${path} must document 401`).toContain("401");
         expect(Object.keys(op.responses), `${method} ${path} must document 403`).toContain("403");
         // Only the JSON reads answer 304.
         if (method === "get") expect(Object.keys(op.responses), `${method} ${path} must document 304`).toContain("304");
       }
     }
+    // The binary asset-content route refuses before any existence check, so a 404 only follows a caller it serves.
     const content = paths[CODEX_ASSET_PATHS.content].get;
-    expect(Object.keys(content.responses)).toEqual(["200", "304", "403", "404"]);
+    expect(Object.keys(content.responses)).toEqual(["200", "304", "401", "403", "404"]);
     // A route whose body parser exceeds the global limit must document the 413 it raises.
     expect(Object.keys(paths[CODEX_ASSET_PATHS.collection].post.responses)).toContain("413");
     expect(Object.keys(paths[CODEX_PATHS.import].post.responses)).toContain("413");
@@ -256,7 +277,7 @@ describe("the OpenAPI document", () => {
     const schemas = openApiDocument.components.schemas as unknown as Record<string, Schema>;
     const wrappers = Object.keys(schemas).filter((name) => name.startsWith("Codex") && name.endsWith("Projected"));
     // Pinned so deleting a wrapper cannot silently empty this test.
-    expect(wrappers).toHaveLength(12);
+    expect(wrappers).toHaveLength(14);
     for (const wrapper of wrappers) {
       const branches = schemas[wrapper].oneOf ?? [];
       expect(
@@ -298,9 +319,9 @@ describe("the OpenAPI document", () => {
     const operations = homebrewPaths.flatMap((path) =>
       Object.entries(paths[path]).map(([method, op]) => [`${method} ${path}`, op] as const)
     );
-    // 11 paths, 14 operations: one polymorphic surface, not one endpoint per content type.
-    expect(homebrewPaths).toHaveLength(11);
-    expect(operations).toHaveLength(14);
+    // 24 paths, 27 operations: one polymorphic surface for every content type.
+    expect(homebrewPaths).toHaveLength(24);
+    expect(operations).toHaveLength(27);
     for (const [label, op] of operations) {
       // No player read at all: players reach homebrew only through the merged catalogs, after the audience filter.
       expect(op.security, `${label} must be GM-session-only`).toEqual([{ gmAuth: [] }]);
@@ -317,8 +338,10 @@ describe("the OpenAPI document", () => {
     expect(IntegrationScopeSchema.options).not.toContain("content:read");
     // Homebrew rows are not GameState, so none of them is a game command.
     expect(Object.keys(GAME_COMMANDS).filter((type) => type.startsWith("homebrew."))).toEqual([]);
-    // The id budget is 60, not contentSlug's 80 (persisted ActorDefinition ids cap at 60).
-    for (const path of homebrewPaths.filter((path) => path.includes("{id}"))) {
+    // The id budget is 60, below contentSlug's 80 (persisted ActorDefinition ids cap at 60). The SRD read and See as
+    // take an SRD id too, which is a content slug.
+    const takesSrdIds = new Set<string>([HOMEBREW_PATHS.srdRecord, HOMEBREW_PATHS.seeAsContent]);
+    for (const path of homebrewPaths.filter((path) => path.includes("{id}") && !takesSrdIds.has(path))) {
       const parameter = Object.values(paths[path])[0]?.parameters?.find(
         (parameter) => parameter.name === "id" && parameter.in === "path"
       );
@@ -347,12 +370,23 @@ describe("the OpenAPI document", () => {
     expect(scopeOf(GAME_PATHS.actionResolve, "post")).toEqual(["combat:write"]);
     expect(scopeOf(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toEqual(["combat:read"]);
     expect(scopeOf(ENCOUNTER_ARCHIVE_PATHS.byId, "delete")).toEqual(["admin"]);
-    // Every game/content/archive operation also accepts a GM session.
+    // Every game/content/archive operation also accepts a GM session, except a command only a player may send.
+    const playerOnly = new Set(
+      gameCommands
+        .filter((command) => command.playerOnly !== undefined)
+        .map((command) => GAME_COMMANDS[command.type].path as string)
+    );
+    expect(playerOnly.size).toBeGreaterThan(0);
     for (const path of [
       ...Object.values(GAME_PATHS),
       ...Object.values(CONTENT_PATHS),
       ...Object.values(ENCOUNTER_ARCHIVE_PATHS)
     ]) {
+      if (playerOnly.has(path)) {
+        for (const operation of Object.values(paths[path]))
+          expect(operation.security, `${path} is a player's own`).toEqual([{ playerAuth: [] }]);
+        continue;
+      }
       for (const operation of Object.values(paths[path])) {
         expect(
           operation.security?.some((entry) => "gmAuth" in entry),
@@ -388,7 +422,9 @@ describe("the OpenAPI document", () => {
       expect(acceptsPlayer(path, "get"), `${path} must accept a player session`).toBe(true);
       expect(scopeOf(path, "get"), `${path} scope`).toEqual(["game:read"]);
     }
-    expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toBe(false);
+    // A player lists and reads only the replays the GM shared; managing them stays with the GM.
+    expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toBe(true);
+    expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.byId, "delete")).toBe(false);
     expect(openApiDocument.components.securitySchemes.playerAuth).toMatchObject({ type: "http", scheme: "bearer" });
   });
 
@@ -418,18 +454,29 @@ describe("the OpenAPI document", () => {
       "IntegrationCredentialIssued.token",
       "PlayerSessionIssued.token",
       "CodexPreviewSessionData.token",
-      // The host's own sign-in: the GM password goes in and a GM session token comes out.
-      "HostPasswordRequest.password",
-      "GmSignIn.token"
+      // The host's own setup and sign-in: the GM password goes in and a GM session token comes out.
+      "HostSetupRequest.password",
+      "GmSignInRequest.password",
+      "GmSignIn.token",
+      // Changing the GM password: both passwords go in, and the GmSignIn token above comes out.
+      "GmPasswordChangeRequest.currentPassword",
+      "GmPasswordChangeRequest.newPassword"
+    ]);
+    // Battlemap pieces: an actor's token, a name fixed by ActorDefinitionSchema, and the token image library.
+    const gamePieces = new Set([
+      "ActorDefinition.token",
+      "HomebrewMonsterRecord.token",
+      "TokenAssetUploadData.token",
+      "TokenAssetData.token",
+      "TokenAssetListData.tokens"
     ]);
     for (const [name, schema] of Object.entries(openApiDocument.components.schemas)) {
       const properties =
         "properties" in schema ? Object.keys((schema as { properties: Record<string, unknown> }).properties) : [];
       for (const property of properties) {
         if (issuance.has(`${name}.${property}`)) continue;
-        if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces, not credentials
-        // An ActorDefinition's `token` is its battlemap piece, a name fixed by ActorDefinitionSchema.
-        if (`${name}.${property}` === "HomebrewMonsterRecord.token") continue;
+        if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces
+        if (gamePieces.has(`${name}.${property}`)) continue;
         expect(property, `${name}.${property} looks secret-shaped`).not.toMatch(forbiddenNames);
       }
     }

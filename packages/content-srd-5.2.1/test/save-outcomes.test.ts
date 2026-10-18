@@ -79,7 +79,7 @@ describe("save outcomes in the shipped content", () => {
       failureConditions: ["paralyzed"]
     });
     expect(monsterAction("giant-spider", "web").save).toMatchObject({ failureConditions: ["restrained"] });
-    // "one creature ... that is Charmed or Grappled by the aboleth" is who it targets, not what a failure does.
+    // "one creature ... that is Charmed or Grappled by the aboleth" names who it targets and says nothing of a failure.
     expect(monsterAction("aboleth", "consume-memories").save).toMatchObject({
       successDamage: "half",
       failureConditions: []
@@ -238,7 +238,7 @@ describe("save outcomes in the shipped content", () => {
     // A reminder that was only the damage goes.
     expect(monsterAction("vrock", "spores").save?.ongoingDamage?.at).toBe("bearer-turn-start");
     expect(monsterAction("vrock", "spores").reminder).toBeUndefined();
-    // Losing hit points is not damage: an infernal wound is the failure's own effect, taking untyped hit points.
+    // Losing hit points is not damage: an infernal wound is the failure's own effect, and its loss has no type.
     expect(monsterAction("horned-devil", "infernal-tail").save).toMatchObject({
       failureEffect: { name: "Infernal Wound", duration: { type: "rounds", rounds: 10 }, endsOnSpellHealing: true },
       ongoingDamage: { damage: [{ formula: "3d6" }], at: "bearer-turn-start", hitPointLoss: true }

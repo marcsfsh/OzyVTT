@@ -1,10 +1,29 @@
 import type { ActorMovementReply, EncounterToken, GmActor, PlayerActor } from "@vtt/domain";
-import { footprintCenter, footprintOrigin, movementPath, pointInRects, spacePassage } from "@vtt/rules-5e";
+import {
+  footprintCenter,
+  footprintOrigin,
+  footprintStepBlocked,
+  movementPath,
+  pointInRects,
+  spacePassage,
+  wallCrossing
+} from "@vtt/rules-5e";
 import { gridToImagePreview, imageToGridPreview, type GridCalibration } from "./gridPreview";
 
 type Point = Readonly<{ x: number; y: number }>;
 type Rect = Readonly<{ x: number; y: number; width: number; height: number }>;
 type MapActor = GmActor | PlayerActor;
+
+/** A wall, closed door or window that bars a move, in image pixels. */
+export type MoveWall = Readonly<{ a: Point; b: Point }>;
+
+/** The walls that bar a move among those the view has (dynamic vision): every one but an open door. A door whose state
+ *  a player wasn't sent counts as closed. */
+export function movementWallsOf(
+  walls: ReadonlyArray<Readonly<{ kind: "wall" | "door" | "window"; a: Point; b: Point; open?: boolean }>>
+): MoveWall[] {
+  return walls.filter((wall) => wall.kind !== "door" || wall.open !== true).map((wall) => ({ a: wall.a, b: wall.b }));
+}
 
 /** How a drag travels, as `token.move` takes it. */
 export type MoveMode = "walk" | "fly" | "swim" | "climb" | "burrow" | "teleport" | "forced";
@@ -37,8 +56,9 @@ export const alliesByKind = (mover: MapActor, occupant: MapActor) => {
  * painted terrain and other creatures' spaces costing double or barring the way as the SRD says (`spacePassage`), an
  * extra foot per foot while crawling, climbing or swimming without the speed, or dragging. The client sees only what
  * it may (players get the revealed terrain, no hidden creatures, and no NPC's side), and the server leaves hidden
- * creatures out too, so the two agree except where unrevealed terrain lies under the fog or an NPC's side matters. A
- * spell's area that halves the mover's Speed (Spirit Guardians) is charged by the server alone.
+ * creatures out too, so the two agree except where unrevealed terrain lies under the fog or an NPC's side matters.
+ * With dynamic vision on, the walls the view has bar the way as the server's do. A spell's area that halves the
+ * mover's Speed (Spirit Guardians) is charged by the server alone.
  */
 export function previewMove(
   input: Readonly<{
@@ -58,6 +78,8 @@ export function previewMove(
     carried?: readonly string[];
     /** Teleporting or moved by force: a straight line that spends nothing. */
     free?: boolean;
+    /** Walls that bar the way while the scene's dynamic vision is on (`movementWallsOf`). */
+    walls?: readonly MoveWall[];
   }>
 ): MovePreview | null {
   const { calibration, size, terrain, tokens, actorsById, moverId } = input;
@@ -97,6 +119,12 @@ export function previewMove(
   }
   const center = (column: number, row: number) =>
     gridToImagePreview(calibration, { column: column + 0.5, row: row + 0.5 });
+  const crosses = wallCrossing(
+    (input.walls ?? []).map((wall) => ({
+      a: imageToGridPreview(calibration, wall.a),
+      b: imageToGridPreview(calibration, wall.b)
+    }))
+  );
   const path = movementPath({
     from,
     to,
@@ -107,6 +135,7 @@ export function previewMove(
       const point = center(column, row);
       return point.x >= 0 && point.y >= 0 && point.x <= size.width && point.y <= size.height;
     },
+    isStepOpen: (stepFrom, stepTo) => !footprintStepBlocked(stepFrom, stepTo, sizeCells, crosses),
     extraPerStep: input.extraPerStep ?? 0
   });
   if (!path) return null;

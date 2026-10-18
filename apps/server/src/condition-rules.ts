@@ -2,7 +2,7 @@ import type { Actor } from "@vtt/domain";
 
 // Shared condition math (SRD 5.2.1 glossary). Dependency-free so any engine module can import it.
 
-/** Conditions that include Incapacitated (SRD 2024): no actions, bonus actions, or reactions while any is active. */
+/** Conditions that include Incapacitated (SRD 2024): no actions, Bonus Actions, or reactions while any is active. */
 export const INCAPACITATING_CONDITIONS = ["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"] as const;
 
 /** The first incapacitating condition the actor has, so a refusal can name it; null when none. */

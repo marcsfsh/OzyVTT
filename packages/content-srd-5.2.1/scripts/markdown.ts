@@ -6,7 +6,7 @@
 export const strip = (value: string) =>
   value
     .replace(/<[^>]+>/g, " ")
-    .replace(/&mdash;|&#8212;/g, "—")
+    .replace(/&mdash;|&#8212;/g, "\u2014")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
@@ -37,7 +37,7 @@ export function tableAsText(html: string): string {
   return text === "" ? "" : `${text}.`;
 }
 
-/** Inlines tables as text instead of dropping them: several features' content lives in a table. */
+/** Inlines tables as text, so none is dropped: several features' content lives in a table. */
 export const withTables = (value: string) =>
   value.replace(/<table>[\s\S]*?<\/table>/g, (html) => ` ${tableAsText(html)} `);
 
@@ -45,6 +45,6 @@ export const withTables = (value: string) =>
 export const slug = (value: string) =>
   strip(value)
     .toLowerCase()
-    .replace(/['’]/g, "")
+    .replace(/['\u2019]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");

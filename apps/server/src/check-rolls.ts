@@ -31,6 +31,8 @@ export type CheckRollDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   catalog?: EquipmentCatalog;
   names?: CheckNames;
+  /** Creatures hidden from a player by sight or the fog. */
+  unseen?: ReadonlySet<string>;
   /** Where creatures stand, for an ally's aura around the roller; absent, only the roller's own aura is known. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
@@ -72,12 +74,13 @@ function planFor(state: GameState, scope: Initiator, input: CheckRollInput, deps
   const derivation = deriveEquipment(actor, definition, deps.catalog);
   // A player names only a creature they can see; a hidden one would answer whether it carries their mark.
   const finding =
-    input.findActorId !== undefined && (scope.role === "gm" || canPlayerTarget(state, input.findActorId))
+    input.findActorId !== undefined && (scope.role === "gm" || canPlayerTarget(state, input.findActorId, deps.unseen))
       ? state.actors.find((candidate) => candidate.id === input.findActorId)
       : undefined;
   const warded = wardedConditions(state, actor, {
     resolveDefinition: deps.resolveDefinition,
-    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
   });
   const plan = checkPlan(actor, definition, derivation, input.subject, {
     ...(deps.names ? { names: deps.names } : {}),

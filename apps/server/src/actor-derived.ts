@@ -21,14 +21,15 @@ import { autoFailsPhysicalSaves } from "./condition-rules.js";
 import { standingDefences } from "./hit-points.js";
 import { auraBonusOf, saveRollSources, saveTotalFor } from "./saving-throws.js";
 import { currentSpeedFeet } from "./speed.js";
+import { weaponMasteriesOf } from "./weapon-masteries.js";
 
 /**
  * The numbers a character sheet shows next to its roll buttons, derived server-side with the same
  * functions the resolver uses, so a chip and a GM-forced roll never disagree and item riders apply.
  *
  * Delivered on `actor:available-actions`, a request that authorizes its caller for one actor before
- * anything is derived, rather than on the broadcast `PlayerView`. That keeps one authorization gate
- * instead of a per-actor strip that must stay right in both `projections.ts` and `PlayerActor`, and the
+ * anything is derived, and is never on the broadcast `PlayerView`. That keeps one authorization gate
+ * where a per-actor strip would have to stay right in both `projections.ts` and `PlayerActor`, and the
  * block is never computed for an actor the caller may not see.
  */
 
@@ -127,7 +128,8 @@ export function deriveActorSheet(
       "spell-save-dc"
     ),
     // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
-    attunementSlots: 3 + derivation.attunementSlots
+    attunementSlots: 3 + derivation.attunementSlots,
+    weaponMasteries: weaponMasteriesOf(definition, catalog?.equipmentRecord)
   };
 }
 

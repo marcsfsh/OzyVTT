@@ -64,22 +64,22 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
         : (actor.actionUses[key] ?? 0);
     if (spent >= action.usesLimit)
       return action.usesPer === "recharge"
-        ? `Spent - recharges on ${action.usesRecharge}+ at its turn start`
+        ? `Spent · recharges on ${action.usesRecharge}+ at its turn start`
         : action.usesPer === "own-turn"
-          ? "Spent - back at its next turn"
+          ? "Spent · back at its next turn"
           : "No uses left";
   }
   const myTurn = state.combat.turnActorId === actor.id;
   if (!myTurn) return null;
   const turn = state.combat.turn;
-  // An open compound bonus action (Flurry of Blows) pays for its strikes before any slot is asked.
+  // An open compound Bonus Action (Flurry of Blows) pays for its strikes before any slot is asked.
   const bonusOpen = turn.bonusActionInstance?.actorId === actor.id ? turn.bonusActionInstance.components : null;
   const fromBonus =
     bonusOpen && !action.multiattack
       ? (bonusOpen[action.id] ?? 0) + (action.attackBonus !== null ? (bonusOpen["attack"] ?? 0) : 0)
       : 0;
-  if (fromBonus > 0) return `${fromBonus} left from the bonus action`;
-  if (action.activation === "bonus-action" && turn.bonusActionUsed) return "Bonus action used";
+  if (fromBonus > 0) return `${fromBonus} left from the Bonus Action`;
+  if (action.activation === "bonus-action" && turn.bonusActionUsed) return "Bonus Action used";
   if (action.activation === "action" && turn.actionUsed) {
     // Action Surge or Haste left another action; the server says which actions it can take.
     const extra = turn.extraActions?.actorId === actor.id ? turn.extraActions : undefined;
@@ -89,7 +89,7 @@ function availabilityHint(state: GmView, actor: GmActor, action: ContentActionSu
     const instance = open?.components ?? null;
     // The Multiattack plan row stays a live "continue" while any component remains.
     if (action.multiattack && instance && Object.values(instance).some((count) => count > 0))
-      return "In progress - pick the next attack";
+      return "In progress · pick the next attack";
     // A weapon attack or an Unarmed Strike spends one of the Attack action's attacks.
     const attackMember = action.attackBonus !== null || action.replacesAttack === true;
     const remaining = instance ? placesLeft(instance, action.id) + (attackMember ? (instance["attack"] ?? 0) : 0) : 0;

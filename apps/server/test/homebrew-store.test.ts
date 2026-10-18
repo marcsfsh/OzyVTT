@@ -27,6 +27,7 @@ import {
   slugify
 } from "../src/homebrew-ids.js";
 import {
+  EVERYONE_AUDIENCE,
   HomebrewNotFoundError,
   HomebrewRevisionConflictError,
   HomebrewStateError,
@@ -53,12 +54,12 @@ const bodyFor = (name: string) => ({ name, description: "Authored by the GM." })
 
 describe("homebrew id minting", () => {
   it("keeps every minted id inside the 60-character budget, slug-legal, and out of the reserved families", () => {
-    // 90 characters of name: the slug must be cut at a hyphen boundary, not merely truncated.
+    // 90 characters of name: the slug must be cut at a hyphen boundary.
     const long = "The Extremely Overlong Homebrew Class Of Considerable And Frankly Excessive Verbosity Name";
     for (const type of HomebrewContentTypeSchema.options) {
       const id = mintHomebrewId(type, long, () => false);
       expect(id.length, `${type} id "${id}"`).toBeLessThanOrEqual(HOMEBREW_ID_MAX_LENGTH);
-      // Anchored to the schema, not our constant: `CharacterIdentitySchema` caps persisted ids at 60
+      // Anchored to the schema itself: `CharacterIdentitySchema` caps persisted ids at 60
       // where `ContentIdSchema` allows 80, so raising HOMEBREW_ID_MAX_LENGTH must fail here.
       expect(
         CharacterIdentitySchema.safeParse({
@@ -151,7 +152,7 @@ describe("HomebrewStore", () => {
       type: "class",
       name: "Blood Hunter",
       state: "draft",
-      visibleToPlayers: false,
+      audience: "hidden",
       deletedAt: null,
       rev: 1
     });
@@ -187,7 +188,7 @@ describe("HomebrewStore", () => {
     const updated = store.update(row.id, bodyFor("Blood Maledict II"), row.rev, "gm");
     expect(updated.rev).toBe(2);
     // The stale write is refused with the row's real revision, so the editor's autosave can resync
-    // instead of clobbering.
+    // and clobbers nothing.
     let conflict: unknown;
     try {
       store.update(row.id, bodyFor("Stale"), row.rev, "gm");
@@ -198,34 +199,38 @@ describe("HomebrewStore", () => {
     expect((conflict as HomebrewRevisionConflictError).currentRev).toBe(2);
     expect(store.get(row.id)!.name).toBe("Blood Maledict II");
     expect(() => store.setState(row.id, "published", 1)).toThrow(HomebrewRevisionConflictError);
-    expect(() => store.setVisibility(row.id, true, 1)).toThrow(HomebrewRevisionConflictError);
+    expect(() => store.setAudience(row.id, EVERYONE_AUDIENCE, 1)).toThrow(HomebrewRevisionConflictError);
     // An expectedRev on a missing row is not-found, never a conflict.
     expect(() => store.update("hb-gone-abcdef", bodyFor("x"), 1, "gm")).toThrow(HomebrewNotFoundError);
   });
 
-  it("treats state and visibility as orthogonal, and refuses the one meaningless combination", () => {
+  it("keeps a draft Hidden: sharing one is refused, and unpublishing hides a shared record", () => {
     const row = store.create({ type: "species", body: bodyFor("Ashborn") });
-    // draft + visible is meaningless, so it is refused rather than silently ignored.
-    expect(() => store.setVisibility(row.id, true, undefined)).toThrow(HomebrewStateError);
+    // A draft is always Hidden, so sharing one is refused.
+    expect(() => store.setAudience(row.id, EVERYONE_AUDIENCE, undefined)).toThrow(HomebrewStateError);
     const published = store.setState(row.id, "published", undefined);
-    expect(published).toMatchObject({ state: "published", visibleToPlayers: false });
-    const visible = store.setVisibility(row.id, true, undefined);
-    expect(visible.visibleToPlayers).toBe(true);
-    // Unpublishing keeps the GM's visibility intent; the merged player catalog requires both.
-    expect(store.setState(row.id, "draft", undefined)).toMatchObject({ state: "draft", visibleToPlayers: true });
+    expect(published).toMatchObject({ state: "published", audience: "hidden" });
+    const visible = store.setAudience(row.id, EVERYONE_AUDIENCE, undefined);
+    expect(visible).toMatchObject({ audience: "everyone" });
+    // Unpublishing takes it from every player at once; the reveal stamp stays as history.
+    expect(store.setState(row.id, "draft", undefined)).toMatchObject({
+      state: "draft",
+      audience: "hidden",
+      reveals: [{ to: "everyone" }]
+    });
   });
 
   it("soft-deletes idempotently, hides the row from the default listing, and restores its prior state", () => {
     const row = store.create({ type: "equipment", body: bodyFor("Ring of Cinders") });
     store.setState(row.id, "published", undefined);
-    store.setVisibility(row.id, true, undefined);
+    store.setAudience(row.id, EVERYONE_AUDIENCE, undefined);
     const deleted = store.softDelete(row.id)!;
     expect(deleted.deletedAt).toBeTruthy();
     expect(store.softDelete(row.id)!.deletedAt).toBe(deleted.deletedAt); // idempotent: the stamp does not move
     expect(store.list().rows.map((r) => r.id)).not.toContain(row.id);
     expect(store.list({ includeDeleted: true }).rows.map((r) => r.id)).toContain(row.id);
     // Data is retained; restore is the explicit inverse and keeps state/visibility.
-    expect(store.restore(row.id)).toMatchObject({ deletedAt: null, state: "published", visibleToPlayers: true });
+    expect(store.restore(row.id)).toMatchObject({ deletedAt: null, state: "published", audience: "everyone" });
     expect(store.softDelete("hb-never-existed")).toBeNull();
   });
 
@@ -252,7 +257,7 @@ describe("HomebrewStore", () => {
     const third = store.list({ limit: 2, cursor: second.nextCursor! });
     expect(third.rows.map((row) => row.name)).toEqual(["echo"]);
     expect(third.nextCursor).toBeNull();
-    // An opaque cursor a client mangled restarts from the top rather than 500ing.
+    // An opaque cursor a client mangled restarts from the top.
     expect(store.list({ limit: 2, cursor: "not-a-cursor" }).rows.map((row) => row.name)).toEqual(["alpha", "bravo"]);
   });
 
@@ -274,7 +279,7 @@ describe("HomebrewStore", () => {
     store.setState(wand.id, "published", undefined);
     expect(store.list({ type: "equipment" }).total).toBe(2);
     expect(store.list({ state: "published" }).rows.map((row) => row.id)).toEqual([wand.id]);
-    expect(store.list({ visibleToPlayers: true }).total).toBe(0);
+    expect(store.list({ audience: "everyone" }).total).toBe(0);
     expect(store.list({ q: "wand" }).total).toBe(3);
     // `_` is a LIKE wildcard: a GM searching for the literal character must not match "Wand of Fire".
     expect(store.list({ q: "Wand_of" }).rows.map((row) => row.name)).toEqual(["Wand_of Sparks"]);
@@ -285,10 +290,14 @@ describe("HomebrewStore", () => {
     store.setState(row.id, "published", undefined);
     const copy = store.duplicate(row.id);
     expect(copy.id).not.toBe(row.id);
-    expect(copy).toMatchObject({ name: "Blood Hunter (copy)", state: "draft", visibleToPlayers: false, rev: 1 });
+    expect(copy).toMatchObject({ name: "Blood Hunter (copy)", state: "draft", audience: "hidden", rev: 1 });
     expect(copy.body.hitDie).toBe("d10");
     expect(copy.body.id).toBe(copy.id);
-    expect(store.duplicate(row.id, "Crimson Hunter").name).toBe("Crimson Hunter (copy)");
+    expect(copy.basedOn).toMatchObject({ source: "homebrew", id: row.id, name: "Blood Hunter" });
+    // The name the GM typed is the copy's name, and its id is minted from it.
+    const named = store.duplicate(row.id, "Crimson Hunter");
+    expect(named.name).toBe("Crimson Hunter");
+    expect(named.id).toMatch(/^hb-crimson-hunter-[0-9a-f]{6}$/);
     expect(() => store.duplicate("hb-missing-000000")).toThrow(HomebrewNotFoundError);
   });
 
@@ -339,18 +348,19 @@ describe("HomebrewStore revision counter", () => {
     const database = new DatabaseSync(path);
     expect(database.prepare("SELECT store, version FROM migrations").all()).toEqual([
       { store: "homebrew", version: 1 },
-      { store: "homebrew", version: 2 }
+      { store: "homebrew", version: 2 },
+      { store: "homebrew", version: 3 }
     ]);
     const tables = (
       database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
     ).map((r) => r.name);
     expect(tables).toContain("homebrew_records");
     expect(tables).toContain("homebrew_record_revisions");
-    // STRICT tables: a wrong-typed write is refused rather than coerced.
+    // STRICT tables: a wrong-typed write is refused.
     expect(() =>
       database
         .prepare(
-          "INSERT INTO homebrew_records (id, type, name, state, visible_to_players, body_json, rev, created_at, updated_at) VALUES ('hb-x-000000', 'nonsense', 'X', 'draft', 0, '{}', 1, '', '')"
+          "INSERT INTO homebrew_records (id, type, name, state, body_json, rev, created_at, updated_at) VALUES ('hb-x-000000', 'nonsense', 'X', 'draft', '{}', 1, '', '')"
         )
         .run()
     ).toThrow(/CHECK constraint/i);
@@ -365,8 +375,8 @@ describe("HomebrewStore as a ContentLibrary source", () => {
     const library = new ContentLibrary(store);
     store.create({ type: "class", body: bodyFor("Blood Hunter") });
     const gm = library.forAudience("gm");
-    const player = library.forAudience("player");
-    // The same catalog objects for both audiences, not merely equal contents.
+    const player = library.forAudience({ characterIds: [] });
+    // The same catalog objects for both audiences, identical by reference.
     expect(gm.classSummaries()).toBe(player.classSummaries());
     expect(gm.monsterSummaries()).toBe(player.monsterSummaries());
     expect(gm.classSummaries().some((summary) => summary.name === "Blood Hunter")).toBe(false);
@@ -375,7 +385,7 @@ describe("HomebrewStore as a ContentLibrary source", () => {
   });
 
   // The authorship index is the publish gate's only source that can see drafts. Two gate rules ask
-  // "does this record exist" rather than "is it playable"; answering them from the published catalog
+  // "does this record exist", whether or not it is playable; answering them from the published catalog
   // would deadlock publishing.
   it("sees drafts, keys subclasses by the class they name, and forgets a deleted row", () => {
     const klass = store.create({ type: "class", body: bodyFor("Blood Hunter") });
@@ -420,9 +430,9 @@ describe("HomebrewStore as a ContentLibrary source", () => {
     // published or deleted target is refused, with the reason in `rejected[].issues`.
     const published = store.create({ type: "feat", body: bodyFor("Live Feat") });
     store.setState(published.id, "published", undefined);
-    store.setVisibility(published.id, true, undefined);
+    store.setAudience(published.id, EVERYONE_AUDIENCE, undefined);
     expect(() => store.importRecord(published.id, "feat", bodyFor("Clobbered"), true)).toThrow(HomebrewStateError);
-    expect(store.get(published.id)).toMatchObject({ state: "published", visibleToPlayers: true, name: "Live Feat" });
+    expect(store.get(published.id)).toMatchObject({ state: "published", audience: "everyone", name: "Live Feat" });
 
     const deleted = store.create({ type: "feat", body: bodyFor("Dead Feat") });
     store.softDelete(deleted.id);
@@ -437,15 +447,21 @@ describe("HomebrewStore as a ContentLibrary source", () => {
   it("holds a published record's edits as pending, so the live body and visibility never move mid-edit", () => {
     const record = store.create({ type: "feat", body: bodyFor("Alert") });
     store.setState(record.id, "published", undefined);
-    store.setVisibility(record.id, true, undefined);
+    store.setAudience(record.id, EVERYONE_AUDIENCE, undefined);
     const before = store.revision;
 
     const edited = store.update(record.id, bodyFor("Alert II"), undefined, "gm");
-    expect(edited).toMatchObject({ state: "published", visibleToPlayers: true, name: "Alert" });
+    expect(edited).toMatchObject({ state: "published", audience: "everyone", name: "Alert" });
     expect(edited.body.name).toBe("Alert");
     expect(edited.pendingBody?.name).toBe("Alert II");
     expect(store.revision).toBeGreaterThan(before);
-    expect(store.listRevisions(record.id)[0]).toMatchObject({ state: "published", authorTag: "gm:pending" });
+    expect(store.listRevisions(record.id)[0]).toMatchObject({
+      state: "published",
+      authorTag: "gm",
+      event: "edit",
+      pending: true,
+      changedFields: ["name"]
+    });
 
     // Editing back to the live body leaves nothing pending.
     expect(store.update(record.id, bodyFor("Alert"), undefined, "gm").pendingBody).toBeNull();
@@ -481,7 +497,9 @@ describe("HomebrewStore as a ContentLibrary source", () => {
     expect(uninitialised.revision).toBe(-1);
     expect(uninitialised.publishedFor("gm").classes).toEqual([]);
     expect(uninitialised.monsterForInstance("hb-m-4f19c8b02de7")).toBeUndefined();
-    expect(new ContentLibrary(uninitialised).forAudience("player").classSummaries().length).toBeGreaterThan(0);
+    expect(new ContentLibrary(uninitialised).forAudience({ characterIds: [] }).classSummaries().length).toBeGreaterThan(
+      0
+    );
     await uninitialised.initialize();
     uninitialised.close();
   });

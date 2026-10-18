@@ -124,6 +124,49 @@ export async function expectPageFits(page: Page) {
 }
 
 /**
+ * A control sits wholly inside the viewport and nothing covers its centre: `elementFromPoint` there lands on the
+ * control itself. The bar under the thumb pads itself by the device's safe area, so this holds on a notched phone.
+ */
+export async function expectUncovered(control: Locator) {
+  await expect(control).toBeVisible();
+  const measure = () =>
+    control.evaluate((element: HTMLElement) => {
+      const box = element.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      return {
+        connected: element.isConnected,
+        inside: box.top >= 0 && box.left >= 0 && box.bottom <= window.innerHeight && box.right <= window.innerWidth,
+        hit: hit !== null && (hit === element || element.contains(hit)),
+        at: hit ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join(".")}` : "nothing"
+      };
+    });
+  // Playwright finds the control and measures it in two calls, and a render between them can replace it. A detached
+  // node measures as an empty box at the page's top-left corner, so the control is found and measured again.
+  let found = await measure();
+  for (let attempt = 1; !found.connected && attempt < 5; attempt++) found = await measure();
+  expect.soft(found.connected, `${control} stays in the page while it is measured`).toBe(true);
+  expect.soft(found.inside, `${control} inside the viewport`).toBe(true);
+  expect.soft(found.hit, `${control} is uncovered (the centre hits ${found.at})`).toBe(true);
+}
+
+/** Nothing covers a token on the map: `elementFromPoint` at its centre lands on the token. */
+export async function expectTokenUncovered(page: Page, tokenId: string) {
+  const token = page.locator(`g.encounter-token[data-token-id="${tokenId}"]`);
+  await expect(token).toBeVisible();
+  const found = await token.evaluate((element: SVGGElement) => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return {
+      hit: hit !== null && element.contains(hit),
+      at: hit ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join(".")}` : "nothing"
+    };
+  });
+  expect.soft(found.hit, `the token's centre hits ${found.at}`).toBe(true);
+}
+
+/**
  * Sets the GM password from loopback unless the first journey already did (409), so any journey can
  * run on its own with `--grep`. Players cannot join before it is set.
  */
@@ -140,12 +183,29 @@ export async function signInAsGm(page: Page) {
   await expect(page.getByRole("tablist", { name: "GM sections" })).toBeVisible();
 }
 
+/** Joins, claims `name`, and goes from My character (where a claim lands) to the Table. */
 export async function joinAndClaim(page: Page, name: string) {
   await ensureGmPassword(page.request);
   await press(page.getByRole("button", { name: "Join as Player" }));
   await press(page.getByRole("listitem").filter({ hasText: name }).getByRole("button", { name: "Claim" }));
   await press(page.getByRole("dialog").getByRole("button", { name: "Claim" }));
   await expect(page.getByText(`You're playing ${name}.`)).toBeVisible();
+  await expect(page.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
+  await press(page.getByRole("tab", { name: "Table" }));
+}
+
+/**
+ * Opens a section of the GM's app: its tab, or on a narrow screen the More menu's item for it (the tab bar
+ * keeps every section one tap away without scrolling sideways).
+ */
+export async function openGmSection(page: Page, name: string) {
+  const tab = page.getByRole("tab", { name, exact: true });
+  if (await tab.isVisible()) {
+    await press(tab);
+    return;
+  }
+  await press(page.getByLabel(/more sections$/i));
+  await press(page.getByRole("menuitem", { name, exact: true }));
 }
 
 type Point = { x: number; y: number };
@@ -165,10 +225,11 @@ async function fingers(page: Page) {
   };
 }
 
-/** Drags with one finger on a touch project, or the mouse otherwise. */
-export async function drag(page: Page, target: Locator, by: Point) {
+/** Drags with one finger on a touch project, or the mouse otherwise: from `start` (by default the middle of
+ *  `target`) by `by`. */
+export async function drag(page: Page, target: Locator, by: Point, start?: Point) {
   const box = (await target.boundingBox())!;
-  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const from = start ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   const steps = 8;
   if (touchPages.has(page)) {
     const touch = await fingers(page);
@@ -265,4 +326,25 @@ export function battleMap(width = 700, height = 500): Buffer {
     chunk("IDAT", deflateSync(rows)),
     chunk("IEND", Buffer.alloc(0))
   ]);
+}
+
+/** A WAV of a soft 440 Hz tone, built here so the suite carries no binary. */
+export function toneWav(seconds: number, sampleRate = 22_050): Buffer {
+  const samples = Math.round(seconds * sampleRate);
+  const file = Buffer.alloc(44 + samples * 2);
+  file.write("RIFF", 0, "latin1");
+  file.writeUInt32LE(36 + samples * 2, 4);
+  file.write("WAVEfmt ", 8, "latin1");
+  file.writeUInt32LE(16, 16);
+  file.writeUInt16LE(1, 20);
+  file.writeUInt16LE(1, 22);
+  file.writeUInt32LE(sampleRate, 24);
+  file.writeUInt32LE(sampleRate * 2, 28);
+  file.writeUInt16LE(2, 32);
+  file.writeUInt16LE(16, 34);
+  file.write("data", 36, "latin1");
+  file.writeUInt32LE(samples * 2, 40);
+  for (let index = 0; index < samples; index++)
+    file.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * index) / sampleRate) * 6_000), 44 + index * 2);
+  return file;
 }

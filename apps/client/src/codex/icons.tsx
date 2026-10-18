@@ -294,7 +294,7 @@ export const CODEX_ICONS: Readonly<Record<string, ReactNode>> = {
     </>
   ),
 
-  // Utility (editor toolbar + notebook tree - not in the marker picker)
+  // Utility (editor toolbar + notebook tree; the marker picker leaves these out)
   image: (
     <path
       fillRule="evenodd"

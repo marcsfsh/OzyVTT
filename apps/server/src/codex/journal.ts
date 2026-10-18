@@ -90,7 +90,7 @@ export type EntryFields = Readonly<{
 }>;
 
 const JOURNAL_COLUMNS =
-  "j.id, j.kind, j.player_text, j.gm_text, j.revealed, j.attach_marker_id, j.attach_page_id, j.source_encounter_id, j.session_id, j.deleted_session_number, s.session_number AS live_session_number, j.real_date, j.in_world_year, j.in_world_month, j.in_world_day, j.in_world_label, j.calendar_instant, j.sort_key, j.tags_json, j.payload_json, j.created_at, j.updated_at";
+  "j.id, j.kind, j.player_text, j.gm_text, j.revealed, j.attach_marker_id, j.attach_page_id, j.source_encounter_id, j.session_id, j.deleted_session_number, s.session_number AS live_session_number, j.real_date, j.in_world_year, j.in_world_month, j.in_world_day, j.in_world_label, j.calendar_instant, j.sort_key, j.tags_json, j.payload_json, j.created_at, j.updated_at, j.first_shown_at";
 /** Always with `JOURNAL_COLUMNS`: without the join every entry would show only the left-behind number. */
 const JOURNAL_FROM = "codex_journal j LEFT JOIN codex_sessions s ON s.id = j.session_id";
 type JournalRowRaw = {
@@ -116,6 +116,7 @@ type JournalRowRaw = {
   payload_json: string | null;
   created_at: string;
   updated_at: string;
+  first_shown_at: string | null;
 };
 
 function toEntry(row: JournalRowRaw): CodexJournalEntry {
@@ -142,7 +143,8 @@ function toEntry(row: JournalRowRaw): CodexJournalEntry {
     tags: parseStringArray(row.tags_json),
     payload: payloadOf(kind, row.payload_json),
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    firstShownAt: row.first_shown_at
   };
 }
 function entryRow(db: CodexDb, entryId: string): JournalRowRaw | undefined {
@@ -155,13 +157,20 @@ function entryRow(db: CodexDb, entryId: string): JournalRowRaw | undefined {
 export function insertEntry(
   db: CodexDb,
   entry: EntryFields &
-    Readonly<{ id: string; deletedSessionNumber: number | null; sortKey: number; createdAt: string; updatedAt: string }>
+    Readonly<{
+      id: string;
+      deletedSessionNumber: number | null;
+      sortKey: number;
+      createdAt: string;
+      updatedAt: string;
+      firstShownAt: string | null;
+    }>
 ): void {
   const entryTags = tags(entry.tags);
   const date = entry.dated.date;
   db.database
     .prepare(
-      "INSERT INTO codex_journal (id, kind, player_text, gm_text, revealed, attach_marker_id, attach_page_id, source_encounter_id, session_id, deleted_session_number, real_date, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, sort_key, tags_json, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO codex_journal (id, kind, player_text, gm_text, revealed, attach_marker_id, attach_page_id, source_encounter_id, session_id, deleted_session_number, real_date, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, sort_key, tags_json, payload_json, created_at, updated_at, first_shown_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .run(
       entry.id,
@@ -184,7 +193,8 @@ export function insertEntry(
       JSON.stringify(entryTags),
       entry.payload === null ? null : JSON.stringify(entry.payload),
       entry.createdAt,
-      entry.updatedAt
+      entry.updatedAt,
+      entry.firstShownAt
     );
   indexEntry(db, entry.id, entry.playerText, entry.gmText, entryTags);
   rebuildLinks(db, "journal", entry.id, entry.playerText, entry.gmText ?? "");
@@ -196,7 +206,16 @@ export function writeEntry(db: CodexDb, fields: EntryFields): string {
   const now = stamp(db);
   const sortKey =
     ((db.database.prepare("SELECT MAX(sort_key) AS m FROM codex_journal").get() as { m: number | null }).m ?? 0) + 1;
-  insertEntry(db, { ...fields, id: entryId, deletedSessionNumber: null, sortKey, createdAt: now, updatedAt: now });
+  // The write dates it if players can read it.
+  insertEntry(db, {
+    ...fields,
+    id: entryId,
+    deletedSessionNumber: null,
+    sortKey,
+    createdAt: now,
+    updatedAt: now,
+    firstShownAt: null
+  });
   return entryId;
 }
 
@@ -249,10 +268,38 @@ export function appendCombatEntry(db: CodexDb, input: CodexCombatEntryInput): Co
   });
 }
 
+/** The longest line the live board logs. */
+const MAX_LOG_LINE = 2000;
+
+/** A line logged at the table: a note filed under the session (active or not), dated at the GM's clock. */
+export function logSessionLine(
+  db: CodexDb,
+  sessionId: string,
+  input: Readonly<{ text: string; revealedToPlayers?: boolean }>
+): CodexJournalEntry {
+  const session = requireSession(db, sessionId);
+  const text = typeof input.text === "string" ? input.text.trim() : "";
+  if (!text) throw new CodexValidationError("Write the line to log.");
+  if (text.length > MAX_LOG_LINE) throw new CodexValidationError(`A logged line is up to ${MAX_LOG_LINE} characters.`);
+  return createOne(db, {
+    playerText: entryText(text),
+    gmText: null,
+    revealedToPlayers: input.revealedToPlayers === true,
+    attachMarkerId: null,
+    attachPageId: null,
+    kind: "note",
+    sourceEncounterId: null,
+    sessionId: session,
+    realDate: null,
+    dated: resolveNow(db),
+    payload: null
+  });
+}
+
 /** A deadline needs a structured date, since a label cannot be compared with a clock. `fired` is derived. */
 export function createDeadline(db: CodexDb, input: CodexJournalCreateInput): CodexJournalEntry {
   const dated = resolveDate(db, input.inWorldDate, input.inWorldLabel);
-  if (!dated.date) throw new CodexValidationError("A deadline needs an in-world date - the date is when it fires.");
+  if (!dated.date) throw new CodexValidationError("A deadline needs an in-world date. The date is when it fires.");
   return createOne(db, { ...authoredFields(db, input, dated), kind: "deadline", payload: null });
 }
 
@@ -267,7 +314,7 @@ export function createDowntime(db: CodexDb, input: CodexDowntimeCreateInput): Co
   return createOne(db, { ...authoredFields(db, input, dated), kind: "downtime", payload });
 }
 
-/** Level history is a journal record, not a table: the timeline already orders it. */
+/** Level history is a journal record with no table of its own: the timeline already orders it. */
 export function createMilestone(db: CodexDb, input: CodexMilestoneCreateInput): CodexJournalEntry {
   const payload = milestonePayload(input.milestone);
   const dated = resolveDate(db, input.inWorldDate ?? getCalendar(db).currentDate ?? null, input.inWorldLabel);
@@ -293,7 +340,7 @@ export function applyDowntime(
   const payload = downtimePayloadOf(existing);
   if (!payload) throw new CodexValidationError("That downtime record has no activity to apply.");
   if (payload.applied)
-    throw new CodexRevisionConflictError("That downtime has already passed - the clock has already moved.");
+    throw new CodexRevisionConflictError("That downtime has already passed, and the clock has already moved.");
   const target = proposedDateFor(db, existing);
   if (!target) throw new CodexValidationError("Set the campaign's current date before passing time.");
   const calendar = getCalendar(db);
@@ -316,11 +363,11 @@ export function updateEntry(db: CodexDb, entryId: string, input: CodexJournalUpd
     input.inWorldDate !== undefined || input.inWorldLabel !== undefined
       ? resolveDate(db, input.inWorldDate ?? null, input.inWorldLabel)
       : null;
-  // A deadline's date cannot be cleared, since without one it could never fire; rejected rather than ignored so
+  // A deadline's date cannot be cleared, since without one it could never fire; rejected, so
   // the GM learns the field is required.
   if (existing.kind === "deadline" && dated && dated.instant === null)
     throw new CodexValidationError(
-      "A deadline needs an in-world date - that is what makes it a deadline. Change its date, or delete it and write a note instead."
+      "A deadline needs an in-world date, because the date is what makes it a deadline. Change its date, or delete it and write a note."
     );
   const next = {
     playerText: input.playerText === undefined ? existing.playerText : entryText(input.playerText),
@@ -494,21 +541,27 @@ export function downtimeCharacterPageIds(db: CodexDb): string[] {
 type ChronicleSortKey = Readonly<{
   calendarInstant: number | null;
   sessionNumber: number | null;
-  createdAt: string;
+  /** Creation time for the GM, first-shown time for a player. */
+  time: string;
   id: string;
 }>;
-function chronicleSortKey(record: CodexChronicleSource): ChronicleSortKey {
+/** What a reader places a record by: the session number it gives an entry, and the time it gives any record. */
+export type ChronicleOrderBasis = Readonly<{
+  sessionNumberOf: (entry: CodexJournalEntry) => number | null;
+  timeOf: (record: CodexChronicleSource) => string;
+}>;
+function chronicleSortKey(record: CodexChronicleSource, basis: ChronicleOrderBasis): ChronicleSortKey {
   return record.kind === "entry"
     ? {
         calendarInstant: record.entry.calendarInstant,
-        sessionNumber: record.entry.sessionNumber,
-        createdAt: record.entry.createdAt,
+        sessionNumber: basis.sessionNumberOf(record.entry),
+        time: basis.timeOf(record),
         id: record.entry.id
       }
     : {
         calendarInstant: record.page.calendarInstant,
         sessionNumber: null,
-        createdAt: record.page.createdAt,
+        time: basis.timeOf(record),
         id: record.page.id
       };
 }
@@ -521,8 +574,15 @@ function compareChronicle(a: ChronicleSortKey, b: ChronicleSortKey): number {
   if (unsessioned !== 0) return unsessioned;
   if (a.sessionNumber !== null && b.sessionNumber !== null && a.sessionNumber !== b.sessionNumber)
     return a.sessionNumber - b.sessionNumber;
-  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
+  if (a.time !== b.time) return a.time < b.time ? -1 : 1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/** The chronicle's order, with each record placed by the session number and time `basis` gives it. */
+export function chronicleOrder(
+  basis: ChronicleOrderBasis
+): (a: CodexChronicleSource, b: CodexChronicleSource) => number {
+  return (a, b) => compareChronicle(chronicleSortKey(a, basis), chronicleSortKey(b, basis));
 }
 
 /** Entries and dated event pages in one order. Ungated by design; `projectPlayerChronicleRecord` gates. */
@@ -531,5 +591,10 @@ export function listChronicle(db: CodexDb): CodexChronicleSource[] {
     ...listTimeline(db).map((entry) => ({ kind: "entry", entry }) as const),
     ...listDatedEventPages(db).map((page) => ({ kind: "event", page }) as const)
   ];
-  return records.sort((a, b) => compareChronicle(chronicleSortKey(a), chronicleSortKey(b)));
+  return records.sort(
+    chronicleOrder({
+      sessionNumberOf: (entry) => entry.sessionNumber,
+      timeOf: (record) => (record.kind === "entry" ? record.entry.createdAt : record.page.createdAt)
+    })
+  );
 }

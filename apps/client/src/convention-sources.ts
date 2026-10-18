@@ -1,6 +1,6 @@
 /**
  * The source files the convention checks read (`design-conventions.test.ts`, `play-vocabulary.test.ts`).
- * Imported, not a test file.
+ * Imported by tests; it is no test file itself.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 
@@ -27,7 +27,19 @@ function walk(dir: string, keep: (name: string) => boolean, base = ""): string[]
   return out;
 }
 
+/** What the play vocabulary lock leaves out besides `PLAY_EXCLUDED`: record surfaces, which say who sees a record in
+    the Codex's words. Their design is still checked with the rest of the play tree. */
+const VOCABULARY_EXCLUDED: ReadonlyArray<readonly [prefix: string, why: string]> = [
+  ...PLAY_EXCLUDED,
+  [
+    "compendium/",
+    "a record surface: it says Hidden, Everyone or the characters' names through WhoSeesIt in @vtt/ui, " +
+      "and has its own lock (compendium/vocabulary.test.ts)"
+  ]
+];
+
 const excluded = (rel: string): boolean => PLAY_EXCLUDED.some(([prefix]) => rel.startsWith(prefix));
+const vocabularyExcluded = (rel: string): boolean => VOCABULARY_EXCLUDED.some(([prefix]) => rel.startsWith(prefix));
 const isSource = (name: string) => /\.tsx?$/.test(name) && !name.includes(".test.") && !name.endsWith(".d.ts");
 const isCss = (name: string) => name.endsWith(".css");
 
@@ -56,9 +68,23 @@ export const scannedTsx = (): Source[] => [...playTsx(), ...uiFiles((name) => is
 export const allTsx = (): Source[] => [...clientFiles(isSource, true), ...uiFiles(isSource)];
 /** What the vocabulary lock reads: play `.ts`/`.tsx` plus the `packages/ui` primitives. */
 export const playCopySources = (): { file: string; read: () => string }[] =>
-  [...clientFiles(isSource), ...uiFiles((name) => isSource(name)).filter((s) => s.path.includes("/primitives/"))].map(
-    (source) => ({ file: source.path, read: () => stripComments(source.read()) })
-  );
+  [
+    ...sources(
+      CLIENT_SRC,
+      "apps/client/src",
+      walk(CLIENT_SRC, isSource).filter((rel) => !vocabularyExcluded(rel))
+    ),
+    ...uiFiles((name) => isSource(name)).filter((s) => s.path.includes("/primitives/"))
+  ].map((source) => ({ file: source.path, read: () => stripComments(source.read()) }));
+/**
+ * The record pieces in `packages/ui/src/records/` (Who sees it, the filters, the Sort dialog). They say the Codex's
+ * words, so the Codex's and the Compendium's vocabulary locks read them as their own.
+ */
+export const recordPieceSources = (): { file: string; read: () => string }[] =>
+  sources(`${UI_SRC}/records`, "packages/ui/src/records", walk(`${UI_SRC}/records`, isSource)).map((source) => ({
+    file: source.path,
+    read: source.read
+  }));
 /** Every stylesheet, client and `packages/ui`. */
 export const stylesheets = (): Source[] => [...clientFiles(isCss, true), ...uiFiles(isCss)];
 /** Client stylesheets only. */

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { ContentClassSummary, GmView, PlayerView } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { multiclassShortfalls, multiclassShortfallText } from "@vtt/rules-5e";
@@ -59,6 +59,8 @@ export function LevelFlow({
   const [target, setTarget] = useState<{ level: number; classLevels: string[] } | null>(null);
   /** The class the next level goes to; null keeps the class of the last level taken. */
   const [nextClass, setNextClass] = useState<string | null>(null);
+  /** Whether the classes the character doesn't have yet are on offer; a level mostly goes to a class it has. */
+  const [newClassOpen, setNewClassOpen] = useState(false);
 
   const actor = state.actors.find((entry) => entry.id === actorId) ?? null;
   /**
@@ -96,7 +98,7 @@ export function LevelFlow({
   if (!actor)
     return (
       <Gate title="That character isn't here" onClose={onClose}>
-        This sheet isn&rsquo;t on the table any more. It may have been archived or deleted.
+        This sheet isn't on the table any more. It may have been archived or deleted.
       </Gate>
     );
 
@@ -110,16 +112,16 @@ export function LevelFlow({
   if (classOrderUnknown(definition))
     return (
       <Gate title={`${actor.name}'s classes were added by hand`} onClose={onClose}>
-        The sheet lists its classes but not which level went to which, so it can&rsquo;t be releveled step-by-step.
-        Rebuild it in the builder to level it here.
+        The sheet lists its classes but not which level went to which, so it can't be releveled step-by-step. Rebuild it
+        in the builder to level it here.
       </Gate>
     );
 
   if (!identity || !ledger || !definition)
     return (
       <Gate title={`${actor.name} wasn't built here`} onClose={onClose}>
-        This sheet wasn&rsquo;t built here, so it can&rsquo;t be releveled step-by-step yet. Edit the sheet directly, or
-        rebuild it in the builder.
+        This sheet wasn't built here, so it can't be releveled step-by-step yet. Edit the sheet directly, or rebuild it
+        in the builder.
       </Gate>
     );
 
@@ -134,7 +136,7 @@ export function LevelFlow({
     return (
       <LevelPage>
         <p className="cb-note" role="status">
-          Reading {actor.name}&rsquo;s choices at level {target.level}…
+          Reading {actor.name}'s choices at level {target.level}…
         </p>
         <Button variant="ghost" onClick={() => setTarget(null)}>
           Back
@@ -160,6 +162,7 @@ export function LevelFlow({
           name: actor.name,
           seed,
           heldClasses: keptClasses(identity, target.level),
+          mode: target.level > current ? "up" : "down",
           ...(recordedMethod ? { recordedMethod } : {}),
           ...(gap
             ? {
@@ -187,10 +190,40 @@ export function LevelFlow({
   const lastName = nameOf(lastClass);
   const onlyLevel = identity.classLevels.filter((id) => id === lastClass).length === 1;
 
+  const choices = classChoices(identity, definition, catalogs);
+  const held = choices.filter((option) => classes.some((entry) => entry.id === option.value));
+  const goingNew = !classes.some((entry) => entry.id === upClass);
   return (
-    <LevelPage>
+    <LevelPage
+      footer={
+        <>
+          <Button
+            variant="primary"
+            className="cb-level-up"
+            disabled={atCap}
+            onClick={() =>
+              setTarget({ level: current + 1, classLevels: targetClassLevels(identity, current + 1, upClass) })
+            }
+          >
+            Level up to {Math.min(cap, current + 1)}
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={current <= 1}
+            onClick={() =>
+              setTarget({ level: current - 1, classLevels: targetClassLevels(identity, current - 1, lastClass) })
+            }
+          >
+            Level down to {Math.max(1, current - 1)}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            Back to the sheet
+          </Button>
+        </>
+      }
+    >
       <header className="cb-level-head">
-        <span className="nh-eyebrow">Level</span>
+        <span className="nh-eyebrow">Level up or down</span>
         <h2>{actor.name}</h2>
         <p>
           Level {current}
@@ -199,7 +232,7 @@ export function LevelFlow({
         </p>
       </header>
 
-      {/* Buttons, not a slider: a 20-stop scrubber is unusable at 390px. */}
+      {/* Buttons: a 20-stop slider is unusable at 390px. */}
       <ol className="cb-level-rail" aria-label="Levels">
         {Array.from({ length: cap }, (_, index) => index + 1).map((level) => (
           <li
@@ -218,47 +251,31 @@ export function LevelFlow({
             <h3 className="cb-offer-title">Level {current + 1} goes to</h3>
           </div>
           <p className="cb-offer-help">
-            One of your classes, or a new one. A new class needs 13 in its primary ability and in each class you already
-            have.
+            {newClassOpen || goingNew
+              ? "A new class needs 13 in its primary ability and in each class you already have."
+              : multiclass
+                ? "One of your classes."
+                : `${lastName} level ${current + 1}, or a new class for a multiclass character.`}
           </p>
           <ChoiceGrid
             ariaLabel={`Level ${current + 1} goes to`}
-            options={classChoices(identity, definition, catalogs)}
+            /* The classes the character has, and the rest only once asked for, so the page stays short. */
+            options={newClassOpen || goingNew ? choices : held}
             value={upClass}
             onChange={setNextClass}
-            /* Capped, so the level buttons stay near the classes on a phone. */
             bounded
-            searchable={catalogs.choice.classes.length > 8}
+            searchable={(newClassOpen || goingNew) && catalogs.choice.classes.length > 8}
             searchPlaceholder="Search classes…"
           />
+          {!newClassOpen && !goingNew && (
+            <Button variant="ghost" size="sm" onClick={() => setNewClassOpen(true)}>
+              Take a new class
+            </Button>
+          )}
         </section>
       )}
 
-      <div className="cb-level-actions">
-        <Button
-          variant="primary"
-          disabled={atCap}
-          onClick={() =>
-            setTarget({ level: current + 1, classLevels: targetClassLevels(identity, current + 1, upClass) })
-          }
-        >
-          Level up to {Math.min(cap, current + 1)}
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={current <= 1}
-          onClick={() =>
-            setTarget({ level: current - 1, classLevels: targetClassLevels(identity, current - 1, lastClass) })
-          }
-        >
-          Level down to {Math.max(1, current - 1)}
-        </Button>
-        <Button variant="ghost" onClick={onClose}>
-          Back to the sheet
-        </Button>
-      </div>
-
-      {atCap && <p className="cb-note">At the table&rsquo;s level cap ({cap}).</p>}
+      {atCap && <p className="cb-note">At the table's level cap ({cap}).</p>}
 
       {current > 1 && (
         <section className="cb-level-preview">
@@ -267,7 +284,9 @@ export function LevelFlow({
             {multiclass && (
               <>
                 Level {current} went to {lastName}.
-                {onlyLevel ? ` It is your only ${lastName} level, so ${lastName} comes off the sheet.` : ""}{" "}
+                {onlyLevel
+                  ? ` It is ${actor.name}'s only ${lastName} level, so ${lastName} comes off the sheet.`
+                  : ""}{" "}
               </>
             )}
             {removed.length > 0 ? (
@@ -286,7 +305,7 @@ export function LevelFlow({
             ) : (
               <>Level {current} added no choices of its own.</>
             )}{" "}
-            Your level {current} choices and HP roll are kept, and leveling back up restores them exactly.
+            {actor.name}'s level {current} choices and HP roll are kept, and leveling back up restores them exactly.
           </p>
         </section>
       )}
@@ -294,12 +313,19 @@ export function LevelFlow({
   );
 }
 
-/** The flow's page: a full-width region that scrolls inside the pane (the page itself never does), holding the
- *  centred column. */
-function LevelPage({ children }: Readonly<{ children: React.ReactNode }>) {
+/** The flow's page: a centred column that scrolls inside the pane (the page itself never does), over a footer that
+ *  keeps the level buttons in view at any height. */
+function LevelPage({ children, footer }: Readonly<{ children: ReactNode; footer?: ReactNode }>) {
   return (
-    <div className="cb-level-page scroll-y">
-      <div className="cb-level">{children}</div>
+    <div className="cb-level-page">
+      <div className="cb-level-body scroll-y">
+        <div className="cb-level">{children}</div>
+      </div>
+      {footer && (
+        <div className="cb-level-foot">
+          <div className="cb-level-actions">{footer}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -356,11 +382,7 @@ function classChoices(
   return [...held, ...fresh];
 }
 
-function Gate({
-  title,
-  children,
-  onClose
-}: Readonly<{ title: string; children: React.ReactNode; onClose: () => void }>) {
+function Gate({ title, children, onClose }: Readonly<{ title: string; children: ReactNode; onClose: () => void }>) {
   return (
     <LevelPage>
       <section className="cb-level-gate">

@@ -10,7 +10,7 @@ import { png } from "./image-fixtures.js";
 
 // The three gates a player needs to choose their own character's token: the command, the library
 // listing, and the upload. Each opens only for the player's own claimed character. The GM keeps
-// every management route plus a per-entry `hidden` flag, which is curation, not approval.
+// every management route plus a per-entry `hidden` flag, which is curation.
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
 const OTHER_ID = "10000000-0000-4000-8000-000000000002";
@@ -123,10 +123,10 @@ describe("the three player gates", () => {
 
     const playerList = await (await fetch(base + TOKEN_COLLECTION, { headers: bearer(playerToken) })).json();
     expect(playerList.data.tokens.map((token: { name: string }) => token.name)).toEqual(["Hero"]);
-    // The GM's per-stat-block memory is prep, not a player's business.
+    // The GM's per-stat-block memory is prep and stays hidden from players.
     expect(playerList.data.rememberedAssetId).toBeNull();
 
-    // Every management route stays GM-only.
+    // Every management route stays GM-only: a player's valid session is refused with 403.
     expect(
       (
         await fetch(`${base}${TOKEN_COLLECTION}/${sharedId}`, {
@@ -135,13 +135,13 @@ describe("the three player gates", () => {
           body: JSON.stringify({ name: "Mine" })
         })
       ).status
-    ).toBe(401);
+    ).toBe(403);
     expect(
       (await fetch(`${base}${TOKEN_COLLECTION}/${sharedId}`, { method: "DELETE", headers: bearer(playerToken) })).status
-    ).toBe(401);
+    ).toBe(403);
     expect(
       (await post(base, `${TOKEN_COLLECTION}/folders/visibility`, playerToken, { folder: null, hidden: true })).status
-    ).toBe(401);
+    ).toBe(403);
   });
 
   it("lets a player upload their own image onto one curated shelf, bounded by a daily cap", async () => {
@@ -153,7 +153,7 @@ describe("the three player gates", () => {
     expect(body.data.token.folder).toBe("Player uploads");
     expect(body.data.token.hidden).toBe(false);
 
-    // 20 a day, then a clear refusal rather than an unbounded disk.
+    // 20 a day, then a clear refusal, so the disk stays bounded.
     let last = uploaded;
     for (let index = 0; index < 25; index += 1) last = await uploadToken(base, playerToken, `extra-${index}`);
     expect(last.status).toBe(429);
@@ -178,7 +178,7 @@ describe("the three player gates", () => {
     expect(own.status).toBe(200);
     expect(server.store.snapshot.actors.find((actor) => actor.id === HERO_ID)!.tokenAssetId).toBe(assetId);
 
-    // Another player's character is still refused - one gate, the same one every player command uses.
+    // Another player's character is still refused: one gate, the same one every player command uses.
     const other = await post(base, GAME_PATHS.actorTokenImage.replace("{actorId}", OTHER_ID), playerToken, {
       tokenAssetId: assetId
     });

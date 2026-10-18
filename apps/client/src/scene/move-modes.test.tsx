@@ -5,7 +5,7 @@ import type { ActorMovementReply } from "@vtt/domain";
 const command = vi.fn(async (..._args: unknown[]) => ({ ok: true }) as Record<string, unknown>);
 vi.mock("../lib/command", () => ({ command: (...args: unknown[]) => command(...args) }));
 
-import { MoveModeBar } from "./MoveModeBar";
+import { MoveModeChoice } from "./MoveModeChoice";
 import { useMapCommands } from "./useMapCommands";
 
 const HERO = "10000000-0000-4000-8000-000000000001";
@@ -27,7 +27,7 @@ describe("picking how a creature moves", () => {
   it("offers each way with the feet it has left, one tap each, and force to the GM alone", () => {
     const onChange = vi.fn();
     const { rerender } = render(
-      <MoveModeBar name="Red Dragon" budget={DRAGON_BUDGET} mode="walk" onChange={onChange} gm />
+      <MoveModeChoice name="Red Dragon" budget={DRAGON_BUDGET} mode="walk" onChange={onChange} gm />
     );
     const group = screen.getByRole("group", { name: "How Red Dragon moves" });
     expect([...group.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
@@ -41,7 +41,7 @@ describe("picking how a creature moves", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fly 70" }));
     expect(onChange).toHaveBeenCalledWith("fly");
     rerender(
-      <MoveModeBar
+      <MoveModeChoice
         name="Kesh"
         budget={{ ...DRAGON_BUDGET, crawling: true }}
         mode="walk"

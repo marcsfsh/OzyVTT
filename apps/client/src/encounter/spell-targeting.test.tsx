@@ -147,9 +147,9 @@ describe("an area the GM places", () => {
     };
     beginTargeting(moonbeam as unknown as ContentActionSummary, CASTER, 2);
     render(<Picker />);
-    expect(screen.getByRole("group", { name: "Targets for Moonbeam" }).textContent).toContain(
-      "place the 5-ft-radius cylinder on the map"
-    );
+    const picker = screen.getByRole("group", { name: "Targets for Moonbeam" });
+    expect(picker.textContent).toContain("Moonbeam · 5-foot-radius cylinder");
+    expect(picker.textContent).toContain("Drag on the map to place it.");
     let shape: string | undefined;
     function Shape() {
       shape = useTargeting()?.template?.shape;

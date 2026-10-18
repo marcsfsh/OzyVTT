@@ -20,20 +20,26 @@ export function DamageTypeField({
   onChange: (next: string | null) => void;
 }>) {
   return (
-    <Combobox
-      className="damage-type-field"
-      ariaLabel="Damage type"
-      /* "Untyped" is the placeholder, not an option: it is the absent value. `manualDamageType` still
-       treats a hand-typed "untyped" as no type. */
-      placeholder="Untyped"
-      options={DAMAGE_TYPE_OPTIONS}
-      value={value}
-      disabled={disabled}
-      /* The whole list rather than `Combobox`'s default page of 8: thirteen types is a complete,
-       bounded vocabulary. */
-      limit={DAMAGE_TYPE_OPTIONS.length}
-      allowFreeText
-      onChange={onChange}
-    />
+    <div className="damage-type-field">
+      {/* The visible twin of the field's accessible name: "Untyped" alone did not say what the field is for. */}
+      <span className="damage-type-label" aria-hidden="true">
+        Damage type
+      </span>
+      <Combobox
+        className="damage-type-box"
+        ariaLabel="Damage type"
+        /* "Untyped" is the placeholder and no option: it is the absent value. `manualDamageType` still
+         treats a hand-typed "untyped" as no type. */
+        placeholder="Untyped"
+        options={DAMAGE_TYPE_OPTIONS}
+        value={value}
+        disabled={disabled}
+        /* The whole list where `Combobox` would show a page of 8: thirteen types is a complete,
+         bounded vocabulary. */
+        limit={DAMAGE_TYPE_OPTIONS.length}
+        allowFreeText
+        onChange={onChange}
+      />
+    </div>
   );
 }

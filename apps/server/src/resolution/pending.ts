@@ -7,9 +7,10 @@ import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
+import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { rollDice } from "@vtt/rules-5e";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { recordRoll, type ResolveContext } from "./context.js";
+import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
 import { coverBonusOf, coverFor } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
@@ -119,6 +120,7 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
         weighed: null,
         acBonus: offer.reaction.amount,
         rollsAttack: false,
+        attackTotal: attack.total,
         parkedAttack: {
           actionId: ctx.action.id,
           builtin: input.builtin === true,
@@ -161,7 +163,7 @@ export function isMagicalAction(ctx: MagicalSource): boolean {
   return item !== undefined && ctx.deps.catalog?.equipmentRecord(catalogIdOf(item))?.isMagic === true;
 }
 
-/** Conditions a failed save leaves on their own rather than on its effect: Prone ends by standing up, and
+/** Conditions a failed save leaves on their own, outside its effect: Prone ends by standing up, and
  *  Exhaustion stacks and leaves with rests. */
 const BARE_FAILURE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
 
@@ -253,7 +255,7 @@ function successEffectFor(ctx: MagicalSource & Pick<ResolveContext, "castId">): 
   };
 }
 
-/** SRD Power Word Stun: a target over its hit-point gate isn't Stunned - "Otherwise, its Speed is 0 until the start
+/** SRD Power Word Stun: a target over its hit-point gate isn't Stunned. Instead, "Otherwise, its Speed is 0 until the start
  *  of your next turn". */
 const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"]);
 
@@ -292,14 +294,16 @@ export function parkActionSave(ctx: ResolveContext): void {
               speedZero: true
             })
           );
+          // A caster hidden from the table is "A hidden threat" in the table's line.
+          const casterName = ctx.hiddenFromTable(attacker.id) ? HIDDEN_SOURCE : attacker.name;
           ctx.tableNarration.push({
             kind: "effect",
-            text: `${target.name}'s Speed is 0 until the start of ${attacker.name}'s next turn.`,
+            text: `${target.name}'s Speed is 0 until the start of ${casterName}'s next turn.`,
             actorIds: [target.id]
           });
         }
         ctx.warnings.push(
-          `${target.name} has more than ${threshold} hit points - ${action.name} doesn't affect it that way.`
+          `${target.name} has more than ${threshold} hit points, so ${action.name} doesn't affect it that way.`
         );
         continue;
       }
@@ -317,8 +321,7 @@ export function parkActionSave(ctx: ResolveContext): void {
             )
           : [])
       ];
-      for (const event of events)
-        ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+      for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
     }
   }
   if (saving.length === 0) return;
@@ -333,7 +336,8 @@ export function parkActionSave(ctx: ResolveContext): void {
             (deps.resolveDefinition
               ? smiteOfProtectionCover(state, target, {
                   resolveDefinition: deps.resolveDefinition,
-                  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+                  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+                  ...(deps.catalog ? { catalog: deps.catalog } : {})
                 })
               : null)
         )
@@ -390,7 +394,7 @@ export function parkBurstSave(ctx: ResolveContext): void {
     : [];
   if (!deps.distanceFeet)
     warnings.push(
-      `${action.name}: each creature within ${burst.radiusFeet} feet of ${target.name} also makes the save - add them by hand.`
+      `${action.name}: each creature within ${burst.radiusFeet} feet of ${target.name} also makes the save. Add them by hand.`
     );
   createPendingSaves(state, {
     sourceActorId: attacker.id,

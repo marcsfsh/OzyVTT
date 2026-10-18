@@ -2,40 +2,53 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
-      "Bash",
-      "mcp__github__pull_request_read",
-      "mcp__github__create_pull_request",
-      "mcp__github__update_pull_request",
-      "mcp__github__merge_pull_request",
-      "mcp__github__update_pull_request_branch",
-      "mcp__github__list_pull_requests",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(npm ci)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npx prettier *)",
+      "Bash(npx playwright test *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git switch *)",
+      "Bash(git checkout -b *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git merge *)",
+      "Bash(git push *)",
+      "mcp__github__get_*",
+      "mcp__github__list_*",
+      "mcp__github__search_*",
       "mcp__github__issue_read",
-      "mcp__github__issue_write",
-      "mcp__github__list_issues",
-      "mcp__github__search_issues",
-      "mcp__github__add_issue_comment",
-      "mcp__github__get_check_run",
-      "mcp__github__get_job_logs",
+      "mcp__github__pull_request_read",
       "mcp__github__actions_get",
       "mcp__github__actions_list",
-      "mcp__github__list_branches",
-      "mcp__github__list_commits",
       "mcp__claude-code-remote__subscribe_pr_activity",
       "mcp__claude-code-remote__unsubscribe_pr_activity",
       "mcp__claude-code-remote__send_later",
       "mcp__claude-code-remote__get_session"
+    ],
+    "ask": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push * --force)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "Bash(rm *data*)"
     ]
   },
-  "autoMemoryEnabled": true,
   "hooks": {
-    "PreToolUse": [
+    "PostToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/danger-guard.mjs\"",
-            "timeout": 10
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/format.mjs"],
+            "timeout": 30
           }
         ]
       }

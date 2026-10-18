@@ -4,8 +4,8 @@ import type { Actor, ActorDefinition } from "@vtt/schemas";
 import type { ContentView } from "./content-library.js";
 
 /** Picks a character may re-make on a rest (a feature's `replaces` clause). Most are stored on the actor as
- *  `choiceOverrides`, not in the choices ledger, so no rebuild is needed; a pick the build itself reads (a land
- *  whose spells the character has prepared) goes into the ledger instead (`ledger-rechoice.ts`). What may be
+ *  `choiceOverrides`, outside the choices ledger, so no rebuild is needed; a pick the build itself reads (a land
+ *  whose spells the character has prepared) goes into the ledger (`ledger-rechoice.ts`). What may be
  *  re-chosen, and to what, comes from content. */
 
 /** An inline option as this module reads it: what it grants, and the earlier answer it needs. */
@@ -33,7 +33,7 @@ type ReplaceableRecord = Readonly<{
 /** One offer this character may re-choose on a rest, with the answers that are legal for it. */
 export type ReplaceableOffer = Readonly<{
   offer: string;
-  /** The rest that clears the override. A `short-rest` clause is satisfied by a long rest too. */
+  /** The rest that clears the override. A `short-rest` clause is satisfied by a Long Rest too. */
   per: "short-rest" | "long-rest";
   /** The feature's display name, for the refusal message and the GM's log line. */
   label: string;
@@ -41,7 +41,7 @@ export type ReplaceableOffer = Readonly<{
   /** Each option's display name, by id. */
   optionNames: Readonly<Record<string, string>>;
   /** The build reads this answer (its options grant spells, or another pick depends on it), so a re-choice is
-   *  written to the ledger and the sheet rebuilt, rather than kept as an override. */
+   *  written to the ledger and the sheet rebuilt, and is never kept as an override. */
   rebuilds: boolean;
 }>;
 
@@ -154,7 +154,7 @@ const defenceGrantsOf = (record: GrantingRecord | undefined) =>
   ungated(record) ? [...(record?.grants?.damageResistances ?? []), ...(record?.grants?.damageImmunities ?? [])] : [];
 
 /** What the character chose, resolved for the damage pipeline (e.g. Fiendish Resilience re-chosen on a
- *  short rest). Fails open wherever a lookup misses, since a damage roll must never throw. */
+ *  Short Rest). Fails open wherever a lookup misses, since a damage roll must never throw. */
 export function choiceOverrideDefenses(
   definition: ActorDefinition | undefined,
   overrides: Actor["choiceOverrides"] | undefined,

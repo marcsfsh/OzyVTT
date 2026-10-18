@@ -8,6 +8,7 @@ import {
 } from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
 import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
+import type { PlayerView } from "./views.js";
 import type { Wire } from "./wire.js";
 
 /**
@@ -25,6 +26,8 @@ export type RefusalCode =
   | "refused"
   | "history_review"
   | "scene_room_full"
+  | "in_fight"
+  | "unauthenticated"
   | "internal_error";
 export type MutationResult = {
   ok: boolean;
@@ -47,6 +50,12 @@ export type EncounterStartEntry = Readonly<{
 export type AnnotationGeometryInput = Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>;
 export type AnnotationAddResult = MutationResult & { annotationId?: string };
 export type ActorAddResult = MutationResult & { actorId?: string };
+/** The sample characters one removal took away, and each it kept with the reason (a player holds it, or a fight uses
+ *  it). */
+export type SampleRemovalResult = MutationResult & {
+  removed?: readonly string[];
+  kept?: ReadonlyArray<Readonly<{ name: string; reason: string }>>;
+};
 export type SceneCreateResult = MutationResult & { sceneId?: string };
 
 /** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */
@@ -93,7 +102,7 @@ export type HitOffer = Readonly<{
   name: string;
   /** What it adds, for the label ("3d6 Piercing", "2d8 Radiant"). */
   dice: string;
-  /** What choosing it spends ("1st-level slot and your Bonus Action", "once per turn"), or null. */
+  /** What choosing it spends ("a level 1 spell slot and your Bonus Action", "once per turn"), or null. */
   cost: string | null;
   /** Pick one when choosing it (Divine Strike: Necrotic or Radiant). */
   damageTypes?: readonly string[];
@@ -150,14 +159,14 @@ export type ActionResolution = Readonly<{
   }> | null;
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
-  /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer instead of the apply button. */
+  /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer. */
   reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
   /** An extra attack this swing opened (Cleave's swing at a second creature), for the result card to offer. */
   opens?: Readonly<{ actionId: string; actionName: string }>;
   /** The attack would hit, and the target's reaction (Parry, Shield) may still turn it into a miss. Nothing past the
    *  roll has happened yet: answering the prompt finishes the attack, damage included. */
   waitingOnReaction?: true;
-  /** A builtin action's check roll (Hide vs DC 15; Influence/Search/Study with dc/success null - GM adjudicates). */
+  /** A builtin action's check roll (Hide vs DC 15; Influence/Search/Study with dc/success null: GM adjudicates). */
   check?: Readonly<{
     skill: string;
     total: number;
@@ -291,29 +300,67 @@ export const ActionAvailabilitySchema = z.strictObject({
   name: z.string(),
   activation: z.enum(["action", "bonus-action", "reaction", "other"]),
   /** Whether strict mode would allow resolving this action right now (target-specific rules can't be pre-checked). */
-  available: z.boolean(),
-  violations: z.array(z.strictObject({ rule: z.string(), message: z.string() })),
+  available: z.boolean().describe("Whether strict mode would allow resolving this action right now"),
+  violations: z.array(
+    z.strictObject({
+      rule: z
+        .string()
+        .describe(
+          "Machine-readable rule id, e.g. economy.action-used, feature.requires-effect, condition.incapacitated"
+        ),
+      message: z.string()
+    })
+  ),
   /** Limited-use spending left in the current scope; null when the action has no use limit. */
-  usesRemaining: z.number().int().min(0).nullable(),
+  usesRemaining: z
+    .number()
+    .int()
+    .min(0)
+    .nullable()
+    .describe("Limited-use spending left; null when the action has no use limit"),
   /** Rolls left in the open compound-action instance for this action; null when no instance applies. */
-  componentsRemaining: z.number().int().min(0).nullable(),
-  /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...) - not on the stat block. */
-  builtin: z.boolean().optional(),
-  /** Added to a hit rather than taken alone (Sneak Attack, a smite): chosen on an attack's result. */
+  componentsRemaining: z
+    .number()
+    .int()
+    .min(0)
+    .nullable()
+    .describe("Rolls left in the open compound-action instance; null when no instance applies"),
+  /** True for the SRD generic actions every combatant can take (Dodge, Dash, Help, ...), which no stat block lists. */
+  builtin: z
+    .boolean()
+    .optional()
+    .describe("True for the SRD generic actions (Dodge, Dash, Help, Unarmed Strike, ...) every combatant can take"),
+  /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */
   ridesAHit: z.literal(true).optional(),
   // Display values only (ADR-0007); resolution recomputes from the id.
-  description: z.string(),
-  attackBonus: z.number().int().nullable(),
+  description: z
+    .string()
+    .describe(
+      "Display only. Every field from here down is read off the actor's effective action list, so it already carries the standing riders of what is equipped and attuned, which is what lets a client render an item-derived action (an amulet's cast, a +1 sword's swing) that is absent from the stat block entirely. None of it is what gets rolled: resolution takes `id` and recomputes through the same function, so a preview cannot disagree with the roll."
+    ),
+  attackBonus: z
+    .number()
+    .int()
+    .nullable()
+    .describe("To-hit including item riders; null when the action has no attack roll"),
   reachFeet: z.number().int().nullable(),
   rangeFeet: z.number().int().nullable(),
-  rangeNormalFeet: z.number().int().nullable(),
+  rangeNormalFeet: z
+    .number()
+    .int()
+    .nullable()
+    .describe("Normal range band; shots beyond it up to rangeFeet roll at disadvantage"),
   attackCount: z.number().int().nullable(),
   saveAbility: z.string().nullable(),
-  saveDc: z.number().int().nullable(),
+  saveDc: z.number().int().nullable().describe("Save DC including item riders"),
   damage: z.array(z.strictObject({ formula: z.string(), type: z.string() })),
-  usesLimit: z.number().int().nullable(),
+  usesLimit: z
+    .number()
+    .int()
+    .nullable()
+    .describe("Total limited uses including any item that raised the pool; null when unlimited"),
   usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
-  usesPool: z.string().nullable(),
+  usesPool: z.string().nullable().describe("Shared pool key; actions naming one pool spend one counter"),
   /** How many uses one activation spends when it is more than one, or `chosen` when the user picks it each time. */
   useCost: z.union([z.number().int(), z.literal("chosen")]).nullable(),
   requiresEffectTag: z.string().nullable(),
@@ -322,39 +369,105 @@ export const ActionAvailabilitySchema = z.strictObject({
     .nullable(),
   reaction: ActionReactionSchema.nullable(),
   /** The hit points it restores (a potion's 2d4 + 2), for display. */
-  healing: z.strictObject({ formula: z.string() }).nullable().optional(),
+  healing: z
+    .strictObject({ formula: z.string() })
+    .nullable()
+    .optional()
+    .describe("The hit points the action restores (a potion's 2d4 + 2); null when it heals nothing"),
   /** How many creatures one use heals when it can be more than one (Prayer of Healing's five); null otherwise. */
   healTargets: z.number().int().nullable().optional(),
   /** Who a tap picks: one creature, several, or none (it acts on its user); null when nothing structured resolves. */
-  targeting: z.enum(["none", "single", "multi"]).nullable().optional(),
+  targeting: z
+    .enum(["none", "single", "multi"])
+    .nullable()
+    .optional()
+    .describe(
+      'Who a tap picks, as resolution takes it: "single" (an attack, a heal such as a potion, a grant aimed at a target), "multi" (a save, damage with no attack roll, or a grant on each creature it targets), "none" (it acts on its user: a self heal, Rage, a scroll of a spell with no target); null when nothing structured resolves. A builtin reports the targeting the stat block list gives it'
+    ),
   /** Darts it makes, each assigned to a target (Magic Missile read from a scroll or cast from a wand). */
-  darts: z.number().int().nullable().optional(),
+  darts: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "Darts the action makes, each dealing its damage to a target the caller assigns (Magic Missile, read from a scroll or cast from a wand); null otherwise"
+    ),
   /** The damage types its caster picks from (Chromatic Orb). */
-  damageTypes: z.array(DamageTypeSchema).nullable().optional(),
+  damageTypes: z
+    .array(DamageTypeSchema)
+    .nullable()
+    .optional()
+    .describe(
+      "The damage types the caster picks one of when it resolves (Chromatic Orb), sent as the resolve's `damageType`; null when the action deals its own"
+    ),
   /** The conditions its caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s `conditionId`. */
   conditionChoices: z.array(SaveConditionSchema).optional(),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
-  checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional()
+  checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional(),
+  /** The weapon mastery property this character uses with this swing (Graze on Borin's Greatsword): present only when
+   *  the character chose the weapon's kind under Weapon Mastery. */
+  mastery: z
+    .strictObject({ id: z.string(), name: z.string() })
+    .optional()
+    .describe(
+      "The weapon mastery property this swing carries (Graze on a Greatsword), present only when the character chose the weapon's kind under Weapon Mastery"
+    ),
+  /** Why it can't be used now, in one short sentence ("Not prepared."); present exactly when `available` is false. */
+  reason: z
+    .string()
+    .optional()
+    .describe(
+      'Why it can\'t be used now, in one short sentence for the sheet ("Not prepared.", "No level 2 spell slots left.", "You used your Bonus Action this turn."). Present exactly when `available` is false. The character comes first (Stunned, 0 Hit Points), then the option itself, then the turn, then targeting; `violations` keeps the full account. A hint only: resolution checks again.'
+    ),
+  /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
+   *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
+   *  (a spell area's later save). */
+  passive: z
+    .enum(["rider", "rest", "automatic"])
+    .optional()
+    .describe(
+      "Present when the option belongs off a turn list: rider (it changes a roll, a hit or a cast and is chosen with it: Savage Attacker, Sneak Attack, Metamagic, Indomitable), rest (it is used when a rest ends: Arcane Recovery) or automatic (the server runs it: a spell area's later save). Absent for everything a creature takes on a turn."
+    )
 });
 export type ActionAvailability = Wire<z.infer<typeof ActionAvailabilitySchema>>;
+export type PassiveOption = NonNullable<ActionAvailability["passive"]>;
 /** A roll's mode as the rules count it, with what grants each side, so the sheet can say why before the roll. */
 const RollModeSummarySchema = z.strictObject({
   mode: z.enum(["advantage", "disadvantage", "normal"]),
   advantage: z.array(z.string()),
   disadvantage: z.array(z.string())
 });
-/** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor), not `PlayerView`. Every
+/** The sheet's derived numbers. Sent only via `actor:available-actions` (authorized per actor); `PlayerView` leaves them out. Every
  *  number is what the server would roll: Exhaustion, item riders and features included. */
 const DerivedAbilityRowSchema = z.strictObject({
   ability: AbilityIdSchema,
-  check: z.number().int(),
-  checkMode: RollModeSummarySchema,
-  save: z.number().int(),
-  saveMode: RollModeSummarySchema,
+  check: z
+    .number()
+    .int()
+    .describe("The ability-check bonus the server rolls: item check-bonus riders and Exhaustion included"),
+  checkMode: RollModeSummarySchema.describe(
+    "Advantage or Disadvantage the rules give this ability's checks, with what grants each side (Poisoned, armor worn without training, Hex)"
+  ),
+  save: z
+    .number()
+    .int()
+    .describe(
+      "The save the server will actually roll, minus only per-save cover and an ally Paladin's aura (both depend on the moment)"
+    ),
+  saveMode: RollModeSummarySchema.describe("Advantage or Disadvantage the rules give this save, with its sources"),
   saveProficient: z.boolean(),
-  saveFromItems: z.number().int(),
+  saveFromItems: z
+    .number()
+    .int()
+    .describe("The equipment share of `save`, so a sheet can say where the bonus came from"),
   /** The condition that makes a Strength or Dexterity save fail without a roll (Paralyzed); null otherwise. */
-  saveAutoFails: z.string().nullable()
+  saveAutoFails: z
+    .string()
+    .nullable()
+    .describe(
+      "The condition that makes a Strength or Dexterity save fail without a roll (Paralyzed, Stunned); null otherwise"
+    )
 });
 export type DerivedAbilityRow = Wire<z.infer<typeof DerivedAbilityRowSchema>>;
 /** `tier` is the effective tier: the sheet's base raised by any item grant. `sources` names the items that raised it.
@@ -363,11 +476,21 @@ const DerivedSkillRowSchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   ability: AbilityIdSchema.nullable(),
-  tier: z.enum(["none", "proficient", "expertise"]),
-  bonus: z.number().int().nullable(),
-  sources: z.array(z.string()),
-  mode: RollModeSummarySchema,
-  reliableTalent: z.boolean()
+  tier: z
+    .enum(["none", "proficient", "expertise"])
+    .describe("The effective tier: the sheet's base tier raised by any item grant"),
+  bonus: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "What the server adds to the d20 (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, riders, Exhaustion). Null only when the skill names no ability, the one case a sheet cannot roll it"
+    ),
+  sources: z.array(z.string()).describe('Item names that raised the tier, e.g. ["Circlet of Shadows"]'),
+  mode: RollModeSummarySchema.describe(
+    "Advantage or Disadvantage the rules give this skill's checks, with its sources"
+  ),
+  reliableTalent: z.boolean().describe("A d20 of 9 or lower counts as 10 on this check (Reliable Talent)")
 });
 export type DerivedSkillRow = Wire<z.infer<typeof DerivedSkillRowSchema>>;
 /** A tool the character is proficient with, checked with the ability its SRD entry names. */
@@ -381,33 +504,80 @@ const DerivedToolRowSchema = z.strictObject({
 });
 export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
 /** One damage type a defence covers, and what grants it (null for the stat block itself). */
-const DerivedDefenceSchema = z.strictObject({ type: z.string(), source: z.string().nullable() });
+const DerivedDefenceSchema = z.strictObject({
+  type: z.string().describe('A damage type, e.g. "fire"'),
+  source: z.string().nullable().describe("The feature, item or effect that grants it; null for the stat block itself")
+});
 export type DerivedDefence = Wire<z.infer<typeof DerivedDefenceSchema>>;
 const ActorDerivedSheetSchema = z.strictObject({
   proficiencyBonus: z.number().int(),
-  armorClass: z.number().int(),
-  initiative: z.number().int(),
+  armorClass: z.number().int().describe("Live AC, already reconciled against worn armour and item riders"),
+  initiative: z.number().int().describe("Live initiative bonus including item riders"),
   abilities: z.array(DerivedAbilityRowSchema),
   skills: z.array(DerivedSkillRowSchema),
-  tools: z.array(DerivedToolRowSchema),
+  tools: z
+    .array(DerivedToolRowSchema)
+    .describe(
+      "The tools the character is proficient with that the SRD names an ability for, each with its check bonus"
+    ),
   /** 10 plus the Wisdom (Perception) bonus, 5 more with Advantage on such checks or 5 less with Disadvantage. */
-  passivePerception: z.number().int(),
+  passivePerception: z
+    .number()
+    .int()
+    .describe(
+      "10 plus the Wisdom (Perception) bonus, 5 more with Advantage on such checks or 5 less with Disadvantage"
+    ),
   /** Speed now, before Dash: Exhaustion, Slow, armor too heavy for the wearer and Speed-0 conditions included; null
    *  when the sheet records none. */
-  speedFeet: z.number().int().min(0).nullable(),
+  speedFeet: z
+    .number()
+    .int()
+    .min(0)
+    .nullable()
+    .describe("Speed now, before Dash: Exhaustion, Slow, heavy armor and Speed-0 conditions included"),
   /** The damage defences in force outside any one hit: the stat block's, chosen features', items' and
    *  effects', as the damage pipeline reads them. */
-  defences: z.strictObject({
-    resistances: z.array(DerivedDefenceSchema),
-    immunities: z.array(DerivedDefenceSchema),
-    vulnerabilities: z.array(DerivedDefenceSchema)
-  }),
+  defences: z
+    .strictObject({
+      resistances: z.array(DerivedDefenceSchema),
+      immunities: z.array(DerivedDefenceSchema),
+      vulnerabilities: z.array(DerivedDefenceSchema)
+    })
+    .describe(
+      "The damage defences in force outside any one hit, as the damage pipeline applies them: the stat block's, chosen features', items' and effects'. Petrified and underwater resistance are added per hit and are not listed."
+    ),
   /** What standing `spell-save-dc` riders add to the bearer's spell save DC, and so to every action that uses it. */
-  spellSaveDcBonus: z.number().int(),
+  spellSaveDcBonus: z
+    .number()
+    .int()
+    .describe(
+      "What standing spell-save-dc riders (an item, a feat) add to the bearer's spell save DC, and so to every action that uses it. A printed DC is not raised."
+    ),
   /** How many items the bearer can attune to at once: 3, or 4 with Use Magic Device. */
-  attunementSlots: z.number().int().min(1).max(10)
+  attunementSlots: z
+    .number()
+    .int()
+    .min(1)
+    .max(10)
+    .describe("How many items the character can attune to at once: 3, or 4 with Use Magic Device"),
+  /** The weapon kinds chosen under Weapon Mastery, in the order chosen, each with the property it grants and the SRD
+   *  text of what that property does. Empty for a sheet that records no such choice. */
+  weaponMasteries: z
+    .array(
+      z.strictObject({
+        weaponId: z.string().describe("The weapon kind, a catalog id such as greatsword"),
+        weaponName: z.string(),
+        mastery: z
+          .strictObject({ id: z.string(), name: z.string(), description: z.string() })
+          .describe("The mastery property the kind grants, with the SRD text of what it does")
+      })
+    )
+    .describe(
+      "The weapon kinds the character chose under Weapon Mastery, in the order chosen, whether or not it carries one. Empty for a sheet that records no such choice (an import)."
+    )
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
+export type DerivedWeaponMastery = ActorDerivedSheet["weaponMasteries"][number];
 /** A pick this character may re-make on a rest (Circle of the Land's land after a Long Rest), with its options and
  *  the answer in force. */
 const RechoiceSchema = z.strictObject({
@@ -447,7 +617,9 @@ export type SpellChoices = Wire<z.infer<typeof SpellChoicesSchema>>;
 export const AvailableActionsReplySchema = z.strictObject({
   rulesMode: z.enum(["strict", "assisted", "freeform"]),
   actions: z.array(ActionAvailabilitySchema),
-  derived: ActorDerivedSheetSchema,
+  derived: ActorDerivedSheetSchema.describe(
+    "Display only, and the sheet's single source for every number beside a roll button. Derived from the actor's live loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts: a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this request, outside the broadcast game-state projection, on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see."
+  ),
   rechoices: z.array(RechoiceSchema),
   spellChoices: SpellChoicesSchema.nullable()
 });
@@ -482,6 +654,55 @@ export const ActorMovementReplySchema = z.strictObject({
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;
 
+/** What `character:next-level` answers: the level a character's next level-up reaches, the class it goes to (the one
+ *  the Level page offers first), and short plain lines for what it brings. */
+export const NextLevelReplySchema = z.strictObject({
+  level: z.number().int().min(2).max(20).describe("The character level the next level-up reaches"),
+  classId: z
+    .string()
+    .describe("The class that level goes to: the class of the last level taken, which the Level page offers first"),
+  className: z.string(),
+  classLevel: z.number().int().min(1).max(20).describe("That class's own level after the level-up"),
+  lines: z
+    .array(z.string())
+    .describe(
+      "Short plain lines in order: the Proficiency Bonus when it rises, each feature gained, each pick no feature names, spell slots, prepared spells and cantrips, a Wizard's spellbook spells, and the Hit Points the level adds (the die plus today's Constitution modifier and per-level riders, or the average)"
+    )
+});
+export type NextLevelReply = Wire<z.infer<typeof NextLevelReplySchema>>;
+export type NextLevelResult = MutationResult & Partial<NextLevelReply>;
+
+/** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
+ *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */
+export const VisionPreviewReplySchema = z.strictObject({
+  enabled: z.boolean(),
+  visible: z.array(z.array(z.number())),
+  actorIds: z.array(z.string())
+});
+export type VisionPreviewReply = Wire<z.infer<typeof VisionPreviewReplySchema>>;
+export type VisionPreviewResult = { ok: boolean; message?: string } & Partial<VisionPreviewReply>;
+
+/**
+ * What `scene:preview` answers the GM: what one audience would receive if the scene were live now, from the same
+ * projections that build the real feeds. `screen` is the shared screen's map (its encounter and turn order, as the
+ * presentation carries them); `player` is that character's player's combat and the creatures in it.
+ */
+export const ScenePreviewReplySchema = z.strictObject({
+  sceneId: z.uuid(),
+  live: z.boolean(),
+  mapAssetId: z.uuid(),
+  actorId: z.uuid().nullable(),
+  screen: z.strictObject({ encounter: z.looseObject({}), initiative: z.looseObject({}) }).nullable(),
+  player: z.strictObject({ combat: z.looseObject({}), actors: z.array(z.looseObject({})) }).nullable()
+});
+export type ScenePreviewReply = Omit<Wire<z.infer<typeof ScenePreviewReplySchema>>, "player" | "screen"> & {
+  screen: { encounter: Record<string, unknown>; initiative: Record<string, unknown> } | null;
+  player: { combat: PlayerView["combat"]; actors: PlayerView["actors"] } | null;
+};
+export type ScenePreviewResult = { ok: boolean; message?: string } & Partial<ScenePreviewReply>;
+export type WallAddResult = MutationResult & { wallIds?: readonly string[] };
+export type LightAddResult = MutationResult & { lightId?: string };
+
 /** What `character:draft` answers: the caller's parked build and when it was last saved, or null for none. */
 export const CharacterDraftReplySchema = z.strictObject({
   draft: z.strictObject({ draft: CharacterDraftSchema, updatedAt: z.iso.datetime() }).nullable()
@@ -496,7 +717,7 @@ export type BuilderOfferStep = z.infer<typeof BuilderOfferStepSchema>;
 /** One pick the content asks a build for, as the server works it out for a draft (`builder:offers`). */
 const BuilderOfferSchema = z.strictObject({
   /** Stable key into the draft's picks. */
-  key: z.string(),
+  key: z.string().describe("Stable key the draft's answers are filed under"),
   step: BuilderOfferStepSchema,
   /** The feature that offers the pick; a choose-N list (class skills, background languages) has none. */
   featureId: z.string().nullable(),
@@ -513,10 +734,13 @@ const BuilderOfferSchema = z.strictObject({
   classId: z.string().nullable(),
   /** Set when the content offers nothing to pick here yet (a catalog gap, or no eligible earlier answer):
    *  the pick may be left open. */
-  unresolvable: z.string().nullable(),
+  unresolvable: z.string().nullable().describe("Why nothing can be picked here yet; such an offer may be left open"),
   /** Option id -> why this build cannot usefully take it (already held, or no proficiency to build on).
-   *  Shown disabled rather than hidden, so an earlier answer never vanishes. Null for kinds without the rule. */
-  unavailable: z.record(z.string(), z.string()).nullable()
+   *  Shown disabled, so an earlier answer never vanishes. Null for kinds without the rule. */
+  unavailable: z
+    .record(z.string(), z.string())
+    .nullable()
+    .describe("Option id -> why this build cannot usefully take it (already held, or no proficiency)")
 });
 export type BuilderOffer = Wire<z.infer<typeof BuilderOfferSchema>>;
 
@@ -549,20 +773,26 @@ const BuilderSheetAbilitiesSchema = z.strictObject({
   abilityMethod: BuilderAbilityMethodSchema,
   baseScores: z.record(AbilityIdSchema, z.number().int()),
   backgroundBonusAllocation: z.array(z.strictObject({ ability: AbilityIdSchema, amount: z.number().int() })),
-  derived: z.boolean()
+  derived: z
+    .boolean()
+    .describe(
+      "True when worked out from the sheet's totals; false when read from its ledger. A rebuild may re-send these whatever ability methods the table allows today."
+    )
 });
 
 /** What the build offers, the answers it still accepts (picks it no longer offers are dropped), and the
  *  ledger rows those answers make, which `character.create` carries. */
 export const BuilderOffersReplySchema = z.strictObject({
   offers: z.array(BuilderOfferSchema),
-  picks: z.record(z.string(), z.array(z.string())),
+  picks: z.record(z.string(), z.array(z.string())).describe("The answers the build still accepts, by offer key"),
   asiIncreases: z.record(z.string(), BuilderAbilityIncreasesSchema),
-  subclassId: z.string().nullable(),
-  choices: z.array(CharacterChoiceSchema),
+  subclassId: z.string().nullable().describe("The subclass offer's answer"),
+  choices: z.array(CharacterChoiceSchema).describe("The ledger rows these answers make: a create's `choices`"),
   /** For a draft that sent `sheet`: how that sheet's scores were made. Null when not asked, or when no base scores
    *  and background increase reproduce them. */
-  abilities: BuilderSheetAbilitiesSchema.nullable()
+  abilities: BuilderSheetAbilitiesSchema.nullable().describe(
+    "For a draft that sent `sheet`: how that sheet's ability scores were made, which a rebuild re-sends as the scores the character already has. The ledger's own record, or for a sheet built before the ledger kept one, the base scores and background increase that rebuild its totals exactly. Null when not asked, or when nothing reproduces them."
+  )
 });
 export type BuilderOffersReply = Wire<z.infer<typeof BuilderOffersReplySchema>>;
 export type BuilderOffersResult = MutationResult & Partial<BuilderOffersReply>;

@@ -55,7 +55,13 @@ describe("what a prepared caster may change", () => {
     const sheet = built("cleric", 3);
     const choices = spellChoicesOf({ spellbook: [] }, sheet, library, policy)!;
     const cleric = choices.swaps.find((entry) => entry.classId === "cleric")!;
-    expect(cleric.spellIds).toEqual(expect.arrayContaining(["shield-of-faith", "spiritual-weapon"]));
+    // Level 1 and 2 Cleric spells the build didn't prepare are offered; which ones the dice prepared varies.
+    const held = new Set(classSpells(sheet, "cleric").map((spell) => spell.id));
+    const unprepared = ["shield-of-faith", "spiritual-weapon", "guiding-bolt", "sanctuary", "command", "hold-person"]
+      .filter((id) => !held.has(id))
+      .slice(0, 2);
+    expect(unprepared).toHaveLength(2);
+    expect(cleric.spellIds).toEqual(expect.arrayContaining(unprepared));
     expect(cleric.spellIds).not.toContain("spirit-guardians");
     for (const spell of classSpells(sheet, "cleric")) expect(cleric.spellIds).not.toContain(spell.id);
     expect(choices.spellbook).toBeNull();
@@ -191,7 +197,7 @@ describe("over the wire", () => {
     expect((await longRest()).status).toBe(200);
     const notInBook = await send(GAME_PATHS.characterSwapSpell, player, { spellId: "misty-step", replaces: out.id });
     expect((await notInBook.json()).error.message).toBe(
-      `Misty Step isn't in ${hero().name}'s spellbook - copy it in first.`
+      `Misty Step isn't in ${hero().name}'s spellbook. Copy it in first.`
     );
     expect((await send(GAME_PATHS.characterSwapSpell, player, { spellId: "web", replaces: out.id })).status).toBe(200);
     expect(hero().preparedSpellIds).toContain("web");
@@ -205,7 +211,7 @@ describe("over the wire", () => {
       expect((await add(player, { spellId: id, from: "level" })).status).toBe(200);
     const full = await add(player, { spellId: addable[free], from: "level" });
     expect((await full.json()).error.message).toBe(
-      `${hero().name}'s spellbook already holds the spells the Wizard's levels give - copy others in.`
+      `${hero().name}'s spellbook already holds the spells the Wizard's levels give. Copy others in.`
     );
     // The GM copies from a book the party found, for 2 hours and 50 GP a level.
     const purse = { currency: { cp: 0, sp: 0, ep: 0, gp: 120, pp: 0 } };

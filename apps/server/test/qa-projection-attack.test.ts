@@ -53,7 +53,7 @@ function roll(sessionId: string, actorId: string, visibility: RollRecord["visibi
   };
 }
 
-describe("QA attack — the one feed never hands a player another's die", () => {
+describe("QA attack: the one feed never hands a player another's die", () => {
   it("player A's read excludes player B's self-only roll, though both are gm_only=0", async () => {
     const log = await store();
     log.append({
@@ -103,7 +103,7 @@ describe("QA attack — the one feed never hands a player another's die", () => 
 
   it("keeps a blind roll (hidden from its own roller) out of every player read", async () => {
     const log = await store();
-    // A blind roll is stored gm_only=1; no player, not even the roller, may see it.
+    // A blind roll is stored gm_only=1; no player, the roller included, may see it.
     log.append({
       kind: "roll",
       text: "Blind roll.",
@@ -162,7 +162,7 @@ function turnState(revealed: boolean): GameState {
   return state;
 }
 
-describe("QA attack — a player replay reveals nothing the player could not have seen", () => {
+describe("QA attack: a player replay reveals nothing the player could not have seen", () => {
   function archive(): EncounterArchiveDocument {
     return {
       version: 3,

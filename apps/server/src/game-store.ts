@@ -74,6 +74,10 @@ export type GameStoreOptions = Readonly<{
   /** Whether a mutation changed restorable state; while rewound, true marks historyDirty. Injected so the
    *  store doesn't know which fields are restorable. */
   timelineDirtied?: (before: GameState, after: GameState) => boolean;
+  /** Runs after every command's own changes, in the same transaction, with the state before them: state the server
+   *  keeps derived from the rest (what the party has seen, which new rolls a hidden creature made). Must not throw for
+   *  a command that is otherwise fine. */
+  afterMutate?: (state: GameState, before: GameState) => void;
 }>;
 
 /** Timeline operations for a plan. Reads run immediately (inside the serialized queue); writes are queued
@@ -105,6 +109,8 @@ export type EncounterArchiveInput = Readonly<{
   endedAt: string;
   turnCount: number;
   documentJson: string;
+  /** The live scene the fight was on, which names the replay until the GM gives it a name. */
+  sceneName?: string | null;
 }>;
 export type EncounterArchiveSummary = Readonly<{
   id: number;
@@ -113,6 +119,10 @@ export type EncounterArchiveSummary = Readonly<{
   endedAt: string;
   turnCount: number;
   /** Shared with players by the GM? Default false. */ playerVisible: boolean;
+  /** The GM's own name for the replay, or null. */
+  name: string | null;
+  /** The scene the fight was on; GM-only. */
+  sceneName: string | null;
 }>;
 
 type SqlWrite = Readonly<{ sql: string; params: readonly (string | number | null)[] }>;
@@ -194,6 +204,15 @@ const MIGRATIONS: readonly Migration[] = [
         for (const row of rows) update.run(rewrite(row.state_json), row.row_id);
       }
     }
+  },
+  {
+    // A replay is named by its scene, and the GM may name it. Older archives have neither and read by their date.
+    version: 3,
+    up: (database) =>
+      database.exec(`
+        ALTER TABLE encounter_archives ADD COLUMN name TEXT;
+        ALTER TABLE encounter_archives ADD COLUMN scene_name TEXT;
+      `)
   }
 ];
 
@@ -297,14 +316,15 @@ export class GameStore {
         },
         archive: (row) => {
           pending.push({
-            sql: "INSERT OR IGNORE INTO encounter_archives (command_id, archived_at, started_at, ended_at, turn_count, document_json) VALUES (?, ?, ?, ?, ?, ?)",
+            sql: "INSERT OR IGNORE INTO encounter_archives (command_id, archived_at, started_at, ended_at, turn_count, document_json, scene_name) VALUES (?, ?, ?, ?, ?, ?, ?)",
             params: [
               row.commandId,
               new Date().toISOString(),
               row.startedAt,
               row.endedAt,
               row.turnCount,
-              row.documentJson
+              row.documentJson,
+              row.sceneName ?? null
             ]
           });
         },
@@ -358,7 +378,7 @@ export class GameStore {
     return (
       this.requireDatabase()
         .prepare(
-          "SELECT id, archived_at, started_at, ended_at, turn_count, player_visible FROM encounter_archives ORDER BY id DESC"
+          "SELECT id, archived_at, started_at, ended_at, turn_count, player_visible, name, scene_name FROM encounter_archives ORDER BY id DESC"
         )
         .all() as Array<{
         id: number;
@@ -367,6 +387,8 @@ export class GameStore {
         ended_at: string;
         turn_count: number;
         player_visible: number;
+        name: string | null;
+        scene_name: string | null;
       }>
     ).map((row) => ({
       id: row.id,
@@ -374,8 +396,15 @@ export class GameStore {
       startedAt: row.started_at,
       endedAt: row.ended_at,
       turnCount: row.turn_count,
-      playerVisible: row.player_visible === 1
+      playerVisible: row.player_visible === 1,
+      name: row.name,
+      sceneName: row.scene_name
     }));
+  }
+  /** The GM names a replay, or takes the name away with null; false if missing. */
+  renameEncounterArchive(id: number, name: string | null): boolean {
+    const result = this.requireDatabase().prepare("UPDATE encounter_archives SET name = ? WHERE id = ?").run(name, id);
+    return Number(result.changes) > 0;
   }
   /** Shares or un-shares an archived fight; false if missing. Players only ever get the computed replay projection. */
   setEncounterArchiveVisibility(id: number, playerVisible: boolean): boolean {
@@ -406,6 +435,7 @@ export class GameStore {
 
       const nextState = structuredClone(this.state);
       const pendingTimelineWrites = operate(nextState);
+      this.options.afterMutate?.(nextState, this.state);
       nextState.revision += 1;
       const acceptedAt = new Date().toISOString();
 

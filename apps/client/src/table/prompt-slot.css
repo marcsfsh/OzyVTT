@@ -1,0 +1,107 @@
+/* The player's prompt slot holds one card at a time in reserved space. What is under it moves down. */
+
+.prompt-slot {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+.prompt-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--magenta);
+  background: var(--material-lip), var(--material-plate);
+  box-shadow: var(--glow-magenta);
+}
+.prompt-card--danger {
+  border-color: var(--danger);
+  box-shadow: var(--glow-danger);
+}
+.prompt-card--call {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: none;
+}
+.prompt-card--call .roll-call-card {
+  padding: var(--space-4);
+  border: 1px solid var(--magenta);
+  background: var(--material-lip), var(--material-plate);
+  box-shadow: var(--glow-magenta);
+}
+.prompt-card-eyebrow {
+  margin: 0;
+  color: var(--magenta-text);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.prompt-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  color: var(--text);
+  font: 700 var(--fs-h3) / 1.25 var(--font-body);
+  text-shadow: none;
+}
+.prompt-card--danger .prompt-card-title > span:first-child {
+  color: var(--danger-text);
+  font-family: var(--font-display);
+  font-weight: 400;
+}
+.prompt-card-title:focus {
+  outline: none;
+}
+.prompt-card-title:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.prompt-card-meta {
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.3 var(--font-numeric);
+}
+.prompt-card-detail {
+  margin: 0;
+  color: var(--text-dim);
+  font: 400 var(--fs-sm) / 1.45 var(--font-body);
+}
+.prompt-card-body {
+  display: grid;
+  gap: var(--space-2);
+}
+/* The card's own title says what the prompt is about, so the prompt's inline label steps aside. */
+.prompt-card .save-prompt-label,
+.needs-card .save-prompt-label {
+  display: none;
+}
+.prompt-card .save-prompt,
+.prompt-card .dying-tracker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+/* The card is the frame, so the prompt's own plate (painted on `::before`) would draw an empty box round the
+   buttons. */
+.prompt-card .save-prompt::before,
+.prompt-card .dying-tracker::before {
+  display: none;
+}
+.prompt-slot-more,
+.prompt-slot-outcome {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.prompt-slot-outcome {
+  color: var(--text);
+}
+@media (max-width: 979px) {
+  .prompt-card:not(.prompt-card--call),
+  .prompt-card--call .roll-call-card {
+    padding: var(--space-3);
+  }
+}

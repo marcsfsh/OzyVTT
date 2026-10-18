@@ -1,14 +1,39 @@
 import {
+  codexDefaultHiddenFields,
+  codexFieldKeys,
   pruneCodexFields,
   type CodexEntityType,
+  type CodexFieldAudience,
   type CodexInWorldDate,
   type CodexPage,
   type CodexPageSummary
 } from "@vtt/domain";
 import { transaction } from "../database.js";
-import { resolveDate } from "./calendar.js";
+import {
+  addBlock,
+  applyLayout,
+  audienceReaches,
+  clampAnchors,
+  editBlock,
+  linkSources,
+  moveBlock,
+  newBlocks,
+  parseBlocks,
+  rebaseAnchors,
+  removeBlock,
+  restoreBlocks,
+  serializeBlocks,
+  setBlockAudience,
+  toWireBlocks,
+  type CodexBlockInput,
+  type CodexBlockPlacement,
+  type StampReader,
+  type StoredBlock
+} from "./blocks.js";
+import { getCalendar, resolveDate } from "./calendar.js";
 import { bumpRevision, freshId, stamp, write, type CodexDb } from "./db.js";
-import { rebuildLinks, scrubLinks } from "./links.js";
+import { pendingFlag } from "./first-shown.js";
+import { rebuildLinksFrom, scrubLinks } from "./links.js";
 import { revisionContent, revisionDue, revisionExistsAt, snapshotRevision } from "./revisions.js";
 import { indexPage, unindex } from "./search.js";
 import { revisionSettings } from "./settings.js";
@@ -19,12 +44,14 @@ import {
   body,
   entityFields,
   entityType,
+  fieldAudience,
   folder,
+  hiddenFieldKeys,
   id,
   isId,
   parseFields,
   parseStringArray,
-  sealSecretFields,
+  slot,
   tags,
   title
 } from "./validate.js";
@@ -34,29 +61,46 @@ import {
 export type CodexPageCreateInput = Readonly<{
   title: string;
   entityType?: CodexEntityType;
+  /** Every field value, whatever its audience. */
   fields?: Readonly<Record<string, string>>;
-  gmFields?: Readonly<Record<string, string>>;
+  /** Omitted: the kind's default-hidden keys. */
+  hiddenFields?: readonly string[];
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
-  gmBody?: string;
+  /** Created hidden. */
+  blocks?: readonly CodexBlockInput[];
   revealedToPlayers?: boolean;
   bannerAssetId?: string | null;
   /** The raw in-world date. `null` clears it; omitted leaves it alone. */
   inWorldDate?: CodexInWorldDate | null;
 }>;
-/** No `revealedToPlayers`: reveal has its own route. */
-export type CodexPageUpdateInput = Omit<CodexPageCreateInput, "title" | "revealedToPlayers"> &
-  Readonly<{ title?: string }>;
+/** No reveal flag, field audiences or block content: each has its own write. */
+export type CodexPageUpdateInput = Readonly<{
+  title?: string;
+  entityType?: CodexEntityType;
+  fields?: Readonly<Record<string, string>>;
+  folder?: string | null;
+  tags?: readonly string[];
+  playerBody?: string;
+  bannerAssetId?: string | null;
+  inWorldDate?: CodexInWorldDate | null;
+  /** Every block, in document order, with its anchor; applied after `playerBody`. */
+  layout?: readonly CodexBlockPlacement[];
+}>;
+
+/** A page as the store holds it: the wire row with its blocks as stored. */
+export type CodexPageRecord = Omit<CodexPage, "blocks"> & Readonly<{ blocks: readonly StoredBlock[] }>;
 
 const SUMMARY_COLUMNS =
-  "id, title, entity_type, fields_json, folder, tags_json, revealed, banner_asset_id, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, rev, created_at, updated_at";
-const PAGE_COLUMNS = `${SUMMARY_COLUMNS}, gm_fields_json, player_body, gm_body`;
+  "id, title, entity_type, fields_json, hidden_fields_json, folder, tags_json, revealed, banner_asset_id, in_world_year, in_world_month, in_world_day, in_world_label, calendar_instant, rev, created_at, updated_at, player_updated_at, character_updated_at_json, first_shown_at";
+const PAGE_COLUMNS = `${SUMMARY_COLUMNS}, player_body, blocks_json`;
 type SummaryRowRaw = {
   id: string;
   title: string;
   entity_type: string;
   fields_json: string;
+  hidden_fields_json: string;
   folder: string | null;
   tags_json: string;
   revealed: number;
@@ -69,8 +113,11 @@ type SummaryRowRaw = {
   rev: number;
   created_at: string;
   updated_at: string;
+  player_updated_at: string;
+  character_updated_at_json: string;
+  first_shown_at: string | null;
 };
-type PageRowRaw = SummaryRowRaw & { gm_fields_json: string; player_body: string; gm_body: string };
+type PageRowRaw = SummaryRowRaw & { player_body: string; blocks_json: string };
 
 function toSummary(row: SummaryRowRaw): CodexPageSummary {
   return {
@@ -78,6 +125,7 @@ function toSummary(row: SummaryRowRaw): CodexPageSummary {
     title: row.title,
     entityType: row.entity_type as CodexEntityType,
     fields: parseFields(row.fields_json),
+    hiddenFields: parseStringArray(row.hidden_fields_json),
     folder: row.folder,
     tags: parseStringArray(row.tags_json),
     revealedToPlayers: row.revealed === 1,
@@ -91,38 +139,41 @@ function toSummary(row: SummaryRowRaw): CodexPageSummary {
         : null,
     rev: row.rev,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    playerUpdatedAt: row.player_updated_at,
+    characterUpdatedAt: parseFields(row.character_updated_at_json),
+    firstShownAt: row.first_shown_at
   };
 }
-function toPage(row: PageRowRaw): CodexPage {
-  return {
-    ...toSummary(row),
-    gmFields: parseFields(row.gm_fields_json),
-    playerBody: row.player_body,
-    gmBody: row.gm_body
-  };
+function toRecord(row: PageRowRaw): CodexPageRecord {
+  return { ...toSummary(row), playerBody: row.player_body, blocks: parseBlocks(row.blocks_json) };
 }
 
-/** Fields are pruned to the type, so a page never holds values its type cannot show, and secrets are sealed. */
-function sealedFields(
-  type: CodexEntityType,
-  fields: Readonly<Record<string, string>>,
-  gmFields: Readonly<Record<string, string>>
-) {
-  return sealSecretFields(pruneCodexFields(type, fields), pruneCodexFields(type, gmFields));
+/** What labels block stamps as they are read: the live calendar and every session's current number. */
+export function stampReader(db: CodexDb): StampReader {
+  const sessions = db.database.prepare("SELECT id, session_number FROM codex_sessions").all() as Array<{
+    id: string;
+    session_number: number | null;
+  }>;
+  return { calendar: getCalendar(db), sessionNumbers: new Map(sessions.map((row) => [row.id, row.session_number])) };
+}
+export function toWirePage(record: CodexPageRecord, reader: StampReader): CodexPage {
+  return { ...record, blocks: toWireBlocks(record.blocks, reader) };
 }
 
 /** Leaf write of a whole page row (create and restore); its links, index row and folder records follow. */
-export function insertPage(db: CodexDb, page: CodexPage): void {
+export function insertPage(db: CodexDb, page: CodexPageRecord): void {
+  const blocksJson = serializeBlocks(page.blocks);
   db.database
     .prepare(
-      `INSERT INTO codex_pages (${PAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO codex_pages (${PAGE_COLUMNS}, blocks_pending) VALUES (${Array.from({ length: 23 }, () => "?").join(", ")})`
     )
     .run(
       page.id,
       page.title,
       page.entityType,
       JSON.stringify(page.fields),
+      JSON.stringify(page.hiddenFields),
       page.folder,
       JSON.stringify(page.tags),
       page.revealedToPlayers ? 1 : 0,
@@ -135,22 +186,31 @@ export function insertPage(db: CodexDb, page: CodexPage): void {
       page.rev,
       page.createdAt,
       page.updatedAt,
-      JSON.stringify(page.gmFields),
+      page.playerUpdatedAt,
+      JSON.stringify(page.characterUpdatedAt),
+      page.firstShownAt,
       page.playerBody,
-      page.gmBody
+      blocksJson,
+      pendingFlag(blocksJson)
     );
-  rebuildLinks(db, "page", page.id, page.playerBody, page.gmBody);
-  indexPage(db, page);
+  derive(db, page);
   registerFolderPath(db, page.folder, page.createdAt);
 }
 
-/** A restored page: fields re-pruned and re-sealed, and its date re-resolved against the restored calendar. */
-export function restorePage(db: CodexDb, page: CodexPage): void {
-  const sealed = sealedFields(page.entityType, page.fields, page.gmFields);
+/** The rows that follow a page's text and audiences: its mentions and its search rows. */
+function derive(db: CodexDb, page: CodexPageRecord): void {
+  rebuildLinksFrom(db, "page", page.id, linkSources(page.playerBody, page.blocks));
+  indexPage(db, page);
+}
+
+/** A restored page: fields re-pruned, blocks placed in its text, and its date re-resolved against the restored calendar. */
+export function restorePage(db: CodexDb, page: CodexPageRecord): void {
   const dated = resolveDate(db, page.inWorldDate, null);
   insertPage(db, {
     ...page,
-    ...sealed,
+    fields: pruneCodexFields(page.entityType, page.fields),
+    hiddenFields: hiddenFieldKeys(page.entityType, page.hiddenFields),
+    blocks: clampAnchors(page.blocks, page.playerBody),
     inWorldLabel: dated.label,
     calendarInstant: dated.instant,
     inWorldDate: dated.date
@@ -159,20 +219,20 @@ export function restorePage(db: CodexDb, page: CodexPage): void {
 
 export function createPage(db: CodexDb, input: CodexPageCreateInput): CodexPage {
   const type = entityType(input.entityType);
-  const sealed = sealedFields(type, entityFields(input.fields), entityFields(input.gmFields));
   // The same `resolveDate` as journal entries, so a calendar change reflows both by one rule.
   const dated = resolveDate(db, input.inWorldDate, null);
+  const playerBody = body(input.playerBody);
   const now = stamp(db);
-  const page: CodexPage = {
+  const page: CodexPageRecord = {
     id: freshId(),
     title: title(input.title),
     entityType: type,
-    fields: sealed.fields,
-    gmFields: sealed.gmFields,
+    fields: pruneCodexFields(type, entityFields(input.fields)),
+    hiddenFields: hiddenFieldKeys(type, input.hiddenFields ?? codexDefaultHiddenFields(type)),
     folder: folder(input.folder),
     tags: tags(input.tags),
-    playerBody: body(input.playerBody),
-    gmBody: body(input.gmBody),
+    playerBody,
+    blocks: newBlocks(input.blocks ?? [], playerBody),
     revealedToPlayers: input.revealedToPlayers === true,
     bannerAssetId: input.bannerAssetId ? id(input.bannerAssetId) : null,
     inWorldLabel: dated.label,
@@ -180,7 +240,11 @@ export function createPage(db: CodexDb, input: CodexPageCreateInput): CodexPage 
     inWorldDate: dated.date,
     rev: 1,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    playerUpdatedAt: now,
+    characterUpdatedAt: {},
+    // The write dates it if it is created revealed.
+    firstShownAt: null
   };
   write(db, () => {
     insertPage(db, page);
@@ -190,66 +254,238 @@ export function createPage(db: CodexDb, input: CodexPageCreateInput): CodexPage 
   return getPage(db, page.id)!;
 }
 
-/** `forceRevision` is set only by `restoreRevision`, so no request can force a checkpoint. */
+/** The stored page, refusing a missing one and, when `expectedRev` is given, a stale copy. */
+function existingPage(db: CodexDb, pageId: string, expectedRev: number | undefined): CodexPageRecord {
+  const existing = readPage(db, pageId);
+  if (!existing) throw new CodexNotFoundError("That page no longer exists.");
+  // Single-writer, last-writer-wins: the message states what happened; the next save resyncs the revision.
+  if (expectedRev !== undefined && expectedRev !== existing.rev)
+    throw new CodexRevisionConflictError("This page was changed somewhere else after you opened it.");
+  return existing;
+}
+
+/** A kind change keeps the audience of the fields both kinds have; a field new to the page starts at its default. */
+function hiddenAfterKindChange(hidden: readonly string[], from: CodexEntityType, to: CodexEntityType): string[] {
+  const before = codexFieldKeys(from);
+  return hiddenFieldKeys(to, [...hidden, ...codexDefaultHiddenFields(to).filter((key) => !before.has(key))]);
+}
+
+/** The editor's save. Blocks keep their place by paragraph unless `layout` places them. */
 export function updatePage(
   db: CodexDb,
   pageId: string,
   input: CodexPageUpdateInput,
   expectedRev: number | undefined,
-  authorTag: string,
-  forceRevision = false
+  authorTag: string
 ): CodexPage {
-  const existing = getPage(db, pageId);
-  if (!existing) throw new CodexNotFoundError("That page no longer exists.");
-  // Single-writer, last-writer-wins: the message states what happened; the next save resyncs the revision.
-  if (expectedRev !== undefined && expectedRev !== existing.rev)
-    throw new CodexRevisionConflictError("This page was changed somewhere else after you opened it.");
+  const existing = existingPage(db, pageId, expectedRev);
   const nextType = input.entityType === undefined ? existing.entityType : entityType(input.entityType);
   const typeChanged = nextType !== existing.entityType;
-  // Re-sealed and re-pruned whenever fields or the type change, so a secret never rests in `fields` and a type
-  // switch cannot leave hidden values on a revealed page. Pruned values stay in revision history.
-  const sealed =
-    input.fields !== undefined || input.gmFields !== undefined || typeChanged
-      ? sealedFields(
-          nextType,
-          input.fields === undefined ? existing.fields : entityFields(input.fields),
-          input.gmFields === undefined ? existing.gmFields : entityFields(input.gmFields)
-        )
-      : { fields: existing.fields, gmFields: existing.gmFields };
+  // Pruned whenever the fields or the kind change, so a kind switch leaves no value its kind cannot show. Pruned
+  // values stay in revision history.
+  const fields =
+    input.fields !== undefined || typeChanged
+      ? pruneCodexFields(nextType, input.fields === undefined ? existing.fields : entityFields(input.fields))
+      : existing.fields;
   // Omitted `inWorldDate` keeps the stored date and `null` clears it: the editor PATCHes whole drafts.
   const dated = input.inWorldDate !== undefined ? resolveDate(db, input.inWorldDate, null) : null;
-  const next: CodexPage = {
+  const playerBody = input.playerBody === undefined ? existing.playerBody : body(input.playerBody);
+  const rebased = rebaseAnchors(existing.blocks, existing.playerBody, playerBody);
+  const next: CodexPageRecord = {
     ...existing,
     title: input.title === undefined ? existing.title : title(input.title),
     entityType: nextType,
-    fields: sealed.fields,
-    gmFields: sealed.gmFields,
+    fields,
+    hiddenFields: typeChanged
+      ? hiddenAfterKindChange(existing.hiddenFields, existing.entityType, nextType)
+      : existing.hiddenFields,
     folder: input.folder === undefined ? existing.folder : folder(input.folder),
     tags: input.tags === undefined ? existing.tags : tags(input.tags),
-    playerBody: input.playerBody === undefined ? existing.playerBody : body(input.playerBody),
-    gmBody: input.gmBody === undefined ? existing.gmBody : body(input.gmBody),
+    playerBody,
+    blocks: input.layout === undefined ? rebased : applyLayout(rebased, input.layout, playerBody),
     bannerAssetId:
       input.bannerAssetId === undefined ? existing.bannerAssetId : input.bannerAssetId ? id(input.bannerAssetId) : null,
     inWorldLabel: dated ? dated.label : existing.inWorldLabel,
     calendarInstant: dated ? dated.instant : existing.calendarInstant,
-    inWorldDate: dated ? dated.date : existing.inWorldDate,
-    rev: existing.rev + 1,
-    updatedAt: stamp(db)
+    inWorldDate: dated ? dated.date : existing.inWorldDate
   };
+  // Type changes force a checkpoint, since they discard content.
+  savePage(db, existing, next, { edit: { authorTag, force: typeChanged } });
+  return getPage(db, pageId)!;
+}
+
+/**
+ * Writes a past revision forward as a new save, and checkpoints the state it discards so the restore can be undone.
+ * It never shows players anything new: see `restoreBlocks`, and a field is Hidden when it was in the revision or is now.
+ */
+export function restoreRevision(db: CodexDb, pageId: string, revisionId: number, authorTag: string): CodexPage {
+  const content = revisionContent(db, pageId, revisionId);
+  if (!content) throw new CodexNotFoundError("That revision no longer exists.");
+  const existing = existingPage(db, pageId, undefined);
+  const type = content.entityType;
+  const next: CodexPageRecord = {
+    ...existing,
+    title: content.title,
+    entityType: type,
+    fields: pruneCodexFields(type, content.fields),
+    hiddenFields: hiddenFieldKeys(type, [
+      ...content.hiddenFields,
+      ...hiddenAfterKindChange(existing.hiddenFields, existing.entityType, type)
+    ]),
+    playerBody: content.playerBody,
+    blocks: clampAnchors(restoreBlocks(existing.blocks, content.blocks), content.playerBody),
+    bannerAssetId: content.bannerAssetId,
+    tags: content.tags
+  };
+  savePage(db, existing, next, { edit: { authorTag, force: true } });
+  return getPage(db, pageId)!;
+}
+
+// Hidden blocks. Content and place are edits (`rev` and `updatedAt` move); an audience is not.
+
+export function addPageBlock(
+  db: CodexDb,
+  pageId: string,
+  input: CodexBlockInput & Readonly<{ slot?: number }>,
+  expectedRev: number | undefined
+): { page: CodexPage; blockId: string } {
+  const existing = existingPage(db, pageId, expectedRev);
+  const added = addBlock(existing.blocks, input, slot(input.slot), existing.playerBody);
+  savePage(db, existing, { ...existing, blocks: added.blocks }, { edit: { authorTag: "gm", force: false } });
+  return { page: getPage(db, pageId)!, blockId: added.block.id };
+}
+
+export function editPageBlock(
+  db: CodexDb,
+  pageId: string,
+  blockId: string,
+  input: Readonly<{ title?: string | null; text?: string }>,
+  expectedRev: number | undefined
+): CodexPage {
+  const existing = existingPage(db, pageId, expectedRev);
+  const blocks = editBlock(existing.blocks, blockId, input);
+  savePage(db, existing, { ...existing, blocks }, { edit: { authorTag: "gm", force: false } });
+  return getPage(db, pageId)!;
+}
+
+export function movePageBlock(
+  db: CodexDb,
+  pageId: string,
+  blockId: string,
+  place: Readonly<{ anchor: number; slot?: number }>,
+  expectedRev: number | undefined
+): CodexPage {
+  const existing = existingPage(db, pageId, expectedRev);
+  const blocks = moveBlock(existing.blocks, blockId, place.anchor, slot(place.slot), existing.playerBody);
+  savePage(db, existing, { ...existing, blocks }, { edit: { authorTag: "gm", force: false } });
+  return getPage(db, pageId)!;
+}
+
+/** Idempotent: a block already gone leaves the page as it is. */
+export function deletePageBlock(db: CodexDb, pageId: string, blockId: string, expectedRev?: number): CodexPage {
+  const existing = existingPage(db, pageId, expectedRev);
+  if (!existing.blocks.some((block) => block.id === blockId)) return getPage(db, pageId)!;
+  const blocks = removeBlock(existing.blocks, blockId);
+  savePage(db, existing, { ...existing, blocks }, { edit: { authorTag: "gm", force: false } });
+  return getPage(db, pageId)!;
+}
+
+/** Who sees one block. Not an edit; the reveal pass stamps each audience it reaches once the page is revealed. */
+export function setPageBlockAudience(
+  db: CodexDb,
+  pageId: string,
+  blockId: string,
+  value: string,
+  characterIds: readonly string[] | undefined
+): CodexPage {
+  const existing = existingPage(db, pageId, undefined);
+  const blocks = setBlockAudience(existing.blocks, blockId, value, characterIds);
+  savePage(db, existing, { ...existing, blocks }, { edit: null });
+  return getPage(db, pageId)!;
+}
+
+/** Who sees one field. Not an edit. A key the page's kind does not have is refused. */
+export function setPageFieldAudience(db: CodexDb, pageId: string, key: string, value: string): CodexPage {
+  const existing = existingPage(db, pageId, undefined);
+  if (!codexFieldKeys(existing.entityType).has(key))
+    throw new CodexValidationError("That field does not belong to this kind of page.");
+  const shown: CodexFieldAudience = fieldAudience(value);
+  const others = existing.hiddenFields.filter((hidden) => hidden !== key);
+  const hiddenFields = shown === "hidden" ? [...others, key] : others;
+  savePage(db, existing, { ...existing, hiddenFields }, { edit: null });
+  return getPage(db, pageId)!;
+}
+
+/**
+ * What everyone who can read the page sees: everything `projectPlayerPage` sends a reader with no character, and the
+ * date while the page is an event the chronicle lists. A save that changes none of it leaves `playerUpdatedAt`.
+ */
+function everyoneView(page: CodexPageRecord): string {
+  const hidden = new Set(page.hiddenFields);
+  return JSON.stringify([
+    page.title,
+    page.entityType,
+    Object.entries(page.fields)
+      .filter(([key]) => !hidden.has(key))
+      .sort(([a], [b]) => (a < b ? -1 : 1)),
+    page.tags,
+    page.playerBody,
+    page.bannerAssetId,
+    page.entityType === "event" ? page.inWorldDate : null,
+    viewOf(page, new Set())
+  ]);
+}
+/** The blocks one reader sees, in order and place. */
+function viewOf(page: CodexPageRecord, characterIds: ReadonlySet<string>): unknown[] {
+  return page.blocks
+    .filter((block) => audienceReaches(block, characterIds))
+    .map((block) => [block.anchor, block.title, block.text]);
+}
+function charactersNamed(page: CodexPageRecord): string[] {
+  return page.blocks.flatMap((block) => block.characterIds);
+}
+
+/**
+ * One page write: the row, its mentions and search rows, and the times players see. `playerUpdatedAt` moves when
+ * what everyone sees changed, and `characterUpdatedAt` for each character whose own view changed. An edit (`edit`
+ * set) also moves `rev` and `updatedAt`, keeps folder records and checkpoints the state it replaces (throttled).
+ */
+function savePage(
+  db: CodexDb,
+  existing: CodexPageRecord,
+  proposed: CodexPageRecord,
+  how: Readonly<{ edit: Readonly<{ authorTag: string; force: boolean }> | null }>
+): void {
+  const now = stamp(db);
+  const characterUpdatedAt = { ...existing.characterUpdatedAt };
+  for (const characterId of new Set([...charactersNamed(existing), ...charactersNamed(proposed)])) {
+    const reader = new Set([characterId]);
+    if (JSON.stringify(viewOf(existing, reader)) !== JSON.stringify(viewOf(proposed, reader)))
+      characterUpdatedAt[characterId] = now;
+  }
+  const next: CodexPageRecord = {
+    ...proposed,
+    rev: how.edit ? existing.rev + 1 : existing.rev,
+    updatedAt: how.edit ? now : existing.updatedAt,
+    playerUpdatedAt: everyoneView(proposed) === everyoneView(existing) ? existing.playerUpdatedAt : now,
+    characterUpdatedAt
+  };
+  const blocksJson = serializeBlocks(next.blocks);
   write(db, () => {
     db.database
       .prepare(
-        "UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, gm_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, gm_body = ?, banner_asset_id = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, in_world_label = ?, calendar_instant = ?, rev = ?, updated_at = ? WHERE id = ?"
+        "UPDATE codex_pages SET title = ?, entity_type = ?, fields_json = ?, hidden_fields_json = ?, folder = ?, tags_json = ?, player_body = ?, blocks_json = ?, blocks_pending = ?, banner_asset_id = ?, in_world_year = ?, in_world_month = ?, in_world_day = ?, in_world_label = ?, calendar_instant = ?, rev = ?, updated_at = ?, player_updated_at = ?, character_updated_at_json = ? WHERE id = ?"
       )
       .run(
         next.title,
         next.entityType,
         JSON.stringify(next.fields),
-        JSON.stringify(next.gmFields),
+        JSON.stringify(next.hiddenFields),
         next.folder,
         JSON.stringify(next.tags),
         next.playerBody,
-        next.gmBody,
+        blocksJson,
+        pendingFlag(blocksJson),
         next.bannerAssetId,
         next.inWorldDate?.year ?? null,
         next.inWorldDate?.month ?? null,
@@ -258,34 +494,31 @@ export function updatePage(
         next.calendarInstant,
         next.rev,
         next.updatedAt,
-        pageId
+        next.playerUpdatedAt,
+        JSON.stringify(next.characterUpdatedAt),
+        next.id
       );
-    rebuildLinks(db, "page", pageId, next.playerBody, next.gmBody);
-    indexPage(db, next);
+    derive(db, next);
+    if (!how.edit) return;
     registerFolderPath(db, next.folder, next.updatedAt);
-    // Checkpoint the state being replaced (throttled). Restores and type changes force one, since both discard
-    // content; `revisionExistsAt` prevents duplicates.
-    if (
-      revisionDue(db, pageId, revisionSettings(db), forceRevision || typeChanged) &&
-      !revisionExistsAt(db, pageId, existing.rev)
-    )
-      snapshotRevision(db, existing, authorTag);
+    // Checkpoint the state being replaced (throttled); `revisionExistsAt` prevents duplicates.
+    if (revisionDue(db, next.id, revisionSettings(db), how.edit.force) && !revisionExistsAt(db, next.id, existing.rev))
+      snapshotRevision(db, existing, how.edit.authorTag);
   });
-  return getPage(db, pageId)!;
 }
 
-/** Writes a past revision forward as a new save, checkpointing the state it discards so the restore can be undone. */
-export function restoreRevision(db: CodexDb, pageId: string, revisionId: number, authorTag: string): CodexPage {
-  const content = revisionContent(db, pageId, revisionId);
-  if (!content) throw new CodexNotFoundError("That revision no longer exists.");
-  return updatePage(db, pageId, content, undefined, authorTag, true);
-}
-
-/** Revealing is not editing: `updatedAt` stays, though the Codex revision still bumps. */
+/**
+ * Revealing is not editing: `updatedAt` stays, though the Codex revision still bumps. Players see a reveal or a
+ * hide, so `playerUpdatedAt` moves when the flag flips.
+ */
 export function setPageRevealed(db: CodexDb, pageId: string, revealed: boolean): CodexPage {
-  if (!getPage(db, pageId)) throw new CodexNotFoundError("That page no longer exists.");
+  const existing = readPage(db, pageId);
+  if (!existing) throw new CodexNotFoundError("That page no longer exists.");
   write(db, () => {
-    db.database.prepare("UPDATE codex_pages SET revealed = ? WHERE id = ?").run(revealed ? 1 : 0, pageId);
+    if (existing.revealedToPlayers === revealed) return;
+    db.database
+      .prepare("UPDATE codex_pages SET revealed = ?, player_updated_at = ? WHERE id = ?")
+      .run(revealed ? 1 : 0, stamp(db), pageId);
   });
   return getPage(db, pageId)!;
 }
@@ -303,11 +536,16 @@ export function touchPages(db: CodexDb, pageIds: readonly string[], at: string):
   for (const pageId of pageIds) update.run(at, pageId);
 }
 
-export function getPage(db: CodexDb, pageId: string): CodexPage | null {
+export function readPage(db: CodexDb, pageId: string): CodexPageRecord | null {
   if (!isId(pageId)) return null;
   const row = db.database.prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages WHERE id = ?`).get(pageId) as
     PageRowRaw | undefined;
-  return row ? toPage(row) : null;
+  return row ? toRecord(row) : null;
+}
+
+export function getPage(db: CodexDb, pageId: string): CodexPage | null {
+  const record = readPage(db, pageId);
+  return record ? toWirePage(record, stampReader(db)) : null;
 }
 
 export function listPages(
@@ -327,22 +565,29 @@ export function listPages(
     );
 }
 
-/** Every page with both bodies, for the backup. */
-export function listFullPages(db: CodexDb): CodexPage[] {
+/** Every page as stored, for the backup and the upgrade's rebuild. */
+export function listPageRecords(db: CodexDb): CodexPageRecord[] {
   return (
     db.database.prepare(`SELECT ${PAGE_COLUMNS} FROM codex_pages ORDER BY title COLLATE NOCASE`).all() as PageRowRaw[]
-  ).map(toPage);
+  ).map(toRecord);
 }
 
-/** Dated `event` pages. Filtering on type rather than clearing dates keeps a type switch lossless. */
+/** Every page with its player text and blocks. */
+export function listFullPages(db: CodexDb): CodexPage[] {
+  const reader = stampReader(db);
+  return listPageRecords(db).map((record) => toWirePage(record, reader));
+}
+
+/** Dated `event` pages. Filtering on type, and keeping the dates, makes a type switch lossless. */
 export function listDatedEventPages(db: CodexDb): CodexPage[] {
+  const reader = stampReader(db);
   return (
     db.database
       .prepare(
         `SELECT ${PAGE_COLUMNS} FROM codex_pages WHERE entity_type = 'event' AND calendar_instant IS NOT NULL ORDER BY calendar_instant, created_at`
       )
       .all() as PageRowRaw[]
-  ).map(toPage);
+  ).map((row) => toWirePage(toRecord(row), reader));
 }
 
 // Folders: a page carries its own path; a folder record lets an empty folder persist.
@@ -385,7 +630,7 @@ export function moveFolder(db: CodexDb, fromPath: string, toPath: string): numbe
   // `folder()` re-validates the new path's depth and length, and turns "" (the top level) into null.
   const repath = (value: string): string | null =>
     folder(value === from ? (to ?? "") : to === null ? value.slice(from.length + 1) : to + value.slice(from.length));
-  // A move that finds nothing writes nothing, so it leaves the revision (and every ETag) alone.
+  // A move that finds nothing writes nothing, so it leaves the revision (and every GM ETag) alone.
   return transaction(db.database, () => {
     const now = stamp(db);
     const pages = db.database

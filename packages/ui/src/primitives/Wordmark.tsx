@@ -42,7 +42,7 @@ export function SunMark({ size = "md", className }: SunMarkProps) {
 
 type EyebrowProps = HTMLAttributes<HTMLSpanElement>;
 
-/** Small uppercase tracked label in the label face. Size and contrast are governed by accessibility, not style. */
+/** Small uppercase tracked label in the label face. Accessibility governs its size and contrast. */
 export function Eyebrow({ className, children, ...rest }: EyebrowProps) {
   return (
     <span className={cx("nh-eyebrow", className)} {...rest}>

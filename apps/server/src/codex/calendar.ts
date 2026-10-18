@@ -85,7 +85,7 @@ export function getCalendar(db: CodexDb): CodexCalendar {
 
 /**
  * Leaf write: replaces the calendar and recomputes every dated record's instant and label from its raw date.
- * Pages are selected by having a date, not by type, so a later type change finds them current.
+ * Pages are selected by having a date, whatever their type, so a later type change finds them current.
  */
 export function writeCalendar(db: CodexDb, calendar: CodexCalendar): void {
   const { database } = db;
@@ -137,6 +137,25 @@ export function writePublishedDate(db: CodexDb, date: CodexInWorldDate | null): 
   db.database
     .prepare("UPDATE codex_meta SET published_year = ?, published_month = ?, published_day = ? WHERE id = 1")
     .run(date ? date.year : null, date ? date.month : null, date ? date.day : null);
+}
+
+/**
+ * Game time passing at the table (a rest, or Pass time) moves the GM's date by the days it crossed; the game keeps
+ * the hour (`rest.clockHours`), so the two make one clock. The players' date moves too when it was the same day,
+ * since the party lived through that time at the table. Returns whether anything moved; nothing does with no date.
+ */
+export function advanceCampaignDate(db: CodexDb, days: number): boolean {
+  const current = getCalendar(db);
+  const from = current.currentDate;
+  if (!from || !Number.isSafeInteger(days) || days <= 0) return false;
+  const next = instantToDate(current, dateToInstant(current, from) + days);
+  const published = getPublishedDate(db);
+  // Only the clock moves, so the dated records keep their instants and labels; `writeCalendar` would reflow them.
+  db.database
+    .prepare("UPDATE codex_meta SET calendar_json = ? WHERE id = 1")
+    .run(JSON.stringify({ ...current, currentDate: next }));
+  if (published && dateToInstant(current, published) === dateToInstant(current, from)) writePublishedDate(db, next);
+  return true;
 }
 
 /** The GM's clock as an instant. Never pass this to a player projection; use `publishedInstant`. */

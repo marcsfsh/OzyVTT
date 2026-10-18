@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { classResourceGrowth, extraPickAmount, type PrintedResourceRow } from "../src/pick-budget.js";
 
-// Checked against the shipped bundle's level tables, not a fixture that could agree with a mistake.
+// Checked against the shipped bundle's level tables, since a fixture could agree with a mistake.
 const classes = createRequire(import.meta.url)("../../content-srd-5.2.1/bundles/classes.v1.json") as Array<{
   id: string;
   levelTable: PrintedResourceRow[];

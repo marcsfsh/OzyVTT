@@ -2,7 +2,7 @@
  * An inline option's row writes what its controls write, including removals. `FeatureEditor` draws
  * `choice.options` by hand (an option mounts `RiderEditor`, which the renderer's rows branch can't),
  * so its setter must replace the row as the renderer does; a merge would restore keys a write deleted.
- * Clearing both `requires` boxes must drop the clause, not leave `{}`. Drives the rendered form,
+ * Clearing both `requires` boxes must drop the clause and never leave `{}`. Drives the rendered form,
  * since `applyField` calls the field's `write` directly and can't see this.
  */
 
@@ -12,7 +12,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { blankDraft, forStorage } from "./defaults";
 import { FeatureEditor } from "./FeatureEditor";
-import { SchemaForm } from "./SchemaForm";
+import { SchemaForm } from "./form-harness";
 import { SCHEMAS } from "./schemas";
 import { EMPTY_CONTEXT, type Draft } from "./schema";
 
@@ -44,7 +44,7 @@ const GATED_FEAT: Draft = {
   }
 };
 
-/** The real form, driven as `RecordDetail` drives it: one draft, one `onDraft`, the same `custom`
+/** The real form, driven as the record view drives it: one draft, one `onDraft`, the same `custom`
     map (without it the custom `features` section renders empty). */
 function RecordForm({ seed, onBody }: { seed: Draft; onBody: (body: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(seed);
@@ -122,7 +122,7 @@ describe("an inline option's gate can be cleared, not only set", () => {
     expect(form.option().requires).toEqual({ id: "emberborn" });
 
     await user.click(form.clear("emberborn"));
-    // No key at all, not `{}` (which would raise two "Required" issues for a removed gate).
+    // No key at all: `{}` would raise two "Required" issues for a removed gate.
     expect(Object.keys(form.option()), "the cleared clause must not survive as an empty object").not.toContain(
       "requires"
     );
@@ -146,7 +146,7 @@ describe("an inline option's gate can be cleared, not only set", () => {
     expect(form.option().requires).toEqual({ offer: "feature:echoed-ward", id: "frostborn" });
   });
 
-  it("THE GATE IS PICKED, not spelled — the half a datalist could not do on a phone", async () => {
+  it("THE GATE IS PICKED and never spelled: the half a datalist could not do on a phone", async () => {
     const user = userEvent.setup();
     const seed = JSON.parse(JSON.stringify(GATED_FEAT)) as typeof GATED_FEAT;
     delete ((seed.feature as Record<string, unknown>).choice as { options: Array<Record<string, unknown>> }).options[0]

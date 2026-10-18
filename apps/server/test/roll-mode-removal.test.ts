@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { GAME_COMMANDS } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { GameStateSchema } from "@vtt/domain";
 import { gameCommands } from "../src/commands/index.js";
 
@@ -17,7 +17,7 @@ const source = (path: string): string => readFileSync(fileURLToPath(new URL(path
 describe("the retired table-wide roll mode", () => {
   it("lets a save written before the removal load, dropping the stored field", () => {
     // A save carrying the removed setting on the live combat and on a parked scene. Neither object is
-    // strict, so Zod strips the unknown key rather than rejecting the campaign.
+    // strict, so Zod strips the unknown key and the campaign loads.
     const stored = {
       schemaVersion: 1,
       revision: 12,

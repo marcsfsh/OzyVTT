@@ -10,7 +10,7 @@ import {
   type EquipmentDerivation
 } from "./equipment-derivation.js";
 
-/** The action list every actor-scoped consumer must read instead of `definition.actions`: item-derived
+/** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
  *  reads, and the effects of a row that takes two generic actions at once (`withTakenActions`). Nothing is written
  *  back. Moment-gated riders are collected on the roll path instead (the two sets are disjoint). */
@@ -20,7 +20,7 @@ export function effectiveActions(
   catalog: EquipmentCatalog | undefined
 ): readonly ActorAction[] {
   const declared = definition?.actions ?? [];
-  // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a 3rd-level slot).
+  // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a level 3 spell slot).
   const taken = declared.map((action) =>
     withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition)
   );
@@ -124,7 +124,7 @@ function withFlatBonus(formula: string, bonus: number): string {
 }
 
 /** Extra attacks, for weapon swings only (SRD: "whenever you take the Attack action"). A definition
- *  action declaring its own `count` is left alone. Max, not sum: each rider names the total extra swings
+ *  action declaring its own `count` is left alone. Max and no sum: each rider names the total extra swings
  *  at its tier, and Extra Attack from two sources doesn't stack. */
 function extraAttacksFor(
   action: ActorAction,

@@ -56,7 +56,7 @@ describe("rule families", () => {
       ["economy.spent-slot", "economy"],
       // No one acts while a wait-mode fight gathers initiative: the turn economy hasn't begun.
       ["initiative.gathering", "economy"],
-      // Being incapacitated or down is "you have no actions" - economy, not a targeting rule.
+      // Being incapacitated or down is "you have no actions": an economy rule.
       ["condition.incapacitated", "economy"],
       ["condition.down", "economy"],
       // Ending what someone else imposed skips the action or save its rules ask for; a raging Barbarian can't cast.
@@ -97,11 +97,13 @@ describe("rule families", () => {
       ["range.underwater", "targeting"],
       ["target.grappled-by-source", "targeting"],
       ["target.too-large-to-grapple", "targeting"],
-      // Help distracts an enemy: not the helper, not an ally.
+      // Help distracts an enemy: never the helper or an ally.
       ["target.not-an-enemy", "targeting"],
       // Hunter's Mark and Hex move from a creature at 0 Hit Points only: whom the action may target.
       ["target.mark-still-standing", "targeting"],
       ["cover.total", "targeting"],
+      // Hiding in an enemy's sight: where the creature stands relative to the others, like cover.
+      ["hide.seen", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],
       ["attack.cleave-same-target", "targeting"],
@@ -130,7 +132,7 @@ describe("effective mode", () => {
     const state = stateWith({ rulesMode: "strict", ruleExceptions: { movement: "freeform", slots: "strict" } });
     expect(effectiveModeFor(state.combat, "movement.exceeds-speed")).toBe("freeform");
     expect(effectiveModeFor(state.combat, "slots.none-remaining")).toBe("strict");
-    // Untouched families keep the dial - relaxing movement must not relax the action economy.
+    // Untouched families keep the dial: relaxing movement must not relax the action economy.
     expect(effectiveModeFor(state.combat, "economy.action-used")).toBe("strict");
     expect(effectiveModeFor(state.combat, "cover.total")).toBe("strict");
   });
@@ -173,7 +175,7 @@ describe("per-turn override memory", () => {
 });
 
 describe("override reason", () => {
-  it("is optional - one tap, never a mandatory modal - and audits as a plain GM override", () => {
+  it("is optional (one tap, never a mandatory modal) and audits as a plain GM override", () => {
     expect(overrideReason(undefined)).toBe("GM override");
     expect(overrideReason(null)).toBe("GM override");
     expect(overrideReason({})).toBe("GM override");

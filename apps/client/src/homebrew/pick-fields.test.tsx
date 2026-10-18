@@ -5,7 +5,7 @@
  * - every value is listed by its printed name without typing;
  * - picking "Very Rare" writes `"very-rare"`;
  * - typing "unique" writes `"unique"` (the slug stays open);
- * - clearing removes the key rather than writing `null` (`rarity` is `.optional()`).
+ * - clearing removes the key and never writes `null` (`rarity` is `.optional()`).
  *
  * jsdom loads no stylesheet, so the 44px touch floor is left to `Combobox.css`.
  */
@@ -17,12 +17,12 @@ import userEvent from "@testing-library/user-event";
 import { DAMAGE_TYPE_IDS, RARITY_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { blankDraft, forStorage } from "./defaults";
 import { RiderEditor } from "./RiderEditor";
-import { SchemaForm } from "./SchemaForm";
+import { SchemaForm } from "./form-harness";
 import { SCHEMAS } from "./schemas";
 import { EMPTY_CONTEXT, pickValue, suggestionLabel, type Draft } from "./schema";
 import type { HomebrewType } from "./types";
 
-/** The real form, driven as `RecordDetail` drives it: one draft, one `onDraft`. */
+/** The real form, driven as the record view drives it: one draft, one `onDraft`. */
 function RecordForm({ type, seed, onBody }: { type: HomebrewType; seed: Draft; onBody: (body: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(seed);
   return (
@@ -65,7 +65,7 @@ function mount(type: HomebrewType = "equipment", seed: Draft = { name: "Mace of 
   };
 }
 
-describe("3a — the rarity control is a visible chooser that still takes a word of the GM's own", () => {
+describe("3a: the rarity control is a visible chooser that still takes a word of the GM's own", () => {
   it("shows all seven rungs by their printed names, before anything is typed", async () => {
     const user = userEvent.setup();
     const form = mount();
@@ -74,11 +74,11 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     await user.click(form.rarity());
     const shown = form.rungs().map((option) => option.textContent);
     expect(shown).toEqual(["Common", "Uncommon", "Rare", "Very Rare", "Legendary", "Artifact", "Varies"]);
-    // Names are derived from `RARITY_IDS`, not retyped.
+    // Names are derived from `RARITY_IDS` and never retyped.
     expect(shown).toEqual(RARITY_IDS.map(suggestionLabel));
   });
 
-  it("picking “Very Rare” writes the slug, and shows the name back", async () => {
+  it('picking "Very Rare" writes the slug, and shows the name back', async () => {
     const user = userEvent.setup();
     const form = mount();
 
@@ -92,7 +92,7 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     expect(screen.queryByRole("combobox", { name: "Rarity" })).toBeNull();
   });
 
-  it("typing “unique” writes “unique” — the open slug stays open", async () => {
+  it('typing "unique" writes "unique": the open slug stays open', async () => {
     const user = userEvent.setup();
     const form = mount();
 
@@ -103,11 +103,11 @@ describe("3a — the rarity control is a visible chooser that still takes a word
     expect(screen.getByText("unique")).toBeInTheDocument();
   });
 
-  it("typing “unique” and moving to the next field keeps it — Enter is not the only way out", async () => {
+  it('typing "unique" and moving to the next field keeps it: Enter is not the only way out', async () => {
     const user = userEvent.setup();
     const form = mount();
 
-    // Typed text must be kept on blur, not only on Enter.
+    // Typed text must be kept on blur as well as on Enter.
     await user.type(form.rarity(), "unique");
     await user.click(screen.getByLabelText("Name"));
 
@@ -136,7 +136,7 @@ describe("3a — the rarity control is a visible chooser that still takes a word
 
     await user.click(screen.getByRole("button", { name: "Clear Legendary" }));
 
-    // `emptyValue: "omit"`: the key goes away rather than holding `null`.
+    // `emptyValue: "omit"`: the key goes away and never holds `null`.
     expect("rarity" in form.body()).toBe(false);
     expect(form.rarity()).toBeInTheDocument();
   });
@@ -152,7 +152,7 @@ describe("3a — the rarity control is a visible chooser that still takes a word
  * survives, and the value reaches the published body. `DamageTypeIdSchema` stays an open string.
  * A rider's damage type is the exception: it names one of the SRD's thirteen, so its sites are closed choices.
  */
-describe("3d — every damage-type control is a visible chooser; the open ones still take a homebrew type", () => {
+describe("3d: every damage-type control is a visible chooser; the open ones still take a homebrew type", () => {
   const NAMES = DAMAGE_TYPE_IDS.map(suggestionLabel);
 
   it("kind 1, text: the weapon's damage type shows the whole vocabulary, not eight of it", async () => {
@@ -178,11 +178,11 @@ describe("3d — every damage-type control is a visible chooser; the open ones s
     expect(screen.getByText("Lightning")).toBeInTheDocument();
   });
 
-  it("kind 1, text: a homebrew “void” type survives — the column stays open", async () => {
+  it('kind 1, text: a homebrew "void" type survives: the column stays open', async () => {
     const user = userEvent.setup();
     const form = mount();
 
-    // An open slug: a homebrew type survives. Tab out rather than Enter, the common gesture.
+    // An open slug: a homebrew type survives. Tab out (the common gesture) where Enter would also work.
     await user.type(form.chooser("Damage type"), "void");
     await user.click(screen.getByLabelText("Name"));
 
@@ -208,7 +208,7 @@ describe("3d — every damage-type control is a visible chooser; the open ones s
     expect(form.body().damageResistances).toEqual(["fire", "void"]);
   });
 
-  it("kind 2, tags: “Necrotic” typed by hand is the slug, not a string the store refuses", async () => {
+  it('kind 2, tags: "Necrotic" typed by hand is the slug the store keeps', async () => {
     const user = userEvent.setup();
     const form = mount("monster", { ...blankDraft("monster"), name: "Storm Herald" });
 
@@ -308,7 +308,7 @@ describe("3d — every damage-type control is a visible chooser; the open ones s
     expect((value.grants as { damageResistances?: readonly string[] }).damageResistances).toEqual(["cold", "void"]);
   });
 
-  it("a tag field with NO list keeps the plain box — `pick` is not “always a menu”", async () => {
+  it("a tag field with NO list keeps the plain box: `pick` is no promise of a menu", async () => {
     const user = userEvent.setup();
     let value: Draft = {};
     function Harness() {
@@ -332,7 +332,7 @@ describe("3d — every damage-type control is a visible chooser; the open ones s
     await user.click(screen.getByRole("button", { name: "Grant something" }));
     await user.selectOptions(container.querySelector("select")!, "languages");
 
-    // `pick` is set for the control, not per kind; `TagInput` falls back to a plain input for kinds
+    // `pick` is set for the control, and never per kind; `TagInput` falls back to a plain input for kinds
     // with no vocabulary.
     expect(screen.queryByRole("combobox", { name: "Which languages" })).toBeNull();
     await user.type(screen.getByLabelText("Which languages"), "elvish{Enter}");
@@ -375,7 +375,7 @@ describe("the eleventh grant kind is a spell PICKER, because a spell id cannot b
     return { container, grants: () => value.grants as { spells?: ReadonlyArray<Record<string, unknown>> } | undefined };
   }
 
-  it("“Spells” is offered as a kind at all — the eleventh array stops being write-only", async () => {
+  it('"Spells" is offered as a kind at all: the eleventh array stops being write-only', async () => {
     const user = userEvent.setup();
     const { container } = mountGrants();
     await user.click(screen.getByRole("button", { name: "Grant something" }));
@@ -411,7 +411,7 @@ describe("the eleventh grant kind is a spell PICKER, because a spell id cannot b
     expect(value.grants).toBeDefined();
   });
 
-  it("picking Bless writes `{id, alwaysPrepared}` — the shape 41 SRD records author", async () => {
+  it("picking Bless writes `{id, alwaysPrepared}`: the shape 41 SRD records author", async () => {
     const user = userEvent.setup();
     const { container, grants } = mountGrants();
     await user.click(screen.getByRole("button", { name: "Grant something" }));
@@ -458,7 +458,7 @@ describe("the eleventh grant kind is a spell PICKER, because a spell id cannot b
 
 /** `GrantsEditor` exposes no control for `grants.when` but rebuilds the bag on every edit, so it must
     carry the gate across. This drives the gesture (a real mount and tap, and the `onChange` payload
-    `RecordDetail` would autosave); the body half is `grant-gate-preservation.mirror.test.ts`. */
+    the record view would autosave); the body half is `grant-gate-preservation.mirror.test.ts`. */
 describe("a gate the editor cannot show is a gate the editor must not drop", () => {
   /** `mindless-rage` as `subclasses.v1.json` ships it, as the opened body. */
   const GATED = {
@@ -490,7 +490,7 @@ describe("a gate the editor cannot show is a gate the editor must not drop", () 
     return { grants: () => value.grants as { conditionImmunities?: readonly string[]; when?: unknown } };
   }
 
-  it("adding a condition to the row keeps the “while raging” gate on the block", async () => {
+  it('adding a condition to the row keeps the "while raging" gate on the block', async () => {
     const user = userEvent.setup();
     const { grants } = mountGated();
 
@@ -544,7 +544,7 @@ describe("a homebrew weapon's Properties row is a visible chooser over the prope
     expect(form.options("Properties")).not.toContain("Finesse");
   });
 
-  it("a homebrew “duelling” property survives — the column stays open", async () => {
+  it('a homebrew "duelling" property survives: the column stays open', async () => {
     const user = userEvent.setup();
     const form = mount();
 

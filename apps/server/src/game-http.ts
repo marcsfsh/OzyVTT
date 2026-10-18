@@ -1,14 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
-import {
-  API_VERSION,
-  ENCOUNTER_ARCHIVE_PATHS,
-  GAME_PATHS,
-  GAME_COMMANDS,
-  GameCommandEnvelopeSchema,
-  SESSION_PATHS,
-  type IntegrationScope
-} from "@vtt/api-contract";
+import { API_VERSION, GAME_COMMANDS, type IntegrationScope } from "@vtt/api-contract";
+import { encounterRoutes, gameRoutes, systemRoutes } from "@vtt/api-contract/routes";
 import type { EncounterArchiveSummary } from "./game-store.js";
 import {
   describeFailure,
@@ -18,9 +11,12 @@ import {
   type GamePrincipal,
   type GameReply
 } from "./commands/index.js";
+import { readScope } from "./commands/pipeline.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
-import { bearerToken, expressPath, issuesOf, pathParam, sendData, sendFailure } from "./http-kit.js";
-import { projectPlayerReplay } from "./replay-projection.js";
+import { expressPath, issuesOf, mount, sendData, sendFailure } from "./http-kit.js";
+import { projectPlayerArchiveSummary, projectPlayerReplay } from "./replay-projection.js";
+import { callerOf, isUnauthenticated, refuse, type CredentialVerifiers } from "./request-auth.js";
+import type { SightContent } from "./vision/senses.js";
 
 /**
  * The public HTTP adapter over the game commands (ADR-0016): every write and read runs the same
@@ -30,22 +26,23 @@ import { projectPlayerReplay } from "./replay-projection.js";
  * credential, checked against each route's scope and acting with GM authority. Players keep the table's
  * player limits. The public viewer never authenticates here.
  *
- * Errors: 400 validation_failed, 401 unauthenticated, 403 forbidden (bad/revoked/underscoped token or
- * role denial), 404 not_found, and 409 conflict for game refusals, stale `expectedRevision` (with
- * `error.currentRevision`) and timeline navigations awaiting confirmation (`error.details.needsConfirm`).
+ * Errors: 400 validation_failed, 401 unauthenticated (no token, or a malformed, expired or revoked one), 403
+ * forbidden (a valid credential without the scope, or a role denial), 404 not_found, and 409 conflict for game
+ * refusals, stale `expectedRevision` (with `error.currentRevision`) and timeline navigations awaiting confirmation
+ * (`error.details.needsConfirm`).
  */
 
 export type GameApiRouterOptions = Readonly<{
   game: GameCommands;
-  gmSession: (token: string) => Readonly<{ sessionId: string }> | null;
-  playerSession: (token: string) => Readonly<{ sessionId: string }> | null;
-  verifyIntegration: (token: string, scope: IntegrationScope) => Readonly<{ id: string; name: string }> | null;
+  /** The server's credential checks; the route's scope decides whether an integration credential reaches it. */
+  verifiers: CredentialVerifiers;
   archives: Readonly<{
     list: () => readonly EncounterArchiveSummary[];
     get: (id: number) => string | null;
     remove: (id: number) => void;
     /** Shares (or un-shares) one archived fight with players; false when no such archive exists. */
     setVisibility: (id: number, playerVisible: boolean) => boolean;
+    rename: (id: number, name: string | null) => boolean;
   }>;
   sessions: Readonly<{
     /** Issues a fresh player session (the socket's open LAN-trust join, over HTTP), or null before GM setup. */
@@ -53,6 +50,8 @@ export type GameApiRouterOptions = Readonly<{
   }>;
   revision: () => number;
   newId?: () => string;
+  /** What a replay's dynamic vision reads from the content (senses, lit items). */
+  sightContent?: () => SightContent;
 }>;
 
 export function createGameApiRouter(options: GameApiRouterOptions) {
@@ -72,23 +71,15 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   }
 
   function resolvePrincipal(req: Request, res: Response, scope: IntegrationScope): GamePrincipal | null {
-    const token = bearerToken(req);
-    if (!token) {
-      sendFailure(
-        res,
-        401,
-        "unauthenticated",
-        "A GM session, player session, or integration bearer token is required."
-      );
-      return null;
-    }
-    const gm = options.gmSession(token);
-    if (gm) return { kind: "gm", sessionId: gm.sessionId };
-    const player = options.playerSession(token);
-    if (player) return { kind: "player", sessionId: player.sessionId };
-    const credential = options.verifyIntegration(token, scope);
-    if (credential) return { kind: "integration", credentialId: credential.id, name: credential.name };
-    sendFailure(res, 403, "forbidden", "The token is invalid, revoked, or missing the required scope.");
+    const caller = callerOf(req, res, options.verifiers, { scope });
+    if (caller.kind === "gm") return { kind: "gm", sessionId: caller.sessionId };
+    if (caller.kind === "player")
+      return caller.preview
+        ? { kind: "player", sessionId: caller.sessionId, preview: { characterIds: caller.preview.characterIds } }
+        : { kind: "player", sessionId: caller.sessionId };
+    if (caller.kind === "integration" && caller.inScope)
+      return { kind: "integration", credentialId: caller.id, name: caller.name };
+    refuse(res, caller, "This credential does not carry the scope this route needs.");
     return null;
   }
 
@@ -120,15 +111,11 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Game state reads ----------
 
-  router.get(expressPath(GAME_PATHS.snapshot), authorize("game:read"), (req, res) => {
+  mount(router, gameRoutes.getGameSnapshot, authorize("game:read"), (req, res) => {
     try {
-      const requested =
-        req.query.view === "player"
-          ? ("player" as const)
-          : req.query.view === "gm" || req.query.view === undefined
-            ? undefined
-            : null;
-      if (requested === null) return sendFailure(res, 400, "validation_failed", 'view must be "gm" or "player".');
+      const query = gameRoutes.getGameSnapshot.query.safeParse(req.query);
+      if (!query.success) return sendFailure(res, 400, "validation_failed", 'view must be "gm" or "player".');
+      const requested = query.data.view === "player" ? ("player" as const) : undefined;
       const projected = game.view(res.locals.principal as GamePrincipal, requested);
       const revision = (projected.game as { revision: number }).revision;
       // Weak because presence and timed-annotation expiry can change content without a revision bump.
@@ -143,7 +130,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // The reads the socket serves too (content catalogs, action availability, the combat log), from one table.
   for (const read of game.reads)
-    router.get(expressPath(read.path), authorize(read.scope), (req, res) => {
+    mount(router, read.route, authorize(readScope(read)), (req, res) => {
       try {
         const params = req.params as Record<string, string>;
         const input = read.httpInput ? read.httpInput({ params, query: req.query }) : params;
@@ -155,15 +142,18 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Generic command tunnel + catalog ----------
 
-  router.get(expressPath(GAME_PATHS.commands), authorize("system:read"), (_req, res) => {
+  mount(router, gameRoutes.listGameCommands, authorize("system:read"), (_req, res) => {
     const commands = game.commands
       .map(({ type, summary }) => ({ type, scope: GAME_COMMANDS[type].scope, summary }))
       .sort((a, b) => a.type.localeCompare(b.type));
     return sendData(res, 200, { commands });
   });
 
-  router.post(expressPath(GAME_PATHS.commands), async (req, res) => {
-    const envelope = GameCommandEnvelopeSchema.safeParse(req.body);
+  mount(router, gameRoutes.submitGameCommand, async (req, res) => {
+    // A dead credential hears so before its envelope is read; the command's own scope is checked once it is known.
+    const caller = callerOf(req, res, options.verifiers, { scope: "any" });
+    if (isUnauthenticated(caller)) return refuse(res, caller, "");
+    const envelope = gameRoutes.submitGameCommand.body.schema.safeParse(req.body);
     if (!envelope.success)
       return sendFailure(res, 400, "validation_failed", "The command envelope is malformed.", {
         issues: issuesOf(envelope.error)
@@ -202,7 +192,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
 
   // ---------- Player sessions (headless / alternate player clients) ----------
 
-  router.post(expressPath(SESSION_PATHS.player), (_req, res) => {
+  mount(router, systemRoutes.issuePlayerSession, (_req, res) => {
     const issued = options.sessions.issuePlayer();
     if (!issued) return sendFailure(res, 409, "conflict", "The host must complete GM setup before players join.");
     return sendData(res, 201, issued);
@@ -221,25 +211,28 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   }
 
   function archiveIdParam(req: Request, res: Response): number | null {
-    const raw = pathParam(req, "id");
-    const id = /^[0-9]{1,12}$/.test(raw) ? Number(raw) : NaN;
-    if (!Number.isInteger(id) || id < 1) {
-      sendFailure(res, 400, "validation_failed", "The archive id must be a positive integer.");
-      return null;
-    }
-    return id;
+    const params = encounterRoutes.EncounterArchiveIdParamsSchema.safeParse(req.params);
+    if (params.success) return params.data.id;
+    sendFailure(res, 400, "validation_failed", "The archive id must be a positive integer.");
+    return null;
   }
 
   /** Role-aware: the GM gets the stored document, a player gets the computed player replay, and an
    *  unshared archive is a 404 for a player. Never 403, which would confirm the recording exists. */
-  router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.collection), authorize("combat:read"), (_req, res) => {
+  mount(router, encounterRoutes.listEncounterArchives, authorize("combat:read"), (_req, res) => {
     const principal = res.locals.principal as GamePrincipal;
+    // A player's view of the table never names scenes, so a shared replay goes without its scene's name.
     if (!isGmGrade(principal))
-      return sendData(res, 200, { encounters: options.archives.list().filter((entry) => entry.playerVisible) });
+      return sendData(res, 200, {
+        encounters: options.archives
+          .list()
+          .filter((entry) => entry.playerVisible)
+          .map(projectPlayerArchiveSummary)
+      });
     return sendData(res, 200, { encounters: options.archives.list() });
   });
 
-  router.get(expressPath(ENCOUNTER_ARCHIVE_PATHS.byId), authorize("combat:read"), (req, res) => {
+  mount(router, encounterRoutes.getEncounterArchive, authorize("combat:read"), (req, res) => {
     const principal = res.locals.principal as GamePrincipal;
     const id = archiveIdParam(req, res);
     if (id === null) return;
@@ -254,33 +247,44 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
       } catch {
         return sendFailure(res, 404, "not_found", "No such encounter archive.");
       }
-      return sendData(res, 200, { id, document: projectPlayerReplay(id, document) });
+      return sendData(res, 200, {
+        id,
+        document: projectPlayerReplay(id, document, Date.now(), options.sightContent?.() ?? {})
+      });
     }
     const document = options.archives.get(id);
     if (document === null) return sendFailure(res, 404, "not_found", "No such encounter archive.");
-    // The stored JSON is spliced in verbatim, avoiding a parse/re-serialize of a potentially large document.
+    // The stored JSON is spliced in verbatim, which avoids a parse/re-serialize of a potentially large document.
     return res
       .type("application/json")
       .send(`{"ok":true,"apiVersion":"${API_VERSION}","data":{"id":${id},"document":${document}}}`);
   });
 
-  /** Per-replay sharing: GM-grade only, storing the GM's decision. */
-  router.post(expressPath(ENCOUNTER_ARCHIVE_PATHS.visibility), authorize("combat:write"), (req, res) => {
+  /** Per-replay sharing: GM-grade only, and stores the GM's decision. */
+  mount(router, encounterRoutes.setEncounterArchiveVisibility, authorize("combat:write"), (req, res) => {
     if (!requireGmGradePrincipal(res)) return;
     const id = archiveIdParam(req, res);
     if (id === null) return;
-    const body = (req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {}) as Record<
-      string,
-      unknown
-    >;
-    if (typeof body.playerVisible !== "boolean")
-      return sendFailure(res, 400, "validation_failed", "playerVisible must be true or false.");
-    if (!options.archives.setVisibility(id, body.playerVisible))
+    const body = encounterRoutes.setEncounterArchiveVisibility.body.schema.safeParse(req.body ?? {});
+    if (!body.success) return sendFailure(res, 400, "validation_failed", "playerVisible must be true or false.");
+    if (!options.archives.setVisibility(id, body.data.playerVisible))
       return sendFailure(res, 404, "not_found", "No such encounter archive.");
-    return sendData(res, 200, { id, playerVisible: body.playerVisible });
+    return sendData(res, 200, { id, playerVisible: body.data.playerVisible });
   });
 
-  router.delete(expressPath(ENCOUNTER_ARCHIVE_PATHS.byId), authorize("admin"), (req, res) => {
+  /** The GM's own name for a replay, which a player sees once it is shared. GM-grade only. */
+  mount(router, encounterRoutes.renameEncounterArchive, authorize("combat:write"), (req, res) => {
+    if (!requireGmGradePrincipal(res)) return;
+    const id = archiveIdParam(req, res);
+    if (id === null) return;
+    const body = encounterRoutes.renameEncounterArchive.body.schema.safeParse(req.body);
+    if (!body.success) return sendFailure(res, 400, "validation_failed", "A replay's name is up to 80 characters.");
+    const name = body.data.name === null || body.data.name === "" ? null : body.data.name;
+    if (!options.archives.rename(id, name)) return sendFailure(res, 404, "not_found", "No such encounter archive.");
+    return sendData(res, 200, { id, name });
+  });
+
+  mount(router, encounterRoutes.deleteEncounterArchive, authorize("admin"), (req, res) => {
     if (!requireGmGradePrincipal(res)) return;
     const id = archiveIdParam(req, res);
     if (id === null) return;

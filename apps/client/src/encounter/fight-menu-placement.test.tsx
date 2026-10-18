@@ -42,7 +42,7 @@ describe("the fight menu opens where there is room", () => {
   });
 
   it("flips up on a landscape phone, where below is nothing", () => {
-    // 844x390 with the turn row pinned to the dock scroller's top: the trigger sits at 326-370, leaving
+    // 844x390 with the turn row pinned to the dock scroller's top: the trigger sits at 326-370, which leaves
     // 6px under it and 312 over it.
     const box = placeFightMenu(trigger(326), NATURAL, { width: 844, height: 390 });
     expect(box.top).toBe("auto");

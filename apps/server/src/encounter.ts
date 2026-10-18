@@ -240,7 +240,7 @@ export function startEncounter(
     actorIds.add(entry.actorId);
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!actor) throw new CommandRejectedError("One of the selected combatants no longer exists.");
-    // An archived character is out of play; enforced here, not just by the picker.
+    // An archived character is out of play; enforced here as well as by the picker.
     assertNotArchived(state, entry.actorId);
     actor.lastUsedAt = now; // recency for the scene-setup "Recent" list (GM-only)
     const tieBreaker = actor.initiative ?? 0;
@@ -306,7 +306,7 @@ export function startEncounter(
 
 /**
  * The GM takes a combatant out of a running fight (it fled, was dismissed, or lies dead and is in the way): its
- * initiative entry, token and prompts go, and what it sustains ends - its grapples and Concentration, what lasts only
+ * initiative entry, token and prompts go, and what it sustains ends: its grapples and Concentration, what lasts only
  * until its next turn, and a creature it swallowed climbs out. The caller advances the turn first when it is this
  * combatant's (so the history records the boundary).
  */
@@ -320,7 +320,7 @@ export function removeCombatant(
   if (!actor || !state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("That combatant is not in this encounter.");
   if (state.combat.initiative.length === 1)
-    throw new CommandRejectedError("It is the last combatant - end the encounter instead.");
+    throw new CommandRejectedError("It is the last one in the fight. End the fight to take it out.");
   if (state.combat.turnActorId === actorId)
     throw new CommandRejectedError("Advance past its turn before taking it out of the fight.");
   const events: EffectNarration[] = [
@@ -521,8 +521,8 @@ export function rollSelfInitiative(
   return roll.total;
 }
 
-/** The GM settles every pending player roll, beginning a wait-mode fight. The provisional rolls made at the
- *  start already followed the rules and are in the feed, so they stand rather than being rolled again. */
+/** The GM settles every pending player roll, and a wait-mode fight begins. The provisional rolls made at the
+ *  start already followed the rules and are in the feed, so they stand and are never rolled again. */
 export function rollRemainingInitiative(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("Start an encounter before rolling Initiative.");
   if (state.combat.pendingInitiative.length === 0) return;
@@ -618,6 +618,18 @@ function legendaryRefilled(used: GameState["combat"]["legendaryUsed"], actorId: 
   return Object.fromEntries(Object.entries(used).filter(([key]) => key !== actorId && !key.startsWith(`${actorId}:`)));
 }
 
+/** A creature out of the fight for good: a monster or NPC at 0 HP. A character at 0 HP is dying and keeps its turns
+ *  for its death saves, and a creature whose turn decides whether it rises again (a troll's Regeneration) keeps its. */
+export function isDefeated(state: GameState, actorId: string): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  return (
+    actor !== undefined &&
+    actor.kind !== "player-character" &&
+    actor.hp.current <= 0 &&
+    !actor.effects.some((effect) => effect.tags.includes("regenerating-at-zero"))
+  );
+}
+
 /** The spell areas' deps from a turn change's, when it has dice and ids to act with. */
 function zoneDepsOf(deps: TurnAdvanceDeps | undefined): ZoneDeps | null {
   if (!deps?.newId) return null;
@@ -636,10 +648,16 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     throw new CommandRejectedError("Start an encounter before advancing Initiative.");
   // Wait mode holds turns until every player has rolled their initiative (or the GM rolls the rest).
   if (state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0)
-    throw new CommandRejectedError("Players are still rolling initiative - roll for the rest to begin.");
+    throw new CommandRejectedError("Players are still rolling initiative. Roll for the rest to begin.");
   const currentIndex = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
-  const wraps = currentIndex === state.combat.initiative.length - 1;
+  // A defeated creature takes no more turns: the order passes over it to the next one still in the fight.
+  const length = state.combat.initiative.length;
+  let steps = 1;
+  while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
+    steps += 1;
+  if (steps === length) steps = 1;
+  const wraps = currentIndex + steps >= length;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
@@ -653,9 +671,11 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
   events?.push(...ending);
-  // A new round sorts the whole order again, settling any mid-round score change.
+  // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
-  const nextActorId = order[wraps ? 0 : currentIndex + 1].actorId;
+  const nextActorId = wraps
+    ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
+    : order[currentIndex + steps].actorId;
   state.combat = {
     ...state.combat,
     initiative: order,

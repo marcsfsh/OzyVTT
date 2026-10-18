@@ -88,7 +88,7 @@ describe("a player's item actions in the fight", () => {
       />
     );
     expect(screen.queryByRole("button", { name: /Draw a Card/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /Drink Potion of Healing/ }).textContent).toContain("Heals 2d4 + 2");
+    expect(screen.getByRole("button", { name: /Drink Potion of Healing/ }).textContent).toContain("Regain 2d4 + 2 HP");
 
     const user = userEvent.setup();
     // Nothing to aim: it resolves on the tap.
@@ -140,7 +140,7 @@ describe("whom a player's own touch can pick", () => {
     await user.click(screen.getByRole("button", { name: /Lesser Restoration/ }));
     const picker = screen.getByRole("group", { name: "Targets for Lesser Restoration" });
     expect(within(picker).getByRole("radio", { name: "Aria" })).toBeTruthy();
-    await user.click(within(picker).getByRole("button", { name: "Back" }));
+    await user.click(within(picker).getByRole("button", { name: "Cancel" }));
     await user.click(screen.getByRole("button", { name: /Dart/ }));
     const aim = screen.getByRole("group", { name: "Targets for Dart" });
     expect(within(aim).queryByRole("radio", { name: "Aria" })).toBeNull();

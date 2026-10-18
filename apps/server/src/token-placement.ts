@@ -171,7 +171,7 @@ export function moveSceneToken(
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId)
-    throw new CommandRejectedError("This scene is live - move its tokens on the encounter map instead.");
+    throw new CommandRejectedError("This scene is live. Move its tokens on the fight's map.");
   const token = scene.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token) throw new CommandRejectedError("That combatant is not staged in this scene.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))
@@ -202,7 +202,9 @@ export function moveEncounterToken(
   position: EncounterTokenPosition | null,
   geometry: TokenMapGeometry
 ) {
-  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before moving tokens.");
+  // A live scene's tokens can be placed before its fight starts (they wait in the tray until then).
+  if (!state.combat.active && !state.combat.mapAssetId)
+    throw new CommandRejectedError("Make a scene live before moving tokens.");
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!token) throw new CommandRejectedError("That combatant does not have a token in this encounter.");
   if (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))

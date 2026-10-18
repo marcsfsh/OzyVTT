@@ -1,4 +1,4 @@
-import { DEFAULT_RULE_EXCEPTIONS, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
+import { DEFAULT_RULE_EXCEPTIONS, EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
@@ -12,7 +12,7 @@ const MAX_SCENES = 20;
 // Go-live refusals, exported because `replay-launch.ts` pre-checks the room refusal. The Replays tab
 // routes both by their codes.
 export const SCENE_ROOM_REFUSAL =
-  "Remove a prepared scene first - launching needs room to park the table and stage the replay.";
+  "Remove a prepared scene first. Launching needs room to park the table and stage the replay.";
 export const HISTORY_REVIEW_REFUSAL = "Finish reviewing the combat history before switching scenes.";
 
 /** A parked scene's combat is the live top-level combat minus the map and scene bookkeeping. */
@@ -36,6 +36,7 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     legendaryUsed: combat.legendaryUsed,
     fog: combat.fog,
     terrain: combat.terrain,
+    vision: combat.vision,
     pendingSaves: combat.pendingSaves,
     pendingReactions: combat.pendingReactions,
     pendingDamage: combat.pendingDamage,
@@ -72,6 +73,7 @@ function emptySceneCombat(): SceneCombat {
     legendaryUsed: {},
     fog: { enabled: false, shapes: [] },
     terrain: { difficult: [] },
+    vision: { ...EMPTY_SCENE_VISION },
     pendingSaves: [],
     pendingReactions: [],
     pendingDamage: [],
@@ -99,7 +101,7 @@ function buildSceneCombat(state: GameState, combatantIds: readonly string[], geo
     }),
     geometry
   );
-  // A newly prepared scene inherits the table's current policy settings rather than resetting to defaults.
+  // A newly prepared scene inherits the table's current policy settings.
   return {
     ...emptySceneCombat(),
     rulesMode: state.combat.rulesMode,
@@ -134,7 +136,9 @@ export function createScene(
     id: input.sceneId,
     name: input.name,
     mapAssetId: input.mapAssetId,
-    combat: buildSceneCombat(state, input.combatantIds, geometry)
+    combat: buildSceneCombat(state, input.combatantIds, geometry),
+    createdAt: now,
+    updatedAt: now
   };
   stampStagingRecency(state, input.combatantIds, now);
   state.combat = { ...state.combat, scenes: [...state.combat.scenes, scene] };
@@ -180,7 +184,7 @@ export function setSceneCombatants(
   const scene = state.combat.scenes.find((candidate) => candidate.id === sceneId);
   if (!scene) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId)
-    throw new CommandRejectedError("This scene is live - change its combatants from the encounter instead.");
+    throw new CommandRejectedError("This scene is live. Change who is in it from the fight.");
   // Preserve where already-staged combatants stand so adding/removing one doesn't reset the layout.
   const placed = new Map(scene.combat.tokens.map((token) => [token.actorId, token.position]));
   const combat = buildSceneCombat(state, combatantIds, geometry);
@@ -198,7 +202,12 @@ export function setSceneCombatants(
 }
 
 /** Duplicates a scene as a parked copy; duplicating the live scene snapshots the top-level combat. */
-export function duplicateScene(state: GameState, sourceSceneId: string, newSceneId: string): Scene {
+export function duplicateScene(
+  state: GameState,
+  sourceSceneId: string,
+  newSceneId: string,
+  now: number = Date.now()
+): Scene {
   if (state.combat.scenes.length >= MAX_SCENES)
     throw new CommandRejectedError(`You can prepare up to ${MAX_SCENES} scenes.`);
   const sourceIndex = state.combat.scenes.findIndex((scene) => scene.id === sourceSceneId);
@@ -210,7 +219,7 @@ export function duplicateScene(state: GameState, sourceSceneId: string, newScene
     state.combat.activeSceneId === sourceSceneId ? snapshotSceneCombat(state.combat) : structuredClone(source.combat);
   const suffix = " (copy)";
   const name = `${source.name.length + suffix.length > 120 ? source.name.slice(0, 120 - suffix.length) : source.name}${suffix}`;
-  const copy: Scene = { id: newSceneId, name, mapAssetId: source.mapAssetId, combat };
+  const copy: Scene = { id: newSceneId, name, mapAssetId: source.mapAssetId, combat, createdAt: now, updatedAt: now };
   const scenes = [...state.combat.scenes];
   scenes.splice(sourceIndex + 1, 0, copy);
   state.combat = { ...state.combat, scenes };
@@ -230,7 +239,7 @@ export function reorderScenes(state: GameState, order: readonly string[]) {
 
 /** Park-and-resume: parks the live combat into its slot (or an implicit scene), then resumes the target
  *  and empties its slot. */
-export function activateScene(state: GameState, sceneId: string, implicitSceneId: string) {
+export function activateScene(state: GameState, sceneId: string, implicitSceneId: string, now: number = Date.now()) {
   const target = state.combat.scenes.find((scene) => scene.id === sceneId);
   if (!target) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("That scene is already live.");
@@ -254,13 +263,17 @@ export function activateScene(state: GameState, sceneId: string, implicitSceneId
         id: implicitSceneId,
         name: "Current encounter",
         mapAssetId: state.combat.mapAssetId,
-        combat: snapshotSceneCombat(state.combat)
+        combat: snapshotSceneCombat(state.combat),
+        createdAt: now,
+        updatedAt: now
       }
     ];
   }
   // Read the target's stored combat before blanking its slot.
   const resumed = target.combat;
-  scenes = scenes.map((scene) => (scene.id === sceneId ? { ...scene, combat: emptySceneCombat() } : scene));
+  scenes = scenes.map((scene) =>
+    scene.id === sceneId ? { ...scene, combat: emptySceneCombat(), liveAt: now } : scene
+  );
   // SceneCombat has no timeline fields; set them so the resumed combat starts live.
   state.combat = {
     ...resumed,
@@ -287,7 +300,7 @@ export function sceneHeadroom(state: GameState): number {
   return MAX_SCENES - state.combat.scenes.length;
 }
 
-/** `activateScene` with the target created rather than resumed; used for replay launch. */
+/** `activateScene` for a target it creates fresh; used for replay launch. */
 export function activateNewScene(
   state: GameState,
   input: Readonly<{
@@ -297,7 +310,8 @@ export function activateNewScene(
     combat: SceneCombat;
     replayOf?: Scene["replayOf"];
   }>,
-  implicitSceneId: string
+  implicitSceneId: string,
+  now: number = Date.now()
 ): Scene {
   if (state.combat.historyCursor !== null) throw new CommandRejectedError(HISTORY_REVIEW_REFUSAL, "history_review");
   if (state.combat.scenes.some((scene) => scene.id === input.sceneId))
@@ -320,7 +334,9 @@ export function activateNewScene(
         id: implicitSceneId,
         name: "Current encounter",
         mapAssetId: state.combat.mapAssetId,
-        combat: snapshotSceneCombat(state.combat)
+        combat: snapshotSceneCombat(state.combat),
+        createdAt: now,
+        updatedAt: now
       }
     ];
   }
@@ -330,6 +346,9 @@ export function activateNewScene(
     name: input.name,
     mapAssetId: input.mapAssetId ?? state.combat.mapAssetId ?? "",
     combat: emptySceneCombat(),
+    createdAt: now,
+    updatedAt: now,
+    liveAt: now,
     ...(input.replayOf ? { replayOf: input.replayOf } : {})
   };
   state.combat = {
@@ -343,4 +362,28 @@ export function activateNewScene(
   // Launching a replay from a replay ends the first one, so repeated launches don't hit the scene cap.
   if (departingId !== null) dropReplayScene(state, departingId);
   return scene;
+}
+
+/** A scene's record without its own stamps, to tell whether a command changed it. */
+function sceneContent(scene: Scene): string {
+  const { createdAt: _created, updatedAt: _updated, liveAt: _live, ...content } = scene;
+  return JSON.stringify(content);
+}
+
+/**
+ * Stamps `updatedAt` on every scene a command changed, whichever command it was: a rename, its creatures, a token
+ * moved on it, its fog, terrain, walls or lights, or a fight parked into it. The scene that went live in this command
+ * only had its slot emptied, which its `liveAt` already records.
+ */
+export function stampSceneChanges(state: GameState, before: GameState, now: number = Date.now()) {
+  const previous = new Map(before.combat.scenes.map((scene) => [scene.id, scene]));
+  const wentLive = state.combat.activeSceneId !== before.combat.activeSceneId ? state.combat.activeSceneId : null;
+  let changed = false;
+  const scenes = state.combat.scenes.map((scene) => {
+    const earlier = previous.get(scene.id);
+    if (!earlier || scene.id === wentLive || sceneContent(scene) === sceneContent(earlier)) return scene;
+    changed = true;
+    return { ...scene, updatedAt: now };
+  });
+  if (changed) state.combat = { ...state.combat, scenes };
 }

@@ -95,7 +95,7 @@ describe("player-submitted PDF imports (GM approval queue)", () => {
     expect(game.actors).toHaveLength(0);
   });
 
-  it("keeps the pending queue GM-only — never in the player projection", () => {
+  it("keeps the pending queue GM-only and out of the player projection", () => {
     const game = state();
     submitPendingImport(game, DEFINITION, "imp-1", IDS.session);
     const playerView = projectPlayerView(game, IDS.session, () => null);

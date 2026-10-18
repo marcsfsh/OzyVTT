@@ -192,8 +192,8 @@ const resolve = (
     deps(faces, definition, distanceFeet)
   );
 
-describe("report test 1 - Rage and Frenzy on round 1", () => {
-  it("blocks Frenzy without an active Rage, offers the legal path, and blocks a second bonus action", () => {
+describe("report test 1: Rage and Frenzy on round 1", () => {
+  it("blocks Frenzy without an active Rage, offers the legal path, and blocks a second Bonus Action", () => {
     const game = buildGame();
     // Frenzy with no Rage is refused.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])).toThrow(
@@ -203,7 +203,7 @@ describe("report test 1 - Rage and Frenzy on round 1", () => {
       /requires an active Raging effect/
     );
 
-    // The legal path: Rage as the bonus action grants the effect and spends a use.
+    // The legal path: Rage as the Bonus Action grants the effect and spends a use.
     const rage = resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
     expect(rage.effectGranted).toEqual({ name: "Rage", tags: ["raging"] });
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
@@ -211,9 +211,9 @@ describe("report test 1 - Rage and Frenzy on round 1", () => {
     expect(torva.actionUses.rage).toBe(1);
     expect(game.combat.turn.bonusActionUsed).toBe(true);
 
-    // Frenzy now satisfies its Rage requirement but the bonus action is spent, so strict mode rejects it.
+    // Frenzy now satisfies its Rage requirement but the Bonus Action is spent, so strict mode rejects it.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])).toThrow(
-      /already used a bonus action/
+      /already used a Bonus Action/
     );
     try {
       resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, []);
@@ -230,7 +230,7 @@ describe("report test 1 - Rage and Frenzy on round 1", () => {
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
     torva.actionUses = { rage: 4 };
     expect(() => resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, [])).toThrow(
-      /no uses remaining \(4\/long rest\)/
+      /no uses remaining \(4\/Long Rest\)/
     );
   });
 
@@ -245,7 +245,7 @@ describe("report test 1 - Rage and Frenzy on round 1", () => {
   });
 });
 
-describe("report test 2 - Extra Attack", () => {
+describe("report test 2: Extra Attack", () => {
   it("gives the Attack action two attacks consuming one action slot, then blocks a third", () => {
     const game = buildGame();
     const first = resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6]);
@@ -253,7 +253,7 @@ describe("report test 2 - Extra Attack", () => {
     expect(game.combat.turn.actionUsed).toBe(true);
     expect(first.componentsRemaining).toEqual({ attack: 1 });
 
-    // Attack 2 of 2 may even switch weapons (SRD Extra Attack) - the pool is generic.
+    // Attack 2 of 2 may even switch weapons (SRD Extra Attack): the pool is generic.
     const second = resolve(
       game,
       torvaDefinition,
@@ -298,7 +298,7 @@ describe("report test 2 - Extra Attack", () => {
   });
 });
 
-describe("report test 3 - Reckless Attack", () => {
+describe("report test 3: Reckless Attack", () => {
   it("grants advantage on Torva's attacks this turn and advantage to attacks against her until her next turn", () => {
     const game = buildGame([
       { actorId: IDS.torva, score: 16 },
@@ -338,7 +338,7 @@ describe("report test 3 - Reckless Attack", () => {
   });
 });
 
-describe("report test 4 - Rage damage and resistance", () => {
+describe("report test 4: Rage damage and resistance", () => {
   it("adds +2 rage damage as an explainable bonus line", () => {
     const game = buildGame();
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
@@ -365,7 +365,7 @@ describe("report test 4 - Rage damage and resistance", () => {
   });
 });
 
-describe("report test 5 - critical hits and Savage Attacks", () => {
+describe("report test 5: critical hits and Savage Attacks", () => {
   it("doubles the dice and adds exactly one declared bonus weapon die on a natural 20", () => {
     const game = buildGame();
     const crit = resolve(
@@ -380,7 +380,7 @@ describe("report test 5 - critical hits and Savage Attacks", () => {
   });
 });
 
-describe("report test 6 (partial) - Sneak Attack once per turn", () => {
+describe("report test 6 (partial): Sneak Attack once per turn", () => {
   it("spends the shared per-turn pool and refreshes it on the next turn", () => {
     const game = buildGame([
       { actorId: IDS.pip, score: 12 },
@@ -403,7 +403,7 @@ describe("report test 6 (partial) - Sneak Attack once per turn", () => {
   });
 });
 
-describe("report test 8 - crocodile Multiattack, grapple riders, and target rules", () => {
+describe("report test 8: crocodile Multiattack, grapple riders, and target rules", () => {
   it("tracks one Bite + one Tail per Multiattack, applies the source-linked grapple, and forbids Tail against the held target", () => {
     const game = buildGame([
       { actorId: IDS.croc1, score: 20 },
@@ -517,7 +517,7 @@ describe("report test 8 - crocodile Multiattack, grapple riders, and target rule
   });
 });
 
-describe("report test 9 - zero HP, dying, and healing", () => {
+describe("report test 9: zero HP, dying, and healing", () => {
   it("drops a player character into the dying state instead of a bare 0", () => {
     const game = buildGame();
     const outcome = applyDamageDetailed(
@@ -683,8 +683,8 @@ describe("report test 9 - zero HP, dying, and healing", () => {
   });
 });
 
-describe("report test 12 - GM override", () => {
-  it("rejects an illegal second bonus action, then allows it with an audited override", () => {
+describe("report test 12: GM override", () => {
+  it("rejects an illegal second Bonus Action, then allows it with an audited override", () => {
     const game = buildGame();
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])).toThrow(
@@ -697,13 +697,13 @@ describe("report test 12 - GM override", () => {
       {
         actorId: IDS.torva,
         targetIds: [IDS.croc1],
-        override: { reason: "Homebrew: haste variant grants a second bonus action" }
+        override: { reason: "Homebrew: haste variant grants a second Bonus Action" }
       },
       [15, 6]
     );
     expect(overridden.overridden).toEqual({
       rule: "economy.bonus-action-used",
-      reason: "Homebrew: haste variant grants a second bonus action"
+      reason: "Homebrew: haste variant grants a second Bonus Action"
     });
     expect(overridden.attack?.outcome).toBe("hit");
   });
@@ -711,7 +711,7 @@ describe("report test 12 - GM override", () => {
   it("keeps one economy override in force for the rest of the creature's turn, then clears it next turn", () => {
     const game = buildGame();
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
-    // A second bonus action this turn is blocked until the GM overrides once.
+    // A second Bonus Action this turn is blocked until the GM overrides once.
     expect(() => resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [])).toThrow(
       RulesBlockedError
     );
@@ -723,8 +723,8 @@ describe("report test 12 - GM override", () => {
       [15, 6]
     );
     expect(game.combat.turn.rulesOverriddenFamilies).toEqual(["economy"]);
-    // A third bonus action the same turn needs no fresh override (nat-1 keeps it a harmless miss): the
-    // override is once per turn, not once per action.
+    // A third Bonus Action the same turn needs no fresh override (nat-1 keeps it a harmless miss): the
+    // override is once per turn.
     expect(() =>
       resolve(game, torvaDefinition, "frenzy", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [1, 6])
     ).not.toThrow();
@@ -749,7 +749,7 @@ describe("report test 12 - GM override", () => {
   });
 });
 
-describe("effect lifecycle - Frenzy's Exhaustion and Rage duration", () => {
+describe("effect lifecycle: Frenzy's Exhaustion and Rage duration", () => {
   it("fires Exhaustion exactly once when the Frenzied Rage ends, however it ends", () => {
     const game = buildGame();
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
@@ -783,7 +783,7 @@ describe("effect lifecycle - Frenzy's Exhaustion and Rage duration", () => {
       { actorId: IDS.croc1, score: 8 }
     ]);
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
-    // Sable is not in this fight - a parked scene's effect on her must survive the sweep.
+    // Sable is not in this fight: a parked scene's effect on her must survive the sweep.
     const sable = game.actors.find((actor) => actor.id === IDS.sable)!;
     sable.effects = [
       {
@@ -979,12 +979,12 @@ describe("prose-only Multiattack degrades strict blocking to warnings", () => {
       { actorId: IDS.croc2, targetIds: [IDS.torva], commandId: nextCommandId() },
       deps([15, 5], proseDefinition)
     );
-    expect(second.warnings).toEqual(expect.arrayContaining([expect.stringMatching(/Multiattack is prose-only/)]));
+    expect(second.warnings).toEqual(expect.arrayContaining([expect.stringMatching(/Multiattack is prose only/)]));
     expect(second.attack?.outcome).toBe("hit");
   });
 });
 
-describe("report test 2/3 supplement - Eldritch Blast beams", () => {
+describe("report test 2/3 supplement: Eldritch Blast beams", () => {
   it("gives the level-7 warlock two beams on one action, each with its own target", () => {
     const game = buildGame([
       { actorId: IDS.sable, score: 16 },
@@ -1012,7 +1012,7 @@ describe("report test 2/3 supplement - Eldritch Blast beams", () => {
   });
 });
 
-describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
+describe("reaction prompts: Uncanny Dodge (ADR-0020 amendment)", () => {
   // The crocodile bites on its own turn: an action off it is a rules block of its own.
   const crocTurn = () =>
     buildGame([
@@ -1122,7 +1122,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
     expect(game.combat.pendingReactions).toHaveLength(0);
   });
 
-  it("opportunity attack previews the swing, then confirms - the reaction is spent only on confirm (#5/#4)", () => {
+  it("opportunity attack previews the swing, then confirms: the reaction is spent only on confirm (#5/#4)", () => {
     const game = buildGame([
       { actorId: IDS.croc1, score: 20 },
       { actorId: IDS.torva, score: 8 }
@@ -1320,7 +1320,7 @@ describe("reaction prompts - Uncanny Dodge (ADR-0020 amendment)", () => {
 });
 
 describe("incapacitation gates the action economy (SRD 2024 Incapacitated)", () => {
-  it("blocks actions, bonus actions, and reactions for an incapacitated combatant, with the rule named", () => {
+  it("blocks actions, Bonus Actions, and reactions for an incapacitated combatant, with the rule named", () => {
     const game = buildGame();
     game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "unconscious" }];
     try {
@@ -1331,7 +1331,7 @@ describe("incapacitation gates the action economy (SRD 2024 Incapacitated)", () 
       expect((error as RulesBlockedError).rule).toBe("condition.incapacitated");
     }
     expect(() => resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, [])).toThrow(
-      /Unconscious and can't take actions, bonus actions, or reactions/
+      /Unconscious and can't take actions, Bonus Actions, or reactions/
     );
   });
 });
@@ -1406,7 +1406,7 @@ describe("actions and Bonus Actions belong to your own turn (SRD Actions, Ready)
     ]);
     builtin(game, "ready", { actorId: IDS.pip, note: "shoot the crocodile" }, pipDefinition);
     nextInitiativeTurn(game);
-    // Spent before the trigger came: the ready can't be taken, rather than releasing for free.
+    // Spent before the trigger came: the ready can't be taken, so nothing releases for free.
     game.combat = { ...game.combat, reactionsUsed: [IDS.pip] };
     try {
       resolve(game, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [15, 4]);
@@ -1433,7 +1433,7 @@ describe("available-actions projection (server-computed availability)", () => {
     const rageRow = before.find((row) => row.id === "rage")!;
     expect(rageRow).toMatchObject({ available: true, usesRemaining: 4 });
 
-    // Rage, then the first Greataxe swing: the report tracks the spent bonus action, the spent use,
+    // Rage, then the first Greataxe swing: the report tracks the spent Bonus Action, the spent use,
     // and the open Extra Attack instance.
     resolve(game, torvaDefinition, "rage", { actorId: IDS.torva }, []);
     resolve(game, torvaDefinition, "greataxe", { actorId: IDS.torva, targetIds: [IDS.croc1] }, [15, 6, 6]);
@@ -1454,7 +1454,7 @@ describe("available-actions projection (server-computed availability)", () => {
   });
 });
 
-describe("SRD condition modifiers - Tier A completeness (Playing the Game / conditions appendix)", () => {
+describe("SRD condition modifiers: Tier A completeness (Playing the Game / conditions appendix)", () => {
   it("frightened imposes attack disadvantage with an explainable source", () => {
     const game = buildGame();
     game.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "frightened" }];
@@ -1557,7 +1557,7 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
     );
   });
 
-  it("exhaustion level 6 is death - engine-owned for PCs and monsters (SRD Exhaustion)", () => {
+  it("exhaustion level 6 is death: engine-owned for PCs and monsters (SRD Exhaustion)", () => {
     const game = buildGame();
     const events = setCondition(game, IDS.torva, "exhaustion", true, 6, { role: "gm" });
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
@@ -1604,7 +1604,7 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
     croc.conditionImmunities = ["prone"];
     const events = setCondition(game, IDS.croc1, "prone", true, undefined, { role: "gm" });
     expect(croc.conditions.some((condition) => condition.id === "prone")).toBe(false);
-    expect(events[0].text).toMatch(/immune to Prone - not applied/);
+    expect(events[0].text).toMatch(/immune to Prone, so it isn't applied/);
   });
 
   it("a charmed creature can't target its charmer with harmful effects (SRD Charmed)", () => {
@@ -1644,7 +1644,7 @@ describe("SRD condition modifiers - Tier A completeness (Playing the Game / cond
   });
 });
 
-describe("SRD generic actions - builtin catalog (rules glossary [Action] entries)", () => {
+describe("SRD generic actions: builtin catalog (rules glossary [Action] entries)", () => {
   const resolveBuiltin = (
     game: GameState,
     actionId: string,
@@ -1847,7 +1847,7 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
       { actorId: IDS.pip, score: 12 },
       { actorId: IDS.croc1, score: 8 }
     ]);
-    // Torva grapples Pip (small - within one size): DC 8 + 4 + 3 = 15; Pip's better save is Dex (+7).
+    // Torva grapples Pip (small, within one size): DC 8 + 4 + 3 = 15; Pip's better save is Dex (+7).
     const grapple = resolveBuiltin(
       game,
       "unarmed-grapple",
@@ -1897,7 +1897,7 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
     expect(escape.check).toMatchObject({ dc: 15, success: true });
     expect(pip.conditions.some((condition) => condition.id === "grappled")).toBe(false);
 
-    // Re-grapple on Torva's turn, then stun the grappler: SRD Grappling - an incapacitated grappler releases.
+    // Re-grapple on Torva's turn, then stun the grappler (SRD Grappling: an incapacitated grappler releases).
     game.combat = {
       ...game.combat,
       turnActorId: IDS.torva,
@@ -1954,7 +1954,7 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
       pipDefinition
     );
     expect(ready.effectGranted?.name).toBe("Readied: shoot the first crocodile that surfaces");
-    nextInitiativeTurn(game); // croc's turn - Pip acts off-turn, releasing the ready.
+    nextInitiativeTurn(game); // croc's turn: Pip acts off-turn and releases the ready.
     const release = resolve(game, pipDefinition, "shortbow", { actorId: IDS.pip, targetIds: [IDS.croc1] }, [15, 4]);
     expect(release.effectsEnded?.some((ended) => ended.name.startsWith("Readied:"))).toBe(true);
     expect(game.combat.reactionsUsed).toContain(IDS.pip);
@@ -1988,7 +1988,7 @@ describe("SRD generic actions - builtin catalog (rules glossary [Action] entries
   });
 });
 
-describe("movement rules - speed budget and opportunity attacks (SRD Movement and Position)", () => {
+describe("movement rules: speed budget and opportunity attacks (SRD Movement and Position)", () => {
   // Feet-space positions with a straight Euclidean distance stand in for the calibrated map.
   const feet = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(b.x - a.x, b.y - a.y);
   const place = (game: GameState, actorId: string, x: number, y: number) => {
@@ -2030,7 +2030,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
       expect((error as RulesBlockedError).rule).toBe("movement.exceeds-speed");
       expect((error as RulesBlockedError).message).toMatch(/10 ft of movement left/);
     }
-    // The GM override allows and still accumulates; assisted mode warns instead of blocking.
+    // The GM override allows and still accumulates; assisted mode warns and lets it through.
     const overridden = moveRules(
       game,
       IDS.torva,
@@ -2077,7 +2077,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
   });
 
   it("off-turn moves never accumulate or block (GM repositioning stays free)", () => {
-    const game = buildGame(); // Torva's turn - move Pip
+    const game = buildGame(); // Torva's turn: move Pip
     const outcome = moveRules(game, IDS.pip, { x: 0, y: 0 }, { x: 500, y: 0 });
     expect(outcome.warning).toBeNull();
     expect(game.combat.turn.movementUsedFeet).toBe(0);
@@ -2200,7 +2200,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     const game = buildGame();
     place(game, IDS.croc1, 0, 0);
     place(game, IDS.torva, 5, 0);
-    moveRules(game, IDS.torva, { x: 5, y: 0 }, { x: 45, y: 0 }); // 40 ft - well past the 10 ft reach
+    moveRules(game, IDS.torva, { x: 5, y: 0 }, { x: 45, y: 0 }); // 40 ft, well past the 10 ft reach
     const outcome = answerReaction(
       game,
       nextCommandId(),
@@ -2300,7 +2300,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 })).toThrow(
       "Torva Grimtusk has 30 ft of movement left (this move needs 45 ft)."
     );
-    // The budget moved, not just the sentence: 35 ft was legal at 40 and is refused at 30.
+    // The budget moved along with the sentence: 35 ft was legal at 40 and is refused at 30.
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 35, y: 0 })).toThrow(
       "Torva Grimtusk has 30 ft of movement left (this move needs 35 ft)."
     );
@@ -2309,7 +2309,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(() => moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 45, y: 0 })).toThrow(
       "Torva Grimtusk has 40 ft of movement left (this move needs 45 ft)."
     );
-    // ...and the move the effect forbade now goes through, spending the feet it costs.
+    // ...and the move the effect forbade now goes through and spends the feet it costs.
     expect(moveRules(game, IDS.torva, { x: 0, y: 0 }, { x: 35, y: 0 }).warning).toBeNull();
     expect(game.combat.turn.movementUsedFeet).toBe(35);
   });
@@ -2396,7 +2396,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
       "Sable Vex has 0 ft of movement left (this move needs 5 ft)."
     );
 
-    // The grant is a quantity recorded when the action was taken, not a multiplier re-read later. Asserted
+    // The grant is a quantity fixed when the action was taken. Asserted
     // last so the refusals above are what a regression hits first.
     expect(
       game.actors.find((actor) => actor.id === IDS.sable)!.effects.find((effect) => effect.tags.includes("dashing"))!
@@ -2442,7 +2442,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     expect(moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 40, y: 0 }).warning).toBeNull();
   });
 
-  it("exhaustion cannot eat a speed BONUS - the reduction stops at 0 where it applies", () => {
+  it("exhaustion cannot eat a speed BONUS: the reduction stops at 0 where it applies", () => {
     const game = buildGame([
       { actorId: IDS.sable, score: 20 },
       { actorId: IDS.croc1, score: 8 }
@@ -2451,7 +2451,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     sable.speedFeet = 20;
     sable.conditions = [{ id: "exhaustion", level: 5 }];
     addEffect(game, IDS.sable, speedEffect("longstrider", 10, "longstrider"));
-    // 20 - 25 stops at 0, and the +10 then reads 10, not 5.
+    // 20 - 25 stops at 0, and the +10 then reads 10.
     expect(() => moveRules(game, IDS.sable, { x: 0, y: 0 }, { x: 15, y: 0 })).toThrow(
       "Sable Vex has 10 ft of movement left (this move needs 15 ft)."
     );
@@ -2527,7 +2527,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     addEffect(buried, IDS.torva, speedEffect("web-1", -30, "web"));
     addEffect(buried, IDS.torva, speedEffect("web-2", -30, "web-2"));
     expect(() => moveRules(buried, IDS.torva, { x: 0, y: 0 }, { x: 5, y: 0 })).toThrow(
-      "Torva Grimtusk can't move - its Speed is 0."
+      "Torva Grimtusk can't move while its Speed is 0."
     );
 
     // Grappled is "your Speed is 0 and can't increase"; the early return is the second clause.
@@ -2535,7 +2535,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     held.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "grappled" }];
     addEffect(held, IDS.torva, speedEffect("haste-1", 20, "haste"));
     expect(() => moveRules(held, IDS.torva, { x: 0, y: 0 }, { x: 5, y: 0 })).toThrow(
-      "Torva Grimtusk can't move - its Speed is 0."
+      "Torva Grimtusk can't move while its Speed is 0."
     );
   });
 
@@ -2558,13 +2558,13 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     torva.conditions = [{ id: "prone" }];
     game.combat = { ...game.combat, turn: { ...game.combat.turn, movementUsedFeet: 25 } }; // 15 left of 40
     expect(() => setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" })).toThrow(
-      "Standing up costs 20 ft of movement - Torva Grimtusk has 15 ft left."
+      "Standing up costs 20 ft of movement, and Torva Grimtusk has 15 ft left."
     );
 
     addEffect(game, IDS.torva, speedEffect("slow-1", -10, "slow"));
     // Speed 30 now: half of it is 15, and 25 of that 30 is already spent.
     expect(() => setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" })).toThrow(
-      "Standing up costs 15 ft of movement - Torva Grimtusk has 5 ft left."
+      "Standing up costs 15 ft of movement, and Torva Grimtusk has 5 ft left."
     );
 
     game.combat = { ...game.combat, turn: { ...game.combat.turn, movementUsedFeet: 10 } };
@@ -2579,12 +2579,12 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     // Half of a zeroed Speed is 0, so `cost > budgetLeft` alone would have waved the stand-up through.
     torva.conditions = [{ id: "prone" }, { id: "grappled" }];
     expect(() => setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" })).toThrow(
-      "Torva Grimtusk can't stand up - its Speed is 0."
+      "Torva Grimtusk can't stand up while its Speed is 0."
     );
     expect(torva.conditions.some((condition) => condition.id === "prone")).toBe(true);
   });
 
-  it("assisted mode lets the impossible stand-up happen but SAYS SO - it never reads as a clean event", () => {
+  it("assisted mode lets the impossible stand-up happen but SAYS SO: it never reads as a clean event", () => {
     // As with `applyMovementRules`, a non-strict mode returns the refusal sentence as a warning and the
     // action still happens, so an illegal stand-up does not read as a legal one.
     const game = buildGame();
@@ -2592,15 +2592,15 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
     const torva = game.actors.find((actor) => actor.id === IDS.torva)!;
     torva.conditions = [{ id: "prone" }, { id: "grappled" }];
     const events = setCondition(game, IDS.torva, "prone", false, undefined, { role: "gm" });
-    // It happened - strict mode's refusal is untouched, and assisted mode still does not block.
+    // It happened: strict mode's refusal is untouched, and assisted mode still does not block.
     expect(torva.conditions.some((condition) => condition.id === "prone")).toBe(false);
     // ...and the feed carries the reason, in the same words and with the same label the map uses.
     expect(events.map((event) => event.text)).toEqual([
       "Torva Grimtusk stood up (0 ft of movement).",
-      "Rules note: Torva Grimtusk can't stand up - its Speed is 0."
+      "Rules note: Torva Grimtusk can't stand up while its Speed is 0."
     ]);
 
-    // The other blocked shape - a real cost against a short budget - narrates its own numbers.
+    // The other blocked shape (a real cost against a short budget) narrates its own numbers.
     const short = buildGame();
     short.combat = { ...short.combat, rulesMode: "assisted", turn: { ...short.combat.turn, movementUsedFeet: 25 } };
     short.actors.find((actor) => actor.id === IDS.torva)!.conditions = [{ id: "prone" }];
@@ -2608,7 +2608,7 @@ describe("movement rules - speed budget and opportunity attacks (SRD Movement an
       setCondition(short, IDS.torva, "prone", false, undefined, { role: "gm" }).map((event) => event.text)
     ).toEqual([
       "Torva Grimtusk stood up (20 ft of movement).",
-      "Rules note: Standing up costs 20 ft of movement - Torva Grimtusk has 15 ft left."
+      "Rules note: Standing up costs 20 ft of movement, and Torva Grimtusk has 15 ft left."
     ]);
 
     // Control: a legal stand-up says nothing extra.
@@ -2741,7 +2741,7 @@ describe("range and reach validation (SRD Making an Attack / Range)", () => {
   });
 });
 
-describe("cover - GM-adjudicated, server math (SRD Cover)", () => {
+describe("cover: GM-adjudicated, server math (SRD Cover)", () => {
   const resolveCover = (
     game: GameState,
     definition: ActorDefinition,
@@ -2770,7 +2770,7 @@ describe("cover - GM-adjudicated, server math (SRD Cover)", () => {
 
   it("half cover adds +2 AC: a 15 vs AC 14 now misses, with the bonus shown on the result", () => {
     const game = buildGame();
-    // Torva +7: face 8 → 15, a hit against the croc's bare AC 14 - but not against 16 behind half cover.
+    // Torva +7: face 8 → 15, a hit against the croc's bare AC 14, and a miss against 16 behind half cover.
     const swing = resolveCover(
       game,
       torvaDefinition,
@@ -2794,7 +2794,7 @@ describe("cover - GM-adjudicated, server math (SRD Cover)", () => {
       [4, 4, 4, 4, 4, 4, 4, 4, 4]
     );
     expect(game.combat.pendingSaves[0]).toMatchObject({ ability: "dex", dc: 15, saveBonus: 5 });
-    // Croc Dex −1: face 10 → 10 − 1 + 5 (cover) = 14, still a failure against DC 15 - but the +5 landed.
+    // Croc Dex −1: face 10 → 10 − 1 + 5 (cover) = 14, still a failure against DC 15, but the +5 landed.
     const answered = answerSave(
       game,
       nextCommandId(),
@@ -2966,7 +2966,7 @@ describe("concentration (SRD Concentration)", () => {
   });
 });
 
-describe("surprise - initiative Disadvantage (SRD 2024 Surprise)", () => {
+describe("surprise: initiative Disadvantage (SRD 2024 Surprise)", () => {
   it("a surprised combatant with no explicit score rolls two d20s and keeps the lower", () => {
     const game = GameStateSchema.parse({
       schemaVersion: 1,
@@ -3019,7 +3019,7 @@ describe("surprise - initiative Disadvantage (SRD 2024 Surprise)", () => {
   });
 });
 
-describe("rests (SRD Resting) - short rests re-arm only per-short-rest pools", () => {
+describe("rests (SRD Resting): Short Rests re-arm only per-short-rest pools", () => {
   const FIGHTER_ID = "10000000-0000-4000-8000-00000000000f";
   const withSecondWind: ActorDefinition = {
     ...pipDefinition,
@@ -3057,7 +3057,7 @@ describe("rests (SRD Resting) - short rests re-arm only per-short-rest pools", (
   const resolveDef = (game: GameState) => (definitionId: string) =>
     game.definitions.find((entry) => entry.id === definitionId)?.definition;
 
-  it("a short rest clears per-short-rest pools, leaves other pools and hit points alone", () => {
+  it("a Short Rest clears per-short-rest pools, leaves other pools and hit points alone", () => {
     const game = buildResting();
     applyRest(game, FIGHTER_ID, "short", resolveDef(game));
     const fighter = game.actors.find((actor) => actor.id === FIGHTER_ID)!;
@@ -3065,7 +3065,7 @@ describe("rests (SRD Resting) - short rests re-arm only per-short-rest pools", (
     expect(fighter.hp.current).toBe(6);
   });
 
-  it("a long rest still clears everything and restores hit points", () => {
+  it("a Long Rest still clears everything and restores hit points", () => {
     const game = buildResting();
     applyRest(game, FIGHTER_ID, "long", resolveDef(game));
     const fighter = game.actors.find((actor) => actor.id === FIGHTER_ID)!;
@@ -3079,7 +3079,7 @@ describe("rests (SRD Resting) - short rests re-arm only per-short-rest pools", (
   });
 });
 
-describe("underwater combat (SRD Underwater Combat) - GM environment toggle", () => {
+describe("underwater combat (SRD Underwater Combat): GM environment toggle", () => {
   it("melee attacks take Disadvantage unless they deal piercing damage", () => {
     const game = buildGame();
     game.combat = { ...game.combat, underwater: true };
@@ -3177,7 +3177,7 @@ describe("underwater combat (SRD Underwater Combat) - GM environment toggle", ()
 
 // SRD 5.2.1 Knocking Out a Creature: the drop to 0 becomes 1 HP and Unconscious (and so Prone) until it regains
 // any hit points; no dying, no defeat. The 2014-style "0 HP and stable" is gone.
-describe("knocking out a creature (SRD) - nonlethal damage", () => {
+describe("knocking out a creature (SRD): nonlethal damage", () => {
   it("a nonlethal drop to 0 leaves a character at 1 HP and Unconscious instead of dying", () => {
     const game = buildGame();
     const outcome = applyDamageDetailed(
@@ -3218,7 +3218,7 @@ describe("knocking out a creature (SRD) - nonlethal damage", () => {
   });
 });
 
-describe("multiattack ergonomics - no pre-selection needed (report bug 5)", () => {
+describe("multiattack ergonomics: no pre-selection needed (report bug 5)", () => {
   it("tapping Multiattack mid-instance continues the plan instead of blocking; a spent plan still rejects", () => {
     const game = buildGame([
       { actorId: IDS.croc1, score: 20 },
@@ -3232,13 +3232,13 @@ describe("multiattack ergonomics - no pre-selection needed (report bug 5)", () =
       components: { bite: 0, tail: 1 },
       parentId: "multiattack"
     });
-    // Tapping the Multiattack row now is a continue (reports the remaining plan), not an override dialog.
+    // Tapping the Multiattack row now is a continue (reports the remaining plan) with no override dialog.
     const plan = resolve(game, crocodileDefinition, "multiattack", { actorId: IDS.croc1 }, []);
     expect(plan.componentsRemaining).toEqual({ bite: 0, tail: 1 });
-    // A second Bite names what IS left instead of a dead-end message.
+    // A second Bite names what IS left.
     expect(() =>
       resolve(game, crocodileDefinition, "bite", { actorId: IDS.croc1, targetIds: [IDS.torva] }, [2, 6, 6, 6])
-    ).toThrow(/no Bite left in this action - remaining: 1× Tail/);
+    ).toThrow(/no Bite left in this action. Remaining: 1× Tail/);
     // Spend the Tail; with the plan empty, Multiattack rejects like any exhausted action.
     resolve(game, crocodileDefinition, "tail", { actorId: IDS.croc1, targetIds: [IDS.torva] }, [10, 6, 6, 6, 6]);
     expect(() => resolve(game, crocodileDefinition, "multiattack", { actorId: IDS.croc1 }, [])).toThrow(
@@ -3247,7 +3247,7 @@ describe("multiattack ergonomics - no pre-selection needed (report bug 5)", () =
   });
 });
 
-describe("creature size and distance - footprint-aware, edge-to-edge (SRD Creature Size / Space)", () => {
+describe("creature size and distance: footprint-aware, edge-to-edge (SRD Creature Size / Space)", () => {
   // 50 px cells at 5 ft, no rotation: cell centers at 25+50k, intersections at 50k.
   const CALIBRATION = {
     kind: "square" as const,
@@ -3373,7 +3373,7 @@ describe("creature size and distance - footprint-aware, edge-to-edge (SRD Creatu
       const raw = gridToImage(skewed.calibration, { column: col, row });
       return { x: round3(raw.x), y: round3(raw.y) };
     };
-    // Medium at a cell center (col 2.5), Large 2x2 centered on the adjacent intersection (col 4) - edge-to-edge 1 cell.
+    // Medium at a cell center (col 2.5), Large 2x2 centered on the adjacent intersection (col 4): edge-to-edge 1 cell.
     const mediumAt = { position: at(2.5, 3.5), sizeCells: 1, sizePx: 41 };
     const largeAt = { position: at(4, 3), sizeCells: 2, sizePx: 96 };
     expect(creatureDistance(skewed, mediumAt, largeAt)!.value).toBe(5); // not 5.0001
@@ -3604,7 +3604,7 @@ describe("recharge abilities (SRD Recharge X-Y; Foundry-parity adoption)", () =>
     expect(game.actors.find((actor) => actor.id === DRAGON)!.actionUses["cold-breath"]).toBeUndefined();
   });
 
-  it("short and long rests re-arm recharge pools out of combat", () => {
+  it("Short and Long Rests re-arm recharge pools out of combat", () => {
     for (const kind of ["short", "long"] as const) {
       const game = GameStateSchema.parse({
         schemaVersion: 1,
@@ -3759,7 +3759,7 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     expect(() =>
       resolve(game, bossDefinition, "tail-swipe", { actorId: BOSS, targetIds: [IDS.torva] }, [15, 4])
     ).toThrowError(/0 of 3 legendary actions left/);
-    // The boss's own turn starts: the pool refills - but legendary actions are off-turn only.
+    // The boss's own turn starts: the pool refills, but legendary actions are off-turn only.
     nextInitiativeTurn(game);
     expect(game.combat.legendaryUsed[BOSS]).toBeUndefined();
     expect(() =>
@@ -3810,7 +3810,7 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     // Torva forces a boss save (Dread Word: DC 14 WIS, 2d6 psychic → 3 + 4 = 7 proposed damage).
     resolve(game, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
     const saveId = game.combat.pendingSaves[0].id;
-    // Preview: d20 3 + WIS +1 = 4 < 14 - a failure about to land 7 psychic.
+    // Preview: d20 3 + WIS +1 = 4 < 14: a failure about to land 7 psychic.
     const preview = answerSave(
       game,
       nextCommandId(),
@@ -3886,7 +3886,7 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     expect(dis.outcome.rollMode?.mode).toBe("disadvantage");
   });
 
-  it("Legendary Resistance rejects when exhausted, spends nothing on a natural success, and re-arms on a long rest", () => {
+  it("Legendary Resistance rejects when exhausted, spends nothing on a natural success, and re-arms on a Long Rest", () => {
     const exhausted = buildBossGame({ "legendary-resistance": 3 });
     resolve(exhausted, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
     expect(() =>
@@ -3902,7 +3902,7 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
         true
       )
     ).toThrowError(/no Legendary Resistance left/);
-    // A natural success with the flag set spends nothing - "succeed instead" only matters on a failure.
+    // A natural success with the flag set spends nothing: "succeed instead" only matters on a failure.
     const fresh = buildBossGame();
     resolve(fresh, bossDefinition, "dread-word", { actorId: IDS.torva, targetIds: [BOSS] }, [3, 4]);
     const committed = answerSave(
@@ -3918,7 +3918,7 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
     );
     expect(committed.outcome.success).toBe(true);
     expect(fresh.actors.find((actor) => actor.id === BOSS)!.actionUses["legendary-resistance"]).toBeUndefined();
-    // Long rest re-arms the daily pool (day = long rest, out of combat).
+    // Long rest re-arms the daily pool (day = Long Rest, out of combat).
     const resting = GameStateSchema.parse({
       schemaVersion: 1,
       actors: [
@@ -4043,7 +4043,7 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
         { role: "gm" },
         (definitionId) => fighting.definitions.find((entry) => entry.id === definitionId)?.definition
       )
-    ).toThrowError(/end the encounter/i);
+    ).toThrowError(/end the fight/i);
   });
 
   function buildDiceGameInCombat(): GameState {
@@ -4064,7 +4064,7 @@ describe("hit dice (SRD Hit Point Dice; short-rest healing adoption)", () => {
     return game;
   }
 
-  it("a long rest restores all spent Hit Point Dice (SRD 5.2.1 Regain All HP)", () => {
+  it("a Long Rest restores all spent Hit Point Dice (SRD 5.2.1 Regain All HP)", () => {
     const game = buildRestingGame(2, 10);
     applyRest(game, HERO, "long", resolveTorva(game));
     // The stored save uses the single-class single-object shape; it normalizes into a one-entry pool.
@@ -4157,7 +4157,7 @@ describe("Bonus Action forms of the generic actions (SRD Cunning Action, Nimble 
     const pip = game.actors.find((actor) => actor.id === IDS.pip)!;
     expect(pip.effects.find((effect) => effect.tags.includes("dashing"))?.movementGrantFeet).toBe(25);
     // One Bonus Action a turn.
-    expect(() => take(game, pipDefinition, IDS.pip, "disengage-bonus")).toThrow(/already used a bonus action/);
+    expect(() => take(game, pipDefinition, IDS.pip, "disengage-bonus")).toThrow(/already used a Bonus Action/);
   });
 
   it("lets a goblin hit and then Disengage with Nimble Escape, so leaving reach provokes nothing", () => {
@@ -4375,7 +4375,7 @@ describe("Opportunity attacks: one melee attack with a weapon or an Unarmed Stri
   it("refuses a ranged weapon or a spell, and keeps the reaction", () => {
     const game = leaving();
     expect(() => strike(game, "shortbow", [18, 4])).toThrow(
-      /An opportunity attack is one melee attack with a weapon or an Unarmed Strike - Shortbow isn't one/
+      /An opportunity attack is one melee attack with a weapon or an Unarmed Strike, and Shortbow isn't one/
     );
     expect(game.combat.reactionsUsed).not.toContain(IDS.pip);
     expect(game.combat.pendingReactions).toHaveLength(1);
@@ -4383,7 +4383,7 @@ describe("Opportunity attacks: one melee attack with a weapon or an Unarmed Stri
 
   it("takes an Unarmed Strike, and keeps the size rule on its Grapple option", () => {
     const game = leaving();
-    // A Small halfling can't grapple a Huge crocodile: the option's own rule, not the reaction's.
+    // A Small halfling can't grapple a Huge crocodile: the option's own rule refuses it.
     expect(() => strike(game, "unarmed-grapple", [])).toThrow(/more than one size larger/);
     const punch = strike(game, "unarmed-strike", [18, 2]);
     expect(punch.used).toBe(true);

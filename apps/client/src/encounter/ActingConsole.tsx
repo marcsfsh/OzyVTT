@@ -4,7 +4,6 @@ import type { GmActor, GmView, MutationResult } from "@vtt/domain";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
 import { ActionRunner } from "./ActionRunner";
-import { DyingTracker } from "./DyingTracker";
 import "./acting-console.css";
 
 /**
@@ -16,7 +15,6 @@ export function ActingConsole({
   actorsById,
   busy,
   run,
-  rollMode,
   onFeedback
 }: Readonly<{
   state: GmView;
@@ -24,7 +22,6 @@ export function ActingConsole({
   busy: boolean;
   /** Runs a command with the panel's busy flag and reports `success` on the panel's feedback line. */
   run: (operation: () => Promise<MutationResult>, success: string) => Promise<void>;
-  rollMode: "auto" | "manual";
   onFeedback: (text: string) => void;
 }>) {
   // A legendary creature acting off-turn (SRD Legendary Actions) takes over the acting console until
@@ -85,24 +82,20 @@ export function ActingConsole({
           ))}
         </div>
       )}
-      {down &&
-        (actor.deathSaves ? (
-          <DyingTracker
-            actorId={actor.id}
-            name={actor.name}
-            deathSaves={actor.deathSaves}
-            canRoll
-            onFeedback={onFeedback}
-            rollMode={rollMode}
-            isActingTurn={state.combat.turnActorId === actor.id}
-            viewer="gm"
-          />
-        ) : (
-          <p className="acting-down-note" role="status">
-            <strong>{actor.name} is down (0 HP).</strong> Actions are disabled — click one to force it through a rules
-            override.
-          </p>
-        ))}
+      {down && (
+        <p className="acting-down-note" role="status">
+          {actor.deathSaves ? (
+            <>
+              <strong>{actor.name} is dying.</strong> The death save waits in Needs you, and actions are disabled.
+            </>
+          ) : (
+            <>
+              <strong>{actor.name} is down at 0 HP.</strong> Actions are disabled. Choose one to force it through a
+              rules override.
+            </>
+          )}
+        </p>
+      )}
       <section
         className={`acting-console${legendaryActor ? " legendary-acting" : ""}${down ? " down" : ""}`}
         aria-label={legendaryActor ? `Legendary action: ${actor.name}` : `Acting now: ${actor.name}`}
@@ -123,7 +116,8 @@ export function ActingConsole({
               ) : (
                 actor.speedFeet !== undefined && (
                   <span className="economy-movement" title="Movement spent this turn / this turn's movement">
-                    {Math.round(state.combat.turn.movementUsedFeet)}/{movement?.speedFeet ?? actor.speedFeet} ft
+                    {/* One text node: Chromium drew a lone leading "0" node invisibly here. */}
+                    {`Move ${Math.round(state.combat.turn.movementUsedFeet)}/${movement?.speedFeet ?? actor.speedFeet} ft`}
                   </span>
                 )
               )}
@@ -131,7 +125,7 @@ export function ActingConsole({
           )}
           {legendaryActor ? (
             // Off-turn legendary console: the turn economy belongs to the turn actor, so offer a spend (-1, for a
-            // legendary action run by hand) and a GM correction (+1) and a way back instead of Action/Bonus/Reaction.
+            // legendary action run by hand) and a GM correction (+1) and a way back in place of Action/Bonus/Reaction.
             <div className="acting-console-economy-row">
               <button
                 type="button"
@@ -209,7 +203,7 @@ export function ActingConsole({
                         used: !state.combat.turn.bonusActionUsed,
                         expectedRevision: state.revision
                       }),
-                    state.combat.turn.bonusActionUsed ? "Bonus action restored." : "Bonus action spent."
+                    state.combat.turn.bonusActionUsed ? "Bonus Action restored." : "Bonus Action spent."
                   )
                 }
               >

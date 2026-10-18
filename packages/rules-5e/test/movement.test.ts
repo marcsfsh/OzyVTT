@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { footprintCenter, footprintOrigin, movementPath, pointInRects, spacePassage } from "../src/movement.js";
+import {
+  footprintCenter,
+  footprintOrigin,
+  footprintStepBlocked,
+  movementPath,
+  pointInRects,
+  segmentsMeet,
+  spacePassage,
+  wallCrossing
+} from "../src/movement.js";
 
 const open = () => false;
 const cellSet = (cells: ReadonlyArray<readonly [number, number]>) => {
@@ -191,5 +200,73 @@ describe("movement over a square grid", () => {
     const rects = [{ x: 10, y: 10, width: 20, height: 20 }];
     expect(pointInRects({ x: 10, y: 30 }, rects)).toBe(true);
     expect(pointInRects({ x: 31, y: 20 }, rects)).toBe(false);
+  });
+});
+
+describe("walls in the way of a move", () => {
+  // A wall along the grid line x = 2 from row 0 to row 3. The way round below it is open.
+  const wall = { a: { column: 2, row: 0 }, b: { column: 2, row: 3 } };
+  const crosses = wallCrossing([wall]);
+  const blockedBy =
+    (sizeCells: number) => (from: { column: number; row: number }, to: { column: number; row: number }) =>
+      !footprintStepBlocked(from, to, sizeCells, crosses);
+
+  it("walks round the end of a wall", () => {
+    const path = movementPath({
+      from: { column: 0, row: 1 },
+      to: { column: 4, row: 1 },
+      sizeCells: 1,
+      isDifficult: open,
+      isStepOpen: blockedBy(1)
+    });
+    // Straight across is 4; round either end of the wall costs 5, since grazing its end is barred too.
+    expect(path?.costCells).toBe(5);
+    const steps = path?.steps ?? [];
+    for (let index = 1; index < steps.length; index++) {
+      const [from, to] = [steps[index - 1]!, steps[index]!];
+      if (from.column <= 1 && to.column >= 2) expect(to.row < 0 || to.row > 2).toBe(true);
+    }
+  });
+
+  it("is shut when walls close the way off", () => {
+    const box = wallCrossing([
+      { a: { column: 2, row: -10 }, b: { column: 2, row: 10 } },
+      { a: { column: -10, row: -10 }, b: { column: 2, row: -10 } },
+      { a: { column: -10, row: 10 }, b: { column: 2, row: 10 } },
+      { a: { column: -10, row: -10 }, b: { column: -10, row: 10 } }
+    ]);
+    const path = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: open,
+      isStepOpen: (from, to) => !footprintStepBlocked(from, to, 1, box)
+    });
+    expect(path?.blocked).toBe(true);
+  });
+
+  it("does not slip diagonally past the corner where two walls meet", () => {
+    const corner = wallCrossing([
+      { a: { column: 0, row: 1 }, b: { column: 1, row: 1 } },
+      { a: { column: 1, row: 1 }, b: { column: 1, row: 2 } }
+    ]);
+    // From cell (0,0) to (1,1) the diagonal passes through the corner point (1,1).
+    expect(footprintStepBlocked({ column: 0, row: 0 }, { column: 1, row: 1 }, 1, corner)).toBe(true);
+    // The orthogonal step from (0,0) to (1,0) crosses nothing.
+    expect(footprintStepBlocked({ column: 0, row: 0 }, { column: 1, row: 0 }, 1, corner)).toBe(false);
+  });
+
+  it("keeps a Large creature from straddling a wall", () => {
+    // A 2x2 footprint whose cells would sit either side of the wall at x = 2.
+    expect(footprintStepBlocked({ column: 0, row: 0 }, { column: 1, row: 0 }, 2, crosses)).toBe(true);
+    expect(footprintStepBlocked({ column: 0, row: 4 }, { column: 1, row: 4 }, 2, crosses)).toBe(false);
+  });
+
+  it("meets at touching ends and on overlapping lines, and not when apart", () => {
+    const p = (column: number, row: number) => ({ column, row });
+    expect(segmentsMeet(p(0, 0), p(2, 2), p(0, 2), p(2, 0))).toBe(true);
+    expect(segmentsMeet(p(0, 0), p(1, 1), p(1, 1), p(3, 0))).toBe(true);
+    expect(segmentsMeet(p(0, 0), p(2, 0), p(1, 0), p(3, 0))).toBe(true);
+    expect(segmentsMeet(p(0, 0), p(1, 0), p(0, 1), p(1, 1))).toBe(false);
   });
 });

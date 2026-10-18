@@ -1,6 +1,6 @@
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { ContentLibrary } from "../src/content-library.js";
 
 describe("bundled reference content exposed to the client", () => {
@@ -31,7 +31,7 @@ describe("bundled reference content exposed to the client", () => {
     expect(fireball?.castingOptions.find((option) => option.level === 9)).toMatchObject({ damageRoll: "14d6" });
     // Only slot-level upcasts are surfaced (cantrip character-level scaling is filtered out).
     expect(fireball?.castingOptions.every((option) => option.level >= 4 && option.level <= 9)).toBe(true);
-    // A target-scaling spell carries the count, not a new damage roll (Scorching Ray: +1 ray/level).
+    // A target-scaling spell carries the count and adds no damage roll (Scorching Ray: +1 ray/level).
     const scorchingRay = spells.find((spell) => spell.id === "scorching-ray");
     expect(scorchingRay?.castingOptions.find((option) => option.level === 3)).toEqual({
       level: 3,
@@ -70,6 +70,13 @@ describe("bundled reference content exposed to the client", () => {
       weapon: null,
       armor: null
     });
+    // Rarity and attunement say what the item's printed line says, and no mechanics travel with them.
+    const wand = equipment.find((item) => item.id === "wand-of-the-war-mage-1")!;
+    expect(wand).toMatchObject({ rarity: "uncommon", attunement: { required: true } });
+    expect(wand.description).toContain("Wand, Uncommon (Requires Attunement by a Spellcaster).");
+    for (const key of ["modifiers", "effects", "actions", "casts", "cursed", "uses", "grants"])
+      expect(wand, key).not.toHaveProperty(key);
+    expect(equipment.find((item) => item.id === "thieves-tools")).toMatchObject({ rarity: null, attunement: null });
     // The attribution line is available for any surface that renders the catalog (CC-BY requirement).
     expect(library.attribution).toContain("System Reference Document 5.2.1");
   });
@@ -86,7 +93,7 @@ describe("bundled reference content exposed to the client", () => {
     expect(fighter.levelTable[0].spellSlots).toBeNull();
     expect(fighter.levelTable[0].pactSlots).toBeNull();
     expect(fighter.levelTable[0].cantripsKnown).toBeNull();
-    // Named per-level resources travel as data - this is what grows Second Wind 2 -> 3 -> 4.
+    // Named per-level resources travel as data: this is what grows Second Wind 2 -> 3 -> 4.
     const secondWind = fighter.levelTable.find((row) =>
       row.classResources.some((resource) => resource.id === "second-wind")
     );

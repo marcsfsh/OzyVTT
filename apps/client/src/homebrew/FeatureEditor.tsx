@@ -40,6 +40,7 @@ import {
   writeChoiceAt,
   writeChoiceBlocks
 } from "./feature-fields";
+import { withArticle } from "@vtt/domain";
 
 export function FeatureEditor({
   draft,
@@ -106,7 +107,7 @@ export function FeatureEditor({
     const sorted = [...new Set(levels)].sort((a, b) => a - b);
 
     const nextFeature: Record<string, unknown> = { ...feature };
-    // `.optional()`, not `.nullable()`: omit the key rather than sending null.
+    // `.optional()` and never `.nullable()`: omit the key and never send null.
     if (sorted.length === 1) nextFeature.level = sorted[0];
     else delete nextFeature.level;
 
@@ -165,7 +166,7 @@ export function FeatureEditor({
     const putFeature = (next: Draft) =>
       writeFeatures(features.map((entry, i) => (i === index ? (next as Feature) : entry)));
 
-    /** One declared control rendered against this feature, using the field's own write. */
+    /** One declared control rendered against this feature, with the field's own write. */
     const control = (key: string) => (
       <FieldRenderer
         field={fieldFor(key)}
@@ -328,7 +329,7 @@ export function FeatureEditor({
               </FieldGrid>
               {/* Resolved through the same function the server validates with. A slug naming this
                   record cannot resolve against the merged catalog, so it gets a neutral explanation
-                  instead of an error. */}
+                  and no error. */}
               <p
                 className={
                   (!catalogSlug || (catalogResult && "error" in catalogResult)) && !selfCatalog
@@ -337,13 +338,13 @@ export function FeatureEditor({
                 }
               >
                 {selfCatalog
-                  ? "Players pick from the records that name this one. They only have to exist in your library — they don't have to be published."
+                  ? "Players pick from the records that name this one. Records in your library count, published or not."
                   : !catalogSlug
                     ? family
                       ? "Pick which one, and this will say how many options players get."
-                      : "This matches no catalog — the choice would be skipped."
+                      : "This matches no catalog, so the choice would be skipped."
                     : catalogResult && "error" in catalogResult
-                      ? `This matches no catalog — the choice would be skipped. (${catalogResult.error})`
+                      ? `This matches no catalog, so the choice would be skipped. (${catalogResult.error})`
                       : `Players will pick from ${catalogResult?.count ?? 0} ${catalogResult?.count === 1 ? "option" : "options"}.`}
               </p>
             </>
@@ -364,7 +365,7 @@ export function FeatureEditor({
               emptyText={optionsField.emptyText}
               collapsible
               ariaLabel={optionsField.label}
-              rowLabel={(option, optionIndex) => optionsField.rowLabel!(option, optionIndex)}
+              rowLabel={(option, optionIndex) => optionsField.rowLabel!(option, optionIndex, ctx)}
               renderRow={(option, optionIndex) => {
                 /** Replace the row, never merge: both callers hand over a whole option, and a merge
                     would restore keys a write deleted (e.g. clearing `requires`). */
@@ -472,7 +473,7 @@ export function FeatureEditor({
                   ? "Granted the moment this subclass is taken. Pick a level to hold it back until then."
                   : `Granted at level ${levels[0]}. Tap it again to grant it with the subclass instead.`
                 : levels.length === 0
-                  ? "On no level row, so the class never grants it — pick at least one level."
+                  ? "On no level row, so the class never grants it. Pick at least one level."
                   : levels.length === 1
                     ? `On the level table at level ${levels[0]}. A class feature is always granted at a level, so add another before clearing this one.`
                     : `On the level table at levels ${levels.join(", ")}.`}
@@ -550,7 +551,7 @@ export function FeatureEditor({
             ...(tableBacked ? { level: DEFAULT_GRANT_LEVEL } : {})
           }) as Feature
         }
-        addLabel={`Add a ${singular}`}
+        addLabel={`Add ${withArticle(singular)}`}
         emptyText={`No ${singular === "feature" ? "features" : `${singular}s`} yet.`}
         collapsible
         ariaLabel={`${singular} list`}

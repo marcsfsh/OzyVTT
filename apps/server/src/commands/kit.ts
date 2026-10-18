@@ -1,11 +1,14 @@
 import type {
   ActionResolution,
   ActionTableNarration,
+  ClaimReleasedEvent,
   CombatLogEntry,
   GameState,
   GmView,
   PlayerView,
   RollRecord,
+  SoundBoard,
+  SoundBoardView,
   TableEvent
 } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
@@ -14,28 +17,50 @@ import type { CharacterDraftStore } from "../character-drafts.js";
 import type { Initiator } from "../authorization.js";
 import type { CombatLogStore } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
-import type { ContentLibrary } from "../content-library.js";
+import type { ContentAudience, ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
 import type { InitiativeRollDeps, InitiativeRollSink, TurnAdvanceDeps } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
 import type { GameStore } from "../game-store.js";
+import type { SoundDeps } from "../sound-board.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
-import { withoutSourceName } from "../projections.js";
+import { withoutSourceName } from "../hidden-source.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { ZoneDeps } from "../spell-zones.js";
 import type { TokenMapGeometry } from "../token-placement.js";
+import { hiddenFrom, playerSight } from "../vision/audience.js";
+import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
  *  (ADR-0016); players keep player limits. The public viewer never reaches a command. */
+/** `preview` marks the GM's See as players session, which reads as the characters it names and never acts. */
 export type GamePrincipal =
   | Readonly<{ kind: "gm"; sessionId: string }>
-  | Readonly<{ kind: "player"; sessionId: string }>
+  | PlayerPrincipal
   | Readonly<{ kind: "integration"; credentialId: string; name: string }>;
+export type PlayerPrincipal = Readonly<{
+  kind: "player";
+  sessionId: string;
+  preview?: Readonly<{ characterIds: readonly string[] }>;
+}>;
 
-export function isGmGrade(
-  principal: GamePrincipal
-): principal is Exclude<GamePrincipal, Readonly<{ kind: "player"; sessionId: string }>> {
+export function isGmGrade(principal: GamePrincipal): principal is Exclude<GamePrincipal, PlayerPrincipal> {
   return principal.kind !== "player";
+}
+
+/** The party characters a player session has claimed: whose homebrew it receives beyond everyone's. */
+export function claimedCharacterIds(state: Pick<GameState, "actors">, sessionId: string): string[] {
+  return state.actors
+    .filter((actor) => actor.kind === "player-character" && actor.ownerSessionId === sessionId)
+    .map((actor) => actor.id);
+}
+
+/** Whose catalog a principal reads: the GM's, or one reader's (a preview reads as the characters it names). */
+export function contentAudienceOf(principal: GamePrincipal, state: Pick<GameState, "actors">): ContentAudience {
+  if (isGmGrade(principal)) return "gm";
+  return {
+    characterIds: principal.preview ? principal.preview.characterIds : claimedCharacterIds(state, principal.sessionId)
+  };
 }
 
 /** The principal as authorization reads it: GM-grade acts on anyone, a player on their own claimed actor. */
@@ -68,7 +93,7 @@ export function gmGradeLabelOf(principal: GamePrincipal): string {
 /** What the commands need from the server around them. */
 export type CommandContext = Readonly<{
   store: GameStore;
-  /** The committed state for reads: frozen, and cloned once per revision rather than per read. */
+  /** The committed state for reads: frozen, and cloned once per revision, however many reads there are. */
   readState: () => GameState;
   combatLog: Pick<CombatLogStore, "list" | "exportSince">;
   contentLibrary: ContentLibrary;
@@ -84,7 +109,8 @@ export type CommandContext = Readonly<{
   publishGameState: (state: GameState) => Promise<void>;
   /** Presents a newly-live scene's map on the shared screen; best-effort, a viewer failure must not undo the switch. */
   presentSceneMap: (mapAssetId: string) => Promise<void>;
-  /** Fires a transient toast, also written to the feed unless `logged: false` (a richer row is written). */
+  /** Fires a transient toast, also written to the feed unless `logged: false` (a richer row is written). A
+   *  `playersOnly` toast skips the GM's devices: it tells the players what the GM just did. */
   broadcastTableEvent: (
     event: Readonly<{
       kind: TableEvent["kind"];
@@ -92,6 +118,7 @@ export type CommandContext = Readonly<{
       actorIds?: readonly string[];
       gmOnly?: boolean;
       logged?: boolean;
+      playersOnly?: boolean;
     }>
   ) => void;
   /** Appends a feed line; `actorId` attributes it, and a `roll` row's own visibility decides who receives it. */
@@ -117,8 +144,27 @@ export type CommandContext = Readonly<{
   onEncounterArchived?: (
     info: Readonly<{ mapAssetId: string | null; sceneId: string | null; turnCount: number }>
   ) => void;
+  /** Best-effort hook after game time passed (a rest, or Pass time), so the Codex calendar's date moves with it.
+   *  Must swallow its own errors. */
+  onTimePassed?: (info: Readonly<{ fromHours: number; toHours: number }>) => void;
   /** Reads one stored archive document (raw JSON) for `replay.launch`; without it replays can't launch. */
   archiveDocument?: (id: number) => string | null;
+  /** The sound board, kept in its own store (ADR-0024); without it the sound commands refuse. */
+  sound?: SoundPort;
+  /** Tells the player whose character the GM released, on that player's devices alone. */
+  claimReleased?: (sessionId: string, event: ClaimReleasedEvent) => void;
+}>;
+
+/** What the sound commands need from the sound board service (`sound-service.ts`). */
+export type SoundPort = Readonly<{
+  run: (
+    commandId: string,
+    change: (board: SoundBoard, deps: SoundDeps) => void
+  ) => Promise<Readonly<{ soundRevision: number; duplicate: boolean }>>;
+  durationOf: (assetId: string) => number | null;
+  view: () => SoundBoardView;
+  /** Starts a scene's saved sound when it goes live, unless the GM turned that off. Best-effort. */
+  sceneWentLive: (sceneId: string, sourceRevision: number) => Promise<void>;
 }>;
 
 export type Kit = ReturnType<typeof createKit>;
@@ -128,8 +174,28 @@ export function createKit(context: CommandContext) {
   const { store, contentLibrary } = context;
   const read = context.readState;
   const actorName = (actorId: string) => read().actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
-  const actorHidden = (actorId: string) =>
-    read().actors.find((actor) => actor.id === actorId)?.visibility === "gm-only";
+  /** Play-time content: what is already on a sheet or the map resolves whatever its pack's switch says. */
+  const playCatalog = () => contentLibrary.forAudience("play");
+  /** What dynamic vision reads from the content: stat blocks, and the catalog with species senses and lit items. */
+  const sightContent = (): SightContent => ({
+    definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
+    catalog: equipmentCatalogOf(playCatalog())
+  });
+  /** The creatures hidden from this initiator by sight or the fog, which it may not target; none for the GM. */
+  const unseenBy = (initiator: Initiator, state: GameState): ReadonlySet<string> =>
+    initiator.role === "gm" ? new Set() : playerSight(state, initiator.sessionId, sightContent()).hidden;
+  /** The shared hidden check (`hiddenFrom`) as the table sees `state`, which every public line and die follows. */
+  const hiddenFromTable = (state: GameState) => hiddenFrom(state, sightContent());
+  /** The same check for whoever acts: the table's view for the GM, that player's own for a player, since a reply or
+   *  refusal reaches only them. */
+  const hiddenFor = (initiator: Initiator, state: GameState) =>
+    hiddenFrom(state, sightContent(), initiator.role === "player" ? initiator.sessionId : undefined);
+  /** Hidden from the table now: GM-only, or a creature no character perceives or wholly under the fog. An actor no
+   *  longer on the roster is not, so a line about one just removed reads as before. */
+  const actorHidden = (actorId: string) => {
+    const state = read();
+    return state.actors.some((actor) => actor.id === actorId) && hiddenFromTable(state)(actorId);
+  };
 
   /** Play-time definition lookup: imported stat blocks first; `monsterForInstance` ignores homebrew status so
    *  a soft-deleted creature's live tokens keep working. */
@@ -161,14 +227,21 @@ export function createKit(context: CommandContext) {
     read,
     actorName,
     actorHidden,
+    hiddenFromTable,
+    hiddenFor,
+    unseenBy,
     resolveDefinitionIn,
+    sightContent,
     /** The same lookup against the committed state, for reads outside a command transaction. */
     resolveDefinition: (definitionId: string) => resolveDefinitionIn(read(), definitionId),
-    /** The catalog a principal may read: GM-grade sees everything, a player only player-visible records. */
-    catalogFor: (principal: GamePrincipal) => contentLibrary.forAudience(isGmGrade(principal) ? "gm" : "player"),
-    /** Play-time item catalog (riders live here, never on the inventory row). GM audience so a player can
-     *  still roll their own GM-authored item; browsing is gated on the catalog reads. */
-    equipmentCatalog: () => equipmentCatalogOf(contentLibrary.forAudience("gm")),
+    /** The catalog a principal may browse: the GM's, or the homebrew this player receives (shown to everyone or to
+     *  one of the characters the session claimed). */
+    catalogFor: (principal: GamePrincipal) => contentLibrary.forAudience(contentAudienceOf(principal, read())),
+    /** Play-time content, for rebuilding and resolving what a character or a monster already has. Never browsed. */
+    playCatalog,
+    /** Play-time item catalog (riders live here, never on the inventory row). The play audience, so a player can
+     *  still roll an item the GM hid or whose pack is off; browsing is gated on the catalog reads. */
+    equipmentCatalog: () => equipmentCatalogOf(playCatalog()),
 
     /** False once a player session has created its daily share of characters. */
     withinCreateCap(sessionId: string): boolean {
@@ -187,7 +260,7 @@ export function createKit(context: CommandContext) {
     zoneDeps: (state: GameState, geometry: TokenMapGeometry | null): ZoneDeps => ({
       geometry,
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
-      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
+      catalog: equipmentCatalogOf(playCatalog()),
       rollDie: (sides) => context.random(sides),
       newId: context.newId,
       now: () => new Date().toISOString()
@@ -201,7 +274,7 @@ export function createKit(context: CommandContext) {
       distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null
     ): TurnAdvanceDeps => ({
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
-      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
+      catalog: equipmentCatalogOf(playCatalog()),
       rollDie: (sides) => context.random(sides),
       newId: context.newId,
       now: () => new Date().toISOString(),
@@ -219,7 +292,7 @@ export function createKit(context: CommandContext) {
     /** What an initiative roll reads about its roller in `state`: stat blocks and items for its riders. */
     initiativeRollDeps: (state: GameState): InitiativeRollDeps => ({
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
-      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+      catalog: equipmentCatalogOf(playCatalog())
     }),
 
     /** Server-thrown initiative dice land in `state.rolls` attributed to the combatant; hidden ones are GM-only. */
@@ -273,7 +346,7 @@ export function createKit(context: CommandContext) {
           : null;
     },
 
-    /** A rule the table advises rather than enforces, let through: a note for the GM alone. */
+    /** A rule the table advises on and doesn't enforce, let through: a note for the GM alone. */
     logRulesNotes(notes: readonly string[], actorId: string | null) {
       for (const note of notes)
         context.appendLog({
@@ -325,12 +398,12 @@ export function createKit(context: CommandContext) {
           gmOnly: hidden
         });
       // A reaction window opened: the table hears why nothing landed yet.
-      const waiting = resolution.waitingOnReaction ? "the attack waits" : "the damage waits";
+      const waiting = resolution.waitingOnReaction ? "The attack waits" : "The damage waits";
       for (const prompt of resolution.reactionPrompts ?? []) {
         const promptHidden = hidden || actorHidden(prompt.actorId);
         context.appendLog({
           kind: "reaction",
-          text: `${prompt.actorName} may use ${prompt.actionName} - ${waiting} on their answer.`,
+          text: `${prompt.actorName} may use ${prompt.actionName}. ${waiting} on the answer.`,
           actorIds: [prompt.actorId],
           gmOnly: promptHidden
         });

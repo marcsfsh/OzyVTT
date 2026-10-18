@@ -12,7 +12,7 @@ export interface TagInputProps {
   /** The vocabulary this field draws on; free entry is always allowed. A `<datalist>` unless `pick` is set. */
   suggestions?: readonly string[];
   /**
-   * Show the list: the entry box becomes a `Combobox` instead of an `<input list>`, whose datalist has no visible
+   * Show the list: the entry box becomes a `Combobox` in place of an `<input list>`, whose datalist has no visible
    * affordance and renders nothing on iOS Safari. Opt in for a canonical vocabulary (the SRD damage types); leave
    * it off for a corpus of existing values (Codex tags), where typing new entries is the norm. Either way the
    * field stays open and normalised. Trade-off: in this mode Backspace on empty doesn't remove the last tag, since the
@@ -33,7 +33,7 @@ export interface TagInputProps {
 }
 
 /** An open list of slugs (armour proficiencies, languages, damage resistances, tags), built from `Chip` +
-    `Input`. Open rather than a multiselect because the schemas keep these as free slugs for homebrew.
+    `Input`. Open, with no multiselect, because the schemas keep these as free slugs for homebrew.
     Enter or comma commits; Backspace on an empty input removes the last tag. Adds and removes are announced
     politely. `pick` shows a visible chooser over the same suggestions without changing what is accepted. */
 export function TagInput({
@@ -60,7 +60,7 @@ export function TagInput({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const full = max != null && values.length >= max;
-  /* Decided by whether a list exists, not by what is left of it, so the entry component never swaps out
+  /* Decided by whether a list exists, whatever is left of it, so the entry component never swaps out
      under the cursor when the last option is chosen. */
   const picking = pick && suggestions !== undefined && suggestions.length > 0;
   const offered = picking ? (suggestions ?? []).filter((entry) => !values.includes(entry)) : [];
@@ -98,7 +98,7 @@ export function TagInput({
   return (
     <div className={cx("nh-taginput", className)}>
       {values.length > 0 && (
-        <ul className="nh-taginput-tags" role="list" aria-label={ariaLabel ? `${ariaLabel} — chosen` : "Chosen"}>
+        <ul className="nh-taginput-tags" role="list" aria-label={ariaLabel ? `${ariaLabel}, chosen` : "Chosen"}>
           {values.map((tag) => (
             <li key={tag}>
               <Chip onRemove={() => remove(tag)} removeLabel={`Remove ${tag}`}>
@@ -157,7 +157,7 @@ export function TagInput({
       <p className="nh-taginput-hint" id={hintId}>
         {picking ? "Pick from the list, or type your own." : "Press Enter to add."}
       </p>
-      {/* At capacity, annotate rather than hide; the reason stays full strength while the input dims. */}
+      {/* At capacity, annotate and keep the input visible; the reason stays full strength while the input dims. */}
       {full && maxReachedReason && (
         <p className="nh-taginput-reason" id={reasonId}>
           {maxReachedReason}

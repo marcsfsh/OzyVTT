@@ -11,6 +11,13 @@ import userEvent from "@testing-library/user-event";
 const gmSearch = vi.fn();
 const playerSearch = vi.fn();
 
+// The palette and the tag view search through the record API; each call reads as (token, words) here.
+vi.mock("./api-records", () => ({
+  findApi: {
+    search: (token: string, params: { q: string }) => gmSearch(token, params.q),
+    searchAsPlayer: (token: string, params: { q: string }) => playerSearch(token, params.q)
+  }
+}));
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
@@ -121,7 +128,7 @@ describe("Everything that carries the tag, across types", () => {
     await user.click(screen.getByRole("button", { name: /Barovia/ }));
     expect(onNavigate).toHaveBeenLastCalledWith("/codex/atlas/m1");
     await user.click(screen.getByRole("button", { name: /We reached the shore/ }));
-    expect(onNavigate).toHaveBeenLastCalledWith("/codex/journal?entry=j1");
+    expect(onNavigate).toHaveBeenLastCalledWith("/codex/story?entry=j1");
     await user.click(screen.getByRole("button", { name: /Session 4/ }));
     expect(onNavigate).toHaveBeenLastCalledWith("/codex/sessions/s1");
     await user.click(screen.getByRole("button", { name: /The Missing Cask/ }));
@@ -154,7 +161,7 @@ describe("Everything that carries the tag, across types", () => {
   });
 });
 
-describe("Pins — the one kind that is not client-enumerable", () => {
+describe("Pins: the one kind that is not client-enumerable", () => {
   it("waits for the search rather than claiming there are no pins", () => {
     let resolve: (value: unknown) => void = () => {};
     gmSearch.mockReturnValue(
@@ -199,7 +206,7 @@ describe("Role-blindness", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows no reveal badge at all on player rows — because the field is absent, not because a flag says so", async () => {
+  it("shows no reveal badge at all on player rows, because the field is absent (no flag says so)", async () => {
     playerSearch.mockResolvedValue({ hits: [PIN_HIT], truncated: false });
     // Player projections have no `revealedToPlayers`; they type-check unchanged.
     render(

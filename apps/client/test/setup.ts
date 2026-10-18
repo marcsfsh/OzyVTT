@@ -4,17 +4,17 @@ import { cleanup } from "@testing-library/react";
 import { goTo } from "./route";
 
 /**
- * jsdom gaps this app actually hits, filled here in TEST setup only — never in product code.
+ * jsdom gaps this app actually hits, filled here in TEST setup only and never in product code.
  *
- * Each shim below was confirmed missing in jsdom 30 by probing it directly, not assumed. They exist so a
+ * Each shim below was confirmed missing in jsdom 30 by probing it directly. They exist so a
  * component can *render* under test; they are deliberately minimal and do not emulate real behaviour.
  *
  * **What this means for what these tests can prove:** a test passing under a shim is evidence about this
- * app's logic, not about the browser. Not verifiable here, and therefore still real-browser checks:
- * layout and pointer geometry (`MapSurface` panning, `RelationshipGraph` hit-testing, the 44px touch
- * floor — `getScreenCTM` is deliberately NOT shimmed, since faking a matrix would invent geometry);
- * Modal focus-trap / Escape / click-outside (the shim below is `show()` semantics, not `showModal()`);
- * and anything CSS-dependent, since no stylesheet is loaded. See `docs/ai-context/testing.md`.
+ * app's logic. These stay real-browser checks, because a shim can't stand in for the browser:
+ * layout and pointer geometry (`AtlasMap` panning, `RelationshipGraph` hit-testing, the 44px touch
+ * floor: `getScreenCTM` is deliberately NOT shimmed, since faking a matrix would invent geometry);
+ * Modal focus-trap / Escape / click-outside (the shim below has `show()` semantics, where the browser has `showModal()`);
+ * and anything CSS-dependent, since no stylesheet is loaded.
  */
 
 // Native <dialog>: the app's Modal calls showModal()/close(). jsdom implements neither.
@@ -29,16 +29,16 @@ if (typeof HTMLDialogElement !== "undefined" && !HTMLDialogElement.prototype.sho
   };
 }
 
-// Pointer capture: MapSurface/RelationshipGraph call these on every drag gesture.
+// Pointer capture: AtlasMap/RelationshipGraph call these on every drag gesture.
 if (typeof Element !== "undefined" && !Element.prototype.setPointerCapture) {
   Element.prototype.setPointerCapture = () => {};
   Element.prototype.releasePointerCapture = () => {};
   Element.prototype.hasPointerCapture = () => false;
 }
 
-// Scrolling and observation APIs jsdom omits entirely. `scrollTo` is used by the scrolling Tabs bar —
+// Scrolling and observation APIs jsdom omits entirely. `scrollTo` is used by the scrolling Tabs bar:
 // it did not show up in the upfront probe and only surfaced once real components rendered, which is a
-// reminder that this list is empirical, not exhaustive.
+// reminder that this list is empirical and may be missing some.
 if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
 if (typeof Element !== "undefined" && !Element.prototype.scrollTo) Element.prototype.scrollTo = () => {};
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -69,8 +69,8 @@ afterEach(() => cleanup());
  * Each test file sets its own path (`goTo("/codex/pages")`); this resets the URL between tests so one
  * test's navigation cannot leak into the next, which is the same isolation `cleanup()` gives the DOM.
  *
- * It goes through `goTo` rather than raising a synthetic `popstate`, because the router now lets a dirty
- * autosave-off editor veto a real history traversal — and a teardown must never be something the code
+ * It goes through `goTo` and raises no synthetic `popstate`, because the router now lets a dirty
+ * autosave-off editor veto a real history traversal, and a teardown must never be something the code
  * under test can refuse. See `test/route.ts`.
  */
 afterEach(() => {

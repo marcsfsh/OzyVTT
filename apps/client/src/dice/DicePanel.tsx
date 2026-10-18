@@ -1,12 +1,13 @@
 import { useState } from "react";
-import type { GmView, PlayerView, RollPurpose, RollVisibility } from "@vtt/domain";
+import type { GmView, PlayerView, RollPurpose, RollVisibility, TableRollPurpose } from "@vtt/domain";
 import { Button, Input, SegmentedControl, Select, Stepper, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "./roll-preference";
 import { RollCallPanel } from "./RollCallPanel";
 import "./dice-panel.css";
 
-const PURPOSE_LABELS: Record<RollPurpose, string> = {
+/** The purposes the picker offers: every one a free roll may carry. */
+const PURPOSE_LABELS: Record<TableRollPurpose, string> = {
   manual: "Roll",
   attack: "Attack",
   damage: "Damage",
@@ -14,6 +15,8 @@ const PURPOSE_LABELS: Record<RollPurpose, string> = {
   save: "Save",
   check: "Check"
 };
+/** A roll's label in the log, the character builder's own rolls included. */
+const ROLL_LABELS: Record<RollPurpose, string> = { ...PURPOSE_LABELS, builder: "Builder" };
 const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
 
 /**
@@ -24,8 +27,8 @@ const QUICK_DICE = [4, 6, 8, 10, 12, 20] as const;
 export const ROLL_VISIBILITY_WORD: Readonly<Record<RollVisibility, string>> = {
   public: "Shown to players",
   "gm-only": "GM only",
-  "self-only": "Hidden from players — you and the GM see it",
-  blind: "GM only — you won't see the result"
+  "self-only": "Hidden from players · you and the GM see it",
+  blind: "GM only · you won't see the result"
 };
 
 /**
@@ -65,13 +68,17 @@ export function DicePanel({
   mineActorId?: string;
 }) {
   const [formula, setFormula] = useState("1d20");
-  const [purpose, setPurpose] = useState<RollPurpose>("manual");
+  const [purpose, setPurpose] = useState<TableRollPurpose>("manual");
   const [visibility, setVisibility] = useState<RollVisibility>("public");
   const [rollFilter, setRollFilter] = useState<"all" | "mine">("all");
   const [modifier, setModifier] = useState(0);
   const [advantage, setAdvantage] = useState(false);
   const [disadvantage, setDisadvantage] = useState(false);
   const [fallFeet, setFallFeet] = useState("");
+  // The GM's own panel calls for rolls; a character's dice pane does not. Calling sits beside rolling, one tap away.
+  const gmState = role === "gm" && !mineActorId && "definitions" in state ? state : null;
+  const [mode, setMode] = useState<"roll" | "call">("roll");
+  const openCalls = gmState?.rollCalls.length ?? 0;
   const { toast } = useToast();
   // The shared per-browser dice-input preference; no choice at a table that keeps players' dice on the server.
   const { rollInput, mayType, setRollInput } = useRollPreference();
@@ -81,7 +88,7 @@ export function DicePanel({
   const visibilityLabel = (value: RollVisibility) => ROLL_VISIBILITY_WORD[value] ?? value;
 
   // A roll lands in the feed below, so only what the feed cannot show gets a toast.
-  const submit = async (rollFormula: string, rollPurpose: RollPurpose) => {
+  const submit = async (rollFormula: string, rollPurpose: TableRollPurpose) => {
     const result = await command("dice:roll", { formula: rollFormula, purpose: rollPurpose, visibility });
     if (!result.ok)
       toast(result.message ?? "That roll didn't work. Check the formula and try again.", { tone: "error" });
@@ -139,15 +146,36 @@ export function DicePanel({
       });
   };
 
+  const modeSwitch = gmState ? (
+    <SegmentedControl
+      className="dice-mode"
+      ariaLabel="Roll dice or call for a roll"
+      value={mode}
+      onChange={(next) => setMode(next as "roll" | "call")}
+      options={[
+        { value: "roll", label: "Roll dice" },
+        { value: "call", label: openCalls > 0 ? `Call for a roll · ${openCalls} open` : "Call for a roll" }
+      ]}
+    />
+  ) : null;
+  if (gmState && mode === "call")
+    return (
+      <section className="dice-proof" aria-labelledby="roll-call-heading">
+        {modeSwitch}
+        <RollCallPanel state={gmState} />
+      </section>
+    );
+
   return (
     <section className="dice-proof" aria-labelledby="dice-proof-heading">
+      {modeSwitch}
       <div className="dice-heading">
         {/* The `id` is the section's `aria-labelledby` target. */}
         <div>
           <h2 id="dice-proof-heading">Roll dice</h2>
         </div>
         <label className="dice-visibility">
-          Who sees it?
+          Visibility
           <Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>
             {visibilityOptions.map((value) => (
               <option key={value} value={value}>
@@ -206,8 +234,8 @@ export function DicePanel({
           </label>
           <label>
             Purpose
-            <Select value={purpose} onChange={(event) => setPurpose(event.target.value as RollPurpose)}>
-              {(Object.keys(PURPOSE_LABELS) as RollPurpose[]).map((value) => (
+            <Select value={purpose} onChange={(event) => setPurpose(event.target.value as TableRollPurpose)}>
+              {(Object.keys(PURPOSE_LABELS) as TableRollPurpose[]).map((value) => (
                 <option key={value} value={value}>
                   {PURPOSE_LABELS[value]}
                 </option>
@@ -241,8 +269,6 @@ export function DicePanel({
         </div>
         <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
       </details>
-      {/* The GM's own panel calls for rolls; a character's dice pane does not. */}
-      {role === "gm" && !mineActorId && "definitions" in state && <RollCallPanel state={state} />}
       {(() => {
         const rolls =
           mineActorId && rollFilter === "mine"
@@ -275,8 +301,8 @@ export function DicePanel({
                 .map((roll) => (
                   <article className="roll-card" key={roll.id}>
                     <div className="roll-card-top">
-                      <span className={`roll-badge roll-badge--${roll.purpose}`} title={PURPOSE_LABELS[roll.purpose]}>
-                        {roll.label ?? PURPOSE_LABELS[roll.purpose]}
+                      <span className={`roll-badge roll-badge--${roll.purpose}`} title={ROLL_LABELS[roll.purpose]}>
+                        {roll.label ?? ROLL_LABELS[roll.purpose]}
                       </span>
                       <span className="roll-meta">
                         {roll.initiatorLabel ?? "Unknown roller"} · {visibilityLabel(roll.visibility)}

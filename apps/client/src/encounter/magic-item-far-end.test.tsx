@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { loadEquipment } from "@vtt/content-srd-5.2.1";
@@ -21,25 +21,31 @@ vi.mock("../socket", () => {
 import { socket } from "../socket";
 import { EquipmentPicker } from "./equipment";
 import { ToastProvider } from "@vtt/ui";
-import { CharacterSheet } from "./CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 
 /**
  * A GM adds `Wand of the War Mage, +1` and its rarity and attunement requirement appear on screen,
  * using the real folded catalog (`loadEquipment()`). Only the actor holding it is a fixture.
- * The description is the channel: neither `ContentEquipmentSummary` nor `ItemMagicMarkerSchema`
- * carries a `rarity`, and adding one to a projection would be a viewer-safety change.
+ * The description's printed line is the channel the sheet reads. The browse row also carries `rarity` and
+ * `attunement` for the Compendium's columns: they say what that line says, so they are public to every reader who
+ * receives the item, and nothing else of the item's mechanics travels with them.
  */
 
 const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) => ({
   id: item.id,
   name: item.name,
+  source: item.source,
   category: item.category,
   costGp: item.costGp,
   weightLb: item.weightLb,
   description: item.description,
   weapon: item.weapon ?? null,
   armor: item.armor ?? null,
-  appliesTo: item.appliesTo ?? null
+  appliesTo: item.appliesTo ?? null,
+  rarity: item.rarity ?? null,
+  attunement: item.attunement
+    ? { required: item.attunement.required, restrictedTo: [...item.attunement.restrictedTo] }
+    : null
 }));
 
 /** Answer `content:equipment` with the real catalog, the way the server's projection does. */
@@ -51,7 +57,12 @@ function serveCatalog() {
   );
 }
 
-/** A real imported PC, so the sheet renders its Inventory section rather than the "no sheet yet" note. */
+afterEach(() => localStorage.clear());
+/** Opens the sheet's Gear tab, where the inventory and its picker live. */
+const openGear = async (user: ReturnType<typeof userEvent.setup>) =>
+  user.click(await screen.findByRole("tab", { name: "Gear" }));
+
+/** A real imported PC, so the sheet renders its Inventory section and no "no sheet yet" note. */
 const DEFINITION = ActorDefinitionSchema.parse(loadActorFixture("player-character"));
 const ACTOR = {
   id: "10000000-0000-4000-8000-000000000001",
@@ -88,7 +99,7 @@ describe("the far end of the magic-item ETL", () => {
       "Add Wand of the War Mage, +2",
       "Add Wand of the War Mage, +3"
     ]);
-    // Read off the DOM, not the record.
+    // Read off the DOM, never the record.
     expect(rows[0].textContent).toContain("Wand, Uncommon (Requires Attunement by a Spellcaster).");
     // ...and each tier shows its own rung.
     expect(rows[1].textContent).toContain("Wand, Rare (");
@@ -132,14 +143,18 @@ describe("the far end of the magic-item ETL", () => {
     };
     const holding = { ...ACTOR, inventory: [stored] } as unknown as PlayerActor;
     render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
 
-    const row = screen.getByText("Wand of the War Mage, +1").closest(".sheet-inv-row") as HTMLElement;
+    const row = screen.getByText("Wand of the War Mage, +1").closest("button") as HTMLElement;
     expect(row).toBeTruthy();
     // The rendered row on the sheet carries the SRD rarity and attunement requirement for this tier.
     expect(row.textContent).toContain("Wand, Uncommon (Requires Attunement by a Spellcaster).");
-    expect(row.textContent).toContain("While holding this wand, you gain a bonus to spell attack rolls");
-    // The Attune control the requirement is asking about is on the same row.
-    expect(within(row).getByRole("button", { name: "Attune" })).toBeTruthy();
+    // Its detail holds the whole entry, and the Attune control the requirement is asking about.
+    await user.click(row);
+    const detail = within(screen.getByRole("region", { name: "Wand of the War Mage, +1" }));
+    expect(detail.getByText(/While holding this wand, you gain a bonus to spell attack rolls/)).toBeTruthy();
+    expect(detail.getByRole("button", { name: "Attune" })).toBeTruthy();
   });
 
   it("makes all 270 magic rows reachable without scrolling a 400-row list", async () => {
@@ -175,12 +190,12 @@ describe("the far end of the magic-item ETL", () => {
       .type(await screen.findByRole("searchbox", { name: "Search equipment" }), "armor of resistance");
     const rows = screen.getAllByRole("listitem");
     expect(rows).toHaveLength(1);
-    // Its d10 table went into the description rather than ten near-identical browse rows.
+    // Its d10 table went into the description, so there are no ten near-identical browse rows.
     expect(rows[0].textContent).toContain("Armor (Any Light, Medium, or Heavy), Rare (Requires Attunement).");
     expect(rows[0].textContent).toContain("1d10 1: Damage Type Acid");
   });
 
-  it("does not put a wand's mechanics on the wire — only what a browse row and an inventory row already carried", () => {
+  it("does not put a wand's mechanics on the wire, only what a browse row and an inventory row already carried", () => {
     // The browse projection has exactly these keys, none of them a rider, a cast or a cursed flag.
     // `appliesTo` (the printed eligibility qualifier plus resolved base ids) is SRD reference text,
     // identical for every viewer; it is null for the wand (only weapon/armor templates carry one).
@@ -189,27 +204,44 @@ describe("the far end of the magic-item ETL", () => {
     expect(Object.keys(wand).sort()).toEqual([
       "appliesTo",
       "armor",
+      "attunement",
       "category",
       "costGp",
       "description",
       "id",
       "name",
+      "rarity",
+      "source",
       "weapon",
       "weightLb"
     ]);
-    for (const key of [
-      "modifiers",
-      "effects",
-      "actions",
-      "casts",
-      "cursed",
-      "uses",
-      "grants",
-      "rarity",
-      "attunement"
-    ]) {
+    for (const key of ["modifiers", "effects", "actions", "casts", "cursed", "uses", "grants"]) {
       expect(wand, key).not.toHaveProperty(key);
     }
+  });
+
+  it("carries a rarity and an attunement that say what the item's printed line says", () => {
+    const titled = (slug: string) =>
+      slug
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    const rated = CATALOG.filter((item) => item.rarity !== null && item.rarity !== "varies");
+    expect(rated.length).toBeGreaterThan(200);
+    for (const item of rated) {
+      // The printed line is the description's first sentence: "Wand, Uncommon (Requires Attunement by a Spellcaster)."
+      const line = (item.description ?? "").split("\n")[0]!;
+      expect(line, item.id).toContain(titled(item.rarity!));
+      expect(line.includes("Requires Attunement"), item.id).toBe(item.attunement?.required === true);
+    }
+    const wand = CATALOG.find((item) => item.id === "wand-of-the-war-mage-1")!;
+    expect(wand.rarity).toBe("uncommon");
+    expect(wand.attunement?.required).toBe(true);
+    expect(wand.description).toContain("Wand, Uncommon (Requires Attunement by a Spellcaster).");
+    // A mundane item says nothing of either.
+    const rope = CATALOG.find((item) => item.id === "rope")!;
+    expect(rope.rarity).toBeNull();
+    expect(rope.attunement).toBeNull();
   });
 });
 
@@ -233,7 +265,7 @@ describe("the base chooser", () => {
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
     await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
 
-    // Nothing added yet: the chooser opened, showing the printed form and real bases.
+    // Nothing added yet: the chooser opened and shows the printed form and real bases.
     expect(added).toEqual([]);
     expect(screen.getByText(/applies to Any Simple or Martial/)).toBeTruthy();
     // All 38 bases are offered, each with its own numbers on the row.
@@ -284,7 +316,7 @@ describe("the base chooser", () => {
   });
 });
 
-describe("the wire seam - the real sheet ships the pick", () => {
+describe("the wire seam: the real sheet ships the pick", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -309,6 +341,7 @@ describe("the wire seam - the real sheet ships the pick", () => {
     const emits = captureEmits();
     render(<CharacterSheet actor={ACTOR} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
+    await openGear(user);
     await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
     await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
@@ -344,6 +377,7 @@ describe("the wire seam - the real sheet ships the pick", () => {
     const holding = { ...ACTOR, inventory: [bound] } as unknown as PlayerActor;
     render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
+    await openGear(user);
     await user.click(await screen.findByRole("button", { name: "Browse SRD gear" }));
     await user.type(await screen.findByRole("searchbox", { name: "Search equipment" }), "Weapon, +1");
     await user.click(screen.getByRole("button", { name: "Add Weapon, +1" }));
@@ -373,6 +407,8 @@ describe("the wire seam - the real sheet ships the pick", () => {
     const holding = { ...ACTOR, inventory: [legacy] } as unknown as PlayerActor;
     render(<CharacterSheet actor={holding} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
+    await openGear(user);
+    await user.click(await screen.findByText("Weapon, +2"));
     // The bound-base display is absent and the one sheet-side chooser is offered instead.
     await user.click(await screen.findByRole("button", { name: "Choose what it is" }));
     await user.click(await screen.findByRole("button", { name: "Make it a Warhammer" }));

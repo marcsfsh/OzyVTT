@@ -26,11 +26,11 @@
 .nh-table tbody tr:hover {
   background: color-mix(in srgb, var(--surface-3) 60%, transparent);
 }
-.nh-table tbody tr:last-child td {
+.nh-table tbody tr:last-child > * {
   border-bottom: 0;
 }
 
-/* ---- Stat / definition list (character-sheet vitals, monster meta, key–value data) ---- */
+/* ---- Stat / definition list (character-sheet vitals, monster meta, key-value data) ---- */
 .nh-statlist {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
@@ -127,7 +127,7 @@
     border-color var(--dur-hover),
     filter var(--dur-base);
 }
-/* Genuine click-target cards lift on hover — the shared motion cue map/token cards already use. */
+/* Genuine click-target cards lift on hover: the shared motion cue map/token cards already use. */
 .nh-card.is-interactive:hover {
   transform: translateY(-2px);
   --card-edge: var(--line-strong);
@@ -226,7 +226,7 @@
 }
 
 /* Add-new tile: fills its gallery cell like a real card. A button, so edge and hover ride the backing layer
-   and the element is never clipped. Solid, not dashed; a quieter `--line-strong` edge marks it as different. */
+   and the element is never clipped. Solid edge; a quieter `--line-strong` edge marks it as different. */
 .nh-card--new {
   display: grid;
   place-items: center;

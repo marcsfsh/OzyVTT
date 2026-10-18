@@ -1,0 +1,330 @@
+/* The GM's sound board (Shared screen > Sound). Only SoundBoard.tsx imports this; the Table tab's pocket control
+   has its own sheet. */
+
+.sound-board {
+  gap: var(--space-4);
+}
+.sound-board-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+.sound-board-title h2 {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+}
+.sound-board-title p {
+  margin: 0.4rem 0 0;
+  max-width: 44rem;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.sound-board-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Now playing: the table screens' state, what is on, and the controls the whole board shares. */
+.sound-transport {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+}
+.sound-screens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sound-screens li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.sound-screens .nh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+.sound-now {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+.sound-now div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.sound-now dt {
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sound-now dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.sound-transport-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.sound-transport-controls .nh-slider {
+  flex: 1 1 16rem;
+}
+
+/* The sections: one column, two from 1280px (what plays | where it comes from). */
+.sound-board-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+.sound-board-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.sound-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+}
+.sound-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+.sound-section-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font: 400 var(--fs-h3) var(--font-display);
+}
+.sound-hint,
+.sound-empty {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.sound-hint {
+  color: var(--text-dim);
+}
+.sound-empty {
+  color: var(--text-muted);
+}
+.sound-file-input {
+  display: none;
+}
+
+/* A row: what it is, its level, its tools. Each kind places its parts on named areas. */
+.sound-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sound-row {
+  position: relative;
+  display: grid;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+/* What is playing now wears the sun on its edge: "this is now". */
+.sound-row.is-playing {
+  padding-inline-start: var(--space-3);
+}
+.sound-row.is-playing::before {
+  content: "";
+  position: absolute;
+  inset: var(--space-1) auto var(--space-1) 0;
+  width: 3px;
+  background: var(--grad-sun);
+}
+.sound-row-name {
+  grid-area: name;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sound-row-name strong {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.sound-row-name small {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.sound-row-tools {
+  grid-area: tools;
+  display: flex;
+  justify-content: end;
+  gap: var(--space-1);
+}
+.sound-row .sound-level {
+  grid-area: level;
+}
+.sound-icon-up {
+  transform: rotate(180deg);
+}
+
+.sound-track {
+  grid-template-columns: auto minmax(0, 1fr) minmax(8rem, 12rem) auto;
+  grid-template-areas: "play name level tools";
+}
+.sound-track > .nh-iconbtn {
+  grid-area: play;
+}
+.sound-layer {
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 12rem) auto;
+  grid-template-areas: "toggle level tools";
+}
+.sound-layer-switch {
+  grid-area: toggle;
+  min-width: 0;
+  justify-self: start;
+}
+.sound-layer-switch .nh-switch-label {
+  overflow-wrap: anywhere;
+}
+.sound-asset {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "name add tools";
+}
+.sound-asset-add {
+  grid-area: add;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.sound-asset-in {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  color: var(--cyan-hi);
+  font: 600 var(--fs-sm) / 1.2 var(--font-label);
+}
+.sound-rename {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.sound-rename .nh-input {
+  flex: 1;
+  min-width: 0;
+}
+.sound-scene {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "name save autoplay tools";
+}
+.sound-scene > .nh-btn {
+  grid-area: save;
+}
+.sound-scene > .nh-switch {
+  grid-area: autoplay;
+}
+
+/* Effect pads: a big button each, its level and remove beneath. */
+.sound-pads {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sound-pad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.sound-pad-fire {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sound-pad-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.sound-pad-tools .nh-slider {
+  flex: 1;
+}
+.sound-pad-tools .nh-slider-input {
+  min-width: 0;
+}
+
+@media (min-width: 1280px) {
+  .sound-board-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+/* A phone: each row gives its level and its buttons a line of their own. */
+@media (max-width: 650px) {
+  .sound-track {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "play name tools"
+      "level level level";
+  }
+  .sound-layer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "toggle tools"
+      "level level";
+  }
+  .sound-asset {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name tools"
+      "add add";
+  }
+  .sound-scene {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name tools"
+      "save save"
+      "autoplay autoplay";
+  }
+  .sound-scene > .nh-btn,
+  .sound-scene > .nh-switch {
+    justify-self: start;
+  }
+  .sound-transport-controls .nh-btn {
+    flex: 1 1 auto;
+  }
+}

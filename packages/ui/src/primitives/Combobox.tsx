@@ -6,7 +6,7 @@ import "./Combobox.css";
 interface ComboboxOption {
   id: string;
   label: string;
-  /** Optional leading glyph — an entity icon, a kind mark. Purely decorative; the label names it. */
+  /** Optional leading glyph: an entity icon, a kind mark. Purely decorative; the label names it. */
   icon?: ReactNode;
   /** Optional muted suffix ("Character", "#coast") to disambiguate two same-named records. */
   meta?: string;
@@ -14,7 +14,7 @@ interface ComboboxOption {
 
 interface ComboboxProps {
   options: readonly ComboboxOption[];
-  /** The chosen option's id, or null. A chosen value renders as a removable chip, not as typed text. */
+  /** The chosen option's id, or null. A chosen value renders as a removable chip and never as typed text. */
   value: string | null;
   onChange: (id: string | null) => void;
   placeholder?: string;
@@ -24,7 +24,7 @@ interface ComboboxProps {
   /** Cap on rows shown at once. */
   limit?: number;
   className?: string;
-  /** Accept text that matches no option, making this a free-text field with suggestions. The id handed back is
+  /** Accept text that matches no option, so this is a free-text field with suggestions. The id handed back is
    * the raw text. */
   allowFreeText?: boolean;
   /** Ids of caller-rendered text (a hint, a limit notice) the input should be described by. */
@@ -71,7 +71,7 @@ export function Combobox({
 
   /**
    * On blur, keep typed text only when typed text is a value (`allowFreeText`). An exact label match commits
-   * the option's id rather than the words. Without `allowFreeText` the query is discarded, so a closed set
+   * the option's id and never the words. Without `allowFreeText` the query is discarded, so a closed set
    * gains no members.
    */
   const commitOnBlur = () => {

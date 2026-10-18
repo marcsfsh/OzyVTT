@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
@@ -19,7 +19,6 @@ vi.mock("./api", async (importOriginal) => {
   };
 });
 
-import { CampaignHome, type CampaignStanding } from "./CampaignHome";
 import { StandingAdjuster } from "./StandingAdjuster";
 import {
   CHRONICLE_KIND_META,
@@ -48,24 +47,9 @@ const STANDING = (value: number, revealed = false): CodexStanding => ({
   value,
   revealedToPlayers: revealed,
   createdAt: "2026-07-29T00:00:00.000Z",
-  updatedAt: "2026-07-29T00:00:00.000Z"
+  updatedAt: "2026-07-29T00:00:00.000Z",
+  firstShownAt: null
 });
-
-const CARD = (value: number, name = "The Zhentarim"): CampaignStanding => ({ factionPageId: "f1", name, value });
-
-const renderCard = (standing: readonly CampaignStanding[], onAdjustStanding?: (id: string) => void) =>
-  render(
-    <CampaignHome
-      pages={[]}
-      standing={standing}
-      onAdjustStanding={onAdjustStanding}
-      onPickType={vi.fn()}
-      onPickTag={vi.fn()}
-      onOpenPage={vi.fn()}
-      onOpenEntry={vi.fn()}
-      onOpenMap={vi.fn()}
-    />
-  );
 
 const meterWidth = () => (document.querySelector(".nh-meter-fill") as HTMLElement).style.width;
 
@@ -102,7 +86,7 @@ describe("The seven tiers are a reading rule with hard edges", () => {
   });
 
   it("the bands are exhaustive and non-overlapping across the whole scale", () => {
-    // Every integer maps to exactly one word, matching the displayed table.
+    // Every integer maps to exactly one word, as the displayed table does.
     for (let value = STANDING_MIN; value <= STANDING_MAX; value += 1) {
       const matches = STANDING_TIERS.filter((tier) => value >= tier.min && value <= tier.max);
       expect(matches, `${value} should sit in exactly one band`).toHaveLength(1);
@@ -141,48 +125,26 @@ describe("A signed scale on an unsigned bar", () => {
   });
 
   it("renders the bar at the mapped fraction, and never shows Meter's own value/max readout", () => {
-    renderCard([CARD(-100)]);
+    const adjuster = (value: number) => (
+      <StandingAdjuster
+        gmToken="gm"
+        factionPageId="f1"
+        factionName="The Zhentarim"
+        standing={STANDING(value)}
+        onSaved={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    const { unmount } = render(adjuster(-100));
     expect(meterWidth()).toBe("0%");
+    unmount();
 
-    renderCard([CARD(0)]);
-    expect(document.querySelectorAll(".nh-meter-fill")[1].getAttribute("style")).toContain("50%");
+    render(adjuster(0));
+    expect(meterWidth()).toContain("50%");
 
     // No standing call site passes `label`, which would print the shifted "x/200".
     expect(screen.queryByText(/\/\s*200/)).not.toBeInTheDocument();
     expect(document.querySelector(".nh-meter-value")).toBeNull();
-  });
-});
-
-describe("The card says where you stand, in words", () => {
-  it("names the faction, the tier and the signed value, with no colour at all", () => {
-    renderCard([CARD(-80, "The Zhentarim"), CARD(50, "Harpers")]);
-
-    // Colour is CSS-only, so the text must carry the meaning.
-    const card = screen.getByRole("heading", { name: "Faction standing" }).closest("section")!;
-    expect(within(card).getByText("The Zhentarim")).toBeInTheDocument();
-    expect(within(card).getByText("Hunted")).toBeInTheDocument();
-    expect(within(card).getByText("-80")).toBeInTheDocument();
-    expect(within(card).getByText("Harpers")).toBeInTheDocument();
-    expect(within(card).getByText("Allied")).toBeInTheDocument();
-    expect(within(card).getByText("+50")).toBeInTheDocument();
-  });
-
-  it("offers Adjust only to a caller that can write — a player's card has nothing to tap", () => {
-    // A capability flag, never a role check: the player's Codex renders this component too.
-    const { unmount } = renderCard([CARD(20)], vi.fn());
-    expect(screen.getByRole("button", { name: "Adjust" })).toBeInTheDocument();
-    unmount();
-
-    renderCard([CARD(20)]);
-    expect(screen.queryByRole("button", { name: "Adjust" })).not.toBeInTheDocument();
-  });
-
-  it("lists the factions that have taken a side first, either side", () => {
-    renderCard([CARD(0, "Neutral guild"), CARD(-90, "The hunters"), CARD(30, "The friends")]);
-    const names = [...document.querySelectorAll(".codex-campaign-standingname .codex-list-title")].map(
-      (node) => node.textContent
-    );
-    expect(names).toEqual(["The hunters", "The friends", "Neutral guild"]);
   });
 });
 
@@ -217,7 +179,7 @@ describe("Adjusting standing writes the reason with it", () => {
   });
 
   /** The server makes `reason` optional, so the button arms as soon as the value changes. */
-  it("arms as soon as the value moves, reason or not — the server does not require one", async () => {
+  it("arms as soon as the value moves, reason or not: the server does not require one", async () => {
     renderAdjuster(STANDING(10));
     const user = userEvent.setup();
 
@@ -369,7 +331,7 @@ describe("Standing and milestone chronicle kinds read by icon AND word", () => {
     expect(milestoneOf(standing)).toBeNull();
     expect(downtimeOf(milestone)).toBeNull();
     expect(downtimeOf(standing)).toBeNull();
-    // The gate is the kind, not the payload shape.
+    // The gate is the kind; the payload shape doesn't open it.
     expect(milestoneOf(record({ kind: "entry", payload: { level: 5, reason: "x" } }))).toBeNull();
   });
 

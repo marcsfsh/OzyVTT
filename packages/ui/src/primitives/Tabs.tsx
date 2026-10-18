@@ -16,19 +16,29 @@ interface TabsProps {
   orientation?: "horizontal" | "vertical";
   ariaLabel?: string;
   className?: string;
+  /** Ties each tab to its panel: tab `${idBase}-tab-${id}` controls panel `${idBase}-panel-${id}`. */
+  idBase?: string;
 }
 
 /** The one tab bar: a sunken track whose chosen tab is raised and underlined in cyan (a left bar when vertical).
     Full keyboard control. An overflowing horizontal bar hides its scrollbar, keeps the active tab in view
     and fades whichever edge has more content (no fade when everything fits). */
-export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ariaLabel, className }: TabsProps) {
+export function Tabs({
+  tabs,
+  activeId,
+  onChange,
+  orientation = "horizontal",
+  ariaLabel,
+  className,
+  idBase
+}: TabsProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const barRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState({ scrollable: false, atStart: true, atEnd: true });
 
   const horizontal = orientation === "horizontal";
 
-  /* A ResizeObserver rather than a window listener, because the bar overflows when its container narrows. */
+  /* A ResizeObserver, because the bar overflows when its container narrows and a window listener can't see that. */
   useEffect(() => {
     const bar = barRef.current;
     if (!bar || !horizontal) return;
@@ -50,7 +60,7 @@ export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ari
     };
   }, [horizontal, tabs.length]);
 
-  /* Scroll the bar itself, not `scrollIntoView`, which would scroll every ancestor (and the page on mount).
+  /* Scroll the bar itself: `scrollIntoView` would scroll every ancestor (and the page on mount).
      SCROLL_PAD matches `scroll-padding-inline` in Tabs.css so the tab lands clear of the edge fade. */
   useLayoutEffect(() => {
     const bar = barRef.current;
@@ -129,6 +139,7 @@ export function Tabs({ tabs, activeId, onChange, orientation = "horizontal", ari
             }}
             role="tab"
             type="button"
+            {...(idBase ? { id: `${idBase}-tab-${tab.id}`, "aria-controls": `${idBase}-panel-${tab.id}` } : {})}
             aria-selected={active}
             tabIndex={active ? 0 : -1}
             disabled={tab.disabled}

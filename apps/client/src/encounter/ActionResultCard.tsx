@@ -97,12 +97,12 @@ export function ActionResultCard({
           );
           return waiting ? (
             <p className="action-save-note">
-              Waiting on {result.attack.targetName}'s <strong>{prompt?.actionName ?? "reaction"}</strong> - answer it in
-              the turn order; the attack finishes there.
+              Waiting on {result.attack.targetName}'s <strong>{prompt?.actionName ?? "reaction"}</strong>. Answer it in
+              Needs you, and the attack finishes there.
             </p>
           ) : (
             <p className="action-applied">
-              {prompt?.actionName ?? "The reaction"} answered - the attack finished in the turn order.
+              {prompt?.actionName ?? "The reaction"} answered. The attack finished in Needs you.
             </p>
           );
         })()}
@@ -142,8 +142,8 @@ export function ActionResultCard({
           return (
             <p className="action-damage">
               Damage: <strong>{overriding ? typed : result.damageTotal}</strong>
-              {overriding ? ` (manual - rolled ${result.damageTotal})` : ` (${breakdown})`}
-              {!overriding && result.crit ? " - crit dice doubled" : ""}
+              {overriding ? ` (manual · rolled ${result.damageTotal})` : ` (${breakdown})`}
+              {!overriding && result.crit ? " · crit dice doubled" : ""}
             </p>
           );
         })()}
@@ -161,11 +161,11 @@ export function ActionResultCard({
             );
             return waiting ? (
               <p className="action-save-note">
-                Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong> - answer it in the turn
-                order; the damage applies there.
+                Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong>. Answer it in Needs you,
+                and the damage applies there.
               </p>
             ) : (
-              <p className="action-applied">{prompt.actionName} answered - damage handled in the turn order.</p>
+              <p className="action-applied">{prompt.actionName} answered. The damage was handled in Needs you.</p>
             );
           }
           return applied.has(result.attack.targetId) ? (
@@ -226,7 +226,7 @@ export function ActionResultCard({
           <IconWarning /> {warning}
         </p>
       ))}
-      {/* Narration of what happened (a push, a forced save), matching the feed. Includes `gmOnly`
+      {/* Narration of what happened (a push, a forced save), as in the feed. Includes `gmOnly`
           rows because this component takes a `GmView` and is mounted only in the GM console. Reusing
           it for a player would need a client-side filter here; the server also strips gmOnly rows
           from non-GM acks (`withoutGmOnlyNarration`, game-operations.ts). */}
@@ -243,9 +243,8 @@ export function ActionResultCard({
           ).length;
           return waiting > 0 ? (
             <p className="action-save-note">
-              Saving-throw {waiting === 1 ? "prompt is" : "prompts are"} waiting on {waiting}{" "}
-              {waiting === 1 ? "target" : "targets"} in the turn order - roll or enter each result there, then confirm
-              to apply.
+              {waiting === 1 ? "A saving throw waits" : `${waiting} saving throws wait`} in Needs you. Roll or enter
+              each result there, then confirm it.
             </p>
           ) : (
             <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>

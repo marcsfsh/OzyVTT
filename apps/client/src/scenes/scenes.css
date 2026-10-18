@@ -1,0 +1,512 @@
+/* The Scenes tab: a section bar over the view on a laptop; the view and a tab bar under the thumb on a phone. The
+   shell never scrolls; each view's regions scroll themselves with `.scroll-y`. */
+
+.sc-shell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+.sc-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.sc-content > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.sc-grow {
+  flex: 1 1 auto;
+}
+
+/* ----- Laptop: the section bar ----- */
+.sc-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  padding: var(--space-1) var(--pane-gutter);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--material-lip), var(--surface-1);
+}
+.sc-bar-title {
+  margin: 0;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-shadow: var(--heading-shadow);
+}
+.sc-bar-sections {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.sc-bar-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+  font-size: var(--fs-sm);
+}
+.sc-find {
+  position: relative;
+  width: min(18rem, 28vw);
+}
+.sc-find-key {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.sc-find:focus-within .sc-find-key {
+  display: none;
+}
+
+/* ----- Phone: the tab bar under the thumb ----- */
+.sc-tabbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: none;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--line-strong);
+  background: var(--material-lip), var(--surface-1);
+}
+.sc-tabbar-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: calc(var(--tap-min) + var(--space-3));
+  padding: var(--space-1) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 var(--fs-2xs) / 1.1 var(--font-label);
+  cursor: pointer;
+}
+.sc-tabbar-tab svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+.sc-tabbar-tab:hover {
+  color: var(--text);
+}
+/* The tab that is on is raised, with the cyan selection edge along its top. */
+.sc-tabbar-tab.is-on {
+  color: var(--text);
+  background: var(--tab-on);
+  box-shadow:
+    var(--tab-on-sheen),
+    inset 0 2px 0 var(--cyan);
+}
+.sc-phone-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-2) var(--space-3) 0;
+}
+.sc-phone-title {
+  margin: 0;
+  flex: none;
+  padding: var(--space-2) var(--space-3) 0;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h2) / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-shadow: var(--heading-shadow);
+}
+.sc-phone-head .sc-phone-title {
+  padding: 0;
+}
+
+/* ----- Shared pieces ----- */
+.sc-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.sc-caution {
+  color: var(--caution-hi);
+}
+.sc-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: var(--space-6) auto;
+  padding: 0 var(--space-4);
+  max-width: 32rem;
+  color: var(--text-dim);
+}
+.sc-thumb {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 3rem;
+  height: 2.25rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--void);
+  color: var(--text-muted);
+}
+.sc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sc-thumb-lg {
+  width: 6rem;
+  height: 4.25rem;
+}
+/* A scene's state is a chip: a tinted strip with a 3px bar in its tone. Live carries the sun's glyph and the magenta
+   that means "this is now". */
+.sc-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.5rem;
+  padding: 0 0.45rem;
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: 600 var(--fs-2xs) / 1 var(--font-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sc-state svg {
+  width: 0.9em;
+  height: 0.9em;
+}
+.sc-state.is-live {
+  border-left-color: var(--magenta);
+  background: color-mix(in srgb, var(--magenta) 14%, var(--surface-2));
+  color: var(--magenta-text);
+}
+.sc-state.is-parked {
+  border-left-color: var(--caution);
+  color: var(--caution-hi);
+}
+.sc-state.is-replay {
+  border-left-color: var(--info);
+  color: var(--indigo-text);
+}
+.sc-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.sc-who svg {
+  width: 1em;
+  height: 1em;
+}
+
+/* ----- The front page ----- */
+.sc-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--pane-gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+}
+.sc-overview-counts {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.sc-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  background: var(--material-lip), var(--surface-1);
+}
+.sc-card-title {
+  margin: 0;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+}
+.sc-needs {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-needs li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.sc-needs li:last-child {
+  border-bottom: 0;
+}
+.sc-needs-icon {
+  display: inline-grid;
+  place-items: center;
+  color: var(--caution-hi);
+}
+.sc-needs li.is-live .sc-needs-icon {
+  color: var(--magenta-text);
+}
+.sc-needs-text {
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.sc-needs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.sc-start {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-3);
+}
+.sc-start-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-3);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.sc-start-item:hover,
+.sc-start-item:focus-visible {
+  border-color: var(--line-hover);
+}
+.sc-start-item svg {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  color: var(--cyan-hi);
+}
+.sc-start-item span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.sc-start-item small {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* ----- Lists: a table on a laptop, rows with two facts on a phone ----- */
+.sc-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sc-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-2) var(--pane-gutter);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-1) 55%, transparent);
+}
+.sc-sub-count {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+/* The table and the Filters flyout that opens over its left side. */
+.sc-list-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.sc-list-body {
+  padding: var(--space-2) var(--pane-gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+}
+.sc-list-none {
+  padding: var(--space-4) 0;
+}
+.sc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 32rem;
+  margin: var(--space-6) auto;
+  color: var(--text-dim);
+}
+.sc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 500 var(--fs-sm) / 1.35 var(--font-body);
+}
+.sc-table th {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-align: start;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sc-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  vertical-align: middle;
+}
+.sc-tr:hover td {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+/* The live scene's row carries the magenta edge of "this is now". */
+.sc-tr.is-live td:first-child {
+  box-shadow: inset 3px 0 0 var(--magenta);
+}
+.sc-tr.is-dragging td,
+.sc-rows li.is-dragging {
+  opacity: 0.6;
+}
+.sc-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.sc-rowlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.sc-rowlink:hover b,
+.sc-rowlink:focus-visible b {
+  color: var(--cyan-hi);
+}
+.sc-rowlink svg {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  color: var(--text-muted);
+}
+.sc-col-date {
+  white-space: nowrap;
+}
+.sc-col-menu {
+  width: 3rem;
+  text-align: end;
+}
+/* The drag grip: a drag surface, so the browser never takes the finger for a scroll. */
+.sc-grip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.75rem;
+  height: var(--tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.sc-grip:hover {
+  color: var(--text);
+}
+.sc-grip:active {
+  cursor: grabbing;
+}
+.sc-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-rows > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.sc-row {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: calc(var(--tap-min) + var(--space-2));
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.sc-row.is-current {
+  box-shadow: inset 3px 0 0 var(--cyan);
+  padding-left: var(--space-2);
+}
+.sc-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sc-row-main strong,
+.sc-row-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-row-main small {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+@media (max-width: 760px) {
+  .sc-overview,
+  .sc-list-body,
+  .sc-sub {
+    padding-inline: var(--space-3);
+  }
+  .sc-card {
+    padding: var(--space-3);
+  }
+  .sc-needs li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .sc-needs-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}

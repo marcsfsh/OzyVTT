@@ -9,7 +9,8 @@ import {
   type MasteryPush,
   type MasterySwing
 } from "../weapon-mastery.js";
-import { sizeAtMost, type ResolveContext } from "./context.js";
+import { endedEffect, sizeAtMost, type ResolveContext } from "./context.js";
+import { withArticle } from "@vtt/domain";
 
 /** The weapon mastery in force on this swing (rules in `weapon-mastery.ts`); null unless a mastery
  *  applies to an attack that rolled. */
@@ -29,9 +30,10 @@ export function masterySwingOf(ctx: ResolveContext): MasterySwing | null {
   };
 }
 
-/** The resolver's own gate for table lines (`appendLog` re-checks). Unknown or non-public fails toward hiding. */
+/** The resolver's own gate for table lines (`appendLog` re-checks): the shared hidden check, where an unknown id
+ *  fails toward hiding. */
 function namesAHiddenCombatant(ctx: ResolveContext, ...actorIds: readonly string[]): boolean {
-  return actorIds.some((id) => ctx.state.actors.find((actor) => actor.id === id)?.visibility !== "public");
+  return actorIds.some(ctx.hiddenFromTable);
 }
 
 /** What a landed mastery forces on its target: a saving throw (Topple) and forced movement (Push). */
@@ -64,12 +66,12 @@ function parkMasterySaves(ctx: ResolveContext): void {
       forced.conditionId === null ? "" : ` or have the ${conditionLabel(forced.conditionId)} condition`;
     tableNarration.push({
       kind: "save",
-      text: `${attacker.name}'s ${forced.actionName} forces ${forced.targetName} to make a ${forced.ability.toUpperCase()} save${orTheCondition}.`,
+      text: `${attacker.name}'s ${forced.actionName} forces ${forced.targetName} to make ${withArticle(`${forced.ability.toUpperCase()} save`)}${orTheCondition}.`,
       actorIds: [attacker.id, forced.targetId],
       ...(namesAHiddenCombatant(ctx, attacker.id, forced.targetId) ? { gmOnly: true } : {})
     });
     warnings.push(
-      `${forced.actionName}: ${forced.targetName}'s save is DC ${forced.dc} - the prompt is in the turn order.`
+      `${forced.actionName}: ${forced.targetName}'s save is DC ${forced.dc}. The prompt is in the turn order.`
     );
   }
 }
@@ -112,7 +114,7 @@ export function offeredPush(ctx: ResolveContext): Readonly<{ targetName: string;
 }
 
 /** A hit's forced movement (the Push mastery, Repelling Blast, a stat block's shove), as far as the attacker chose
- *  (SRD "up to"). Failures degrade to a GM-only sentence, never a rejection; only an accomplished push is narrated to
+ *  (SRD "up to"). A failure is a GM-only sentence and refuses nothing; only an accomplished push is narrated to
  *  the table. */
 function pushMasteryTargets(ctx: ResolveContext): void {
   const { attacker, targets, deps, input, tableNarration, warnings } = ctx;
@@ -139,7 +141,7 @@ function pushMasteryTargets(ctx: ResolveContext): void {
     // square, so say nothing. Rounded so snapping noise can't print "pushed 0 ft".
     if (moved === null) {
       warnings.push(
-        `${forced.targetName} is pushed ${forced.distanceFeet} feet straight away from ${attacker.name} - move the token.`
+        `${forced.targetName} is pushed ${forced.distanceFeet} feet straight away from ${attacker.name}. Move the token.`
       );
       continue;
     }
@@ -155,7 +157,7 @@ function pushMasteryTargets(ctx: ResolveContext): void {
       continue;
     }
     warnings.push(
-      `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it - the token stays where it is.`
+      `${forced.targetName} is pushed straight away from ${attacker.name}, but the map has nowhere to put it, so the token stays where it is.`
     );
   }
 }
@@ -166,7 +168,7 @@ export function spendSap(ctx: ResolveContext): void {
   if (attack === null) return;
   for (const sapped of attacker.effects.filter((effect) => effect.tags.includes(SAPPED_TAG))) {
     endEffect(state, attacker.id, sapped.id);
-    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: sapped.name });
+    effectsEnded.push(endedEffect(attacker, sapped));
   }
 }
 
@@ -181,5 +183,5 @@ export function spendVex(ctx: ResolveContext): void {
   );
   if (!marker) return;
   endEffect(state, target.id, marker.id);
-  effectsEnded.push({ actorId: target.id, actorName: target.name, name: marker.name });
+  effectsEnded.push(endedEffect(target, marker));
 }

@@ -72,7 +72,7 @@
 .party-archived {
   margin-top: 1.4rem;
 }
-/* A disclosure row in a stacked list grows its paint to 44px rather than overhanging its neighbours. */
+/* A disclosure row in a stacked list grows its paint to 44px and stays inside its own row. */
 .party-archived > summary {
   display: flex;
   align-items: center;
@@ -134,5 +134,62 @@
   }
   .party-queue-actions .nh-btn {
     flex: 1 1 auto;
+  }
+}
+
+/* The sample party's note: what the samples are, and the one action that clears them. */
+.party-samples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 1.6rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.party-samples p {
+  flex: 1 1 18rem;
+  margin: 0;
+  color: var(--text-dim);
+}
+.party-roster-body > .join-address {
+  margin-bottom: var(--space-4);
+}
+
+/* A phone gets compact cards: the portrait beside the name, and the actions two to a row under them, so the party
+   fits a screen without a tall portrait band per character. */
+@media (max-width: 560px) {
+  .party-gallery {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+  .party-gallery .party-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    min-height: 0;
+  }
+  .party-gallery .party-card-thumb {
+    display: grid;
+    place-items: center;
+    aspect-ratio: auto;
+    padding: var(--space-3) 0 var(--space-3) var(--space-3);
+    background: transparent;
+  }
+  .party-gallery .party-card .nh-card-status {
+    left: auto;
+    right: var(--space-2);
+  }
+  .party-gallery .party-card .party-card-preview,
+  .party-gallery .party-card .nh-card-actions {
+    grid-column: 1 / -1;
+  }
+  .party-gallery .party-card .nh-card-actions {
+    flex-wrap: wrap;
+  }
+  .party-gallery .party-card .nh-card-actions > button {
+    flex: 1 1 calc(50% - var(--space-2));
   }
 }

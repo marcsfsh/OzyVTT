@@ -10,7 +10,7 @@ import type { TokenMapGeometry } from "./token-placement.js";
  * on a calibrated grid, distancePerPixel on a scaled gridless map); an unmeasurable map narrates
  * without numbers.
  *
- * Viewer safety: the result splits into a player-visible line (only when the mover is public, naming
+ * Viewer safety: the result splits into a player-visible line (only when the mover is public; it names
  * only public combatants) and a GM-only line with hidden combatants' distances, or the whole narration
  * when the mover is hidden. A player can never learn a hidden token's range from the log.
  */
@@ -58,7 +58,7 @@ export type CreatureFootprint = Readonly<{ position: Point; sizeCells: number; s
 
 /**
  * Rules-facing distance between two creatures, edge to edge (SRD: from the nearest point of each
- * creature's space), so Medium adjacent to Large (2x2) is 5 ft, not 10. Grid maps subtract each
+ * creature's space), so Medium adjacent to Large (2x2) is 5 ft away. Grid maps subtract each
  * footprint's half-width in cells; scaled gridless maps subtract each token's radius beyond its central
  * cell. Null when unmeasurable.
  */
@@ -125,13 +125,20 @@ export function narrateTokenMove(
     mode?: MoveMode;
     /** It crawled, being Prone. */
     crawled?: boolean;
+    /** Creatures the table can't know of beyond the GM-only ones (dynamic vision: none of the party perceives them). */
+    hiddenFromTable?: (actorId: string) => boolean;
+    /** It was hidden from the table when it set off. The table's line then says only where it is now: where it
+     *  started and how far it came would say where it hid. */
+    fromHiding?: boolean;
   }>
 ): MovementNarration | null {
   const { state, actorId, from, geometry } = input;
   const mover = state.actors.find((actor) => actor.id === actorId);
   if (!mover) return null;
   const to = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
-  const moverHidden = mover.visibility === "gm-only";
+  const hidden = (actor: GameState["actors"][number]) =>
+    actor.visibility === "gm-only" || input.hiddenFromTable?.(actor.id) === true;
+  const moverHidden = hidden(mover);
 
   if (to === null) {
     if (from === null) return null; // tray-to-tray: nothing happened
@@ -149,7 +156,7 @@ export function narrateTokenMove(
     sizeCells: moverToken?.sizeCells ?? 1,
     sizePx: moverToken?.sizePx ?? 0
   });
-  type Range = Readonly<{ name: string; hidden: boolean; label: string }>;
+  type Range = Readonly<{ name: string; hidden: boolean; label: string; nowLabel: string }>;
   const ranges: Range[] = [];
   for (const entry of state.combat.initiative) {
     if (entry.actorId === actorId) continue;
@@ -168,7 +175,7 @@ export function narrateTokenMove(
       before === null
         ? `${other.name} ${formatDistance(now)}`
         : `${other.name} ${formatDistance(before)} → ${formatDistance(now)}`;
-    ranges.push({ name: other.name, hidden: other.visibility === "gm-only", label });
+    ranges.push({ name: other.name, hidden: hidden(other), label, nowLabel: `${other.name} ${formatDistance(now)}` });
   }
 
   const how = input.crawled ? "crawled" : MODE_VERBS[input.mode ?? "walk"];
@@ -184,11 +191,18 @@ export function narrateTokenMove(
   if (moverHidden) return { publicText: null, gmText: withRanges(ranges) };
   const visible = ranges.filter((range) => !range.hidden);
   const concealed = ranges.filter((range) => range.hidden);
+  if (input.fromHiding) {
+    const now = visible.map((range) => range.nowLabel);
+    return {
+      publicText: `${mover.name} came into view${now.length > 0 ? ` - ${now.join(", ")}` : ""}.`,
+      gmText: withRanges(ranges)
+    };
+  }
   return {
     publicText: withRanges(visible),
     gmText:
       concealed.length > 0
-        ? `Hidden ranges for ${mover.name} - ${concealed.map((range) => range.label).join(", ")}.`
+        ? `Hidden ranges for ${mover.name}: ${concealed.map((range) => range.label).join(", ")}.`
         : null
   };
 }

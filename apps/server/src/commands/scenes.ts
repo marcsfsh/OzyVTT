@@ -1,3 +1,4 @@
+import { EncounterArchiveLaunchSchema } from "@vtt/api-contract";
 import type { EncounterArchiveDocument } from "../encounter-archive.js";
 import { paintFog, resetFog, setFogEnabled } from "../fog.js";
 import {
@@ -58,9 +59,10 @@ export const sceneCommands = [
           restartTimeline(draft, timeline);
         }
       });
-      // Going live also presents the map on the shared screen.
+      // Going live also presents the map on the shared screen and starts the scene's sound.
       if (!duplicate && activate === true && state.combat.mapAssetId)
         await kit.context.presentSceneMap(state.combat.mapAssetId);
+      if (!duplicate && activate === true) await kit.context.sound?.sceneWentLive(commandId, state.revision);
       return { sceneId: commandId };
     }
   }),
@@ -95,8 +97,8 @@ export const sceneCommands = [
     type: "scene.activate",
     operationId: "activateScene",
     description:
-      "Switches the live table to a prepared scene, parking the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.",
-    summary: "Switch the live table to a prepared scene, parking the current one (GM).",
+      "Switches the live table to a prepared scene and parks the current one non-destructively (GM-grade only). Rejected while the timeline is rewound; the turn-snapshot timeline restarts for the newly live scene.",
+    summary: "Switch the live table to a prepared scene and park the current one (GM).",
     schema: SceneIdSchema,
     malformed: "The scene command is malformed.",
     gmOnly: "Only the GM can switch scenes.",
@@ -118,11 +120,12 @@ export const sceneCommands = [
       if (resumedArchived.length > 0)
         kit.context.appendLog({
           kind: "scene",
-          text: `This scene still stages ${resumedArchived.length} archived character${resumedArchived.length === 1 ? "" : "s"} (${resumedArchived.map((actor) => actor.name).join(", ")}) - restore or remove them.`,
+          text: `This scene still stages ${resumedArchived.length} archived character${resumedArchived.length === 1 ? "" : "s"} (${resumedArchived.map((actor) => actor.name).join(", ")}). Restore or remove ${resumedArchived.length === 1 ? "it" : "them"}.`,
           gmOnly: true
         });
-      // Going live also presents the scene's map on the shared screen.
+      // Going live also presents the scene's map on the shared screen and starts its sound.
       if (state.combat.mapAssetId) await kit.context.presentSceneMap(state.combat.mapAssetId);
+      await kit.context.sound?.sceneWentLive(sceneId, state.revision);
     }
   }),
 
@@ -180,12 +183,13 @@ export const sceneCommands = [
     description:
       "Parks the live table exactly as a scene switch does and makes one recorded moment of this archive live on it (GM-grade only). The moment's combatants are cloned under new ids, so tonight's characters are never rewritten, and the parked scene resumes any time through scene.activate.",
     summary:
-      "Launch one recorded moment of an archived fight onto the live table, parking the current scene; the moment's combatants are cloned under new ids so live characters are never rewritten (GM).",
+      "Launch one recorded moment of an archived fight onto the live table and park the current scene; the moment's combatants are cloned under new ids so live characters are never rewritten (GM).",
     schema: ReplayLaunchSchema,
     malformed: "The replay launch is malformed.",
     gmOnly: "Only the GM can launch a replay.",
     // The typed route lives on the archive it replays, so its `{id}` is the archive's number.
     pathParams: (params) => ({ archiveId: Number(params.id) }),
+    reply: { schema: EncounterArchiveLaunchSchema, description: "The launched scene and the cloned combatants." },
     // Parks the live table like `scene.activate` and goes live on a recorded moment.
     async run({ request, executeTimeline }, kit) {
       const { commandId, archiveId, turnIndex } = request;
@@ -216,7 +220,7 @@ export const sceneCommands = [
       if (!duplicate) {
         kit.context.appendLog({
           kind: "scene",
-          text: `Launched a recorded moment: "${outcome.label}". The table you were on is parked - switch back any time.`,
+          text: `Launched a recorded moment: "${outcome.label}". The table you were on is parked. Switch back any time.`,
           gmOnly: true
         });
         if (state.combat.mapAssetId) await kit.context.presentSceneMap(state.combat.mapAssetId);
@@ -229,7 +233,7 @@ export const sceneCommands = [
     type: "fog.set-enabled",
     operationId: "setFogEnabled",
     description:
-      "Turns manual fog of war on/off (GM-grade only). Enabled fog with no reveal strokes hides the whole map from players and the shared screen; `sceneId` targets a prepared scene's private prep instead of the live table.",
+      "Turns manual fog of war on/off (GM-grade only). Enabled fog with no reveal strokes hides the whole map from players and the shared screen; `sceneId` targets a prepared scene's private prep; without it, the live table.",
     summary: "Turn manual fog of war on/off for the live table or a prepared scene (GM).",
     schema: FogSetEnabledSchema,
     malformed: "The fog command is malformed.",
@@ -240,7 +244,7 @@ export const sceneCommands = [
       if (!duplicate && sceneId === undefined)
         kit.context.appendLog({
           kind: "scene",
-          text: enabled ? "Fog of war enabled - unrevealed ground is hidden from players." : "Fog of war disabled.",
+          text: enabled ? "Fog of war is on. Unrevealed ground is hidden from players." : "Fog of war is off.",
           gmOnly: true
         });
     }
@@ -274,7 +278,7 @@ export const sceneCommands = [
     type: "fog.reset",
     operationId: "resetFog",
     description:
-      "Clears every fog stroke - with fog enabled the whole map is hidden again (GM-grade only). `sceneId` targets a prepared scene.",
+      "Clears every fog stroke, so with fog on the whole map is hidden again (GM-grade only). `sceneId` targets a prepared scene.",
     summary: "Hide the whole map again (clear every fog stroke) (GM).",
     schema: FogResetSchema,
     malformed: "The fog command is malformed.",

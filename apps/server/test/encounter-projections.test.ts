@@ -94,6 +94,7 @@ describe("recipient-safe encounter projections", () => {
       reactionsUsed: [],
       fog: { enabled: false, shapes: [] },
       terrain: { difficult: [] },
+      vision: { enabled: false },
       rewound: false,
       pendingSaves: [],
       pendingReactions: [],
@@ -159,22 +160,37 @@ describe("recipient-safe encounter projections", () => {
     expect(token.conditionIds).toEqual(["poisoned", "exhaustion"]);
   });
 
-  it("hides the Initiative list when a scene is live but not fighting, keeping the map/fog but no tokens", () => {
+  it("hides the Initiative list when a scene is live but not fighting, keeping the map, fog and placed public tokens", () => {
     const state = game(PUBLIC);
     state.combat = { ...state.combat, active: false, turnActorId: null };
     expect(projectViewerInitiative(state)).toEqual({ visible: false, round: 0, hiddenTurn: false, entries: [] });
-    // A live scene keeps its map and fog on the shared screen, but every combatant token (public or
-    // hidden) stays off until the fight is running.
+    // A live scene shows the shared screen what players see before the fight: its map and fog, and the public
+    // tokens the GM has placed. A hidden combatant stays off it.
     const scene = projectViewerEncounterScene(state);
     expect(scene).toEqual({
       mapAssetId: MAP,
-      tokens: [],
+      tokens: [
+        {
+          actorId: PUBLIC,
+          name: "Visible Hero",
+          kind: "player-character",
+          position: { x: 200, y: 200 },
+          sizePx: 40,
+          active: false,
+          health: "healthy",
+          conditions: [],
+          conditionIds: []
+        }
+      ],
       annotations: [],
       fog: { enabled: false, shapes: [] },
       terrain: { difficult: [] }
     });
-    expect(JSON.stringify(scene)).not.toContain(PUBLIC);
     expect(JSON.stringify(scene)).not.toContain(HIDDEN);
+    // Players get the same tokens and no turn order before the fight.
+    const player = projectPlayerCombat(state);
+    expect(player.tokens.map((token) => token.actorId)).toEqual([PUBLIC]);
+    expect(player.initiative).toEqual([]);
   });
 });
 
@@ -264,9 +280,13 @@ describe("recipient-safe annotation projections", () => {
     expect(view.annotations.some((annotation) => annotation.id === "90000000-0000-4000-8000-000000000001")).toBe(false);
   });
 
-  it("returns no annotations once combat is inactive", () => {
+  it("keeps the live map's annotations between fights and drops them with no map", () => {
     const state = gameWithAnnotations();
     state.combat = { ...state.combat, active: false };
+    expect(projectPlayerCombat(state, PLAYER_A, 1000).annotations).toEqual(
+      projectPlayerCombat(gameWithAnnotations(), PLAYER_A, 1000).annotations
+    );
+    state.combat = { ...state.combat, mapAssetId: null };
     expect(projectPlayerCombat(state, PLAYER_A, 1000).annotations).toEqual([]);
   });
 
@@ -379,7 +399,7 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     expect(state.actors[0].healthDisplay).toBeUndefined();
   });
 
-  it("keeps the default band silent - no healthDisplay reaches players or the viewer", () => {
+  it("keeps the default band silent: no healthDisplay reaches players or the viewer", () => {
     const state = healthGame();
     expect(projectPlayerView(state, PLAYER_A, () => null).actors.every((actor) => !("healthDisplay" in actor))).toBe(
       true
@@ -391,7 +411,7 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     const state = healthGame({ style: "ring", audience: "gm" });
     const view = projectPlayerView(state, PLAYER_A, () => null);
     expect(view.actors.every((actor) => !("healthDisplay" in actor))).toBe(true);
-    // The non-owned monster is still a coarse band for players - never exact HP.
+    // The non-owned monster is still a coarse band for players, never exact HP.
     expect(view.actors.find((actor) => actor.id === GOBLIN)!.hp).toEqual({ kind: "band", band: "bloodied" });
     expect(projectViewerEncounterScene(state).tokens.every((token) => !("healthDisplay" in token))).toBe(true);
   });
@@ -434,7 +454,7 @@ describe("token health-display projection (audience gate, viewer safety)", () =>
     expect(demotedTokens.find((token) => token.actorId === PUBLIC)!.healthDisplay).toEqual({ style: "bar" });
   });
 
-  it("gates the aura style exactly like bar/ring - to everyone under audience all, hidden under gm", () => {
+  it("gates the aura style exactly like bar/ring: to everyone under audience all, hidden under gm", () => {
     const shown = healthGame({ style: "aura", audience: "all" });
     expect(projectViewerEncounterScene(shown).tokens.every((token) => token.healthDisplay?.style === "aura")).toBe(
       true

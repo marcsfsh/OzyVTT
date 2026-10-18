@@ -22,7 +22,7 @@ export const StoredDefinitionSchema = z
   })
   .strict();
 export type StoredDefinition = z.infer<typeof StoredDefinitionSchema>;
-/** A player-submitted PDF import awaiting GM approval. GM-only — never in PlayerView or the viewer (ADR-0018). */
+/** A player-submitted PDF import awaiting GM approval. GM-only: never in PlayerView or the viewer (ADR-0018). */
 export const PendingImportSchema = z
   .object({
     id: z.string().max(120),
@@ -34,7 +34,11 @@ export const PendingImportSchema = z
 export type PendingImport = z.infer<typeof PendingImportSchema>;
 
 export const RollVisibilitySchema = z.enum(["public", "gm-only", "blind", "self-only"]);
-export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "healing", "manual"]);
+/** What a roll was for. `builder` marks the rolls the character builder makes itself (Hit Points for new levels, a
+ *  set of ability scores), which a sheet's latest-roll line leaves out; only the builder records one. */
+export const RollPurposeSchema = z.enum(["attack", "save", "check", "damage", "healing", "manual", "builder"]);
+/** The purposes a free `dice.roll` may carry: every one but the builder's. */
+export const TableRollPurposeSchema = RollPurposeSchema.exclude(["builder"]);
 export const RollRecordSchema = z.object({
   id: z.uuid(),
   commandId: z.uuid(),
@@ -60,12 +64,13 @@ export const RollRecordSchema = z.object({
   ),
   modifiers: z.array(z.object({ value: z.number().int().nonnegative(), sign: z.union([z.literal(1), z.literal(-1)]) })),
   total: z.number().int(),
-  /** The d20 was typed from a physical die rather than thrown by the server. */
+  /** The d20 was typed from a physical die; the server threw nothing. */
   typed: z.literal(true).optional(),
   createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
 export type RollPurpose = z.infer<typeof RollPurposeSchema>;
+export type TableRollPurpose = z.infer<typeof TableRollPurposeSchema>;
 export type RollRecord = z.infer<typeof RollRecordSchema>;
 export type PlayerRollRecord = Omit<RollRecord, "initiatorSessionId">;
 
@@ -91,7 +96,7 @@ export const EncounterTokenSchema = z
     sizePx: z.number().positive().max(4096),
     gridSizePx: z.number().positive().max(4096).nullable().default(null),
     gridRotationRadians: z.number().min(-Math.PI).max(Math.PI).nullable().default(null),
-    /** Footprint in cells per side; even sizes snap to grid intersections instead of cell centers. */
+    /** Footprint in cells per side; even sizes snap to grid intersections, odd ones to cell centers. */
     sizeCells: z.number().int().min(1).max(4).default(1)
   })
   .strict();
@@ -212,7 +217,7 @@ const PendingSaveEffectSchema = z
     /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
      * once that has ended. */
     castId: z.string().min(1).max(120).optional(),
-    /** The action it came from, so a second hit from the same action refreshes rather than stacks. */
+    /** The action it came from, so a second hit from the same action refreshes it and never stacks. */
     sourceActionId: z.string().max(120).optional(),
     /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
     ongoingDamage: EffectInstanceSchema.shape.ongoingDamage,
@@ -339,7 +344,7 @@ export const HeldRollSchema = z
       .default([]),
     /** The roll the faces were recorded under. */
     rollId: z.uuid().nullable().default(null),
-    /** Typed from a physical die rather than thrown by the server. */
+    /** Typed from a physical die; the server threw nothing. */
     typed: z.boolean().default(false),
     /** The round and turn they were thrown in: a die held for one turn's attack is not reused on a later turn. */
     round: z.number().int().nonnegative(),
@@ -438,7 +443,7 @@ export const ParkedAttackSchema = z
     distanceFeet: z.number().min(0).max(100000).nullable(),
     initiatorRole: z.enum(["gm", "player"]),
     initiatorSessionId: z.string().min(1).max(200),
-    /** The bonus lasts until the reactor's next turn (Shield) rather than against this attack only (Parry). */
+    /** The bonus lasts until the reactor's next turn (Shield); without it, the bonus counts against this attack only (Parry). */
     untilNextTurn: z.boolean(),
     /** Extras chosen for the hit (Sneak Attack, a smite), checked and spent only if it still hits. */
     hitOptions: z
@@ -508,6 +513,8 @@ export const PendingReactionSchema = z
     rollsAttack: z.boolean().default(false),
     /** attack-would-hit: the attack the answer finishes. */
     parkedAttack: ParkedAttackSchema.nullable().default(null),
+    /** attack-would-hit: the held attack's total, against the reactor's AC before the reaction. */
+    attackTotal: z.number().int().min(-100).max(1000).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -637,14 +644,87 @@ export const PendingRuleAskSchema = z
     /** The machine-readable rule that blocked it (e.g. `economy.action-used`). */
     rule: z.string().min(1).max(120),
     family: RuleFamilySchema.nullable().default(null),
-    /** The player-facing sentence the block produced ("That needs your action - already used this turn"). */
+    /** The player-facing sentence the block produced ("Borin has already used a Bonus Action this turn."). */
     message: z.string().min(1).max(300),
-    /** The parked command, replayed verbatim on Allow. GM-only - never projected to any player. */
+    /** The parked command, replayed verbatim on Allow. GM-only, never projected to any player. */
     command: z.object({ type: AskableCommandSchema, payload: z.unknown() }).strict(),
     createdAt: z.iso.datetime()
   })
   .strict();
 export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
+
+/** A point on the battlemap, in image pixels. */
+const VisionPointSchema = z.object({ x: z.number().min(0).max(100000), y: z.number().min(0).max(100000) }).strict();
+
+/** A wall in image pixels (ADR-0023). A wall blocks sight, light and movement; a door does too while it is closed; a
+ * window blocks movement only. `open` is a door's alone. */
+export const VisionWallSchema = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(["wall", "door", "window"]),
+    a: VisionPointSchema,
+    b: VisionPointSchema,
+    open: z.boolean().optional()
+  })
+  .strict();
+export type VisionWall = z.infer<typeof VisionWallSchema>;
+
+/** A light: placed on the map (`position`) or carried by a token (`actorId`), never both. Radii are in feet as the SRD
+ * prints them: Bright Light out to `brightFeet`, and Dim Light for `dimFeet` more. */
+export const VisionLightSchema = z
+  .object({
+    id: z.uuid(),
+    position: VisionPointSchema.nullable().default(null),
+    actorId: z.uuid().nullable().default(null),
+    brightFeet: z.number().min(0).max(1000),
+    dimFeet: z.number().min(0).max(1000)
+  })
+  .strict()
+  .refine((light) => (light.position === null) !== (light.actorId === null), {
+    message: "A light is either placed on the map or carried by a token."
+  });
+export type VisionLight = z.infer<typeof VisionLightSchema>;
+
+/** The scene's dynamic vision (ADR-0023). Off by default, so a scene without it behaves as before. `measure` is the
+ * map's size and scale, written by the server whenever the GM edits it, so feet convert to pixels without the map
+ * catalog (a replay of the fight reads it too). `explored` is what the party has seen in this scene: a bitmap over the
+ * map in `cellPx` squares, row-major, base64. GM-only as stored; players get their own projection. */
+export const SceneVisionSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    ambient: z.enum(["bright", "dim", "dark"]).default("bright"),
+    walls: z.array(VisionWallSchema).max(1000).default([]),
+    lights: z.array(VisionLightSchema).max(100).default([]),
+    measure: z
+      .object({
+        width: z.number().positive().max(100000),
+        height: z.number().positive().max(100000),
+        pixelsPerFoot: z.number().positive().max(10000)
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    explored: z
+      .object({
+        cellPx: z.number().positive().max(100000),
+        columns: z.number().int().min(1).max(256),
+        rows: z.number().int().min(1).max(256),
+        bits: z.string().max(11000)
+      })
+      .strict()
+      .nullable()
+      .default(null)
+  })
+  .strict();
+export type SceneVision = z.infer<typeof SceneVisionSchema>;
+export const EMPTY_SCENE_VISION: SceneVision = {
+  enabled: false,
+  ambient: "bright",
+  walls: [],
+  lights: [],
+  measure: null,
+  explored: null
+};
 
 /**
  * An area a spell left on the map that acts on creatures later (Spirit Guardians, Moonbeam, a wall of fire): the
@@ -695,7 +775,7 @@ const sceneCombatShape = {
   /** The spell areas that act on creatures later (see SpellZoneSchema). GM-only. */
   spellZones: z.array(SpellZoneSchema).max(20).default([]),
   /** Action economy of the current turn's actor, reset on turn change. `actionInstance` holds remaining components
-   * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound bonus action (Flurry of
+   * of an open compound action (Extra Attack) and `bonusActionInstance` those of a compound Bonus Action (Flurry of
    * Blows); `turnUses` is keyed `${actorId}:${actionId}`. */
   turn: z
     .object({
@@ -798,8 +878,8 @@ const sceneCombatShape = {
   /** Legendary actions spent since each creature's last turn start (SRD refresh). Stripped from the player projection. */
   legendaryUsed: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** Manual fog of war (ADR-0022): an ordered list of reveal/hide rects applied over "all hidden"; enabled with
-   * no shapes means a fully hidden map. Rects are in image-pixel space. Fog is presentation, not the security
-   * boundary: hidden actors and annotations are stripped by their own projections, so players get this verbatim. */
+   * no shapes means a fully hidden map. Rects are in image-pixel space. Players get the shapes verbatim; a creature
+   * whose whole space lies under the fog is left out of their projections (ADR-0023). */
   fog: z
     .object({
       enabled: z.boolean().default(false),
@@ -843,6 +923,9 @@ const sceneCombatShape = {
     })
     .strict()
     .prefault({ difficult: [] }),
+  /** Walls, doors, lights and what the party has seen (ADR-0023). With `enabled`, the server sends each player only
+   * what their characters can see; scene dressing like fog, so a rewind keeps it. */
+  vision: SceneVisionSchema.prefault({}),
   pendingSaves: z.array(PendingSaveSchema).max(100).default([]),
   pendingReactions: z.array(PendingReactionSchema).max(20).default([]),
   /** GM-only (see PendingDamageSchema). */
@@ -853,7 +936,7 @@ const sceneCombatShape = {
   pendingInitiative: z.array(z.uuid()).max(200).default([])
 };
 
-/** A parked scene's frozen combat - same fields and invariants as the live combat, minus the map (the Scene owns that). */
+/** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */
 export const SceneCombatSchema = z.object(sceneCombatShape).superRefine(refineCombatContext);
 export type SceneCombat = z.infer<typeof SceneCombatSchema>;
 
@@ -864,6 +947,11 @@ export const SceneSchema = z
     name: z.string().min(1).max(120),
     mapAssetId: z.uuid(),
     combat: SceneCombatSchema.prefault({}),
+    /** When the GM prepared it, last changed its record and last made it live, in epoch ms. GM-only, as every scene
+     * is; a scene saved before these existed has none. */
+    createdAt: z.number().int().nonnegative().optional(),
+    updatedAt: z.number().int().nonnegative().optional(),
+    liveAt: z.number().int().nonnegative().optional(),
     /** Set when this scene is a launched replay. Such scenes are disposable: `scenes.ts` drops the scene and its
      * cloned combatants (`Actor.replaySceneId`) when the table leaves it. GM-only. */
     replayOf: z
@@ -929,6 +1017,10 @@ export const CombatStateSchema = z
         active.combat.fog.enabled ||
         active.combat.fog.shapes.length > 0 ||
         active.combat.terrain.difficult.length > 0 ||
+        active.combat.vision.enabled ||
+        active.combat.vision.walls.length > 0 ||
+        active.combat.vision.lights.length > 0 ||
+        active.combat.vision.explored !== null ||
         active.combat.pendingSaves.length > 0 ||
         active.combat.pendingReactions.length > 0 ||
         active.combat.pendingDamage.length > 0 ||
@@ -938,7 +1030,7 @@ export const CombatStateSchema = z
       context.addIssue({
         code: "custom",
         path: ["scenes"],
-        message: "The active scene's stored combat must be empty - its live copy is the top-level combat."
+        message: "The active scene's stored combat must be empty, because its live copy is the top-level combat."
       });
     }
   });

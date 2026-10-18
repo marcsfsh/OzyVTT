@@ -27,7 +27,7 @@ interface ChecklistProps {
  * An ordered list of short tickable lines (`{ text, done }` only), e.g. a quest's objectives.
  *
  * Read-only when `onChange` is absent: players see progress with no checkbox, field, remove, Add or anything
- * focusable, rather than a disabled editor that announces refused controls.
+ * focusable, so no disabled editor announces refused controls.
  *
  * Not built on `RowEditor`, which requires a stable row id (items have none), has no read-only mode, and
  * spends a grip and menu on each row. Use `RowEditor` once a row grows a second field.
@@ -50,7 +50,7 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
 
   const remove = (index: number) => {
     // Removal has no native announcement; name the row so "Remove" isn't announced bare.
-    setAnnouncement(`${nameOf(items[index], index)} removed — ${items.length - 1} left.`);
+    setAnnouncement(`${nameOf(items[index], index)} removed, ${items.length - 1} left.`);
     onChange?.(items.filter((_, i) => i !== index));
   };
 
@@ -97,7 +97,7 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
                     {item.done && <IconCheck />}
                   </span>
                   <span className="nh-checklist-text">{item.text}</span>
-                  <span className="nh-sr-only">{item.done ? "— done" : "— not done"}</span>
+                  <span className="nh-sr-only">{item.done ? ", done" : ", not done"}</span>
                 </>
               )}
             </li>
@@ -107,7 +107,7 @@ export function Checklist({ items, onChange, onAdd, addLabel, max, ariaLabel, cl
 
       {editable && onAdd && (
         <div className="nh-checklist-foot">
-          {/* At capacity, disable Add with its reason rather than hiding it. */}
+          {/* At capacity, disable Add and show its reason; the button stays visible. */}
           <Button
             variant="secondary"
             size="sm"

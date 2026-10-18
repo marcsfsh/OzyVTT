@@ -1,11 +1,19 @@
 import { useState } from "react";
 import type { BuilderOffer, ContentSpellSummary } from "@vtt/domain";
 import { ABILITIES, type Ability } from "@vtt/rules-5e";
-import { Alert, Badge, ChoiceGrid, SegmentedControl, Select, type ChoiceOption } from "@vtt/ui";
+import { Alert, ChoiceGrid, SegmentedControl, Select, type ChoiceOption } from "@vtt/ui";
 import type { BuilderCatalogs } from "../content/catalogs";
+import { HomebrewBadge } from "../homebrew/marks";
 // The fight's own spell card, so a spell reads the same while choosing it and while casting it.
 import { SpellCard } from "../encounter/spells";
-import { ABILITY_LABELS, ABILITY_SCORE_CAP, ASI_SHORTHAND, FEAT_KINDS, type BuilderDraft } from "./build-payload";
+import {
+  ABILITY_LABELS,
+  ABILITY_SCORE_CAP,
+  ASI_SHORTHAND,
+  FEAT_KINDS,
+  increaseLabel,
+  type BuilderDraft
+} from "./build-payload";
 
 /** The grids that answer the table's offers: one pick, or an Ability Score Improvement. */
 
@@ -22,8 +30,7 @@ const SPELL_KINDS: ReadonlySet<string> = new Set(["spell", "cantrip"]);
  * Badge only the exception: nearly every option is SRD, so only homebrew gets a badge. `ChoiceCard`
  * collapses the slot when the badge is `undefined`.
  */
-export const sourceBadge = (source: string | undefined) =>
-  source === "homebrew" ? <Badge tone="primary">Homebrew</Badge> : undefined;
+export const sourceBadge = (source: string | undefined) => (source === "homebrew" ? <HomebrewBadge /> : undefined);
 /** Sentence-cases a stored provenance phrase for a card's disabled reason. */
 const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
 
@@ -37,15 +44,13 @@ const spellLevelLine = (level: number | null | undefined) =>
 
 /**
  * Provenance for an offer option, by id. The server's offers carry options as `{ id, name, level? }`,
- * so `source` is looked back up in the catalog the id came from.
- *
- * Subclasses and feats only: spell, equipment and monster summaries carry no `source`, so a
- * homebrew spell is still unbadged. These catalogs are audience-merged server-side, so nothing a
- * player may not see can be badged.
+ * so `source` is looked back up in the catalog the id came from. These catalogs are built for the reader on the
+ * server, so nothing a player may not see can be badged.
  */
 const offerSource = (catalogs: BuilderCatalogs, id: string): string | undefined =>
   catalogs.choice.subclasses.find((entry) => entry.id === id)?.source ??
-  catalogs.choice.feats.find((entry) => entry.id === id)?.source;
+  catalogs.choice.feats.find((entry) => entry.id === id)?.source ??
+  catalogs.choice.spells.find((entry) => entry.id === id)?.source;
 
 /**
  * One pick offered by the content: heading, count, and the grid that answers it.
@@ -86,13 +91,13 @@ export function OfferPicker({
   const isFeat = FEAT_KINDS.has(offer.kind);
   const options: ChoiceOption[] = offer.options.map((option) => ({
     value: option.id,
-    // The option's name is the title for every kind (equipment included), matching the review step.
+    // The option's name is the title for every kind (equipment included), as in the review step.
     title: option.name,
     // Feats show their summary. A spell's type line ("Cantrip", "Level 3") also goes in `description`,
     // not `meta`, which is the mono micro-label meant for numbers.
     description: isFeat ? featSummary(catalogs, option.id) : spellLevelLine(option.level),
     badge: sourceBadge(offerSource(catalogs, option.id)),
-    // A proficiency the build already holds stays listed but disabled, saying where it came from;
+    // A proficiency the build already holds stays listed but disabled and says where it came from;
     // picked from another source it would be merged away server-side, silently costing a pick.
     ...(offer.unavailable?.[option.id]
       ? { disabled: true, disabledReason: asReason(offer.unavailable[option.id]) }
@@ -168,7 +173,7 @@ export function AsiOffer({
       title: option.name,
       description: featSummary(catalogs, option.id),
       badge: sourceBadge(offerSource(catalogs, option.id)),
-      // A feat whose prerequisite this build does not meet stays listed, saying why.
+      // A feat whose prerequisite this build does not meet stays listed and says why.
       ...(offer.unavailable?.[option.id]
         ? { disabled: true, disabledReason: asReason(offer.unavailable[option.id]) }
         : {}),
@@ -255,7 +260,10 @@ export function AsiOffer({
                 <span className="cb-asi-label">+{amount} to</span>
                 <Select
                   value={chosen}
-                  aria-label={`Ability to raise by ${amount}`}
+                  aria-label={increaseLabel(
+                    slots.map(() => amount),
+                    index
+                  )}
                   onChange={(event) => setAbility(index, event.target.value)}
                 >
                   <option value="">Choose an ability…</option>
@@ -267,7 +275,7 @@ export function AsiOffer({
                     return (
                       <option key={ability} value={ability} disabled={noRoom && ability !== chosen}>
                         {ABILITY_LABELS[ability]}
-                        {total == null ? "" : ` — ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
+                        {total == null ? "" : ` · ${total}${noRoom ? ` (over ${ABILITY_SCORE_CAP})` : ""}`}
                       </option>
                     );
                   })}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameStateSchema, type CombatLogEntry, type GameState, type RollRecord } from "@vtt/domain";
-import { playerReplayMapAssetIds, projectPlayerReplay } from "../src/replay-projection.js";
+import { playerFeedId } from "../src/combat-log.js";
+import { playerReplayMapAssetIds, projectPlayerArchiveSummary, projectPlayerReplay } from "../src/replay-projection.js";
 import { startEncounter } from "../src/encounter.js";
 import type { EncounterArchiveDocument } from "../src/encounter-archive.js";
 
@@ -180,20 +181,20 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     expect(revealed.actors.find((actor) => actor.name === "Shadow Stalker")!.hp).toMatchObject({ kind: "band" });
   });
 
-  it("drops every roll that is not public - from the document AND from each turn's log slice", () => {
+  it("drops every roll that is not public: from the document AND from each turn's log slice", () => {
     const replay = projectPlayerReplay(3, document());
     expect(replay.rolls.map((entry) => entry.id)).toEqual(["r-public"]);
     const logIds = replay.turns.flatMap((turn) => turn.log.map((entry) => entry.id));
-    // Row 2 is gmOnly, row 3 is another player's self-only roll: neither survives.
-    expect(logIds).toEqual([1, 4]);
+    // Row 2 is gmOnly, row 3 is another player's self-only roll: neither survives. Ids are the live feed's opaque ones.
+    expect(logIds).toEqual([1, 4].map(playerFeedId));
     expect(JSON.stringify(replay)).not.toContain("readies an ambush");
     expect(JSON.stringify(replay)).not.toContain("in secret");
   });
 
   it("slices the log by turn boundary, so each moment carries its own commentary", () => {
     const replay = projectPlayerReplay(3, document());
-    expect(replay.turns[0].log.map((entry) => entry.id)).toEqual([1]);
-    expect(replay.turns[1].log.map((entry) => entry.id)).toEqual([4]);
+    expect(replay.turns[0].log.map((entry) => entry.id)).toEqual([playerFeedId(1)]);
+    expect(replay.turns[1].log.map((entry) => entry.id)).toEqual([playerFeedId(4)]);
   });
 
   it("never carries a session id, the journal, the raw states, the notes, or the stat blocks", () => {
@@ -258,5 +259,33 @@ describe("the player's replay is a projection, not a filtered archive", () => {
     idle.combat = { ...idle.combat, active: false };
     const parked = { ...source, turns: [{ ...source.turns[0], state: idle }] } as unknown as EncounterArchiveDocument;
     expect([...playerReplayMapAssetIds(3, parked)]).toEqual([]);
+  });
+});
+
+describe("a player's list of shared replays", () => {
+  it("carries the listed fields alone: the GM's name, never the scene, nor a field the GM's summary gains later", () => {
+    const entry = {
+      id: 7,
+      archivedAt: "2026-10-17T20:30:00.000Z",
+      startedAt: "2026-10-17T20:18:00.000Z",
+      endedAt: "2026-10-17T20:30:00.000Z",
+      turnCount: 3,
+      playerVisible: true,
+      name: "Ambush at the bridge",
+      sceneName: "Goblin cave",
+      // A GM-side field added after this projection was written.
+      gmNote: "The goblins were the bait."
+    };
+    const projected = projectPlayerArchiveSummary(entry);
+    expect(projected).toEqual({
+      id: 7,
+      archivedAt: "2026-10-17T20:30:00.000Z",
+      startedAt: "2026-10-17T20:18:00.000Z",
+      endedAt: "2026-10-17T20:30:00.000Z",
+      turnCount: 3,
+      playerVisible: true,
+      name: "Ambush at the bridge"
+    });
+    expect(JSON.stringify(projected)).not.toMatch(/Goblin cave|bait/);
   });
 });

@@ -1,10 +1,12 @@
 import { pageLinkKey, type CodexConnectionSourceKind } from "@vtt/domain";
 import type { CodexDb } from "./db.js";
+import { parseStringArray } from "./validate.js";
 
 /**
  * `[[wiki link]]` mentions (`codex_links`), re-extracted from a record's text by every write that changes it.
- * A mention takes its layer from the text it sits in, so GM-layer text only ever yields GM-layer edges. The
- * table has no foreign key (its sources live in four tables), so each kind scrubs its rows on delete.
+ * A mention takes its layer from the text it sits in, so GM-layer text only ever yields GM-layer edges. One in a
+ * hidden block shown to some characters is GM layer with those `characterIds`, which a reader holding one of them
+ * receives. The table has no foreign key (its sources live in four tables), so each kind scrubs its rows on delete.
  */
 
 export type CodexLinkTargetKind = "page" | "actor" | "monster" | "spell" | "map" | "marker";
@@ -21,9 +23,13 @@ export type CodexMentionRow = Readonly<{
   sourceKind: CodexConnectionSourceKind;
   sourceId: string;
   layer: "player" | "gm";
+  /** Set only on a GM-layer mention from a block shown to these characters. */
+  characterIds: readonly string[];
   targetRef: string;
   section: string | null;
 }>;
+/** One piece of a record's text and who reads it. */
+export type CodexLinkSource = Readonly<{ text: string; layer: "player" | "gm"; characterIds?: readonly string[] }>;
 
 const WIKILINK = /\[\[([^\]]+)\]\]/g;
 const TARGET_KINDS = new Set<string>(["page", "actor", "monster", "spell", "map", "marker"]);
@@ -65,12 +71,33 @@ export function rebuildLinks(
   playerText: string,
   gmText: string
 ): void {
+  rebuildLinksFrom(db, sourceKind, sourceId, [
+    { text: playerText, layer: "player" },
+    { text: gmText, layer: "gm" }
+  ]);
+}
+
+/** Leaf write: replace one record's mentions with those in `sources`, one row per distinct mention and audience. */
+export function rebuildLinksFrom(
+  db: CodexDb,
+  sourceKind: CodexConnectionSourceKind,
+  sourceId: string,
+  sources: readonly CodexLinkSource[]
+): void {
   scrubLinks(db, sourceKind, sourceId);
   const insert = db.database.prepare(
-    "INSERT INTO codex_links (source_kind, source_id, layer, target_kind, target_ref, section) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO codex_links (source_kind, source_id, layer, target_kind, target_ref, section, character_ids_json) VALUES (?, ?, ?, ?, ?, ?, ?)"
   );
-  for (const link of [...parseWikiLinks(playerText, "player"), ...parseWikiLinks(gmText, "gm")])
-    insert.run(sourceKind, sourceId, link.layer, link.targetKind, link.targetRef, link.section);
+  const seen = new Set<string>();
+  for (const source of sources) {
+    const characterIds = source.layer === "gm" ? JSON.stringify([...(source.characterIds ?? [])].sort()) : "[]";
+    for (const link of parseWikiLinks(source.text, source.layer)) {
+      const key = `${link.layer}|${characterIds}|${link.targetKind}|${link.targetRef}|${link.section ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      insert.run(sourceKind, sourceId, link.layer, link.targetKind, link.targetRef, link.section, characterIds);
+    }
+  }
 }
 
 /** Leaf delete of one record's mentions. */
@@ -82,6 +109,7 @@ type MentionRowRaw = {
   source_kind: CodexConnectionSourceKind;
   source_id: string;
   layer: "player" | "gm";
+  character_ids_json: string;
   target_ref: string;
   section: string | null;
 };
@@ -90,28 +118,33 @@ function toMention(row: MentionRowRaw): CodexMentionRow {
     sourceKind: row.source_kind,
     sourceId: row.source_id,
     layer: row.layer,
+    characterIds: row.layer === "gm" ? parseStringArray(row.character_ids_json) : [],
     targetRef: row.target_ref,
     section: row.section
   };
 }
+const MENTION_COLUMNS = "source_kind, source_id, layer, character_ids_json, target_ref, section";
 
-/** Every mention of the page with this link key, except the page's mentions of itself. */
+/**
+ * Every mention of the page with this link key, except the page's mentions of itself. In a fixed order: a save
+ * rewrites its record's rows, so table order would move other pages' panels on a GM-only save.
+ */
 export function mentionsOf(db: CodexDb, linkKey: string, pageId: string): CodexMentionRow[] {
   return (
     db.database
       .prepare(
-        "SELECT source_kind, source_id, layer, target_ref, section FROM codex_links WHERE target_kind = 'page' AND target_ref = ? AND NOT (source_kind = 'page' AND source_id = ?)"
+        `SELECT ${MENTION_COLUMNS} FROM codex_links WHERE target_kind = 'page' AND target_ref = ? AND NOT (source_kind = 'page' AND source_id = ?) ORDER BY source_kind, source_id, layer, character_ids_json, section`
       )
       .all(linkKey, pageId) as MentionRowRaw[]
   ).map(toMention);
 }
 
-/** The page mentions in one page's own text. */
+/** The page mentions in one page's own text, in the order its text holds them. */
 export function mentionsFrom(db: CodexDb, pageId: string): CodexMentionRow[] {
   return (
     db.database
       .prepare(
-        "SELECT source_kind, source_id, layer, target_ref, section FROM codex_links WHERE source_kind = 'page' AND source_id = ? AND target_kind = 'page'"
+        `SELECT ${MENTION_COLUMNS} FROM codex_links WHERE source_kind = 'page' AND source_id = ? AND target_kind = 'page' ORDER BY rowid`
       )
       .all(pageId) as MentionRowRaw[]
   ).map(toMention);
@@ -122,7 +155,7 @@ export function allPageMentions(db: CodexDb): CodexMentionRow[] {
   return (
     db.database
       .prepare(
-        "SELECT source_kind, source_id, layer, target_ref, section FROM codex_links WHERE target_kind = 'page' ORDER BY source_kind, source_id, target_ref, layer"
+        `SELECT ${MENTION_COLUMNS} FROM codex_links WHERE target_kind = 'page' ORDER BY source_kind, source_id, target_ref, layer, character_ids_json`
       )
       .all() as MentionRowRaw[]
   ).map(toMention);

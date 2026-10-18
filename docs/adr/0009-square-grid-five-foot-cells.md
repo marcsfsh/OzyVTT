@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted by implementation — recorded 2026-08-01. **Closes** ADR-0009 ("Square grid /
+Accepted by implementation, recorded 2026-08-01. **Closes** ADR-0009 ("Square grid /
 five-foot cells for MVP; measurement conventions pending spike"), which had no file and stood
 as _Proposed … pending spike_ in `docs/adr/README.md`.
 
@@ -10,14 +10,14 @@ as _Proposed … pending spike_ in `docs/adr/README.md`.
 
 Shipped, and load-bearing. Calibration is `{origin, cellSizePx, rotationRadians,
 distancePerCell}`. The square-grid path derives `cellSizePx` from a 3×3 drag, sets `origin` to
-the min corner, and **locks rotation to 0** (`apps/server/src/grid-calibration.ts`) — drag
+the min corner, and **locks rotation to 0** (`apps/server/src/grid-calibration.ts`), so drag
 imprecision is never read as a rotated grid. Non-square maps are handled by a distance scale
-rather than a grid (`deriveMapDistanceScale`, `apps/server/src/map-measurement.ts`).
+with no grid (`deriveMapDistanceScale`, `apps/server/src/map-measurement.ts`).
 
-Measurement conventions were settled in code rather than in a spike: cones follow 5e RAW equal
+Measurement conventions were settled in code, with no spike: cones follow 5e RAW equal
 length and width (`apps/client/src/scene/annotationGlyph.tsx`), and ephemeral annotations
 expire on a fixed schedule with a re-broadcast at expiry (`apps/server/src/annotations.ts`).
-The server owns snapping in every case — odd footprints centre on a cell, even footprints on a
+The server owns snapping in every case: odd footprints centre on a cell, even footprints on a
 grid intersection, gridless maps clamp without snapping (`apps/server/src/token-placement.ts`).
 
 ## Recorded outcome
@@ -28,6 +28,6 @@ and should not be scheduled.
 
 ## What is still open
 
-Nothing about the grid itself. Fog is a separate decision (ADR-0022) and is presentation only.
+Nothing about the grid itself. Fog and dynamic vision are separate decisions (ADR-0022, ADR-0023).
 Difficult terrain and the movement preview now build on these cells: see the 2026-10-16 amendment to
 ADR-0020.

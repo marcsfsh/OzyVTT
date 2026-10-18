@@ -59,7 +59,7 @@ function buildSpellIndex(spells: readonly ContentSpellSummary[]): SpellIndex {
   return { byName, matcher: new RegExp(`\\b(${escaped.join("|")})\\b`, "gi") };
 }
 
-/** Splits a plain-text run on recognized spell names, wrapping each hit in a button that opens its card. */
+/** Splits a plain-text run on recognized spell names and wraps each hit in a button that opens its card. */
 function linkSpells(
   text: string,
   index: SpellIndex,
@@ -114,7 +114,7 @@ export function SpellcastingText({ text }: Readonly<{ text: string }>) {
   const index = useMemo(() => buildSpellIndex(spells), [spells]);
   const [open, setOpen] = useState<ContentSpellSummary | null>(null);
   const lines = text
-    .replace(/\s*—\s*/g, " - ")
+    .replace(/\s*\u2014\s*/g, " - ")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
@@ -144,12 +144,39 @@ export function SpellcastingText({ text }: Readonly<{ text: string }>) {
 
 /** In-tab spell rules window: header, the four reference lines, full description, and upcast note. */
 export function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSummary; onClose: () => void }>) {
-  const levelLine = spell.level === 0 ? `${capitalize(spell.school)} cantrip` : `Level ${spell.level} ${spell.school}`;
   return (
     <Modal open onClose={onClose} size="md" accent="violet" title={spell.name} ariaLabel={`${spell.name} spell rules`}>
+      <SpellCardContent spell={spell} />
+      <p className="spell-card-attribution">SRD 5.2.1, CC BY 4.0.</p>
+    </Modal>
+  );
+}
+
+/** The spell lists a card names: an SRD list by its class, and a homebrew one by the name the caller knows. */
+function listNames(spell: ContentSpellSummary, names?: (id: string) => string | null): string[] {
+  return spell.classes
+    .map((id) => names?.(id) ?? (id.startsWith("hb-") ? null : id.split("-").map(capitalize).join(" ")))
+    .filter((name): name is string => Boolean(name))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * The card's body, shared by the sheet, the builder and the Compendium, so a spell reads the same wherever it is
+ * met. The type line is the SRD's: "Level 3 Evocation (Sorcerer, Wizard)".
+ */
+export function SpellCardContent({
+  spell,
+  listName
+}: Readonly<{ spell: ContentSpellSummary; listName?: (id: string) => string | null }>) {
+  const school = capitalize(spell.school);
+  const lists = listNames(spell, listName);
+  const levelLine = spell.level === 0 ? `${school} Cantrip` : `Level ${spell.level} ${school}`;
+  return (
+    <>
       <p className="spell-card-type">
         {levelLine}
-        {spell.ritual ? " · ritual" : ""}
+        {lists.length > 0 ? ` (${lists.join(", ")})` : ""}
+        {spell.ritual ? " · Ritual" : ""}
       </p>
       <dl className="spell-card-meta">
         <div>
@@ -177,7 +204,6 @@ export function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSumm
           <RichText text={`**At Higher Levels.** ${spell.higherLevel}`} />
         </div>
       )}
-      <p className="spell-card-attribution">SRD 5.2.1, CC BY 4.0.</p>
-    </Modal>
+    </>
   );
 }

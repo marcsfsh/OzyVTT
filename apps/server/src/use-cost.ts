@@ -14,7 +14,7 @@ export function withChosenCost<T extends Pick<ActorAction, "name" | "useCost">>(
   spend: number | undefined
 ): T {
   if (action.useCost !== "chosen") {
-    if (spend !== undefined) throw new CommandRejectedError(`${action.name} spends a set amount - send no amount.`);
+    if (spend !== undefined) throw new CommandRejectedError(`${action.name} spends a set amount. Send no amount.`);
     return action;
   }
   if (spend === undefined) throw new CommandRejectedError(`Choose how much of ${action.name} to spend.`);
@@ -23,5 +23,5 @@ export function withChosenCost<T extends Pick<ActorAction, "name" | "useCost">>(
 
 /** Why a pool can't pay for this activation when it still holds something. */
 export function notEnoughUses(name: string, left: number, cost: number): string {
-  return `${name} has ${left} left - this spends ${cost}.`;
+  return `${name} has ${left} left, and this spends ${cost}.`;
 }

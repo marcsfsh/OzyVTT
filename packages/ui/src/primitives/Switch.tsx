@@ -52,7 +52,7 @@ export function Switch({
       <span className="nh-switch-track" aria-hidden="true">
         <span className="nh-switch-thumb" />
       </span>
-      {/* The label stays inside the button: it is part of the tap target. The band is margin on the button, not a
+      {/* The label stays inside the button: it is part of the tap target. The band is margin on the button, with no
           wrapper. */}
       {label != null && (
         <span className="nh-switch-label">

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import {
   currentHref,
-  discardTransient,
   gmTabForPath,
   isGmOnlyPath,
   isKnownPath,
@@ -11,11 +10,11 @@ import {
   lastLocationForTab,
   layerOf,
   litGmTab,
+  litPlayerTab,
   navigate,
   pathForGmTab,
   redirectForRetiredPath,
-  popTransient,
-  pushTransient,
+  SOUND_BOARD_PATH,
   registerNavigationGuard,
   rememberLocation,
   replaceQuery,
@@ -43,8 +42,17 @@ describe("The address table", () => {
     expect(gmTabForPath("/viewer")).toBeNull();
   });
 
+  it("gives the sound board its own address in the Shared screen tab, for the GM only", () => {
+    expect(SOUND_BOARD_PATH).toBe("/viewer-controls/sound");
+    expect(gmTabForPath(SOUND_BOARD_PATH)).toBe("viewer");
+    expect(isKnownPath(SOUND_BOARD_PATH)).toBe(true);
+    expect(isKnownPath("/viewer-controls/sound/extra")).toBe(false);
+    expect(isKnownPath("/viewer-controls/music")).toBe(false);
+    expect(isGmOnlyPath(SOUND_BOARD_PATH)).toBe(true);
+  });
+
   it("round-trips every GM tab through its address", () => {
-    for (const tab of ["scenes", "table", "roster", "codex", "homebrew", "viewer", "replay", "settings"] as const) {
+    for (const tab of ["scenes", "table", "roster", "codex", "compendium", "viewer", "replay", "settings"] as const) {
       expect(gmTabForPath(pathForGmTab(tab))).toBe(tab);
     }
   });
@@ -65,6 +73,14 @@ describe("The address table", () => {
     expect(litGmTab("/scenes/maps")).toBe("scenes");
     expect(litGmTab("/replays/12")).toBe("replay");
     expect(litGmTab("/nonsense")).toBeNull();
+    // A player's own sheet, its level page and the builder belong to My character.
+    expect(litPlayerTab("/characters/a1")).toBe("mine");
+    expect(litPlayerTab("/characters/a1/level")).toBe("mine");
+    expect(litPlayerTab("/builder")).toBe("mine");
+    expect(litPlayerTab("/me")).toBe("mine");
+    expect(litPlayerTab("/codex/pages/p1")).toBe("codex");
+    expect(litPlayerTab("/replays/12")).toBe("table");
+    expect(litPlayerTab("/table")).toBe("table");
   });
 
   it("reads each layer back off its address", () => {
@@ -72,9 +88,19 @@ describe("The address table", () => {
     expect(layerOf("/characters/a1/level")).toEqual({ kind: "level", actorId: "a1" });
     expect(layerOf("/builder")).toEqual({ kind: "builder" });
     expect(layerOf("/replays/12")).toEqual({ kind: "replay", archiveId: 12 });
-    expect(layerOf("/scenes/maps")).toEqual({ kind: "maps" });
-    expect(layerOf("/scenes/new")).toEqual({ kind: "scene-prep", sceneId: null });
-    expect(layerOf("/scenes/s1")).toEqual({ kind: "scene-prep", sceneId: "s1" });
+    expect(layerOf("/scenes/maps")).toEqual({ kind: "scenes", view: { view: "maps" } });
+    expect(layerOf("/scenes/list")).toEqual({ kind: "scenes", view: { view: "scenes" } });
+    expect(layerOf("/scenes/new")).toEqual({ kind: "scenes", view: { view: "scene", sceneId: null, step: "map" } });
+    expect(layerOf("/scenes/s1")).toEqual({ kind: "scenes", view: { view: "scene", sceneId: "s1", step: null } });
+    expect(layerOf("/scenes/s1", new URLSearchParams("step=light"))).toEqual({
+      kind: "scenes",
+      view: { view: "scene", sceneId: "s1", step: "light" }
+    });
+    expect(layerOf("/scenes/maps/m1")).toEqual({ kind: "scenes", view: { view: "map", mapId: "m1", step: null } });
+    expect(layerOf("/scenes/maps/new")).toEqual({
+      kind: "scenes",
+      view: { view: "map", mapId: null, step: "upload" }
+    });
     // A tab's own address is not a layer, or every tab would render one.
     expect(layerOf("/table")).toBeNull();
     expect(layerOf("/replays")).toBeNull();
@@ -82,12 +108,18 @@ describe("The address table", () => {
   });
 
   /**
-   * A retired address redirects rather than 404s, so old bookmarks land somewhere true.
+   * A retired address redirects (no 404), so old bookmarks land somewhere true.
    */
   it("redirects the addresses that moved, and nothing else", () => {
     expect(redirectForRetiredPath("/encounter", new URLSearchParams())).toBe("/table");
     expect(redirectForRetiredPath("/setup", new URLSearchParams())).toBe("/settings");
+    expect(redirectForRetiredPath("/homebrew", new URLSearchParams())).toBe("/compendium");
     expect(redirectForRetiredPath("/scenes", new URLSearchParams("view=maps"))).toBe("/scenes/maps");
+    // The map library's one-map address lands on that map's grid step, still knowing to go back to the table.
+    expect(redirectForRetiredPath("/scenes/maps", new URLSearchParams("map=m1&from=table"))).toBe(
+      "/scenes/maps/m1?step=grid&back=%2Ftable"
+    );
+    expect(redirectForRetiredPath("/scenes/maps", new URLSearchParams())).toBeNull();
     expect(redirectForRetiredPath("/scenes", new URLSearchParams())).toBeNull();
     expect(redirectForRetiredPath("/table", new URLSearchParams())).toBeNull();
     expect(redirectForRetiredPath("/codex/pages", new URLSearchParams())).toBeNull();
@@ -98,22 +130,27 @@ describe("Which addresses exist", () => {
   it("knows the codex sections, and rejects a section that does not exist", () => {
     expect(isKnownPath("/codex")).toBe(true);
     for (const section of [
+      "search",
       "pages",
       "atlas",
-      "graph",
+      "story",
+      "timeline",
       "sessions",
       "quests",
-      "journal",
-      "calendar",
-      "downtime",
-      "audit",
+      "relationships",
+      "templates",
       "backup",
       "settings"
     ]) {
       expect(isKnownPath(`/codex/${section}`)).toBe(true);
     }
-    expect(isKnownPath("/codex/relationships")).toBe(false); // the retired name
     expect(isKnownPath("/codex/notebook")).toBe(false); // the retired word
+  });
+
+  it("still answers the addresses from before the remaster, which the shells redirect", () => {
+    for (const section of ["graph", "journal", "calendar", "downtime", "audit"]) {
+      expect(isKnownPath(`/codex/${section}`)).toBe(true);
+    }
   });
 
   it("allows a record id only on the sections that HAVE records", () => {
@@ -121,8 +158,10 @@ describe("Which addresses exist", () => {
     expect(isKnownPath("/codex/sessions/s1")).toBe(true);
     expect(isKnownPath("/codex/quests/q1")).toBe(true);
     expect(isKnownPath("/codex/atlas/m1")).toBe(true);
-    // The journal focuses an entry with `?entry=`, not a path segment; the other shape must not work.
-    expect(isKnownPath("/codex/journal/j1")).toBe(false);
+    expect(isKnownPath("/codex/templates/t1")).toBe(true);
+    // The chronicle focuses an entry with `?entry=` and no path segment; the other shape must not work.
+    expect(isKnownPath("/codex/story/j1")).toBe(false);
+    expect(isKnownPath("/codex/search/x")).toBe(false);
     expect(isKnownPath("/codex/settings/anything")).toBe(false);
   });
 
@@ -157,6 +196,13 @@ describe("Which addresses exist", () => {
       "/codex/graph",
       "/codex/graph/g1",
       "/codex/audit",
+      "/codex/search",
+      "/codex/search/x",
+      "/codex/story",
+      "/codex/story/x",
+      "/codex/timeline",
+      "/codex/templates",
+      "/codex/templates/t1",
       "/codex/backup",
       "/codex/settings",
       "/codex/settings/anything",
@@ -169,7 +215,7 @@ describe("Which addresses exist", () => {
     ];
     for (const address of addresses) {
       const renders = codexSectionOf(address.split("/").filter(Boolean)) !== null;
-      expect(isKnownPath(address), `${address} — router says ${isKnownPath(address)}, shell says ${renders}`).toBe(
+      expect(isKnownPath(address), `${address}: router says ${isKnownPath(address)}, shell says ${renders}`).toBe(
         renders
       );
     }
@@ -181,11 +227,26 @@ describe("Which addresses a player may reach (viewer safety)", () => {
    * The client half of the GM-only rule. The server refuses a player token anyway, but a player who
    * reaches the address has already learned the surface exists; the not-found view prevents that.
    */
-  it("marks the three GM-only codex addresses, and only those three", () => {
+  it("marks the GM menu's codex addresses and the retired audit GM-only, and only those", () => {
     expect(isGmOnlyPath("/codex/audit")).toBe(true);
+    expect(isGmOnlyPath("/codex/templates")).toBe(true);
+    expect(isGmOnlyPath("/codex/templates/t1")).toBe(true);
     expect(isGmOnlyPath("/codex/backup")).toBe(true);
     expect(isGmOnlyPath("/codex/settings")).toBe(true);
-    for (const section of ["pages", "atlas", "graph", "sessions", "quests", "journal", "calendar", "downtime"]) {
+    for (const section of [
+      "search",
+      "pages",
+      "atlas",
+      "story",
+      "timeline",
+      "relationships",
+      "sessions",
+      "quests",
+      "graph",
+      "journal",
+      "calendar",
+      "downtime"
+    ]) {
       expect(isGmOnlyPath(`/codex/${section}`)).toBe(false);
     }
     expect(isGmOnlyPath("/codex")).toBe(false);
@@ -195,7 +256,8 @@ describe("Which addresses a player may reach (viewer safety)", () => {
     expect(isGmOnlyPath("/scenes")).toBe(true);
     expect(isGmOnlyPath("/scenes/maps")).toBe(true);
     expect(isGmOnlyPath("/roster")).toBe(true);
-    expect(isGmOnlyPath("/homebrew")).toBe(true);
+    expect(isGmOnlyPath("/compendium")).toBe(true);
+    expect(isGmOnlyPath("/compendium/spells/hb-brine-burst-a1b2c3")).toBe(true);
     expect(isGmOnlyPath("/viewer-controls")).toBe(true);
     expect(isGmOnlyPath("/codex")).toBe(false);
   });
@@ -215,12 +277,16 @@ describe("Which addresses a player may reach (viewer safety)", () => {
   });
 
   /**
-   * `/settings` is shared (a player gets the Mine group) while `/settings/api` is GM-only; a player
-   * asking for it gets the not-found view.
+   * `/settings` and its Device section are shared (a player gets Device alone) while every other section is
+   * GM-only; a player asking for one gets the not-found view.
    */
-  it("keeps /settings shared and /settings/api GM-only", () => {
+  it("keeps /settings and its Device section shared and the other sections GM-only", () => {
     expect(isGmOnlyPath("/settings")).toBe(false);
+    expect(isGmOnlyPath("/settings/device")).toBe(false);
+    for (const section of ["players", "fights", "characters", "access", "api"])
+      expect(isGmOnlyPath(`/settings/${section}`), section).toBe(true);
     expect(isGmOnlyPath("/settings/api")).toBe(true);
+    expect(isGmOnlyPath("/settings/api/listIntegrationCredentials")).toBe(true);
   });
 
   /**
@@ -257,6 +323,11 @@ describe("The addresses D29 added", () => {
     expect(isKnownPath("/scenes/new")).toBe(true);
     expect(isKnownPath("/scenes/maps")).toBe(true);
     expect(isKnownPath("/scenes/s1")).toBe(true);
+    expect(isKnownPath("/scenes/list")).toBe(true);
+    expect(isKnownPath("/scenes/maps/new")).toBe(true);
+    expect(isKnownPath("/scenes/maps/m1")).toBe(true);
+    expect(isKnownPath("/scenes/s1/more")).toBe(false);
+    expect(isKnownPath("/scenes/maps/m1/more")).toBe(false);
     expect(isKnownPath("/replays")).toBe(true);
     expect(isKnownPath("/replays/12")).toBe(true);
     expect(isKnownPath("/me")).toBe(true);
@@ -270,12 +341,25 @@ describe("The addresses D29 added", () => {
     expect(isKnownPath("/builder/new")).toBe(false);
     expect(isKnownPath("/replays/abc")).toBe(false);
     expect(isKnownPath("/settings/table")).toBe(false);
-    // `/settings/api` is the one two-segment settings address; a length check would open all of them.
-    expect(isKnownPath("/settings/api/keys")).toBe(false);
+    // A section by its id, and an operation of the API reference by its operation id; a length check would open
+    // every shape.
+    expect(isKnownPath("/settings/fights")).toBe(true);
+    expect(isKnownPath("/settings/api/listIntegrationCredentials")).toBe(true);
+    expect(isKnownPath("/settings/fights/rules")).toBe(false);
+    expect(isKnownPath("/settings/api/keys/1")).toBe(false);
+    expect(isKnownPath("/settings/api/%20")).toBe(false);
     expect(isKnownPath("/me/anything")).toBe(false);
+    // The Compendium's views, and each record at its kind's address.
+    expect(isKnownPath("/compendium")).toBe(true);
+    expect(isKnownPath("/compendium/tables/spells")).toBe(true);
+    expect(isKnownPath("/compendium/sources")).toBe(true);
+    expect(isKnownPath("/compendium/spells/hb-brine-burst-a1b2c3")).toBe(true);
+    expect(isKnownPath("/compendium/tables/dragons")).toBe(false);
+    expect(isKnownPath("/compendium/spells/fireball/extra")).toBe(false);
     // Retired addresses no longer exist, so a stale stored location self-heals.
     expect(isKnownPath("/encounter")).toBe(false);
     expect(isKnownPath("/setup")).toBe(false);
+    expect(isKnownPath("/homebrew")).toBe(false);
   });
 });
 
@@ -314,7 +398,7 @@ describe("Navigating", () => {
   });
 });
 
-describe("Navigation guards (D6 — autosave off, draft dirty)", () => {
+describe("Navigation guards (D6: autosave off, draft dirty)", () => {
   /**
    * Flush past the guard chain before asserting a non-navigation: `mayLeave()` awaits each guard, so
    * the push lands several microtasks after `navigate()` returns. A macrotask boundary is past all of
@@ -417,58 +501,6 @@ describe("Back and forward are guarded too (mobile parity)", () => {
   });
 });
 
-describe("Transient history (the phone nav drawer)", () => {
-  it("closes the drawer on back instead of leaving the section", () => {
-    goTo("/codex/pages");
-    const onPop = vi.fn();
-    pushTransient("nav-drawer", onPop);
-    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
-    expect(onPop).toHaveBeenCalledTimes(1);
-    // The address is untouched.
-    expect(window.location.pathname).toBe("/codex/pages");
-  });
-
-  it("withdraws its entry when the drawer is closed by its own X, so back still means back", () => {
-    goTo("/codex/pages");
-    const onPop = vi.fn();
-    pushTransient("nav-drawer", onPop);
-    popTransient("nav-drawer");
-    // Withdrawn, so the next pop is a real navigation and the handler is not called again.
-    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
-    expect(onPop).not.toHaveBeenCalled();
-  });
-
-  it("ignores popTransient for a key that was never pushed", () => {
-    goTo("/codex/pages");
-    expect(() => popTransient("never-opened")).not.toThrow();
-  });
-
-  /**
-   * `discardTransient` exists because `popTransient` cannot serve a caller about to navigate: in a
-   * browser `history.back()` is a task and `navigate`'s push is a microtask, so closing then
-   * navigating would push the destination and immediately go back off it.
-   */
-  it("discardTransient forgets the entry WITHOUT going back, and says one was stranded", () => {
-    goTo("/codex/pages");
-    const onPop = vi.fn();
-    pushTransient("nav-drawer", onPop);
-    const at = window.location.pathname;
-
-    expect(discardTransient("nav-drawer")).toBe(true);
-    // No history movement: the caller overwrites the entry itself.
-    expect(window.location.pathname).toBe(at);
-    // The handler is gone, so a later pop is a real navigation.
-    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
-    expect(onPop).not.toHaveBeenCalled();
-  });
-
-  it("discardTransient reports false when nothing was open, so the caller does not replace by mistake", () => {
-    // No drawer, so the navigation must push; replacing would eat the entry the GM came from.
-    goTo("/codex/pages");
-    expect(discardTransient("nav-drawer")).toBe(false);
-  });
-});
-
 describe("Resume-last-location", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -477,7 +509,7 @@ describe("Resume-last-location", () => {
     localStorage.clear();
   });
 
-  it("resumes only from the bare root — a deep link always wins", () => {
+  it("resumes only from the bare root: a deep link always wins", () => {
     rememberLocation("gm", "/codex/quests");
     expect(resumeTarget("gm", "/codex/pages/p1")).toBeNull();
     expect(resumeTarget("gm", "/")).toBe("/codex/quests");
@@ -513,7 +545,7 @@ describe("Resume-last-location", () => {
 
   /**
    * Locations are remembered per tab, so leaving the Codex for the Table and coming back returns to
-   * the record that was open, not the tab's front door.
+   * the record that was open, where the tab's front door would otherwise be.
    */
   describe("per tab", () => {
     it("returns to the record that was open in that tab, not to the tab's front door", () => {
@@ -523,7 +555,7 @@ describe("Resume-last-location", () => {
       expect(lastLocationForTab("gm", "table")).toBe("/table");
     });
 
-    it("keeps the tabs apart — leaving one does not overwrite where you were in another", () => {
+    it("keeps the tabs apart: leaving one does not overwrite where you were in another", () => {
       rememberLocation("gm", "/codex/quests/q1");
       rememberLocation("gm", "/scenes?view=maps");
       expect(lastLocationForTab("gm", "codex")).toBe("/codex/quests/q1");
@@ -531,7 +563,7 @@ describe("Resume-last-location", () => {
     });
 
     it("has nothing to say about a tab never visited", () => {
-      expect(lastLocationForTab("gm", "homebrew")).toBeNull();
+      expect(lastLocationForTab("gm", "compendium")).toBeNull();
     });
 
     it("refuses an address that no longer exists, so a deleted record cannot strand a tab", () => {

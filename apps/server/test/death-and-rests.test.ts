@@ -63,7 +63,7 @@ describe("the dead regain no hit points", () => {
     const state = game();
     healActor(state, GOBLIN, 5, { role: "gm" });
     expect(state.actors[1].hp.current).toBe(0);
-    expect(() => setCurrentHp(state, GOBLIN, 7, { role: "gm" })).toThrow(/dead - revive them/);
+    expect(() => setCurrentHp(state, GOBLIN, 7, { role: "gm" })).toThrow(/dead\. Revive /);
     // A dying character is not dead: healing still wakes them.
     const dyingState = game(dying);
     healActor(dyingState, HERO, 3, { role: "gm" });
@@ -75,15 +75,15 @@ describe("rests need at least 1 Hit Point", () => {
   it("a dead character gets no Long Rest", () => {
     const state = game(dead);
     expect(() => applyRest(state, HERO, "long", resolve(state))).toThrow(
-      /Torva is dead - a rest can't bring them back/
+      /Torva is dead, and a rest can't bring Torva back/
     );
     expect(state.actors[0].hp.current).toBe(0);
   });
 
   it("a dying or stable character at 0 gets neither rest", () => {
     const state = game(dying);
-    expect(() => applyRest(state, HERO, "long", resolve(state))).toThrow(/0 Hit Points - a Long Rest needs at least 1/);
-    expect(() => applyRest(state, HERO, "short", resolve(state))).toThrow(/a Short Rest needs at least 1/);
+    expect(() => applyRest(state, HERO, "long", resolve(state))).toThrow(/0 Hit Points. A Long Rest needs at least 1/);
+    expect(() => applyRest(state, HERO, "short", resolve(state))).toThrow(/A Short Rest needs at least 1/);
     const stable = game({
       deathSaves: { successes: 0, failures: 0, stable: true },
       conditions: [{ id: "unconscious" }]
@@ -150,7 +150,7 @@ describe("over the API", () => {
     expect((await post(GAME_PATHS.claims, player, { commandId: randomUUID(), actorId: HERO })).status).toBe(200);
     const ask = await post(GAME_PATHS.restAsk.replace("{actorId}", HERO), player, { commandId: randomUUID() });
     expect(ask.status).toBe(409);
-    expect((await ask.json()).error.message).toBe("Torva is dead - a rest can't bring them back.");
+    expect((await ask.json()).error.message).toBe("Torva is dead, and a rest can't bring Torva back.");
     const heal = await post(GAME_PATHS.actorHeal.replace("{actorId}", HERO), gmToken, {
       commandId: randomUUID(),
       amount: 10

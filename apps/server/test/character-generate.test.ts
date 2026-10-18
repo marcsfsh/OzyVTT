@@ -31,7 +31,7 @@ const catalog = equipmentCatalogOf(library);
 const defaultPolicy = BuilderPolicySchema.parse({});
 const ACTOR_ID = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
 
-/** A seeded stand-in for `context.random` (1..sides), using mulberry32 so runs are reproducible. */
+/** A seeded stand-in for `context.random` (1..sides). It uses mulberry32, so runs are reproducible. */
 function seeded(seed: number): (sides: number) => number {
   let state = seed >>> 0;
   return (sides: number) => {
@@ -72,17 +72,17 @@ const CLASS_SIGNATURE: Readonly<Record<string, Readonly<{ atOne: string | null; 
   wizard: { atOne: "arcane-recovery", later: "arcane-recovery" }
 };
 
-/** Everything on the effective list this character owns rather than carries: actions and pools, minus item-derived ones. */
+/** Everything on the effective list that is this character's own: actions and pools, minus item-derived ones. */
 const ownContent = (actions: readonly ActorDefinition["actions"][number][]): Set<string> =>
   new Set([
     ...actions.filter((action) => !isItemActionId(action.id)).map((action) => action.id),
     ...actionPools(actions).map((pool) => pool.id)
   ]);
 
-describe("random character generator - the far end", () => {
+describe("random character generator: the far end", () => {
   it("rolls all twelve classes at levels 1/5/11/20, and each one round-trips through its own ledger", () => {
     expect(CLASS_IDS).toHaveLength(12);
-    // A thirteenth class must name what it owes rather than sliding through unchecked.
+    // A thirteenth class must name what it owes, so none slides through unchecked.
     expect([...CLASS_IDS].sort()).toEqual(Object.keys(CLASS_SIGNATURE).sort());
     const failures: string[] = [];
     for (const classId of CLASS_IDS) {
@@ -135,6 +135,30 @@ describe("random character generator - the far end", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
+  it("draws Magic Initiate's spells from the ones the class does not already prepare", () => {
+    // Sage and Acolyte give Magic Initiate from the Wizard and Cleric lists: the class's own list.
+    const pairs = [
+      ["wizard", "sage"],
+      ["cleric", "acolyte"]
+    ] as const;
+    const repeats: string[] = [];
+    for (const [classId, backgroundId] of pairs)
+      for (let seed = 1; seed <= 12; seed += 1) {
+        const { request } = generateCharacterRequest(
+          { classId, level: 5, backgroundId },
+          library,
+          defaultPolicy,
+          seeded(seed)
+        );
+        const spells = request.choices
+          .filter((row) => row.kind === "spell" || row.kind === "cantrip")
+          .map((row) => row.id);
+        const twice = spells.filter((id, index) => spells.indexOf(id) !== index);
+        if (twice.length > 0) repeats.push(`${classId} seed ${seed}: ${twice.join(", ")}`);
+      }
+    expect(repeats, repeats.join("\n")).toEqual([]);
+  });
+
   it("distributes the standard array by the class's own stat priority, and aims the background spread the same way", () => {
     for (const classId of CLASS_IDS) {
       const { request } = generateCharacterRequest({ classId, level: 5 }, library, defaultPolicy, seeded(7));
@@ -160,12 +184,39 @@ describe("random character generator - the far end", () => {
     }
   });
 
+  it("spends no prepared spell on one its subclass already keeps prepared", () => {
+    // SRD Life Domain: Aid, Bless, Cure Wounds and Lesser Restoration are always prepared from Cleric level 3, and
+    // Mass Healing Word and Revivify from level 5; a pick of one would leave the character a spell short.
+    const domain = new Set(["aid", "bless", "cure-wounds", "lesser-restoration", "mass-healing-word", "revivify"]);
+    for (const seed of [2, 3, 4, 6, 8, 10]) {
+      const { request } = generateCharacterRequest(
+        { classes: [{ classId: "cleric", level: 5 }], level: 5 },
+        library,
+        defaultPolicy,
+        seeded(seed)
+      );
+      expect(request.choices.find((row) => row.kind === "subclass")?.id).toBe("life-domain");
+      // The Cleric list's own picks; a feat's spell (Magic Initiate) is a pick of its own.
+      const picked = request.choices
+        .filter((row) => row.kind === "spell" && row.payload?.featureId === undefined)
+        .map((row) => row.id);
+      expect(
+        picked.filter((id) => domain.has(id)),
+        `seed ${seed}`
+      ).toEqual([]);
+      // Every pick the Cleric list made is one of the nine it prepares, none spent on a domain spell.
+      expect(
+        request.choices.filter((row) => row.kind === "spell" && row.payload?.featureId === undefined)
+      ).toHaveLength(9);
+    }
+  });
+
   it("is deterministic in its injected random, and only in that", () => {
     const once = generateCharacterRequest({ classId: "wizard", level: 11 }, library, defaultPolicy, seeded(2026));
     const twice = generateCharacterRequest({ classId: "wizard", level: 11 }, library, defaultPolicy, seeded(2026));
     expect(twice).toEqual(once);
     const other = generateCharacterRequest({ classId: "wizard", level: 11 }, library, defaultPolicy, seeded(2027));
-    // A different character, not just a different name (same class by request, everything else drawn).
+    // A different character beyond its name (same class by request, everything else drawn).
     expect(JSON.stringify(other.request.choices)).not.toEqual(JSON.stringify(once.request.choices));
   });
 
@@ -210,7 +261,7 @@ describe("random character generator - the far end", () => {
   // a wizard offer on `(level, kind, classId, featureId)`, so every generated row must carry that tuple.
   it("stamps every row with the tuple the level-up flow matches on", () => {
     // The subclass row must carry `payload.featureId`. Checked against the offer the build has, since
-    // "<class>-subclass" is the wizard's convention, not a law.
+    // "<class>-subclass" is only the wizard's convention.
     const misses: string[] = [];
     for (const classId of CLASS_IDS) {
       for (const level of LEVELS) {
@@ -244,7 +295,7 @@ describe("random character generator - the far end", () => {
   });
 
   it("records a chosen feat's own picks at the ASI that took it, not at the first one", () => {
-    // A feat's own picks must sit at the level the feat was taken, not at the first ASI level. The first seed
+    // A feat's own picks must sit at the level the feat was taken, even past the first ASI level. The first seed
     // whose cleric 11 takes a feat with picks of its own at the level-8 ASI shows it.
     const cleric = Array.from({ length: 60 }, (_, index) =>
       generateCharacterRequest({ classId: "cleric", level: 11 }, library, defaultPolicy, seeded(index + 1))
@@ -352,7 +403,7 @@ const post = (base: string, path: string, token: string, body: unknown) =>
     body: JSON.stringify(body)
   });
 
-describe("random character generator - the role gate", () => {
+describe("random character generator: the role gate", () => {
   it("is closed to players by default, opens on the GM's setting, and auto-claims what a player rolls", async () => {
     const { base, server, gmToken } = await boot();
     const playerToken = server.auth.issuePlayerSession();
@@ -394,7 +445,7 @@ describe("random character generator - the role gate", () => {
     const second = await post(base, GAME_PATHS.charactersRandom, playerToken, { commandId: randomUUID(), level: 3 });
     expect(second.status).toBe(409);
 
-    // The table's level cap is enforced against the stored policy, not the caller's word.
+    // The table's level cap is enforced against the stored policy, whatever the caller says.
     const capped = await post(base, GAME_PATHS.builderPolicy, gmToken, {
       commandId: randomUUID(),
       allowedAbilityMethods: ["standard-array"],

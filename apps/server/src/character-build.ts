@@ -1,5 +1,5 @@
 import type { BuilderPolicy } from "@vtt/domain";
-import { CatalogChoiceError, resolveCatalogChoice } from "@vtt/domain";
+import { CatalogChoiceError, resolveCatalogChoice, withArticle } from "@vtt/domain";
 import {
   ActorDefinitionSchema,
   MAX_ACTION_USES,
@@ -235,7 +235,7 @@ function resolvedUseLimit(uses: NonNullable<FeatureRecord["uses"]>, context: Bui
   return rows.length > 0 ? rows[rows.length - 1].limit : 0;
 }
 
-/** A feature action as a definition action, resolving the rider templates' to-hit and DC from the character's numbers. */
+/** A feature action as a definition action. The rider templates' to-hit and DC come from the character's numbers. */
 function interpretAction(
   feature: FeatureRecord,
   action: FeatureRecord["actions"][number],
@@ -324,8 +324,8 @@ function interpretAction(
 /** The action id a spell resolves through (`spells[].actionId`); namespaced so it cannot collide with a feature action. */
 const spellActionId = (spellId: string): string => `spell-${spellId}`;
 
-// `DiceFormulaSchema`'s shape, used to skip an unusable printed column here instead of failing the
-// whole build at schema validation.
+// `DiceFormulaSchema`'s shape, used to skip an unusable printed column here, so the whole build doesn't fail
+// at schema validation.
 const DICE_FORMULA = /^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i;
 
 /**
@@ -378,7 +378,7 @@ type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLe
 
 /**
  * A leveled spell as an action. Cast with a slot, it carries `spellSlot` at the spell's level, which the economy
- * spends (a higher slot on request, upcasting the dice). Cast without one (`free`), it spends the granting
+ * spends (a higher slot on request upcasts the dice). Cast without one (`free`), it spends the granting
  * feature's uses, or nothing at will. Null for an at-will cast with nothing to resolve.
  */
 function leveledSpellActionFor(
@@ -429,7 +429,7 @@ function ritualActionOf(cast: ActorAction, spell: SpellReference): ActorAction {
   };
 }
 
-/** The tag of a feature whose spell picks go to the spellbook to be prepared, not straight onto the prepared list
+/** The tag of a feature whose spell picks go to the spellbook to be prepared, and never straight onto the prepared list
  *  (Evocation Savant). */
 const SPELLBOOK_TAG = "spellbook";
 
@@ -481,7 +481,7 @@ function linkSpellActions(
       if (hasSlots && entry.withSlot !== false) {
         const cast = leveledSpellActionFor(record, numbers);
         mint(cast, "actionId");
-        // SRD Rituals: a prepared ritual spell can be cast without a slot, taking 10 minutes longer.
+        // SRD Rituals: a prepared ritual spell can be cast without a slot and takes 10 minutes longer.
         if (cast && record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
       }
       if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
@@ -522,7 +522,7 @@ function martialArtsStrike(context: BuildContext): ActorAction | null {
     id: UNARMED_STRIKE_ACTION_ID,
     name: "Unarmed Strike",
     activation: "action",
-    description: `A strike with your body. You roll your Martial Arts die (${die}) in place of the normal damage, and use Dexterity or Strength for the attack and damage rolls - whichever is higher. (SRD 5.2.1, Martial Arts)`,
+    description: `A strike with your body. You roll your Martial Arts die (${die}) in place of the normal damage, and use Dexterity or Strength for the attack and damage rolls, whichever is higher. (SRD 5.2.1, Martial Arts)`,
     attack: { bonus: modifier + context.proficiencyBonus, reachFeet: 5 },
     damage: [
       {
@@ -576,7 +576,7 @@ function interpretFeature(
     : undefined;
   const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
   // A spell picked for a feature with limited uses is cast with them (Magic Initiate once per Long Rest, Mystic
-  // Arcanum), so the counter rides that spell's free-cast action rather than an action of its own.
+  // Arcanum), so the counter rides that spell's free-cast action, with no action of its own.
   const freeCastPick = carriesUses && featurePicks(feature).some((pick) => pick.kind === "spell");
   if (freeCastPick) into.pickedSpellUses.set(feature.id, freeUses!);
   const synthesizedId = owned(feature.id);
@@ -625,7 +625,7 @@ function interpretFeature(
         withSlot: spell.withSlot,
         source,
         ...(spell.withoutSlot === "at-will" ? { free: null } : {}),
-        // A free casting with no counter to spend is refused at build rather than cast without limit.
+        // A free casting with no counter to spend is refused at build, so nothing casts without limit.
         ...(spell.withoutSlot === "free"
           ? { free: freeUses ?? reject(`"${feature.name}" casts ${spell.id} without a slot but has no uses to spend.`) }
           : {})
@@ -675,7 +675,7 @@ function interpretFeature(
 }
 
 /** Deduped `{kind, sourceId, id}` triples for every granted feature with an origin, in grant order.
- *  Truncated at the schema's 80 rather than rejecting an oversized homebrew class. */
+ *  Truncated at the schema's 80, so an oversized homebrew class is still accepted. */
 function dedupeFeatureRefs(
   granted: ReadonlyArray<{ record: FeatureRecord; origin: CharacterFeatureOrigin | null }>
 ): CharacterFeatureRef[] {
@@ -693,9 +693,9 @@ function dedupeFeatureRefs(
 }
 
 // The build. `library` is always an audience-scoped view, so a player can never build against (or
-// name) a homebrew record the GM has not made player-visible.
+// name) a homebrew record the GM has not shared with one of that player's characters.
 
-/** Rolled HP entries as ledger rows (level N is entry N-2), replacing any already in the input. A multiclass sheet's
+/** Rolled HP entries as ledger rows (level N is entry N-2), in place of any already in the input. A multiclass sheet's
  *  rows name the class each roll was for, so a later rebuild reuses a roll only where that class still is. */
 export function hitPointRollRows(
   input: Pick<CharacterCreateRequestInput, "hp" | "choices">,
@@ -713,7 +713,7 @@ export function hitPointRollRows(
 }
 
 /** The ledger row recording how the ability scores were made: the method, the base scores and the background's
- *  increase, which a rebuild re-sends rather than recomputing from the sheet's totals. */
+ *  increase, which a rebuild re-sends and never recomputes from the sheet's totals. */
 export const ABILITY_SCORES_KIND = "ability-scores";
 
 export function abilityScoresRow(
@@ -834,7 +834,7 @@ export function buildCharacterDefinition(
     if (total !== 2) reject("An Ability Score Improvement grants exactly +2 (one ability +2, or two abilities +1).");
   }
   // Each consumed "ability-score" pick is +1 (the choice vocabulary carries no amount). The ceiling is
-  // the offer's `maximum` (epic boons allow 30), not a fixed 20.
+  // the offer's `maximum` (epic boons allow 30), which isn't always 20.
   for (const offer of offers.filter((candidate) => candidate.kind === "ability-score")) {
     offer.taken.forEach((taken, index) => {
       const ability = ABILITIES.find((candidate) => candidate === taken) ?? reject(`"${taken}" is not an ability.`);
@@ -868,7 +868,7 @@ export function buildCharacterDefinition(
     }
     for (const increase of increases.filter((candidate) => candidate.level === level)) {
       finalScores[increase.ability] += increase.amount;
-      // Refused rather than clamped, so a pick past the ceiling is never silently lost.
+      // Refused and never clamped, so a pick past the ceiling is never silently lost.
       if (finalScores[increase.ability] > increase.maximum)
         reject(
           `${increase.ability.toUpperCase()} would be ${finalScores[increase.ability]}; ${increase.source} cannot raise a score above ${increase.maximum}. Choose another ability.`
@@ -1017,7 +1017,7 @@ export function buildCharacterDefinition(
     ...interpreted.grantedSkills
   ];
   // A pick of something the character already has, or the same pick twice, would be merged away below and the
-  // pick lost; the builder greys these out, so a payload that sends one is refused rather than quietly shortened.
+  // pick lost; the builder greys these out, so a payload that sends one is refused and never quietly shortened.
   const refuseRepeatPicks = (kind: string, picked: readonly string[], fixed: readonly string[]) => {
     const held = new Set(fixed);
     for (const id of picked) {
@@ -1221,7 +1221,7 @@ export function buildCharacterDefinition(
       };
       for (const row of budget.cantripRows) {
         const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${budget.className} spell list.`);
-        if (option.level !== 0) reject(`"${row.id}" is a level-${option.level} spell, not a cantrip.`);
+        if (option.level !== 0) reject(`"${row.id}" is a level ${option.level} spell. Record it as a spell choice.`);
         claim(row);
         if (alwaysPreparedGrants.has(option.id)) continue; // the grant supplies it, uncharged
         spells.push({
@@ -1236,7 +1236,7 @@ export function buildCharacterDefinition(
       for (const row of budget.spellRows) {
         const option = listOptions.get(row.id) ?? reject(`"${row.id}" is not on the ${budget.className} spell list.`);
         const spellLevel = option.level ?? 0;
-        if (spellLevel < 1) reject(`"${row.id}" is a cantrip - record it as a "cantrip" choice.`);
+        if (spellLevel < 1) reject(`"${row.id}" is a cantrip. Record it as a "cantrip" choice.`);
         if (spellLevel > budget.maxSlotLevel)
           reject(
             `"${row.id}" is level ${spellLevel}, above the highest slot level (${budget.maxSlotLevel}) at ${budget.className} ${entry.level}.`
@@ -1393,7 +1393,7 @@ export function buildCharacterDefinition(
       !background.startingEquipment.some((option) => option.id === row.id)
   );
   if (strayEquipment)
-    reject(`"${strayEquipment.id}" is not a ${classRecord.name} or ${background.name} equipment option.`);
+    reject(`"${strayEquipment.id}" is not ${withArticle(classRecord.name)} or ${background.name} equipment option.`);
   // Only one body armor stays equipped (two would fight over derived AC); keep the best base.
   const equippedArmor = inventory.filter((item) => item.category === "armor" && item.equipped);
   for (const extra of equippedArmor
@@ -1406,7 +1406,7 @@ export function buildCharacterDefinition(
   const size: ActorDefinition["size"] = sizeRow
     ? (species.sizes as readonly string[]).includes(sizeRow.id)
       ? (sizeRow.id as ActorDefinition["size"])
-      : reject(`${species.name} may be ${species.sizes.join(" or ")}, not "${sizeRow.id}".`)
+      : reject(`${species.name} may be ${species.sizes.join(" or ")}. Choose one of those sizes.`)
     : species.sizes.includes("medium")
       ? "medium"
       : species.sizes[0];

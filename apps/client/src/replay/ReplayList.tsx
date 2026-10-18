@@ -1,8 +1,16 @@
 import { useState } from "react";
-import { Button, IconChevronLeft, Menu, MenuItem, RevealSwitch, useToast } from "@vtt/ui";
+import { Button, Field, IconChevronLeft, Input, Menu, MenuItem, Modal, RevealSwitch, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
-import { dateOnly, durationOf, exportDocument, failure, readArchive, useReplays, type ArchiveSummary } from "./replays";
+import {
+  exportDocument,
+  failure,
+  readArchive,
+  replayMeta,
+  replayTitle,
+  useReplays,
+  type ArchiveSummary
+} from "./replays";
 import "./replay.css";
 
 export function ReplayList({
@@ -21,6 +29,7 @@ export function ReplayList({
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
   const [busy, setBusy] = useState<number | null>(null);
+  const [renaming, setRenaming] = useState<ArchiveSummary | null>(null);
 
   const setShared = async (archive: ArchiveSummary, shared: boolean) => {
     setBusy(archive.id);
@@ -53,7 +62,7 @@ export function ReplayList({
   const remove = async (archive: ArchiveSummary) => {
     const ok = await confirm({
       title: "Delete this replay?",
-      body: `The replay of the fight that ended ${dateOnly(archive.endedAt)} is gone — every turn, every roll, every line. This cannot be undone.`,
+      body: `${replayTitle(archive)} is gone, with every turn, roll and line of it. This cannot be undone.`,
       confirmLabel: "Delete",
       danger: true
     });
@@ -71,7 +80,7 @@ export function ReplayList({
   };
 
   /* Heading (and the player's way back) stay fixed; the rows are the one scroll region. Rows are
-     plain `<li>`s with rules drawn in `replay.css`, not cards. */
+     plain `<li>`s with rules drawn in `replay.css`, and no cards. */
   return (
     <section className="replay-panel replay-list-page pane-frame pane-scene scanlines frame-col anim-view">
       <div className="pane-sky" aria-hidden="true" />
@@ -94,21 +103,18 @@ export function ReplayList({
             <p>
               {role === "gm"
                 ? "No replays yet. Every fight that ends is kept here."
-                : "Your GM hasn’t shared a fight yet."}
+                : "Your GM hasn't shared a fight yet."}
             </p>
           </div>
         )}
         {archives !== null && archives.length > 0 && (
           <ul className="replay-rows">
             {archives.map((archive) => {
-              const duration = durationOf(archive.startedAt, archive.endedAt);
               return (
                 <li key={archive.id} className="replay-row">
                   <div className="replay-row-text">
-                    <span className="replay-row-title">{dateOnly(archive.endedAt)}</span>
-                    <span className="replay-row-meta tabular">
-                      {archive.turnCount} turns{duration ? ` · ${duration}` : ""}
-                    </span>
+                    <span className="replay-row-title">{replayTitle(archive)}</span>
+                    <span className="replay-row-meta tabular">{replayMeta(archive)}</span>
                   </div>
                   {role === "gm" && (
                     <RevealSwitch
@@ -124,6 +130,7 @@ export function ReplayList({
                     </Button>
                     {role === "gm" && (
                       <Menu trigger="More" label="More actions for this replay" align="end">
+                        <MenuItem onClick={() => setRenaming(archive)}>Rename…</MenuItem>
                         <MenuItem onClick={() => void download(archive)}>Download JSON</MenuItem>
                         <MenuItem tone="danger" onClick={() => void remove(archive)}>
                           Delete replay
@@ -138,6 +145,79 @@ export function ReplayList({
         )}
       </div>
       {dialog}
+      {renaming && (
+        <RenameReplay
+          archive={renaming}
+          token={token}
+          onClose={() => setRenaming(null)}
+          onRenamed={() => {
+            setRenaming(null);
+            refresh();
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+/** The GM names a replay. An empty name gives it back its scene and date. */
+function RenameReplay({
+  archive,
+  token,
+  onClose,
+  onRenamed
+}: Readonly<{ archive: ArchiveSummary; token: string; onClose: () => void; onRenamed: () => void }>) {
+  const [name, setName] = useState(archive.name ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await apiRequest(`/api/v1/encounters/${archive.id}/name`, {
+        token,
+        body: { name: name.trim() === "" ? null : name.trim() },
+        failure: "That name could not be saved."
+      });
+      onRenamed();
+    } catch (cause) {
+      setError((cause as Error).message);
+      setSaving(false);
+    }
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="sm"
+      title="Rename the replay"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => void save()} disabled={saving}>
+            Save name
+          </Button>
+        </>
+      }
+    >
+      <Field
+        label="Name"
+        htmlFor="replay-name"
+        help={`Players see this name once you share the replay. Leave it empty to call it ${archive.sceneName ?? "Fight"} again.`}
+        error={error ?? undefined}
+      >
+        <Input
+          id="replay-name"
+          value={name}
+          maxLength={80}
+          placeholder={archive.sceneName ?? "Fight"}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void save();
+          }}
+        />
+      </Field>
+    </Modal>
   );
 }

@@ -1,0 +1,358 @@
+/* The Codex's shared pieces: the hidden block, the Reveal panel, the page picker, the mini map and the date bar.
+   Hidden is violet with the crossed eye, everyone is indigo with the eye, chosen characters are cyan with a person. */
+
+.cx-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / var(--lh-body) var(--font-body);
+}
+
+/* ----- The hidden block ----- */
+.cx-block {
+  --cx-block-hue: var(--rim-gm);
+  --cx-block-ink: var(--violet-hi);
+  position: relative;
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--cx-block-hue) 60%, transparent);
+  border-left: 3px solid var(--cx-block-hue);
+  background: color-mix(in srgb, var(--cx-block-hue) 10%, var(--surface-1));
+}
+.cx-block.is-everyone {
+  --cx-block-hue: var(--indigo);
+  --cx-block-ink: var(--indigo-text);
+  background: color-mix(in srgb, var(--indigo) 9%, var(--surface-1));
+}
+.cx-block.is-characters {
+  --cx-block-hue: var(--cyan);
+  --cx-block-ink: var(--cyan-hi);
+  background: color-mix(in srgb, var(--cyan) 7%, var(--surface-1));
+}
+.cx-block.is-focus {
+  box-shadow: 0 0 0 2px var(--cyan);
+}
+.cx-block.is-draft {
+  border-style: dashed;
+  border-left-style: solid;
+}
+.cx-block-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+.cx-block-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  color: var(--cx-block-ink);
+}
+.cx-block-title {
+  flex: 1 1 8rem;
+  min-width: 0;
+  margin: 0;
+  color: var(--cx-block-ink);
+  font: 400 var(--fs-sm) / 1.25 var(--font-display);
+  letter-spacing: var(--tracking-display);
+}
+.cx-block-untitled {
+  font-family: var(--font-label);
+  font-weight: 600;
+  letter-spacing: 0;
+  opacity: 0.8;
+}
+.cx-block-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--cx-block-hue);
+  color: var(--cx-block-ink);
+  font: 700 var(--fs-2xs) / 1 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.cx-block-body {
+  color: var(--text);
+}
+.cx-block.is-hidden .cx-block-body {
+  color: color-mix(in srgb, var(--violet-hi) 45%, var(--text));
+}
+.cx-block-body > :first-child {
+  margin-top: 0;
+}
+.cx-block-body > :last-child {
+  margin-bottom: 0;
+}
+.cx-block-since {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font: 600 var(--fs-2xs) / 1.2 var(--font-label);
+}
+/* On a phone the block is a card with its audience control at the top. */
+.cx-block.is-card {
+  border-left-width: 3px;
+  padding: var(--space-2);
+}
+
+/* ----- The Reveal panel ----- */
+.cx-reveal .nh-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cx-reveal-who {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.cx-reveal-who legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+.cx-reveal-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  color: var(--text);
+  font: 500 var(--fs-sm) / 1.2 var(--font-body);
+  cursor: pointer;
+}
+.cx-reveal-option input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--cyan);
+}
+.cx-reveal-characters {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-4);
+  padding-left: var(--space-6);
+}
+.cx-reveal-option.is-character:has(input:disabled) {
+  color: var(--text-muted);
+  cursor: default;
+}
+.cx-reveal-preview {
+  max-height: 14rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+}
+.cx-reveal-error {
+  margin: 0;
+  color: var(--danger-text);
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+}
+
+/* ----- The page picker ----- */
+.cx-picker {
+  position: relative;
+  min-width: 0;
+}
+.cx-picker-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-raised);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.cx-picker-box:hover,
+.cx-picker-box[aria-expanded="true"] {
+  border-color: var(--rim-color-hi);
+}
+.cx-picker-label {
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  white-space: nowrap;
+}
+.cx-picker-kind {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+.cx-picker-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-picker-caret {
+  flex: none;
+  color: var(--text-dim);
+}
+.cx-picker-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: max(100%, 300px);
+  max-width: calc(100vw - 2 * var(--space-3));
+  max-height: 24rem;
+  padding: var(--space-1);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-drop-2);
+}
+.cx-picker-search {
+  width: 100%;
+}
+.cx-picker-list {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  min-height: 0;
+}
+.cx-picker-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.2 var(--font-body);
+  cursor: pointer;
+}
+.cx-picker-option.is-active {
+  background: var(--tab-on);
+}
+.cx-picker-option[aria-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.cx-picker-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-picker-meta,
+.cx-picker-empty {
+  color: var(--text-muted);
+  font: 500 var(--fs-xs) / 1 var(--font-body);
+}
+.cx-picker-empty {
+  padding: var(--space-2);
+}
+
+/* ----- The mini map ----- */
+.cx-minimap {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+}
+.cx-minimap > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.cx-minimap-disc {
+  fill: var(--surface-1);
+  stroke: var(--cyan);
+  stroke-width: 2;
+}
+.cx-minimap-ring {
+  fill: none;
+  stroke: var(--magenta);
+  stroke-width: 3;
+}
+.cx-minimap-label {
+  fill: var(--text);
+  stroke: var(--bg);
+  stroke-width: 3;
+  paint-order: stroke;
+  font: 700 12px var(--font-label);
+}
+
+/* ----- Both dates in one bar ----- */
+.cx-datebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background: var(--material-plate);
+  border: 1px solid var(--line);
+  box-shadow: var(--material-lip);
+}
+.cx-datebar.is-tight {
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-1) var(--space-2);
+}
+.cx-datebar-part {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cx-datebar-key {
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.cx-datebar-date {
+  font: 700 var(--fs-sm) / 1.2 var(--font-body);
+  color: var(--text);
+}
+/* The GM's date opens its editor; it grows its own 44px since the bar wraps. */
+button.cx-datebar-date {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-1);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--violet);
+}
+.cx-datebar-date.is-gm {
+  color: var(--violet-hi);
+}
+.cx-datebar-hour {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.cx-datebar-hidden {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--violet-hi);
+  font: 700 var(--fs-xs) / 1 var(--font-label);
+}
+.cx-datebar-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+.cx-datebar-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* The app's base sheet stacks and dims every span inside a button; the Codex's own rows lay theirs out. */
+:where(.cx-home, .cx-search, .cx-page, .cx-index, .cx-quests, .cx-rel, .cx-tab) button span {
+  display: revert;
+  margin-top: 0;
+  color: inherit;
+  font-size: inherit;
+}

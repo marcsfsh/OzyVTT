@@ -1,0 +1,70 @@
+/* A list's filters: the Filters button, the flyout it opens and the chips inside. */
+.nh-filters-button.is-on {
+  border-color: var(--cyan);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+.nh-flyout {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(330px, 100%);
+  padding: var(--space-2) var(--space-3) 0;
+  background: var(--material-lip), var(--surface-1);
+  border-right: 1px solid var(--line-raised);
+  box-shadow: var(--shadow-drop-2);
+}
+.nh-flyout-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.nh-flyout-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font: 400 var(--fs-body) / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+}
+.nh-flyout-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+.nh-filterchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.nh-filterchip {
+  position: relative;
+  min-height: 2rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-raised);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  cursor: pointer;
+}
+/* The chip paints 2rem; its hit area reaches the 44px floor. */
+.nh-filterchip::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+.nh-filterchip.is-on {
+  border-color: var(--cyan);
+  background: var(--tab-on);
+  color: var(--text);
+}
+.nh-filters-glyph {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+}

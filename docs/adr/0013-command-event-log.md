@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted by implementation — recorded 2026-08-01. **Closes** ADR-0013 ("Transactional
+Accepted by implementation, recorded 2026-08-01. **Closes** ADR-0013 ("Transactional
 command/event log with snapshots and bounded undo"), which had no file and stood as
 _Proposed_ in `docs/adr/README.md`.
 
@@ -10,9 +10,9 @@ _Proposed_ in `docs/adr/README.md`.
 
 Shipped. Each accepted command writes its idempotency receipt, its ordered domain event and
 the new state projection in **one SQLite transaction** (`apps/server/src/game-store.ts`), with
-`command_receipts` keyed by `commandId` so a replay returns the prior result rather than
-re-applying, and periodic snapshots bounding replay. Stale `expectedRevision` is rejected with
-a revision conflict rather than overwritten. `docs/ai-context/realtime.md` is the live
+`command_receipts` keyed by `commandId` so a replay returns the prior result and applies
+nothing twice, and periodic snapshots bounding replay. Stale `expectedRevision` is rejected with
+a revision conflict and never overwrites. `docs/ai-context/realtime.md` is the live
 description.
 
 ## Recorded outcome
@@ -25,11 +25,11 @@ mutation walks; `vtt-orientation` documents its seven touch points.
 **"Bounded undo" did not ship as described.** What exists is turn-boundary time travel over a
 separate `turn_snapshots` table (`apps/server/src/combat-history.ts`), which rewinds the table
 to the end state of a prior turn and re-plans forward. That is a different feature from
-per-command undo: it is scoped to combat, its unit is a turn rather than a command, and it
-prompts before discarding a rewritten future. A general per-command undo remains **undecided**
-— if it is wanted, it needs its own ADR rather than being read out of this one.
+per-command undo: it is scoped to combat, its unit is a turn, and it
+prompts before discarding a rewritten future. A general per-command undo remains **undecided**.
+If it is wanted, it needs its own ADR; this one can't be read as deciding it.
 
-## Update — 2026-10-14
+## Update of 2026-10-14
 
 The `domain_events` table and the periodic `snapshots` were removed (issue #101). Both were
 written on every command and read only by a test, and snapshots were never pruned. A command

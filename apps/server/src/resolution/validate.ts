@@ -16,10 +16,21 @@ import {
   withSpellEffects
 } from "../item-actions.js";
 import { coverBonusOf, coverFor } from "../cover.js";
+import { builtinBaseId } from "../builtin-actions.js";
+import { isIncapacitated } from "../condition-rules.js";
+import { areEnemies } from "../creature-sides.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
+import { sceneSight } from "../vision/sight.js";
 import { scrollOfAction } from "../scrolls.js";
 import { builtinHandlerFor } from "./builtins.js";
-import type { DefinitionAction, LiveActor, ResolveContext, ResolveDependencies, ResolveInput } from "./context.js";
+import {
+  resolveHiddenCheck,
+  type DefinitionAction,
+  type LiveActor,
+  type ResolveContext,
+  type ResolveDependencies,
+  type ResolveInput
+} from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
@@ -84,8 +95,31 @@ function combatantsOf(
     !startsALastingSpell &&
     input.builtin !== true
   )
-    throw new CommandRejectedError("That action has no structured effect to resolve - run it from its description.");
+    throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
   return { attacker, targets };
+}
+
+/** The enemies on the map that see the creature and that it sees, by name; none while dynamic vision is off. A
+ *  creature hidden from whoever asks (by sight, the fog or GM-only) never counts for one they can see, or the refusal
+ *  would name it. */
+function enemiesWatching(
+  state: GameState,
+  hider: LiveActor,
+  deps: ResolveDependencies,
+  hidden: (actorId: string) => boolean
+): string[] {
+  const sight = sceneSight(state, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  if (!sight.enabled) return [];
+  return state.combat.initiative.flatMap((entry) => {
+    const enemy = state.actors.find((actor) => actor.id === entry.actorId);
+    if (!enemy || enemy.id === hider.id || isIncapacitated(enemy)) return [];
+    if (hidden(enemy.id) && !hidden(hider.id)) return [];
+    if (!areEnemies(hider, enemy, deps.resolveDefinition)) return [];
+    return sight.sees(hider.id, enemy.id) && sight.sees(enemy.id, hider.id) ? [enemy.name] : [];
+  });
 }
 
 /** Validates the resolve against the encounter and the rules mode, plans its economy, and opens the
@@ -96,6 +130,8 @@ export function openResolve(
   input: ResolveInput,
   deps: ResolveDependencies
 ): ResolveContext {
+  const hiddenFromTable = resolveHiddenCheck(state, deps, false);
+  const hiddenFromInitiator = resolveHiddenCheck(state, deps, true);
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
   const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog, spell);
@@ -144,7 +180,8 @@ export function openResolve(
     deps.resolveDefinition
       ? smiteOfProtectionCover(state, target, {
           resolveDefinition: deps.resolveDefinition,
-          ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+          ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+          ...(deps.catalog ? { catalog: deps.catalog } : {})
         })
       : null;
   const attackCover =
@@ -153,13 +190,29 @@ export function openResolve(
   if (targets.length > 1)
     for (const target of targets)
       if ((input.cover ?? null) === null && coverFor(null, target) === "total")
-        warnings.push(`${target.name} has Total Cover - leave it out if the effect can't reach it.`);
+        warnings.push(`${target.name} has Total Cover. Leave it out if the effect can't reach it.`);
   if (attackCover === "total" && coverMode !== "freeform") {
     const waived = overrideWaives(input.override, "cover.total");
     if (coverMode === "strict" && !waived && !overrideCovers(state.combat.turn, "cover.total"))
       throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
     if (waived && overridden === null) overridden = { rule: "cover.total", reason: overrideReason(input.override) };
-    else warnings.push("The target has Total Cover - allowed per the rules mode.");
+    else warnings.push("The target has Total Cover. The rules mode allows it.");
+  }
+
+  // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
+  // only an enemy the hider sees counts ("if you can see a creature, you can discern whether it can see you"), so
+  // the refusal never gives away one the player doesn't know of.
+  if (input.builtin && builtinBaseId(action.id) === "hide") {
+    const watchers = enemiesWatching(state, attacker, deps, hiddenFromInitiator);
+    const mode = effectiveModeFor(state.combat, "hide.seen");
+    if (watchers.length > 0 && mode !== "freeform") {
+      const message = `${watchers.join(" and ")} can see ${attacker.name}. Hide out of every enemy's sight.`;
+      const waived = overrideWaives(input.override, "hide.seen");
+      if (mode === "strict" && !waived && !overrideCovers(state.combat.turn, "hide.seen"))
+        throw new RulesBlockedError("hide.seen", message);
+      if (waived && overridden === null) overridden = { rule: "hide.seen", reason: overrideReason(input.override) };
+      else warnings.push(message);
+    }
   }
 
   const builtin = input.builtin ? builtinHandlerFor(action.id) : undefined;
@@ -168,6 +221,8 @@ export function openResolve(
     action,
     input,
     deps,
+    hiddenFromTable,
+    hiddenFromInitiator,
     attacker,
     targets,
     builtin,
@@ -240,11 +295,11 @@ function laterActionReminders(
     // SRD Rituals: 10 minutes longer than the spell's casting time, and no slot.
     ...(action.id === ritualSpellActionId(spell.id)
       ? [
-          `${spell.name} as a Ritual takes 10 minutes longer than its ${spell.castingTime}: the Magic action on each of the caster's turns, keeping Concentration, and no slot.`
+          `${spell.name} as a Ritual takes 10 minutes longer than its ${spell.castingTime}. The caster takes the Magic action on each turn and keeps Concentration, and no slot is spent.`
         ]
       : isLongCastingTime(spell.castingTime)
         ? [
-            `${spell.name} takes ${spell.castingTime} to cast: the Magic action on each of the caster's turns until then, keeping Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost - give it back on the sheet" : "its slot isn't spent - restore it on the sheet"}.`
+            `${spell.name} takes ${spell.castingTime} to cast. Until then, the caster takes the Magic action on each turn and keeps Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost, so give it back on the sheet" : "its slot isn't spent, so restore it on the sheet"}.`
           ]
         : []),
     ...later

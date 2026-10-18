@@ -143,7 +143,7 @@ const AUTHORED_CASTS = Object.entries(ITEM_MECHANICS).flatMap(([itemId, mechanic
 // Spells no item may cast, each with what the cast would have done. `castAction` reads
 // `spell.damage.roll` as the cast's damage, `spell.damage.types[0] ?? "force"` as its type, and emits
 // an `attack` block from `spell.attackRoll`; for these records those columns describe the spell's text
-// rather than what one cast rolls at a target.
+// and say nothing of what one cast rolls at a target.
 const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
   [
     "cure-wounds",
@@ -164,7 +164,7 @@ const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 describe("the cast rules apply to every authored cast", () => {
-  it("walks a real population - the sweeps below are vacuous if it is ever empty", () => {
+  it("walks a real population: the sweeps below are vacuous if it is ever empty", () => {
     expect(AUTHORED_CASTS.length).toBeGreaterThan(0);
   });
 
@@ -292,7 +292,7 @@ describe("the rider families held only by a bundle assertion, driven", () => {
       expect(worn.formula).toBe("2d20kh1+0");
       expect(worn.resolution.rollMode).toEqual({ mode: "advantage", advantage: [name], disadvantage: [] });
 
-      // The control. For the Rod it is attunement rather than equipping: `picked` sets `attuned` from the
+      // The control. For the Rod it is attunement: `picked` sets `attuned` from the
       // row's `attunement.required`.
       const off = searchWith(id, n + 10, id === "rod-of-alertness" ? { attuned: false } : { equipped: false });
       expect(off.resolution.check, `${id}: taking it off must be the un-grant`).toMatchObject({
@@ -335,7 +335,7 @@ describe("the rider families held only by a bundle assertion, driven", () => {
       ["armor-of-vulnerability", "Armor of Vulnerability"]
     ] as const) {
       const worn = stateWith([picked(id)]);
-      // Captured rather than asserted with `.toThrow`, so a failure shows the item's id in the diff.
+      // Captured with no `.toThrow`, so a failure shows the item's id in the diff.
       const attempt = (() => {
         try {
           setInventoryItem(worn, IDS.hero, picked(id, { equipped: false }), () => definition, {

@@ -12,13 +12,21 @@ import {
   POINT_BUY_MAXIMUM,
   POINT_BUY_MINIMUM,
   STANDARD_ARRAY,
+  standardArrayOrder,
   validateAbilityFormula,
   type Ability,
   type HitDie
 } from "@vtt/rules-5e";
-import { AbilityScoreAllocator, DiceInputRow, SegmentedControl, Select, type DiceEntryMode } from "@vtt/ui";
+import { AbilityScoreAllocator, Button, DiceInputRow, SegmentedControl, Select, type DiceEntryMode } from "@vtt/ui";
 import { command } from "../lib/command";
-import { ABILITY_LABELS, isAssignMethod, pointBuySpent, type BuilderDraft, type OfferContext } from "./build-payload";
+import {
+  ABILITY_LABELS,
+  increaseLabel,
+  isAssignMethod,
+  pointBuySpent,
+  type BuilderDraft,
+  type OfferContext
+} from "./build-payload";
 
 /** The ability scores step: the method, the scores, the background's increases and hit points. */
 
@@ -62,7 +70,7 @@ export type ServerRolls = Readonly<{
 
 /**
  * Dice the wizard throws on the server. Rolls arrive through the roll history (`dice.roll` replies
- * with an id, not a total), so the number the wizard uses is the one the table can see was rolled.
+ * with an id and no total), so the number the wizard uses is the one the table can see was rolled.
  */
 export function useServerRolls(
   rolls: ReadonlyArray<Readonly<{ id: string; total: number }>>,
@@ -179,23 +187,7 @@ export function AbilitiesStep({
     for (let index = 0; index < missing; index += 1)
       rolls.roll(rollFormula, `Ability score ${draft.abilityPool.length + index + 1}`, addRolledScore);
   };
-  const addHpRoll = (total: number) =>
-    editDraft((current) =>
-      current.hpEntries.length >= current.level - 1 ? current : { ...current, hpEntries: [...current.hpEntries, total] }
-    );
-  const hitDie = (context.hitDie ?? "d8") as HitDie;
-  /** Each level rolls its own class's die (a Fighter level a d10, a Wizard level a d6). */
-  const dieAt = (level: number) => (context.levelDice[level - 1] ?? hitDie) as HitDie;
-  const dice = [...new Set(context.levelDice.filter((die): die is HitDie => die !== null))];
   const multiclass = context.classes.length > 1;
-  const nextLevel = draft.hpEntries.length + 2;
-  const rollAllHp = () => {
-    const missing = draft.level - 1 - draft.hpEntries.length;
-    for (let index = 0; index < missing; index += 1) {
-      const level = draft.hpEntries.length + index + 2;
-      rolls.roll(`1d${hitDieFaces(dieAt(level))}`, `Hit points, level ${level}`, addHpRoll);
-    }
-  };
   const allocatorRows = ABILITIES.map((ability) => {
     const score = base[ability];
     const bonus = bonuses[ability];
@@ -213,6 +205,25 @@ export function AbilitiesStep({
     };
   });
   const spent = pointBuySpent(draft);
+  /** The standard array laid out for the class (its 13s first for a multiclass character), one tap from the grid. */
+  const suggestion = useMemo(() => {
+    if (method !== "standard-array" || context.classes.length === 0) return null;
+    const order = standardArrayOrder(
+      (context.classes[0].record.statPriority ?? []) as Ability[],
+      context.classes.map(({ record }) => record)
+    );
+    const pool = [...draft.abilityPool].sort((left, right) => right.value - left.value);
+    const assignment: Record<string, string | null> = Object.fromEntries(
+      order.map((ability, index) => [ability, pool[index]?.id ?? null])
+    );
+    const names = context.classes.map(({ record }) => record.name).join(" / ");
+    const scores = order.map((ability, index) => `${ability.toUpperCase()} ${pool[index]?.value ?? ""}`);
+    return {
+      assignment,
+      line: `Suggested for ${names} · ${scores.join(" · ")}`,
+      applied: order.every((ability) => draft.poolAssignment[ability] === assignment[ability])
+    };
+  }, [method, context.classes, draft.abilityPool, draft.poolAssignment]);
   const options = context.background?.abilityOptions ?? null;
 
   return (
@@ -312,6 +323,18 @@ export function AbilitiesStep({
                   : "The table rolls all six at once, and everyone sees the roll."
               }
             />
+          ) : suggestion ? (
+            <div className="cb-suggest">
+              <span className="cb-suggest-text tabular">{suggestion.line}</span>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={suggestion.applied}
+                onClick={() => editDraft((current) => ({ ...current, poolAssignment: suggestion.assignment }))}
+              >
+                Use the suggested layout
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -347,7 +370,10 @@ export function AbilitiesStep({
                 <span className="cb-asi-label">+{entry.amount} to</span>
                 <Select
                   value={entry.ability}
-                  aria-label={`Ability to raise by ${entry.amount}`}
+                  aria-label={increaseLabel(
+                    draft.backgroundBonus.map((row) => row.amount),
+                    index
+                  )}
                   onChange={(event) =>
                     patch({
                       backgroundBonus: draft.backgroundBonus.map((row, position) =>
@@ -368,76 +394,137 @@ export function AbilitiesStep({
         </section>
       )}
 
-      <section className="cb-offer">
-        <div className="cb-offer-head">
-          <h3 className="cb-offer-title">Hit points</h3>
-          {/* The hit die and CON modifier that decide the hit points about to be rolled. */}
-          <span className="cb-offer-count tabular" role="status">
-            {multiclass ? dice.join("/") : hitDie} · CON{" "}
-            {base.con == null
-              ? "—"
-              : abilityModifier(base.con + bonuses.con) >= 0
-                ? `+${abilityModifier(base.con + bonuses.con)}`
-                : abilityModifier(base.con + bonuses.con)}
-          </span>
-        </div>
-        {/* The rule `character-build.ts` applies, said in table terms. */}
-        <p className="cb-offer-help">
-          Level 1 is always the full die. From level 2 up, take the average or roll -{" "}
-          {policy.hitPointRollFloor === "average"
-            ? "at this table a roll below the average is raised to it."
-            : "a roll counts as rolled, even below the average."}{" "}
-          Rolled HP is remembered: leveling down and back up restores it.
-        </p>
-        <SegmentedControl
-          ariaLabel="How to gain hit points"
-          value={draft.hpMode}
-          onChange={(next) => patch({ hpMode: next as BuilderDraft["hpMode"], hpEntries: [] })}
-          options={[
-            {
-              value: "average",
-              label: multiclass ? "Average of each level's die" : `Average (${hitDieAverage(hitDie)} per level)`
-            },
-            // Typing physical dice is the GM's, or every player's at a table that allows it.
-            ...(mayTypeDice ? [{ value: "entries", label: "Enter rolls" }] : []),
-            { value: "roll", label: "Table rolls" }
-          ]}
-        />
-        {draft.hpMode === "roll" && draft.level > 1 && (
-          <p className="cb-note">
-            {multiclass
-              ? `The table rolls each level's own die (${context.classes
-                  .map(({ record }) => `${record.hitDie} for ${record.name}`)
-                  .join(", ")}) for levels 2 to ${draft.level} when you finish, and everyone sees the roll.`
-              : `The table rolls a ${hitDie} for each level from 2 to ${draft.level} when you finish, and everyone sees the roll.`}{" "}
-            Rolls already on this character are kept.
-          </p>
-        )}
-        {draft.hpMode === "entries" &&
-          (draft.level === 1 ? (
-            <p className="cb-note">A level 1 character rolls nothing — your hit points are the full {hitDie}.</p>
-          ) : (
-            <DiceInputRow
-              label={
-                multiclass && nextLevel <= draft.level
-                  ? `Levels 2-${draft.level} (${draft.hpEntries.length} of ${draft.level - 1}) · level ${nextLevel} is a ${dieAt(nextLevel)}`
-                  : `Levels 2-${draft.level} (${draft.hpEntries.length} of ${draft.level - 1})`
-              }
-              notation={`1${dieAt(Math.min(nextLevel, draft.level))}`}
-              mode={hpEntry}
-              onModeChange={onHpEntryChange}
-              rollLabel="Roll the rest for me"
-              onRoll={rollAllHp}
-              onManual={addHpRoll}
-              onReroll={draft.hpEntries.length > 0 ? () => patch({ hpEntries: [] }) : undefined}
-              result={draft.hpEntries.length > 0 ? draft.hpEntries.join(", ") : undefined}
-              min={1}
-              max={hitDieFaces(dieAt(Math.min(nextLevel, draft.level)))}
-              busy={rolls.rolling}
-              complete={draft.hpEntries.length >= draft.level - 1}
-            />
-          ))}
-      </section>
+      <HitPointsSection
+        draft={draft}
+        policy={policy}
+        mayTypeDice={mayTypeDice}
+        context={context}
+        base={base}
+        bonuses={bonuses}
+        rolls={rolls}
+        hpEntry={hpEntry}
+        onHpEntryChange={onHpEntryChange}
+        editDraft={editDraft}
+      />
     </>
+  );
+}
+
+/**
+ * Hit points: how a level past the first gains them (the average, typed rolls or the table's roll) and the rolls so
+ * far. Its own section so a level-up can show it beside that level's other choices.
+ */
+export function HitPointsSection({
+  draft,
+  policy,
+  mayTypeDice,
+  context,
+  base,
+  bonuses,
+  rolls,
+  hpEntry,
+  onHpEntryChange,
+  editDraft
+}: Readonly<{
+  draft: BuilderDraft;
+  policy: BuilderPolicy;
+  mayTypeDice: boolean;
+  context: OfferContext;
+  base: Readonly<Record<Ability, number | null>>;
+  bonuses: Readonly<Record<Ability, number>>;
+  rolls: ServerRolls;
+  hpEntry: DiceEntryMode;
+  onHpEntryChange: (mode: DiceEntryMode) => void;
+  editDraft: (update: (current: BuilderDraft) => BuilderDraft) => void;
+}>) {
+  const patch = (change: Partial<BuilderDraft>) => editDraft((current) => ({ ...current, ...change }));
+  const addHpRoll = (total: number) =>
+    editDraft((current) =>
+      current.hpEntries.length >= current.level - 1 ? current : { ...current, hpEntries: [...current.hpEntries, total] }
+    );
+  const hitDie = (context.hitDie ?? "d8") as HitDie;
+  /** Each level rolls its own class's die (a Fighter level a d10, a Wizard level a d6). */
+  const dieAt = (level: number) => (context.levelDice[level - 1] ?? hitDie) as HitDie;
+  const dice = [...new Set(context.levelDice.filter((die): die is HitDie => die !== null))];
+  const nextLevel = draft.hpEntries.length + 2;
+  const rollAllHp = () => {
+    const missing = draft.level - 1 - draft.hpEntries.length;
+    for (let index = 0; index < missing; index += 1) {
+      const level = draft.hpEntries.length + index + 2;
+      rolls.roll(`1d${hitDieFaces(dieAt(level))}`, `Hit points, level ${level}`, addHpRoll);
+    }
+  };
+  const multiclass = context.classes.length > 1;
+  return (
+    <section className="cb-offer">
+      <div className="cb-offer-head">
+        <h3 className="cb-offer-title">Hit points</h3>
+        {/* The hit die and CON modifier that decide the hit points about to be rolled. */}
+        <span className="cb-offer-count tabular" role="status">
+          {multiclass ? dice.join("/") : hitDie} · CON{" "}
+          {base.con == null
+            ? "None"
+            : abilityModifier(base.con + bonuses.con) >= 0
+              ? `+${abilityModifier(base.con + bonuses.con)}`
+              : abilityModifier(base.con + bonuses.con)}
+        </span>
+      </div>
+      {/* The rule `character-build.ts` applies, said in table terms. */}
+      <p className="cb-offer-help">
+        Level 1 is always the full die. From level 2 up, take the average or a roll.{" "}
+        {policy.hitPointRollFloor === "average"
+          ? "At this table a roll below the average is raised to it."
+          : "A roll counts as rolled, even below the average."}{" "}
+        Rolled hit points are kept when you level down and back up.
+      </p>
+      <SegmentedControl
+        ariaLabel="How to gain hit points"
+        value={draft.hpMode}
+        onChange={(next) => patch({ hpMode: next as BuilderDraft["hpMode"], hpEntries: [] })}
+        options={[
+          {
+            value: "average",
+            label: multiclass ? "Average of each level's die" : `Average (${hitDieAverage(hitDie)} per level)`
+          },
+          // Typing physical dice is the GM's, or every player's at a table that allows it.
+          ...(mayTypeDice ? [{ value: "entries", label: "Enter rolls" }] : []),
+          { value: "roll", label: "Table rolls" }
+        ]}
+      />
+      {draft.hpMode === "roll" && draft.level > 1 && (
+        <p className="cb-note">
+          {multiclass
+            ? `The table rolls each level's own die (${context.classes
+                .map(({ record }) => `${record.hitDie} for ${record.name}`)
+                .join(", ")}) for levels 2 to ${draft.level} when you finish, and everyone sees the roll.`
+            : `The table rolls a ${hitDie} for each level from 2 to ${draft.level} when you finish, and everyone sees the roll.`}{" "}
+          Rolls already on this character are kept.
+        </p>
+      )}
+      {draft.hpMode === "entries" &&
+        (draft.level === 1 ? (
+          <p className="cb-note">A level 1 character rolls nothing. Its hit points are the full {hitDie}.</p>
+        ) : (
+          <DiceInputRow
+            label={
+              multiclass && nextLevel <= draft.level
+                ? `Levels 2-${draft.level} (${draft.hpEntries.length} of ${draft.level - 1}) · level ${nextLevel} is a ${dieAt(nextLevel)}`
+                : `Levels 2-${draft.level} (${draft.hpEntries.length} of ${draft.level - 1})`
+            }
+            notation={`1${dieAt(Math.min(nextLevel, draft.level))}`}
+            mode={hpEntry}
+            onModeChange={onHpEntryChange}
+            rollLabel="Roll the rest for me"
+            onRoll={rollAllHp}
+            onManual={addHpRoll}
+            onReroll={draft.hpEntries.length > 0 ? () => patch({ hpEntries: [] }) : undefined}
+            result={draft.hpEntries.length > 0 ? draft.hpEntries.join(", ") : undefined}
+            min={1}
+            max={hitDieFaces(dieAt(Math.min(nextLevel, draft.level)))}
+            busy={rolls.rolling}
+            complete={draft.hpEntries.length >= draft.level - 1}
+          />
+        ))}
+    </section>
   );
 }

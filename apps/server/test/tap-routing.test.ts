@@ -16,7 +16,7 @@ import { png } from "./image-fixtures.js";
 
 // Tapping an action is a server routing decision with three named outcomes. Also pinned: a monster
 // sheet outside the fight rolls loose for the GM, and an off-turn tap is a rules block with an
-// explanation rather than a silent die.
+// explanation, and no die rolls.
 
 const HERO = "10000000-0000-4000-8000-0000000000b1";
 const OTHER = "10000000-0000-4000-8000-0000000000b2";
@@ -135,15 +135,15 @@ describe("tap routing (the seam)", () => {
     } catch (error) {
       const blocked = error as RulesBlockedError;
       expect(blocked.rule).toBe(NOT_YOUR_TURN);
-      expect(blocked.message).toBe("Not your turn yet - Hero is up.");
-      // Overridable and askable, which is why it is a rules block rather than silence.
+      expect(blocked.message).toBe("Not your turn yet. Hero is up.");
+      // Overridable and askable, which is why it is a rules block.
       expect(blocked.overridable).toBe(true);
       expect(familyOf(blocked.rule)).toBe("economy");
     }
 
     const advise = fightState();
     advise.combat = { ...advise.combat, ruleExceptions: { economy: "assisted" } };
-    expect(offTurn(advise)).toEqual(["Not your turn yet - Hero is up."]);
+    expect(offTurn(advise)).toEqual(["Not your turn yet. Hero is up."]);
 
     const off = fightState();
     off.combat = { ...off.combat, ruleExceptions: { economy: "freeform" } };
@@ -158,11 +158,11 @@ describe("tap routing (the seam)", () => {
       offTurn(fight);
       expect.unreachable();
     } catch (error) {
-      expect((error as RulesBlockedError).message).toBe("Not your turn yet - wait for your turn.");
+      expect((error as RulesBlockedError).message).toBe("Not your turn yet. Wait for your turn.");
     }
   });
 
-  it("exempts reactions and legendary actions - taking those off turn is the point", () => {
+  it("exempts reactions and legendary actions: taking those off turn is the point", () => {
     const fight = fightState();
     expect(offTurn(fight, PARRY)).toEqual([]);
     expect(offTurn(fight, { ...SWING, activation: "other", legendary: { cost: 1 } })).toEqual([]);
@@ -319,7 +319,7 @@ describe("action.use over the API", () => {
     expect((await onTurn.json()).data.route).toBe("resolved");
     expect(server.store.snapshot.combat.turn.actionUsed).toBe(true);
 
-    // Second Hero's turn has not come around: a real block, not a silent loose die.
+    // Second Hero's turn has not come around: a real block.
     const offTurn = await post(base, GAME_PATHS.actionUse, otherSession, {
       commandId: randomUUID(),
       actorId: OTHER,
@@ -354,7 +354,7 @@ describe("action.use over the API", () => {
     expect(server.store.snapshot.rolls.some((roll) => roll.actorId === OTHER && roll.purpose === "attack")).toBe(true);
   });
 
-  it("rolls loose, attributed dice outside a fight - and moves no hit points", async () => {
+  it("rolls loose, attributed dice outside a fight, and moves no hit points", async () => {
     const idle = GameStateSchema.parse({
       schemaVersion: 1,
       actors: [
@@ -388,7 +388,7 @@ describe("action.use over the API", () => {
     expect(rolls.map((roll) => roll.purpose)).toEqual(["attack", "damage"]);
     expect(rolls.every((roll) => roll.actorId === HERO)).toBe(true);
     expect(rolls.every((roll) => roll.initiatorLabel === "Hero")).toBe(true);
-    // No fight was started and nothing took damage: a loose damage roll is a number, not an application.
+    // No fight was started and nothing took damage: a loose damage roll is a number and applies nothing.
     expect(server.store.snapshot.combat.active).toBe(false);
     expect(server.store.snapshot.actors.find((actor) => actor.id === GOBLIN)?.hp.current).toBe(7);
     // And the rolls reached the one feed, attributed.
@@ -424,7 +424,7 @@ describe("action.use over the API", () => {
     expect(server.store.snapshot.actors[0].actionUses).toMatchObject({ zap: 1 });
     const again = await use("zap");
     expect(again.status).toBe(409);
-    expect((await again.json()).error.message).toBe("Zap: no uses remaining (1/long rest).");
+    expect((await again.json()).error.message).toBe("Zap: no uses remaining (1/Long Rest).");
     expect(server.store.snapshot.rolls).toHaveLength(1);
 
     const flared = await use("flare");
@@ -542,7 +542,7 @@ describe("save.roll over the API", () => {
     const body = (await answered.json()).data;
     expect(body.route).toBe("answered");
     expect(body.saveId).toBe(pendingId);
-    // The prompt actually closed - the tracker is no longer waiting for a save the table already made.
+    // The prompt actually closed: the tracker is no longer waiting for a save the table already made.
     expect(server.store.snapshot.combat.pendingSaves).toEqual([]);
   });
 

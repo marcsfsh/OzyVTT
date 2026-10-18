@@ -5,7 +5,7 @@ import { migrate, openDatabase, type Migration } from "./database.js";
 
 /**
  * The character builder's parked builds, one per owner: each player session, and the GM. Kept beside the game state
- * rather than in it, since a draft belongs to one person and changes on every pick, and the game state goes to the
+ * since a draft belongs to one person and changes on every pick, and the game state goes to the
  * whole table on every change.
  */
 

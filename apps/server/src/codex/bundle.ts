@@ -1,5 +1,7 @@
 import type {
+  CodexBlock,
   CodexCalendar,
+  CodexEntityType,
   CodexImportCounts,
   CodexInWorldDate,
   CodexJournalEntry,
@@ -12,6 +14,7 @@ import type {
   CodexSettingsInput,
   CodexStanding
 } from "@vtt/domain";
+import { blocksFromGmFields, fromWireBlocks, type StoredBlock } from "./blocks.js";
 import {
   DEFAULT_CALENDAR,
   getCalendar,
@@ -23,11 +26,34 @@ import {
 } from "./calendar.js";
 import { insertMap, insertMarker, listMaps, listMarkers, partyMarker } from "./atlas.js";
 import { insertRelationship, listAllDeclaredConnections, type CodexRelationshipRow } from "./connections.js";
+import { legacyPageBlocks, mergedFields, migratedObjectives } from "./hidden-blocks-migration.js";
 import { stamp, write, type CodexDb } from "./db.js";
+import { backfillFirstShown } from "./first-shown.js";
 import { journalKind, payloadOf } from "./journal-kinds.js";
 import { insertEntry, listTimeline } from "./journal.js";
-import { listFolders, listFullPages, registerFolderPath, restorePage } from "./pages.js";
-import { insertQuest, listQuests } from "./quests.js";
+import {
+  listFolders,
+  listPageRecords,
+  registerFolderPath,
+  restorePage,
+  stampReader,
+  toWirePage,
+  type CodexPageRecord
+} from "./pages.js";
+import {
+  BUILT_IN_TEMPLATE_ID,
+  insertTemplate,
+  legacyPrep,
+  listStoredTemplates,
+  prepSections,
+  storedDefaultTemplateId,
+  templateSections,
+  writeDefaultTemplate,
+  type PrepSectionInput,
+  type PrepTemplateSectionInput,
+  type StoredPrepTemplate
+} from "./prep.js";
+import { listQuestRecords, parseObjectives, restoreQuest, toWireQuest, type CodexQuestRecord } from "./quests.js";
 import { insertRevision, listAllRevisions, type CodexPageRevisionExportRow } from "./revisions.js";
 import { CODEX_CONTENT_TABLES } from "./schema.js";
 import { activeSessionId, insertSession, listSessions, writeActiveSession } from "./sessions.js";
@@ -41,7 +67,11 @@ import {
 import { insertStanding, listStanding } from "./standing.js";
 import {
   CodexValidationError,
+  MAX_BLOCKS,
   attendees,
+  audience,
+  blockText,
+  blockTitle,
   body,
   connectionLabel,
   connectionLayer,
@@ -51,16 +81,20 @@ import {
   entryGmText,
   entryText,
   folder,
+  hiddenFieldKeys,
   hexColor,
   iconId,
   id,
   idArray,
+  isId,
   mapKind,
   mapName,
   markerLabel,
+  objectiveText,
   optionalId,
-  questObjectives,
+  questObjectiveCount,
   questStatus,
+  relationshipBegan,
   sessionNo,
   sessionSceneIds,
   sessionStatus,
@@ -75,10 +109,11 @@ import {
  * instants were computed against, empty folders, every revision and the settings included).
  */
 
-/** The bundle format version. A fact about the file, so the export route stamps it beside `codex`. */
-export const CODEX_BUNDLE_VERSION = 1;
+/** The bundle format version lives with the import body that checks it. */
+export { CODEX_BUNDLE_VERSION } from "@vtt/api-contract/schemas";
 
 export type CodexBundle = Readonly<{
+  /** Pages and quests carry their blocks in the wire form, stamps labelled; a restore reads the stamps back. */
   pages: readonly CodexPage[];
   maps: readonly CodexMap[];
   markers: readonly CodexMarker[];
@@ -94,35 +129,44 @@ export type CodexBundle = Readonly<{
   folders: readonly string[];
   revisions: readonly CodexPageRevisionExportRow[];
   settings?: CodexSettingsInput;
+  prepTemplates: readonly StoredPrepTemplate[];
+  defaultPrepTemplateId: string | null;
 }>;
 
 export function exportBundle(db: CodexDb): CodexBundle {
   const maps = listMaps(db);
+  const reader = stampReader(db);
   // New keys go last, so an older reader of the file sees the keys it knows in the order it knows them.
   return {
-    pages: listFullPages(db),
+    pages: listPageRecords(db).map((page) => toWirePage(page, reader)),
     maps,
     markers: maps.flatMap((map) => listMarkers(db, map.id)),
     journal: listTimeline(db),
     relationships: listAllDeclaredConnections(db),
     sessions: listSessions(db),
     activeSessionId: activeSessionId(db),
-    quests: listQuests(db),
+    quests: listQuestRecords(db).map((quest) => toWireQuest(quest, reader)),
     publishedDate: getPublishedDate(db),
     standing: listStanding(db),
     partyMarkerId: partyMarker(db)?.id ?? null,
     calendar: getCalendar(db),
     folders: listFolders(db),
     revisions: listAllRevisions(db),
-    settings: { revisionHistory: revisionSettings(db), autosave: autosaveSettings(db) }
+    settings: { revisionHistory: revisionSettings(db), autosave: autosaveSettings(db) },
+    prepTemplates: listStoredTemplates(db),
+    defaultPrepTemplateId: storedDefaultTemplateId(db)
   };
 }
 
 /**
- * Replaces the Codex with a validated bundle in one write. Replace, not merge: merging singleton and uniquely
- * indexed state has no defined answer. Rows are written as they are, with no create-time side effects (no
+ * Replaces the Codex with a validated bundle in one write. A merge would have no defined answer for singleton and
+ * uniquely indexed state. Rows are written as they are, with no create-time side effects (no
  * quest history, no revision snapshots); dates are re-resolved against the restored calendar.
  */
+/** A bundle after `normalizeBundle`: every record validated, and pages and quests with their blocks as stored. */
+type NormalizedBundle = Omit<CodexBundle, "pages" | "quests"> &
+  Readonly<{ pages: readonly CodexPageRecord[]; quests: readonly CodexQuestRecord[] }>;
+
 export function importBundle(db: CodexDb, raw: unknown): CodexImportCounts {
   const bundle = normalizeBundle(raw);
   write(db, () => {
@@ -149,15 +193,25 @@ export function importBundle(db: CodexDb, raw: unknown): CodexImportCounts {
     }
     for (const map of bundle.maps) insertMap(db, map);
     for (const marker of bundle.markers) insertMarker(db, marker);
-    for (const quest of bundle.quests) insertQuest(db, quest);
+    for (const quest of bundle.quests) restoreQuest(db, quest);
     for (const standing of bundle.standing) insertStanding(db, standing);
     for (const relationship of bundle.relationships) insertRelationship(db, relationship);
     // Revisions keep their ids, so `.../revisions/{revisionId}/restore` URLs survive a restore.
     for (const revision of bundle.revisions) insertRevision(db, revision);
+    for (const template of bundle.prepTemplates) insertTemplate(db, template);
+    const templateIds = new Set(bundle.prepTemplates.map((template) => template.id));
+    writeDefaultTemplate(
+      db,
+      bundle.defaultPrepTemplateId !== null && templateIds.has(bundle.defaultPrepTemplateId)
+        ? bundle.defaultPrepTemplateId
+        : null
+    );
     writeActiveSession(
       db,
       bundle.activeSessionId !== null && sessionIds.has(bundle.activeSessionId) ? bundle.activeSessionId : null
     );
+    // A backup from before first-shown dates: what players can read takes its `createdAt`, as the migrations do.
+    backfillFirstShown(db.database);
   });
   const count = (table: string) => (db.database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
   return {
@@ -184,29 +238,37 @@ const BUNDLE_LIST_KEYS = [
   "quests",
   "standing",
   "revisions",
-  "folders"
+  "folders",
+  "prepTemplates"
 ] as const;
-const BUNDLE_VALUE_KEYS = ["activeSessionId", "publishedDate", "partyMarkerId", "calendar", "settings"] as const;
+const BUNDLE_VALUE_KEYS = [
+  "activeSessionId",
+  "publishedDate",
+  "partyMarkerId",
+  "calendar",
+  "settings",
+  "defaultPrepTemplateId"
+] as const;
 const BUNDLE_KEYS: ReadonlySet<string> = new Set<string>([...BUNDLE_LIST_KEYS, ...BUNDLE_VALUE_KEYS]);
 
 /**
  * Validates an untrusted bundle before any write, through the same validators as ordinary writes. A restore
  * replaces everything, so a bundle with no or unknown sections is refused: it would silently delete data. A
  * missing key within a record takes its default. Cross-record checks mirror the database's constraints, so a
- * bad file gets a readable error instead of driver text.
+ * bad file gets a readable error, with no driver text.
  */
-function normalizeBundle(raw: unknown): CodexBundle {
+function normalizeBundle(raw: unknown): NormalizedBundle {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new CodexValidationError("That backup file is not a codex bundle.");
   const bundle = raw as Record<string, unknown>;
   const unrecognised = Object.keys(bundle).find((key) => !BUNDLE_KEYS.has(key));
   if (unrecognised !== undefined)
     throw new CodexValidationError(
-      `That backup has a section the codex does not recognise: "${unrecognised}". Compare it with a fresh export - a mistyped section name means those records would be dropped rather than restored.`
+      `That backup has a section the codex does not recognise: "${unrecognised}". Compare it with a fresh export. With a mistyped section name, those records would be dropped.`
     );
   if (!Object.keys(bundle).some((key) => BUNDLE_KEYS.has(key)))
     throw new CodexValidationError(
-      'That backup holds no codex sections at all, so it is truncated or is not a backup file. A campaign with nothing in it still exports every section ("pages": [], and so on) - restoring this would erase the codex rather than replace it.'
+      'That backup holds no codex sections at all, so it is truncated or is not a backup file. A campaign with nothing in it still exports every section ("pages": [], and so on), so restoring this would erase the codex.'
     );
   const list = (key: string): unknown[] => {
     const value = bundle[key];
@@ -243,25 +305,90 @@ function normalizeBundle(raw: unknown): CodexBundle {
     return { year: Math.trunc(parts.year), month: Math.trunc(parts.month), day: Math.trunc(parts.day) };
   };
 
-  const pages = rows("pages", (row): CodexPage => ({
-    id: id(text(row.id)),
-    title: title(text(row.title)),
-    entityType: entityType(typeof row.entityType === "string" ? row.entityType : undefined),
-    fields: entityFields(row.fields as Record<string, string> | undefined),
-    gmFields: entityFields(row.gmFields as Record<string, string> | undefined),
-    folder: folder(nullableText(row.folder)),
-    tags: tags(stringList(row.tags)),
-    playerBody: body(text(row.playerBody)),
-    gmBody: body(text(row.gmBody)),
-    revealedToPlayers: flag(row.revealedToPlayers),
-    bannerAssetId: optionalId(nullableText(row.bannerAssetId)),
-    inWorldLabel: null,
-    calendarInstant: null,
-    inWorldDate: date(row.inWorldDate),
-    rev: Math.max(1, count(row.rev, 1)),
-    createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt)
-  }));
+  const timesByCharacter = (value: unknown): Record<string, string> =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value as Record<string, unknown>).filter(
+            (entry): entry is [string, string] => isId(entry[0]) && typeof entry[1] === "string"
+          )
+        )
+      : {};
+  /** A version 2 record's blocks, through the block validators; a malformed audience reads as hidden. */
+  const storedBlocks = (value: unknown): StoredBlock[] => {
+    const raw = Array.isArray(value) ? (value as unknown[]) : [];
+    // The block reader drops a malformed entry; in a backup that would lose hidden text without a word.
+    if (
+      raw.some(
+        (entry) =>
+          !entry ||
+          typeof entry !== "object" ||
+          typeof (entry as CodexBlock).id !== "string" ||
+          typeof (entry as CodexBlock).text !== "string"
+      )
+    )
+      throw new CodexValidationError("One of its blocks has no id or no text.");
+    const list = fromWireBlocks(raw as CodexBlock[]);
+    if (list.length > MAX_BLOCKS) throw new CodexValidationError(`A record holds at most ${MAX_BLOCKS} blocks.`);
+    if (new Set(list.map((block) => block.id)).size !== list.length)
+      throw new CodexValidationError("Two of its blocks have the same id.");
+    return list.map((block) => ({
+      ...block,
+      id: id(block.id),
+      title: blockTitle(block.title),
+      text: blockText(block.text),
+      ...audience(block.audience, block.characterIds)
+    }));
+  };
+  /** Blocks from a version 2 record, or a version 1 record's GM body split as migration 4 splits it. */
+  const blocksOf = (
+    row: Record<string, unknown>,
+    ownerId: string,
+    playerBody: string,
+    keptFields: Readonly<Record<string, string>> = {}
+  ): StoredBlock[] => {
+    const gmBody = typeof row.gmBody === "string" ? row.gmBody : "";
+    if (Array.isArray(row.blocks)) {
+      if (gmBody.trim() !== "")
+        throw new CodexValidationError("It has both hidden blocks and an old GM body. Keep one of them.");
+      return [...storedBlocks(row.blocks), ...blocksFromGmFields(ownerId, playerBody, keptFields)];
+    }
+    return legacyPageBlocks(ownerId, playerBody, body(gmBody), keptFields);
+  };
+
+  const pages = rows("pages", (row): CodexPageRecord => {
+    const pageId = id(text(row.id));
+    const type: CodexEntityType = entityType(typeof row.entityType === "string" ? row.entityType : undefined);
+    const playerBody = body(text(row.playerBody));
+    const values = entityFields(row.fields as Record<string, string> | undefined);
+    // A version 1 page keeps secret values in `gmFields`; a version 2 page lists its Hidden keys.
+    const split = Array.isArray(row.hiddenFields)
+      ? { fields: values, hiddenFields: hiddenFieldKeys(type, stringList(row.hiddenFields)), kept: {} }
+      : mergedFields(type, values, entityFields(row.gmFields as Record<string, string> | undefined));
+    return {
+      id: pageId,
+      title: title(text(row.title)),
+      entityType: type,
+      fields: split.fields,
+      hiddenFields: split.hiddenFields,
+      folder: folder(nullableText(row.folder)),
+      tags: tags(stringList(row.tags)),
+      playerBody,
+      blocks: blocksOf(row, pageId, playerBody, split.kept),
+      revealedToPlayers: flag(row.revealedToPlayers),
+      bannerAssetId: optionalId(nullableText(row.bannerAssetId)),
+      inWorldLabel: null,
+      calendarInstant: null,
+      inWorldDate: date(row.inWorldDate),
+      rev: Math.max(1, count(row.rev, 1)),
+      createdAt: text(row.createdAt),
+      updatedAt: text(row.updatedAt),
+      // A backup from before this date has only `updatedAt`, which players could already read.
+      playerUpdatedAt: text(row.playerUpdatedAt) || text(row.updatedAt),
+      characterUpdatedAt: timesByCharacter(row.characterUpdatedAt),
+      // Absent from an older backup; `importBundle` fills it as the migration does.
+      firstShownAt: nullableText(row.firstShownAt)
+    };
+  });
   const maps = rows("maps", (row): CodexMap => ({
     id: id(text(row.id)),
     assetId: id(text(row.assetId)),
@@ -272,7 +399,8 @@ function normalizeBundle(raw: unknown): CodexBundle {
     sortKey: count(row.sortKey),
     tags: tags(stringList(row.tags)),
     createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt)
+    updatedAt: text(row.updatedAt),
+    firstShownAt: nullableText(row.firstShownAt)
   }));
   const markers = rows("markers", (row): CodexMarker => ({
     id: id(text(row.id)),
@@ -290,23 +418,53 @@ function normalizeBundle(raw: unknown): CodexBundle {
     tags: tags(stringList(row.tags)),
     isParty: flag(row.isParty),
     createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt)
+    updatedAt: text(row.updatedAt),
+    firstShownAt: nullableText(row.firstShownAt)
   }));
-  const sessions = rows("sessions", (row): CodexSession => ({
-    id: id(text(row.id)),
-    sessionNumber: sessionNo(typeof row.sessionNumber === "number" ? row.sessionNumber : null),
-    realDate: shortLabel(nullableText(row.realDate), 40, "date"),
-    attendees: attendees(stringList(row.attendees)),
-    prepBody: body(text(row.prepBody)),
-    recapBody: body(text(row.recapBody)),
-    revealedToPlayers: flag(row.revealedToPlayers),
-    status: sessionStatus(typeof row.status === "string" ? row.status : undefined),
-    tags: tags(stringList(row.tags)),
-    sceneIds: sessionSceneIds(stringList(row.sceneIds)),
-    rev: Math.max(1, count(row.rev, 1)),
-    createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt)
-  }));
+  // The restore keeps each tick's own time, so the recap still reads when each clue was found.
+  const restoredAt = new Date().toISOString();
+  const sessions = rows("sessions", (row): CodexSession => {
+    // A backup from before prep sections carries `prepBody`, which restores as one Text section, as the migration does.
+    const prep = Array.isArray(row.prep)
+      ? prepSections(row.prep as PrepSectionInput[], { now: restoredAt, restore: true })
+      : legacyPrep(body(text(row.prepBody)));
+    const currentSceneId = typeof row.currentSceneId === "string" ? optionalId(row.currentSceneId) : null;
+    return {
+      id: id(text(row.id)),
+      sessionNumber: sessionNo(typeof row.sessionNumber === "number" ? row.sessionNumber : null),
+      realDate: shortLabel(nullableText(row.realDate), 40, "date"),
+      attendees: attendees(stringList(row.attendees)),
+      prep,
+      prepTemplateId: typeof row.prepTemplateId === "string" ? optionalId(row.prepTemplateId) : null,
+      currentSceneId:
+        currentSceneId !== null &&
+        prep.some((section) => section.type === "scenes" && section.scenes.some((scene) => scene.id === currentSceneId))
+          ? currentSceneId
+          : null,
+      recapBody: body(text(row.recapBody)),
+      revealedToPlayers: flag(row.revealedToPlayers),
+      status: sessionStatus(typeof row.status === "string" ? row.status : undefined),
+      tags: tags(stringList(row.tags)),
+      sceneIds: sessionSceneIds(stringList(row.sceneIds)),
+      rev: Math.max(1, count(row.rev, 1)),
+      createdAt: text(row.createdAt),
+      updatedAt: text(row.updatedAt),
+      firstShownAt: nullableText(row.firstShownAt)
+    };
+  });
+  const prepTemplates = rows("prepTemplates", (row): StoredPrepTemplate => {
+    const templateId = id(text(row.id));
+    if (templateId === BUILT_IN_TEMPLATE_ID)
+      throw new CodexValidationError("The starting template ships with the app, so a backup can't carry it.");
+    return {
+      id: templateId,
+      name: shortLabel(nullableText(row.name), 80, "template name") ?? "Template",
+      sections: templateSections(Array.isArray(row.sections) ? (row.sections as PrepTemplateSectionInput[]) : []),
+      rev: Math.max(1, count(row.rev, 1)),
+      createdAt: text(row.createdAt),
+      updatedAt: text(row.updatedAt)
+    };
+  });
   const journal = rows("journal", (row): CodexJournalEntry => {
     const kind = journalKind(text(row.kind));
     return {
@@ -329,54 +487,117 @@ function normalizeBundle(raw: unknown): CodexBundle {
       // The parser a stored row uses, so a hand-edited payload degrades exactly as it would on read.
       payload: payloadOf(kind, row.payload === undefined || row.payload === null ? null : JSON.stringify(row.payload)),
       createdAt: text(row.createdAt),
-      updatedAt: text(row.updatedAt)
+      updatedAt: text(row.updatedAt),
+      // Absent from an older backup; `importBundle` fills it as the migration does.
+      firstShownAt: nullableText(row.firstShownAt)
     };
   });
-  const quests = rows("quests", (row): CodexQuest => ({
-    id: id(text(row.id)),
-    title: title(text(row.title)),
-    status: questStatus(typeof row.status === "string" ? row.status : undefined),
-    playerBody: body(text(row.playerBody)),
-    gmBody: body(text(row.gmBody)),
-    objectives: questObjectives(Array.isArray(row.objectives) ? (row.objectives as CodexQuestObjective[]) : []),
-    entityIds: idArray(row.entityIds as string[] | undefined),
-    revealedToPlayers: flag(row.revealedToPlayers),
-    tags: tags(stringList(row.tags)),
-    rev: Math.max(1, count(row.rev, 1)),
-    createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt)
-  }));
+  const quests = rows("quests", (row): CodexQuestRecord => {
+    const questId = id(text(row.id));
+    const playerBody = body(text(row.playerBody));
+    const listed = Array.isArray(row.objectives) ? (row.objectives as unknown[]) : [];
+    questObjectiveCount(listed.length);
+    // A version 1 quest's objectives carry no audience; each was shown to everyone, and still is.
+    const legacy = !listed.some((entry) => !!entry && typeof entry === "object" && "audience" in entry);
+    const objectives = (legacy ? migratedObjectives(questId, JSON.stringify(listed)) : listed) as CodexQuestObjective[];
+    const parsed = parseObjectives(questId, JSON.stringify(objectives));
+    if (new Set(parsed.map((objective) => objective.id)).size !== parsed.length)
+      throw new CodexValidationError("Two of its objectives have the same id.");
+    return {
+      id: questId,
+      title: title(text(row.title)),
+      status: questStatus(typeof row.status === "string" ? row.status : undefined),
+      playerBody,
+      blocks: blocksOf(row, questId, playerBody),
+      objectives: parsed.map((objective) => ({
+        ...objective,
+        text: objectiveText(objective.text),
+        ...audience(objective.audience, objective.characterIds)
+      })),
+      entityIds: idArray(row.entityIds as string[] | undefined),
+      revealedToPlayers: flag(row.revealedToPlayers),
+      tags: tags(stringList(row.tags)),
+      rev: Math.max(1, count(row.rev, 1)),
+      createdAt: text(row.createdAt),
+      updatedAt: text(row.updatedAt),
+      firstShownAt: nullableText(row.firstShownAt)
+    };
+  });
   const standing = rows("standing", (row): CodexStanding => ({
     id: id(text(row.id)),
     factionPageId: id(text(row.factionPageId)),
     value: standingValue(count(row.value)),
     revealedToPlayers: flag(row.revealedToPlayers),
     createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt)
+    updatedAt: text(row.updatedAt),
+    firstShownAt: nullableText(row.firstShownAt)
   }));
-  const relationships = rows("relationships", (row): CodexRelationshipRow => ({
-    id: id(text(row.id)),
-    fromPageId: id(text(row.fromPageId)),
-    toPageId: id(text(row.toPageId)),
-    label: connectionLabel(nullableText(row.label)) || null,
-    layer: connectionLayer(nullableText(row.layer)),
-    createdAt: text(row.createdAt)
-  }));
-  const revisions = rows("revisions", (row): CodexPageRevisionExportRow => ({
-    id: count(row.id),
-    pageId: id(text(row.pageId)),
-    rev: count(row.rev, 1),
-    title: title(text(row.title)),
-    entityType: entityType(typeof row.entityType === "string" ? row.entityType : undefined),
-    fields: entityFields(row.fields as Record<string, string> | undefined),
-    gmFields: entityFields(row.gmFields as Record<string, string> | undefined),
-    playerBody: body(text(row.playerBody)),
-    gmBody: body(text(row.gmBody)),
-    bannerAssetId: optionalId(nullableText(row.bannerAssetId)),
-    tags: tags(stringList(row.tags)),
-    authoredAt: text(row.authoredAt),
-    authorTag: text(row.authorTag)
-  }));
+  const relationships = rows("relationships", (row): CodexRelationshipRow => {
+    const learned = row.learned && typeof row.learned === "object" ? (row.learned as Record<string, unknown>) : null;
+    return {
+      id: id(text(row.id)),
+      fromPageId: id(text(row.fromPageId)),
+      toPageId: id(text(row.toPageId)),
+      label: connectionLabel(nullableText(row.label)) || null,
+      layer: connectionLayer(nullableText(row.layer)),
+      createdAt: text(row.createdAt),
+      began: relationshipBegan(
+        row.began && typeof row.began === "object"
+          ? (row.began as { inWorldDate: CodexInWorldDate | null; beforeCampaign: boolean })
+          : null
+      ),
+      learned:
+        learned && typeof learned.at === "string" && learned.at !== ""
+          ? {
+              at: learned.at,
+              sessionId: typeof learned.sessionId === "string" ? optionalId(learned.sessionId) : null,
+              sessionNumber: typeof learned.sessionNumber === "number" ? Math.trunc(learned.sessionNumber) : null,
+              inWorldDate: date(learned.inWorldDate)
+            }
+          : null
+    };
+  });
+  const revisions = rows("revisions", (row): CodexPageRevisionExportRow => {
+    const pageId = id(text(row.pageId));
+    const type: CodexEntityType = entityType(typeof row.entityType === "string" ? row.entityType : undefined);
+    const playerBody = body(text(row.playerBody));
+    const values = entityFields(row.fields as Record<string, string> | undefined);
+    const split = Array.isArray(row.hiddenFields)
+      ? { fields: values, hiddenFields: hiddenFieldKeys(type, stringList(row.hiddenFields)), kept: {} }
+      : mergedFields(type, values, entityFields(row.gmFields as Record<string, string> | undefined));
+    // A revision keeps content only, so its blocks come back hidden whatever the file says.
+    const blocks = blocksOf(
+      Array.isArray(row.blocks)
+        ? {
+            ...row,
+            blocks: (row.blocks as Array<Record<string, unknown>>).map((block) => ({
+              ...block,
+              audience: "hidden",
+              characterIds: [],
+              reveals: []
+            }))
+          }
+        : row,
+      pageId,
+      playerBody,
+      split.kept
+    );
+    return {
+      id: count(row.id),
+      pageId,
+      rev: count(row.rev, 1),
+      title: title(text(row.title)),
+      entityType: type,
+      fields: split.fields,
+      hiddenFields: split.hiddenFields,
+      playerBody,
+      blocks: blocks.map((block) => ({ id: block.id, anchor: block.anchor, title: block.title, text: block.text })),
+      bannerAssetId: optionalId(nullableText(row.bannerAssetId)),
+      tags: tags(stringList(row.tags)),
+      authoredAt: text(row.authoredAt),
+      authorTag: text(row.authorTag)
+    };
+  });
 
   for (const [key, records] of [
     ["pages", pages],
@@ -387,7 +608,8 @@ function normalizeBundle(raw: unknown): CodexBundle {
     ["quests", quests],
     ["standing", standing],
     ["relationships", relationships],
-    ["revisions", revisions]
+    ["revisions", revisions],
+    ["prepTemplates", prepTemplates]
   ] as const) {
     const seen = new Set<string | number>();
     for (const { id: recordId } of records as ReadonlyArray<{ id: string | number }>) {
@@ -414,10 +636,10 @@ function normalizeBundle(raw: unknown): CodexBundle {
   const factions = standing.map((row) => row.factionPageId);
   if (new Set(factions).size !== factions.length)
     throw new CodexValidationError(
-      "That backup has two standing rows for the same faction - a faction holds one standing."
+      "That backup has two standing rows for the same faction. A faction holds one standing."
     );
   if (markers.filter((marker) => marker.isParty).length > 1)
-    throw new CodexValidationError("That backup marks more than one pin as the party's - only one pin can be.");
+    throw new CodexValidationError("That backup marks more than one pin as the party's. Only one pin can be.");
   const numbers = sessions.map((session) => session.sessionNumber).filter((value): value is number => value !== null);
   if (new Set(numbers).size !== numbers.length)
     throw new CodexValidationError("That backup has two sessions with the same number.");
@@ -438,6 +660,9 @@ function normalizeBundle(raw: unknown): CodexBundle {
     quests,
     standing,
     revisions,
+    prepTemplates,
+    defaultPrepTemplateId:
+      typeof bundle.defaultPrepTemplateId === "string" ? optionalId(bundle.defaultPrepTemplateId) : null,
     settings: settingsRaw
       ? {
           revisionHistory: {

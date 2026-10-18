@@ -1,4 +1,4 @@
-/* The reveal toggle is an icon-only eye; magenta is the state. The 44px floor is met by `.tap-target`, not paint,
+/* The reveal toggle is an icon-only eye; magenta is the state. The 44px floor is met by `.tap-target` and no paint,
    because it sits in dense rows. */
 .nh-reveal {
   display: inline-flex;
@@ -22,6 +22,18 @@
 }
 .nh-reveal-toggle {
   cursor: pointer;
+}
+/* The labelled switch: the eye and its state in words, one control; its paint reaches the 44px floor. */
+.nh-reveal-toggle--labelled {
+  display: inline-flex;
+  gap: var(--space-2);
+  width: auto;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+}
+.nh-reveal-words {
+  font: 700 var(--fs-sm) / 1 var(--font-label);
+  white-space: nowrap;
 }
 .nh-reveal-toggle svg,
 .nh-reveal-mark svg {

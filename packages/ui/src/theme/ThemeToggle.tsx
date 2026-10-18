@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
-import { IconThemeDark, IconThemeDusk, IconThemeLight } from "../primitives/icons";
+import { IconCheck, IconThemeDawn, IconThemeDay, IconThemeDusk, IconThemeNight } from "../primitives/icons";
+import { Menu, MenuItem } from "../primitives/Menu";
 import { SegmentedControl } from "../primitives/SegmentedControl";
-import { THEMES, type Theme } from "./theme";
+import { THEME_NAMES, THEMES, type Theme } from "./theme";
 import { useTheme } from "./useTheme";
-/* No stylesheet of its own: it is a SegmentedControl. */
+import "./ThemeSwitch.css";
 
-const THEME_META: Record<Theme, { label: string; icon: ReactNode }> = {
-  dark: { label: "Dark", icon: <IconThemeDark /> },
-  dusk: { label: "Dusk", icon: <IconThemeDusk /> },
-  light: { label: "Light", icon: <IconThemeLight /> }
+const THEME_ICONS: Record<Theme, ReactNode> = {
+  dark: <IconThemeNight />,
+  dusk: <IconThemeDusk />,
+  dawn: <IconThemeDawn />,
+  light: <IconThemeDay />
 };
 
 interface ThemeToggleProps {
@@ -17,25 +19,53 @@ interface ThemeToggleProps {
   className?: string;
 }
 
-/** Dark / dusk / light switch, built as a `SegmentedControl` so it shares its look and 44px floor. */
+/** The four themes side by side, built as a `SegmentedControl` so it shares its look and 44px floor. */
 export function ThemeToggle({ compact = false, className }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme();
   return (
     <SegmentedControl
-      ariaLabel="Color theme"
+      ariaLabel="Theme"
       className={`theme-toggle${className ? ` ${className}` : ""}`}
       value={theme}
       onChange={(next) => setTheme(next as Theme)}
-      options={THEMES.map((option) => {
-        const meta = THEME_META[option];
-        return {
-          value: option,
-          icon: meta.icon,
-          label: compact ? undefined : meta.label,
-          ariaLabel: compact ? `${meta.label} theme` : undefined,
-          title: `${meta.label} theme`
-        };
-      })}
+      options={THEMES.map((option) => ({
+        value: option,
+        icon: THEME_ICONS[option],
+        label: compact ? undefined : THEME_NAMES[option],
+        ariaLabel: compact ? THEME_NAMES[option] : undefined,
+        title: THEME_NAMES[option]
+      }))}
     />
+  );
+}
+
+/**
+ * The app bar's theme switch: one square showing the current theme's mark, which opens the four choices. It takes
+ * the 44px floor as paint, so it needs no hit-area layer in a crowded bar.
+ */
+export function ThemeSwitch({ className }: Readonly<{ className?: string }>) {
+  const { theme, setTheme } = useTheme();
+  return (
+    <Menu
+      align="end"
+      hideCaret
+      className={`nh-theme-switch${className ? ` ${className}` : ""}`}
+      triggerClassName="nh-theme-switch-trigger"
+      label={`Theme: ${THEME_NAMES[theme]}`}
+      trigger={THEME_ICONS[theme]}
+    >
+      {THEMES.map((option) => (
+        <MenuItem
+          key={option}
+          role="menuitemradio"
+          aria-checked={option === theme}
+          icon={THEME_ICONS[option]}
+          onClick={() => setTheme(option)}
+        >
+          <span className="nh-theme-switch-name">{THEME_NAMES[option]}</span>
+          {option === theme && <IconCheck className="nh-theme-switch-check" />}
+        </MenuItem>
+      ))}
+    </Menu>
   );
 }

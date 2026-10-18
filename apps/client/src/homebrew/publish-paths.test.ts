@@ -40,11 +40,11 @@ function expectPublishable(type: HomebrewType, draft: Draft) {
 }
 
 describe("the eleven item authoring paths (Appendix A5 repro)", () => {
-  it("1. plain gear item — defaults plus name and description", () => {
+  it("1. plain gear item: defaults plus name and description", () => {
     expectPublishable("equipment", item(["description", "A sturdy iron lantern."]));
   });
 
-  it("2. MELEE WEAPON with the range fields never touched — the flagship case", () => {
+  it("2. MELEE WEAPON with the range fields never touched: the flagship case", () => {
     // Mechanism A: touching Damage seeds the whole container with null ranges, as an SRD mace carries.
     const mace = item(["category", "weapon"], ["weapon.damageDice", "1d6"], ["weapon.damageType", "bludgeoning"]);
     expectPublishable("equipment", mace);
@@ -88,7 +88,7 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
     );
   });
 
-  it("6. the slot select chosen and then returned to “Not set”", () => {
+  it('6. the slot select chosen and then returned to "Not set"', () => {
     // Mechanism B: `ItemSlotSchema.optional()` rejects `null`, so "Not set" removes the key.
     const draft = clearField("equipment", item(["description", "A charm."], ["slot", "neck"]), "slot");
     expect("slot" in (forStorage(draft) as Record<string, unknown>)).toBe(false);
@@ -113,7 +113,7 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
     expectPublishable("equipment", ring);
   });
 
-  it("9. magic item with one cast — a seeded row and a spell picked", () => {
+  it("9. magic item with one cast: a seeded row and a spell picked", () => {
     const wand = item(
       ["description", "A wand."],
       ["isMagic", true],
@@ -127,7 +127,7 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
     expect(stored.casts[0]).not.toHaveProperty("rowId");
   });
 
-  it("10. a cast row whose ability select is returned to “Not set”", () => {
+  it('10. a cast row whose ability select is returned to "Not set"', () => {
     // Mechanism B inside a row: `ItemSpellCastSchema.ability` is `.optional()` and `.strict()`.
     const row = applyField(
       "equipment",
@@ -139,7 +139,7 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
     expectPublishable("equipment", item(["description", "A wand."], ["isMagic", true], ["casts", [row]]));
   });
 
-  it("11. the weapon-kind select returned to “Not set” — the one case that stays blocked, and now SAYS so", () => {
+  it('11. the weapon-kind select returned to "Not set": the one case that stays blocked, and now SAYS so', () => {
     // A weapon must be simple or martial, so this stays blocked, but as a named sentence under the
     // button before anything is sent.
     const draft = clearField(
@@ -147,7 +147,7 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
       item(["weapon.damageDice", "1d8"], ["weapon.damageType", "slashing"]),
       "weapon.category"
     );
-    expect(issuesFor("equipment", draft)).toContain("Fill in weapon kind.");
+    expect(issuesFor("equipment", draft)).toContain("Pick the weapon kind from the list.");
     expect(parsesAsStored("equipment", draft)!.success).toBe(false);
   });
 });
@@ -189,7 +189,7 @@ describe("the checklist and the store agree", () => {
 });
 
 describe("the same repair, on the other type that had it", () => {
-  it("an area spell's shape publishes — it wrote a key the column has never had", () => {
+  it("an area spell's shape publishes: it wrote a key the column has never had", () => {
     // The key is `size`; `SpellReferenceSchema` isn't `.strict()`, so a wrong key would be silently
     // stripped and `size`/`unit` reported as required.
     let spell: Draft = { ...blankDraft("spell"), name: "Blast", description: "A blast." };

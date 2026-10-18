@@ -25,7 +25,7 @@ export function statblockFacts(definition: ActorDefinition): {
     type?: unknown;
     experiencePoints?: unknown;
   };
-  // Narrowed, not cast: the bag is untyped. Null means "nothing to show", which the publish gate refuses.
+  // Narrowed by checks (no cast): the bag is untyped. Null means "nothing to show", which the publish gate refuses.
   const challengeRating = typeof bag.challengeRating === "number" ? bag.challengeRating : null;
   return {
     challengeRating,

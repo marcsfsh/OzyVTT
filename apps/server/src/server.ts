@@ -2,7 +2,7 @@ import { createServer as createHttpServer } from "node:http";
 import { randomInt, randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import express, { type Express } from "express";
-import { Server } from "socket.io";
+import { Server, type Socket } from "socket.io";
 import { CODEX_PATHS, HOST_NAMESPACE } from "@vtt/api-contract";
 import type {
   ClientToServerEvents,
@@ -17,7 +17,8 @@ import { ACTOR_DEFINITION_SCHEMA_VERSION } from "@vtt/schemas";
 import { nextAnnotationExpiry } from "./annotations.js";
 import { fillMissingSpeeds, fillStoredProseFacts, reconcileArmorClasses, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
-import { ContentLibrary } from "./content-library.js";
+import { AudioAssetStore } from "./audio-assets.js";
+import { ContentLibrary, type ContentReader } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
 import { reconcileMagicMarkers } from "./inventory.js";
 import { AuthService } from "./auth.js";
@@ -29,12 +30,15 @@ import {
   createGameCommands,
   failureReply,
   NOT_JOINED_REPLY,
+  SESSION_ENDED_REPLY,
   socketEventOf,
   type GamePrincipal
 } from "./commands/index.js";
 import { CommandRejectedError, GameStore } from "./game-store.js";
 import { CodexStore } from "./codex-store.js";
 import { createCodexImportGuard, createCodexRouter } from "./codex-http.js";
+import { PlayerCodexChanges, readerKey, readerOf } from "./codex/player-reads.js";
+import { EVERYONE, type CodexReader } from "./codex-projections.js";
 import { HomebrewStore } from "./homebrew-store.js";
 import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "./homebrew-http.js";
 import { createHomebrewValidator, scenarioCatalogs } from "./homebrew-validate.js";
@@ -53,6 +57,7 @@ import { TokenCatalogStore } from "./token-catalog.js";
 import { createTokenRouter } from "./token-http.js";
 import { PresenceRegistry } from "./presence.js";
 import { projectGmView, projectPlayerView } from "./projections.js";
+import { callerOfToken, type CredentialVerifiers } from "./request-auth.js";
 import { playerReplayMapAssetIds } from "./replay-projection.js";
 import type { EncounterArchiveDocument } from "./encounter-archive.js";
 import type { TokenMapGeometry } from "./token-placement.js";
@@ -61,8 +66,15 @@ import { ViewerCoordinator } from "./viewer-coordinator.js";
 import { createViewerRouter } from "./viewer-http.js";
 import { projectViewerEncounter } from "./viewer-encounter.js";
 import { ViewerPresentationStore } from "./viewer-presentation-store.js";
+import { SoundCatalogStore } from "./sound-catalog.js";
+import { createSoundRouter } from "./sound-http.js";
+import { SoundService } from "./sound-service.js";
+import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
+import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
+import { stampSceneChanges } from "./scenes.js";
+import type { SightContent } from "./vision/senses.js";
 
 export type CreateServerOptions = {
   authPath: string;
@@ -71,6 +83,7 @@ export type CreateServerOptions = {
   integrationCredentialsPath: string;
   mapAssetsPath?: string;
   tokenAssetsPath?: string;
+  soundAssetsPath?: string;
   webDist: string;
   useDevelopmentClient: boolean;
   developmentClientPort: number;
@@ -79,8 +92,14 @@ export type CreateServerOptions = {
   applicationVersion?: string;
   /** Browser origins that a GM can copy to a separate LAN display. */
   viewerBaseUrls?: readonly string[];
+  /** Where the first GM password is set, said to a request from anywhere but loopback. */
+  gmSetupHint?: string;
   /** How long a session stays "reconnecting" after its last connection drops before going "offline". */
   presenceGraceMs?: number;
+  /** How often connected sockets are re-checked for a session that ran out. */
+  sessionSweepMs?: number;
+  /** How long after a GM password change the other GM devices are told their session ended. */
+  passwordChangeGraceMs?: number;
 };
 
 const isLoopback = (ip: string | undefined) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
@@ -94,8 +113,25 @@ export function createServer(options: CreateServerOptions) {
     cors: options.clientOrigin ? { origin: options.clientOrigin } : undefined
   });
   const auth = new AuthService(options.authPath);
+  // Late-bound: the content library is built below, and the store only calls this from a command.
+  let sightContent: () => SightContent = () => ({});
   const store = new GameStore(options.databasePath, options.initialGameState ?? createInitialGameState(), {
-    timelineDirtied
+    timelineDirtied,
+    // What the party sees joins what it has seen, in the same transaction as the move or door that showed it. A
+    // failure here must not undo the command; the next one catches up.
+    afterMutate: (state, before) => {
+      try {
+        rememberExplored(state, sightContent());
+      } catch (error) {
+        console.error("remembering what the party saw failed:", error instanceof Error ? error.message : error);
+      }
+      try {
+        hideRollsOfHidden(state, before, sightContent());
+      } catch (error) {
+        console.error("hiding a hidden creature's rolls failed:", error instanceof Error ? error.message : error);
+      }
+      stampSceneChanges(state, before);
+    }
   });
   // Every read of the game state outside a command's own transaction goes through here.
   const committedState = createStateReader(store);
@@ -118,20 +154,56 @@ export function createServer(options: CreateServerOptions) {
     maxPixels: 4096 * 4096
   });
   const homebrewStore = new HomebrewStore(options.databasePath);
-  // `publishedFor(audience)` gives `ContentLibrary` only published (and, for players, player-visible)
-  // records; drafts are in neither slice.
+  // `publishedFor(audience)` gives `ContentLibrary` only published records, and for a reader only those shown to
+  // everyone or to one of its characters in packs that are on; drafts are in no slice.
   const contentLibrary = new ContentLibrary(homebrewStore);
+  sightContent = () => ({
+    definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
+    catalog: equipmentCatalogOf(contentLibrary.forAudience("play"))
+  });
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
-  // The codex authorization callbacks, shared by `createCodexRouter` and the `POST /codex/import` guard
-  // so "who may write the codex" has one definition.
-  const codexAuth = {
-    authorizeGm,
-    authorizePlayer: (token: string | undefined) => auth.verifyPlayer(token) !== null,
-    // Same credential store as the game router. A codex credential acts at GM grade; scope decides
-    // read vs write, and `admin` implies both.
-    verifyIntegration: (token: string, scope: "codex:read" | "codex:write") => credentials.verify(token, scope)
-  };
+  /** Every credential the server accepts, checked one way for every HTTP route and the socket (ADR-0027). */
+  const verifiers = {
+    gm: (token) => auth.verify(token),
+    player: (token) => auth.verifyPlayer(token),
+    integration: (token, scope) => {
+      const checked = credentials.check(token, scope);
+      return checked && { id: checked.credential.id, name: checked.credential.name, inScope: checked.inScope };
+    },
+    viewer: (token) => {
+      try {
+        viewerAccess.verify(token);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  } satisfies Required<CredentialVerifiers>;
+  // Shared by `createCodexRouter` and the `POST /codex/import` guard so "who may write the codex" has one
+  // definition. A codex credential acts at GM grade; scope decides read vs write, and `admin` implies both.
+  const codexAuth = { verifiers };
   const viewerCoordinator = new ViewerCoordinator(viewerAccess, viewerPresentation, authorizeGm);
+  // The table's sound (ADR-0024): the GM's library of files and the board, each in its own store. The board's
+  // output reaches table screens through the viewer feed and the GM's devices as `sound:changed`; players get none.
+  const soundAssets = new AudioAssetStore(
+    options.soundAssetsPath ?? join(dirname(options.databasePath), "sound-assets")
+  );
+  const soundCatalog = new SoundCatalogStore(options.databasePath);
+  const soundStore = new SoundStore(options.databasePath);
+  const sound = new SoundService({
+    store: soundStore,
+    assets: soundAssets,
+    catalog: soundCatalog,
+    screens: () => viewerCoordinator.soundScreens(),
+    changed: () => {
+      viewerCoordinator.broadcast();
+      pushSoundToGm();
+    }
+  });
+  viewerCoordinator.attachSound(
+    (now) => sound.viewerSound(now),
+    () => pushSoundToGm()
+  );
   const gmLoginRateLimiter = new LoginRateLimiter();
   const presence = new PresenceRegistry(options.presenceGraceMs ?? 8000, () => broadcast());
   const presenceFor = (sessionId: string) => presence.statusFor(sessionId);
@@ -160,7 +232,15 @@ export function createServer(options: CreateServerOptions) {
   function gmView(state: GameState, now = Date.now()) {
     return { ...projectGmView(state, presenceFor, now), turnHistory: store.listTurnSnapshots() };
   }
-  /** Also reauthorizes every connected socket, so a revoked GM client is downgraded or disconnected promptly. */
+  /** Tells a socket its session ended (revoked or expired) and drops it, so the client signs in again. */
+  function endSession(socket: Socket<ClientToServerEvents, ServerToClientEvents>) {
+    socket.emit("session:ended");
+    socket.disconnect(true);
+  }
+  /**
+   * Also reauthorizes every connected socket, so a revoked GM client is told and disconnected promptly, and pings a
+   * player socket's Codex when a claim changed what it can read there.
+   */
   function broadcast() {
     const current = committedState.read();
     for (const socket of io.sockets.sockets.values()) {
@@ -168,21 +248,165 @@ export function createServer(options: CreateServerOptions) {
       const gm = auth.verify(token);
       const player = auth.verifyPlayer(token);
       if (token && !gm && !player) {
-        socket.disconnect(true);
+        endSession(socket);
         continue;
       }
-      socket.emit("state:updated", gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor));
+      socket.emit(
+        "state:updated",
+        gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor, Date.now(), sightContent())
+      );
+      if (!gm) {
+        followCodexReader(socket);
+        // A claim or a release changes which homebrew the socket receives.
+        try {
+          followHomebrewReader(socket);
+        } catch (error) {
+          console.error("checking a player's homebrew failed:", error instanceof Error ? error.message : error);
+        }
+      }
     }
   }
-  /** Tells every client the codex changed so it refetches its own projected view. Content-free (only a
-   *  revision): naming the changed scope would leak what the GM is working on. */
-  function notifyCodexChanged() {
-    io.emit("codex:changed", { codexRevision: codexStore.revision });
+  /** The player characters a session has claimed: what it reads in the Codex beyond what everyone reads. */
+  function claimedCharacters(sessionId: string): string[] {
+    return committedState
+      .read()
+      .actors.filter((actor) => actor.kind === "player-character" && actor.ownerSessionId === sessionId)
+      .map((actor) => actor.id);
   }
-  /** Tells every client the homebrew library changed so it refetches its own merged catalog. Content-free
-   *  (only a revision), so players learn nothing about what the GM is working on. */
+  /** The party's player characters: the only ids a Codex audience may name. */
+  function partyCharacters(): ReadonlySet<string> {
+    return new Set(
+      committedState
+        .read()
+        .actors.filter((actor) => actor.kind === "player-character" && actor.replaySceneId === undefined)
+        .map((actor) => actor.id)
+    );
+  }
+  /** Who a socket's Codex pings are for: its player's claimed characters, or the ones a preview names. */
+  function codexReaderOf(socket: Socket<ClientToServerEvents, ServerToClientEvents>): CodexReader {
+    const player = auth.verifyPlayer(socket.handshake.auth?.token);
+    if (!player) return EVERYONE;
+    return readerOf(player.preview ? player.preview.characterIds : claimedCharacters(player.sessionId));
+  }
+  /** Each player socket's reader as its last ping counted it. */
+  const codexReaders = new WeakMap<Socket<ClientToServerEvents, ServerToClientEvents>, string>();
+  /**
+   * Keeps a player socket's Codex reader current. A claim or a release changes what the socket can read, so it is
+   * pinged with its new reader's count; the first sight of a socket only starts counting for it.
+   */
+  function followCodexReader(socket: Socket<ClientToServerEvents, ServerToClientEvents>) {
+    if (!playerCodexChanges) return;
+    const reader = codexReaderOf(socket);
+    const key = readerKey(reader);
+    const known = codexReaders.get(socket);
+    if (known === key) return;
+    codexReaders.set(socket, key);
+    try {
+      const count = playerCodexChanges.watch(reader);
+      if (known !== undefined) socket.emit("codex:changed", { codexRevision: count });
+    } catch (error) {
+      console.error("checking a player's codex failed:", error instanceof Error ? error.message : error);
+    }
+  }
+  /** A session that runs out ends with no state change to notice it, so every socket is re-checked on a timer. */
+  const sessionSweep = setInterval(() => {
+    for (const socket of io.sockets.sockets.values()) {
+      const token = socket.handshake.auth?.token;
+      if (token && !auth.verify(token) && !auth.verifyPlayer(token)) endSession(socket);
+    }
+  }, options.sessionSweepMs ?? 30_000);
+  sessionSweep.unref?.();
+  /** Sends the sound board to the GM's devices; a player's socket is never sent it. */
+  function pushSoundToGm() {
+    const view = sound.view();
+    for (const socket of io.sockets.sockets.values())
+      if (auth.verify(socket.handshake.auth?.token)) socket.emit("sound:changed", view);
+  }
+  /** Set once the Codex store is open; counts the changes each audience of players can read. */
+  let playerCodexChanges: PlayerCodexChanges | undefined;
+  /** The players' check waiting to run, so writes in one tick share it. */
+  let playerCodexCheck: NodeJS.Immediate | undefined;
+  /**
+   * Tells clients the codex changed so each refetches its own projected view. Content-free (only a revision):
+   * naming the changed scope would leak what the GM is working on. The GM's devices hear of every write. A
+   * player's device hears only of a change it can read, with a count of its own audience's changes alone, since a
+   * ping on a GM-only write would tell the table when the GM is writing secrets, and one on a reveal to Lyra would
+   * tell Borin's player. That check reads each audience's whole Codex, so it runs after the write has answered.
+   */
+  function notifyCodexChanged() {
+    for (const socket of io.sockets.sockets.values())
+      if (auth.verify(socket.handshake.auth?.token))
+        socket.emit("codex:changed", { codexRevision: codexStore.revision });
+    playerCodexCheck ??= setImmediate(() => {
+      playerCodexCheck = undefined;
+      const readers = [...io.sockets.sockets.values()]
+        .filter((socket) => !auth.verify(socket.handshake.auth?.token))
+        .map((socket) => [socket, codexReaderOf(socket)] as const);
+      let moved = new Map<string, number>();
+      try {
+        moved = playerCodexChanges?.next(readers.map(([, reader]) => reader)) ?? moved;
+      } catch (error) {
+        // Best-effort (the write already committed), but logged. With no answer, players are not pinged.
+        console.error("checking the players' codex failed:", error instanceof Error ? error.message : error);
+      }
+      for (const [socket, reader] of readers) {
+        const count = moved.get(readerKey(reader));
+        if (count !== undefined) socket.emit("codex:changed", { codexRevision: count });
+      }
+    });
+  }
+  /** The characters whose homebrew a player socket receives: its session's claims, or the ones a preview names. */
+  function homebrewReaderOf(socket: Socket<ClientToServerEvents, ServerToClientEvents>): ContentReader {
+    const player = auth.verifyPlayer(socket.handshake.auth?.token);
+    if (!player) return { characterIds: [] };
+    return { characterIds: player.preview ? player.preview.characterIds : claimedCharacters(player.sessionId) };
+  }
+  /** What each player socket's last homebrew ping covered: the hash of the homebrew its reader receives, and the
+   *  number it was last sent. */
+  const homebrewSeen = new WeakMap<
+    Socket<ClientToServerEvents, ServerToClientEvents>,
+    { fingerprint: string; sent: number }
+  >();
+  /**
+   * Pings a player socket when the homebrew its reader receives changed since the last check, and starts counting for
+   * a socket seen for the first time. The number grows for that socket alone, so it says nothing about any other
+   * reader's changes, and a reconnect never reuses one.
+   */
+  function followHomebrewReader(socket: Socket<ClientToServerEvents, ServerToClientEvents>) {
+    const fingerprint = homebrewStore.fingerprintFor(homebrewReaderOf(socket));
+    const seen = homebrewSeen.get(socket);
+    if (!seen) {
+      homebrewSeen.set(socket, { fingerprint, sent: Date.now() });
+      return;
+    }
+    if (seen.fingerprint === fingerprint) return;
+    const sent = Math.max(seen.sent + 1, Date.now());
+    homebrewSeen.set(socket, { fingerprint, sent });
+    socket.emit("homebrew:changed", { revision: sent });
+  }
+  /** The players' homebrew check waiting to run, so writes in one tick share it. */
+  let playerHomebrewCheck: NodeJS.Immediate | undefined;
+  /**
+   * Tells clients the homebrew library changed so each refetches its own catalog. Content-free (only a revision).
+   * The GM's devices hear of every write. A player's device hears only of a change to what its reader receives, so a
+   * hidden record, a reveal to another character or a pack nobody receives anything from pings no player.
+   */
   function notifyHomebrewChanged() {
-    io.emit("homebrew:changed", { revision: homebrewStore.revision });
+    for (const socket of io.sockets.sockets.values())
+      if (auth.verify(socket.handshake.auth?.token))
+        socket.emit("homebrew:changed", { revision: homebrewStore.revision });
+    playerHomebrewCheck ??= setImmediate(() => {
+      playerHomebrewCheck = undefined;
+      for (const socket of io.sockets.sockets.values()) {
+        if (auth.verify(socket.handshake.auth?.token)) continue;
+        try {
+          followHomebrewReader(socket);
+        } catch (error) {
+          // Best-effort (the write already committed), but logged. With no answer, the player is not pinged.
+          console.error("checking a player's homebrew failed:", error instanceof Error ? error.message : error);
+        }
+      }
+    });
     // Best-effort (the homebrew write already committed), but logged.
     void reconcileContentDerived().catch((error: unknown) =>
       console.error("re-deriving armor classes failed:", error instanceof Error ? error.message : error)
@@ -194,7 +418,7 @@ export function createServer(options: CreateServerOptions) {
   async function reconcileContentDerived() {
     const current = committedState.read();
     if (current.combat.historyCursor !== null) return;
-    const catalog = equipmentCatalogOf(contentLibrary.forAudience("gm"));
+    const catalog = equipmentCatalogOf(contentLibrary.forAudience("play"));
     const definitionsIn = (state: GameState) => (definitionId: string) =>
       storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
     const reconcile = (state: GameState) => {
@@ -231,24 +455,26 @@ export function createServer(options: CreateServerOptions) {
       actorIds?: readonly string[];
       gmOnly?: boolean;
       logged?: boolean;
+      playersOnly?: boolean;
     }>
   ) {
-    const { actors } = committedState.read();
     const actorIds = event.actorIds ?? [];
-    const publicToPlayers =
-      !event.gmOnly && actorIds.every((id) => actors.find((actor) => actor.id === id)?.visibility === "public");
+    // The shared check: GM-only, or out of every character's sight or under the fog (ADR-0023).
+    const hidden = hiddenFrom(committedState.read(), sightContent());
+    const publicToPlayers = !event.gmOnly && !actorIds.some(hidden);
     const payload: TableEvent = { id: randomUUID(), kind: event.kind, text: event.text, actorIds, at: Date.now() };
     for (const socket of io.sockets.sockets.values()) {
       const token = socket.handshake.auth?.token;
-      if (auth.verify(token)) socket.emit("table:event", payload);
-      else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
+      if (auth.verify(token)) {
+        if (event.playersOnly !== true) socket.emit("table:event", payload);
+      } else if (publicToPlayers && auth.verifyPlayer(token)) socket.emit("table:event", payload);
     }
     // Every toast is also a feed line, gated the same way, unless the caller writes a richer row itself
     // (`logged: false`). Call `appendLog` directly only for lines with no toast.
     if (event.logged !== false) appendLog({ kind: event.kind, text: event.text, actorIds, gmOnly: event.gmOnly });
   }
-  /** Appends a feed line and pushes it live, gated like toasts. `!== "public"` so an actor no longer on the
-   *  roster (or a future visibility) fails closed. */
+  /** Appends a feed line and pushes it live, gated like toasts. An actor no longer on the roster counts as hidden, so
+   *  the gate fails closed. */
   function appendLog(
     entry: Readonly<{
       kind: CombatLogEntry["kind"];
@@ -261,9 +487,7 @@ export function createServer(options: CreateServerOptions) {
   ) {
     const current = committedState.read();
     const actorIds = entry.actorIds ?? [];
-    const gmOnly =
-      entry.gmOnly === true ||
-      actorIds.some((id) => current.actors.find((actor) => actor.id === id)?.visibility !== "public");
+    const gmOnly = entry.gmOnly === true || actorIds.some(hiddenFrom(current, sightContent()));
     const row = combatLog.append({
       kind: entry.kind,
       text: entry.text,
@@ -286,17 +510,17 @@ export function createServer(options: CreateServerOptions) {
       if (projected) socket.emit("log:entry", projected);
     }
   }
-  /** "Round 3 - Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
+  /** "Round 3 · Borin's turn.", then what Borin carries into it (`turnReminder`). A hidden combatant's turn stays
    *  GM-only (its name would otherwise leak). */
   function logTurnBegin(state: GameState) {
     if (state.combat.turnActorId === null) return;
     const name = state.actors.find((actor) => actor.id === state.combat.turnActorId)?.name ?? "A combatant";
     appendLog({
       kind: "turn",
-      text: `Round ${state.combat.round} - ${name}'s turn.`,
+      text: `Round ${state.combat.round} · ${name}'s turn.`,
       actorIds: [state.combat.turnActorId]
     });
-    const reminder = turnReminder(state, state.combat.turnActorId);
+    const reminder = turnReminder(state, state.combat.turnActorId, hiddenFrom(state, sightContent()));
     if (reminder !== null) appendLog({ kind: "turn", text: reminder, actorIds: [state.combat.turnActorId] });
   }
   /** Turns a timeline navigation outcome into log lines: plain turns for forward play, GM-only notes for rewinds. */
@@ -309,7 +533,7 @@ export function createServer(options: CreateServerOptions) {
       case "rewrote":
         appendLog({
           kind: "history",
-          text: "The GM rewrote history from this turn - every later turn was undone.",
+          text: "The GM rewrote history from this turn, and every later turn was undone.",
           gmOnly: true
         });
         logTurnBegin(state);
@@ -341,7 +565,10 @@ export function createServer(options: CreateServerOptions) {
   }
   async function publishGameState(state: GameState) {
     try {
-      await viewerCoordinator.synchronizeEncounter(state.revision, projectViewerEncounter(state, Date.now()));
+      await viewerCoordinator.synchronizeEncounter(
+        state.revision,
+        projectViewerEncounter(state, Date.now(), sightContent())
+      );
     } catch {
       for (const socket of io.sockets.sockets.values())
         if (auth.verify(socket.handshake.auth?.token))
@@ -372,6 +599,18 @@ export function createServer(options: CreateServerOptions) {
     }
   }
 
+  /**
+   * After the GM password is reset (data/auth.json deleted), every player session from before is dead, so the
+   * characters they claimed are let go and each player can claim again from a fresh seat.
+   */
+  async function releaseEveryClaim() {
+    if (!committedState.read().actors.some((actor) => actor.ownerSessionId !== null)) return;
+    const { state } = await store.execute({ id: randomUUID(), type: "host.release-claims" }, (draft) => {
+      for (const actor of draft.actors) actor.ownerSessionId = null;
+    });
+    await publishGameState(state);
+  }
+
   // The game commands and reads, served by both the Socket.IO handlers below and the HTTP API (ADR-0016).
   const game = createGameCommands({
     store,
@@ -390,11 +629,27 @@ export function createServer(options: CreateServerOptions) {
     logTimelineOutcome,
     scheduleAnnotationExpiry,
     gmView: (state) => gmView(state),
-    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor),
+    playerView: (state, sessionId) => projectPlayerView(state, sessionId, presenceFor, Date.now(), sightContent()),
     random: (sides) => randomInt(1, sides + 1),
     newId: randomUUID,
     // Archives live in the game store's own table; `replay.launch` reads one document through this hook.
     archiveDocument: (id) => store.getEncounterArchive(id),
+    sound,
+    onTimePassed: ({ fromHours, toHours }) => {
+      // The game keeps the hour and the Codex calendar the day: each midnight crossed moves the date a day.
+      const days = Math.floor(toHours / 24) - Math.floor(fromHours / 24);
+      try {
+        if (codexStore.advanceCampaignDate(days)) notifyCodexChanged();
+      } catch (error) {
+        // Best-effort (the rest already committed), but logged.
+        console.error("moving the codex date failed:", error instanceof Error ? error.message : error);
+      }
+    },
+    claimReleased: (sessionId, event) => {
+      for (const socket of io.sockets.sockets.values())
+        if (auth.verifyPlayer(socket.handshake.auth?.token)?.sessionId === sessionId)
+          socket.emit("claim:released", event);
+    },
     onEncounterArchived: ({ sceneId, turnCount }) => {
       // Log the fight to the codex timeline, pinned to the location marker that links this scene, if any.
       try {
@@ -444,7 +699,7 @@ export function createServer(options: CreateServerOptions) {
   app.use(CODEX_PATHS.import, createCodexImportGuard(codexAuth), express.json({ limit: "64mb" }));
   // Above the express default so canonical ActorDefinition imports (capped at 256kb) fit.
   app.use(express.json({ limit: "512kb" }));
-  // Give /api/v1 callers the stable error envelope for malformed/oversized JSON instead of Express's HTML.
+  // Give /api/v1 callers the stable error envelope for malformed/oversized JSON. Express would answer with HTML.
   app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!error || res.headersSent || !isApiV1(req.path)) return next(error as Error);
     return (error as { type?: string }).type === "entity.too.large"
@@ -454,10 +709,14 @@ export function createServer(options: CreateServerOptions) {
   app.use(
     createHostRouter({
       auth,
+      verifiers,
       loginLimiter: gmLoginRateLimiter,
       isLoopback,
       broadcast,
-      viewerBaseUrls: options.viewerBaseUrls
+      onBootstrapped: releaseEveryClaim,
+      viewerBaseUrls: options.viewerBaseUrls,
+      ...(options.gmSetupHint !== undefined ? { gmSetupHint: options.gmSetupHint } : {}),
+      ...(options.passwordChangeGraceMs !== undefined ? { passwordChangeGraceMs: options.passwordChangeGraceMs } : {})
     })
   );
   app.use(
@@ -465,7 +724,7 @@ export function createServer(options: CreateServerOptions) {
       access: viewerAccess,
       presentation: viewerPresentation,
       coordinator: viewerCoordinator,
-      authorizeGm
+      verifiers
     })
   );
 
@@ -496,26 +755,18 @@ export function createServer(options: CreateServerOptions) {
     createMapRouter({
       assets: mapAssets,
       catalog: mapCatalog,
-      authorizeGm,
-      authorizePlayer: (token, assetId) => {
-        if (auth.verifyPlayer(token) === null) return false;
+      verifiers,
+      playerMayLoad: (assetId) => {
         const { combat } = committedState.read();
-        // A player may load the active battle map, any revealed atlas map, or the map of a replay the GM shared.
+        // A player may load the live battle map (before its fight too, as their projection names it), any revealed
+        // atlas map, or the map of a replay the GM shared.
         return (
-          (combat.active && combat.mapAssetId === assetId) ||
-          codexStore.isAssetRevealedToPlayers(assetId) ||
-          sharedReplayMap(assetId)
+          combat.mapAssetId === assetId || codexStore.isAssetRevealedToPlayers(assetId) || sharedReplayMap(assetId)
         );
       },
-      authorizeViewer: (token, assetId) => {
-        if (!token) return false;
-        try {
-          viewerAccess.verify(token);
-          const presentation = viewerPresentation.project();
-          return presentation.enabled && presentation.activeMap?.assetId === assetId;
-        } catch {
-          return false;
-        }
+      viewerMayLoad: (assetId) => {
+        const presentation = viewerPresentation.project();
+        return presentation.enabled && presentation.activeMap?.assetId === assetId;
       }
     })
   );
@@ -523,26 +774,32 @@ export function createServer(options: CreateServerOptions) {
     createTokenRouter({
       assets: tokenAssets,
       catalog: tokenCatalog,
-      authorizeGm,
       // A joined player may browse the GM's token library and upload their own token image.
-      playerSession: (token) => auth.verifyPlayer(token),
-      authorizePlayer: (token, assetId) =>
-        auth.verifyPlayer(token) !== null &&
-        committedState.read().actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId),
-      authorizeViewer: (token, assetId) => {
-        if (!token) return false;
-        try {
-          viewerAccess.verify(token);
-          return (
-            viewerPresentation.project().enabled &&
-            committedState
-              .read()
-              .actors.some((actor) => actor.visibility === "public" && actor.tokenAssetId === assetId)
-          );
-        } catch {
-          return false;
-        }
+      verifiers,
+      // Only a creature the reader may know of: an image worn by one hidden by sight or the fog would answer
+      // whether it is in play.
+      playerMayLoad: (assetId, sessionId) => {
+        const state = committedState.read();
+        const hidden = hiddenFrom(state, sightContent(), sessionId);
+        return state.actors.some((actor) => actor.tokenAssetId === assetId && !hidden(actor.id));
+      },
+      viewerMayLoad: (assetId) => {
+        const state = committedState.read();
+        const hidden = hiddenFrom(state, sightContent());
+        return (
+          viewerPresentation.project().enabled &&
+          state.actors.some((actor) => actor.tokenAssetId === assetId && !hidden(actor.id))
+        );
       }
+    })
+  );
+  app.use(
+    createSoundRouter({
+      service: sound,
+      assets: soundAssets,
+      verifiers,
+      // A table screen may load a sound only while it is playing; the GM's library stays the GM's.
+      viewerMayLoad: (assetId) => sound.isOnAir(assetId)
     })
   );
   app.use(
@@ -551,39 +808,42 @@ export function createServer(options: CreateServerOptions) {
       assets: codexAssets,
       ...codexAuth,
       notifyChanged: notifyCodexChanged,
-      issuePreviewSession: () => auth.issuePreviewPlayerSession()
+      issuePreviewSession: (characterIds) => auth.issuePreviewPlayerSession(characterIds),
+      playerCharacters: claimedCharacters,
+      partyCharacters
     })
   );
-  // GM-only end to end; `authorizePlayer` exists only so a player gets 403 rather than 401.
+  // GM-only end to end: any other valid credential gets 403.
   app.use(
     createHomebrewRouter({
       store: homebrewStore,
-      authorizeGm,
-      authorizePlayer: (token) => auth.verifyPlayer(token) !== null,
+      verifiers,
       notifyChanged: notifyHomebrewChanged,
-      // The GM catalog: a dependency that is published but not player-visible is valid here.
+      // The table with every pack on: a dependency in a pack that is off publishes, with a warning.
       validate: createHomebrewValidator({
         forAudience: (audience) => contentLibrary.forAudience(audience),
         forScenario: scenarioCatalogs(contentLibrary, homebrewStore),
-        publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists,
+        publishedSpellLists: (audience = "play") => homebrewStore.publishedFor(audience).spellLists,
         // Drafts included, only here: the gate asks whether a record exists, so a class and its subclass can
         // publish in either order.
-        authoredIndex: () => homebrewStore.authoredIndex()
+        authoredIndex: () => homebrewStore.authoredIndex(),
+        offPackRecords: () => homebrewStore.offPackRecords()
       }),
       usagesOf: homebrewUsagesFor,
-      catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
+      catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("play"), id),
+      contentLibrary,
+      partyCharacters
     })
   );
   const gameApiRouter = createGameApiRouter({
     game,
-    gmSession: (token) => auth.verify(token),
-    playerSession: (token) => auth.verifyPlayer(token),
-    verifyIntegration: (token, scope) => credentials.verify(token, scope),
+    verifiers,
     archives: {
       list: () => store.listEncounterArchives(),
       get: (id) => store.getEncounterArchive(id),
       remove: (id) => store.deleteEncounterArchive(id),
-      setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible)
+      setVisibility: (id, playerVisible) => store.setEncounterArchiveVisibility(id, playerVisible),
+      rename: (id, name) => store.renameEncounterArchive(id, name)
     },
     sessions: {
       // The HTTP mirror of the socket's LAN-trust join: anyone who can reach the host may take a player seat
@@ -595,18 +855,18 @@ export function createServer(options: CreateServerOptions) {
       }
     },
     revision: () => store.revision,
-    newId: randomUUID
+    newId: randomUUID,
+    sightContent: () => sightContent()
   });
   const apiV1Router = createApiV1Router({
     applicationVersion: options.applicationVersion ?? "0.1.0",
     actorDefinitionVersion: ACTOR_DEFINITION_SCHEMA_VERSION,
-    authorizeIntegration: (token, requiredScope) => credentials.verify(token, requiredScope) !== null,
-    authorizeGm,
+    verifiers,
     credentialStore: credentials,
     gameRouter: gameApiRouter
   });
-  // Keep the API-only 404 envelope scoped to /api/v1 so it cannot swallow the SPA or the viewer.
-  app.use((req, res, next) => (isApiV1(req.path) ? apiV1Router(req, res, next) : next()));
+  // Its API-only 404 envelope answers inside /api/v1 alone, so it cannot swallow the SPA or the viewer.
+  app.use(apiV1Router);
   app.use("/api", (_req, res) => res.status(404).json({ message: "API route not found." }));
   if (!options.useDevelopmentClient) {
     app.get("/viewer", (_req, res) => res.redirect(307, "/viewer.html"));
@@ -628,10 +888,18 @@ export function createServer(options: CreateServerOptions) {
     let joinedSession: { sessionId: string; role: ClientRole } | null = null;
     socket.on("session:join", (payload, ack) => {
       // Client input: a join without a payload or an acknowledgement must not throw out of the handler.
-      const token = typeof payload?.token === "string" ? payload.token : undefined;
+      const token = typeof payload?.token === "string" && payload.token !== "" ? payload.token : undefined;
       const acknowledge: typeof ack = (result) => {
         if (typeof ack === "function") ack(result);
       };
+      // The handshake reads the caller like every HTTP route (ADR-0027). A token that no longer verifies is refused,
+      // never swapped for a fresh player seat: a GM whose session ended must hear so, and a player's client drops
+      // the dead token and joins again without one.
+      const caller = callerOfToken(token, verifiers);
+      if (caller.kind === "invalid")
+        return acknowledge({ ok: false, code: "unauthenticated", message: "Your session ended. Sign in again." });
+      if (caller.kind !== "none" && caller.kind !== "gm" && caller.kind !== "player")
+        return acknowledge({ ok: false, code: "forbidden", message: "That credential does not join the table." });
       socket.handshake.auth.token = token;
       const gm = auth.verify(token);
       if (gm) {
@@ -639,6 +907,8 @@ export function createServer(options: CreateServerOptions) {
         presence.connect(gm.sessionId, "gm");
         acknowledge({ ok: true, role: "gm", sessionId: gm.sessionId });
         broadcast();
+        // The board too, so a GM device that (re)joins never waits for the next change to see it.
+        socket.emit("sound:changed", sound.view());
         return;
       }
       const existingPlayer = auth.verifyPlayer(token);
@@ -672,7 +942,15 @@ export function createServer(options: CreateServerOptions) {
       const gm = auth.verify(token);
       if (gm) return { kind: "gm", sessionId: gm.sessionId };
       const player = auth.verifyPlayer(token);
-      return player ? { kind: "player", sessionId: player.sessionId } : null;
+      if (!player) return null;
+      return player.preview
+        ? { kind: "player", sessionId: player.sessionId, preview: { characterIds: player.preview.characterIds } }
+        : { kind: "player", sessionId: player.sessionId };
+    };
+    /** Whether this socket joined with a token that has since been revoked or run out. */
+    const sessionEnded = () => {
+      const token = socket.handshake.auth?.token;
+      return typeof token === "string" && !auth.verify(token) && !auth.verifyPlayer(token);
     };
     /** Socket adapter: resolve the principal, run the work, and answer through the same failure mapping as
      *  HTTP. A timeline confirmation bounce is an ok:true ack, and an emit without an acknowledgement still
@@ -685,6 +963,11 @@ export function createServer(options: CreateServerOptions) {
         if (typeof acknowledge === "function") acknowledge(result);
       };
       const principal = principalOf();
+      if (!principal && sessionEnded()) {
+        reply(SESSION_ENDED_REPLY);
+        endSession(socket);
+        return;
+      }
       if (!principal) return reply(NOT_JOINED_REPLY);
       let outcome: Record<string, unknown>;
       try {
@@ -710,7 +993,13 @@ export function createServer(options: CreateServerOptions) {
       );
     socket.emit(
       "state:updated",
-      projectPlayerView(committedState.read(), auth.verifyPlayer(socket.handshake.auth.token)?.sessionId, presenceFor)
+      projectPlayerView(
+        committedState.read(),
+        auth.verifyPlayer(socket.handshake.auth.token)?.sessionId,
+        presenceFor,
+        Date.now(),
+        sightContent()
+      )
     );
   });
 
@@ -729,16 +1018,29 @@ export function createServer(options: CreateServerOptions) {
       characterDrafts.initialize(),
       codexStore.initialize(),
       codexAssets.initialize(),
-      homebrewStore.initialize()
+      homebrewStore.initialize(),
+      soundAssets.initialize(),
+      soundCatalog.initialize(),
+      soundStore.initialize()
     ]);
+    // The players' view as it stands at start, so the first write a player cannot see pings no player.
+    playerCodexChanges = new PlayerCodexChanges(codexStore);
+    await sound.initialize();
     // The store's startup seeds may change the state without a revision bump.
     committedState.reset();
     await reconcileContentDerived();
-    await viewerCoordinator.synchronizeEncounter(store.revision, projectViewerEncounter(committedState.read()));
+    await viewerCoordinator.synchronizeEncounter(
+      store.revision,
+      projectViewerEncounter(committedState.read(), Date.now(), sightContent())
+    );
   }
   function close() {
+    clearInterval(sessionSweep);
+    if (playerCodexCheck) clearImmediate(playerCodexCheck);
+    if (playerHomebrewCheck) clearImmediate(playerHomebrewCheck);
     presence.dispose();
     viewerCoordinator.dispose();
+    sound.dispose();
     for (const timer of annotationExpiryTimers) clearTimeout(timer);
     annotationExpiryTimers.clear();
     io.close();
@@ -751,6 +1053,8 @@ export function createServer(options: CreateServerOptions) {
     viewerPresentation.close();
     characterDrafts.close();
     homebrewStore.close();
+    soundCatalog.close();
+    soundStore.close();
   }
 
   return {
@@ -766,6 +1070,7 @@ export function createServer(options: CreateServerOptions) {
     viewerAccess,
     viewerPresentation,
     viewerCoordinator,
+    sound,
     initialize,
     close
   };

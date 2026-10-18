@@ -4,7 +4,9 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areAllies, areEnemies } from "./creature-sides.js";
+import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { creatureTypeOf } from "./statblock-facts.js";
+import { hiddenFrom } from "./vision/audience.js";
 
 /**
  * What a Paladin's Aura of Protection carries to the Paladin and its allies inside it (SRD 5.2.1 Paladin): its reach,
@@ -16,23 +18,41 @@ import { creatureTypeOf } from "./statblock-facts.js";
 export type AuraContext = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** The item catalog, for the senses that decide who the table can see; absent means fewer senses. */
+  catalog?: EquipmentCatalog;
 }>;
+
+/** The shared hidden check for the table (ADR-0023), read with the context's content. It builds sight only when first
+ *  asked about a creature that isn't a player character. */
+export function tableHiddenCheck(
+  state: GameState,
+  context: Pick<AuraContext, "resolveDefinition" | "catalog">
+): (actorId: string) => boolean {
+  return hiddenFrom(state, {
+    definition: context.resolveDefinition,
+    ...(context.catalog ? { catalog: context.catalog } : {})
+  });
+}
 
 /** Aura of Protection's Emanation: 10 feet, 30 with Aura Expansion. */
 export function auraReachFeet(definition: ActorDefinition | undefined): number {
   return holdsFeature(definition, "aura-expansion", "Aura Expansion") ? 30 : 10;
 }
 
-/** The Paladin itself, or an ally the map shows inside its aura. A hidden Paladin's aura never shows on a visible
- *  creature, which would reveal it. */
+/** The Paladin itself, or an ally the map shows inside its aura. A Paladin hidden from the table (the shared check:
+ *  GM-only, out of every character's sight or under the fog) never shows its aura on a visible creature, which would
+ *  reveal it. */
 export function inPaladinAura(
+  state: GameState,
   paladin: Actor,
   definition: ActorDefinition | undefined,
   target: Actor,
-  context: AuraContext
+  context: AuraContext,
+  hidden: (actorId: string) => boolean = tableHiddenCheck(state, context)
 ): boolean {
-  if (paladin.archived || (paladin.visibility !== "public" && target.visibility === "public")) return false;
+  if (paladin.archived) return false;
   if (paladin.id === target.id) return true;
+  if (hidden(paladin.id) && !hidden(target.id)) return false;
   if (!areAllies(paladin, target, context.resolveDefinition)) return false;
   const distance = context.distanceFeet?.(paladin.id, target.id) ?? null;
   return distance !== null && distance <= auraReachFeet(definition) + 1e-6;
@@ -51,10 +71,11 @@ const WARDS = [
 export function wardingAura(state: GameState, target: Actor, conditionId: string, context: AuraContext): string | null {
   const ward = WARDS.find((entry) => entry.conditionId === conditionId);
   if (!ward) return null;
+  const hidden = tableHiddenCheck(state, context);
   for (const paladin of state.actors) {
     const definition = paladin.definitionId ? context.resolveDefinition(paladin.definitionId) : undefined;
     if (isIncapacitated(paladin) || !holdsFeature(definition, ward.featureId, ward.name)) continue;
-    if (!inPaladinAura(paladin, definition, target, context)) continue;
+    if (!inPaladinAura(state, paladin, definition, target, context, hidden)) continue;
     return paladin.id === target.id ? ward.name : `${paladin.name}'s ${ward.name}`;
   }
   return null;
@@ -96,10 +117,12 @@ export function holyNimbusBurns(
   target: Actor,
   context: AuraContext
 ): Array<Readonly<{ paladin: Actor; amount: number }>> {
+  const hidden = tableHiddenCheck(state, context);
   return paladinsCarrying(state, HOLY_NIMBUS_TAG, context).flatMap(({ paladin, definition }) => {
     if (paladin.id === target.id || target.hp.current <= 0 || !areEnemies(paladin, target, context.resolveDefinition))
       return [];
-    if (paladin.visibility !== "public" && target.visibility === "public") return [];
+    // A Paladin hidden from the table burns no visible creature: the damage would give it away.
+    if (hidden(paladin.id) && !hidden(target.id)) return [];
     const distance = context.distanceFeet?.(paladin.id, target.id) ?? null;
     if (distance === null || distance > auraReachFeet(definition) + 1e-6) return [];
     const amount = abilityModifier(definition?.abilityScores.cha ?? 10) + (definition?.proficiencyBonus ?? 0);
@@ -108,25 +131,29 @@ export function holyNimbusBurns(
 }
 
 /** SRD Holy Nimbus, Holy Ward: "You have Advantage on any saving throw you are forced to make by a Fiend or an
- *  Undead." The claim on a save `target` makes against the creature that forced it, or null. */
+ *  Undead." The claim on a save `target` makes against the creature that forced it, or null. A forcer hidden from the
+ *  table gives a visible creature no Advantage, which would tell the table what kind of creature it is. */
 export function holyWardClaim(
   state: GameState,
   target: Actor,
   sourceActorId: string | null,
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+  context: Pick<AuraContext, "resolveDefinition" | "catalog">
 ): Readonly<{ source: string; label: string }> | null {
   if (sourceActorId === null || !carries(target, HOLY_NIMBUS_TAG)) return null;
   const forcer = state.actors.find((actor) => actor.id === sourceActorId);
   if (!forcer) return null;
-  const type = creatureTypeOf(forcer, forcer.definitionId ? resolveDefinition(forcer.definitionId) : undefined);
+  const hidden = tableHiddenCheck(state, context);
+  if (hidden(forcer.id) && !hidden(target.id)) return null;
+  const type = creatureTypeOf(forcer, forcer.definitionId ? context.resolveDefinition(forcer.definitionId) : undefined);
   return type === "fiend" || type === "undead" ? { source: "holy-ward", label: "Holy Nimbus (Holy Ward)" } : null;
 }
 
 /** SRD Smite of Protection: "Whenever you cast Divine Smite, you and your allies have Half Cover while in your Aura of
  *  Protection", until the start of the Paladin's next turn. Half when such an aura reaches `target`, else null. */
 export function smiteOfProtectionCover(state: GameState, target: Actor, context: AuraContext): "half" | null {
+  const hidden = tableHiddenCheck(state, context);
   return paladinsCarrying(state, SMITE_OF_PROTECTION_TAG, context).some(({ paladin, definition }) =>
-    inPaladinAura(paladin, definition, target, context)
+    inPaladinAura(state, paladin, definition, target, context, hidden)
   )
     ? "half"
     : null;

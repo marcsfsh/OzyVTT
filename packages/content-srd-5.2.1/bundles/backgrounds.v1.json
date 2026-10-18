@@ -3,8 +3,8 @@
     "id": "acolyte",
     "name": "Acolyte",
     "source": "srd",
-    "summary": "You served in a temple, learning sacred rites and prayers.",
-    "description": "You spent your formative years in a temple, monastery, or shrine, performing sacred rites, copying prayers, and serving the faithful and the divine.",
+    "summary": "You served in a temple and learned its rites and prayers.",
+    "description": "You spent your early years in a temple, where you performed sacred rites and copied prayers for the faithful.",
     "abilityOptions": {
       "from": [
         "int",
@@ -73,7 +73,7 @@
     "name": "Criminal",
     "source": "srd",
     "summary": "You earned your living in the shadows, outside the law.",
-    "description": "You made your way on the wrong side of the law - picking locks, lifting purses, or pulling off jobs respectable folk pretend not to know about - and you learned to stay alert while doing it.",
+    "description": "You made your living on the wrong side of the law by picking locks and lifting purses, and you learned to stay alert while you worked.",
     "abilityOptions": {
       "from": [
         "dex",
@@ -143,7 +143,7 @@
     "name": "Sage",
     "source": "srd",
     "summary": "You spent years learning the lore of the multiverse.",
-    "description": "You spent years learning the lore of the multiverse, studying at a library, an academy, or under a mentor, and you know where to look for answers.",
+    "description": "You spent years learning the lore of the multiverse in libraries and academies or under a mentor. You know where to look for answers.",
     "abilityOptions": {
       "from": [
         "con",
@@ -212,7 +212,7 @@
     "name": "Soldier",
     "source": "srd",
     "summary": "You trained on a battlefield and learned discipline under arms.",
-    "description": "You trained as a soldier, whether in a militia, a mercenary company, or a standing army. You learned discipline, unit tactics, and the value of a hot meal.",
+    "description": "You trained as a soldier in a militia, a mercenary company or a standing army. You learned discipline and the tactics of fighting in a unit.",
     "abilityOptions": {
       "from": [
         "str",

@@ -22,9 +22,9 @@ import { bodyForPublish, publishIssues } from "./validate";
     never grow to hide a gap. */
 export const RIDER_EXEMPT: readonly string[] = ["grants"];
 
-/** The scope at which a record type mounts `RiderEditor` (directly or via `FeatureEditor`), derived
-    from the form data and matching `RecordDetail.tsx`: equipment is `item`, monster is `statblock`,
-    everything else is `feature`. */
+/** The scope at which a record type mounts `RiderEditor` (directly or via `FeatureEditor`), derived from the form
+    data and matching `compendium/record/editorParts.tsx`: equipment is `item`, monster is `statblock`, everything
+    else is `feature`. */
 export function riderScopeOf(type: HomebrewType): RiderScope | null {
   const customs = new Set<string>();
   const walk = (fields: readonly FieldDef[]) => {
@@ -82,9 +82,7 @@ export function fieldsWithin(type: HomebrewType, within: readonly string[]): rea
   for (const key of within) {
     const container = fields.find((entry) => entry.key === key);
     if (!container)
-      throw new Error(
-        `No field "${key}" in the ${type} form — the test is addressing a container that does not exist.`
-      );
+      throw new Error(`No field "${key}" in the ${type} form. The test is addressing a container that does not exist.`);
     if (!container.rows) throw new Error(`Field "${key}" in the ${type} form has no rows to address.`);
     fields = flattenGroups(container.rows);
   }
@@ -111,7 +109,7 @@ export function applyField(
   if (!field) {
     if (!RIDER_EXEMPT.includes(key)) {
       const where = within.length === 0 ? `the ${type} form` : `the ${type} form (${within.join(" > ")} row)`;
-      throw new Error(`No field "${key}" in ${where} — the test is addressing a field that does not exist.`);
+      throw new Error(`No field "${key}" in ${where}. The test is addressing a field that does not exist.`);
     }
     return setAt(scope, key, value);
   }
@@ -166,7 +164,7 @@ export const parsesAsStored = (type: HomebrewType, draft: Draft, recordId: strin
   HOMEBREW_BODY_SCHEMAS[type].safeParse(storedBody(type, draft, recordId));
 
 /** Publishable means the checklist is empty and the shared schema accepts the stored body; the two
-    must never disagree. Returned rather than asserted so this module stays free of `vitest`. */
+    must never disagree. Returned, and never asserted, so this module stays free of `vitest`. */
 export function publishVerdict(type: HomebrewType, draft: Draft, recordId: string) {
   const issues = issuesFor(type, draft, recordId);
   const parsed = parsesAsStored(type, draft, recordId);

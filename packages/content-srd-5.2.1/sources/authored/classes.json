@@ -4,7 +4,7 @@
     "name": "Cleric",
     "source": "srd",
     "summary": "A priestly champion who channels divine magic from the Outer Planes.",
-    "description": "Clerics can reach out to the divine magic of the Outer Planes and channel it to bolster people and battle foes. Blessed by a deity, a pantheon, or another immortal entity, a Cleric works miracles: mending wounds, turning away the Undead, and calling down intervention from on high.",
+    "description": "Clerics draw on the divine magic of the Outer Planes to bolster allies and battle foes. A deity, a pantheon or another immortal entity grants a Cleric the power to heal wounds and turn away the Undead.",
     "hitDie": "d8",
     "statPriority": [
       "wis",
@@ -984,7 +984,7 @@
     "name": "Fighter",
     "source": "srd",
     "summary": "A master of martial combat, skilled with a variety of weapons and armor.",
-    "description": "Fighters rule many battlefields. Questing knights, conquering overlords, royal champions, elite foot soldiers, hardened mercenaries, and bandit kings are all Fighters, united by their unparalleled mastery with weapons and armor and their thorough knowledge of the skills of combat.",
+    "description": "Fighters rule many battlefields with a mastery of weapons and armor and a thorough knowledge of the skills of combat.",
     "hitDie": "d10",
     "statPriority": [
       "str",
@@ -1921,7 +1921,7 @@
     "name": "Wizard",
     "source": "srd",
     "summary": "A scholarly magic-user capable of manipulating the structures of reality.",
-    "description": "Wizards are defined by their exhaustive study of magic's inner workings. They cast spells of explosive fire, arcing lightning, subtle deception, and spectacular transformation, drawing on a spellbook of hard-won formulas.",
+    "description": "Wizards are defined by their study of magic's inner workings. They prepare their spells from a spellbook and add new spells to it as they find them.",
     "hitDie": "d6",
     "statPriority": [
       "int",

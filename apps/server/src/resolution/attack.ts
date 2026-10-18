@@ -42,7 +42,15 @@ import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
 import { auraOfAuthority } from "../statblock-traits.js";
 import { wardedConditions } from "../paladin-auras.js";
-import { naturalFace, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
+import { sceneSight } from "../vision/sight.js";
+import {
+  endedEffect,
+  naturalFace,
+  recordRoll,
+  type DefinitionAction,
+  type LiveActor,
+  type ResolveContext
+} from "./context.js";
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
  *  ranged, so a mapless table never hands a thrown weapon melee-gated riders or bonuses. */
@@ -107,9 +115,9 @@ function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
 }
 
 /** Conditions that by themselves give an attack advantage or disadvantage (SRD conditions appendix), in
- *  the order the roll card lists them. Frightened applies only while its source is in sight; with no
- *  vision system it applies whenever active, and the GM's explicit roll mode covers the rest. Invisible
- *  (Hide grants it as a linked effect) cuts both ways; seeing through it is GM adjudication. */
+ *  the order the roll card lists them. Frightened applies only while its source is in sight; it applies whenever
+ *  active, and the GM's explicit roll mode covers the rest. Invisible (Hide grants it as a linked effect) cuts both
+ *  ways; with dynamic vision on, who sees through it is decided by `sightClaims`, else by the GM. */
 const CONDITION_ROLL_MODES: ReadonlyArray<
   Readonly<{ side: "attacker" | "target"; condition: string; mode: "advantage" | "disadvantage" }>
 > = [
@@ -186,21 +194,54 @@ function riderClaims(
     );
 }
 
+/** With dynamic vision on, who sees whom (SRD "Unseen Attackers and Targets"): an attack against a target you can't
+ *  see has Disadvantage, and one against a creature that can't see you has Advantage. This decides Invisible too,
+ *  since the condition gives nothing against a creature that can see you (Blindsight, Truesight). A Blinded side is
+ *  left to its own condition line. Returns whether it decided: false while vision is off or a token is off the map. */
+function sightClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeClaims): boolean {
+  const { attacker, state, deps } = ctx;
+  const placed = (actorId: string) =>
+    state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
+  if (!placed(attacker.id) || !placed(target.id)) return false;
+  const sight = sceneSight(state, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  if (!sight.enabled) return false;
+  const invisible = (actor: LiveActor) => has(actor, "invisible") && !outlined(actor);
+  if (!has(target, "blinded") && !sight.sees(target.id, attacker.id))
+    sources.advantage.push(
+      invisible(attacker)
+        ? { source: "attacker-invisible", label: "Attacker is Invisible" }
+        : { source: "attacker-unseen", label: "Target can't see the attacker" }
+    );
+  if (!has(attacker, "blinded") && !sight.sees(attacker.id, target.id))
+    sources.disadvantage.push(
+      invisible(target)
+        ? { source: "target-invisible", label: "Target is Invisible" }
+        : { source: "target-unseen", label: "Attacker can't see the target" }
+    );
+  return true;
+}
+
 /** Conditions on either side, including the two that depend on who or where: Grappled and a Prone target. */
 function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: number | null, sources: RollModeClaims) {
   const { attacker } = ctx;
+  // Dynamic vision decides Invisible by who actually sees whom; without it the condition applies as printed.
+  const sighted = sightClaims(ctx, target, sources);
   // A Frightened attacker in a Paladin's Aura of Courage: "that condition has no effect on that ally while there".
   const warded = ctx.deps.resolveDefinition
     ? wardedConditions(ctx.state, attacker, {
         resolveDefinition: ctx.deps.resolveDefinition,
-        ...(ctx.deps.distanceFeet ? { distanceFeet: ctx.deps.distanceFeet } : {})
+        ...(ctx.deps.distanceFeet ? { distanceFeet: ctx.deps.distanceFeet } : {}),
+        ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
       })
     : [];
   for (const entry of CONDITION_ROLL_MODES) {
     const side = entry.side === "attacker" ? attacker : target;
     if (!has(side, entry.condition)) continue;
     if (entry.side === "attacker" && warded.includes(entry.condition)) continue;
-    if (entry.condition === "invisible" && outlined(side)) continue;
+    if (entry.condition === "invisible" && (outlined(side) || sighted)) continue;
     sources[entry.mode].push({
       source: `${entry.side}-${entry.condition}`,
       label: `${entry.side === "attacker" ? "Attacker" : "Target"} is ${conditionLabel(entry.condition)}`
@@ -229,7 +270,7 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
     const helper = ctx.state.actors.find((actor) => actor.id === distraction.sourceActorId);
     sources.advantage.push({
       source: "help",
-      label: helper?.visibility === "public" ? `Help (${helper.name})` : "Help"
+      label: helper && !ctx.hiddenFromInitiator(helper.id) ? `Help (${helper.name})` : "Help"
     });
   }
   // 2024 rule: advantage within 5 feet, disadvantage beyond. Unknown distance contributes nothing.
@@ -270,9 +311,9 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!enemy || enemy.hp.current <= 0 || isIncapacitated(enemy)) continue;
     if (!areEnemies(attacker, enemy, deps.resolveDefinition)) continue;
-    // A creature the players can't see never spoils a visible attacker's shot on its own: the Disadvantage
-    // would reveal it. The GM can still impose it.
-    if (enemy.visibility !== "public" && attacker.visibility === "public") continue;
+    // A creature hidden from the table (GM-only, out of every character's sight, or under the fog) never spoils a
+    // visible attacker's shot on its own: the Disadvantage would show in the public dice. The GM can still impose it.
+    if (ctx.hiddenFromTable(enemy.id) && !ctx.hiddenFromTable(attacker.id)) continue;
     const enemyDistance = deps.distanceFeet(attacker.id, enemy.id);
     if (enemyDistance !== null && enemyDistance <= 5 + 1e-6) {
       sources.disadvantage.push({ source: "ranged-in-close-combat", label: `Enemy within 5 feet (${enemy.name})` });
@@ -303,8 +344,8 @@ function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
     const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!ally || ally.id === attacker.id || ally.id === target.id) continue;
     if (!areAllies(attacker, ally, deps.resolveDefinition) || ally.hp.current <= 0 || isIncapacitated(ally)) continue;
-    // An ally the players can't see never gives a visible attacker Advantage: the roll would reveal it.
-    if (ally.visibility !== "public" && attacker.visibility === "public") continue;
+    // An ally hidden from the table never gives a visible attacker Advantage: the roll would reveal it.
+    if (ctx.hiddenFromTable(ally.id) && !ctx.hiddenFromTable(attacker.id)) continue;
     const apart = deps.distanceFeet(ally.id, target.id);
     if (apart !== null && apart <= 5 + DISTANCE_TOLERANCE_FEET) {
       sources.advantage.push({ source: "pack-tactics", label: `Pack Tactics (${ally.name} within 5 ft)` });
@@ -551,7 +592,7 @@ export function spendDistraction(ctx: ResolveContext): void {
   const distraction = distractionOf(ctx, target);
   if (!distraction) return;
   endEffect(state, target.id, distraction.id);
-  effectsEnded.push({ actorId: target.id, actorName: target.name, name: distraction.name });
+  effectsEnded.push(endedEffect(target, distraction));
 }
 
 /** Steady Aim gives Advantage on the next attack roll this turn: the roll spends it, hit or miss, while the Speed 0 it
@@ -591,7 +632,7 @@ export function spendUntilAttacked(ctx: ResolveContext): void {
       continue;
     }
     endEffect(state, target.id, effect.id);
-    effectsEnded.push({ actorId: target.id, actorName: target.name, name: effect.name });
+    effectsEnded.push(endedEffect(target, effect));
   }
 }
 
@@ -606,7 +647,7 @@ export function spendUntilItActs(ctx: ResolveContext): void {
     (candidate) => candidate.tags.includes(UNTIL_IT_ACTS_TAG) && !candidate.id.startsWith(input.commandId)
   )) {
     endEffect(state, attacker.id, effect.id);
-    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
+    effectsEnded.push(endedEffect(attacker, effect));
     // Once no creature keeps the spell, it is over, and so is its caster's Concentration on it.
     const { castId, sourceActorId } = effect;
     if (castId === undefined || sourceActorId === null) continue;
@@ -617,7 +658,7 @@ export function spendUntilItActs(ctx: ResolveContext): void {
     const holding = caster?.effects.find((other) => other.castId === castId && other.tags.includes(CONCENTRATING_TAG));
     if (!kept && caster && holding) {
       endEffect(state, caster.id, holding.id);
-      effectsEnded.push({ actorId: caster.id, actorName: caster.name, name: holding.name });
+      effectsEnded.push(endedEffect(caster, holding));
     }
   }
 }
@@ -628,6 +669,6 @@ export function spendUntilOwnAttack(ctx: ResolveContext): void {
   if (attack === null) return;
   for (const effect of attacker.effects.filter((candidate) => candidate.tags.includes(UNTIL_OWN_ATTACK_TAG))) {
     endEffect(state, attacker.id, effect.id);
-    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
+    effectsEnded.push(endedEffect(attacker, effect));
   }
 }

@@ -1,0 +1,27 @@
+/* The Sort dialog: one row per level, the chosen row edged in cyan. */
+.nh-sortdialog .nh-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.nh-sortlevels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.nh-sortrow {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border: 1px solid transparent;
+}
+.nh-sortrow.is-on {
+  border-color: var(--cyan);
+}
+.nh-sortdialog-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / var(--lh-body) var(--font-body);
+}

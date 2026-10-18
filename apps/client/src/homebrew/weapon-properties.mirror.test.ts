@@ -11,7 +11,7 @@ import { applyField, authored, publishVerdict, storedBody } from "./authoring-ha
  * A GM-authored Finesse weapon swings off Dexterity, end to end: authored through the real controls,
  * POSTed and published through the real gate, read from the merged catalog, added to a sheet through
  * the picker's projection (parsed by the server's inventory schema), and swung. Ends at a rolled
- * number, not the stored array. The SRD Rapier on the same character is the control group.
+ * number, past the stored array. The SRD Rapier on the same character is the control group.
  */
 
 const GM = { authorization: "Bearer gm-token", "content-type": "application/json" };

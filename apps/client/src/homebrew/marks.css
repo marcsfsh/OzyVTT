@@ -1,0 +1,10 @@
+/* A homebrew row's marks sit after its name: Homebrew, and for the GM a Hidden record's chip. */
+.hb-marks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: var(--space-2);
+  vertical-align: middle;
+  font-weight: 400;
+}

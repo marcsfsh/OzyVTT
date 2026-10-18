@@ -10,7 +10,9 @@ import { useState } from "react";
 import { Combobox } from "./Combobox";
 import { Drawer } from "./Drawer";
 import { MarkdownEditor, applyMarkdownFormat, wikiLinkContext } from "./MarkdownEditor";
+import { Modal } from "./Modal";
 import { TagInput } from "./TagInput";
+import { ToastProvider, useToast } from "./Toast";
 
 describe("Drawer", () => {
   it("renders titled, closeable, non-modal, and inert while closed", async () => {
@@ -70,7 +72,7 @@ describe("Drawer", () => {
     const panel = container.querySelector("aside")!;
     expect(panel.className).toContain("nh-drawer--left");
     expect(panel.getAttribute("aria-label")).toBe("Session console");
-    // An explicit label replaces the generated one rather than adding a second name.
+    // An explicit label replaces the generated one, so there is no second name.
     expect(panel.hasAttribute("aria-labelledby")).toBe(false);
   });
 });
@@ -80,7 +82,36 @@ describe("Drawer", () => {
  * autocomplete loop, the format helper and the Edit/View switch. Caret position after insertion is restored in
  * `requestAnimationFrame` and isn't observable in jsdom, so tests check the resulting value.
  */
-describe("MarkdownEditor — the [[ ]] autocomplete", () => {
+describe("Modal", () => {
+  it("is named by its visible title, and by ariaLabel when it has none", () => {
+    const { rerender } = render(
+      <Modal open onClose={() => {}} title="Rest">
+        <p>Body</p>
+      </Modal>
+    );
+    expect(screen.getByRole("dialog", { name: "Rest" })).toBeInTheDocument();
+    rerender(
+      <Modal open onClose={() => {}} ariaLabel="Search the Codex">
+        <p>Body</p>
+      </Modal>
+    );
+    expect(screen.getByRole("dialog", { name: "Search the Codex" })).toBeInTheDocument();
+  });
+
+  it("rests on the bottom edge as a drawer, which slides up instead of growing in", () => {
+    render(
+      <Modal open onClose={() => {}} align="bottom" title="Wand of Web">
+        <p>Body</p>
+      </Modal>
+    );
+    const drawer = screen.getByRole("dialog", { name: "Wand of Web" });
+    expect(drawer.className).toContain("nh-modal--bottom");
+    expect(drawer.className).toContain("anim-sheet");
+    expect(drawer.className).not.toContain("anim-dialog");
+  });
+});
+
+describe("MarkdownEditor: the [[ ]] autocomplete", () => {
   /** `userEvent.type` treats `[` and `{` as key descriptors, so literal brackets are doubled here. */
   const typeText = (element: HTMLElement, text: string) =>
     userEvent.setup().type(element, text.replace(/[[{]/g, "$&$&"));
@@ -188,7 +219,7 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
     expect(screen.queryByRole("listbox", { name: "Link to page" })).toBeNull();
   });
 
-  it("offers nothing when the caller supplies no suggester — the autocomplete is opt-in", async () => {
+  it("offers nothing when the caller supplies no suggester: the autocomplete is opt-in", async () => {
     function Bare() {
       const [value, setValue] = useState("");
       return <MarkdownEditor value={value} onChange={setValue} ariaLabel="Recap" />;
@@ -200,7 +231,7 @@ describe("MarkdownEditor — the [[ ]] autocomplete", () => {
   });
 });
 
-describe("MarkdownEditor — the toolbar and the Edit/View switch", () => {
+describe("MarkdownEditor: the toolbar and the Edit/View switch", () => {
   it("wraps the selection, prefixes the line, and opens a wiki-link from the toolbar", async () => {
     const user = userEvent.setup();
     function Host() {
@@ -270,13 +301,13 @@ describe("MarkdownEditor — the toolbar and the Edit/View switch", () => {
   });
 });
 
-describe("MarkdownEditor — the two pure helpers", () => {
+describe("MarkdownEditor: the two pure helpers", () => {
   it("applyMarkdownFormat wraps, prefixes and inserts", () => {
     expect(applyMarkdownFormat("hello", 0, 5, "bold").value).toBe("**hello**");
     expect(applyMarkdownFormat("hello", 0, 5, "italic").value).toBe("*hello*");
     expect(applyMarkdownFormat("hello", 0, 5, "strike").value).toBe("~~hello~~");
     expect(applyMarkdownFormat("hello", 0, 5, "code").value).toBe("`hello`");
-    // Line prefixes go to the start of the caret's own line, not the start of the document.
+    // Line prefixes go to the start of the caret's own line, which can differ from the start of the document.
     expect(applyMarkdownFormat("one\ntwo", 5, 5, "bullet").value).toBe("one\n- two");
     expect(applyMarkdownFormat("one\ntwo", 5, 5, "quote").value).toBe("one\n> two");
     expect(applyMarkdownFormat("one\ntwo", 5, 5, "numbered").value).toBe("one\n1. two");
@@ -333,7 +364,7 @@ describe("Combobox", () => {
     await user.click(input);
     await user.keyboard("{ArrowDown}{ArrowDown}");
     expect(screen.getByRole("option", { name: /Vallaki/ })).toHaveAttribute("aria-selected", "true");
-    // The walk stops at the ends rather than wrapping.
+    // The walk stops at the ends and never wraps.
     await user.keyboard("{ArrowDown}");
     expect(screen.getByRole("option", { name: /Vallaki/ })).toHaveAttribute("aria-selected", "true");
     await user.keyboard("{Enter}");
@@ -346,7 +377,7 @@ describe("Combobox", () => {
     const onChange = vi.fn();
     render(<Combobox options={OPTIONS} value="p2" onChange={onChange} ariaLabel="Who spent the time" />);
 
-    // A chosen value is a chip, not typed text in the box.
+    // A chosen value is a chip, with no typed text in the box.
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.getByText("Ismark")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear Ismark" }));
@@ -388,7 +419,7 @@ describe("Combobox", () => {
       </>
     );
 
-    // Type, then move to the next field: free text must commit on blur, not only on Enter.
+    // Type, then move to the next field: free text must commit on blur as well as on Enter.
     await user.type(screen.getByRole("combobox", { name: "Rarity" }), "unique");
     await user.click(screen.getByRole("button", { name: "elsewhere" }));
     expect(onChange).toHaveBeenCalledWith("unique");
@@ -411,7 +442,7 @@ describe("Combobox", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
   });
 
-  it("caps the rows it shows — a picker is a picker, not a list view", async () => {
+  it("caps the rows it shows: a picker is a picker, and no list view", async () => {
     const user = userEvent.setup();
     const many = Array.from({ length: 20 }, (_, index) => ({ id: `t${index}`, label: `tag-${index}` }));
     render(<Combobox options={many} value={null} onChange={vi.fn()} ariaLabel="Filter by tag" limit={3} />);
@@ -445,7 +476,7 @@ describe("Combobox", () => {
     expect(input).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("reopens on a tap even when it never lost focus — the multi-value case", async () => {
+  it("reopens on a tap even when it never lost focus: the multi-value case", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Combobox options={OPTIONS} value={null} onChange={onChange} ariaLabel="Filter by tag" />);
@@ -464,20 +495,20 @@ describe("Combobox", () => {
 });
 
 /**
- * `TagInput` in `pick` mode: the entry box becomes a visible `Combobox` instead of a `<datalist>`, which has no
- * affordance and renders nothing on iOS Safari. Opt-in, because a corpus of existing tags is a hint, not a menu.
+ * `TagInput` in `pick` mode: the entry box becomes a visible `Combobox` in place of a `<datalist>`, which has no
+ * affordance and renders nothing on iOS Safari. Opt-in, because a corpus of existing tags is a hint and no menu.
  */
 describe("TagInput", () => {
   const TYPES = ["acid", "cold", "fire", "lightning"];
 
-  it("without `pick` it is the datalist it always was — no listbox, no menu", async () => {
+  it("without `pick` it is the datalist it always was: no listbox, no menu", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const { container } = render(
       <TagInput values={[]} onChange={onChange} suggestions={TYPES} ariaLabel="Damage resistances" />
     );
 
-    // Codex tag fields use this default: their suggestions are a hint, not a set to choose from.
+    // Codex tag fields use this default: their suggestions are a hint and no set to choose from.
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(container.querySelector("datalist")).not.toBeNull();
     await user.type(screen.getByLabelText("Damage resistances"), "fire{Enter}");
@@ -503,7 +534,7 @@ describe("TagInput", () => {
         .getAllByRole("option")
         .map((option) => option.textContent)
     ).toEqual(["ACID", "COLD", "FIRE", "LIGHTNING"]);
-    // The datalist is gone, not supplemented.
+    // The datalist is gone, and nothing supplements it.
     expect(container.querySelector("datalist")).toBeNull();
   });
 
@@ -517,7 +548,7 @@ describe("TagInput", () => {
     expect(onChange).toHaveBeenCalledWith(["fire", "void-fire"]);
   });
 
-  it("with `pick`, what is already chosen leaves the menu — and the chip keeps its ✕", async () => {
+  it("with `pick`, what is already chosen leaves the menu, and the chip keeps its ✕", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<TagInput values={["fire"]} onChange={onChange} suggestions={TYPES} pick ariaLabel="Damage resistances" />);
@@ -539,5 +570,34 @@ describe("TagInput", () => {
     // No suggestions, no chooser: a caller can set `pick` for a whole control whose vocabulary varies.
     expect(screen.queryByRole("combobox", { name: "Which languages" })).toBeNull();
     expect(screen.getByLabelText("Which languages")).toBeInTheDocument();
+  });
+});
+
+describe("ToastProvider", () => {
+  it("clears a pending dismiss timer when it unmounts", () => {
+    vi.useFakeTimers();
+    try {
+      function Saver() {
+        const { toast } = useToast();
+        return (
+          <button type="button" onClick={() => toast("Encounter saved")}>
+            Save
+          </button>
+        );
+      }
+      const { unmount } = render(
+        <ToastProvider>
+          <Saver />
+        </ToastProvider>
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(screen.getByRole("status")).toHaveTextContent("Encounter saved");
+      expect(vi.getTimerCount()).toBe(1);
+      unmount();
+      // A timer left behind would set state in a provider that is gone, after a test's window is torn down.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

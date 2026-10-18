@@ -3,6 +3,16 @@ import { cx } from "./util";
 import { IconArrow } from "./icons";
 import "./Button.css";
 
+/* The label box (see `Button`): an element no page stylesheet names, so no container rule reaches it. */
+declare module "react" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- JSX's intrinsic elements live in this namespace
+  namespace JSX {
+    interface IntrinsicElements {
+      "nh-label": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
+    }
+  }
+}
+
 type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
 type ButtonSize = "sm" | "md";
 
@@ -11,7 +21,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   /** Stretch to the container width. */
   block?: boolean;
-  /** Add a hover-lift, for card-like / CTA buttons, not dense toolbars. */
+  /** Add a hover-lift, for card-like and CTA buttons. Dense toolbars go without. */
   lift?: boolean;
   /** Append a forward arrow that nudges on hover, for navigational actions. */
   arrow?: boolean;
@@ -46,8 +56,12 @@ export function Button({
       )}
       {...rest}
     >
-      {children}
-      {arrow && <IconArrow className="nav-arrow" />}
+      {/* The label takes its ink from the variant (`--nh-ink`), so a page rule that colours buttons in a container
+          can't put dark ink on the primary's dark plate. Its own element name keeps the many `.x span` rules off it. */}
+      <nh-label>
+        {children}
+        {arrow && <IconArrow className="nav-arrow" />}
+      </nh-label>
     </button>
   );
 }

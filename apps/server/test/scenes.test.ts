@@ -7,7 +7,8 @@ import {
   removeScene,
   renameScene,
   reorderScenes,
-  setSceneCombatants
+  setSceneCombatants,
+  stampSceneChanges
 } from "../src/scenes.js";
 import { startEncounter, nextInitiativeTurn } from "../src/encounter.js";
 import { moveEncounterToken, moveSceneToken } from "../src/token-placement.js";
@@ -143,7 +144,7 @@ describe("scene staging (GM-private token placement)", () => {
     createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY);
     createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY);
     activateScene(game, IDS.sceneA, IDS.implicit); // A is live
-    // Stage the parked scene B privately - its token gets a position, and the live top-level is untouched.
+    // Stage the parked scene B privately: its token gets a position, and the live top-level is untouched.
     moveSceneToken(game, IDS.sceneB, IDS.beta, { x: 200, y: 150 }, GEOMETRY);
     expect(
       game.combat.scenes
@@ -381,7 +382,7 @@ describe("scene duplication and reordering", () => {
     );
     nextInitiativeTurn(game);
     const copy = duplicateScene(game, IDS.sceneA, IDS.sceneB);
-    // The active scene's own slot is empty, so the copy must capture the top-level (live) combat, not a blank.
+    // The active scene's own slot is empty, so the copy must capture the top-level (live) combat.
     expect(copy.combat.active).toBe(true);
     expect(copy.combat.initiative.map((entry) => entry.actorId)).toEqual(
       game.combat.initiative.map((entry) => entry.actorId)
@@ -408,5 +409,66 @@ describe("scene duplication and reordering", () => {
     expect(() => reorderScenes(game, [IDS.sceneA])).toThrow(/every prepared scene exactly once/i);
     expect(() => reorderScenes(game, [IDS.sceneA, IDS.sceneA])).toThrow(/every prepared scene exactly once/i);
     expect(() => GameStateSchema.parse(game)).not.toThrow();
+  });
+});
+
+describe("scene stamps", () => {
+  const sceneOf = (game: ReturnType<typeof state>, id: string) => game.combat.scenes.find((scene) => scene.id === id)!;
+
+  it("stamps when a scene was made, last changed and last made live", () => {
+    const game = state();
+    createScene(
+      game,
+      { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] },
+      GEOMETRY,
+      100
+    );
+    createScene(
+      game,
+      { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] },
+      GEOMETRY,
+      150
+    );
+    expect(sceneOf(game, IDS.sceneA)).toMatchObject({ createdAt: 100, updatedAt: 100 });
+    expect(sceneOf(game, IDS.sceneA).liveAt).toBeUndefined();
+    activateScene(game, IDS.sceneA, IDS.implicit, 200);
+    expect(sceneOf(game, IDS.sceneA)).toMatchObject({ createdAt: 100, updatedAt: 100, liveAt: 200 });
+    const copy = duplicateScene(game, IDS.sceneB, IDS.extra, 300);
+    expect(copy).toMatchObject({ createdAt: 300, updatedAt: 300 });
+    expect(copy.liveAt).toBeUndefined();
+    expect(() => GameStateSchema.parse(game)).not.toThrow();
+  });
+
+  it("marks a scene changed by any edit to its record, and leaves the others and the one going live alone", () => {
+    const game = state();
+    createScene(
+      game,
+      { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] },
+      GEOMETRY,
+      100
+    );
+    createScene(
+      game,
+      { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] },
+      GEOMETRY,
+      100
+    );
+    const edit = (change: (draft: typeof game) => void, now: number) => {
+      const before = structuredClone(game);
+      change(game);
+      stampSceneChanges(game, before, now);
+    };
+    edit((draft) => moveSceneToken(draft, IDS.sceneB, IDS.beta, { x: 200, y: 150 }, GEOMETRY), 500);
+    expect(sceneOf(game, IDS.sceneB).updatedAt).toBe(500);
+    expect(sceneOf(game, IDS.sceneA).updatedAt).toBe(100);
+    edit((draft) => renameScene(draft, IDS.sceneA, "Renamed"), 600);
+    expect(sceneOf(game, IDS.sceneA).updatedAt).toBe(600);
+    // Going live empties the scene's slot, which is not an edit; its liveAt says when.
+    edit((draft) => activateScene(draft, IDS.sceneB, IDS.implicit, 700), 700);
+    expect(sceneOf(game, IDS.sceneB)).toMatchObject({ updatedAt: 500, liveAt: 700 });
+    // A fight parked into a scene changes its record.
+    edit((draft) => activateScene(draft, IDS.sceneA, IDS.implicit, 800), 800);
+    expect(sceneOf(game, IDS.sceneB).updatedAt).toBe(800);
+    expect(sceneOf(game, IDS.sceneA)).toMatchObject({ updatedAt: 600, liveAt: 800 });
   });
 });

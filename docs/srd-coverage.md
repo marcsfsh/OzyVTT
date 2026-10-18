@@ -1,4 +1,4 @@
-# SRD 5.2.1 coverage (generated - do not edit by hand)
+# SRD 5.2.1 coverage (generated, do not edit by hand)
 
 This page lists every record in the SRD 5.2.1 content and says what the app does with it. Each record is in
 one of three states:

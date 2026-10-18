@@ -39,6 +39,8 @@ import { endZone } from "../spell-zone-state.js";
 import { placeZone, speedHalvingAt, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
+import { HIDDEN_SOURCE } from "../hidden-source.js";
+import { sceneSight } from "../vision/sight.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -65,7 +67,7 @@ export const mapCommands = [
     type: "token.move",
     operationId: "moveToken",
     description:
-      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character; in a fight, moving it off its turn or teleporting is the GM's to allow, and only the GM takes a placed token back to the tray. `sceneId` targets a prepared (GM-private) scene instead of the live table.",
+      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene; without it the token moves on the live table.",
     summary:
       "Move a combatant's token (server-snapped) walking, by a special speed, teleporting or by force; position null returns it to the tray.",
     schema: TokenMoveSchema,
@@ -85,7 +87,7 @@ export const mapCommands = [
         return;
       }
       const mapAssetId = kit.read().combat.mapAssetId;
-      if (!mapAssetId) throw new CommandRejectedError("Start an encounter before moving tokens.");
+      if (!mapAssetId) throw new CommandRejectedError("Make a scene live before moving tokens.");
       if (request.override && !isGmGrade(principal))
         throw new GameAccessDeniedError("Only the GM can override movement rules.");
       if (mode === "forced" && !isGmGrade(principal))
@@ -98,6 +100,7 @@ export const mapCommands = [
       let released: EffectNarration[] = [];
       const zoneEvents: EffectNarration[] = [];
       const draggedNames: string[] = [];
+      let moverHiddenAtStart = false;
       const { duplicate } = await execute((state) => {
         if (state.combat.mapAssetId !== mapAssetId)
           throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
@@ -108,7 +111,25 @@ export const mapCommands = [
           "move",
           "You may only move your claimed character token."
         );
+        // Before a fight the GM sets the scene; players move their own tokens once it starts.
+        if (!state.combat.active && !isGmGrade(principal))
+          throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
         const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+        // Dynamic vision, as the mover set off: what it perceived, and who saw it go. A player's move also passes over
+        // the creatures hidden from them under the fog, as their preview does.
+        const sight = sceneSight(state, kit.sightContent());
+        const perceivedAtStart = sight.enabled ? sight.perceivedBy([actorId]) : null;
+        const unseenByMover = kit.unseenBy(initiatorOf(principal), state);
+        const perceives =
+          perceivedAtStart || unseenByMover.size > 0
+            ? (id: string) => (perceivedAtStart?.has(id) ?? true) && !unseenByMover.has(id)
+            : null;
+        const seenAtStart = sight.enabled
+          ? new Set(state.actors.filter((actor) => sight.sees(actor.id, actorId)).map((actor) => actor.id))
+          : null;
+        // Hidden from the table as it set off (the shared check): it provokes no player's opportunity attack, and the
+        // table's line about it can't say where it came from.
+        moverHiddenAtStart = kit.hiddenFromTable(state)(actorId);
         // Taking a placed token off the map mid-fight would move it for free.
         if (position === null && from !== null && !isGmGrade(principal) && state.combat.active)
           throw new CommandRejectedError("Only the GM takes a token off the map during a fight.");
@@ -156,6 +177,9 @@ export const mapCommands = [
           override: request.override ?? null,
           resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
           catalog: kit.equipmentCatalog(),
+          ...(perceives ? { perceives } : {}),
+          ...(seenAtStart ? { seenBy: (id: string) => seenAtStart.has(id) } : {}),
+          moverHiddenFromPlayers: moverHiddenAtStart,
           newPromptId: kit.context.newId,
           now: Date.now,
           commandId
@@ -179,11 +203,25 @@ export const mapCommands = [
           );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
-        movement = narrateTokenMove({ state, actorId, from, geometry, mode, crawled: outcome.crawled });
+        // A creature hidden from the table after the move is left out of the table's line. Setting the scene before
+        // a fight tells the table nothing: the feed narrates moves in a fight.
+        const hiddenAfter = kit.hiddenFromTable(state);
+        movement = state.combat.active
+          ? narrateTokenMove({
+              state,
+              actorId,
+              from,
+              geometry,
+              mode,
+              crawled: outcome.crawled,
+              hiddenFromTable: hiddenAfter,
+              fromHiding: moverHiddenAtStart
+            })
+          : null;
         const to = moverToken?.position ?? null;
         if (from !== null && to !== null)
           for (const heldId of dragAlong(state, dragged, from, to, geometry)) {
-            draggedNames.push(kit.actorName(heldId));
+            draggedNames.push(hiddenAfter(heldId) ? HIDDEN_SOURCE : kit.actorName(heldId));
             // A creature dragged along meets the spell areas it is dragged into.
             const held = state.combat.tokens.find((token) => token.actorId === heldId)?.position;
             if (held)
@@ -227,13 +265,15 @@ export const mapCommands = [
       if (movementOverridden)
         kit.context.appendLog({
           kind: "override",
-          text: `OVERRIDE (movement): ${kit.actorName(actorId)} moved past a movement rule - ${movementOverridden}`,
+          text: `OVERRIDE (movement): ${kit.actorName(actorId)} moved past a movement rule · ${movementOverridden}`,
           actorIds: [actorId]
         });
+      // A GM creature's prompt against a mover hidden from the table names it as the projection does.
+      const moverName = moverHiddenAtStart || kit.actorHidden(actorId) ? HIDDEN_SOURCE : kit.actorName(actorId);
       for (const prompt of opportunityPrompts)
         kit.context.broadcastTableEvent({
           kind: "reaction",
-          text: `${prompt.name} may make an opportunity attack against ${kit.actorName(actorId)}.`,
+          text: `${prompt.name} may make an opportunity attack against ${moverName}.`,
           actorIds: [prompt.actorId],
           gmOnly: kit.actorHidden(prompt.actorId)
         });
@@ -268,6 +308,7 @@ export const mapCommands = [
             origin: placed.origin,
             target: placed.target,
             visibility: "public",
+            reachesPastMap: zone.area !== null,
             actor: annotationActorOf(principal),
             now: Date.now()
           },
@@ -282,7 +323,7 @@ export const mapCommands = [
     type: "spell-zone.end",
     operationId: "endSpellZone",
     description:
-      "Ends a spell's lingering area (GM-grade only), removing it from the map: webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too.",
+      "Ends a spell's lingering area and removes it from the map (GM-grade only): webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too.",
     summary: "End a spell's lingering area (GM).",
     schema: SpellZoneEndSchema,
     malformed: "The spell-area command is malformed.",
@@ -308,7 +349,7 @@ export const mapCommands = [
     schema: AnnotationAddSchema,
     malformed: "The annotation is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Start an encounter before adding to the map.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before adding to the map.");
       const { commandId, kind, shape, visibility, visibleToActorId, movableByOthers, color } = request;
       const { duplicate } = await execute((state) => {
         requireSameMap(state.combat.mapAssetId, mapAssetId);
@@ -343,7 +384,7 @@ export const mapCommands = [
     schema: AnnotationPingSchema,
     malformed: "The ping is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Start an encounter before pinging the map.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before pinging the map.");
       const { commandId, point, color } = request;
       const { duplicate } = await execute((state) => {
         requireSameMap(state.combat.mapAssetId, mapAssetId);
@@ -368,7 +409,7 @@ export const mapCommands = [
     schema: AnnotationMoveSchema,
     malformed: "The annotation update is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { geometry } = await liveMap(kit, "Start an encounter before editing the map.");
+      const { geometry } = await liveMap(kit, "Make a scene live before editing the map.");
       const { id, geometry: moved } = request;
       const zoneEvents: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {

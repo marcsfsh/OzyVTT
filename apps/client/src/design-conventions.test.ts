@@ -4,7 +4,7 @@
  *   (b) no raw search or number input where a primitive exists
  *   (c) one eyebrow, the `Eyebrow` primitive
  *   (d) colours come from design-tokens.css
- *   (e) feedback is a toast, not a component's own inline message
+ *   (e) feedback is a toast, and a component shows no inline message of its own
  *   (f) one breakpoint ladder
  *   (g) no viewport-fraction caps on in-flow content
  *   (h) scroll regions are declared with `.scroll-y`
@@ -84,7 +84,7 @@ describe("the scans read the tree", () => {
 /**
  * `\p{Extended_Pictographic}` alone misses most real offenders (⏻ ⇲ ✕ ▾ ✓ ← are not pictographic), so
  * the arrow, technical, geometric, dingbat and arrows-B blocks are added. Typography and maths
- * (− × · … – — and curly quotes) fall outside them and stay legal.
+ * (the minus sign, the times sign, the middle dot, the ellipsis, the dashes and curly quotes) fall outside them and stay legal.
  */
 const GLYPH = /[←-⇿⌀-⏿■-◿☀-➿⬀-⯿]|\p{Extended_Pictographic}/gu;
 
@@ -109,8 +109,6 @@ const rawInput = (type: string) => new RegExp(`<input\\b[^>]*type="${type}"`, "g
 /** Raw number inputs still to move to `NumberField`; each is a compact inline field the primitive's steppers would crowd. */
 const RAW_NUMBER_ALLOW: readonly string[] = [
   "apps/client/src/encounter/GmInitiativeRow.tsx",
-  "apps/client/src/encounter/SheetIdentityEditor.tsx",
-  "apps/client/src/encounter/SheetInventory.tsx",
   // The X and Y of a point and the focus zoom.
   "apps/client/src/viewer/ViewerControls.tsx",
   "apps/client/src/viewer/ViewerControls.tsx",
@@ -138,9 +136,6 @@ describe("(b) no raw input where a primitive exists", () => {
 
 // (c) One eyebrow
 
-/** Uses of the client's `.eyebrow` class, which codex/ (not this suite's to change) still renders. */
-const EYEBROW_ALLOW: readonly string[] = ["apps/client/src/codex/SidebarNav.tsx"];
-
 /** Every `className=` value, braces balanced so `className={cx("a", `b ${c}`)}` comes out whole. */
 function classNameValues(src: string): { value: string; index: number }[] {
   const values: { value: string; index: number }[] = [];
@@ -164,26 +159,24 @@ function classNameValues(src: string): { value: string; index: number }[] {
 }
 
 describe("(c) one eyebrow, the Eyebrow primitive", () => {
-  it("renders the local eyebrow class only where listed", () => {
+  it("renders no local eyebrow class", () => {
     const hits: Hit[] = [];
     for (const source of allTsx()) {
       const src = stripComments(source.read());
-      // A class token, not `\beyebrow\b`, which would match `viewer-eyebrow`.
+      // A class token: `\beyebrow\b` would match `viewer-eyebrow`.
       for (const { value, index } of classNameValues(src))
         if (value.split(/[^A-Za-z0-9_-]+/).includes("eyebrow"))
           hits.push({ key: source.path, at: cite(source.path, src, index, value.trim().slice(0, 60)) });
     }
-    const { unexcused, dead } = settle(hits, EYEBROW_ALLOW);
-    expect(unexcused, "Render <Eyebrow> from @vtt/ui; it owns the tracking, size and colour.").toEqual([]);
     expect(
-      dead,
-      "These EYEBROW_ALLOW rows excuse nothing any more: delete them, and the `.eyebrow` rule in styles.css with the last."
+      hits.map((hit) => hit.at),
+      "Render <Eyebrow> from @vtt/ui; it owns the tracking, size and colour."
     ).toEqual([]);
   });
 
-  it("declares the local class only in styles.css", () => {
+  it("declares no local eyebrow class", () => {
     const hits = hitsOf(stylesheets(), /(?<![\w-])\.eyebrow(?![\w-])/g, stripBlockComments, (_match, path) => path);
-    expect(hits.filter((hit) => hit.key !== "apps/client/src/styles.css").map((hit) => hit.at)).toEqual([]);
+    expect(hits.map((hit) => hit.at)).toEqual([]);
   });
 });
 
@@ -198,8 +191,7 @@ const COLOR = /#[0-9a-fA-F]{3,8}\b|%23[0-9a-fA-F]{3,6}|rgba?\(|hsla?\(/g;
 /** Literal counts per file, each with the reason it cannot be a token. */
 const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: string]> = [
   ["apps/client/src/actors/pdf-import.css", 5, "import-status hues (amber/red/violet) that never became tokens"],
-  ["apps/client/src/codex/codex.css", 1, "graph node-icon fill over arbitrary map art"],
-  ["apps/client/src/maps/map-manager.css", 11, "SVG paint: grid strokes and drop-shadows over image content"],
+  ["apps/client/src/maps/calibration.css", 11, "SVG paint: grid strokes and drop-shadows over image content"],
   ["apps/client/src/scene/annotation.css", 3, "SVG paint: annotation strokes over image content"],
   ["apps/client/src/scene/encounter-map.css", 8, "SVG paint, and the black/white pair a token ring needs on any map"],
   ["apps/client/src/styles.css", 2, "a two-stop black mask, read only for its alpha"],
@@ -236,14 +228,13 @@ const FEEDBACK = /\bset(?:Message|Feedback)\s*\(/g;
 
 /** Surfaces still to move to `useToast`, one row per call. */
 const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
-  ["apps/client/src/encounter/GmEncounterPanel.tsx", 7],
+  ["apps/client/src/encounter/GmEncounterPanel.tsx", 6],
   ["apps/client/src/encounter/InitiativePrompt.tsx", 2],
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],
   ["apps/client/src/scene/TokenContextMenu.tsx", 4],
-  ["apps/client/src/scenes/SceneBuilder.tsx", 6],
-  ["apps/client/src/scenes/ScenePanel.tsx", 3],
-  ["apps/client/src/viewer/ViewerApp.tsx", 4]
+  ["apps/client/src/viewer/ScreenPairing.tsx", 4],
+  ["apps/client/src/viewer/ViewerApp.tsx", 2]
 ];
 
 describe("(e) feedback is a toast", () => {
@@ -292,13 +283,10 @@ const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
 
 /** Values that are not caps on in-flow content, with the reason. */
 const VIEWPORT_ALLOW: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
-  [
-    "apps/client/src/encounter/character-sheet.css",
-    ["52vh", "94vh"],
-    "caps on modal layers (the sheet and its picker)"
-  ],
+  ["apps/client/src/encounter/pickers.css", ["52vh"], "the cap on a picker's list in its modal"],
   ["apps/client/src/encounter/fight-menu.css", ["85vh"], "the cap on the fixed fight menu"],
   ["apps/client/src/encounter/monster-browser.css", ["92vh"], "the cap on the monster browser modal"],
+  ["apps/client/src/sheet/sheet.css", ["92dvh"], "the cap on the sheet's dialog"],
   ["apps/client/src/shell/landing.css", ["4vh", "3.5vh", "4.5vh"], "clamp() middle terms for the landing's spacing"],
   ["apps/client/src/viewer/viewer.css", ["32vh"], "the shared screen's portrait initiative band"]
 ];

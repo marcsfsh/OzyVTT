@@ -18,14 +18,11 @@ import type {
   CodexMapKind,
   CodexMarker,
   CodexPage,
-  CodexPageConnection,
   CodexPageRevision,
   CodexPageSummary,
   CodexQuest,
-  CodexQuestObjective,
   CodexQuestStatus,
-  CodexRevealAudit,
-  CodexSearchResult,
+  CodexPrepSectionInput,
   CodexSession,
   CodexSessionStatus,
   CodexSettings,
@@ -37,8 +34,6 @@ import type {
   PlayerCodexConnection,
   PlayerCodexMap,
   PlayerCodexMarker,
-  PlayerCodexPage,
-  PlayerCodexPageConnection,
   PlayerCodexPageSummary,
   PlayerCodexQuest,
   PlayerCodexSession,
@@ -46,7 +41,7 @@ import type {
 } from "@vtt/domain";
 import { apiBlob, apiRequest, type ApiRequest } from "../lib/api";
 
-/** Restated from the server so an input can refuse rather than earn a 400. */
+/** Restated from the server so an input can refuse before the server answers with a 400. */
 export const CONNECTION_LABEL_MAX = 40;
 export const AUTOSAVE_INTERVAL_MIN = 1;
 export const AUTOSAVE_INTERVAL_MAX = 600;
@@ -60,15 +55,19 @@ export const REVISION_WINDOW_MAX = 10_080;
 /** The server's cap on one search's hits. */
 export const SEARCH_HIT_CAP = 50;
 
+/** A hidden block as a create takes it; it starts Hidden. */
+export type CodexBlockInput = Readonly<{ title?: string | null; text: string; anchor?: number }>;
+
 export type CodexPageInput = Readonly<{
   title?: string;
   entityType?: CodexEntityType;
+  /** Every field value, whatever its audience. */
   fields?: Readonly<Record<string, string>>;
-  gmFields?: Readonly<Record<string, string>>;
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
-  gmBody?: string;
+  /** Create only. */
+  blocks?: readonly CodexBlockInput[];
   revealedToPlayers?: boolean;
   bannerAssetId?: string | null;
   /** Omitted leaves the stored date alone; `null` clears it. */
@@ -84,16 +83,25 @@ function request<T>(token: string, path: string, init: Omit<ApiRequest, "token" 
   return apiRequest<T>(`${BASE}${path}`, { ...init, token, failure: "The codex request failed." });
 }
 
+/** When a tie began, as a write sends it: a date, or before the campaign with no date. `null` clears it. */
+export type CodexRelationshipBeganWrite = Readonly<{
+  inWorldDate: CodexInWorldDate | null;
+  beforeCampaign: boolean;
+}> | null;
+
 export const codexApi = {
   listPages: (token: string) => request<{ pages: CodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
-  search: (token: string, query: string) => request<CodexSearchResult>(token, `/search?q=${encodeURIComponent(query)}`),
-  getPage: (token: string, id: string) =>
-    request<{ page: CodexPage; connections: CodexPageConnection[] }>(token, `/pages/${id}`),
   /** Idempotent on `(from, to, label)`, and on the reverse pair for a symmetric label. */
   addConnection: (
     token: string,
     pageId: string,
-    input: Readonly<{ toPageId: string; label?: string | null; layer?: CodexConnectionLayer; commandId?: string }>
+    input: Readonly<{
+      toPageId: string;
+      label?: string | null;
+      layer?: CodexConnectionLayer;
+      began?: CodexRelationshipBeganWrite;
+      commandId?: string;
+    }>
   ) =>
     request<{ connection: CodexConnection }>(token, `/pages/${pageId}/connections`, {
       method: "POST",
@@ -103,7 +111,12 @@ export const codexApi = {
   updateConnection: (
     token: string,
     id: string,
-    input: Readonly<{ label?: string | null; layer?: CodexConnectionLayer; commandId?: string }>
+    input: Readonly<{
+      label?: string | null;
+      layer?: CodexConnectionLayer;
+      began?: CodexRelationshipBeganWrite;
+      commandId?: string;
+    }>
   ) =>
     request<{ connection: CodexConnection }>(token, `/connections/${id}`, {
       method: "PATCH",
@@ -124,8 +137,6 @@ export const codexApi = {
     request<{ markers: CodexMarker[] }>(token, `/pages/${pageId}/markers`).then((data) => data.markers),
   createPage: (token: string, input: CodexPageInput) =>
     request<{ page: CodexPage }>(token, "/pages", { method: "POST", body: input }).then((data) => data.page),
-  updatePage: (token: string, id: string, input: CodexPageInput) =>
-    request<{ page: CodexPage }>(token, `/pages/${id}`, { method: "PATCH", body: input }).then((data) => data.page),
   revealPage: (token: string, id: string, revealed: boolean) =>
     request<{ page: CodexPage }>(token, `/pages/${id}/reveal`, {
       method: "POST",
@@ -160,8 +171,11 @@ export const codexApi = {
       body: { olderThanDays }
     }),
   /** A short-lived player token so the GM can preview the player Codex through the real player projection. */
-  createPreviewSession: (token: string) =>
-    request<{ token: string }>(token, "/preview-session", { method: "POST" }).then((data) => data.token),
+  /** A short-lived, read-only player token that reads the Codex as Everyone (null) or as one character. */
+  createPreviewSession: (token: string, characterId: string | null = null) =>
+    request<{ token: string }>(token, "/preview-session", { method: "POST", body: { characterId } }).then(
+      (data) => data.token
+    ),
   /** Save the whole object; `importBundle` accepts it back verbatim. */
   exportBundle: (token: string) => request<CodexExportBundle>(token, "/export"),
   /**
@@ -206,9 +220,6 @@ export const codexAssetContent = (token: string, assetId: string, signal?: Abort
 export const playerCodexApi = {
   listPages: (token: string) =>
     request<{ pages: PlayerCodexPageSummary[] }>(token, "/pages").then((data) => data.pages),
-  getPage: (token: string, id: string) =>
-    request<{ page: PlayerCodexPage; connections: PlayerCodexPageConnection[] }>(token, `/pages/${id}`),
-  search: (token: string, query: string) => request<CodexSearchResult>(token, `/search?q=${encodeURIComponent(query)}`),
   /** Already filtered server-side. Never derive the player graph by filtering the GM feed. */
   listConnections: (token: string) =>
     request<{ connections: PlayerCodexConnection[] }>(token, "/connections").then((data) => data.connections),
@@ -225,7 +236,7 @@ export const playerCodexApi = {
     request<{ records: PlayerCodexChronicleRecord[] }>(token, "/timeline").then((data) => data.records),
   sessions: (token: string) =>
     request<{ sessions: PlayerCodexSession[] }>(token, "/sessions").then((data) => data.sessions),
-  /** `gmBody` and `rev` stripped; `entityIds` filtered to pages this player can see. */
+  /** Hidden blocks and objectives this player may not read, and `rev`, stripped; `entityIds` filtered to pages this player can see. */
   quests: (token: string) => request<{ quests: PlayerCodexQuest[] }>(token, "/quests").then((data) => data.quests),
   standing: (token: string) =>
     request<{ standing: PlayerCodexStanding[] }>(token, "/standing").then((data) => data.standing),
@@ -438,7 +449,8 @@ export type CodexSessionInput = Readonly<{
   sessionNumber?: number | null;
   realDate?: string | null;
   attendees?: readonly string[];
-  prepBody?: string;
+  /** The whole list of prep sections. */
+  prep?: readonly CodexPrepSectionInput[];
   recapBody?: string;
   status?: CodexSessionStatus;
   /** Slug-normalized server-side. */
@@ -474,13 +486,17 @@ export const sessionApi = {
 
 // ----- Quests -----
 
+/** An objective as a write lists it: with the id the server gave it, or none for a new one. */
+export type CodexQuestObjectiveInput = Readonly<{ id?: string; text: string; done: boolean }>;
+
 /** Same split as `CodexSessionInput`. */
 export type CodexQuestInput = Readonly<{
   title?: string;
   status?: CodexQuestStatus;
   playerBody?: string;
-  gmBody?: string;
-  objectives?: readonly CodexQuestObjective[];
+  /** Create only. */
+  blocks?: readonly CodexBlockInput[];
+  objectives?: readonly CodexQuestObjectiveInput[];
   entityIds?: readonly string[];
   /** Slug-normalized server-side. */
   tags?: readonly string[];
@@ -488,11 +504,8 @@ export type CodexQuestInput = Readonly<{
 }>;
 export const questApi = {
   list: (token: string) => request<{ quests: CodexQuest[] }>(token, "/quests").then((data) => data.quests),
-  get: (token: string, id: string) => request<{ quest: CodexQuest }>(token, `/quests/${id}`).then((data) => data.quest),
   create: (token: string, input: CodexQuestInput & { title: string; revealedToPlayers?: boolean }) =>
     request<{ quest: CodexQuest }>(token, "/quests", { method: "POST", body: input }).then((data) => data.quest),
-  update: (token: string, id: string, input: CodexQuestInput & { expectedRev?: number }) =>
-    request<{ quest: CodexQuest }>(token, `/quests/${id}`, { method: "PATCH", body: input }).then((data) => data.quest),
   reveal: (token: string, id: string, revealed: boolean) =>
     request<{ quest: CodexQuest }>(token, `/quests/${id}/reveal`, {
       method: "POST",
@@ -516,10 +529,4 @@ export const standingApi = {
       method: "POST",
       body: { revealed }
     }).then((data) => data.standing)
-};
-
-// ----- The reveal audit -----
-
-export const revealAuditApi = {
-  get: (token: string) => request<{ audit: CodexRevealAudit }>(token, "/reveal-audit").then((data) => data.audit)
 };

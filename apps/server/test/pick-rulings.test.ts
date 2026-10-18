@@ -8,7 +8,7 @@ import { applyRest } from "../src/rests.js";
 
 // Choice-offer features, each asserted as a refusal the server issues, a budget that grew, or a
 // proficiency on the sheet, using the real bundles through a real `ContentLibrary`:
-//   - `minSpellLevel`: Mystic Arcanum is "a level 6 spell", not "6 or lower".
+//   - `minSpellLevel`: Mystic Arcanum is exactly "a level 6 spell".
 //   - catalog families: `tools`, `languages`, `<table>-languages`, and the base "Common plus two
 //     languages" budget every character is owed.
 //   - `fromPicks`: a pick whose options are the character's own earlier answers.
@@ -127,7 +127,7 @@ describe("ruling H - `minSpellLevel` makes Mystic Arcanum an EXACT level, not a 
     expect(arcanum!.level).toBe(6);
   });
 
-  it("still refuses a spell ABOVE the window - the ceiling did not stop working", () => {
+  it("still refuses a spell ABOVE the window: the ceiling did not stop working", () => {
     expect(() => build(warlock11("power-word-kill"))).toThrowError(/above the maximum spell level \(6\)/);
   });
 });
@@ -164,15 +164,15 @@ const rogue = (level: number, languages: readonly string[]): Mutable =>
     ]
   }) as Mutable;
 
-describe("ruling C - the base language budget every character was owed and never offered", () => {
-  it("REFUSES a build that skips it - the promise is real, not decorative", () => {
+describe("ruling C: the base language budget every character was owed and never offered", () => {
+  it("REFUSES a build that skips it: the promise is real, not decorative", () => {
     // Every species owes "Common plus two languages".
     expect(() => build(rogue(1, ["dwarvish"]))).toThrowError(
       /"Halfling languages" needs 3 pick\(s\) of kind "language"; got 1/
     );
   });
 
-  it("REFUSES a RARE language for the base budget - the SRD's table narrowing is part of the promise", () => {
+  it("REFUSES a RARE language for the base budget: the SRD's table narrowing is part of the promise", () => {
     // Druidic is a Rare-table language a Druid is granted; the level-1 budget draws from Standard.
     expect(() => build(rogue(1, ["dwarvish", "giant", "druidic"]))).toThrowError(
       /"druidic" is not an offered option for the "language" choice/
@@ -247,7 +247,7 @@ const ranger = (level: number, languages: readonly string[]): Mutable =>
     ]
   }) as Mutable;
 
-describe("ruling C - audit row 61: Deft Explorer's two languages", () => {
+describe("ruling C, audit row 61: Deft Explorer's two languages", () => {
   it("offers TWO at level 1 and FOUR at level 2, the level Deft Explorer arrives", () => {
     // The level-1 Ranger has only the base budget...
     expect(() => build(ranger(1, ["dwarvish", "giant", "goblin", "orc"]))).toThrowError(
@@ -260,7 +260,7 @@ describe("ruling C - audit row 61: Deft Explorer's two languages", () => {
   });
 });
 
-describe("ruling C - audit row 60: Skilled's `or tools` half", () => {
+describe("ruling C, audit row 60: Skilled's `or tools` half", () => {
   /** A level-1 Human Soldier Fighter who spends Versatile on Skilled. */
   const fighterWithSkilled = (picks: readonly Row[]): Mutable =>
     ({
@@ -377,7 +377,7 @@ const cleric = (level: number, blessed: "divine-strike" | "potent-spellcasting")
 const traitsOf = (definition: ReturnType<typeof build>) =>
   (definition.extensions["open5e.srd-2024"] as { traits: Array<{ name: string; description: string }> }).traits;
 
-describe("ruling F - audit row 63: Improved Blessed Strikes reads back the level-7 answer", () => {
+describe("ruling F, audit row 63: Improved Blessed Strikes reads back the level-7 answer", () => {
   it("shows the Divine Strike half to a Divine Strike Cleric, and NOT the other one", () => {
     const traits = traitsOf(build(cleric(14, "divine-strike")));
     expect(traits.map((trait) => trait.name)).toContain("Improved Divine Strike");
@@ -385,7 +385,7 @@ describe("ruling F - audit row 63: Improved Blessed Strikes reads back the level
     expect(traits.find((trait) => trait.name === "Improved Divine Strike")!.description).toContain("increases to 2d8");
   });
 
-  it("shows the OTHER half to a Potent Spellcasting Cleric - same level, same feature, other answer", () => {
+  it("shows the OTHER half to a Potent Spellcasting Cleric: same level, same feature, other answer", () => {
     const traits = traitsOf(build(cleric(14, "potent-spellcasting")));
     expect(traits.map((trait) => trait.name)).toContain("Improved Potent Spellcasting");
     expect(traits.map((trait) => trait.name)).not.toContain("Improved Divine Strike");
@@ -394,7 +394,7 @@ describe("ruling F - audit row 63: Improved Blessed Strikes reads back the level
     );
   });
 
-  it("costs the player NO pick - a determined answer is adopted, never offered", () => {
+  it("costs the player NO pick: a determined answer is adopted, never offered", () => {
     // An option list with exactly one choice is not offered: the build is complete without an
     // `improved-blessed-strikes` row, and volunteering one is refused.
     const input = cleric(14, "divine-strike");
@@ -408,7 +408,7 @@ describe("ruling F - audit row 63: Improved Blessed Strikes reads back the level
     expect(() => build(input)).toThrowError(/No feature "improved-blessed-strikes" offers/);
   });
 
-  it("does not fire before level 14 - the feature is not granted yet", () => {
+  it("does not fire before level 14: the feature is not granted yet", () => {
     expect(traitsOf(build(cleric(13, "divine-strike"))).map((trait) => trait.name)).not.toContain(
       "Improved Divine Strike"
     );
@@ -455,7 +455,7 @@ const druid = (
     ]
   }) as Mutable;
 
-describe("ruling F - audit rows 29 and 65: the land choice, and the Resistance it decides", () => {
+describe("ruling F, audit rows 29 and 65: the land choice, and the Resistance it decides", () => {
   it("audit row 29: the four land types are a REAL pick, and an unknown land is refused", () => {
     // "Choose one type of land" must be a real pick.
     const missing = druid(10, "polar");
@@ -472,7 +472,7 @@ describe("ruling F - audit rows 29 and 65: the land choice, and the Resistance i
     expect(build(druid(10, "polar")).damageResistances).toContain("cold");
     expect(build(druid(10, "temperate")).damageResistances).toContain("lightning");
     expect(build(druid(10, "tropical")).damageResistances).toContain("poison");
-    // ...and exactly one of them, not all four.
+    // ...and exactly one of them.
     const polar = build(druid(10, "polar")).damageResistances ?? [];
     expect(polar.filter((type) => ["fire", "cold", "lightning", "poison"].includes(type))).toEqual(["cold"]);
   });
@@ -483,13 +483,13 @@ describe("ruling F - audit rows 29 and 65: the land choice, and the Resistance i
     expect(definition.damageResistances).toContain("fire");
   });
 
-  it("grants no Resistance at level 9 - Nature's Ward arrives at 10", () => {
+  it("grants no Resistance at level 9: Nature's Ward arrives at 10", () => {
     const nine = build(druid(9, "arid")).damageResistances ?? [];
     expect(nine).not.toContain("fire");
   });
 });
 
-describe("ruling F - audit row 64: Improved Elemental Fury", () => {
+describe("ruling F, audit row 64: Improved Elemental Fury", () => {
   it("shows the half the level-7 answer chose, and only that half", () => {
     const strike = traitsOf(build(druid(15, "arid", "primal-strike"))).map((trait) => trait.name);
     expect(strike).toContain("Improved Primal Strike");
@@ -500,7 +500,7 @@ describe("ruling F - audit row 64: Improved Elemental Fury", () => {
   });
 });
 
-describe("ruling E - audit rows 51-53: `fromPicks` over the character's own known cantrips", () => {
+describe("ruling E, audit rows 51-53: `fromPicks` over the character's own known cantrips", () => {
   /** The warlock11 fixture, with the invocation cantrip rows replaced by `rows`. */
   const withInvocationPicks = (rows: readonly Row[]): Mutable => {
     const input = warlock11("true-seeing");
@@ -516,13 +516,13 @@ describe("ruling E - audit rows 51-53: `fromPicks` over the character's own know
     return input;
   };
 
-  it("records WHICH cantrip the invocation was pointed at - the half these rows were about", () => {
+  it("records WHICH cantrip the invocation was pointed at: the half these rows were about", () => {
     const definition = build(warlock11("true-seeing"));
     const pointed = (definition.character?.choices ?? []).filter((row) => row.payload?.featureId === "agonizing-blast");
     expect(pointed.map((row) => row.id)).toEqual(["eldritch-blast"]);
   });
 
-  it("REFUSES a cantrip the character does not know - the list is the ledger, not the catalog", () => {
+  it("REFUSES a cantrip the character does not know: the list is the ledger, not the catalog", () => {
     // Sacred Flame deals damage and this Warlock has it (from Magic Initiate), but it is not one of their
     // known Warlock cantrips, which is what the invocation requires.
     expect(() =>
@@ -570,7 +570,7 @@ describe("ruling E - audit rows 51-53: `fromPicks` over the character's own know
     );
   });
 
-  it("narrows on the OTHER two predicates too - each invocation asks a different question", () => {
+  it("narrows on the OTHER two predicates too: each invocation asks a different question", () => {
     // Repelling Blast wants an attack roll; Eldritch Spear wants a range of 10+ feet. Chill Touch deals
     // damage and rolls an attack; Thunderclap deals damage and is a Self emanation, so it answers
     // Agonizing Blast and neither of the others.
@@ -614,7 +614,7 @@ describe("ruling A - `replaces` names a pick this build really has, or the build
     );
   });
 
-  it("accepts the clauses the SRD really prints - the land on a Long Rest, the damage type on either", () => {
+  it("accepts the clauses the SRD really prints: the land on a Long Rest, the damage type on either", () => {
     // Circle Spells and Fiendish Resilience both declare `replaces` against their own pick, and both
     // builds stand.
     expect(() => build(druid(10, "polar"))).not.toThrow();
@@ -622,7 +622,7 @@ describe("ruling A - `replaces` names a pick this build really has, or the build
   });
 });
 
-describe("ruling A - the rest-time half: re-choose, then let the rest take it back", () => {
+describe("ruling A, the rest-time half: re-choose, then let the rest take it back", () => {
   const HERO = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
   const onTheTable = (definition: ReturnType<typeof build>) => {
     const state = GameStateSchema.parse({ schemaVersion: 1 });

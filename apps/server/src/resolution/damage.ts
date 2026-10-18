@@ -8,7 +8,7 @@ import {
   type RiderMoment
 } from "@vtt/rules-5e";
 import { endEffect } from "../effects.js";
-import { abilityModifier, recordRoll, type ResolveContext } from "./context.js";
+import { abilityModifier, endedEffect, recordRoll, type ResolveContext } from "./context.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
 export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
@@ -226,6 +226,6 @@ export function spendDamageUses(ctx: ResolveContext): void {
       continue;
     }
     endEffect(state, attacker.id, effectId);
-    effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: effect.name });
+    effectsEnded.push(endedEffect(attacker, effect));
   }
 }

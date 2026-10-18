@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { GAME_PATHS, SESSION_PATHS } from "@vtt/api-contract";
 import { GameStateSchema, type GameState } from "@vtt/domain";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { createServer } from "../src/server.js";
 import { timelineDirtied } from "../src/combat-history.js";
 import { CommandRejectedError, RulesBlockedError } from "../src/game-store.js";
@@ -23,7 +23,7 @@ const OGRE = "10000000-0000-4000-8000-000000000003";
 const LURKER = "10000000-0000-4000-8000-000000000004";
 const RAT = "10000000-0000-4000-8000-000000000005";
 
-/** 50px cells, 5 ft each, origin at 0,0 - cell (c,r) center = (25 + 50c, 25 + 50r). */
+/** 50px cells, 5 ft each, origin at 0,0; cell (c,r) center = (25 + 50c, 25 + 50r). */
 const GRID: TokenMapGeometry = {
   width: 1000,
   height: 1000,

@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted — 2026-07-15.
+Accepted on 2026-07-15.
 
 ## Context and decision drivers
 
-The product serves one trusted GM and a small home group joining directly by LAN IP (ADR-001, ADR-002), with no account system, invitations, or cloud service (README.md, "Current foundation"). The GM needs durable, exclusive administrative authority; players need a low-friction way to sit down at a device, pick their character, and be recognized as that character again after a reload or reconnect — without usernames, emails, or passwords for players.
+The product serves one trusted GM and a small home group joining directly by LAN IP (ADR-001, ADR-002), with no account system, invitations, or cloud service (README.md, "Current foundation"). The GM needs durable, exclusive administrative authority; players need a low-friction way to sit down at a device, pick their character, and be recognized as that character again after a reload or reconnect, with no usernames, emails, or passwords for players.
 
 ## Considered options
 
@@ -16,20 +16,26 @@ The product serves one trusted GM and a small home group joining directly by LAN
 
 ## Decision
 
-All participants reach the same server at the same LAN address; there is no separate GM URL or player invitation link. A first-run GM password is bootstrapped only from a loopback request (`isLoopback` check in `apps/server/src/index.ts`) with a minimum length requirement, hashed with bcrypt (cost factor 12, `apps/server/src/auth.ts`) — the plaintext password is never stored. Subsequent GM logins receive a signed, time-limited (12-hour) session token (ADR-002). Players receive a signed player session token (30-day expiry) on join, with no password; that session claims ownership of exactly one player-character actor at a time by setting the actor's `ownerSessionId` (`packages/schemas/src/index.ts`). The server enforces, per claim command: the target actor is a player-character, it is not already claimed by a different session, and the claiming session does not already own a different character — a player must release before claiming another (`apps/server/src/index.ts`, `character:claim`/`character:release`). Both GM and player session tokens are self-contained, HMAC-SHA256-signed, and verified with a timing-safe comparison (`apps/server/src/auth.ts`).
+All participants reach the same server at the same LAN address; there is no separate GM URL or player invitation link. A first-run GM password is bootstrapped only from a loopback request (`isLoopback` check in `apps/server/src/index.ts`) with a minimum length requirement, hashed with bcrypt (cost factor 12, `apps/server/src/auth.ts`); the plaintext password is never stored. Subsequent GM logins receive a signed, time-limited (12-hour) session token (ADR-002). Players receive a signed player session token (30-day expiry) on join, with no password; that session claims ownership of exactly one player-character actor at a time by setting the actor's `ownerSessionId` (`packages/schemas/src/index.ts`). The server enforces, per claim command: the target actor is a player-character, it is not already claimed by a different session, and the claiming session does not already own a different character. A player must release before claiming another (`apps/server/src/index.ts`, `character:claim`/`character:release`). Both GM and player session tokens are self-contained, HMAC-SHA256-signed, and verified with a timing-safe comparison (`apps/server/src/auth.ts`).
+
+**Amended 2026-10-17 by [ADR-0027](0027-session-lifecycle.md) and [ADR-0028](0028-table-screen-pairing.md):** the GM
+token is kept in the tab's sessionStorage (and, on request, the computer's localStorage) so a reload stays signed in; a
+session that ends is told and dropped; a dead token at join is refused, never swapped for a new seat; the GM can change
+the password in Settings; force-release asks again for a character in the running fight and tells its player; and a
+table screen pairs from the code it shows.
 
 ## Consequences and tradeoffs
 
-Identity is per-browser-session, not per-person: a player who joins from a second device gets a second, independent session and must claim separately, and clearing browser storage loses the claim binding (recoverable by claiming again, since characters are not deleted). There is no password reset flow for players because there is no player password; losing a GM password requires host-machine access to reset. This trade is accepted because it matches the product's explicit no-accounts, trusted-LAN, small-home-group scope (README.md, "Scope boundaries").
+Identity is per browser session, with no notion of a person: a player who joins from a second device gets a second, independent session and must claim separately, and clearing browser storage loses the claim binding (recoverable by claiming again, since characters are not deleted). There is no password reset flow for players because there is no player password; losing a GM password requires host-machine access to reset. This trade is accepted because it matches the product's explicit no-accounts, trusted-LAN, small-home-group scope (README.md, "Scope boundaries").
 
 ## Mobile, security, and visibility impact
 
-Bootstrap's loopback restriction prevents any other device on the LAN from racing the host to set the GM password (ADR-002). GM and player projections diverge at the server boundary, not in the UI: player projections omit `ownerSessionId` and GM-only notes for other sessions' characters (`docs/product/phase-1-character-roster.md`), so a claim's session identity is never leaked to other players regardless of device. Session tokens work identically on phone and desktop browsers since they are ordinary signed strings carried in the Socket.IO handshake, not a platform-specific credential.
+Bootstrap's loopback restriction prevents any other device on the LAN from racing the host to set the GM password (ADR-002). GM and player projections diverge at the server boundary, before the UI sees anything: player projections omit `ownerSessionId` and GM-only notes for other sessions' characters (`docs/product/phase-1-character-roster.md`), so a claim's session identity is never leaked to other players regardless of device. Session tokens work identically on phone and desktop browsers since they are ordinary signed strings carried in the Socket.IO handshake, with no platform-specific credential.
 
 ## Migration / reversibility
 
-The one-character-per-session MVP policy is deliberately narrow; a documented later extension is GM force-release and explicit session invalidation (`docs/product/phase-1-character-roster.md`, "Remaining acceptance work"), which does not require changing the claim/release command shapes. Moving to a real account system later would be a larger migration — it would need to introduce durable cross-device identity distinct from the current per-session token — and is out of scope for the current product boundary.
+The one-character-per-session MVP policy is deliberately narrow; a documented later extension is GM force-release and explicit session invalidation (`docs/product/phase-1-character-roster.md`, "Remaining acceptance work"), which does not require changing the claim/release command shapes. Moving to a real account system later would be a larger migration (it would need to introduce durable cross-device identity distinct from the current per-session token) and is out of scope for the current product boundary.
 
 ## Validation evidence
 
-`docs/product/phase-1-character-roster.md` documents the seeded roster, one-claim-per-session enforcement, and player-projection tests that confirm available/current-session/other-session claim states without leaking owner IDs or notes. Automated coverage includes seed idempotency, migration/seed markers, and claim-visibility projection tests (18 passing tests at time of writing). Remaining acceptance work — two simultaneous clients racing the same claim, browser token recovery after a real server restart, and GM force-release/session invalidation — is tracked as open in that document and in BUILD_PLAN.md's near-term queue, and is not yet closed by this ADR.
+`docs/product/phase-1-character-roster.md` documents the seeded roster, one-claim-per-session enforcement, and player-projection tests that confirm available/current-session/other-session claim states without leaking owner IDs or notes. Automated coverage includes seed idempotency, migration/seed markers, and claim-visibility projection tests (18 passing tests at time of writing). Remaining acceptance work (two simultaneous clients racing the same claim, browser token recovery after a real server restart, and GM force-release/session invalidation) is tracked as open in that document and in BUILD_PLAN.md's near-term queue, and is not yet closed by this ADR.

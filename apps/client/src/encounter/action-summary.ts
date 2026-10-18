@@ -8,23 +8,29 @@ export const tagLabel = (tag: string) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
-/** How a limited use comes back, as a sheet says it ("short rest"): one back at the start of the bearer's next turn
- *  (Peerless Aim) is once a round. */
+/** How a limited use comes back, as a sheet says it ("Short Rest"): one back at the start of the bearer's next turn
+ *  (Peerless Aim) is once a round. The rests are SRD rules terms, so they are capitalised. */
 export const usesScopeLabel = (per: NonNullable<ContentActionSummary["usesPer"]>) =>
-  per === "own-turn" ? "round" : per.replace(/-/g, " ");
+  per === "own-turn"
+    ? "round"
+    : per === "short-rest"
+      ? "Short Rest"
+      : per === "long-rest"
+        ? "Long Rest"
+        : per.replace(/-/g, " ");
+
+/** An area as the SRD sizes it: a Sphere's or a Cylinder's radius, another shape's length or side ("5-foot-radius
+ *  cylinder", "30-foot cone"). */
+export const areaWords = (area: Readonly<{ shape: string; sizeFeet: number }>) =>
+  area.shape === "sphere" || area.shape === "cylinder"
+    ? `${area.sizeFeet}-foot-radius ${area.shape}`
+    : `${area.sizeFeet}-foot ${area.shape}`;
 
 /**
  * An action's mechanics as discrete lines, each drawn as its own bullet under the action's name:
  * to-hit and reach, attack count, a Multiattack plan (named from `all`), the save, each damage part,
  * the use pool, and a legendary cost.
  */
-/** An area as the SRD sizes it: a Sphere's or a Cylinder's radius, another shape's length or side ("5-ft-radius
- *  cylinder", "30-ft cone"). */
-export const areaWords = (area: NonNullable<ContentActionSummary["area"]>) =>
-  area.shape === "sphere" || area.shape === "cylinder"
-    ? `${area.sizeFeet}-ft-radius ${area.shape}`
-    : `${area.sizeFeet}-ft ${area.shape}`;
-
 export function actionSummaryParts(action: ContentActionSummary, all: readonly ContentActionSummary[] = []): string[] {
   const parts: string[] = [];
   const componentName = (id: string) => all.find((candidate) => candidate.id === id)?.name ?? tagLabel(id);

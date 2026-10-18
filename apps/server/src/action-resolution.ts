@@ -24,7 +24,14 @@ import {
   spendUntilOwnAttack
 } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
-import type { DefinitionAction, ResolveContext, ResolveDependencies, ResolveInput } from "./resolution/context.js";
+import type {
+  DefinitionAction,
+  EndedEffect,
+  ResolveContext,
+  ResolveDependencies,
+  ResolveInput
+} from "./resolution/context.js";
+import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
@@ -54,6 +61,7 @@ import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 import { holdReadiedSpell } from "./resolution/ready.js";
 import { healLimit } from "./loose-healing.js";
+import { passiveOf, unavailableReason } from "./availability-reasons.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -201,6 +209,13 @@ function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"]
   return ctx.targets.map((target) => ({ targetId: target.id, targetName: target.name, parts, total }));
 }
 
+/** An ended effect as the result tells it, to the initiator and in the table's toast: a source hidden from the
+ *  initiator is masked in its name, as the projection masks it, and the source itself isn't told. */
+function toldEnded(ctx: ResolveContext, { source, ...ended }: EndedEffect) {
+  const masked = source?.actorId != null && ctx.hiddenFromInitiator(source.actorId);
+  return masked ? { ...ended, name: withoutSourceName(ended.name, source.name) } : ended;
+}
+
 function resolutionOf(ctx: ResolveContext): ActionResolution {
   const { state, action, attacker, targets, damage, bonusDamage, warnings } = ctx;
   const instance = state.combat.turn.actionInstance;
@@ -218,7 +233,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
         }
       : ctx.builtinSave,
     damage,
-    // What every apply path lands: a negative part deals 0 of its type rather than eating another's.
+    // What every apply path lands: a negative part deals 0 of its type and never eats into another's.
     damageTotal: owedDamageTotal({ damage, bonusDamage }),
     crit: ctx.crit,
     ...rollModeOf(ctx),
@@ -234,7 +249,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     overridden: ctx.overridden,
     ...(ctx.reactionPrompts.length > 0 ? { reactionPrompts: ctx.reactionPrompts } : {}),
     ...(ctx.check ? { check: ctx.check } : {}),
-    ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded } : {}),
+    ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded.map((ended) => toldEnded(ctx, ended)) } : {}),
     ...(ctx.healing ? { healing: ctx.healing } : {}),
     ...(ctx.opens ? { opens: ctx.opens } : {}),
     ...(damageTargets ? { damageTargets } : {})
@@ -290,12 +305,17 @@ export function actionAvailability(
       else if ((action.attack || action.replacesAttack) && instance.components["attack"] !== undefined)
         componentsRemaining = instance.components["attack"];
     }
+    const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
+    const passive = passiveOf(action, builtin);
     return {
       id: action.id,
       name: action.name,
       activation: action.activation,
       available: evaluation.violations.length === 0,
       violations: evaluation.violations,
+      // The sheet's one sentence for why not; the violations keep the full account.
+      ...(reason !== undefined ? { reason } : {}),
+      ...(passive !== undefined ? { passive } : {}),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),

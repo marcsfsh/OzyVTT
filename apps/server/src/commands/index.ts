@@ -17,11 +17,13 @@ import { rollCommands } from "./rolls.js";
 import { rulingCommands } from "./rulings.js";
 import { saveCommands } from "./saves.js";
 import { sceneCommands } from "./scenes.js";
+import { soundCommands } from "./sound.js";
 import { tableSettingCommands } from "./table-settings.js";
+import { visionCommands } from "./vision.js";
 
-export { describeFailure, failureReply, NOT_JOINED_REPLY } from "./failures.js";
+export { describeFailure, failureReply, NOT_JOINED_REPLY, SESSION_ENDED_REPLY } from "./failures.js";
 export { isGmGrade, type CommandContext, type GamePrincipal } from "./kit.js";
-export { socketEventOf, type AnyCommand, type GameReply } from "./pipeline.js";
+export { readScope, socketEventOf, type AnyCommand, type GameReply } from "./pipeline.js";
 
 /** Every game command, each defined once: its socket event and typed HTTP route derive from its type, its
  *  scope and route come from `GAME_COMMANDS`, and both transports run it through the same pipeline. */
@@ -40,7 +42,9 @@ export const gameCommands: readonly AnyCommand[] = [
   ...rulingCommands,
   ...tableSettingCommands,
   ...sceneCommands,
-  ...mapCommands
+  ...mapCommands,
+  ...soundCommands,
+  ...visionCommands
 ];
 export { gameReads };
 

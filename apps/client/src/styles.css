@@ -219,8 +219,8 @@ main:has(> .frame-tabbar.rim-player) {
 }
 /* The scanline wipe, on tab and page transitions only (≤180ms, one band, one pass). The pane's one
    child is a new element on every address change, so it fires once; do not add it elsewhere.
-   A mask, not an overlay (no pseudo is free); in Chromium `mask-image` creates no containing block
-   for fixed descendants, and `fill-mode: none` drops it after. The band dims rather than hides.
+   A mask, and no overlay (no pseudo is free); in Chromium `mask-image` creates no containing block
+   for fixed descendants, and `fill-mode: none` drops it after. The band dims and stays visible.
    The tile is 200% of the box with the band at 47-50% of it; `mask-position` percentages resolve
    against (box - image) = -100%, so 100% -> 0% sweeps the band once from top to bottom. */
 .app-pane > .anim-view {
@@ -295,16 +295,6 @@ p {
   color: var(--text-dim);
   line-height: var(--lh-body);
 }
-.eyebrow {
-  display: inline-block;
-  color: var(--text-muted);
-  font-family: var(--font-label);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-}
-
 /* Base styles for the raw <button>/<input>/<select> that remain; prefer @vtt/ui <Button>. */
 button,
 input,
@@ -404,39 +394,6 @@ textarea:focus {
 }
 .card input {
   margin-bottom: var(--space-4);
-}
-/* Primary fill for hand-rolled card buttons. Sets `--nh-fill`/`--nh-rim` rather than `background`:
-   `.nh-btn` paints on a `::before` layer, and a background here would show through translucent layers
-   (e.g. the landing's glass door). Bare `<button>`s get the background on the second line. */
-.card button {
-  text-align: center;
-  --nh-fill: var(--primary);
-  --nh-rim: var(--magenta-hi);
-  color: var(--text-on-neon);
-  border: 0;
-  margin-right: var(--space-2);
-}
-.card button:not(.nh-btn) {
-  background: var(--primary);
-}
-.card button:hover:not(:disabled) {
-  --nh-fill: var(--magenta-hi);
-  box-shadow: var(--glow-magenta);
-}
-.card button:not(.nh-btn):hover:not(:disabled) {
-  background: var(--magenta-hi);
-}
-/* A ghost action in a card is text only: `.card button` above would otherwise give it the primary fill. */
-.card .link {
-  --nh-fill: transparent;
-  --nh-rim: transparent;
-  background: transparent;
-  color: var(--text-dim);
-}
-.card .link:hover:not(:disabled) {
-  --nh-fill: transparent;
-  color: var(--text);
-  box-shadow: none;
 }
 
 .notice {
@@ -567,16 +524,30 @@ textarea:focus {
 .app-logo {
   flex: none;
 }
+/* The tabs, More and Rules sit in the bar's own row; their wrapper only measures them. */
+.app-tabs {
+  display: contents;
+}
+/* The theme switch closes the bar at its far end, on every page and for both roles. */
+.frame-tabbar .app-theme-switch {
+  margin-left: auto;
+}
 /* A phone spends the bar's width on the tabs: no logo, and the tabs share the track. */
 @media (max-width: 760px) {
   .app-logo {
     display: none;
   }
+  /* Tighter steps, so three tabs, More and the theme switch share a 390px bar with nothing clipped. */
   .frame-tabbar {
-    padding-inline: var(--space-3);
+    gap: var(--space-2);
+    padding-inline: var(--space-2);
   }
   .frame-tabbar .nh-tabs {
     flex: 1;
+  }
+  .frame-tabbar .nh-tab,
+  .frame-tabbar .app-more .nh-menu-trigger {
+    padding-inline: var(--space-3);
   }
   .frame-tabbar .nh-tab {
     flex: 1 0 auto;
@@ -607,7 +578,7 @@ textarea:focus {
   opacity: 0.035;
   mix-blend-mode: screen;
 }
-[data-theme="light"] .app-texture {
+:is([data-theme="light"], [data-theme="dawn"]) .app-texture {
   display: none;
 }
 @media (prefers-reduced-transparency: reduce) {

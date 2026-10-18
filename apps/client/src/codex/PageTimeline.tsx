@@ -70,7 +70,7 @@ export function PageTimeline({
                       .join(" · ")}
                   </span>
                 )}
-                {/* Keyed on `revealedToPlayers`, not on missing player text. */}
+                {/* Keyed on `revealedToPlayers`; missing player text doesn't decide it. */}
                 {!entry.revealedToPlayers && <HiddenFromPlayers />}
                 <span className="codex-page-timeline-text codex-list-title">{entry.playerText || entry.gmText}</span>
               </>

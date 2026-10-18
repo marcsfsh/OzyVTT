@@ -2,7 +2,7 @@
    underlined in cyan. Shape carries the state (raised box plus underline), so it reads without colour. */
 .nh-segmented {
   display: inline-flex;
-  /* Wrap rather than overflow: four options at 375px would otherwise run off-screen. */
+  /* Wrap: four options at 375px would otherwise run off-screen. */
   flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
@@ -56,4 +56,14 @@
 .nh-segmented-icon {
   font-size: 1em;
   line-height: 1;
+}
+/* Disabled dims the ink alone (DESIGN: never group opacity); the pressed option keeps its underline, so the
+   standing value still reads. */
+.nh-segmented-option:disabled {
+  opacity: 1;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.nh-segmented-option:disabled:hover {
+  background: transparent;
 }

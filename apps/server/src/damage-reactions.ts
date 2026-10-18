@@ -5,14 +5,17 @@ import type { DamageDeps } from "./hit-points.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { offerableReaction } from "./reaction-offers.js";
 import type { LiveActor } from "./resolution/context.js";
+import { hiddenFrom } from "./vision/audience.js";
 
 type StrikeReaction = Extract<ActionReaction, { trigger: "damaged-by-creature" }>;
 
 /**
  * Damage from a creature opens the damaged creature's strike-back reaction (Hellish Rebuke, Storm's Thunder,
  * Retaliation) as a prompt; answering it strikes that creature (reactions.ts). Out of range on the map opens nothing;
- * an unmeasurable distance is left to the table. A hidden source opens nothing either, since the prompt would name
- * it to the damaged creature's player, and the GM resolves that by hand. Returns the line that announces the prompt.
+ * an unmeasurable distance is left to the table. A source hidden from the damaged creature's player (the shared
+ * check: GM-only, out of their characters' sight or under the fog) opens nothing either, since the prompt would point
+ * at it, and the GM resolves that by hand. Returns the line that announces the prompt, its source masked for the
+ * table when hidden.
  */
 export function offerDamageReaction(
   state: GameState,
@@ -43,6 +46,9 @@ export function offerDamageReaction(
     deps
   );
   if (!offer) return null;
+  const owner = victim.kind === "player-character" ? victim.ownerSessionId : null;
+  const content = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  if (owner !== null && hiddenFrom(state, content, owner)(source.id)) return null;
   const id = deps.newId();
   state.combat = {
     ...state.combat,
@@ -72,6 +78,7 @@ export function offerDamageReaction(
   return {
     kind: "reaction",
     text: `${victim.name} may use ${offer.action.name} against ${source.name}.`,
-    actorId: victim.id
+    actorId: victim.id,
+    source: { actorId: source.id, name: source.name }
   };
 }

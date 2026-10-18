@@ -19,18 +19,22 @@ import * as quests from "./codex/quests.js";
 import * as receipts from "./codex/receipts.js";
 import * as revisions from "./codex/revisions.js";
 import { migrateCodex } from "./codex/schema.js";
-import { searchAll, type CodexSearchRefs } from "./codex/search.js";
+import * as prep from "./codex/prep.js";
+import { searchAll, searchGmMatches, type CodexSearchRef, type CodexSearchRefs } from "./codex/search.js";
 import * as sessions from "./codex/sessions.js";
 import * as settings from "./codex/settings.js";
 import * as standing from "./codex/standing.js";
 import { isId } from "./codex/validate.js";
 import { mapAssetVisibleToPlayers, mediaVisibleToPlayers } from "./codex/visibility.js";
+import type { CodexReader } from "./codex-projections.js";
+import type { CodexBlockInput } from "./codex/blocks.js";
+import type { CodexBeganInput } from "./codex/connections.js";
 import { openDatabase } from "./database.js";
 
 /**
  * The worldbuilding Codex's persistence, one module per aggregate under `codex/`. Every write bumps the coarse
- * `revision`, which pings clients and keys ETags. Rows hold both layers; only `codex-projections.ts` strips
- * GM data for players. Writes that reach across aggregates (deletes, mostly) are composed here.
+ * `revision`, which pings the GM's devices and keys the GM's ETags. Rows hold both layers; only `codex-projections.ts`
+ * strips GM data for players. Writes that reach across aggregates (deletes, mostly) are composed here.
  */
 export class CodexStore {
   #context: CodexDb | undefined;
@@ -85,7 +89,36 @@ export class CodexStore {
   setPageRevealed(pageId: string, revealed: boolean) {
     return pages.setPageRevealed(this.#db, pageId, revealed);
   }
-  /** References to the page elsewhere become label-only rather than dangling; its revisions go with it. */
+  addPageBlock(pageId: string, input: CodexBlockInput & Readonly<{ slot?: number }>, expectedRev?: number) {
+    return pages.addPageBlock(this.#db, pageId, input, expectedRev);
+  }
+  editPageBlock(
+    pageId: string,
+    blockId: string,
+    input: Readonly<{ title?: string | null; text?: string }>,
+    expectedRev?: number
+  ) {
+    return pages.editPageBlock(this.#db, pageId, blockId, input, expectedRev);
+  }
+  movePageBlock(
+    pageId: string,
+    blockId: string,
+    place: Readonly<{ anchor: number; slot?: number }>,
+    expectedRev?: number
+  ) {
+    return pages.movePageBlock(this.#db, pageId, blockId, place, expectedRev);
+  }
+  deletePageBlock(pageId: string, blockId: string, expectedRev?: number) {
+    return pages.deletePageBlock(this.#db, pageId, blockId, expectedRev);
+  }
+  /** Not an edit: who sees one block. Character ids are the caller's to check against the party. */
+  setPageBlockAudience(pageId: string, blockId: string, audience: string, characterIds?: readonly string[]) {
+    return pages.setPageBlockAudience(this.#db, pageId, blockId, audience, characterIds);
+  }
+  setPageFieldAudience(pageId: string, key: string, audience: string) {
+    return pages.setPageFieldAudience(this.#db, pageId, key, audience);
+  }
+  /** References to the page elsewhere become label-only and never dangle; its revisions go with it. */
   deletePage(pageId: string): void {
     if (!isId(pageId)) return;
     const db = this.#db;
@@ -101,6 +134,10 @@ export class CodexStore {
   }
   listPages(filter?: Readonly<{ folder?: string | null; tag?: string }>) {
     return pages.listPages(this.#db, filter);
+  }
+  /** Every page with both bodies. */
+  listFullPages() {
+    return pages.listFullPages(this.#db);
   }
   listFolders() {
     return pages.listFolders(this.#db);
@@ -153,12 +190,37 @@ export class CodexStore {
 
   createConnection(
     fromPageId: string,
-    input: Readonly<{ toPageId: string; label?: string | null; layer?: "player" | "gm" | null }>
+    input: Readonly<{
+      toPageId: string;
+      label?: string | null;
+      layer?: "player" | "gm" | null;
+      began?: CodexBeganInput | null;
+    }>
   ) {
     return connections.createConnection(this.#db, fromPageId, input);
   }
-  updateConnection(connectionId: string, input: Readonly<{ label?: string | null; layer?: "player" | "gm" }>) {
+  updateConnection(
+    connectionId: string,
+    input: Readonly<{ label?: string | null; layer?: "player" | "gm"; began?: CodexBeganInput | null }>
+  ) {
     return connections.updateConnection(this.#db, connectionId, input);
+  }
+  /** A declared connection in its graph-edge shape, as the connection writes answer. */
+  connectionEdge(relationship: connections.CodexRelationshipRow) {
+    const reader = pages.stampReader(this.#db);
+    return {
+      id: relationship.id,
+      fromKind: "page" as const,
+      fromId: relationship.fromPageId,
+      toPageId: relationship.toPageId,
+      label: relationship.label,
+      origin: "declared" as const,
+      layer: relationship.layer,
+      characterIds: [],
+      began: connections.beganOf(relationship.began, reader),
+      learned: connections.learnedOf(relationship, reader),
+      createdAt: relationship.createdAt
+    };
   }
   deleteConnection(connectionId: string): void {
     connections.deleteConnection(this.#db, connectionId);
@@ -178,6 +240,10 @@ export class CodexStore {
   /** The player index holds only player-layer text and its rows are checked against live reveal state. */
   searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRefs {
     return searchAll(this.#db, audience, query, kinds);
+  }
+  /** Every GM match, ranked and uncapped, for a caller that filters, sorts and caps (`codex/find.ts`). */
+  searchGmMatches(query: string): CodexSearchRef[] {
+    return searchGmMatches(this.#db, query);
   }
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
     return this.searchAll(audience, query, ["page"]).hits.map((hit) => ({ pageId: hit.id }));
@@ -250,13 +316,17 @@ export class CodexStore {
   partyMarker() {
     return atlas.partyMarker(this.#db);
   }
+  /** Moves the party pin to a point on any map, or makes one there, in one write. */
+  placeParty(input: atlas.CodexPartyPlaceInput) {
+    return atlas.placeParty(this.#db, input);
+  }
   /** Whether a player may fetch this map image. */
   isAssetRevealedToPlayers(assetId: string): boolean {
     return mapAssetVisibleToPlayers(this.#db, assetId);
   }
-  /** Whether a player may fetch this page image. */
-  isMediaVisibleToPlayers(assetId: string): boolean {
-    return mediaVisibleToPlayers(this.#db, assetId);
+  /** Whether this reader may fetch this page image. */
+  isMediaVisibleToPlayers(assetId: string, reader?: CodexReader): boolean {
+    return mediaVisibleToPlayers(this.#db, assetId, reader);
   }
 
   // The calendar
@@ -284,6 +354,12 @@ export class CodexStore {
     const current = calendar.getCalendar(db);
     write(db, () => calendar.writePublishedDate(db, current.currentDate ?? null));
     return current;
+  }
+  /** Moves the GM's date (and the players' when it matched) by whole days of game time; false with no date set. */
+  advanceCampaignDate(days: number): boolean {
+    const db = this.#db;
+    if (!calendar.getCalendar(db).currentDate || days <= 0) return false;
+    return write(db, () => calendar.advanceCampaignDate(db, days));
   }
   /** Takes the date away from the players: they see no date until the GM publishes again. */
   unpublishCampaignDate(): CodexCalendar {
@@ -382,6 +458,43 @@ export class CodexStore {
   getSession(sessionId: string) {
     return sessions.getSession(this.#db, sessionId);
   }
+  applyPrepTemplate(sessionId: string, templateId: string, expectedRev: number | undefined) {
+    return sessions.applyTemplate(this.#db, sessionId, templateId, expectedRev);
+  }
+  tickPrepItem(sessionId: string, itemId: string, done: boolean) {
+    return sessions.tickPrepItem(this.#db, sessionId, itemId, done);
+  }
+  setCurrentScene(sessionId: string, sceneId: string | null) {
+    return sessions.setCurrentScene(this.#db, sessionId, sceneId);
+  }
+  /** A line logged at the table, filed under the session and dated at the GM's clock. */
+  logSessionLine(sessionId: string, input: Readonly<{ text: string; revealedToPlayers?: boolean }>) {
+    return journal.logSessionLine(this.#db, sessionId, input);
+  }
+
+  // Prep templates
+
+  listPrepTemplates() {
+    return prep.listTemplates(this.#db);
+  }
+  getPrepTemplate(templateId: string) {
+    return prep.getTemplate(this.#db, templateId);
+  }
+  createPrepTemplate(input: prep.PrepTemplateInput) {
+    return prep.createTemplate(this.#db, input);
+  }
+  updatePrepTemplate(templateId: string, input: Partial<prep.PrepTemplateInput>, expectedRev: number | undefined) {
+    return prep.updateTemplate(this.#db, templateId, input, expectedRev);
+  }
+  deletePrepTemplate(templateId: string): void {
+    prep.deleteTemplate(this.#db, templateId);
+  }
+  duplicatePrepTemplate(templateId: string, name?: string) {
+    return prep.duplicateTemplate(this.#db, templateId, name);
+  }
+  setDefaultPrepTemplate(templateId: string) {
+    return prep.setDefaultTemplate(this.#db, templateId);
+  }
   listSessions() {
     return sessions.listSessions(this.#db);
   }
@@ -402,6 +515,34 @@ export class CodexStore {
   }
   setQuestRevealed(questId: string, revealed: boolean) {
     return quests.setQuestRevealed(this.#db, questId, revealed);
+  }
+  addQuestBlock(questId: string, input: CodexBlockInput & Readonly<{ slot?: number }>, expectedRev?: number) {
+    return quests.addQuestBlock(this.#db, questId, input, expectedRev);
+  }
+  editQuestBlock(
+    questId: string,
+    blockId: string,
+    input: Readonly<{ title?: string | null; text?: string }>,
+    expectedRev?: number
+  ) {
+    return quests.editQuestBlock(this.#db, questId, blockId, input, expectedRev);
+  }
+  moveQuestBlock(
+    questId: string,
+    blockId: string,
+    place: Readonly<{ anchor: number; slot?: number }>,
+    expectedRev?: number
+  ) {
+    return quests.moveQuestBlock(this.#db, questId, blockId, place, expectedRev);
+  }
+  deleteQuestBlock(questId: string, blockId: string, expectedRev?: number) {
+    return quests.deleteQuestBlock(this.#db, questId, blockId, expectedRev);
+  }
+  setQuestBlockAudience(questId: string, blockId: string, audience: string, characterIds?: readonly string[]) {
+    return quests.setQuestBlockAudience(this.#db, questId, blockId, audience, characterIds);
+  }
+  setObjectiveAudience(questId: string, objectiveId: string, audience: string, characterIds?: readonly string[]) {
+    return quests.setObjectiveAudience(this.#db, questId, objectiveId, audience, characterIds);
   }
   deleteQuest(questId: string): void {
     if (!isId(questId)) return;

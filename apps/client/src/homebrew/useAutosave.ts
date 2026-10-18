@@ -5,7 +5,9 @@
  *    other. An edit during a save sets `dirtyRef` and re-runs on completion.
  * 3. Every PATCH carries `expectedRev`; a 409 resyncs the revision and settles on "conflict".
  * 4. Flushes on unmount, because the GM tab is conditionally mounted and a tab switch would
- *    otherwise drop the last edit.
+ *    otherwise drop the last edit. `onUnmountFlush` hears of that save, so a reader of the same row
+ *    can wait for it.
+ * 5. `flush` settles only when every save it covers has, including one already in flight.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -33,6 +35,8 @@ export interface AutosaveConfig<T> {
   delayMs?: number;
   /** Defaults to `JSON.stringify`. Override only if key order is unstable. */
   serialize?: (draft: T) => string;
+  /** Given the save an unmount sends, which settles when it lands or fails. */
+  onUnmountFlush?: (pending: Promise<void>) => void;
 }
 
 export interface Autosave<T> {
@@ -40,11 +44,13 @@ export interface Autosave<T> {
   /** Publishing and the visibility toggle must await this first, so they never act on the
       pre-edit body. */
   flush: () => Promise<void>;
-  /** `SaveState`'s "Retry" — re-runs the failed PATCH. */
+  /** `SaveState`'s "Retry": re-runs the failed PATCH. */
   retry: () => void;
   /** Adopt a server copy as the baseline after a publish, unpublish or visibility change (each
       bumps `rev`) or a conflict reload, so the next autosave does not 409. */
   markSaved: (rev: number, draft: T) => void;
+  /** The body the server last held as far as this editor knows: what local edits are measured from. */
+  savedDraft: () => T;
 }
 
 export function useAutosave<T>({
@@ -55,7 +61,8 @@ export function useAutosave<T>({
   resync,
   isConflict,
   delayMs = 800,
-  serialize = (value) => JSON.stringify(value)
+  serialize = (value) => JSON.stringify(value),
+  onUnmountFlush
 }: AutosaveConfig<T>): Autosave<T> {
   const [status, setStatus] = useState<SaveStatus>("idle");
   const revRef = useRef(rev);
@@ -64,7 +71,10 @@ export function useAutosave<T>({
   /** What the form showed when it opened; only a change from this schedules a save. */
   const openedRef = useRef(serialize(draft));
   const draftRef = useRef(draft);
-  const savingRef = useRef(false);
+  /** The draft the server holds, as a value; it starts as the form opened, defaults included. */
+  const savedDraftRef = useRef(draft);
+  /** The save cycle in flight, which a second flush waits on. */
+  const cycleRef = useRef<Promise<void> | null>(null);
   const dirtyRef = useRef(false);
   draftRef.current = draft;
 
@@ -75,45 +85,52 @@ export function useAutosave<T>({
   const resyncRef = useRef(resync);
   const conflictRef = useRef(isConflict);
   const serializeRef = useRef(serialize);
+  const unmountRef = useRef(onUnmountFlush);
   saveRef.current = save;
   resyncRef.current = resync;
   conflictRef.current = isConflict;
   serializeRef.current = serialize;
+  unmountRef.current = onUnmountFlush;
 
-  const flush = useCallback(async () => {
-    if (savingRef.current) {
+  const flush = useCallback(async (): Promise<void> => {
+    if (cycleRef.current) {
+      // The cycle in flight runs again once it lands, and it settles after that run too.
       dirtyRef.current = true;
-      return;
+      return cycleRef.current;
     }
-    const snapshot = serializeRef.current(draftRef.current);
+    const value = draftRef.current;
+    const snapshot = serializeRef.current(value);
     if (snapshot === savedRef.current) return;
-    savingRef.current = true;
-    setStatus("saving");
-    try {
-      const nextRev = await saveRef.current(draftRef.current, revRef.current);
-      // Record the pre-await snapshot so an edit made mid-flight stays dirty.
-      savedRef.current = snapshot;
-      openedRef.current = snapshot;
-      revRef.current = nextRev;
-      setStatus("saved");
-    } catch (error) {
-      if (conflictRef.current(error)) {
-        try {
-          revRef.current = await resyncRef.current();
-        } catch {
-          /* keep the stale revision; a later flush retries */
+    const cycle = (async () => {
+      setStatus("saving");
+      try {
+        const nextRev = await saveRef.current(value, revRef.current);
+        // Record the pre-await snapshot so an edit made mid-flight stays dirty.
+        savedRef.current = snapshot;
+        openedRef.current = snapshot;
+        savedDraftRef.current = value;
+        revRef.current = nextRev;
+        setStatus("saved");
+      } catch (error) {
+        if (conflictRef.current(error)) {
+          try {
+            revRef.current = await resyncRef.current();
+          } catch {
+            /* keep the stale revision; a later flush retries */
+          }
+          setStatus("conflict");
+        } else {
+          setStatus("error");
         }
-        setStatus("conflict");
-      } else {
-        setStatus("error");
       }
-    } finally {
-      savingRef.current = false;
+      cycleRef.current = null;
       if (dirtyRef.current) {
         dirtyRef.current = false;
-        void flush();
+        await flush();
       }
-    }
+    })();
+    cycleRef.current = cycle;
+    return cycle;
   }, []);
 
   // "dirty" is set synchronously on the first change. Compare against the draft at open, not
@@ -129,7 +146,8 @@ export function useAutosave<T>({
   flushRef.current = flush;
   useEffect(
     () => () => {
-      if (serializeRef.current(draftRef.current) !== openedRef.current) void flushRef.current();
+      if (serializeRef.current(draftRef.current) !== openedRef.current || cycleRef.current)
+        unmountRef.current?.(flushRef.current());
     },
     []
   );
@@ -141,8 +159,11 @@ export function useAutosave<T>({
     // The server holds this body, and it is also the new unedited mark.
     savedRef.current = serializeRef.current(nextDraft);
     openedRef.current = savedRef.current;
+    savedDraftRef.current = nextDraft;
     setStatus("saved");
   }, []);
 
-  return { status, flush, retry, markSaved };
+  const savedDraft = useCallback(() => savedDraftRef.current, []);
+
+  return { status, flush, retry, markSaved, savedDraft };
 }

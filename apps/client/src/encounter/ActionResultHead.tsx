@@ -31,7 +31,7 @@ export function CheckOutcome({ check }: Readonly<{ check: NonNullable<ActionReso
   return (
     <p className="action-outcome">
       {check.skill}: <strong>{check.total}</strong> (d20 {check.naturalRoll})
-      {check.dc === null ? "" : ` vs DC ${check.dc} - ${check.success ? "success" : "failure"}`}.
+      {check.dc === null ? "" : ` vs DC ${check.dc} · ${check.success ? "success" : "failure"}`}.
     </p>
   );
 }

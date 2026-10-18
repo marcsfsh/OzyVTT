@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { io as connect } from "socket.io-client";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { GAME_PATHS } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import {
   BuilderPolicySchema,
   GameStateSchema,
@@ -60,7 +60,7 @@ const filled = (offer: BuilderOffer, picks: BuilderOffersReply["picks"]) =>
 /**
  * Answers the first open offer with the first options it still allows, as the wizard's path opens, until
  * nothing is open. Ability-score picks rotate so the 20 cap is not what is tested. Unanswerable offers are
- * collected, not thrown, so a failure names them.
+ * collected and reported together, so a failure names them.
  */
 function fillGreedily(classId: string, level: number) {
   const identity = { speciesId: "human", backgroundId: "soldier", classId, level };
@@ -143,6 +143,19 @@ describe("features that raise a budget", () => {
       offers({ speciesId: "human", backgroundId: "soldier", classId: "fighter", level });
     expect(capacityOf(fighter(1), "feature:weapon-mastery")).toBe(3);
     expect(capacityOf(fighter(4), "feature:weapon-mastery")).toBe(4);
+  });
+
+  it("offers Weapon Mastery the kinds of weapon in the Weapons table, and no magic weapon", () => {
+    const options = ids(
+      offerNamed(
+        offers({ speciesId: "human", backgroundId: "soldier", classId: "fighter", level: 1 }),
+        "feature:weapon-mastery"
+      )
+    );
+    expect(options).toEqual(expect.arrayContaining(["longsword", "dagger", "battleaxe", "longbow"]));
+    expect(options).not.toContain("berserker-axe");
+    expect(options).not.toContain("dagger-of-venom");
+    expect(options).not.toContain("weapon-1");
   });
 });
 

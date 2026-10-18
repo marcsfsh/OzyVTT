@@ -7,7 +7,14 @@ import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect } from "../effec
 import { putOutFire } from "../hazards.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
-import { abilityModifier, recordRoll, type DefinitionAction, type ResolveContext } from "./context.js";
+import {
+  abilityModifier,
+  endedEffect,
+  recordRoll,
+  tableLineOf,
+  type DefinitionAction,
+  type ResolveContext
+} from "./context.js";
 
 /** What the declarative action vocabulary can't express about a builtin action (`builtin-actions.ts`),
  *  one hook per moment of a resolve. A hook runs only for an action taken from the builtin catalog, so a
@@ -49,7 +56,8 @@ export function rollCheck(
   const warded = ctx.deps.resolveDefinition
     ? wardedConditions(ctx.state, ctx.attacker, {
         resolveDefinition: ctx.deps.resolveDefinition,
-        ...(ctx.deps.distanceFeet ? { distanceFeet: ctx.deps.distanceFeet } : {})
+        ...(ctx.deps.distanceFeet ? { distanceFeet: ctx.deps.distanceFeet } : {}),
+        ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
       })
     : [];
   const plan = checkPlan(ctx.attacker, ctx.deps.definition, ctx.derivation, subject, {
@@ -95,7 +103,9 @@ function chosenSubject(ctx: ResolveContext, ability: CheckSubject["ability"]): C
   if (skill === undefined) return { ability };
   const skillAbility = skills[skill];
   if (skillAbility === undefined)
-    throw new CommandRejectedError(`${ctx.action.name} uses ${Object.keys(skills).join(", ")}, not ${skill}.`);
+    throw new CommandRejectedError(
+      `${ctx.action.name} uses ${Object.keys(skills).join(", ")}, and ${skill} is not one of them.`
+    );
   return { ability: skillAbility, skill };
 }
 
@@ -167,7 +177,7 @@ function escapeGrapple(ctx: ResolveContext): void {
   // What the escape would end, for a rider that helps against it (Powerful Build: "to end the Grappled condition").
   if (rollCheck(ctx, subject, escapable.escapeDc, undefined, escapable.linkedConditionIds)) {
     endEffect(state, attacker.id, escapable.id);
-    ctx.effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name: escapable.name });
+    ctx.effectsEnded.push(endedEffect(attacker, escapable));
   }
 }
 
@@ -181,8 +191,8 @@ function rollOnTheGround(ctx: ResolveContext): void {
       ...(deps.catalog ? { catalog: deps.catalog } : {})
     }
   });
-  for (const name of ended) ctx.effectsEnded.push({ actorId: attacker.id, actorName: attacker.name, name });
-  for (const event of events) ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+  for (const effect of ended) ctx.effectsEnded.push(endedEffect(attacker, effect));
+  for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */
@@ -227,7 +237,7 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
-    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet - move the token.`);
+    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet. Move the token.`);
     ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
   };
 }

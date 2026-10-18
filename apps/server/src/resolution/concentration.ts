@@ -5,7 +5,7 @@ import { laterRowOf, laterSpellActionId } from "../item-actions.js";
 import { castThisTurnKey } from "../lasting-spells.js";
 import { endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
-import type { ResolveContext } from "./context.js";
+import { tableLineOf, type ResolveContext } from "./context.js";
 
 /** A spell's printed duration as an effect duration: up to ten minutes counts rounds; longer ones last until
  *  ended (the engine keeps no clock outside a fight). */
@@ -26,8 +26,8 @@ export function spellOf(ctx: Pick<ResolveContext, "action" | "deps">): SpellRefe
 /** The level this resolve casts its spell at: the slot it spends, else the spell's own. */
 const castLevelOf = (ctx: ResolveContext, spell: SpellReference) => ctx.plan.castLevel ?? spell.level;
 
-/** Whether this action is one of what the spell lets its caster do later (Spirit Guardians' save, moving Hex), not a
- *  cast of it. */
+/** Whether this action is one of the things the spell lets its caster do later (Spirit Guardians' save, moving Hex).
+ *  Such an action is no new cast. */
 const isLaterAction = (ctx: ResolveContext, spell: SpellReference) => laterRowOf(spell, ctx.action.id) !== undefined;
 
 /**
@@ -76,7 +76,7 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
     conditionIds: []
   });
   // The previous Concentration ending is the table's news.
-  for (const event of ended) ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+  for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /** Marks the cast on its caster's own turn when the spell has something taken only on later turns. */

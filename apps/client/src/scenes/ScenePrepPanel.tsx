@@ -4,7 +4,7 @@ import { Button, IconPlus, useToast } from "@vtt/ui";
 import { EncounterBudgetLine } from "../encounter/EncounterBudget";
 import { MonsterBrowser } from "../encounter/MonsterBrowser";
 import { MapPicker, type PickerMap } from "../maps/MapPicker";
-import type { MapSelection } from "../maps/MapManager";
+import type { MapSelection } from "../maps/map-catalog";
 import { StagingTray, type StagingEntry } from "./StagingTray";
 import { command } from "../lib/command";
 import { useConfirm } from "../components/feedback";
@@ -35,12 +35,16 @@ export function ScenePrepPanel({
   mapToken,
   mapFallback,
   onMapUploaded,
+  onSetGrid,
+  mapNeedsGrid = false,
   stagingRevealed,
   combatActive,
   busy = false,
   footer,
   emptyNote,
-  placementHint
+  placementHint,
+  hideMap = false,
+  onPlace
 }: Readonly<{
   /** The panel's own title. Omit when the surface already has one. */
   heading?: string;
@@ -62,6 +66,10 @@ export function ScenePrepPanel({
   mapFallback?: readonly MapSelection[];
   /** A map was uploaded from the picker, so the caller's copy of the library is stale. */
   onMapUploaded?: (map: PickerMap) => void;
+  /** Opens a map's grid calibration; offered for a map with no grid. */
+  onSetGrid?: (mapId: string) => void;
+  /** The chosen map has no grid yet, so tokens on it won't snap. */
+  mapNeedsGrid?: boolean;
   /** `GameState.stagingDefaults.visibility === "public"`: the tray toggle's starting state. */
   stagingRevealed: boolean;
   combatActive: boolean;
@@ -69,6 +77,10 @@ export function ScenePrepPanel({
   footer?: ReactNode;
   emptyNote: string;
   placementHint?: boolean;
+  /** A scene's own page shows its map elsewhere, so the panel leaves the map line out. */
+  hideMap?: boolean;
+  /** Arms the map to place a staged token at the next spot pressed. */
+  onPlace?: (actorId: string) => void;
 }>) {
   const [browsing, setBrowsing] = useState(false);
   const [pickingMap, setPickingMap] = useState(false);
@@ -138,22 +150,34 @@ export function ScenePrepPanel({
     <div className="scene-prep">
       {heading && <h3 className="scene-prep-heading">{heading}</h3>}
 
-      <div className="scene-prep-map">
-        <span className="scene-prep-map-name">
-          Map: <strong>{mapName ?? "None yet"}</strong>
-        </span>
-        {!mapLocked && onSelectMap && (
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-expanded={pickingMap}
-            onClick={() => setPickingMap((open) => !open)}
-          >
-            {pickingMap ? "Done" : mapName ? "Change" : "Pick a map"}
-          </Button>
-        )}
-      </div>
+      {!hideMap && (
+        <div className="scene-prep-map">
+          <span className="scene-prep-map-name">
+            Map: <strong>{mapName ?? "None yet"}</strong>
+          </span>
+          {!mapLocked && onSelectMap && (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-expanded={pickingMap}
+              onClick={() => setPickingMap((open) => !open)}
+            >
+              {pickingMap ? "Done" : mapName ? "Change" : "Pick a map"}
+            </Button>
+          )}
+        </div>
+      )}
       {mapNote && pickingMap && <p className="scene-prep-note">{mapNote}</p>}
+      {mapNeedsGrid && !pickingMap && selectedMapId && !hideMap && (
+        <p className="scene-prep-note scene-prep-grid">
+          This map has no grid yet. Tokens still go on it but won't snap to squares.
+          {onSetGrid && (
+            <Button variant="secondary" size="sm" onClick={() => onSetGrid(selectedMapId)}>
+              Set the grid
+            </Button>
+          )}
+        </p>
+      )}
       {pickingMap && !mapLocked && onSelectMap && (
         <MapPicker
           token={mapToken}
@@ -166,6 +190,7 @@ export function ScenePrepPanel({
             if (!meta?.fromUpload) setPickingMap(false);
           }}
           onUploaded={onMapUploaded}
+          {...(onSetGrid ? { onSetGrid } : {})}
         />
       )}
 
@@ -178,6 +203,7 @@ export function ScenePrepPanel({
         busy={busy}
         emptyNote={emptyNote}
         placementHint={placementHint}
+        {...(onPlace ? { onPlace: (entry: StagingEntry) => onPlace(entry.actorId) } : {})}
       />
       <EncounterBudgetLine actors={actors} staged={staged} />
 

@@ -10,9 +10,17 @@ import type {
 import { setTemplatePlacement, toggleTarget, type TargetingSession } from "../encounter/targeting";
 import type { GridCalibration } from "./gridPreview";
 import { imagePointFromClient } from "./mapImage";
-import type { MapTool } from "./mapTools";
+import { isVisionTool, type MapTool } from "./mapTools";
 import type { MapCommands } from "./useMapCommands";
-import { anchoredCamera, clampZoom, imageAtFraction, MAP_OVERLAYS, type MapView, type Point } from "./useMapView";
+import {
+  anchoredCamera,
+  clampZoom,
+  imageAtFraction,
+  MAP_OVERLAYS,
+  viewSize,
+  type MapView,
+  type Point
+} from "./useMapView";
 
 type AnyAnnotation = Annotation | PlayerAnnotation;
 
@@ -32,6 +40,7 @@ export type Gesture =
   | Readonly<{ kind: "measure" | AnnotationShapeKind; origin: Point; current: Point }>
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
   | Readonly<{ kind: "terrain"; op: "difficult" | "clear"; origin: Point; current: Point }>
+  | Readonly<{ kind: "wall"; wallKind: "wall" | "door" | "window"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
   | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>
   /** Two fingers. Every field is read when the pinch begins and never updated, so zoom is absolute
@@ -52,9 +61,9 @@ const TAP_SLOP = 8;
 
 /**
  * Pointer and keyboard handling for the map stage: token drags (and the tray's tap-to-place), pan,
- * pinch, measuring and shapes, fog strokes, moving and resizing a shape, template placement, and the
- * token menu by right-click or long press. Nothing is sent until a gesture ends, and a second finger
- * abandons the gesture underneath.
+ * pinch, measuring and shapes, fog strokes, walls and lights, doors, moving and resizing a shape, template
+ * placement, and the token menu by right-click or long press. Nothing is sent until a gesture ends, and a second
+ * finger abandons the gesture underneath.
  */
 export function useMapGestures({
   role,
@@ -74,7 +83,13 @@ export function useMapGestures({
   tokensById,
   resetKey,
   onSelect,
-  onContextMenu: openMenu
+  onContextMenu: openMenu,
+  onPlaceLight,
+  onTokenPress,
+  readOnly = false,
+  armedActorId = null,
+  onPlaceArmed,
+  onMapMenu
 }: Readonly<{
   role: "gm" | "player";
   tool: MapTool;
@@ -96,6 +111,17 @@ export function useMapGestures({
   resetKey: string;
   onSelect: (annotationId: string | null) => void;
   onContextMenu: (menu: Readonly<{ actorId: string; x: number; y: number }>) => void;
+  /** The GM's Light tool: a tap places the chosen light there. */
+  onPlaceLight?: (point: Point) => void;
+  /** A token pressed with the Select tool, or opened for its menu. */
+  onTokenPress?: (actorId: string) => void;
+  /** The map only shows: a drag pans and two fingers zoom, and nothing is sent. */
+  readOnly?: boolean;
+  /** A creature waiting to be placed: the next press on the map puts it there (button, then click). */
+  armedActorId?: string | null;
+  onPlaceArmed?: (point: Point) => void;
+  /** A right-click or a long press on an empty spot: the menu of what can go there. */
+  onMapMenu?: (menu: Readonly<{ point: Point; x: number; y: number }>) => void;
 }>) {
   const { camera, setCamera, boxFraction } = view;
   const { busyActorId, setMessage } = commands;
@@ -104,7 +130,7 @@ export function useMapGestures({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
    * Live touch points by `pointerId`. Every other gesture is single-pointer via `setPointerCapture`,
-   * so without this a second finger is invisible. Mirrors the Codex atlas (`codex/MapSurface.tsx`).
+   * so without this a second finger is invisible. Mirrors the Codex atlas (`codex/atlas/AtlasMap.tsx`).
    * Mouse pointers are never tracked: a mouse cannot pinch, and an untracked pointer can never be
    * mistaken for a pinch's second finger.
    */
@@ -165,18 +191,69 @@ export function useMapGestures({
     }
   };
   const openContextMenuFor = (actorId: string, x: number, y: number) => {
+    onTokenPress?.(actorId);
     if (!actors.has(actorId)) return;
     if (role === "player" && !canMove(actorId)) return; // players only act on their own claimed token
     onSelect(null);
     openMenu({ actorId, x, y });
   };
-  // Mouse right-click opens the token menu; touch uses a long press started in beginGesture.
+  // Mouse right-click opens the token menu, or off a token the spot's menu; touch uses a long press started in
+  // beginGesture.
   const onContextMenu = (event: MouseEvent<HTMLDivElement>) => {
+    if (readOnly) return;
     const actorId = (event.target as Element).closest<HTMLElement>("[data-token-id]")?.dataset.tokenId;
-    if (!actorId || !tokensById.has(actorId)) return; // let the browser's default menu show off-token
+    if (!actorId || !tokensById.has(actorId)) {
+      const point =
+        onMapMenu && !(event.target as Element).closest(MAP_OVERLAYS)
+          ? pointFromScreen(event.clientX, event.clientY)
+          : null;
+      // Off the map, the browser's own menu shows.
+      if (!point || !onMapMenu) return;
+      event.preventDefault();
+      onSelect(null);
+      onMapMenu({ point, x: event.clientX, y: event.clientY });
+      return;
+    }
     if (role === "player" && !canMove(actorId)) return;
     event.preventDefault();
     openContextMenuFor(actorId, event.clientX, event.clientY);
+  };
+  /** Pans from an empty spot (or anywhere on a map that only shows). A finger held still opens the spot's menu. */
+  const startPan = (event: PointerEvent<HTMLDivElement>) => {
+    const svg = svgRef.current;
+    if (!svg || !size || !(event.target as Element).closest("svg")) return;
+    onSelect(null);
+    event.preventDefault();
+    capturePointer(event);
+    const rect = svg.getBoundingClientRect();
+    const shown = viewSize(size, view.box, camera.zoom);
+    setGesture({
+      kind: "pan",
+      startClient: { x: event.clientX, y: event.clientY },
+      startCenter: camera.center,
+      scaleX: shown.width / rect.width,
+      scaleY: shown.height / rect.height
+    });
+    const point =
+      onMapMenu && !readOnly && event.pointerType === "touch" ? pointFromScreen(event.clientX, event.clientY) : null;
+    if (point && onMapMenu) {
+      const captureEl = event.currentTarget,
+        pointerId = event.pointerId,
+        startX = event.clientX,
+        startY = event.clientY;
+      clearLongPress();
+      longPressRef.current = { startX, startY };
+      longPressTimerRef.current = setTimeout(() => {
+        clearLongPress();
+        try {
+          captureEl.releasePointerCapture(pointerId);
+        } catch {
+          /* pointer already released */
+        }
+        setGesture(null);
+        onMapMenu({ point, x: startX, y: startY });
+      }, 500);
+    }
   };
 
   const beginGesture = (event: PointerEvent<HTMLDivElement>) => {
@@ -211,6 +288,18 @@ export function useMapGestures({
       );
       return;
     }
+    if (readOnly) {
+      startPan(event);
+      return;
+    }
+    // A creature armed from outside the map goes where the map is pressed next.
+    if (armedActorId && onPlaceArmed) {
+      const point = pointFromScreen(event.clientX, event.clientY);
+      if (!point) return;
+      event.preventDefault();
+      onPlaceArmed(point);
+      return;
+    }
     if (tool === "ping") {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
@@ -227,6 +316,40 @@ export function useMapGestures({
       capturePointer(event);
       onSelect(null);
       setGesture({ kind: activeTargeting.template.shape, origin: point, current: point });
+      return;
+    }
+    // A door's handle opens or closes it (the GM's any, a player's beside their character, which the server checks).
+    const door = target.closest("[data-door-id]");
+    if (tool === "select" && door) {
+      event.preventDefault();
+      const doorId = door.getAttribute("data-door-id")!;
+      void commands.setDoorOpen(doorId, door.getAttribute("data-door-open") !== "true");
+      return;
+    }
+    if (role === "gm" && isVisionTool(tool)) {
+      const point = pointFromScreen(event.clientX, event.clientY);
+      if (!point) return;
+      event.preventDefault();
+      if (tool === "vision-erase") {
+        const wallId = target.closest("[data-wall-id]")?.getAttribute("data-wall-id");
+        const lightId = target.closest("[data-light-id]")?.getAttribute("data-light-id");
+        if (wallId) void commands.removeWall(wallId);
+        else if (lightId) void commands.removeLight(lightId);
+        else setMessage("Tap a wall, door, window or light to remove it.");
+        return;
+      }
+      if (tool === "vision-light") {
+        onPlaceLight?.(point);
+        return;
+      }
+      capturePointer(event);
+      setMessage("");
+      setGesture({
+        kind: "wall",
+        wallKind: tool === "vision-door" ? "door" : tool === "vision-window" ? "window" : "wall",
+        origin: point,
+        current: point
+      });
       return;
     }
     const handleId = target.closest<HTMLElement>("[data-annotation-handle]")?.dataset.annotationHandle;
@@ -272,6 +395,7 @@ export function useMapGestures({
       return;
     }
     if (tool === "select" && tokenId && tokensById.has(tokenId)) {
+      onTokenPress?.(tokenId);
       if (!canMove(tokenId)) return;
       event.preventDefault();
       capturePointer(event);
@@ -331,7 +455,13 @@ export function useMapGestures({
       });
       return;
     }
-    if (tool !== "select" && tool !== "terrain-difficult" && tool !== "terrain-clear" && calibration) {
+    if (
+      tool !== "select" &&
+      tool !== "terrain-difficult" &&
+      tool !== "terrain-clear" &&
+      !isVisionTool(tool) &&
+      calibration
+    ) {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();
@@ -341,19 +471,7 @@ export function useMapGestures({
       return;
     }
     // Empty background in select mode: deselect + pan.
-    const svg = svgRef.current;
-    if (tool !== "select" || !svg || !size || !(event.target as Element).closest("svg")) return;
-    onSelect(null);
-    event.preventDefault();
-    capturePointer(event);
-    const rect = svg.getBoundingClientRect();
-    setGesture({
-      kind: "pan",
-      startClient: { x: event.clientX, y: event.clientY },
-      startCenter: camera.center,
-      scaleX: size.width / camera.zoom / rect.width,
-      scaleY: size.height / camera.zoom / rect.height
-    });
+    if (tool === "select") startPan(event);
   };
   const continueGesture = (event: PointerEvent<HTMLDivElement>) => {
     if (pointers.current.has(event.pointerId))
@@ -366,16 +484,21 @@ export function useMapGestures({
       if (!first || !second || gesture.startDist <= 0) return;
       const focus = boxFraction((first.x + second.x) / 2, (first.y + second.y) / 2);
       if (!focus || !size) return;
-      const anchor = imageAtFraction(size, gesture.startFocus, {
+      const anchor = imageAtFraction(size, view.box, gesture.startFocus, {
         center: gesture.startCenter,
         zoom: gesture.startZoom
       });
       setCamera(
         anchoredCamera(
           size,
+          view.box,
           anchor,
           focus,
-          clampZoom(gesture.startZoom * (Math.hypot(first.x - second.x, first.y - second.y) / gesture.startDist))
+          clampZoom(
+            gesture.startZoom * (Math.hypot(first.x - second.x, first.y - second.y) / gesture.startDist),
+            size,
+            view.box
+          )
         )
       );
       return;
@@ -393,6 +516,12 @@ export function useMapGestures({
       return;
     }
     if (gesture.kind === "pan") {
+      if (
+        longPressRef.current &&
+        (Math.abs(event.clientX - longPressRef.current.startX) > TAP_SLOP ||
+          Math.abs(event.clientY - longPressRef.current.startY) > TAP_SLOP)
+      )
+        clearLongPress();
       const dx = (event.clientX - gesture.startClient.x) * gesture.scaleX;
       const dy = (event.clientY - gesture.startClient.y) * gesture.scaleY;
       setCamera((current) => ({
@@ -419,8 +548,8 @@ export function useMapGestures({
   const finishGesture = (event: PointerEvent<HTMLDivElement>) => {
     pointers.current.delete(event.pointerId);
     clearLongPress();
-    /* A pinch commits nothing. Lifting one of two fingers ends the pinch rather than turning the
-       remaining finger into a pan (as on the Codex atlas). */
+    /* A pinch commits nothing. Lifting one of two fingers ends the pinch, and the remaining finger
+       starts no pan (as on the Codex atlas). */
     if (gesture?.kind === "pinch") {
       event.preventDefault();
       dropCapture(event.currentTarget, event.pointerId);
@@ -491,12 +620,18 @@ export function useMapGestures({
       commands.paintTerrain(op, origin, current);
       return;
     }
+    if (gesture.kind === "wall") {
+      const { wallKind, origin, current } = gesture;
+      setGesture(null);
+      commands.addWall(wallKind, origin, current);
+      return;
+    }
     if (gesture.kind === "measure") {
       setGesture(null);
       void commands.addAnnotation("measurement", undefined, gesture.origin, gesture.current);
       return;
     }
-    // A shape drawn while placing an area template goes on the targeting session, not into annotations;
+    // A shape drawn while placing an area template goes on the targeting session and stays out of annotations;
     // the server draws the real blast when the action resolves.
     if (activeTargeting?.mode === "template") {
       const { origin, current } = gesture;

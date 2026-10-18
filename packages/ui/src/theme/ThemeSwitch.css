@@ -1,0 +1,33 @@
+/* The app bar's theme switch: a square trigger at the 44px floor, and the four themes as a menu of choices. */
+.nh-theme-switch {
+  flex: none;
+}
+.nh-theme-switch-trigger {
+  width: var(--tap-min);
+  padding: 0;
+  font-size: 1.15rem;
+  color: var(--text-dim);
+}
+.nh-theme-switch-trigger:hover,
+.nh-theme-switch-trigger:active,
+.nh-theme-switch[open] .nh-theme-switch-trigger {
+  color: var(--text);
+}
+.nh-theme-switch-trigger .nh-menu-trigger-label {
+  display: grid;
+  place-items: center;
+}
+/* The client's `button span` rule would push the name down and dim it; the name states its own ink. */
+.nh-theme-switch-name {
+  flex: 1;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+}
+.nh-theme-switch .nh-menu-item[aria-checked="true"] {
+  color: var(--text);
+}
+.nh-theme-switch .nh-menu-item[aria-checked="true"] .nh-menu-item-icon,
+.nh-theme-switch-check {
+  color: var(--cyan-hi);
+}

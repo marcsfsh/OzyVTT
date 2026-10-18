@@ -67,7 +67,7 @@ describe("archived characters are refused by every staging door (server-side, no
         GEOMETRY
       )
     ).toThrow(/Retired Hero is archived/);
-    // Rejected, not silently filtered: the GM's selection must not lie back to them.
+    // Rejected outright: the GM's selection must not lie back to them.
     expect(game.combat.scenes).toHaveLength(0);
   });
 
@@ -159,7 +159,7 @@ describe("an archived character is deletable even while a stale claim clings to 
     const game = state({ retiredClaimedBy: IDS.player });
     removeActor(game, IDS.retired);
     expect(game.actors.map((actor) => actor.id)).not.toContain(IDS.retired);
-    // The character's own imported sheet goes with it - nothing references it any more.
+    // The character's own imported sheet goes with it: nothing references it any more.
     expect(game.definitions.map((entry) => entry.id)).not.toContain(`import-${IDS.retired}`);
   });
 

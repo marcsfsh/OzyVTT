@@ -1,22 +1,34 @@
 import { useState } from "react";
-import { rosterActors, type PlayerView } from "@vtt/domain";
-import { Avatar, Badge, Button, useToast } from "@vtt/ui";
+import { rosterActors, type PlayerActor, type PlayerView } from "@vtt/domain";
+import { Alert, Avatar, Badge, Button, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { PdfImportModal } from "./PdfImportModal";
 import { CLAIM_WORD, claimStateOf } from "./actor-display";
 import { command } from "../lib/command";
+import { noteClaimReleased, useClaimReleased } from "../lib/claim-notice";
+import { navigate } from "../router";
 import "./claim-character.css";
 
 /**
- * The table view for a player who has not claimed a character yet.
- * A player's projection carries no definition for characters they do not own, so a card shows only
- * portrait, name and claim state.
+ * "Dwarf Fighter 7 · HP 74": who a character is, from what the projection gives an unclaimed character (its species
+ * and class line, and a player character's exact hit points). Parts the sheet doesn't record are left out.
+ */
+export function pickLine(actor: PlayerActor): string {
+  const who = [actor.species, actor.classLine].filter(Boolean).join(" ");
+  const hp = actor.hp.kind === "exact" ? `HP ${actor.hp.maximum}` : null;
+  return [who, hp].filter(Boolean).join(" · ");
+}
+
+/**
+ * The table view for a player who has not claimed a character yet: each character with who they are, and Claim.
+ * A character claimed on another device says so, with what to do. After a claim the player lands on My character.
  */
 export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
   const [claiming, setClaiming] = useState<string | null>(null);
   const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
+  const released = useClaimReleased();
   // Excludes a launched replay's clones: they are unowned and would look claimable. The server
   // refuses such a claim anyway (character-claims.ts).
   const characters = rosterActors(state.actors).filter((actor) => actor.kind === "player-character");
@@ -25,7 +37,7 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
     if (
       !(await confirm({
         title: `Claim ${name}?`,
-        body: "You'll play them at this table until you release them.",
+        body: `You play ${name} at this table until you release ${name}.`,
         confirmLabel: "Claim"
       }))
     )
@@ -33,8 +45,12 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
     setClaiming(actorId);
     const result = await command("character:claim", { actorId, expectedRevision: state.revision });
     setClaiming(null);
-    if (result.ok) toast(`You're playing ${name}.`, { tone: "success" });
-    else toast(result.message ?? `Couldn't claim ${name} — someone may have claimed them first.`, { tone: "error" });
+    if (result.ok) {
+      noteClaimReleased(null);
+      toast(`You're playing ${name}.`, { tone: "success" });
+      navigate("/me");
+    } else
+      toast(result.message ?? `Couldn't claim ${name}. Someone may have claimed ${name} first.`, { tone: "error" });
   };
 
   /* A scroll region at every width, so the picker never pushes the map down its column. */
@@ -44,6 +60,11 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
         <h2 id="claim-heading">Choose your character</h2>
         <p>Pick who you'll play at the table.</p>
       </div>
+      {released && (
+        <Alert tone="info" title={`The GM released ${released.name}`}>
+          Choose a character to keep playing.
+        </Alert>
+      )}
       {characters.length === 0 ? (
         <div className="nh-empty">
           <span className="nh-empty-title">Nothing to claim yet</span>
@@ -56,20 +77,32 @@ export function ClaimCharacter({ state }: Readonly<{ state: PlayerView }>) {
           {characters.map((actor) => {
             const claimState = claimStateOf(actor);
             const taken = claimState === "claimed";
+            const line = pickLine(actor);
             return (
-              <li key={actor.id} className="claim-card">
+              <li key={actor.id} className={`claim-card${taken ? " is-taken" : ""}`}>
                 <Avatar name={actor.name} size="lg" />
-                <h3 className="claim-card-name">{actor.name}</h3>
-                <Badge tone={taken ? "info" : "neutral"}>{CLAIM_WORD[claimState]}</Badge>
-                <Button
-                  variant="primary"
-                  block
-                  className="claim-card-action"
-                  disabled={taken || claiming !== null}
-                  onClick={() => claim(actor.id, actor.name)}
-                >
-                  {claiming === actor.id ? "Claiming…" : taken ? "Claimed" : "Claim"}
-                </Button>
+                <div className="claim-card-text">
+                  <h3 className="claim-card-name">{actor.name}</h3>
+                  {line && <span className="claim-card-line">{line}</span>}
+                </div>
+                {taken ? (
+                  <>
+                    <Badge tone="info">{CLAIM_WORD[claimState]}</Badge>
+                    <p className="claim-card-taken">Claimed on another device. Ask the GM to release it.</p>
+                  </>
+                ) : (
+                  // Secondary: every card has one, and a view has at most one primary.
+                  <Button
+                    variant="secondary"
+                    block
+                    className="claim-card-action"
+                    aria-label={`Claim ${actor.name}`}
+                    disabled={claiming !== null}
+                    onClick={() => claim(actor.id, actor.name)}
+                  >
+                    {claiming === actor.id ? "Claiming…" : "Claim"}
+                  </Button>
+                )}
               </li>
             );
           })}

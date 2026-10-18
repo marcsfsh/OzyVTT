@@ -25,7 +25,7 @@ import { holdsFeature } from "./class-features.js";
 import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
-import { holyWardClaim, inPaladinAura, type AuraContext } from "./paladin-auras.js";
+import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
 import {
@@ -164,8 +164,8 @@ export function auraBonusOf(paladin: Actor, definition: ActorDefinition | undefi
 /**
  * SRD Aura of Protection: "You and your allies in the aura gain a bonus to saving throws equal to your Charisma
  * modifier (minimum bonus of +1)", in a 10-foot Emanation (30 feet with Aura Expansion). A creature benefits from one
- * aura at a time, so the best counts. A hidden Paladin's aura never shows on a visible creature's save, which would
- * reveal it.
+ * aura at a time, so the best counts. A Paladin hidden from the table (the shared check: GM-only, out of every
+ * character's sight or under the fog) never shows its aura on a visible creature's save, which would reveal it.
  */
 export function auraOfProtection(
   state: GameState,
@@ -173,10 +173,12 @@ export function auraOfProtection(
   context: AuraContext
 ): Readonly<{ amount: number; source: string }> | null {
   let best: { amount: number; source: string } | null = null;
+  const hidden = tableHiddenCheck(state, context);
   for (const paladin of state.actors) {
+    // Only a Paladin with the aura is asked about, so a table with none builds no sight.
     const definition = paladin.definitionId ? context.resolveDefinition(paladin.definitionId) : undefined;
     const amount = auraBonusOf(paladin, definition);
-    if (amount === null || !inPaladinAura(paladin, definition, target, context)) continue;
+    if (amount === null || !inPaladinAura(state, paladin, definition, target, context, hidden)) continue;
     if (!best || amount > best.amount)
       best = {
         amount,
@@ -222,7 +224,7 @@ function traitSaveClaims(
   state: GameState,
   target: Actor,
   definition: ActorDefinition | undefined,
-  deps: Pick<SaveAnswerDependencies, "resolveDefinition" | "distanceFeet">
+  deps: Pick<SaveAnswerDependencies, "resolveDefinition" | "distanceFeet" | "catalog">
 ): Array<{ source: string; label: string }> {
   const bloodied = target.hp.current > 0 && target.hp.current * 2 <= target.hp.maximum;
   const authority = auraOfAuthority(state, target, deps);
@@ -437,7 +439,7 @@ export function applyFailureEffect(
       sourceName: onFail.sourceName,
       sourceActionId: onFail.sourceActionId ?? null,
       startedRound: state.combat.round,
-      // "Until the end of the current turn": this turn's end, not the next one's.
+      // "Until the end of the current turn": the end of this turn.
       duration:
         onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
@@ -487,7 +489,7 @@ function pushOnFailure(
     return [
       {
         kind: "effect",
-        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName} - move the token.`,
+        text: `${target.name} is pushed ${push.feet} feet straight away from ${pending.sourceName}. Move the token.`,
         actorId: target.id,
         gmOnly: true
       }
@@ -631,7 +633,10 @@ export function answerSave(
     if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
       sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
-    const ward = holyWardClaim(state, target, pending.sourceActorId, deps.resolveDefinition);
+    const ward = holyWardClaim(state, target, pending.sourceActorId, {
+      resolveDefinition: deps.resolveDefinition,
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    });
     if (ward) sources.advantage.push(ward);
     const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
@@ -681,7 +686,7 @@ export function answerSave(
 
   let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc);
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
-  // the flag; the pool rides actionUses["legendary-resistance"] and a long rest re-arms it.
+  // the flag; the pool rides actionUses["legendary-resistance"] and a Long Rest re-arms it.
   let legendaryNote: string | null = null;
   if (legendaryResistance) {
     if (!commit) throw new CommandRejectedError("Commit the save to spend Legendary Resistance.");
@@ -812,7 +817,7 @@ export function answerSave(
       }
     );
     appliedDamage = outcome.application.totalApplied;
-    // Keep the whole application, not just its total.
+    // Keep the whole application along with its total.
     application = outcome.application;
     events.push(...outcome.events);
     // A spell area that stops after so much damage counts it (Guardian of Faith).
@@ -847,7 +852,15 @@ export function answerSave(
     events.push(
       ...applyFailureEffect(state, target.id, pending.onSuccessEffect, `${commandId}:${saveId}:success`, immunities)
     );
-  if (!success && pending.failureNote) events.push({ kind: "effect", text: pending.failureNote, actorId: target.id });
+  // The note can name the source (Heat Metal's "until the start of the caster's next turn"), so it carries it to be
+  // masked when hidden.
+  if (!success && pending.failureNote)
+    events.push({
+      kind: "effect",
+      text: pending.failureNote,
+      actorId: target.id,
+      ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
+    });
   if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
@@ -907,7 +920,7 @@ export function answerSave(
   };
 }
 
-/** Drop a pending save without resolving it (GM housekeeping - e.g. the effect ended). */
+/** Drop a pending save without resolving it (GM housekeeping, e.g. the effect ended). */
 export function dismissSave(state: GameState, saveId: string, scope: Initiator) {
   requireGm(scope, "Only the GM can dismiss a saving throw.");
   if (!state.combat.pendingSaves.some((entry) => entry.id === saveId))

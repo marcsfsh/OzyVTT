@@ -1,0 +1,800 @@
+/* A page: the header over the document and its metadata panel on a laptop; one column that scrolls on a phone. */
+
+.cx-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cx-page-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6) var(--space-2);
+  border-bottom: 1px solid var(--line-strong);
+  flex: none;
+}
+.cx-page-headmain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cx-page-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.cx-crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.2 var(--font-label);
+}
+.cx-crumb {
+  min-height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.cx-crumb:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+.cx-crumb-sep {
+  width: 0.9em;
+  height: 0.9em;
+}
+.cx-crumb-here {
+  color: var(--text);
+}
+.cx-page-titlerow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cx-page-title {
+  margin: 0;
+  font: 400 var(--fs-h2) / 1.15 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--heading-ink);
+  text-shadow: var(--heading-shadow);
+}
+.cx-page-title.is-phone {
+  font-size: var(--fs-h3);
+}
+.cx-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.6rem;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.cx-visline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.cx-seeas {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-left: var(--space-2);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cx-seeas-banner,
+.cx-newbanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1));
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+}
+.cx-newbanner {
+  border-bottom-color: var(--magenta);
+  background: color-mix(in srgb, var(--magenta) 12%, var(--surface-1));
+}
+.cx-page-notice {
+  padding: var(--space-2) var(--space-6) 0;
+}
+.cx-page-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cx-page-cols.is-writing {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+@media (min-width: 1280px) {
+  .cx-page-cols {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+  .cx-page-cols.is-writing {
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+}
+.cx-page-docscroll {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.cx-doc {
+  max-width: 50rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6) calc(var(--space-10) + env(safe-area-inset-bottom));
+  color: var(--text);
+}
+.cx-doc-text {
+  font: 400 var(--fs-body) / var(--lh-body) var(--font-body);
+}
+.cx-doc-text p {
+  color: var(--text);
+}
+/* What reached the reader since they last read the page: a magenta edge, and the word in the banner. */
+.cx-doc-text.is-new {
+  margin-left: calc(-1 * var(--space-3));
+  padding-left: calc(var(--space-3) - 3px);
+  border-left: 3px solid var(--magenta);
+}
+.cx-page-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-4) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+  border-left: 1px solid var(--line-strong);
+  background: var(--surface-1);
+  overscroll-behavior: contain;
+}
+.cx-page-loading,
+.cx-page-missing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-6);
+}
+
+/* ----- The metadata panel ----- */
+.cx-meta-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cx-meta-fields {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.cx-meta-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px dashed var(--line);
+}
+.cx-meta-row dd {
+  margin: 0;
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.35 var(--font-body);
+}
+.cx-meta-row.is-hidden {
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--rim-gm);
+  background: color-mix(in srgb, var(--rim-gm) 10%, transparent);
+}
+.cx-meta-row.is-hidden dd {
+  color: var(--violet-hi);
+}
+.cx-meta-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.5 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+/* A field's Hidden word sits under its label, so the label keeps its line. */
+dt.cx-meta-key {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+dt.cx-meta-key .cx-meta-hidden {
+  margin-inline-start: 0;
+  font-size: var(--fs-2xs);
+}
+.cx-meta-hidden {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  margin-inline-start: auto;
+  color: var(--violet-hi);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}
+.cx-meta-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cx-meta-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cx-meta-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--indigo);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.2 var(--font-body);
+  text-align: start;
+  cursor: pointer;
+}
+.cx-meta-link:hover {
+  border-color: var(--rim-color-hi);
+}
+.cx-meta-link.is-hidden {
+  border-left-color: var(--rim-gm);
+}
+.cx-meta-link-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-meta-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cx-meta-chips .cx-meta-link {
+  width: auto;
+}
+.cx-meta-map {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.cx-tag {
+  position: relative;
+  min-height: 1.9rem;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-raised);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  cursor: pointer;
+}
+.cx-tag::after {
+  content: "";
+  position: absolute;
+  inset: -7px 0;
+}
+.cx-tag:hover {
+  color: var(--text);
+  border-color: var(--rim-color-hi);
+}
+
+/* ----- The Timeline at a page's foot ----- */
+.cx-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-6);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-strong);
+}
+.cx-timeline-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cx-timeline-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.cx-timeline-when {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted);
+  font: 600 var(--fs-2xs) / 1.25 var(--font-label);
+}
+.cx-timeline-when b {
+  color: var(--cyan-hi);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cx-timeline-what {
+  color: var(--text);
+  font: 400 var(--fs-sm) / 1.4 var(--font-body);
+}
+.cx-timeline-row.is-hidden .cx-timeline-when b,
+.cx-timeline-row.is-hidden .cx-timeline-what {
+  color: var(--violet-hi);
+}
+
+/* ----- A phone's page ----- */
+.cx-page.is-phone {
+  display: block;
+  overscroll-behavior: contain;
+}
+.cx-page-phonebody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+.cx-page-phonebody .cx-doc {
+  padding: 0;
+}
+.cx-page-phonebody .cx-meta-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-3);
+}
+.cx-page-phonebody .cx-meta-row {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.cx-maphead {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  background: none;
+  cursor: pointer;
+}
+.cx-maphead .cx-minimap {
+  border: 0;
+}
+.cx-maphead-chip {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-1);
+  color: var(--text);
+  font: 600 var(--fs-xs) / 1.3 var(--font-label);
+}
+.cx-recordhead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cx-recordhead-avatar {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  border: 2px solid var(--line-raised);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 400 var(--fs-sm) / 1 var(--font-display);
+}
+.cx-recordhead-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cx-recordhead-sub {
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.2 var(--font-body);
+}
+.cx-phonetabs {
+  display: flex;
+  width: 100%;
+}
+.cx-phonetabs .nh-segmented-option {
+  flex: 1 1 auto;
+}
+
+/* ----- Writing ----- */
+.cx-write-title {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 12rem;
+  max-width: 100%;
+  field-sizing: content;
+}
+.cx-page-phonebody .cx-write-title {
+  width: 100%;
+  min-width: 0;
+}
+.cx-write {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cx-write-tools {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1) 0;
+  background: var(--bg);
+}
+/* On a phone the tools ride over the keyboard: the bottom of the page's scroll. */
+.cx-write-tools.is-phone {
+  position: sticky;
+  top: auto;
+  bottom: 0;
+  margin: 0 calc(-1 * var(--space-3));
+  padding: var(--space-1) var(--space-2);
+  border-top: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cx-write-letter {
+  font: 700 var(--fs-sm) / 1 var(--font-body);
+}
+.cx-write-letter.is-bold {
+  font-weight: 800;
+}
+.cx-write-letter.is-italic {
+  font-style: italic;
+}
+.cx-write-hiddenbtn {
+  border-color: var(--rim-gm);
+  color: var(--violet-hi);
+}
+.cx-write-hint {
+  margin-left: var(--space-2);
+}
+.cx-write-doc {
+  display: flex;
+  flex-direction: column;
+}
+.cx-write-stretch {
+  position: relative;
+}
+.cx-write-area {
+  width: 100%;
+  min-height: 2.75rem;
+  resize: none;
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+  font: 400 var(--fs-body) / var(--lh-body) var(--font-body);
+}
+.cx-write-area:hover {
+  border-color: var(--line);
+}
+.cx-write-area:focus {
+  border-color: var(--rim-color-hi);
+  background: var(--surface-1);
+}
+.cx-write-area.is-block {
+  margin-top: var(--space-1);
+  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
+}
+.cx-write-blocktitle {
+  width: 100%;
+}
+.cx-write-blocktools {
+  display: inline-flex;
+  gap: 2px;
+}
+.cx-flip {
+  transform: rotate(180deg);
+}
+.cx-write-menu {
+  position: absolute;
+  z-index: 20;
+  left: var(--space-6);
+  top: calc(100% - var(--space-2));
+  width: min(300px, 90%);
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  border: 1px solid var(--line-raised);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-drop-2);
+}
+.cx-write-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.2 var(--font-body);
+  cursor: pointer;
+}
+.cx-write-option.is-active {
+  background: var(--tab-on);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+
+/* The fields beside the document: the value box shortened, its Who sees it switch on the same line. */
+.cx-writefields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cx-writefields-head {
+  display: flex;
+  justify-content: space-between;
+}
+.cx-writefields-who {
+  white-space: nowrap;
+  text-align: right;
+}
+.cx-writefield {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  gap: 2px var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px dashed var(--line);
+}
+.cx-writefield-label {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cx-writefield.is-hidden .nh-input {
+  border-color: var(--rim-gm);
+  color: var(--violet-hi);
+}
+.cx-writefields-add {
+  align-self: flex-start;
+}
+.cx-writedetails,
+.cx-writerel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cx-writedetails-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.cx-writedetails-date {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.cx-banner-img {
+  width: 100%;
+  max-height: 10rem;
+  object-fit: cover;
+}
+.cx-writerel-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cx-writerel-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cx-began-chip {
+  align-self: flex-start;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.cx-began-chip:hover {
+  color: var(--text);
+}
+.cx-began,
+.cx-began-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cx-began-date {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.cx-writerel-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+}
+.cx-writerel-target {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ----- Pages: the kind groups, the tags and the list ----- */
+.cx-index {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.cx-index-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+.cx-index-head,
+.cx-index-listhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cx-index-groups {
+  display: flex;
+  flex-direction: column;
+}
+.cx-grouprow,
+.cx-pagerow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 3.25rem;
+  padding: var(--space-2) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.cx-grouprow:hover,
+.cx-pagerow:hover {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+.cx-grouprow.is-on {
+  background: var(--tab-on);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.cx-grouprow-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  color: var(--text-dim);
+}
+.cx-grouprow-text,
+.cx-pagerow-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cx-grouprow-title,
+.cx-pagerow-title {
+  font: 700 var(--fs-body) / 1.2 var(--font-body);
+}
+.cx-pagerow-sub {
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.2 var(--font-body);
+}
+.cx-grouprow-count {
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1 var(--font-numeric);
+}
+.cx-grouprow-chev {
+  color: var(--text-muted);
+}
+.cx-pagelist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cx-count {
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.25 var(--font-label);
+}
+.cx-count b {
+  color: var(--text);
+}
+/* Inside a row button the app's legacy rule would stack these spans. */
+.cx-count > span {
+  display: inline;
+  margin: 0;
+  font-size: inherit;
+}
+.cx-count-hidden {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--violet-hi);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+button.cx-count-hidden {
+  position: relative;
+  cursor: pointer;
+}
+button.cx-count-hidden::after {
+  content: "";
+  position: absolute;
+  inset: -12px -4px;
+}
+.cx-index-folders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+.cx-folderrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.cx-folderrow.is-on {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.cx-folderrow-name {
+  flex: 1 1 auto;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.2 var(--font-body);
+  text-align: start;
+  cursor: pointer;
+}

@@ -107,7 +107,7 @@ describe("adding a catalog weapon to a sheet", () => {
     // Reach: a Glaive threatens at 10 feet, a Mace at 5.
     expect(swing("glaive").attack!.reachFeet).toBe(10);
     expect(swing("mace").attack!.reachFeet).toBe(5);
-    // Asserted last so a wrong number fails as a wrong number rather than as a missing slug.
+    // Asserted last so a wrong number fails as a wrong number and never as a missing slug.
     expect(weaponPropertiesOf("rapier", actor.inventory)).toEqual(["finesse"]);
     expect(weaponPropertiesOf("glaive", actor.inventory)).toEqual(["heavy", "reach", "two-handed"]);
   });

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import type { PlayerActor, PlayerView } from "@vtt/domain";
 import { Button, useToast } from "@vtt/ui";
-import { HitDiceSpender } from "../encounter/SheetRest";
+import { HitPointDice } from "../sheet/HitPointDice";
 import { command } from "../lib/command";
 import "./rest.css";
 
 /**
- * The party's Short Rest on a player's own device: each of their resting characters' Hit Dice to spend, and Done when
+ * The party's Short Rest on a player's own device: each of their resting characters' Hit Point Dice to spend, and Done when
  * they have finished. The GM ends the rest, and its benefits land then. The projection carries only the player's own
  * characters, so nothing here names anyone else.
  */
@@ -35,17 +35,19 @@ function ShortRestCard({ actor, done }: Readonly<{ actor: PlayerActor; done: boo
     });
   };
   return (
-    <section className="short-rest-prompt" aria-label={`Short rest for ${actor.name}`}>
+    <section className="short-rest-prompt" aria-label={`Short Rest for ${actor.name}`}>
       <p className="short-rest-prompt-label">
-        <strong>Short rest</strong> · {actor.name}
+        <strong>Short Rest</strong> · {actor.name}
         {hp && ` · ${hp}`}
       </p>
       <p className="short-rest-prompt-hint">
-        {done ? "Done. The GM ends the rest." : "Spend Hit Dice if you want, then tap Done. The GM ends the rest."}
+        {done
+          ? "Done. The GM ends the rest."
+          : "Spend Hit Point Dice if you want, then tap Done. The GM ends the rest."}
       </p>
       <div className="short-rest-prompt-row">
         {actor.hitDice && (
-          <HitDiceSpender actorId={actor.id} hitDice={actor.hitDice} onFeedback={(text) => toast(text)} />
+          <HitPointDice actorId={actor.id} hitDice={actor.hitDice} onFeedback={(text) => toast(text)} />
         )}
         <Button variant={done ? "ghost" : "secondary"} disabled={busy} onClick={() => mark(!done)}>
           {done ? "Not done yet" : "Done"}

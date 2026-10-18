@@ -1,0 +1,15 @@
+# What the image never builds from: installs, builds, campaign data, tests, docs and tooling.
+**/node_modules
+**/dist
+**/data
+.env
+.git
+.github
+.claude
+docs
+e2e
+**/test
+**/*.test.ts
+**/*.test.tsx
+packages/content-srd-5.2.1/sources
+packages/content-srd-5.2.1/scripts

@@ -26,6 +26,10 @@ vi.mock("../lib/command", () => ({
   }))
 }));
 
+// The runner is brought into view in its own scroll region; jsdom lays nothing out, so the call is checked.
+const revealInRegion = vi.fn();
+vi.mock("../lib/reveal", () => ({ revealInRegion: (...args: unknown[]) => revealInRegion(...args) }));
+
 import { PlayerActionRunner } from "./PlayerActionRunner";
 
 // SRD Ready: the response is an action or a move, or a spell cast now and held with Concentration.
@@ -104,15 +108,17 @@ describe("the Ready action on a player's turn", () => {
 
   it("says a refusal above the action list, and brings it into view", async () => {
     const user = userEvent.setup();
-    const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
+    revealInRegion.mockClear();
     command.mockResolvedValueOnce({ ok: false, message: "Wren has already used an action this turn." } as never);
     mount();
     await user.click(await screen.findByRole("button", { name: "Ready" }));
     await user.click(screen.getByRole("button", { name: /An action or a move/ }));
     const refusal = await screen.findByText("Wren has already used an action this turn.");
-    const list = screen.getByText(/Your actions/);
+    const list = screen.getByRole("group", { name: "Common actions" });
     expect(refusal.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
-    scrolled.mockRestore();
+    expect(revealInRegion).toHaveBeenCalledWith(
+      expect.objectContaining({ className: "action-runner player-actions" }),
+      "nearest"
+    );
   });
 });

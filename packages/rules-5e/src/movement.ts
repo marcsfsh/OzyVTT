@@ -106,7 +106,7 @@ const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /**
- * The cheapest path a footprint can take from `from` to `to` (both top-left cells), stepping to any of the
+ * The cheapest path a footprint can take from `from` to `to` (both top-left cells), each step to any of the
  * eight neighbouring positions. A step costs one cell, or two when any cell of the footprint's new position is
  * difficult; the extra cost doesn't stack. A step into a position where the mover's Speed is halved costs twice
  * that, since each foot there spends two of its Speed. Among equally cheap paths it keeps closest to the straight
@@ -122,6 +122,9 @@ export function movementPath(
     isDifficult: (column: number, row: number) => boolean;
     /** Whether a footprint may stand on this cell, such as being on the map at all. Every cell is open when absent. */
     isOpen?: (column: number, row: number) => boolean;
+    /** Whether the footprint may step from one position to the next, such as no wall being in the way
+     *  (`footprintStepBlocked`). Every step is open when absent. */
+    isStepOpen?: (from: GridCell, to: GridCell) => boolean;
     /** Cells added to every step's cost (1 while crawling, climbing or swimming without the speed). */
     extraPerStep?: number;
     /** Whether the mover's Speed is halved at this position, its top-left cell given (Spirit Guardians' Emanation). */
@@ -201,6 +204,7 @@ export function movementPath(
       const column = node.column + stepColumn;
       const row = node.row + stepRow;
       if (!inBox(column, row) || !footprintFits(column, row)) continue;
+      if (input.isStepOpen && !input.isStepOpen({ column: node.column, row: node.row }, { column, row })) continue;
       const difficult = enteringIsDifficult(column, row);
       const halved = input.isHalved?.(column, row) === true;
       const cost = node.cost + ((difficult ? 2 : 1) + extraPerStep) * (halved ? 2 : 1);
@@ -215,7 +219,7 @@ export function movementPath(
   }
 
   const cost = best.get(goalKey);
-  // The whole box was searched and nothing reached the goal: the way is shut, not merely long.
+  // The whole box was searched and nothing reached the goal: the way is shut.
   if (cost === undefined)
     return queue.size === 0 ? { steps: [], costCells: 0, difficultSteps: 0, blocked: true } : null;
   const steps: GridCell[] = [];
@@ -227,6 +231,105 @@ export function movementPath(
   }
   steps.reverse();
   return { steps, costCells: cost, difficultSteps: extra.get(goalKey) ?? 0 };
+}
+
+type GridPoint = Readonly<{ column: number; row: number }>;
+/** A wall, closed door or window as a segment in grid units. */
+export type GridSegment = Readonly<{ a: GridPoint; b: GridPoint }>;
+
+const orient = (p: GridPoint, q: GridPoint, r: GridPoint) =>
+  (q.column - p.column) * (r.row - p.row) - (q.row - p.row) * (r.column - p.column);
+const within = (p: GridPoint, q: GridPoint, r: GridPoint, slack: number) =>
+  Math.min(p.column, q.column) - slack <= r.column &&
+  r.column <= Math.max(p.column, q.column) + slack &&
+  Math.min(p.row, q.row) - slack <= r.row &&
+  r.row <= Math.max(p.row, q.row) + slack;
+
+/** Whether two segments meet, touching ends included: a step that grazes a wall's end is barred, so a token can't
+ *  slip diagonally past the corner where two walls meet. */
+export function segmentsMeet(p1: GridPoint, p2: GridPoint, q1: GridPoint, q2: GridPoint, slack = 1e-9): boolean {
+  const d1 = orient(q1, q2, p1);
+  const d2 = orient(q1, q2, p2);
+  const d3 = orient(p1, p2, q1);
+  const d4 = orient(p1, p2, q2);
+  if (
+    ((d1 > slack && d2 < -slack) || (d1 < -slack && d2 > slack)) &&
+    ((d3 > slack && d4 < -slack) || (d3 < -slack && d4 > slack))
+  )
+    return true;
+  return (
+    (Math.abs(d1) <= slack && within(q1, q2, p1, slack)) ||
+    (Math.abs(d2) <= slack && within(q1, q2, p2, slack)) ||
+    (Math.abs(d3) <= slack && within(p1, p2, q1, slack)) ||
+    (Math.abs(d4) <= slack && within(p1, p2, q2, slack))
+  );
+}
+
+/** A test for "does this move cross a wall", with the walls bucketed by the cells they touch so a long path search
+ *  looks only at the walls near each step. A step between two neighbouring cells stays inside those two cells. */
+export function wallCrossing(segments: readonly GridSegment[]): (from: GridPoint, to: GridPoint) => boolean {
+  if (segments.length === 0) return () => false;
+  const buckets = new Map<string, GridSegment[]>();
+  for (const segment of segments) {
+    const left = Math.floor(Math.min(segment.a.column, segment.b.column) - 1e-6);
+    const right = Math.floor(Math.max(segment.a.column, segment.b.column) + 1e-6);
+    const top = Math.floor(Math.min(segment.a.row, segment.b.row) - 1e-6);
+    const bottom = Math.floor(Math.max(segment.a.row, segment.b.row) + 1e-6);
+    // A wall across most of the map is checked on every step. Filing it under thousands of cells would cost more.
+    if ((right - left + 1) * (bottom - top + 1) > 4096) {
+      const everywhere = buckets.get("*") ?? [];
+      everywhere.push(segment);
+      buckets.set("*", everywhere);
+      continue;
+    }
+    for (let column = left; column <= right; column++)
+      for (let row = top; row <= bottom; row++) {
+        const key = `${column},${row}`;
+        const bucket = buckets.get(key) ?? [];
+        bucket.push(segment);
+        buckets.set(key, bucket);
+      }
+  }
+  const everywhere = buckets.get("*") ?? [];
+  return (from, to) => {
+    const seen = new Set<GridSegment>();
+    const keys = [
+      `${Math.floor(from.column)},${Math.floor(from.row)}`,
+      `${Math.floor(to.column)},${Math.floor(to.row)}`
+    ];
+    for (const list of [...keys.map((key) => buckets.get(key) ?? []), everywhere])
+      for (const segment of list) {
+        if (seen.has(segment)) continue;
+        seen.add(segment);
+        if (segmentsMeet(from, to, segment.a, segment.b)) return true;
+      }
+    return false;
+  };
+}
+
+/** Whether a footprint stepping from one position to the next passes a wall: any of its cells moving centre to
+ *  centre crosses one, or one runs between two of the cells it lands on (a Large creature can't straddle a wall). */
+export function footprintStepBlocked(
+  from: GridCell,
+  to: GridCell,
+  sizeCells: number,
+  crosses: (a: GridPoint, b: GridPoint) => boolean
+): boolean {
+  const size = Math.max(1, Math.round(sizeCells));
+  const dc = to.column - from.column;
+  const dr = to.row - from.row;
+  for (let column = 0; column < size; column++)
+    for (let row = 0; row < size; row++) {
+      const start = { column: from.column + column + 0.5, row: from.row + row + 0.5 };
+      if (crosses(start, { column: start.column + dc, row: start.row + dr })) return true;
+    }
+  for (let column = 0; column < size; column++)
+    for (let row = 0; row < size; row++) {
+      const cell = { column: to.column + column + 0.5, row: to.row + row + 0.5 };
+      if (column + 1 < size && crosses(cell, { column: cell.column + 1, row: cell.row })) return true;
+      if (row + 1 < size && crosses(cell, { column: cell.column, row: cell.row + 1 })) return true;
+    }
+  return false;
 }
 
 /** Whether a point lies in any of the rects, edges included. */

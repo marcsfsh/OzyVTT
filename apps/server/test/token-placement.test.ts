@@ -57,7 +57,7 @@ describe("authoritative encounter token placement", () => {
 
   it("draws Tiny and Small smaller than Medium inside their shared cell, footprint unchanged (report #13)", () => {
     // One-cell sizes scale their glyph (Tiny 50% / Small 66% / Medium 82% of the 50px cell) but all
-    // still occupy a single cell - the footprint (sizeCells) that drives snapping is untouched.
+    // still occupy a single cell: the footprint (sizeCells) that drives snapping is untouched.
     expect(encounterTokenAppearance(geometry, 1, "medium").sizePx).toBe(41); // 50 * .82
     expect(encounterTokenAppearance(geometry, 1, "small").sizePx).toBe(33); // 50 * .66
     expect(encounterTokenAppearance(geometry, 1, "tiny").sizePx).toBe(25); // 50 * .50
@@ -93,9 +93,12 @@ describe("authoritative encounter token placement", () => {
     expect(state.combat.tokens[0].position).toEqual({ x: 579.5, y: 20.5 });
   });
 
-  it("rejects a move once the encounter has ended", () => {
+  it("places a token on a live scene between fights, and refuses with no live map", () => {
     const state = activeState();
     state.combat = { ...state.combat, active: false, turnActorId: null };
-    expect(() => moveEncounterToken(state, ACTOR, { x: 50, y: 50 }, geometry)).toThrow("Start an encounter");
+    moveEncounterToken(state, ACTOR, { x: 50, y: 50 }, geometry);
+    expect(state.combat.tokens[0].position).not.toBeNull();
+    state.combat = { ...state.combat, mapAssetId: null };
+    expect(() => moveEncounterToken(state, ACTOR, { x: 50, y: 50 }, geometry)).toThrow("Make a scene live");
   });
 });

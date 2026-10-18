@@ -4,7 +4,10 @@ import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
 import { pushTokenAway } from "../forced-movement.js";
 import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome } from "../reactions.js";
-import { initiatorOf, sessionIdOf } from "./kit.js";
+import type { ActionResolution } from "@vtt/domain";
+import { withoutSourceName } from "../hidden-source.js";
+import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
+import { countOptionUse } from "../option-uses.js";
 import { defineCommand } from "./pipeline.js";
 
 // Answers to what a hit leaves open: reaction prompts (ADR-0020) and the GM's damage proposals.
@@ -25,11 +28,11 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
       return outcome.used
         ? {
             kind: "reaction",
-            text: `${outcome.actorName} used ${outcome.actionName} - ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`
+            text: `${outcome.actorName} used ${outcome.actionName}, and ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`
           }
         : {
             kind: "damage",
-            text: `${outcome.actorName} declined ${outcome.actionName} - ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`
+            text: `${outcome.actorName} declined ${outcome.actionName}, and ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`
           };
     case "attack-would-hit": {
       if (!resolution) return null;
@@ -43,8 +46,8 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
       return {
         kind: "reaction",
         text: outcome.used
-          ? `${outcome.actorName} used ${outcome.actionName} - ${landed}.`
-          : `${outcome.actorName} declined ${outcome.actionName} - ${landed}.`
+          ? `${outcome.actorName} used ${outcome.actionName}, and ${landed}.`
+          : `${outcome.actorName} declined ${outcome.actionName}, and ${landed}.`
       };
     }
     case "leaves-reach":
@@ -63,6 +66,25 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
       return { kind: "reaction", text: `${outcome.actorName} ${what} - ${result}.` };
     }
   }
+}
+
+/** The attack a player's Parry or Shield met, as that player reads it: whether it hit and what it dealt. The attack
+ *  is the GM's creature's, so what its engine noted stays with the GM. An attacker hidden from the player stays
+ *  unnamed in the action and in what the hit imposed. */
+function metAttack(resolution: ActionResolution, attacker: string | null, attackerHidden: boolean): ActionResolution {
+  const named = (text: string) => (attackerHidden ? withoutSourceName(text, attacker) : text);
+  return {
+    actionName: attackerHidden ? "An attack" : resolution.actionName,
+    activation: resolution.activation,
+    attack: resolution.attack,
+    save: null,
+    damage: resolution.damage.map(({ source: _source, ...part }) => part),
+    damageTotal: resolution.damageTotal,
+    crit: resolution.crit,
+    ...(resolution.effectsApplied
+      ? { effectsApplied: resolution.effectsApplied.map((applied) => ({ ...applied, name: named(applied.name) })) }
+      : {})
+  };
 }
 
 export const reactionCommands = [
@@ -99,6 +121,7 @@ export const reactionCommands = [
         // A typed die must be one the table takes, and not one typed over the strike's thrown die.
         if (attackNatural !== undefined && reroll !== true)
           requireTypedDie(draft, initiator, heldRollFor(draft, reactionHoldKey(reactionId)), attackNatural);
+        const prompt = draft.combat.pendingReactions.find((entry) => entry.id === reactionId);
         outcome = answerReaction(
           draft,
           commandId,
@@ -126,6 +149,14 @@ export const reactionCommands = [
             ...(hitOptions ? { hitOptions } : {})
           }
         );
+        // The reaction taken counts toward the sheet's most-used options: the strike's own action, or the prompt's.
+        const strike = outcome.kind === "leaves-reach" || outcome.kind === "damaged-by-creature";
+        const counted = strike
+          ? outcome.resolution?.preview
+            ? undefined
+            : outcome.resolution?.actionId
+          : prompt?.actionId;
+        if (outcome.used && counted) countOptionUse(draft, outcome.actorId, counted);
       });
       if (duplicate || !outcome) return;
       kit.publishRolls(state, commandId);
@@ -143,11 +174,19 @@ export const reactionCommands = [
           outcome.kind === "attack-would-hit" ? outcome.other!.id : outcome.actorId
         );
       kit.publishNarrations(outcome.events);
+      const resolution =
+        outcome.resolution && outcome.kind === "attack-would-hit" && !isGmGrade(principal)
+          ? metAttack(
+              outcome.resolution,
+              outcome.other?.name ?? null,
+              outcome.other ? kit.hiddenFor(initiator, state)(outcome.other.id) : true
+            )
+          : outcome.resolution;
       return {
         outcome: {
           used: outcome.used,
           appliedDamage: outcome.appliedDamage,
-          ...(outcome.resolution ? { resolution: outcome.resolution } : {}),
+          ...(resolution ? { resolution } : {}),
           ...(outcome.parts ? { parts: outcome.parts } : {}),
           ...(outcome.flatReduction ? { flatReduction: outcome.flatReduction } : {})
         }
@@ -159,7 +198,7 @@ export const reactionCommands = [
     type: "reaction.dismiss",
     operationId: "dismissReaction",
     description:
-      "Dismisses a pending reaction prompt WITHOUT applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield - for when the GM settled it by hand.",
+      "Dismisses a pending reaction prompt without applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield. It is for when the GM settled it by hand.",
     summary: "Dismiss a pending reaction prompt without applying what it holds (GM).",
     schema: ReactionDismissSchema,
     malformed: "The dismissal is malformed.",

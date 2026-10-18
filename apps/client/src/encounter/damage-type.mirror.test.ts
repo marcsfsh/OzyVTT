@@ -8,7 +8,7 @@ import { manualDamagePayload, manualDamageType } from "./manual-damage";
 /**
  * The damage type picked beside a hand-entered number changes the hit points lost. Drives the
  * control's value through the doors' payload builder, the server's `.strict()` schema (so a
- * misspelled key fails) and `applyDamageDetailed`, asserting HP lost and the adjustment line:
+ * misspelled key fails) and `applyDamageDetailed`, and asserts HP lost and the adjustment line:
  *   1. the type reaches the maths (10 fire on a fire-resistant target is 5);
  *   2. the table is told why;
  *   3. an untouched control sends the same payload as no control;
@@ -74,7 +74,7 @@ describe("the manual damage entry's type chooser", () => {
   it("takes 5 off a fire-resistant target when the GM picks Fire and types 10", () => {
     const table = tableWith(["fire"]);
     const result = applyFromTheDoor(table, 10, "fire");
-    // Hit points first, so a wrong value fails here rather than at a payload guard.
+    // Hit points first, so a wrong value fails here and never at a payload guard.
     expect(result.hpLost).toBe(5);
     expect(result.outcome.application.totalApplied).toBe(5);
     expect(result.payload.damageType, "the door sent no type").toBe("fire");
@@ -106,13 +106,13 @@ describe("the manual damage entry's type chooser", () => {
     expect(result.hpLost).toBe(5);
   });
 
-  it("carries a homebrew type through to a homebrew defence - the list is a suggestion, not a gate", () => {
+  it("carries a homebrew type through to a homebrew defence: the list is a suggestion, not a gate", () => {
     expect(isSrdDamageType("ooze"), "the premise: this word is not one of the SRD thirteen").toBe(false);
     // Typed as two words, as a GM writes it; the defence stores the slug.
     const resistant = applyFromTheDoor(tableWith(["primordial-ooze"]), 10, "Primordial Ooze");
     expect(resistant.payload.damageType).toBe("primordial-ooze");
     expect(resistant.hpLost).toBe(5);
-    // The same word against a target without that defence lands whole rather than being dropped.
+    // The same word against a target without that defence lands whole and is never dropped.
     expect(applyFromTheDoor(tableWith(["fire"]), 10, "Primordial Ooze").hpLost).toBe(10);
   });
 

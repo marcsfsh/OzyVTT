@@ -228,7 +228,7 @@ export type ClassProgressionSource = Readonly<{
 }>;
 
 /** An authored class record as a progression row, so authored and homebrew classes use their own values
- * instead of SRD defaults. */
+ * where the SRD defaults would otherwise apply. */
 export function progressionFromClass(source: ClassProgressionSource): ClassProgression {
   return {
     hitDie: source.hitDie,
@@ -280,6 +280,31 @@ export function meetsMulticlassMinimums(
 }
 
 /**
+ * The order the standard array is spent in: the starting class's stat priority (the abilities it leaves out follow
+ * in sheet order), with a multiclass character's needs first, since every class wants 13 in its primary ability
+ * (SRD Multiclassing). An "any" minimum (the Fighter's Strength or Dexterity) takes whichever ranks higher. The
+ * random generator spends it this way, and the builder offers it as the suggested layout.
+ */
+export function standardArrayOrder(
+  priority: readonly Ability[],
+  classes: ReadonlyArray<Readonly<{ multiclassPrerequisites?: MulticlassMinimums | null }>>
+): Ability[] {
+  const ranked = [...priority, ...ABILITIES.filter((ability) => !priority.includes(ability))];
+  const needed = new Set<Ability>();
+  if (classes.length > 1) {
+    const minimums = classes.flatMap((entry) => (entry.multiclassPrerequisites ? [entry.multiclassPrerequisites] : []));
+    for (const minimum of minimums.filter((entry) => entry.mode === "all"))
+      for (const entry of minimum.minimums) needed.add(entry.ability);
+    for (const minimum of minimums.filter((entry) => entry.mode === "any")) {
+      const abilities = minimum.minimums.map((entry) => entry.ability);
+      if (!abilities.some((ability) => needed.has(ability)))
+        needed.add([...abilities].sort((left, right) => ranked.indexOf(left) - ranked.indexOf(right))[0]);
+    }
+  }
+  return [...ranked.filter((ability) => needed.has(ability)), ...ranked.filter((ability) => !needed.has(ability))];
+}
+
+/**
  * SRD Multiclassing: "To qualify for a new class, you must have a score of at least 13 in the primary ability of the
  * new class and your current classes." The classes whose minimums these scores miss, the new class first; empty
  * when the new class may be taken.
@@ -296,7 +321,8 @@ export function multiclassShortfalls<New extends MulticlassCandidate, Current ex
 
 /**
  * Why a new class can't be taken, in sentences: "Wizard needs Intelligence 13; you have 10." for the new class, and
- * "Your Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12." for one already taken.
+ * "Fighter, a class you already have, needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12."
+ * for one already taken.
  */
 export function multiclassShortfallText(
   abilityScores: Readonly<Partial<Record<Ability, number>>>,
@@ -316,7 +342,7 @@ export function multiclassShortfallText(
           : minimums.minimums
               .map((minimum) => `${ABILITY_NAMES[minimum.ability]} ${score(minimum.ability)}`)
               .join(" and ");
-      const who = entry.id === newClass.id ? entry.name : `Your ${entry.name}`;
+      const who = entry.id === newClass.id ? entry.name : `${entry.name}, a class you already have,`;
       return `${who} needs ${wanted}; you have ${have}.`;
     })
     .join(" ");

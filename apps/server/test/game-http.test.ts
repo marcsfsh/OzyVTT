@@ -17,16 +17,16 @@ import {
   PlayerSessionIssuedResponseSchema,
   SESSION_PATHS
 } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
-import { gameCommands, gameReads, socketEventOf } from "../src/commands/index.js";
+import { gameCommands, gameReads, readScope, socketEventOf } from "../src/commands/index.js";
 import { createServer } from "../src/server.js";
 import { png } from "./image-fixtures.js";
 
 // ADR-0016 validation evidence, end to end over plain fetch: an external process creates a scoped
 // credential, discovers capabilities, reads a safe snapshot, submits and safely retries idempotent
-// commands, hits stale-revision and confirmation conflicts, and loses access on revocation - while
+// commands, hits stale-revision and confirmation conflicts, and loses access on revocation, while
 // the hidden combatant never leaks through any player-safe response.
 
 const HERO_ID = "10000000-0000-4000-8000-000000000001";
@@ -206,7 +206,7 @@ describe("public game API over /api/v1", () => {
     const startedBody = GameMutationAcceptedResponseSchema.parse(await started.json());
     expect(startedBody.data).toMatchObject({ commandId: startId, revision: 1, duplicate: false });
 
-    // Retrying the same commandId is an idempotent duplicate, not a re-execution.
+    // Retrying the same commandId is an idempotent duplicate and runs once.
     const retried = GameMutationAcceptedResponseSchema.parse(
       await (
         await post(base, GAME_PATHS.encounterStart, writer.token, {
@@ -229,7 +229,7 @@ describe("public game API over /api/v1", () => {
     expect(staleBody.error.code).toBe("conflict");
     expect(staleBody.error.currentRevision).toBe(1);
 
-    // Damage, heal, temp HP, set HP, condition - the actor routes.
+    // Damage, heal, temp HP, set HP, condition: the actor routes.
     const damaged = GameMutationAcceptedResponseSchema.parse(
       await (await post(base, GAME_PATHS.actorDamage.replace("{actorId}", HERO_ID), writer.token, { amount: 7 })).json()
     );
@@ -332,8 +332,9 @@ describe("public game API over /api/v1", () => {
     // Revocation cuts access immediately.
     const revoked = await post(base, `/api/v1/gm/integration-credentials/${readOnly.id}/revoke`, gmToken);
     expect(revoked.status).toBe(200);
+    // A revoked credential must be replaced: 401, like no credential (ADR-0027).
     const afterRevoke = await fetch(base + GAME_PATHS.snapshot, { headers: bearer(readOnly.token) });
-    expect(afterRevoke.status).toBe(403);
+    expect(afterRevoke.status).toBe(401);
   });
 
   it("lets a player resolve their own claimed character's action but refuses a hidden target or GM-only inputs", async () => {
@@ -362,10 +363,10 @@ describe("public game API over /api/v1", () => {
     });
     expect(hiddenTarget.status).toBe(409);
     const hiddenBody = JSON.stringify(await hiddenTarget.json());
-    expect(hiddenBody).toContain("target combatants you can see");
+    expect(hiddenBody).toContain("Every target must be in this encounter.");
     expect(hiddenBody).not.toContain("Unrevealed Tyrant");
 
-    // GM-only resolve inputs are refused for a player: an area template and a strict-mode override.
+    // A player may aim an area for their own character, but an attack never takes one (and this map has no grid).
     expect(
       (
         await post(base, GAME_PATHS.actionResolve, playerToken, {
@@ -374,7 +375,8 @@ describe("public game API over /api/v1", () => {
           template: { shape: "circle", origin: { x: 10, y: 10 }, target: { x: 40, y: 40 } }
         })
       ).status
-    ).toBe(403);
+    ).toBe(409);
+    // A strict-mode override stays the GM's.
     expect(
       (
         await post(base, GAME_PATHS.actionResolve, playerToken, {
@@ -511,9 +513,23 @@ describe("public game API over /api/v1", () => {
     });
     expect(missing.status).toBe(404);
 
-    // Players may read conditions (public reference) but not the bestiary.
+    // The monster wizard's benchmarks: one row per CR the bestiary has, every stat block counted once.
+    const benchmarks = await fetch(base + CONTENT_PATHS.monsterBenchmarks, { headers: bearer(reader.token) });
+    expect(benchmarks.status).toBe(200);
+    const benchmarkRows = (await benchmarks.json()).data.benchmarks as ReadonlyArray<{
+      challengeRating: number;
+      count: number;
+      hitPoints: { min: number; median: number; max: number };
+    }>;
+    expect(benchmarkRows.reduce((sum, entry) => sum + entry.count, 0)).toBe(monstersBody.data.monsters.length);
+    const crThree = benchmarkRows.find((entry) => entry.challengeRating === 3)!;
+    expect(crThree.hitPoints.min).toBeLessThanOrEqual(crThree.hitPoints.median);
+    expect(crThree.hitPoints.median).toBeLessThanOrEqual(crThree.hitPoints.max);
+
+    // Players may read conditions (public reference) but not the bestiary or its benchmarks.
     expect((await fetch(base + CONTENT_PATHS.conditions, { headers: bearer(playerToken) })).status).toBe(200);
     expect((await fetch(base + CONTENT_PATHS.monsters, { headers: bearer(playerToken) })).status).toBe(403);
+    expect((await fetch(base + CONTENT_PATHS.monsterBenchmarks, { headers: bearer(playerToken) })).status).toBe(403);
 
     // Combat log: GM-only lines reach GM-grade principals, never player sessions.
     await post(base, GAME_PATHS.encounterStart, gmToken, {
@@ -575,7 +591,7 @@ describe("public game API over /api/v1", () => {
     expect(typeof equipmentBody.data.attribution).toBe("string");
 
     // The six character-builder catalogs, on the same audience terms. Bundles grow over time, so these
-    // assert "at least one real row" rather than counts.
+    // assert "at least one real row" and no exact counts.
     const catalogs = [
       [CONTENT_PATHS.classes, "classes"],
       [CONTENT_PATHS.subclasses, "subclasses"],
@@ -612,7 +628,7 @@ describe("public game API over /api/v1", () => {
     expect(picks[0]).toMatchObject({ kind: expect.any(String), choose: expect.any(Number) });
     // Only the full list is served; a single `choice` field once hid a feature's second pick.
     expect(features.every((feature) => !("choice" in feature))).toBe(true);
-    // Subclasses key to their parent class, and name pools to their species - both open slugs.
+    // Subclasses key to their parent class, and name pools to their species: both open slugs.
     expect(catalogRows.subclasses.every((entry) => typeof entry.classId === "string")).toBe(true);
     expect(
       catalogRows.names.every((entry) => typeof entry.speciesId === "string" && (entry.pools as unknown[]).length > 0)
@@ -698,7 +714,7 @@ describe("public game API over /api/v1", () => {
     });
     expect(denied.status).toBe(403);
 
-    // A formula outside the 1-30 ability bounds is rejected by the shared validator, not stored.
+    // A formula outside the 1-30 ability bounds is rejected by the shared validator, and nothing is stored.
     const badFormula = await post(base, GAME_PATHS.builderPolicy, gmToken, {
       allowedAbilityMethods: ["standard-array", "custom"],
       customFormula: "50d20"
@@ -837,7 +853,7 @@ describe("public game API over /api/v1", () => {
     const playerToken = server.auth.issuePlayerSession();
     const definition = loadActorFixture("player-character") as Record<string, unknown>;
 
-    // A player session may submit - this is the player path the wizard rides on.
+    // A player session may submit: this is the player path the wizard rides on.
     const importId = randomUUID();
     const submitted = await post(base, GAME_PATHS.characterImports, playerToken, { commandId: importId, definition });
     expect(submitted.status).toBe(200);
@@ -845,7 +861,7 @@ describe("public game API over /api/v1", () => {
     expect(submitBody.data.commandId).toBe(importId);
     expect(submitBody.data.duplicate).toBe(false);
 
-    // commandId idempotency survives the second transport: the same id replays instead of re-queueing.
+    // commandId idempotency survives the second transport: the same id replays and queues nothing new.
     const replay = GameMutationAcceptedResponseSchema.parse(
       await (await post(base, GAME_PATHS.characterImports, playerToken, { commandId: importId, definition })).json()
     );
@@ -859,7 +875,7 @@ describe("public game API over /api/v1", () => {
     expect(stale.status).toBe(409);
     expect((await stale.json()).error.currentRevision).toBe(submitBody.data.revision);
 
-    // Resolving is GM-only - the operation's own role check, not the route's, refuses the player.
+    // Resolving is GM-only: the operation's own role check refuses the player.
     const resolvePath = GAME_PATHS.characterImportResolve.replace("{importId}", importId);
     const refused = await post(base, resolvePath, playerToken, { approve: true });
     expect(refused.status).toBe(403);
@@ -877,7 +893,7 @@ describe("public game API over /api/v1", () => {
     expect(actors.find((actor) => actor.id === actorId)?.definitionId).toBe(`import-${actorId}`);
     expect((snapshot.data.game as { pendingImports: readonly unknown[] }).pendingImports).toHaveLength(0);
 
-    // A second decision on the same submission is refused - it already left the queue.
+    // A second decision on the same submission is refused: it already left the queue.
     expect((await post(base, resolvePath, gmToken, { approve: false })).status).toBe(409);
   });
 
@@ -969,7 +985,7 @@ describe("public game API over /api/v1", () => {
     expect(document.rolls.length).toBe(1);
     expect(document.rolls[0].formula).toBe("1d20+5");
 
-    // Deletion needs the admin scope (or a GM session) - combat:read cannot destroy the record.
+    // Deletion needs the admin scope (or a GM session): combat:read cannot destroy the record.
     expect(
       (
         await fetch(base + ENCOUNTER_ARCHIVE_PATHS.byId.replace("{id}", String(id)), {
@@ -997,7 +1013,7 @@ describe("public game API over /api/v1", () => {
     const { base, gmToken } = await boot();
     const integration = await issueCredential(base, gmToken, "seat manager", ["game:read", "actor:write"]);
 
-    // Two players join over pure HTTP - the socketless mirror of the open LAN join.
+    // Two players join over pure HTTP: the socketless mirror of the open LAN join.
     const seatA = PlayerSessionIssuedResponseSchema.parse(
       await (await fetch(base + SESSION_PATHS.player, { method: "POST" })).json()
     );
@@ -1165,7 +1181,7 @@ describe("public game API over /api/v1", () => {
     // The studied move: 4 cells = 20 ft, with the hidden Tyrant's ranges split into a GM-only line.
     expect(movement.map((entry) => entry.text)).toContain("Public Hero moved 20 ft.");
     expect(movement.map((entry) => entry.text)).toContain(
-      "Hidden ranges for Public Hero - Unrevealed Tyrant 10 ft → 20 ft."
+      "Hidden ranges for Public Hero: Unrevealed Tyrant 10 ft → 20 ft."
     );
     expect(movement.find((entry) => entry.text.startsWith("Hidden ranges"))?.gmOnly).toBe(true);
 
@@ -1190,7 +1206,7 @@ describe("public game API over /api/v1", () => {
     expect(JSON.stringify(archived.data.document.log)).toContain("Public Hero moved 20 ft.");
   });
 
-  it("answers CORS preflights for /api/v1 only - never for the legacy session/login endpoints", async () => {
+  it("answers CORS preflights for /api/v1 only, never for the legacy session/login endpoints", async () => {
     const { base } = await boot();
     const preflight = await fetch(base + GAME_PATHS.snapshot, {
       method: "OPTIONS",
@@ -1288,7 +1304,7 @@ describe("public game API over /api/v1", () => {
 
     const path = GAME_PATHS.actorAvailableActions.replace("{actorId}", crocId);
     expect((await fetch(base + path)).status).toBe(401);
-    // A player who hasn't claimed this actor is refused - availability names stat-block internals.
+    // A player who hasn't claimed this actor is refused: availability names stat-block internals.
     expect((await fetch(base + path, { headers: bearer(playerToken) })).status).toBe(403);
     expect(
       (
@@ -1341,7 +1357,7 @@ describe("the codex import's 64 MB parser runs after authorization, not before i
   it("refuses an unauthorized oversized import without parsing it, and still restores an authorized one", async () => {
     const { base, gmToken } = await boot();
 
-    // No credential at all: 401 from the codex surface's own envelope, not a 413 from a parser.
+    // No credential at all: 401 from the codex surface's own envelope, ahead of any parser's 413.
     const anonymous = await fetch(`${base}/api/v1/codex/import`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1391,8 +1407,8 @@ describe("the codex import's 64 MB parser runs after authorization, not before i
       body: big
     });
     expect(authorized.status).toBe(200);
-    // >= rather than ==: a nested path registers its parent too, so 7000 leaves under one shared parent
-    // land as 7001 rows. The claim here is "the whole body arrived", not an exact folder count.
+    // >= because a nested path registers its parent too, so 7000 leaves under one shared parent
+    // land as 7001 rows. The claim here is "the whole body arrived", whatever the exact folder count.
     expect((await authorized.json()).data.counts.folders).toBeGreaterThanOrEqual(7000);
   });
 });
@@ -1421,6 +1437,11 @@ describe("the command and read tables", () => {
       expect(socketEventOf(command.type), command.type).toMatch(/^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/);
       const operation = documented[route.path]?.[route.method];
       expect(operation, `${route.method.toUpperCase()} ${route.path} (${command.type}) is undocumented`).toBeDefined();
+      // A player-only command refuses every GM-grade caller, a scoped credential included.
+      if (command.playerOnly !== undefined) {
+        expect(operation?.security, command.type).toEqual([{ playerAuth: [] }]);
+        continue;
+      }
       expect(bearerScope(operation), command.type).toEqual([route.scope]);
       // A GM-only command must not be documented as open to player sessions.
       if (command.gmOnly !== undefined) expect(offeredToPlayers(operation), command.type).toBe(false);
@@ -1429,9 +1450,9 @@ describe("the command and read tables", () => {
 
   it("gives every read a documented GET with its scope, open to players exactly when the read is", () => {
     for (const read of gameReads) {
-      const operation = documented[read.path]?.get;
-      expect(operation, `GET ${read.path} (${read.event}) is undocumented`).toBeDefined();
-      expect(bearerScope(operation), read.event).toEqual([read.scope]);
+      const operation = documented[read.route.path]?.get;
+      expect(operation, `GET ${read.route.path} (${read.event}) is undocumented`).toBeDefined();
+      expect(bearerScope(operation), read.event).toEqual([readScope(read)]);
       expect(offeredToPlayers(operation), read.event).toBe(!("gmOnly" in read));
     }
   });
@@ -1444,7 +1465,7 @@ describe("the command and read tables", () => {
       expect(response.status, `${route.method.toUpperCase()} ${route.path}`).toBe(401);
     }
     for (const read of gameReads)
-      expect((await fetch(base + concrete(read.path))).status, `GET ${read.path}`).toBe(401);
+      expect((await fetch(base + concrete(read.route.path))).status, `GET ${read.route.path}`).toBe(401);
 
     // A socket that never joined reaches every handler and is turned away by the same gate.
     const socket = connect(base, { transports: ["websocket"], reconnection: false, forceNew: true });
@@ -1481,7 +1502,7 @@ describe("the command and read tables", () => {
       expect((await response.json()).error.message, command.type).toBe(command.gmOnly);
     }
     for (const read of gameReads.filter((candidate) => "gmOnly" in candidate)) {
-      const response = await fetch(base + concrete(read.path), { headers: bearer(playerToken) });
+      const response = await fetch(base + concrete(read.route.path), { headers: bearer(playerToken) });
       expect(response.status, read.event).toBe(403);
     }
   });

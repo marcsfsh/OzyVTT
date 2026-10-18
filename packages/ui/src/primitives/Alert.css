@@ -1,5 +1,5 @@
-/* Severity is a 2px leading rule, not a fill: text sits on a neutral ground in every theme (tinted text on a tint
-   fails in daybreak). The material is on a backing layer behind the content. */
+/* Severity is a 2px leading rule and no fill: text sits on a neutral ground in every theme (tinted text on a tint
+   fails in Day and Dawn). The material is on a backing layer behind the content. */
 .nh-alert {
   position: relative;
   isolation: isolate;
@@ -80,6 +80,6 @@
   color: var(--danger-text);
   background: color-mix(in srgb, var(--danger) 20%, transparent);
 }
-:root[data-theme="light"] .nh-alert--info .nh-alert-icon {
+:root:is([data-theme="light"], [data-theme="dawn"]) .nh-alert--info .nh-alert-icon {
   color: var(--info);
 }

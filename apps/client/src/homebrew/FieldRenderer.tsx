@@ -29,6 +29,7 @@ import {
   type FieldDef,
   type SchemaContext
 } from "./schema";
+import { withArticle } from "@vtt/domain";
 
 export type CustomRenderer = (args: {
   field: FieldDef;
@@ -48,7 +49,7 @@ export type FieldRendererProps = Readonly<{
   draft: Draft;
   onDraft: (next: Draft) => void;
   ctx: SchemaContext;
-  /** `hb-{type}` — ids are `hb-{type}-{key with dots as dashes}`. */
+  /** `hb-{type}`: ids are `hb-{type}-{key with dots as dashes}`. */
   idPrefix: string;
   custom?: Readonly<Record<string, CustomRenderer>>;
   disabled?: boolean;
@@ -155,6 +156,41 @@ export function FieldRenderer(props: FieldRendererProps) {
 
     case "select": {
       const options = resolveOptions(field, ctx, draft);
+      if (field.chips) {
+        const chosen = asString(raw);
+        // The multiselect's group of pressed chips, with one pressed at a time; a pressed chip stays pressed.
+        return (
+          <div className={field.wide ? "nh-fieldgrid-wide hb-field" : "hb-field"} id={fieldId}>
+            <span className="nh-field-label" id={`${fieldId}-label`}>
+              {field.label}
+            </span>
+            <div
+              className="hb-chips"
+              role="group"
+              aria-labelledby={`${fieldId}-label`}
+              aria-describedby={help || error ? `${fieldId}-help` : undefined}
+            >
+              {options.map((option) => (
+                <Chip
+                  key={option.value}
+                  pressed={chosen === option.value}
+                  disabled={isDisabled || option.disabled}
+                  onClick={() => {
+                    if (chosen !== option.value) set(option.value);
+                  }}
+                >
+                  {option.label}
+                </Chip>
+              ))}
+            </div>
+            {(help || error) && (
+              <p className={error ? "nh-field-help hb-field-error" : "nh-field-help"} id={`${fieldId}-help`}>
+                {error ?? help}
+              </p>
+            )}
+          </div>
+        );
+      }
       if (field.searchable) {
         const entries = field.catalog === "equipment" ? ctx.equipment : field.catalog === "spells" ? ctx.spells : [];
         return wrap(
@@ -163,7 +199,7 @@ export function FieldRenderer(props: FieldRendererProps) {
             entries={entries}
             value={asString(raw) || null}
             onChange={(next) => set(next)}
-            emptyLabel={field.placeholder ?? `Choose a ${field.label.toLowerCase()}`}
+            emptyLabel={field.placeholder ?? `Choose ${withArticle(field.label.toLowerCase())}`}
             title={field.label}
             searchPlaceholder="Search…"
             ariaLabel={field.label}
@@ -237,6 +273,8 @@ export function FieldRenderer(props: FieldRendererProps) {
               {help}
             </p>
           )}
+          {/* A live value error, like a text field's, under the group it is about. */}
+          {error && <p className="nh-field-help hb-field-error">{error}</p>}
           {full && field.maxRowsReason && <p className="nh-field-help">{field.maxRowsReason}</p>}
         </div>
       );
@@ -282,7 +320,7 @@ export function FieldRenderer(props: FieldRendererProps) {
             rowKey={(row) => field.rowKey?.(row, rows.indexOf(row)) ?? String(rows.indexOf(row))}
             onAdd={() => field.newRow?.() ?? {}}
             addLabel={field.addLabel ?? `Add to ${field.label.toLowerCase()}`}
-            rowLabel={field.rowLabel ? (row, index) => field.rowLabel!(row, index) : undefined}
+            rowLabel={field.rowLabel ? (row, index) => field.rowLabel!(row, index, ctx) : undefined}
             collapsible={rowFields.length > 2}
             emptyText={field.emptyText}
             max={field.maxRows}
@@ -317,7 +355,7 @@ export function FieldRenderer(props: FieldRendererProps) {
       return (
         <fieldset className="hb-fieldset nh-fieldgrid-wide">
           <legend className="hb-fieldset-legend">{field.label}</legend>
-          {/* Group help sits above the members, not after their own help. */}
+          {/* Group help sits above the members, before their own help. */}
           {help && <p className="nh-field-help">{help}</p>}
           <FieldGrid>
             {(field.rows ?? []).map((child, childIndex) => (
@@ -348,6 +386,45 @@ export function FieldRenderer(props: FieldRendererProps) {
           typeable, since `school`, `category`, `rarity` and `creatureType` are open slugs. */
       const suggestions = resolveSuggestions(field, ctx, draft);
 
+      /** `presets`: the common answers as chips, and the input for anything else; both write the same text. */
+      if (field.presets) {
+        const text = asString(raw);
+        return (
+          <div className={field.wide ? "nh-fieldgrid-wide hb-field" : "hb-field"}>
+            <span className="nh-field-label" id={`${fieldId}-label`}>
+              {field.label}
+            </span>
+            <div className="hb-chips" role="group" aria-labelledby={`${fieldId}-label`}>
+              {field.presets.map((preset) => (
+                <Chip
+                  key={preset.value}
+                  pressed={text === preset.value}
+                  disabled={isDisabled}
+                  onClick={() => set(preset.value)}
+                >
+                  {preset.label}
+                </Chip>
+              ))}
+            </div>
+            <Input
+              id={fieldId}
+              aria-label={`${field.label}, in your own words`}
+              value={text}
+              placeholder={field.placeholder}
+              disabled={isDisabled}
+              invalid={!!error}
+              maxLength={field.max}
+              onChange={(event) =>
+                event.target.value === "" && field.emptyValue ? setEmpty() : set(event.target.value)
+              }
+            />
+            {(help || error) && (
+              <p className={error ? "nh-field-help hb-field-error" : "nh-field-help"}>{error ?? help}</p>
+            )}
+          </div>
+        );
+      }
+
       /** `pick`: the same open contract with the list visible (a datalist has no visible cue, and no
           control at all on iOS Safari). Clearing goes through `setEmpty()`. See `FieldDef.pick`. */
       if (field.pick && suggestions.length > 0) {
@@ -359,8 +436,8 @@ export function FieldRenderer(props: FieldRendererProps) {
             value={asString(raw) || null}
             placeholder={field.placeholder ? suggestionLabel(field.placeholder) : undefined}
             disabled={isDisabled}
-            /* Show the whole bounded vocabulary rather than the default page of 8; large catalogs
-               use `searchable` + `CatalogPicker` instead. */
+            /* Show the whole bounded vocabulary past the default page of 8; large catalogs
+               use `searchable` + `CatalogPicker`. */
             limit={suggestions.length}
             allowFreeText
             /* `pickValue` normalizes typed words to the slug shape, so "Very Rare" stores as `very-rare`. */

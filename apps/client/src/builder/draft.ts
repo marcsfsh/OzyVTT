@@ -12,7 +12,7 @@ export type StoredDraft = Readonly<{
   draft: BuilderDraft;
 }>;
 
-/** The caller's parked draft, or null. One from another draft format is dropped rather than half-restored, which
+/** The caller's parked draft, or null. One from another draft format is dropped whole, which
  *  would produce a payload the server rejects; so is one the table could not be asked for. */
 export async function loadDraft(): Promise<StoredDraft | null> {
   const reply = await read("character:draft", {});
@@ -20,7 +20,7 @@ export async function loadDraft(): Promise<StoredDraft | null> {
   return stored && stored.draft.version === BUILDER_DRAFT_VERSION ? stored : null;
 }
 
-/** Parks the draft, replacing the one parked before. */
+/** Parks the draft in place of the one parked before. */
 export function saveDraft(draft: BuilderDraft): void {
   void command("character:save-draft", { draft });
 }
@@ -34,7 +34,7 @@ export function describeWhen(iso: string): string {
   const at = Date.parse(iso);
   if (!Number.isFinite(at)) return "earlier";
   const minutes = Math.round((Date.now() - at) / 60_000);
-  if (minutes < 1) return "just now";
+  if (minutes < 1) return "a moment ago";
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;

@@ -100,7 +100,7 @@ const hit = (
     { resolveDefinition: () => definition, catalog }
   );
 
-// Parsed through the real schema rather than hand-shaped, so the authoring schema and the collector
+// Parsed through the real schema, so the authoring schema and the collector
 // (which reads a structural `RiderBlockLike` view) are held to one object.
 const FORGE_HELM_GRANTS = FeatureGrantsSchema.parse({
   damageResistances: ["fire"],
@@ -147,7 +147,7 @@ describe("W3 far end: a gated grant on an item halves one hit and not the other"
     expect(damageAdjustmentDetail(outcome.application)).toBe(" (20 fire → 10, resistance: Helm of the Forge)");
   });
 
-  it("grants NOTHING when the gate fails - the block is one condition, not one per list", () => {
+  it("grants NOTHING when the gate fails: the block is one condition, not one per list", () => {
     const catalog = catalogOf([FORGE_HELM]);
     const worn = [item({ id: "helm-of-the-forge", name: "Helm of the Forge", equipped: true, category: "wondrous" })];
     const dwarf = deriveEquipment(stateWith(worn).actors[0], definitionOf("dwarf"), catalog);
@@ -278,7 +278,7 @@ describe("a gated condition immunity refuses the condition only while the gate h
       { role: "gm" },
       { resolveDefinition: () => definition, catalog }
     );
-    expect(events[0].text).toMatch(/immune to Frightened - not applied/);
+    expect(events[0].text).toMatch(/immune to Frightened, so it isn't applied/);
     expect(bloodied.actors[0].conditions).toHaveLength(0);
   });
 });
@@ -340,7 +340,7 @@ describe("the builder bakes an ungated grant and refuses to bake a gated one", (
   const policy = BuilderPolicySchema.parse({});
   const NOT_POISONED = [{ type: "while-condition", conditionIds: ["poisoned"], present: false }] as const;
 
-  it("bakes Dwarven Resilience when it has no gate - the shipped behaviour, unchanged", () => {
+  it("bakes Dwarven Resilience when it has no gate: the shipped behaviour, unchanged", () => {
     const built = buildCharacterDefinition(dwarfInput(), viewWithGatedDwarf(null), policy);
     expect(built.damageResistances).toContain("poison");
   });
@@ -387,7 +387,7 @@ describe("the builder bakes an ungated grant and refuses to bake a gated one", (
     expect(full.application.totalApplied).toBe(20);
   });
 
-  it("counts the resistance ONCE - the builder's half and the derivation's half never overlap", () => {
+  it("counts the resistance ONCE: the builder's half and the derivation's half never overlap", () => {
     const view = viewWithGatedDwarf(NOT_POISONED);
     const built = buildCharacterDefinition(dwarfInput(), view, policy);
     const derivation = deriveEquipment(stateWith([]).actors[0], built, equipmentCatalogOf(view));
@@ -395,7 +395,7 @@ describe("the builder bakes an ungated grant and refuses to bake a gated one", (
     expect(built.damageResistances ?? []).not.toContain("poison");
   });
 
-  it("takes nothing from an UNGATED feature here - that half is already inside the definition", () => {
+  it("takes nothing from an UNGATED feature here: that half is already inside the definition", () => {
     const view = viewWithGatedDwarf(null);
     const built = buildCharacterDefinition(dwarfInput(), view, policy);
     const derivation = deriveEquipment(stateWith([]).actors[0], built, equipmentCatalogOf(view));
@@ -410,7 +410,7 @@ describe("the builder bakes an ungated grant and refuses to bake a gated one", (
 // `spells` is the one grant list a gate cannot cover: a granted spell is baked at build time into the
 // spell row, the prepared/cantrip cap, a cantrip's action, and possibly the whole caster block, and
 // `actor.preparedSpellIds` is written state. `deriveEquipment` cannot recompute any of that, so a gated
-// `spells` grant is refused at authoring, naming the spells.
+// `spells` grant is refused at authoring, and the refusal names the spells.
 describe("the eleventh list: `spells` beside a `when` is refused, never silently dropped", () => {
   const GATED_FIREBALL = {
     spells: [{ id: "fireball", level: 3 }],
@@ -450,12 +450,16 @@ describe("the eleventh list: `spells` beside a `when` is refused, never silently
     const validity = validateForPublish("species", species(GATED_FIREBALL), publishContext());
     expect(validity.valid).toBe(false);
     expect(validity.issues).toHaveLength(1);
-    expect(validity.issues[0].message).toBe(grantedSpellGateMessage(["fireball"]));
+    // The schema's own explanation stays with the schema; the GM reads it in plain words.
+    expect(grantedSpellGateMessage(["fireball"])).toContain("cannot carry");
+    expect(validity.issues[0].message).toBe(
+      "A grant with a condition can't give spells. Put the spells in a grant with no condition."
+    );
     // Machine-addressable down the record, so the editor opens the right trait and box.
     expect(validity.issues[0].path.join(".")).toBe("traits.0.grants.spells");
   });
 
-  it("takes the SAME block once the gate comes off - the refusal is the pair, not the spell", () => {
+  it("takes the SAME block once the gate comes off: the refusal is the pair, not the spell", () => {
     const { when: _gate, ...ungated } = GATED_FIREBALL;
     expect(FeatureGrantsSchema.safeParse(ungated).success).toBe(true);
     // The gate alone is still fine on the other ten lists.
@@ -534,9 +538,9 @@ describe("an ungated granted spell still arrives, on the shipped record that gra
     expect(built.spellcasting!.ability).toBe("int");
   });
 
-  it("is what gating it USED to destroy - the measurement that made the refusal the right answer", () => {
+  it("is what gating it USED to destroy: the measurement that made the refusal the right answer", () => {
     // Applying the gate below the schema shows why the pair is refused: `spellcasting` disappears
-    // entirely rather than becoming conditional.
+    // entirely and nothing becomes conditional.
     const built = buildCharacterDefinition(
       highElfInput(),
       elfViewGating([{ type: "while-effect-tag", tags: ["raging"] }]),

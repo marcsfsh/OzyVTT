@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePrompt } from "../components/feedback";
 import { armorClassInPlay, owedDamageParts, type ContentActionSummary, type GmActor, type GmView } from "@vtt/domain";
 import { ActionResultCard } from "./ActionResultCard";
@@ -21,6 +21,10 @@ import {
 } from "./targeting";
 import { command, read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
+import { useRollPreference } from "../dice/roll-preference";
+import { useTableCalibration } from "../scene/tableGeometry";
+import { caughtByArea } from "../table/targetHints";
+import { foesFirst, targetRows } from "../table/targetRows";
 import "./action-runner.css";
 
 /** Per-definition action cache. Cleared on `homebrew:changed` (`content/invalidate.ts`), since a GM
@@ -52,8 +56,10 @@ export function ActionRunner({
   const session = useTargeting();
   const result = useTargetingResult();
   const resolveBusy = useTargetingBusy();
+  const calibration = useTableCalibration(state.combat.mapAssetId);
   // Targeting and result in the store belong to this runner only when they are for this attacker.
-  const picking = session && session.attackerId === actor.id ? session : null;
+  // A spell area the GM places is the Spell areas row's to set, and placing it rolls nothing, so it opens no picker.
+  const picking = session && session.attackerId === actor.id && session.placeZoneId === undefined ? session : null;
 
   const definitionId = actor.definitionId;
   useEffect(() => {
@@ -81,17 +87,57 @@ export function ActionRunner({
     },
     []
   );
-  // A fresh result (from this runner or the map confirm bar) clears prior apply bookkeeping.
+  // A fresh result clears prior apply bookkeeping.
   useEffect(() => {
     setApplied(new Set());
     setDamageEdit(null);
   }, [result]);
+  // Confirming a hit applies its damage in the same step when no reaction can change it. With hand-rolled dice the
+  // GM types the damage first, so Apply stays.
+  const { rollMode } = useRollPreference();
+  const previewedTarget = useRef<string | null>(null);
+  const applyRef = useRef<(targetId: string, targetName: string, key: string) => void>(() => {});
+  useEffect(() => {
+    if (!result) return;
+    if (result.preview) {
+      previewedTarget.current = result.attack?.targetId ?? null;
+      return;
+    }
+    const attack = result.attack;
+    const confirmed = attack !== null && previewedTarget.current === attack.targetId;
+    previewedTarget.current = null;
+    if (!confirmed || rollMode !== "auto" || result.damageTotal <= 0 || result.waitingOnReaction) return;
+    if (result.reactionPrompts?.some((prompt) => prompt.actorId === attack.targetId)) return;
+    applyRef.current(attack.targetId, attack.targetName, attack.targetId);
+  }, [result, rollMode]);
 
   if (!definitionId) return null;
   const combatants = state.combat.initiative.flatMap((entry) => {
     const target = state.actors.find((item) => item.id === entry.actorId);
     return target ? [target] : [];
   });
+  // Who a placed area covers right now, as a hint beside the Roll; the server decides who it catches.
+  const area = picking?.mode === "template" ? picking.template : null;
+  const insideNow =
+    area?.placed && calibration
+      ? targetRows(
+          actor.id,
+          caughtByArea(
+            calibration,
+            area.shape,
+            area.placed,
+            area.widthFeet,
+            state.combat.tokens,
+            area.sizeFeet
+          ).flatMap((id) => {
+            const target = combatants.find((candidate) => candidate.id === id);
+            return target ? [{ id: target.id, name: target.name, kind: target.kind }] : [];
+          }),
+          state.combat.tokens,
+          calibration,
+          combatants
+        )
+      : undefined;
 
   // A blocked resolve keeps its session and shows the override dialog via the store; only genuine
   // failures (revision conflicts, network) need a feedback line.
@@ -137,13 +183,15 @@ export function ActionRunner({
       const application = response.applied;
       if (application && application.totalApplied !== application.totalRequested) {
         onFeedback(
-          `${targetName} took ${application.totalApplied} damage - ${damageAdjustments(application.parts, application.flatReduction)}.`
+          `${targetName} took ${application.totalApplied} damage: ${damageAdjustments(application.parts, application.flatReduction)}.`
         );
       } else {
         onFeedback(`${targetName} took ${application?.totalApplied ?? owed} damage.`);
       }
     });
   };
+
+  applyRef.current = (targetId, targetName, key) => applyDamage(targetId, targetName, key);
 
   const instance =
     state.combat.turn.actionInstance?.actorId === actor.id ? state.combat.turn.actionInstance.components : null;
@@ -177,7 +225,7 @@ export function ActionRunner({
           <strong>Blocked:</strong> {blockedPrompt.blocked.message}
         </ConfirmRow>
       )}
-      {/* Name what is left ("1× Tail") so the GM picks the next attack instead of re-tapping the last. */}
+      {/* Name what is left ("1× Tail") so the GM picks the next attack and doesn't re-tap the last. */}
       {attacksLeft > 0 && !picking && instance && (
         <p className="action-instance-note" role="status">
           Remaining in this action: {componentLabel(instance, actions)}.
@@ -185,7 +233,7 @@ export function ActionRunner({
       )}
       {bonusLeft > 0 && !picking && bonusInstance && (
         <p className="action-instance-note" role="status">
-          Remaining in this bonus action: {componentLabel(bonusInstance, actions)}.
+          Remaining in this Bonus Action: {componentLabel(bonusInstance, actions)}.
         </p>
       )}
       {actions && !picking && (
@@ -205,12 +253,25 @@ export function ActionRunner({
       {picking && !result?.preview && (
         <ActionTargetPicker
           picking={picking}
-          targets={combatants
-            .filter((target) => target.id !== actor.id)
-            .map((target) => ({
-              id: target.id,
-              label: `${target.name}${target.armorClass !== undefined ? ` (AC ${armorClassInPlay(target)})` : ""}`
-            }))}
+          targets={foesFirst(
+            targetRows(
+              actor.id,
+              combatants
+                .filter((target) => target.id !== actor.id)
+                .map((target) => ({
+                  id: target.id,
+                  name: target.name,
+                  kind: target.kind,
+                  ...(target.armorClass !== undefined ? { armorClass: armorClassInPlay(target) } : {})
+                })),
+              state.combat.tokens,
+              calibration,
+              combatants
+            ),
+            actor.kind,
+            picking.action.healing != null
+          )}
+          insideNow={insideNow}
           onMap
           busy={resolveBusy}
           onInvalidFace={onFeedback}

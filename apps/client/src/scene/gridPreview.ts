@@ -7,21 +7,27 @@ export type GridCalibration = Readonly<{
   distancePerCell: number;
 }>;
 
+/** The last grid read per map, so the map and the panel beside it share one read and a remount starts ready. */
+const calibrations = new Map<string, GridCalibration | null>();
+
 /** Fetches the active map's grid calibration (null on a gridless map) for preview maths. Not secret: grid-derived token sizing already reaches the client. */
 export function useMapCalibration(
   assetId: string | null,
   token: string | null | undefined
 ): Readonly<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }> {
-  const [state, setState] = useState<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }>({
-    status: "loading",
-    calibration: null
-  });
+  const [state, setState] = useState<{ status: "loading" | "ready" | "error"; calibration: GridCalibration | null }>(
+    () =>
+      assetId !== null && calibrations.has(assetId)
+        ? { status: "ready", calibration: calibrations.get(assetId) ?? null }
+        : { status: "loading", calibration: null }
+  );
   useEffect(() => {
     if (!assetId || !token) {
       setState({ status: "loading", calibration: null });
       return;
     }
-    setState({ status: "loading", calibration: null });
+    if (calibrations.has(assetId)) setState({ status: "ready", calibration: calibrations.get(assetId) ?? null });
+    else setState({ status: "loading", calibration: null });
     const controller = new AbortController();
     fetch(`/api/v1/map-assets/${encodeURIComponent(assetId)}/grid`, {
       headers: { authorization: `Bearer ${token}` },
@@ -30,6 +36,7 @@ export function useMapCalibration(
       .then(async (response) => {
         if (!response.ok) throw new Error("The grid could not be loaded.");
         const body = await response.json();
+        calibrations.set(assetId, body.data.calibration);
         setState({ status: "ready", calibration: body.data.calibration });
       })
       .catch((error) => {

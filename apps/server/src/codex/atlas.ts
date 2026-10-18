@@ -42,6 +42,8 @@ export type CodexMarkerCreateInput = Readonly<{
   tags?: readonly string[];
 }>;
 export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
+/** Where to put the party: a point on a map. `revealedToPlayers` is kept as it is unless sent. */
+export type CodexPartyPlaceInput = Readonly<{ mapId: string; x: number; y: number; revealedToPlayers?: boolean }>;
 
 type MapRowRaw = {
   id: string;
@@ -54,8 +56,10 @@ type MapRowRaw = {
   tags_json: string;
   created_at: string;
   updated_at: string;
+  first_shown_at: string | null;
 };
-const MAP_COLUMNS = "id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at";
+const MAP_COLUMNS =
+  "id, asset_id, name, kind, parent_map_id, revealed, sort_key, tags_json, created_at, updated_at, first_shown_at";
 type MarkerRowRaw = {
   id: string;
   map_id: string;
@@ -73,9 +77,10 @@ type MarkerRowRaw = {
   is_party: number;
   created_at: string;
   updated_at: string;
+  first_shown_at: string | null;
 };
 const MARKER_COLUMNS =
-  "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, is_party, created_at, updated_at";
+  "id, map_id, x, y, icon_id, icon_color, label, revealed, page_ids_json, sub_map_id, scene_ids_json, actor_id, tags_json, is_party, created_at, updated_at, first_shown_at";
 
 function toMap(row: MapRowRaw): CodexMap {
   return {
@@ -88,7 +93,8 @@ function toMap(row: MapRowRaw): CodexMap {
     sortKey: row.sort_key,
     tags: parseStringArray(row.tags_json),
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    firstShownAt: row.first_shown_at
   };
 }
 function toMarker(row: MarkerRowRaw): CodexMarker {
@@ -108,7 +114,8 @@ function toMarker(row: MarkerRowRaw): CodexMarker {
     tags: parseStringArray(row.tags_json),
     isParty: row.is_party === 1,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    firstShownAt: row.first_shown_at
   };
 }
 function mapRow(db: CodexDb, mapId: string): MapRowRaw | undefined {
@@ -124,7 +131,7 @@ function markerRow(db: CodexDb, markerId: string): MarkerRowRaw | undefined {
 /** Leaf write of a whole, already-validated map row (create and restore). */
 export function insertMap(db: CodexDb, map: CodexMap): void {
   db.database
-    .prepare(`INSERT INTO codex_maps (${MAP_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO codex_maps (${MAP_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       map.id,
       map.assetId,
@@ -135,7 +142,8 @@ export function insertMap(db: CodexDb, map: CodexMap): void {
       map.sortKey,
       JSON.stringify(map.tags),
       map.createdAt,
-      map.updatedAt
+      map.updatedAt,
+      map.firstShownAt
     );
   indexMap(db, map.id, map.name, map.tags);
 }
@@ -143,7 +151,7 @@ export function insertMap(db: CodexDb, map: CodexMap): void {
 /** Leaf write of a whole, already-validated marker row (create and restore). */
 export function insertMarker(db: CodexDb, marker: CodexMarker): void {
   db.database
-    .prepare(`INSERT INTO codex_markers (${MARKER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO codex_markers (${MARKER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       marker.id,
       marker.mapId,
@@ -160,7 +168,8 @@ export function insertMarker(db: CodexDb, marker: CodexMarker): void {
       JSON.stringify(marker.tags),
       marker.isParty ? 1 : 0,
       marker.createdAt,
-      marker.updatedAt
+      marker.updatedAt,
+      marker.firstShownAt
     );
   indexMarker(db, marker.id, marker.label, marker.tags);
 }
@@ -183,7 +192,9 @@ export function createMap(db: CodexDb, input: CodexMapCreateInput): CodexMap {
     sortKey,
     tags: tags(input.tags),
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    // The write dates it if it is created revealed.
+    firstShownAt: null
   };
   write(db, () => insertMap(db, map));
   return getMap(db, map.id)!;
@@ -208,7 +219,7 @@ export function updateMap(
   return getMap(db, mapId)!;
 }
 
-/** Re-parent a map, rejecting self-parenting and cycles so world, region and city stay a tree. */
+/** Re-parent a map. Self-parenting and cycles are refused, so world, region and city stay a tree. */
 export function setMapParent(db: CodexDb, mapId: string, parentMapId: string | null): CodexMap {
   if (!mapRow(db, mapId)) throw new CodexNotFoundError("That map no longer exists.");
   const parent = optionalId(parentMapId);
@@ -295,7 +306,8 @@ export function createMarker(db: CodexDb, mapId: string, input: CodexMarkerCreat
     tags: tags(input.tags),
     isParty: false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    firstShownAt: null
   };
   write(db, () => insertMarker(db, marker));
   return getMarker(db, marker.id)!;
@@ -425,6 +437,50 @@ export function setPartyMarker(db: CodexDb, markerId: string | null): CodexMarke
     if (markerId !== null) db.database.prepare("UPDATE codex_markers SET is_party = 1 WHERE id = ?").run(markerId);
   });
   return markerId === null ? null : getMarker(db, markerId);
+}
+
+/** How a party pin looks when placing the party makes one. */
+const NEW_PARTY_PIN = { label: "The party", iconId: "pin", iconColor: "#FF2E9A" } as const;
+
+/**
+ * Puts the party at a point on any map in one write: the party pin moves there, across maps if it must, or a pin is
+ * made there and flagged. A new pin is revealed when the map is, unless `revealedToPlayers` says otherwise.
+ */
+export function placeParty(db: CodexDb, input: CodexPartyPlaceInput): { marker: CodexMarker; created: boolean } {
+  const map = mapRow(db, id(input.mapId));
+  if (!map) throw new CodexNotFoundError("That map no longer exists.");
+  const x = coord(input.x);
+  const y = coord(input.y);
+  const existing = partyMarker(db);
+  if (existing) {
+    write(db, () => {
+      db.database
+        .prepare("UPDATE codex_markers SET map_id = ?, x = ?, y = ?, revealed = ?, updated_at = ? WHERE id = ?")
+        .run(map.id, x, y, (input.revealedToPlayers ?? existing.revealedToPlayers) ? 1 : 0, stamp(db), existing.id);
+    });
+    return { marker: getMarker(db, existing.id)!, created: false };
+  }
+  const now = stamp(db);
+  const marker: CodexMarker = {
+    id: freshId(),
+    mapId: map.id,
+    x,
+    y,
+    ...NEW_PARTY_PIN,
+    revealedToPlayers: input.revealedToPlayers ?? map.revealed === 1,
+    pageIds: [],
+    subMapId: null,
+    sceneIds: [],
+    actorId: null,
+    tags: [],
+    isParty: true,
+    createdAt: now,
+    updatedAt: now,
+    // The write dates it if players can read it from the start.
+    firstShownAt: null
+  };
+  write(db, () => insertMarker(db, marker));
+  return { marker: getMarker(db, marker.id)!, created: true };
 }
 
 /** Ungated; `projectPlayerPageMarker` is the gate. */

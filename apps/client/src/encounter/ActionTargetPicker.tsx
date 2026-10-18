@@ -1,11 +1,15 @@
-import { useId } from "react";
-import type { AbilityId } from "@vtt/domain";
+import { useEffect, useId, useRef } from "react";
+import type { AbilityId, ContentActionSummary } from "@vtt/domain";
 import { Button, Select, Stepper } from "@vtt/ui";
 import { useSkillCatalog } from "../content/catalogs";
 import { ABILITY_WORDS } from "../dice/roll-call-words";
 import { useRollPreference } from "../dice/roll-preference";
 import { areaWords } from "./action-summary";
 import { FaceEntry } from "./RollControls";
+import { plainActionName } from "./format";
+import type { TargetRow } from "../table/targetRows";
+import { InFooter } from "../table/footerSlot";
+import { revealInRegion } from "../lib/reveal";
 import {
   clearTargeting,
   setCheckSkill,
@@ -20,10 +24,23 @@ import {
 } from "./targeting";
 
 /**
+ * An SRD action that rolls nothing (Help, Dash, Dodge). Only the server's built-in rows are judged: a sheet's own
+ * action reaches the picker without its healing, so it can't be told apart from one that rolls.
+ */
+export const rollsNothing = (action: ContentActionSummary): boolean =>
+  action.builtin === true &&
+  action.attackBonus === null &&
+  action.saveAbility === null &&
+  !action.checkSkills?.length &&
+  action.damage.length === 0 &&
+  !action.healing;
+
+/**
  * Choosing who an action targets: one (radio) or several (checkboxes), or, for an area, where to drag
- * the template on the map; the skill a check action is made with (Search, Influence) and the ability a
- * cast chooses (Hex). Back drops the action; Roll sends it to the server, which throws the attack's d20,
- * or the face a physical die shows is typed in its place while the table lets this browser type.
+ * the template on the map; the skill a check action is made with (Search, Influence), the ability a
+ * cast chooses (Hex) and the condition it imposes or ends (Blindness/Deafness, Lesser Restoration).
+ * Cancel drops the action; Roll sends it to the server, which throws the attack's d20, or the face a
+ * physical die shows is typed in its place while the table lets this browser type.
  */
 export function ActionTargetPicker({
   picking,
@@ -31,49 +48,78 @@ export function ActionTargetPicker({
   onMap = false,
   busy,
   onRoll,
-  onInvalidFace
+  onInvalidFace,
+  insideNow
 }: Readonly<{
   picking: TargetingSession;
-  targets: ReadonlyArray<{ id: string; label: string }>;
-  /** The GM can also pick by clicking tokens on the map, so the heading says so. */
+  targets: ReadonlyArray<Pick<TargetRow, "id" | "label"> & Partial<TargetRow>>;
+  /** Tokens on the map can be tapped to pick them too, so the heading says so. */
   onMap?: boolean;
   busy: boolean;
   /** `face` is a typed attack d20. */
   onRoll: (face?: number) => void;
   onInvalidFace?: (message: string) => void;
+  /** For an area: who it covers where it is placed, of the creatures this viewer can see. The server decides. */
+  insideNow?: readonly TargetRow[];
 }>) {
   const { mayType } = useRollPreference();
+  // On a phone the panel under the map is short, so the picker scrolls up to show its first rows.
+  const groupRef = useRef<HTMLDivElement | null>(null);
+  const actionId = picking.action.id;
+  useEffect(() => {
+    const phone = window.matchMedia?.("(max-width: 979px)").matches ?? false;
+    revealInRegion(groupRef.current, phone ? "start" : "nearest");
+  }, [actionId]);
   const skillCatalog = useSkillCatalog();
   const group = useId();
   const ready = targetingReady(picking);
-  // Placing a spell's lingering area (Moonbeam) rolls nothing: Place sets it on the map.
-  const placingZone = picking.placeZoneId !== undefined;
   const skillName = (id: string) => skillCatalog.items.find((skill) => skill.id === id)?.name ?? id;
   const darts = picking.darts;
   const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
+  // The level or "Cantrip" the list shows in brackets is noise once the action is chosen.
+  const name = plainActionName(picking.action.name);
+  const verb = rollsNothing(picking.action) ? "Use" : "Roll";
+  const where = onMap ? " on the map or in the list" : "";
   return (
-    <div className="action-targeting" role="group" aria-label={`Targets for ${picking.action.name}`}>
+    <div className="action-targeting" role="group" aria-label={`Targets for ${name}`} ref={groupRef}>
       {picking.mode === "none" ? (
         <p className="action-targeting-head">
-          <strong>{picking.action.name}</strong> -{" "}
-          {picking.action.checkSkills?.length ? "choose the skill, then Roll." : "no target to choose. Roll to use it."}
+          <strong>{name}</strong> ·{" "}
+          {picking.action.checkSkills?.length
+            ? "choose the skill, then Roll."
+            : `no target to choose.${verb === "Roll" ? " Roll to use it." : ""}`}
         </p>
       ) : picking.mode === "template" ? (
-        <p className="action-targeting-head">
-          <strong>{picking.action.name}</strong> - place the{" "}
-          {picking.action.area ? areaWords(picking.action.area) : "area"} on the map
-          {placingZone
-            ? picking.template?.placed
-              ? " (placed - Place to set it there)."
-              : ", then Place."
-            : `${picking.template?.placed ? " (placed - Roll to resolve)" : ", then Roll"}. Everyone under it is caught automatically.`}
-        </p>
+        <>
+          {/* The area keeps the action's own size: the drag only places and points it. */}
+          <p className="action-targeting-head">
+            <strong>{name}</strong> · {picking.action.area ? areaWords(picking.action.area) : "area"}
+          </p>
+          <p className="action-targeting-hint">
+            {picking.template?.placed
+              ? "Drag again to move it. Everything inside is caught when you roll."
+              : "Drag on the map to place it. Everything inside is caught when you roll."}
+          </p>
+          {picking.template?.placed && insideNow && (
+            <>
+              <p className="action-targeting-inside">Inside now · {insideNow.length}</p>
+              <ul className="action-target-list scroll-y">
+                {insideNow.map((target) => (
+                  <li key={target.id} className="action-target is-inside">
+                    <TargetAvatar target={target} />
+                    <span className="action-target-name">{target.label}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="action-targeting-hint">Only those you can see are listed.</p>
+            </>
+          )}
+        </>
       ) : (
         <>
           <p className="action-targeting-head">
-            <strong>{picking.action.name}</strong> -{" "}
-            {picking.mode === "single" ? "choose one target" : "choose targets"}
-            {onMap ? (picking.mode === "single" ? " (or click a token)" : " (or click tokens)") : ""}
+            <strong>{name}</strong> · {picking.mode === "single" ? "choose one target" : "choose targets"}
+            {where}
             {darts
               ? `. ${darts.total} darts: ${assigned >= darts.total ? "all assigned" : `${darts.total - Math.min(assigned, darts.total)} left, which go round the chosen targets in order`}.`
               : ""}
@@ -81,14 +127,16 @@ export function ActionTargetPicker({
           <ul className="action-target-list scroll-y">
             {targets.map((target) => (
               <li key={target.id}>
-                <label className="action-target">
+                <label className={`action-target${picking.selected.includes(target.id) ? " is-picked" : ""}`}>
                   <input
                     type={picking.mode === "single" ? "radio" : "checkbox"}
                     name={group}
                     checked={picking.selected.includes(target.id)}
                     onChange={() => toggleTarget(target.id)}
                   />
-                  <span>{target.label}</span>
+                  {target.initials !== undefined && <TargetAvatar target={target as TargetRow} />}
+                  <span className="action-target-name">{target.label}</span>
+                  {target.detail && <span className="action-target-detail">{target.detail}</span>}
                 </label>
                 {darts && picking.selected.includes(target.id) && (
                   <Stepper
@@ -178,14 +226,17 @@ export function ActionTargetPicker({
           </Select>
         </label>
       )}
-      <div className="action-targeting-buttons">
-        <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
-          Back
-        </Button>
-        <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
-          {placingZone ? "Place" : `Roll ${picking.action.name}`}
-        </button>
-      </div>
+      {/* On a phone Cancel and Roll go to the bar under the thumb. */}
+      <InFooter>
+        <div className="action-targeting-buttons">
+          <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
+            Cancel
+          </Button>
+          <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
+            {verb} {name}
+          </button>
+        </div>
+      </InFooter>
       {mayType && ready && picking.mode === "single" && picking.action.attackBonus !== null && (
         <div className="action-targeting-face">
           <FaceEntry
@@ -197,5 +248,15 @@ export function ActionTargetPicker({
         </div>
       )}
     </div>
+  );
+}
+
+/** A target's avatar as its token shows it: initials, and the number it carries among its kind. */
+function TargetAvatar({ target }: Readonly<{ target: TargetRow }>) {
+  return (
+    <span className={`target-avatar ${target.kind}`} aria-hidden="true">
+      {target.initials}
+      {target.number !== undefined && <span className="target-avatar-number">{target.number}</span>}
+    </span>
   );
 }

@@ -4,8 +4,9 @@
 */
 
 /* Theme */
-export { type Theme } from "./theme/theme";
-export { ThemeToggle } from "./theme/ThemeToggle";
+export { type Theme, THEMES, THEME_NAMES } from "./theme/theme";
+export { ThemeSwitch, ThemeToggle } from "./theme/ThemeToggle";
+export { colourDistance, contrastRatio, parseColour, type Rgb } from "./theme/colour";
 
 /* Primitives */
 export { cx } from "./primitives/util";
@@ -18,25 +19,29 @@ export { Tabs } from "./primitives/Tabs";
 export { Menu, MenuItem } from "./primitives/Menu";
 export { Modal } from "./primitives/Modal";
 export { Drawer } from "./primitives/Drawer";
-export { ToastProvider, useToast, useToastMute, type ToastTone } from "./primitives/Toast";
+export { ToastProvider, ToastOutlet, useToast, useToastMute, type ToastTone } from "./primitives/Toast";
 export { Badge, type BadgeTone } from "./primitives/Badge";
 export { Avatar, type AvatarPresence } from "./primitives/Avatar";
 export { Meter, type MeterTone } from "./primitives/Meter";
 export { Alert } from "./primitives/Alert";
 export { Switch } from "./primitives/Switch";
 export { Stepper } from "./primitives/Stepper";
+export { Slider } from "./primitives/Slider";
 /* The reveal family: the one way the product asks "do the players see this?". */
 export { RevealSwitch, VisibilityBadge, HiddenFromPlayers, GmOnlyTag } from "./primitives/Reveal";
 export { SegmentedControl, type SegmentedOption } from "./primitives/SegmentedControl";
 export { Steps, type StepItem } from "./primitives/Steps";
 export { Skeleton } from "./primitives/Skeleton";
 export { Kbd } from "./primitives/Kbd";
+export { QrCode } from "./primitives/QrCode";
+export { encodeQr, type QrMatrix } from "./primitives/qr-encode";
 
 /* Authoring primitives (Codex + homebrew editors, and any long typed-entity form) */
 export { FieldGrid } from "./primitives/FieldGrid";
 export { NumberField } from "./primitives/NumberField";
 export { TagInput, slugify, type TagInputProps } from "./primitives/TagInput";
 export { RowEditor } from "./primitives/RowEditor";
+export { useDragSurface } from "./primitives/dragSurface";
 export { Checklist, type ChecklistItem } from "./primitives/Checklist";
 export { SaveState, type SaveStatus } from "./primitives/SaveState";
 
@@ -53,6 +58,13 @@ export {
   IconEyeOff,
   IconX,
   IconPlay,
+  IconPause,
+  IconStop,
+  IconSkip,
+  IconShuffle,
+  IconVolume,
+  IconVolumeOff,
+  IconMusic,
   IconArrow,
   IconDownload,
   // Map tools and content marks.
@@ -62,6 +74,7 @@ export {
   IconDraw,
   IconFog,
   IconTerrain,
+  IconWall,
   IconColor,
   IconCleanup,
   IconScene,
@@ -74,10 +87,38 @@ export {
   IconDockLeft,
   IconDockRight,
   IconDockSidebar,
-  IconSparkle
+  IconSparkle,
+  IconBell,
+  IconGrip,
+  IconTv,
+  IconTarget,
+  IconLocate,
+  IconWait,
+  IconLog,
+  IconMore,
+  IconCheck,
+  IconDie,
+  IconInfo,
+  // The character sheet's tabs, menu and live states.
+  IconBolt,
+  IconBag,
+  IconPage,
+  IconMoon,
+  IconLevelUp,
+  IconUser,
+  IconCog,
+  IconKey,
+  IconCode,
+  IconPin,
+  IconList,
+  IconSkull,
+  IconConcentration,
+  // Section front pages and the map library.
+  IconHome,
+  IconMap
 } from "./primitives/icons";
 export { Combobox } from "./primitives/Combobox";
-export { MarkdownEditor } from "./primitives/MarkdownEditor";
+export { MarkdownEditor, applyMarkdownFormat } from "./primitives/MarkdownEditor";
 
 /* Guided-flow primitives (character builder, and any other long wizard) */
 export { WizardShell } from "./primitives/WizardShell";
@@ -88,3 +129,23 @@ export { DiceInputRow, type DiceEntryMode } from "./primitives/DiceInputRow";
 export { NameField } from "./primitives/NameField";
 export { FeatureList, type FeatureItem } from "./primitives/FeatureList";
 export { ReviewSummary, type ReviewSection } from "./primitives/ReviewSummary";
+
+/* The record surfaces' pieces (the Codex, the Compendium and the Scenes, Maps and Settings lists): who sees a record,
+   and a list's filters, dropdowns and sort. They say Hidden, Everyone or the characters' names. */
+export {
+  EVERYONE,
+  HIDDEN,
+  audienceLabel,
+  characterNames,
+  namesLabel,
+  revealedLabel,
+  sinceLabel,
+  toggleCharacter,
+  type Audience,
+  type AudienceKind,
+  type PartyCharacter
+} from "./records/audience";
+export { AudienceChip, FieldAudienceToggle, WhoSeesItMenu, WhoSeesItSwitch } from "./records/WhoSeesIt";
+export { FilterChips, FilterFlyout, FiltersButton } from "./records/FilterFlyout";
+export { Dropdown } from "./records/Dropdown";
+export { SortDialog, type SortDirection, type SortLevelOf } from "./records/SortDialog";

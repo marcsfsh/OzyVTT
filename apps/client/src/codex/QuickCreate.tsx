@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Field, Input, Modal, Select } from "@vtt/ui";
-import type { CodexPage } from "@vtt/domain";
+import { splitCodexHiddenBlocks, type CodexPage } from "@vtt/domain";
 import { codexApi } from "./api";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import { newId } from "../lib/ids";
@@ -29,6 +29,8 @@ export type QuickCreateRequest = Readonly<{
   note?: string;
   /** Run with the new page before navigation, e.g. to link it to the pin that made it. */
   onCreated?: (page: CodexPage) => void | Promise<void>;
+  /** Make the page and stay where you are, as a `[[link]]` typed in the editor does. */
+  stay?: boolean;
 }>;
 
 export type QuickCreateProps = Readonly<{
@@ -65,14 +67,15 @@ export function QuickCreate({ gmToken, request, onClose, onOpen, onChanged }: Qu
         entityType,
         ...(request.folder ? { folder: request.folder } : {}),
         playerBody: scaffold.player,
-        gmBody: scaffold.gm,
+        // The scaffold's GM sections become Hidden blocks, one per heading.
+        blocks: splitCodexHiddenBlocks(scaffold.gm),
         // Idempotency key: the button can be double-tapped, and a retry must not create two pages.
         commandId: newId()
       });
       await request.onCreated?.(page);
       await onChanged();
       onClose();
-      onOpen(page.id);
+      if (!request.stay) onOpen(page.id);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Couldn't create the page.");
       setBusy(false);

@@ -1,10 +1,10 @@
 import type {
   CodexEntityType,
-  CodexPage,
   CodexPageRevision,
   CodexRevisionHistorySettings,
   CodexRevisionHistoryUsage
 } from "@vtt/domain";
+import { blockContents, parseBlocks, type StoredBlock } from "./blocks.js";
 import type { CodexDb } from "./db.js";
 import { CodexValidationError, MAX_PRUNE_DAYS, parseFields, parseStringArray } from "./validate.js";
 
@@ -18,16 +18,19 @@ export type CodexPageRevisionExportRow = CodexPageRevision &
   Readonly<{
     entityType: CodexEntityType;
     fields: Readonly<Record<string, string>>;
-    gmFields: Readonly<Record<string, string>>;
+    hiddenFields: readonly string[];
   }>;
-/** The content a restore writes back. The in-world date is not part of it, so chronicle placement stays. */
+/**
+ * The content a restore writes back. The in-world date is not part of it, so chronicle placement stays, and nor
+ * is any audience: a revision is content, and a restore never shows players anything new.
+ */
 export type CodexRevisionContent = Pick<
   CodexPageRevisionExportRow,
-  "title" | "entityType" | "fields" | "gmFields" | "playerBody" | "gmBody" | "bannerAssetId" | "tags"
+  "title" | "entityType" | "fields" | "hiddenFields" | "playerBody" | "blocks" | "bannerAssetId" | "tags"
 >;
 
 const REVISION_COLUMNS =
-  "id, page_id, rev, title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag";
+  "id, page_id, rev, title, entity_type, fields_json, hidden_fields_json, player_body, blocks_json, banner_asset_id, tags_json, authored_at, author_tag";
 type RevisionRowRaw = {
   id: number;
   page_id: string;
@@ -35,9 +38,9 @@ type RevisionRowRaw = {
   title: string;
   entity_type: string;
   fields_json: string;
-  gm_fields_json: string;
+  hidden_fields_json: string;
   player_body: string;
-  gm_body: string;
+  blocks_json: string;
   banner_asset_id: string | null;
   tags_json: string;
   authored_at: string;
@@ -51,7 +54,7 @@ function toRevision(row: RevisionRowRaw): CodexPageRevision {
     rev: row.rev,
     title: row.title,
     playerBody: row.player_body,
-    gmBody: row.gm_body,
+    blocks: blockContents(parseBlocks(row.blocks_json)),
     bannerAssetId: row.banner_asset_id,
     tags: parseStringArray(row.tags_json),
     authoredAt: row.authored_at,
@@ -63,7 +66,7 @@ function toExportRevision(row: RevisionRowRaw): CodexPageRevisionExportRow {
     ...toRevision(row),
     entityType: row.entity_type as CodexEntityType,
     fields: parseFields(row.fields_json),
-    gmFields: parseFields(row.gm_fields_json)
+    hiddenFields: parseStringArray(row.hidden_fields_json)
   };
 }
 
@@ -73,9 +76,7 @@ export function insertRevision(
   revision: Omit<CodexPageRevisionExportRow, "id"> & Readonly<{ id?: number }>
 ): void {
   db.database
-    .prepare(
-      "INSERT INTO codex_page_revisions (id, page_id, rev, title, entity_type, fields_json, gm_fields_json, player_body, gm_body, banner_asset_id, tags_json, authored_at, author_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    )
+    .prepare(`INSERT INTO codex_page_revisions (${REVISION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       revision.id ?? null,
       revision.pageId,
@@ -83,9 +84,9 @@ export function insertRevision(
       revision.title,
       revision.entityType,
       JSON.stringify(revision.fields),
-      JSON.stringify(revision.gmFields),
+      JSON.stringify(revision.hiddenFields),
       revision.playerBody,
-      revision.gmBody,
+      JSON.stringify(revision.blocks),
       revision.bannerAssetId,
       JSON.stringify(revision.tags),
       revision.authoredAt,
@@ -93,17 +94,32 @@ export function insertRevision(
     );
 }
 
+/** A page's state as a revision keeps it. */
+export type CodexRevisionSource = Readonly<{
+  id: string;
+  rev: number;
+  title: string;
+  entityType: CodexEntityType;
+  fields: Readonly<Record<string, string>>;
+  hiddenFields: readonly string[];
+  playerBody: string;
+  blocks: readonly StoredBlock[];
+  bannerAssetId: string | null;
+  tags: readonly string[];
+  updatedAt: string;
+}>;
+
 /** Leaf write: checkpoint a page's stored state. `authoredAt` is when that content was written. */
-export function snapshotRevision(db: CodexDb, page: CodexPage, authorTag: string): void {
+export function snapshotRevision(db: CodexDb, page: CodexRevisionSource, authorTag: string): void {
   insertRevision(db, {
     pageId: page.id,
     rev: page.rev,
     title: page.title,
     entityType: page.entityType,
     fields: page.fields,
-    gmFields: page.gmFields,
+    hiddenFields: page.hiddenFields,
     playerBody: page.playerBody,
-    gmBody: page.gmBody,
+    blocks: blockContents(page.blocks),
     bannerAssetId: page.bannerAssetId,
     tags: page.tags,
     authoredAt: page.updatedAt,
@@ -185,7 +201,7 @@ export function revisionHistoryUsage(db: CodexDb): CodexRevisionHistoryUsage {
   const row = db.database
     .prepare(
       `SELECT COUNT(*) AS version_count,
-              COALESCE(SUM(LENGTH(title) + LENGTH(player_body) + LENGTH(gm_body) + LENGTH(fields_json) + LENGTH(gm_fields_json) + LENGTH(tags_json)), 0) AS version_bytes
+              COALESCE(SUM(LENGTH(title) + LENGTH(player_body) + LENGTH(blocks_json) + LENGTH(fields_json) + LENGTH(hidden_fields_json) + LENGTH(tags_json)), 0) AS version_bytes
        FROM codex_page_revisions`
     )
     .get() as { version_count: number; version_bytes: number };

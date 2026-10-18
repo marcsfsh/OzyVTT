@@ -22,6 +22,7 @@ import { tokenCreatureDistance } from "../movement-narration.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 import { initiatorOf, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+import { withArticle } from "@vtt/domain";
 
 // Ability checks rolled on the server, the GM's calls for a roll, and Heroic Inspiration (ADR-0012).
 
@@ -51,7 +52,8 @@ function checkDeps(
     names: {
       skill: (id) => skills.find((skill) => skill.id === id)?.name,
       tool: (id) => catalog.equipmentRecord(id)?.name
-    }
+    },
+    unseen: kit.unseenBy(initiatorOf(principal), draft)
   };
 }
 
@@ -66,7 +68,7 @@ function narrateVerdict(kit: Kit, actorId: string, result: CheckResult, visibili
   if (outcome.dc === null) return;
   kit.context.appendLog({
     kind: "action",
-    text: `${kit.actorName(actorId)} rolled ${outcome.total} on ${outcome.label} vs DC ${outcome.dc} - ${outcome.success ? "success" : "failure"}.`,
+    text: `${kit.actorName(actorId)} rolled ${outcome.total} on ${outcome.label} vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}.`,
     actorId,
     actorIds: [actorId],
     gmOnly: visibility !== "public" || kit.actorHidden(actorId)
@@ -166,19 +168,21 @@ export const rollCommands = [
         );
       });
       if (!committed.duplicate) {
-        const skills = kit.contentLibrary.forAudience("gm").skillSummaries();
+        const skills = kit.playCatalog().skillSummaries();
         const label = checkLabel(subject, {
           skill: (id) => skills.find((entry) => entry.id === id)?.name,
           tool: (id) => kit.equipmentCatalog().equipmentRecord(id)?.name
         });
         const what =
           kind === "save"
-            ? `a ${ABILITY_NAMES[ability]} saving throw`
-            : `a ${label.endsWith(" check") ? label : `${label} check`}`;
+            ? withArticle(`${ABILITY_NAMES[ability]} saving throw`)
+            : withArticle(label.endsWith(" check") ? label : `${label} check`);
         kit.context.broadcastTableEvent({
           kind: "action",
           text: `The GM calls for ${what}${dc !== undefined && blind !== true ? ` (DC ${dc})` : ""}.`,
-          gmOnly: actorIds.every((actorId) => kit.actorHidden(actorId))
+          gmOnly: actorIds.every((actorId) => kit.actorHidden(actorId)),
+          // The GM's panel shows the open call, so a toast about it would only repeat it in the third person.
+          playersOnly: true
         });
       }
       return { callId: commandId };

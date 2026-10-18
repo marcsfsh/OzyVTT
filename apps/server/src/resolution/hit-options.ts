@@ -10,7 +10,7 @@ import { upcastAction } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { SMITE_OF_PROTECTION_TAG } from "../paladin-auras.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
-import { recordRoll, sizeAtMost, type DefinitionAction, type ResolveContext } from "./context.js";
+import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { beginConcentration } from "./concentration.js";
 import { criticalExpression } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy } from "./economy.js";
@@ -61,8 +61,8 @@ function sneakAttackQualifies(ctx: ResolveContext): true | false | string {
     const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!ally || ally.id === attacker.id || ally.id === target.id) continue;
     if (!areAllies(attacker, ally, deps.resolveDefinition) || ally.hp.current <= 0 || isIncapacitated(ally)) continue;
-    // An ally the players can't see never qualifies a visible attacker on its own: the offer would reveal it.
-    if (ally.visibility !== "public" && attacker.visibility === "public") continue;
+    // An ally hidden from the table never qualifies a visible attacker on its own: the offer would reveal it.
+    if (ctx.hiddenFromTable(ally.id) && !ctx.hiddenFromTable(attacker.id)) continue;
     const apart = deps.distanceFeet?.(ally.id, target.id) ?? null;
     if (apart === null) unmeasured = true;
     else if (apart <= 5 + DISTANCE_TOLERANCE_FEET) return true;
@@ -87,13 +87,12 @@ function openSlots(ctx: ResolveContext, action: DefinitionAction): number[] {
     .sort((left, right) => left - right);
 }
 
-const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
 const capitalised = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
 /** What choosing it spends, in the card's words. */
 function costOf(action: DefinitionAction, slotLevel: number | undefined): string | null {
   const costs = [
-    ...(action.spellSlot && slotLevel !== undefined ? [`a ${ordinal(slotLevel)}-level spell slot`] : []),
+    ...(action.spellSlot && slotLevel !== undefined ? [`a level ${slotLevel} spell slot`] : []),
     ...(action.uses ? [action.uses.per === "turn" ? "once per turn" : `a use of ${action.name}`] : []),
     ...(action.activation === "bonus-action" ? ["your Bonus Action"] : [])
   ];
@@ -139,7 +138,7 @@ export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
       name: "Charge",
       dice: charge.damage.map((part) => `${part.formula} ${capitalised(part.type)}`).join(" + "),
       cost: null,
-      unverified: `Only if ${ctx.attacker.name} moved ${charge.feet ?? 20}+ feet straight toward the target just before the hit.`
+      unverified: `Only if ${ctx.attacker.name} moved ${charge.feet ?? 20}+ feet straight toward the target immediately before the hit.`
     });
   for (const action of ctx.siblings) {
     const rider = hitRiderOf(action);
@@ -254,8 +253,7 @@ export function rollHitOptions(ctx: ResolveContext): void {
         ended,
         ctx.deps
       );
-      for (const event of ended)
-        ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+      for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
       ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
     }
     if (rider.lingers) lingerOn(ctx, target, action, cast, rider.lingers);

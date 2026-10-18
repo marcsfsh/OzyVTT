@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CombatLogEntry, GameState, PlayerCombatView, PlayerHp } from "@vtt/domain";
+import { countOf, type CombatLogEntry, type GameState, type PlayerCombatView, type PlayerHp } from "@vtt/domain";
 import { apiRequest } from "../lib/api";
 import { downloadJson } from "../lib/download";
 
@@ -18,6 +18,10 @@ export type ArchiveSummary = Readonly<{
   endedAt: string;
   turnCount: number;
   playerVisible: boolean;
+  /** The GM's own name for it, or null. */
+  name: string | null;
+  /** The scene the fight was on; only the GM's list carries it. */
+  sceneName?: string | null;
 }>;
 type ArchiveTurn = Readonly<{
   index: number;
@@ -68,6 +72,18 @@ export function readArchive<T>(archiveId: number, token: string): Promise<T> {
 
 export const dateOnly = (iso: string) => new Date(iso).toLocaleDateString([], { dateStyle: "medium" });
 
+/** What a replay is called: the GM's name, else its scene and the day it was fought ("Fight" with no scene). */
+export function replayTitle(archive: ArchiveSummary): string {
+  return archive.name ?? `${archive.sceneName ?? "Fight"} · ${dateOnly(archive.endedAt)}`;
+}
+
+/** The line under a replay's name: its scene and day when the GM named it, then how long the fight was. */
+export function replayMeta(archive: ArchiveSummary): string {
+  const where = archive.name ? [archive.sceneName, dateOnly(archive.endedAt)].filter(Boolean).join(" · ") : null;
+  const duration = durationOf(archive.startedAt, archive.endedAt);
+  return [where, countOf(archive.turnCount, "turn"), duration].filter(Boolean).join(" · ");
+}
+
 /** How long the fight ran, said the way a person would say it. Null when the archive has no start. */
 export function durationOf(startedAt: string | null, endedAt: string): string | null {
   if (!startedAt) return null;
@@ -100,7 +116,7 @@ export function stepsOf(document: ArchiveDocument): readonly Step[] {
     const last = steps[steps.length - 1];
     steps[steps.length - 1] = { ...last, to: document.finalState.revision };
     steps.push({
-      label: "Aftermath - how the fight ended",
+      label: "Aftermath · how the fight ended",
       at: document.endedAt,
       state: document.finalState,
       from: document.finalState.revision,

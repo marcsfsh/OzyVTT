@@ -58,7 +58,7 @@ export function SpellListContents({
           keywords: spell.classes.join(" "),
           facet: resolved.on.has(spell.id) ? "in" : "out",
           disabled: selfTagged,
-          disabledReason: selfTagged ? "This spell names this list itself — edit the spell to change it." : undefined,
+          disabledReason: selfTagged ? "This spell names this list itself. Edit the spell to change it." : undefined,
           badge: selfTagged ? <Badge tone="info">From the spell</Badge> : undefined
         };
       }),
@@ -85,7 +85,7 @@ export function SpellListContents({
     <div className="hb-field">
       <span className="nh-field-label">Spells</span>
       <p className="nh-field-help">
-        <strong className="tabular">{resolved.on.size}</strong> {resolved.on.size === 1 ? "spell" : "spells"} —{" "}
+        <strong className="tabular">{resolved.on.size}</strong> {resolved.on.size === 1 ? "spell" : "spells"}:{" "}
         {inheritedCount} from{" "}
         {basedOn.length === 0 ? "no other list" : basedOn.length === 1 ? "one list" : `${basedOn.length} lists`},{" "}
         {add.length} added, {remove.length} removed.
@@ -110,9 +110,9 @@ export function SpellListContents({
         onFacetChange={setFacet}
         facetAllValue="all"
         emptyTitle="No spells on this list yet."
-        emptyText="Search for spells to add — SRD spells are fair game, and homebrew spells can name this list themselves."
+        emptyText="Search for SRD spells to add. Homebrew spells can also name this list themselves."
       />
-      {ctx.spells.length === 0 && <p className="nh-field-help">The spell catalog hasn&rsquo;t loaded yet.</p>}
+      {ctx.spells.length === 0 && <p className="nh-field-help">The spell catalog hasn't loaded yet.</p>}
     </div>
   );
 }

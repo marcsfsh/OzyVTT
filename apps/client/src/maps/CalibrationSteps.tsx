@@ -33,10 +33,10 @@ export function stepInstruction({
   placedArea: boolean;
   pointCount: number;
 }>): string {
-  if (expired) return "This calibration session expired — the server keeps a measurement for 30 minutes.";
+  if (expired) return "This calibration ran out: a measurement waits 30 minutes for Confirm.";
   if (step === 0)
     return map.kind === "battlemap"
-      ? "Does this map have a printed grid to line up against, or should distance come from two known points?"
+      ? "Choose how this map measures distance: a printed grid to line up against, or two points a known distance apart."
       : "A regional or world map is calibrated by real-world scale: measure a span whose length you already know.";
   if (step === 1) {
     if (squareMode)
@@ -57,10 +57,10 @@ export function stepInstruction({
 export function ExpiredNotice() {
   return (
     <div className="map-expired">
-      <strong>This calibration session expired.</strong>
+      <strong>This calibration ran out.</strong>
       <p>
-        The server holds an unconfirmed measurement for 30 minutes. Your 3 × 3 placement is still here — take it back to
-        the map and measure it again.
+        A measurement waits 30 minutes for Confirm. Your 3 × 3 placement is still here: take it back to the map and
+        measure it again.
       </p>
     </div>
   );
@@ -78,12 +78,12 @@ export function ModeStep({
           {
             value: "square",
             title: "Printed square grid",
-            description: "Drag over a 3 × 3 block of printed squares; the server measures the grid from it."
+            description: "Drag over a 3 × 3 block of printed squares. OzyVTT works out the grid from it."
           },
           {
             value: "gridless",
             title: "Gridless battle map",
-            description: "No overlay — distance comes from two points whose real-world span you know."
+            description: "No grid lines. Distance comes from two points a known distance apart."
           }
         ]
       : [
@@ -108,12 +108,10 @@ export function ModeStep({
 /** Step 1: the hint for the drag or the two points, and the crosshair that helps aim it. */
 export function MarkStep({
   squareMode,
-  points,
   crosshair,
   onCrosshairChange
 }: Readonly<{
   squareMode: boolean;
-  points: readonly Point[];
   crosshair: Crosshair;
   onCrosshairChange: (next: Crosshair) => void;
 }>) {
@@ -127,20 +125,16 @@ export function MarkStep({
       ) : (
         <p className="map-step-hint">
           Click point <strong>A</strong>, then point <strong>C</strong>. Pick two landmarks whose distance apart you
-          already know — a road's length, the span of a lake.
+          already know, such as a road's length or the span of a lake.
         </p>
       )}
-      {/* The crosshair aids aiming, so its controls live on this step. Once a wizard exists the crosshair is
-        not drawn (the overlay replaces it). */}
-      {squareMode && <CrosshairControls value={crosshair} onChange={onCrosshairChange} />}
-      {points.length > 0 && (
-        <p className="map-point-summary tabular">
-          {points.slice(0, 2).map((point, index) => (
-            <span key={index}>
-              <strong>{index === 0 ? "A" : "C"}</strong> {Math.round(point.x)}, {Math.round(point.y)}
-            </span>
-          ))}
-        </p>
+      {/* The crosshair aids aiming, so its look is set on this step, folded away: the default suits most maps. Once
+        a wizard exists the crosshair is not drawn (the overlay replaces it). */}
+      {squareMode && (
+        <details className="crosshair-details">
+          <summary>Crosshair look</summary>
+          <CrosshairControls value={crosshair} onChange={onCrosshairChange} />
+        </details>
       )}
     </div>
   );
@@ -174,7 +168,7 @@ export function TuneGridStep({
           {wizard.calibration.cellSizePx.toFixed(0)} px squares · {wizard.calibration.distancePerCell} ft each
         </p>
       )}
-      {/* Shown, not behind a `<details>`: the nudges are what this step is for, and the coordinate fields
+      {/* Shown in full, outside a `<details>`: the nudges are what this step is for, and the coordinate fields
         under them are the keyboard alternative. Every one is a server action. */}
       <div className="adjustment-groups">
         <fieldset>
@@ -311,8 +305,8 @@ export function VerifyStep({
         <strong>{points.length < 3 ? "Click a distant grid intersection" : "Check point V"}</strong>
         <p>
           {points.length < 3
-            ? "Choose one far from the 3 × 3 sample — that is what catches a spacing error."
-            : "Ask the server whether V lands close enough to an intersection on the blue overlay."}
+            ? "Choose one far from the 3 × 3 sample. A point far away shows a spacing error."
+            : "Check whether V lands close enough to an intersection on the blue overlay."}
         </p>
         <Button
           variant="secondary"
@@ -325,8 +319,8 @@ export function VerifyStep({
       {wizard?.verification && (
         <p className={wizard.verification.accepted ? "verification accepted" : "verification rejected"}>
           {wizard.verification.accepted
-            ? `Aligned — V is within ${wizard.verification.errorPx.toFixed(2)} px of the grid (tolerance ${wizard.verification.tolerancePx.toFixed(2)} px).`
-            : `Not aligned — V misses by ${wizard.verification.errorPx.toFixed(2)} px against a ${wizard.verification.tolerancePx.toFixed(2)} px tolerance. This does not block Confirm.`}
+            ? `Aligned. V is within ${wizard.verification.errorPx.toFixed(2)} px of the grid.`
+            : `Not aligned. V misses the grid by ${wizard.verification.errorPx.toFixed(2)} px. This doesn't block Confirm.`}
         </p>
       )}
       {wizard && (
@@ -352,7 +346,7 @@ export function VerifyStep({
 }
 
 /**
- * Step 3 on the scale path: a review, not a verification. The scale path has no server-side check, so
+ * Step 3 on the scale path: a review with no verification. The scale path has no server-side check, so
  * this reads back what will be saved, and no "verified" badge. When the server would refuse the span or
  * the distance, the sentence says which and the Scale row stays empty.
  */
@@ -373,7 +367,7 @@ export function ScaleReviewStep({
     <div className="map-step-panel">
       <p className="map-step-hint">
         {distancePerPixel !== null
-          ? "Nothing is saved yet. This is what “Save map scale” will send."
+          ? 'Nothing is saved yet. This is what "Save map scale" sends.'
           : scaleSpanPx > 0
             ? "The distance between A and C has to be more than zero before this can be saved."
             : "A and C are the same place, so there is no span to scale. Go back and put them on two different landmarks."}
@@ -381,11 +375,11 @@ export function ScaleReviewStep({
       <dl className="map-review tabular">
         <div>
           <dt>Point A</dt>
-          <dd>{points[0] ? `${Math.round(points[0].x)}, ${Math.round(points[0].y)}` : "—"}</dd>
+          <dd>{points[0] ? "Placed" : "None"}</dd>
         </div>
         <div>
           <dt>Point C</dt>
-          <dd>{points[1] ? `${Math.round(points[1].x)}, ${Math.round(points[1].y)}` : "—"}</dd>
+          <dd>{points[1] ? "Placed" : "None"}</dd>
         </div>
         <div>
           <dt>Known distance</dt>
@@ -395,7 +389,7 @@ export function ScaleReviewStep({
         </div>
         <div>
           <dt>Scale</dt>
-          <dd>{distancePerPixel !== null ? `${distancePerPixel.toFixed(4)} ${unit} per pixel` : "—"}</dd>
+          <dd>{distancePerPixel !== null ? `${distancePerPixel.toFixed(4)} ${unit} per pixel` : "None"}</dd>
         </div>
       </dl>
     </div>

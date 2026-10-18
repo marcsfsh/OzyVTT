@@ -1,4 +1,4 @@
-// Re-derives every `src/enums.ts` list from the bundles. On failure, update the constant, not the assertion.
+// Re-derives every `src/enums.ts` list from the bundles. On failure, update the constant and leave the assertion.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -70,8 +70,8 @@ describe("canonical SRD vocabularies", () => {
     expect(GEAR_CATEGORY_IDS).toEqual(authored);
   });
 
-  it("RARITY_IDS contains every rarity the bundles declare — the weaker assertion, and the honest one", () => {
-    // Rarity has no bundle to project, so this asserts containment rather than equality.
+  it("RARITY_IDS contains every rarity the bundles declare: the weaker assertion, and the honest one", () => {
+    // Rarity has no bundle to project, so this asserts containment.
     const declared = sorted([
       ...new Set(
         loadEquipment()

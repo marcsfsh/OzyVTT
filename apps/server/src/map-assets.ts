@@ -260,7 +260,8 @@ export function inspectMapImage(input: Uint8Array, policy: MapImagePolicy = {}):
   return inspection;
 }
 
-function deterministicAssetId(checksum: string) {
+/** A UUID-shaped id derived from the bytes' checksum, so one file is stored once. Shared with the sound store. */
+export function deterministicAssetId(checksum: string) {
   const bytes = Buffer.from(checksum.slice(0, 32), "hex");
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
@@ -268,13 +269,14 @@ function deterministicAssetId(checksum: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function safeOriginalName(name: string) {
-  const leaf = name.replace(/\\/g, "/").split("/").pop() ?? "map";
+/** The uploaded file's own name, without a path or control characters. */
+export function safeOriginalName(name: string, fallback = "map") {
+  const leaf = name.replace(/\\/g, "/").split("/").pop() ?? fallback;
   const sanitized = leaf
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .trim()
     .slice(0, 200);
-  return !sanitized || sanitized === "." || sanitized === ".." ? "map" : sanitized;
+  return !sanitized || sanitized === "." || sanitized === ".." ? fallback : sanitized;
 }
 
 function validateMetadata(value: unknown): MapAssetMetadata {

@@ -7,7 +7,10 @@
 import { useSyncExternalStore } from "react";
 // The Codex owns its address space (`codex/routes.ts`) and this module asks it. The import cycle via
 // `withQuery` is safe: neither module calls across it during evaluation.
-import { codexSectionOf } from "./codex/routes";
+import { codexSectionOf, GM_ONLY_SECTIONS, type CodexAddress } from "./codex/routes";
+import { compendiumViewOf } from "./compendium/routes";
+import { isSettingsSection } from "./settings/sections";
+import { redirectForOldMapAddress, scenesViewOf, type ScenesView } from "./scenes/routes";
 
 export type Route = Readonly<{
   /** The pathname, always leading-slash, never trailing-slash (except the bare root). */
@@ -52,63 +55,13 @@ export function registerNavigationGuard(guard: Guard): () => void {
 
 async function mayLeave(): Promise<boolean> {
   for (const guard of [...guards]) {
-    // Sequential, not `Promise.all`: each guard may prompt, and two prompts at once is a trap.
+    // Sequential: each guard may prompt, and two prompts at once (as `Promise.all` would give) is a trap.
     if (!(await guard())) return false;
   }
   return true;
 }
 
-// Transient history entries (the phone nav drawer only)
-
-/**
- * Pushes a same-path entry whose only job is to be popped, so Android back closes the phone nav
- * drawer instead of leaving the section. Dialogs stay out of history.
- */
-const transients = new Map<string, () => void>();
-
-export function pushTransient(key: string, onPop: () => void): void {
-  transients.set(key, onPop);
-  window.history.pushState({ transient: key }, "", window.location.href);
-}
-
-/** Withdraw a transient entry that was closed by its own affordance rather than by the back gesture. */
-export function popTransient(key: string): void {
-  if (!transients.has(key)) return;
-  transients.delete(key);
-  // `back()` pops our entry; the popstate handler sees no registered key and re-routes to the same
-  // path, a no-op render.
-  window.history.back();
-}
-
-/**
- * Forgets a transient entry without going back, for a caller about to navigate (`back()` is a task and
- * `navigate` a microtask, so the destination would be popped). Returns whether an entry is stranded,
- * so the caller can navigate with `replace: true`.
- */
-export function discardTransient(key: string): boolean {
-  if (!transients.has(key)) return false;
-  transients.delete(key);
-  return true;
-}
-
-/**
- * Pops an entry `discardTransient` released when the navigation was then vetoed, so the next Back is
- * not spent on a closed drawer. Same address, so no guard prompt.
- */
-export function releaseStrandedEntry(): void {
-  window.history.back();
-}
-
-window.addEventListener("popstate", (event) => {
-  const key = (event.state as { transient?: string } | null)?.transient;
-  // Popping forward onto a transient entry is never honoured; only its disappearance matters. With a
-  // transient registered, the pop closes it and the route stands.
-  if (transients.size > 0) {
-    const [openKey, onPop] = [...transients.entries()][transients.size - 1];
-    transients.delete(openKey);
-    onPop();
-    if (key === undefined) return;
-  }
+window.addEventListener("popstate", () => {
   /**
    * Back is a navigation too, so guards apply; the browser has already moved, so a veto pushes the
    * previous address back. With no guards, or a pop that keeps the address, it just publishes.
@@ -127,10 +80,7 @@ window.addEventListener("popstate", (event) => {
   });
 });
 
-/**
- * Goes to an address after the guards; a veto leaves the URL alone. Resolves to whether it navigated
- * (the nav drawer uses that to take back its released entry).
- */
+/** Goes to an address after the guards; a veto leaves the URL alone. Resolves to whether it navigated. */
 export function navigate(path: string, opts: Readonly<{ replace?: boolean }> = {}): Promise<boolean> {
   if (path === currentHref()) return Promise.resolve(false);
   return mayLeave().then((allowed) => {
@@ -156,7 +106,7 @@ export function replaceQuery(mutate: (query: URLSearchParams) => void): void {
   publish();
 }
 
-/** Builds an address with query parameters, dropping empty ones so a URL never carries `?tag=`. */
+/** Builds an address with query parameters, and drops empty ones so a URL never carries `?tag=`. */
 export function withQuery(path: string, params: Readonly<Record<string, string | number | null | undefined>>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -182,7 +132,7 @@ export function useRoute(): Route {
 
 // The app shell's address table
 
-export type GmTab = "scenes" | "table" | "roster" | "codex" | "homebrew" | "viewer" | "replay" | "settings";
+export type GmTab = "scenes" | "table" | "roster" | "codex" | "compendium" | "viewer" | "replay" | "settings";
 
 /** One address per GM tab; the server reserves `GET /viewer`, hence `/viewer-controls`. */
 const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
@@ -190,7 +140,7 @@ const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
   scenes: "/scenes",
   roster: "/roster",
   codex: "/codex",
-  homebrew: "/homebrew",
+  compendium: "/compendium",
   viewer: "/viewer-controls",
   replay: "/replays",
   settings: "/settings"
@@ -200,13 +150,22 @@ export function pathForGmTab(tab: GmTab): string {
   return GM_TAB_PATHS[tab];
 }
 
-/** Retired addresses, redirected so old bookmarks land. */
-const RETIRED_PATHS: Readonly<Record<string, string>> = { "/encounter": "/table", "/setup": "/settings" };
+/** The sound board: the Shared screen tab's second view, beside the display controls. */
+export const SOUND_BOARD_PATH = `${GM_TAB_PATHS.viewer}/sound`;
 
-/** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too. */
+/** Retired addresses, redirected so old bookmarks land. */
+const RETIRED_PATHS: Readonly<Record<string, string>> = {
+  "/encounter": "/table",
+  "/setup": "/settings",
+  // The Homebrew tab became the Compendium.
+  "/homebrew": "/compendium"
+};
+
+/** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too, and so does the
+ *  map library's `?map=` for one map's grid. */
 export function redirectForRetiredPath(path: string, query: URLSearchParams): string | null {
   if (path === "/scenes" && query.get("view") === "maps") return "/scenes/maps";
-  return RETIRED_PATHS[path] ?? null;
+  return redirectForOldMapAddress(path, query) ?? RETIRED_PATHS[path] ?? null;
 }
 
 /** Which GM tab an address renders, or null when the address is not a GM tab at all. */
@@ -223,15 +182,26 @@ export function litGmTab(path: string): GmTab | null {
   return gmTabForPath(path);
 }
 
+/** The player's tabs, and which one lights for an address: the player's own sheet, its level page and the builder
+ *  belong to My character; everything that is not My character, the Codex or Settings is the table. */
+export type PlayerTab = "mine" | "table" | "codex" | "settings";
+export function litPlayerTab(path: string): PlayerTab {
+  const head = path.split("/").filter(Boolean)[0] ?? "";
+  if (head === "me" || head === "characters" || head === "builder") return "mine";
+  if (head === "codex") return "codex";
+  if (head === "settings") return "settings";
+  return "table";
+}
+
 /**
  * Addresses only the GM may reach; a player gets not-found. Shared addresses whose content a player
  * may not see are guarded by the data, which also renders not-found.
  */
 export function isGmOnlyPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
-  if (segments[0] === "codex") return ["audit", "backup", "settings"].includes(segments[1] ?? "");
-  // `/settings` is shared but `/settings/api` is GM-only.
-  if (segments[0] === "settings") return segments[1] === "api";
+  if (segments[0] === "codex") return GM_ONLY_SECTIONS.includes((segments[1] ?? "") as CodexAddress);
+  // `/settings` and its Device section are shared; every other section, the API reference among them, is the GM's.
+  if (segments[0] === "settings") return segments[1] !== undefined && segments[1] !== "device";
   const tab = gmTabForPath(path);
   if (tab === null) return false;
   return tab !== "codex" && tab !== "table" && tab !== "settings" && tab !== "replay";
@@ -255,36 +225,45 @@ export function isKnownPath(path: string): boolean {
     if (segments.length === 2) return segments[1].length > 0;
     return segments.length === 3 && segments[2] === "level";
   }
-  if (segments[0] === "scenes") return segments.length === 1 || (segments.length === 2 && segments[1].length > 0);
+  if (segments[0] === "scenes") return scenesViewOf(segments, new URLSearchParams()) !== null;
+  // The Compendium's views and each record's own address.
+  if (segments[0] === "compendium") return compendiumViewOf(segments, new URLSearchParams()) !== null;
   // The player's own tab: one segment, nothing under it.
   if (segments[0] === "me") return segments.length === 1;
-  // `/settings/api` is the only two-segment settings address.
-  if (segments[0] === "settings") return segments.length === 1 || (segments.length === 2 && segments[1] === "api");
+  // A section of Settings, or one operation of the API reference by its operation id.
+  if (segments[0] === "settings")
+    return (
+      segments.length === 1 ||
+      (segments.length === 2 && isSettingsSection(segments[1])) ||
+      (segments.length === 3 && segments[1] === "api" && /^[A-Za-z][\w.-]{0,100}$/.test(segments[2]))
+    );
+  // The Shared screen tab is the display controls or, at `/sound`, the sound board.
+  if (segments[0] === "viewer-controls")
+    return segments.length === 1 || (segments.length === 2 && segments[1] === "sound");
   // A replay id is the archive's integer row id, so a non-numeric second segment is genuinely unknown.
   if (segments[0] === "replays")
     return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));
   return gmTabForPath(path) !== null && segments.length === 1;
 }
 
-/** A layer open over a tab (sheet, builder, level flow, replay, scene prep, maps), parsed in one place. */
+/** A layer open over a tab (sheet, builder, level flow, replay, a view inside Scenes), parsed in one place. */
 export type AddressLayer =
   | Readonly<{ kind: "sheet"; actorId: string }>
   | Readonly<{ kind: "level"; actorId: string }>
   | Readonly<{ kind: "builder" }>
   | Readonly<{ kind: "replay"; archiveId: number }>
-  | Readonly<{ kind: "scene-prep"; sceneId: string | null }>
-  | Readonly<{ kind: "maps" }>;
+  | Readonly<{ kind: "scenes"; view: ScenesView }>;
 
-export function layerOf(path: string): AddressLayer | null {
+export function layerOf(path: string, query: URLSearchParams = new URLSearchParams()): AddressLayer | null {
   const segments = path.split("/").filter(Boolean);
   if (segments[0] === "characters" && segments[1]) {
     return segments[2] === "level" ? { kind: "level", actorId: segments[1] } : { kind: "sheet", actorId: segments[1] };
   }
   if (segments[0] === "builder" && segments.length === 1) return { kind: "builder" };
   if (segments[0] === "replays" && segments.length === 2) return { kind: "replay", archiveId: Number(segments[1]) };
-  if (segments[0] === "scenes" && segments.length === 2) {
-    if (segments[1] === "maps") return { kind: "maps" };
-    return { kind: "scene-prep", sceneId: segments[1] === "new" ? null : segments[1] };
+  if (segments[0] === "scenes" && segments.length >= 2) {
+    const view = scenesViewOf(segments, query);
+    return view ? { kind: "scenes", view } : null;
   }
   return null;
 }

@@ -82,7 +82,7 @@ describe("the manual damage entry's type chooser", () => {
     await user.click(box);
     // Scoped to this listbox: the menu's Size and Health `<select>`s have native options of their own.
     const list = screen.getByRole("listbox", { name: "Damage type" });
-    // The whole vocabulary, not the chooser's default page of eight.
+    // The whole vocabulary, beyond the chooser's default page of eight.
     expect(within(list).getAllByRole("option")).toHaveLength(13);
     expect(within(list).getByRole("option", { name: "Bludgeoning" })).toBeTruthy();
   });
@@ -92,7 +92,7 @@ describe("the manual damage entry's type chooser", () => {
     mount();
     await user.type(screen.getByLabelText("Amount"), "10");
     await chooseType(user, "Fire");
-    await user.click(screen.getByRole("button", { name: "Dmg" }));
+    await user.click(screen.getByRole("button", { name: "Damage" }));
     const [event, payload] = lastHpCall();
     expect(event).toBe("actor:apply-damage");
     expect(payload).toMatchObject({ actorId: ACTOR.id, amount: 10, damageType: "fire" });
@@ -102,7 +102,7 @@ describe("the manual damage entry's type chooser", () => {
     const user = userEvent.setup();
     mount();
     await user.type(screen.getByLabelText("Amount"), "10");
-    await user.click(screen.getByRole("button", { name: "Dmg" }));
+    await user.click(screen.getByRole("button", { name: "Damage" }));
     // An untouched chooser must not add `damageType` to the payload.
     expect("damageType" in lastHpCall()[1]).toBe(false);
   });
@@ -122,9 +122,9 @@ describe("the manual damage entry's type chooser", () => {
     const user = userEvent.setup();
     mount();
     await user.type(screen.getByLabelText("Amount"), "10");
-    // Typed, not picked, then left by moving to the next control: `Combobox` commits on blur.
+    // Typed and never picked, then left by moving to the next control: `Combobox` commits on blur.
     await user.type(screen.getByRole("combobox", { name: "Damage type" }), "Primordial Ooze");
-    await user.click(screen.getByRole("button", { name: "Dmg" }));
+    await user.click(screen.getByRole("button", { name: "Damage" }));
     expect(lastHpCall()[1]).toMatchObject({ amount: 10, damageType: "primordial-ooze" });
   });
 });
@@ -152,7 +152,7 @@ describe("the sheet's HP box carries the type too", () => {
     mountSheetHp();
     await user.type(screen.getByLabelText("Amount"), "10");
     await chooseType(user, "Fire");
-    await user.click(screen.getByRole("button", { name: "Dmg" }));
+    await user.click(screen.getByRole("button", { name: "Damage" }));
     const [event, payload] = lastHpCall();
     expect(event).toBe("actor:apply-damage");
     expect(payload).toMatchObject({ actorId: ACTOR.id, amount: 10, damageType: "fire" });
@@ -160,11 +160,17 @@ describe("the sheet's HP box carries the type too", () => {
     expect(ApplyDamageSchema.parse(payload).damageType).toBe("fire");
   });
 
+  it("names the chooser where it can be read, not only in its placeholder", () => {
+    mountSheetHp();
+    const field = screen.getByRole("combobox", { name: "Damage type" });
+    expect(field.closest(".damage-type-field")?.textContent).toContain("Damage type");
+  });
+
   it("sends no type at all while the sheet's chooser is untouched", async () => {
     const user = userEvent.setup();
     mountSheetHp();
     await user.type(screen.getByLabelText("Amount"), "10");
-    await user.click(screen.getByRole("button", { name: "Dmg" }));
+    await user.click(screen.getByRole("button", { name: "Damage" }));
     expect("damageType" in lastHpCall()[1]).toBe(false);
   });
 
@@ -184,7 +190,7 @@ describe("the sheet's HP box carries the type too", () => {
     mountSheetHp();
     await user.type(screen.getByLabelText("Amount"), "10");
     await chooseType(user, "Cold");
-    await user.click(screen.getByRole("button", { name: "Dmg" }));
+    await user.click(screen.getByRole("button", { name: "Damage" }));
     // Drive the ack: the feedback line is written from inside it, once the reply settles.
     lastHpCall()[2]({ ok: true });
     await waitFor(() => expect(said.at(-1)).toBe("Aria took 10 cold damage."));
@@ -247,11 +253,11 @@ describe("the turn-order row's tools popover carries the type too", () => {
     const tools = await openPanel(user);
     await user.type(tools.getByLabelText("Amount"), "10");
     await chooseType(user, "Fire");
-    await user.click(tools.getByRole("button", { name: "Dmg" }));
+    await user.click(tools.getByRole("button", { name: "Damage" }));
     // Drive the ack: the panel writes its line from inside the promise.
     lastHpCall()[2]({ ok: true });
     // The confirmation is built from the same computed type as the payload, and is asserted first so a
-    // wrong value fails here rather than at a payload guard.
+    // wrong value fails here and never at a payload guard.
     expect(await screen.findByText("Aria took 10 fire damage.")).toBeTruthy();
     const [event, payload] = lastHpCall();
     expect(event).toBe("actor:apply-damage");
@@ -262,7 +268,7 @@ describe("the turn-order row's tools popover carries the type too", () => {
     const user = userEvent.setup();
     const tools = await openPanel(user);
     await user.type(tools.getByLabelText("Amount"), "10");
-    await user.click(tools.getByRole("button", { name: "Dmg" }));
+    await user.click(tools.getByRole("button", { name: "Damage" }));
     expect("damageType" in lastHpCall()[1]).toBe(false);
   });
 
@@ -293,12 +299,12 @@ describe("the turn-order row's tools popover carries the type too", () => {
     const first = await openPanel(user);
     await user.type(first.getByLabelText("Amount"), "10");
     await chooseType(user, "Fire");
-    await user.click(first.getByRole("button", { name: "Dmg" }));
+    await user.click(first.getByRole("button", { name: "Damage" }));
     lastHpCall()[2]({ ok: true }); // the panel stays `busy` until the first command is answered
     await user.click(screen.getByTitle(/^Manage Borin/));
     const second = within(screen.getByRole("dialog", { name: "Tools for Borin" }));
     await user.type(second.getByLabelText("Amount"), "6");
-    await user.click(second.getByRole("button", { name: "Dmg" }));
+    await user.click(second.getByRole("button", { name: "Damage" }));
     lastHpCall()[2]({ ok: true });
     expect(await screen.findByText("Borin took 6 fire damage.")).toBeTruthy();
     expect(lastHpCall()[1]).toMatchObject({ actorId: SECOND_ID, amount: 6, damageType: "fire" });

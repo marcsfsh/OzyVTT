@@ -1,11 +1,11 @@
-import { useState } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { Button, useToast } from "@vtt/ui";
+import { useReleaseCharacter } from "../actors/MyCharacter";
+import { ShortRestPrompt } from "../rest/ShortRestPrompt";
 import { lazySurface } from "../components/lazySurface";
 import { NotFoundPage } from "../components/NotFoundView";
-import { CharacterSheet } from "../encounter/CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
 import { navigate, pathForGmTab, type AddressLayer } from "../router";
-import { TokenLibrary } from "../tokens/TokenLibrary";
 import type { Connection } from "./useSession";
 
 const CharacterBuilder = lazySurface(() => import("../builder/CharacterBuilder").then((m) => m.CharacterBuilder));
@@ -16,7 +16,7 @@ const ReplayViewer = lazySurface(() => import("../replay/ReplayViewer").then((m)
 export type FullPageLayer = Extract<AddressLayer, { kind: "builder" | "level" | "replay" | "sheet" }>;
 
 export const isFullPageLayer = (layer: AddressLayer | null): layer is FullPageLayer =>
-  layer !== null && layer.kind !== "maps" && layer.kind !== "scene-prep";
+  layer !== null && layer.kind !== "scenes";
 
 /**
  * A full-page layer for either role: the builder (or its policy gate), the level flow, a replay, or a
@@ -45,7 +45,7 @@ export function LayerView({
           /* The wizard gates its last step on this prop: a disabled Create beats a banner to notice. */
           connection={connection}
           onClose={() => navigate(home)}
-          onCreated={(name) => toast(`${name} joined the roster — ready to claim.`, { tone: "success" })}
+          onCreated={(name) => toast(`${name} joined the roster, ready for a player to claim.`, { tone: "success" })}
         />
       ) : (
         /* The builder is closed to players at this table: one line and one door back. */
@@ -53,8 +53,8 @@ export function LayerView({
           <div className="pane-sky" aria-hidden="true" />
           <div className="scene-empty frame-fill">
             <p>
-              Your GM builds the characters at this table. Ask them to make you one, or claim one that&rsquo;s already
-              on the table.
+              Your GM builds the characters at this table. Ask them to make you one, or claim one that's already on the
+              table.
             </p>
             <Button variant="primary" onClick={() => navigate("/table")}>
               Back to the table
@@ -94,6 +94,7 @@ export function LayerView({
 /**
  * A character sheet at its own address. A player asking for someone else's sheet gets the not-found
  * view: their projection does not carry it, so "no such character" is both true and indistinguishable.
+ * A player's own sheet here is the one on My character, with the same menu.
  */
 function SheetLayer({
   actorId,
@@ -108,42 +109,53 @@ function SheetLayer({
   token: string;
   onClose: () => void;
 }>) {
-  /** The token picker for this character. The server decides who may set which token. */
-  const [pickingToken, setPickingToken] = useState(false);
   const actor = state.actors.find((entry) => entry.id === actorId);
   if (!actor) return <NotFoundPage role={role} />;
-  /* The sheet is its own frame. The two page-level doors ride inside it as the bottom row; they are
-     passed only from here because they navigate to app addresses and `sheet.html` has no router. */
+  if (role === "player")
+    return <PlayerSheetPage state={state as PlayerView} actorId={actorId} token={token} onClose={onClose} />;
   return (
-    <div className="anim-view sheet-page frame-col">
+    <div className="anim-view cs-page frame-col">
       <CharacterSheet
         actor={actor}
         role={role}
         state={state}
-        standalone
+        presentation="page"
+        token={token}
+        onLevel={() => navigate(`/characters/${actorId}/level`)}
         onClose={onClose}
-        standaloneActions={
-          <>
-            <Button variant="secondary" onClick={() => navigate(`/characters/${actorId}/level`)}>
-              Level up or down…
-            </Button>
-            <Button variant="secondary" onClick={() => setPickingToken(true)}>
-              Set token image…
-            </Button>
-          </>
-        }
       />
-      {pickingToken && (
-        <TokenLibrary
-          actorId={actor.id}
-          actorName={actor.name}
-          definitionId={actor.definitionId ?? null}
-          currentAssetId={actor.tokenAssetId ?? null}
-          token={token}
-          role={role}
-          onClose={() => setPickingToken(false)}
-        />
-      )}
+    </div>
+  );
+}
+
+/** A player's own sheet at its address: the release verb and the party's Short Rest, as on My character. */
+function PlayerSheetPage({
+  state,
+  actorId,
+  token,
+  onClose
+}: Readonly<{ state: PlayerView; actorId: string; token: string; onClose: () => void }>) {
+  const { release, releasing, dialog } = useReleaseCharacter(state);
+  const actor = state.actors.find((entry) => entry.id === actorId)!;
+  const mine = actor.claimStatus === "mine";
+  return (
+    <div className="anim-view cs-page frame-col">
+      <CharacterSheet
+        actor={actor}
+        role="player"
+        state={state}
+        presentation="page"
+        token={token}
+        top={<ShortRestPrompt state={state} />}
+        {...(state.builderPolicy.playerBuilder === "open"
+          ? { onLevel: () => navigate(`/characters/${actorId}/level`) }
+          : {})}
+        {...(mine && !releasing
+          ? { doors: { release: { name: actor.name, onSelect: () => void release(actor.name) } } }
+          : {})}
+        onClose={onClose}
+      />
+      {dialog}
     </div>
   );
 }

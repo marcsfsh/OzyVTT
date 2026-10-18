@@ -59,7 +59,7 @@ describe("a multiclass draft's classes", () => {
       { id: "fighter", levels: 3 },
       { id: "wizard", levels: 2 }
     ]);
-    // Another Fighter level goes on the end; taking it back removes the last Fighter level, not the first.
+    // Another Fighter level goes on the end; taking it back removes the last Fighter level.
     const fourth = withClassLevels(threeAndTwo, "fighter", 4);
     expect(classSequenceOf(fourth)).toEqual(["fighter", "fighter", "fighter", "wizard", "wizard", "fighter"]);
     expect(classSequenceOf(withClassLevels(fourth, "fighter", 3))).toEqual(classSequenceOf(threeAndTwo));
@@ -123,7 +123,7 @@ describe("the ability step for a multiclass draft", () => {
       stepBlockedReason("abilities", { ...draft, hpMode: "entries", hpEntries }, catalogs, [], pointBuyPolicy);
     // Level 2 is a Fighter level (d10), level 3 the Wizard's first (d6).
     expect(reason([10, 6])).toBeNull();
-    expect(reason([10, 7])).toBe("A d6 roll is 1-6 - fix the level 3 entry.");
+    expect(reason([10, 7])).toBe("A d6 roll is 1-6. Fix the level 3 entry.");
   });
 
   it("says which class's multiclass minimum the scores miss, as the table does", () => {
@@ -140,7 +140,7 @@ describe("the ability step for a multiclass draft", () => {
     expect(reason({})).toBeNull();
     // The class already taken needs its own 13 too.
     expect(reason({ str: 12, dex: 12 })).toBe(
-      "To take Wizard at level 3: Your Fighter needs Strength 13 or Dexterity 13; you have Strength 12 and Dexterity 12."
+      "To take Wizard at level 3: Fighter, a class you already have, needs Strength 13 or Dexterity 13; you have Strength 12 and Dexterity 12."
     );
   });
 
@@ -180,5 +180,40 @@ describe("the ability step for a multiclass draft", () => {
     );
     // At level 5 it comes after: Intelligence 14.
     expect(reason(withClassAdded(fighterAt(4), "wizard"))).toBeNull();
+  });
+});
+
+describe("a pick the step still waits on", () => {
+  const mastery: BuilderOffer = {
+    key: "feature:weapon-mastery@4",
+    step: "features",
+    featureId: "weapon-mastery",
+    kind: "weapon-mastery",
+    label: "Weapon Mastery",
+    help: null,
+    capacity: 4,
+    options: ["club", "dagger", "flail", "glaive", "greataxe"].map((id) => ({ id, name: id })),
+    maxSpellLevel: null,
+    maximum: null,
+    level: 4,
+    classId: "fighter",
+    unresolvable: null,
+    unavailable: null
+  } as unknown as BuilderOffer;
+  const reason = (picked: string[]) =>
+    stepBlockedReason(
+      "features",
+      { ...fighterAt(4), subclassId: "champion", picks: { [mastery.key]: picked } },
+      catalogs,
+      [mastery],
+      policy
+    );
+
+  it("counts what is left in sentences of their own", () => {
+    expect(reason([])).toBe("Choose 4 for Weapon Mastery to continue.");
+    expect(reason(["club", "dagger", "flail"])).toBe(
+      "Choose 1 more for Weapon Mastery to continue. 3 of 4 are chosen."
+    );
+    expect(reason(["club", "dagger", "flail", "glaive"])).toBeNull();
   });
 });

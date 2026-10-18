@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type {
@@ -73,6 +73,7 @@ const CANTRIPS = [
 const spell = (name: string, level: number): ContentSpellSummary => ({
   id: name.toLowerCase().replace(/ /g, "-"),
   name,
+  source: "srd",
   level,
   school: "evocation",
   castingTime: "action",
@@ -146,7 +147,8 @@ const cleric = {
   levelTable: [
     levelRow(1, { cantripsKnown: 3, spellSlots: [2], preparedCount: 4 }),
     levelRow(2, { cantripsKnown: 3, spellSlots: [3], preparedCount: 5 }),
-    levelRow(3, { cantripsKnown: 3, spellSlots: [4, 2], preparedCount: 6 })
+    levelRow(3, { cantripsKnown: 3, spellSlots: [4, 2], preparedCount: 6 }),
+    levelRow(4, { cantripsKnown: 4, spellSlots: [4, 3], preparedCount: 7 })
   ],
   startingEquipmentOptions: [],
   features: [
@@ -388,6 +390,21 @@ function offersFor(request: BuilderOffersRequest) {
           classId: cleric.id
         })
       );
+    // SRD Cleric: an Ability Score Improvement (or a feat) at level 4.
+    if (request.level >= 4)
+      offers.push(
+        fixtureOffer({
+          key: "feature:ability-score-improvement@4",
+          step: "features",
+          featureId: "ability-score-improvement",
+          kind: "asi-or-feat",
+          label: "Ability Score Improvement",
+          capacity: 1,
+          options: [{ id: "alert", name: "Alert" }],
+          level: 4,
+          classId: cleric.id
+        })
+      );
     const row = cleric.levelTable[request.level - 1];
     offers.push(
       fixtureOffer({
@@ -414,7 +431,10 @@ function offersFor(request: BuilderOffersRequest) {
   }
   const picks = Object.fromEntries(
     offers.flatMap((offer) => {
-      const kept = (request.picks?.[offer.key] ?? []).filter((id) => offer.options.some((option) => option.id === id));
+      // An improvement's "raise ability scores" answer is its own shorthand, separate from the feat options.
+      const kept = (request.picks?.[offer.key] ?? []).filter(
+        (id) => offer.options.some((option) => option.id === id) || (offer.kind === "asi-or-feat" && id === "asi")
+      );
       return kept.length > 0 ? [[offer.key, kept.slice(0, offer.capacity)]] : [];
     })
   );
@@ -422,7 +442,7 @@ function offersFor(request: BuilderOffersRequest) {
     ok: true,
     offers,
     picks,
-    asiIncreases: {},
+    asiIncreases: request.asiIncreases ?? {},
     subclassId: picks["feature:cleric-subclass"]?.[0] ?? null,
     choices: []
   };
@@ -452,6 +472,7 @@ import { socket } from "../socket";
 import { emptyDraft, type BuilderDraft } from "./build-payload";
 import { CharacterBuilder } from "./CharacterBuilder";
 import { LevelFlow } from "./LevelFlow";
+import { RandomCharacterModal } from "./RandomCharacter";
 
 const gmView = {
   revision: 1,
@@ -501,7 +522,7 @@ async function toClassFeatures(user: ReturnType<typeof userEvent.setup>, level: 
 
 // Issue 1
 
-describe("Issue 1 — an answered offer keeps the options it did not take", () => {
+describe("Issue 1: an answered offer keeps the options it did not take", () => {
   it("leaves all three Keen Senses skills on screen after Perception is picked, and lets the pick be swapped", async () => {
     const user = userEvent.setup();
     mount();
@@ -552,7 +573,7 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
    * 12-option offer behaves like the 3-option one, and the grid's bounded scroll region keeps the
    * page height in check.
    */
-  it("keeps a LONG answered offer's options mounted and greys them — the fold is deleted, not gated", async () => {
+  it("keeps a LONG answered offer's options mounted and greys them; the fold is deleted", async () => {
     const user = userEvent.setup();
     mount();
     await toClassFeatures(user, 1);
@@ -617,7 +638,7 @@ describe("Issue 1 — an answered offer keeps the options it did not take", () =
 
 // Issue 2b
 
-describe("Issue 2b — the class features step and its subclass", () => {
+describe("Issue 2b: the class features step and its subclass", () => {
   it("names the level the subclass arrives at, in the step body, when the build is below it", async () => {
     const user = userEvent.setup();
     mount();
@@ -628,7 +649,7 @@ describe("Issue 2b — the class features step and its subclass", () => {
     expect(screen.queryByRole("heading", { name: "Cleric Subclass" })).toBeNull();
 
     /**
-     * In the step body, not the detail pane, which is hidden on narrow screens. jsdom loads no
+     * In the step body: the detail pane is hidden on narrow screens. jsdom loads no
      * stylesheet, so this asserts structure: the note is in the step and the pane is not rendered.
      */
     expect(document.querySelector(".cb-step")).toContainElement(
@@ -659,7 +680,7 @@ describe("Issue 2b — the class features step and its subclass", () => {
 
 // Issue 2c
 
-describe("Issue 2c — a spell's rules can be read while choosing spells", () => {
+describe("Issue 2c: a spell's rules can be read while choosing spells", () => {
   it("opens the rules in a modal, changes no pick, and closes on Escape", async () => {
     const user = userEvent.setup();
     mount();
@@ -715,7 +736,7 @@ describe("Issue 2c — a spell's rules can be read while choosing spells", () =>
     expect(offerNamed("Cleric cantrips")).toBeInTheDocument();
   });
 
-  it("offers the rules on a card that capacity has locked — the two you did NOT take are the ones worth reading", async () => {
+  it("offers the rules on a card that capacity has locked: the two you did NOT take are the ones worth reading", async () => {
     const user = userEvent.setup();
     mount();
     await toClassFeatures(user, 1);
@@ -789,7 +810,7 @@ describe("multiclassing on the class step", () => {
       classLevels: ["cleric", "cleric", "fighter"],
       picks: { "feature:elf-keen-senses": ["perception"] }
     };
-    /** The rebuild's class step, keeping `heldClasses`. */
+    /** The rebuild's class step, which keeps `heldClasses`. */
     const classStepOf = async (heldClasses: readonly string[]) => {
       const view = render(
         <ToastProvider>
@@ -936,15 +957,31 @@ describe("the Level flow's class choice", () => {
       </ToastProvider>
     );
 
+  it("offers the classes the character has, and the rest one tap away", async () => {
+    heldOffers();
+    const user = userEvent.setup();
+    mountLevel(sheet());
+    const grid = await screen.findByRole("radiogroup", { name: "Level 4 goes to" });
+    expect(
+      within(grid)
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent)
+    ).toEqual([expect.stringMatching(/^Cleric/)]);
+    await user.click(screen.getByRole("button", { name: "Take a new class" }));
+    expect(within(grid).getByRole("radio", { name: /^Fighter/ })).toBeInTheDocument();
+  });
+
   it("says plainly why a new class is out of reach with the scores the character has", async () => {
     heldOffers();
+    const user = userEvent.setup();
     mountLevel(sheet());
+    await user.click(await screen.findByRole("button", { name: "Take a new class" }));
     const grid = await screen.findByRole("radiogroup", { name: "Level 4 goes to" });
     expect(within(grid).getByRole("radio", { name: /^Cleric/ })).toHaveAttribute("aria-checked", "true");
     expect((within(grid).getByRole("radio", { name: /^Fighter/ }) as HTMLButtonElement).disabled).toBe(true);
     expect(
       within(grid).getByText(
-        "Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12. Your Cleric needs Wisdom 13; you have 12."
+        "Fighter needs Strength 13 or Dexterity 13; you have Strength 10 and Dexterity 12. Cleric, a class you already have, needs Wisdom 13; you have 12."
       )
     ).toBeInTheDocument();
   });
@@ -954,6 +991,7 @@ describe("the Level flow's class choice", () => {
     const user = userEvent.setup();
     const abilityScores = { str: 14, dex: 12, con: 14, int: 10, wis: 14, cha: 8 };
     mountLevel(sheet({ abilityScores }));
+    await user.click(await screen.findByRole("button", { name: "Take a new class" }));
     const grid = await screen.findByRole("radiogroup", { name: "Level 4 goes to" });
     await user.click(within(grid).getByRole("radio", { name: /^Fighter/ }));
     await user.click(screen.getByRole("button", { name: "Level up to 4" }));
@@ -985,6 +1023,10 @@ describe("the Level flow's class choice", () => {
       await screen.findByText(/Level 3 went to Cleric\./, { selector: ".cb-level-preview p" })
     ).toBeInTheDocument();
     expect(screen.getByText(/Cleric 2 \/ Fighter 1/)).toBeInTheDocument();
+    // The note names the character where it used to say "your".
+    expect(document.querySelector(".cb-level-preview p")?.textContent).toMatch(
+      /\w's level 3 choices and HP roll are kept/
+    );
     await user.click(screen.getByRole("button", { name: "Level down to 2" }));
     await waitFor(() => expect(offers.length).toBeGreaterThan(0));
     expect(offers.at(-1)).toMatchObject({ level: 2, classLevels: ["cleric", "fighter"] });
@@ -1001,5 +1043,157 @@ describe("the Level flow's class choice", () => {
       })
     );
     expect(await screen.findByRole("heading", { name: "Mira's classes were added by hand" })).toBeInTheDocument();
+  });
+});
+
+describe("rolling a random character", () => {
+  it("rolls a multiclass character from the classes and levels the GM picks", async () => {
+    vi.mocked(socket.emit).mockClear();
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <RandomCharacterModal open maxLevel={20} onClose={() => {}} />
+      </ToastProvider>
+    );
+    const dialog = screen.getByRole("dialog", { name: "Roll a random character" });
+    // The dice's own choice of class can't take a second one, so the way to add one waits for a class.
+    expect(within(dialog).queryByRole("button", { name: "Add another class" })).toBeNull();
+    await user.selectOptions(await within(dialog).findByRole("combobox", { name: "Class" }), "cleric");
+    await user.click(within(dialog).getByRole("button", { name: "Add another class" }));
+    expect(within(dialog).getByRole("combobox", { name: "Starting class" })).toHaveValue("cleric");
+    expect(within(dialog).getByRole("combobox", { name: "Class 2" })).toHaveValue("fighter");
+    await user.click(
+      within(within(dialog).getByRole("group", { name: "Cleric levels" })).getByRole("button", { name: "Increase" })
+    );
+    expect(
+      within(dialog).getByText("Level 3 in all. The character starts in the first class at level 1.")
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Roll it up" }));
+    const generate = vi.mocked(socket.emit).mock.calls.find(([event]) => event === "character:generate");
+    expect(generate?.[1]).toMatchObject({
+      level: 3,
+      classId: "cleric",
+      classes: [
+        { classId: "cleric", level: 2 },
+        { classId: "fighter", level: 1 }
+      ]
+    });
+  });
+});
+
+describe("a level-up", () => {
+  // The Level flow's tests hold every offers read; this one needs the table to answer again.
+  beforeEach(() => {
+    vi.mocked(socket.emit).mockImplementation(((event: string, payload: unknown, ack?: (result: unknown) => void) => {
+      if (!ack) return socket;
+      if (event === "builder:offers") ack(offersFor(payload as BuilderOffersRequest));
+      else ack((CATALOG_ANSWERS as Record<string, unknown>)[event] ?? { ok: false });
+      return socket;
+    }) as never);
+  });
+
+  /** Mira, a level 3 Life Domain Cleric built here, who goes to level 4. */
+  const seed = (): BuilderDraft => ({
+    ...emptyDraft(),
+    name: "Mira",
+    speciesId: "halfling",
+    backgroundId: "acolyte",
+    classId: "cleric",
+    subclassId: "life-domain",
+    level: 4,
+    picks: {
+      "feature:cleric-subclass": ["life-domain"],
+      "class-cantrips": ["guidance", "light", "mending"],
+      "class-spells": ["bless", "cure-wounds", "healing-word"]
+    }
+  });
+
+  const mountLevelUp = () =>
+    render(
+      <ToastProvider>
+        <CharacterBuilder
+          state={gmView}
+          onClose={() => {}}
+          onCreated={() => {}}
+          rebuild={{ actorId: "a1000000-0000-4000-8000-000000000001", name: "Mira", seed: seed(), mode: "up" }}
+        />
+      </ToastProvider>
+    );
+
+  it("opens on the new level's choices, titled for the level-up, with the earlier steps a tap away", async () => {
+    const user = userEvent.setup();
+    mountLevelUp();
+    expect(screen.getByRole("heading", { level: 1, name: "Level up Mira" })).toBeInTheDocument();
+    expect(await screen.findByText(/Mira becomes level 4: Cleric 4\./)).toBeInTheDocument();
+    // Not the first step of a fresh build: the species grid is not on screen.
+    expect(screen.queryByRole("radiogroup", { name: "Species" })).toBeNull();
+    // The new level's own pick and the spell list that grew are here.
+    // The offers arrive from the table after the first paint; a big step can take a moment to render under load.
+    const raise = await screen.findByText("Raise ability scores", {}, { timeout: 5000 });
+    expect(raise.closest("[role=group]")).toHaveAccessibleName("Level 4 improvement");
+    expect(screen.getByText("Cleric cantrips")).toBeInTheDocument();
+    expect(screen.getByText("Hit points")).toBeInTheDocument();
+    // Species is one tap away on the rail, and the way back returns to the new level.
+    const species = [...document.querySelectorAll<HTMLButtonElement>(".nh-step-jump")].find((button) =>
+      button.textContent?.startsWith("Species")
+    );
+    await user.click(species!);
+    await waitFor(() => expect(document.querySelector('[role="radiogroup"][aria-label="Species"]')).not.toBeNull());
+    await user.click(screen.getByText("Back to level 4"));
+    expect(await screen.findByText(/Mira becomes level 4: Cleric 4\./)).toBeInTheDocument();
+    // A phone has no rail, so the step lists the earlier steps itself.
+    const earlier = document.querySelector<HTMLElement>('nav[aria-label="Earlier steps"]')!;
+    expect([...earlier.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
+      "Species",
+      "Background",
+      "Class & level",
+      "Class features",
+      "Ability scores",
+      "Equipment"
+    ]);
+    await user.click(within(earlier).getByText("Background"));
+    await waitFor(() => expect(screen.queryByText(/Mira becomes level 4/)).toBeNull());
+    expect(screen.getByText("Back to level 4")).toBeInTheDocument();
+  });
+
+  it("names each of the two +1 pickers of an Ability Score Improvement apart", async () => {
+    const user = userEvent.setup();
+    mountLevelUp();
+    await user.click(await screen.findByText("Raise ability scores", {}, { timeout: 5000 }));
+    await user.click(screen.getByText("+1 to two"));
+    expect(screen.getByLabelText("First ability to raise by 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Second ability to raise by 1")).toBeInTheDocument();
+  });
+});
+
+describe("the standard array", () => {
+  it("offers a layout suggested for the class, and lays it out in one tap", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <CharacterBuilder
+          state={gmView}
+          onClose={() => {}}
+          onCreated={() => {}}
+          rebuild={{
+            actorId: "a1000000-0000-4000-8000-000000000002",
+            name: "Mira",
+            seed: { ...emptyDraft(), name: "Mira", speciesId: "elf", backgroundId: "acolyte", classId: "cleric" },
+            mode: "down"
+          }}
+        />
+      </ToastProvider>
+    );
+    const abilities = [...document.querySelectorAll<HTMLButtonElement>(".nh-step-jump")].find((button) =>
+      button.textContent?.startsWith("Ability scores")
+    );
+    await user.click(abilities!);
+    // The fixture's Cleric ranks Wisdom first; the rest follow in sheet order.
+    expect(
+      await screen.findByText("Suggested for Cleric · WIS 15 · STR 14 · DEX 13 · CON 12 · INT 10 · CHA 8")
+    ).toBeTruthy();
+    const use = screen.getByText("Use the suggested layout").closest("button")!;
+    await user.click(use);
+    expect(use).toBeDisabled();
   });
 });

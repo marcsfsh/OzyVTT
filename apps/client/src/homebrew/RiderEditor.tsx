@@ -31,7 +31,7 @@ export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", 
  * harness's exemption list and tests drive `grantRowsOf`/`grantsFromRows` instead.
  */
 export function riderFieldsForTest(scope: RiderScope): readonly FieldDef[] {
-  // What `RecordDetail` enables on a monster, in render order.
+  // What the record view's editor parts enable on a monster, in render order.
   if (scope === "statblock") return [tagsField("Tags"), actionsField(scope)];
   return [
     whenField(),
@@ -89,7 +89,7 @@ export function RiderEditor({
             ? "These apply while the item is equipped and attuned."
             : "These apply while the item is equipped."
           : scope === "statblock"
-            ? "These are the creature's own — always available to it."
+            ? "These belong to the stat block and always apply."
             : "These apply as soon as the feature is granted."}
       </p>
 

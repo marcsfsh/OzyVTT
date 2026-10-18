@@ -87,7 +87,7 @@ function castOf(
     ...action,
     ...mechanics,
     spellId: spell.id,
-    // A healing area heals the creatures the caster picks, so it is picked rather than templated.
+    // A healing area heals the creatures the caster picks, so it is picked with no template.
     ...(spell.area && !mechanics.healing ? { area: spell.area } : {})
   };
   const level = entry.atLevel ?? spell.level;

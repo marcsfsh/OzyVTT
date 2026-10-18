@@ -3,7 +3,7 @@ import { conditionLabel } from "../condition-rules.js";
 import { addEffect, effectDurationOf, makeEffect, type EffectNarration } from "../effects.js";
 import { previewDamage } from "../hit-points.js";
 import { masteryHitEffects } from "../weapon-mastery.js";
-import { sizeAtMost, type ResolveContext } from "./context.js";
+import { sizeAtMost, tableLineOf, type ResolveContext } from "./context.js";
 import { damagePartsOf } from "./damage.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
@@ -60,8 +60,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       // A rider's Exhaustion levels each add one (SRD: cumulative).
       for (let extra = 1; condition.id === "exhaustion" && extra < (condition.level ?? 1); extra += 1)
         events.push(...setCondition(state, target.id, "exhaustion", true, undefined, { role: "gm" }, immunities));
-      for (const event of events)
-        ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+      for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
       if (!events.some((event) => event.immune))
         ctx.effectsApplied.push({
           targetId: target.id,
@@ -78,7 +77,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     if (rider.insteadOfDamage) {
       ctx.damage.splice(0);
       ctx.bonusDamage.splice(0);
-      warnings.push(`${action.name}: ${target.name} is held instead of taking the hit's damage.`);
+      warnings.push(`${action.name}: ${target.name} is held, and the hit deals no damage.`);
     }
     const grapple = conditionIds.includes("grappled");
     const gained: EffectNarration[] = [];
@@ -104,8 +103,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       gained,
       deps
     );
-    for (const event of gained)
-      ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [event.actorId] });
+    for (const event of gained) ctx.tableNarration.push(tableLineOf(ctx, event));
     ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds });
   });
 }

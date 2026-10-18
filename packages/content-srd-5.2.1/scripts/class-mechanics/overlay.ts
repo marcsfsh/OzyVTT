@@ -99,7 +99,7 @@ export type ClassMechanicsModule = Readonly<{
   liveResources?: readonly string[];
 }>;
 
-/** A rider list authored as empty is not authored at all - it must not trip the collision guard. */
+/** A rider list authored as empty is not authored at all: it must not trip the collision guard. */
 const isAbsent = (value: unknown) => value === undefined || (Array.isArray(value) && value.length === 0);
 
 /**

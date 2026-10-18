@@ -52,7 +52,7 @@ export type SchemaContext = Readonly<{
 
   spells: readonly CatalogEntry[];
   equipment: readonly CatalogEntry[];
-  /** Distinct equipment categories, derived from the catalog rather than hardcoded. */
+  /** Distinct equipment categories, derived from the catalog so none is hardcoded. */
   equipmentCategories: readonly SelectOption[];
 
   /** Canonical SRD vocabularies (drift-tested against the bundles), so the list a GM picks from is
@@ -66,6 +66,9 @@ export type SchemaContext = Readonly<{
 
   /** Resolves a `fromCatalog` slug with the server's own `resolveCatalogChoice`. */
   resolveCatalog: (slug: string) => Readonly<{ count: number }> | Readonly<{ error: string }>;
+  /** Every record the saved body names by id, with its name, as the server read it. A draft or an archived record
+      is here too, where no catalog has it. */
+  references: Readonly<Record<string, Readonly<{ name: string }>>>;
 }>;
 
 export const EMPTY_CONTEXT: SchemaContext = {
@@ -86,17 +89,31 @@ export const EMPTY_CONTEXT: SchemaContext = {
   schools: MAGIC_SCHOOL_IDS,
   creatureTypes: CREATURE_TYPE_IDS,
   weaponProperties: [...WEAPON_PROPERTY_IDS, ...WEAPON_MASTERY_IDS],
-  resolveCatalog: () => ({ error: "Catalogs haven't loaded yet." })
+  resolveCatalog: () => ({ error: "Catalogs haven't loaded yet." }),
+  references: {}
 };
+
+/** The name of a record an id names: the server's reference first, then the catalogs, and the id spelled out only
+    when nothing knows it. */
+export function referenceName(ctx: SchemaContext, id: string, catalog: readonly CatalogEntry[] = ctx.spells): string {
+  return (
+    ctx.references[id]?.name ??
+    catalog.find((entry) => entry.id === id)?.name ??
+    id
+      .replace(/^hb-/, "")
+      .replace(/-/g, " ")
+      .replace(/^./, (first) => first.toUpperCase())
+  );
+}
 
 export type FieldKind =
   | "text" //        Input
   | "textarea" //    Textarea, always full-row
-  | "number" //      NumberField — "1250 gp", not a nudge
-  | "stepper" //     Stepper — small bounded nudges only (1..20, choose N)
+  | "number" //      NumberField: "1250 gp", too large for a nudge
+  | "stepper" //     Stepper: small bounded nudges only (1..20, choose N)
   | "select" //      Select, or a searchable picker with `searchable: true`
   | "multiselect" // a wrapped row of Chip(pressed) toggles in a role="group"
-  | "tags" //        TagInput — open slugs, free entry always allowed
+  | "tags" //        TagInput: open slugs, free entry always allowed
   | "switch" //      Switch
   | "rows" //        RowEditor over `rows: FieldDef[]`
   | "group" //       <fieldset><legend> of nested fields
@@ -110,7 +127,7 @@ export type FieldDef = Readonly<{
   key: string;
   label: string;
   kind?: FieldKind;
-  /** One sentence, sentence case, stated once per group rather than per option. */
+  /** One sentence, sentence case, stated once per group and never per option. */
   help?: string;
   /** Shown for a field that is stored but not yet read by anything, so the GM is not misled. */
   note?: string;
@@ -128,12 +145,18 @@ export type FieldDef = Readonly<{
   options?: readonly SelectOption[] | ((ctx: SchemaContext, draft: Draft) => readonly SelectOption[]);
   /** `kind: "select"` over a catalog too big for a `<select>`; renders a searchable picker. */
   searchable?: boolean;
+  /** `kind: "select"` over a handful of options: a row of chips, one pressed, so every answer is in view and one
+      tap away (the wizards' short closed sets: a hit die, a size, a school). */
+  chips?: boolean;
+  /** `kind: "text"` with common answers: chips that write their value, above the input for anything else (a
+      casting time of "Action", a duration of "1 minute"). The stored text is whatever was tapped or typed. */
+  presets?: readonly SelectOption[];
   /** With `searchable`: which catalog to pick from. */
   catalog?: "spells" | "equipment";
   /** `draft` is the whole record, so suggestions can derive from what is already authored
       (e.g. `feature:<id>` over the record's own features). */
   suggestions?: readonly string[] | ((ctx: SchemaContext, draft: Draft) => readonly string[]);
-  /** Render a visible chooser (`Combobox` with free text) instead of a `<datalist>`, which has no
+  /** Render a visible chooser (`Combobox` with free text) in place of a `<datalist>`, which has no
       visible cue and nothing on iOS Safari. For `text` and `tags`; requires `suggestions`. Opt-in,
       because some suggestion lists are only a corpus of existing values (see `TagInputProps.pick`). */
   pick?: boolean;
@@ -152,7 +175,7 @@ export type FieldDef = Readonly<{
   rowKey?: (row: unknown, index: number) => string;
   /** `kind: "rows"`: mints a row (with `newId()`). */
   newRow?: () => unknown;
-  rowLabel?: (row: unknown, index: number) => string;
+  rowLabel?: (row: unknown, index: number, ctx: SchemaContext) => string;
   addLabel?: string;
   emptyText?: string;
   maxRows?: number;
@@ -163,7 +186,7 @@ export type FieldDef = Readonly<{
   /** Replaces the plain path write when a change must reshape its container (e.g. a `.strict()`
       variant switch). `scope` is the nearest container; the return value replaces it. */
   write?: (next: unknown, scope: Draft) => Draft;
-  /** The matching read, for a value derived from shape rather than stored at `key` (e.g. "None"
+  /** The matching read, for a value derived from shape and never stored at `key` (e.g. "None"
       spellcasting is the absence of the block). */
   read?: (scope: Draft) => unknown;
 
@@ -203,10 +226,10 @@ export function isDiceFormula(text: string): boolean {
 export const diceValidate = (value: unknown): string | null => {
   const text = typeof value === "string" ? value.trim() : "";
   if (text === "") return null;
-  return isDiceFormula(text) ? null : `“${text}” isn't a dice formula. Try 1d8, 2d6 + 3, or 1d8 + 1d6.`;
+  return isDiceFormula(text) ? null : `"${text}" isn't a dice formula. Try 1d8, 2d6 + 3, or 1d8 + 1d6.`;
 };
 
-/** Multi-term damage as a field factory rather than a kind; used by `actionsField()` in `RiderEditor.tsx`. */
+/** Multi-term damage as a field factory, with no kind of its own; used by `actionsField()` in `RiderEditor.tsx`. */
 export function damagePartsField(
   key: string,
   options: Readonly<{ label: string; help?: string; max?: number; newId: () => string }>
@@ -230,7 +253,7 @@ export function damagePartsField(
     },
     rows: [
       { key: "formula", label: "Formula", placeholder: "1d6", validate: diceValidate },
-      // Open slug (homebrew damage types stay authorable), so `pick` on text, not a closed select.
+      // Open slug (homebrew damage types stay authorable), so `pick` on text, and no closed select.
       { key: "type", label: "Damage type", pick: true, placeholder: "fire", suggestions: (ctx) => ctx.damageTypes }
     ]
   };

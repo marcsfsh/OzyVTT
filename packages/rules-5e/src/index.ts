@@ -7,3 +7,4 @@ export * from "./progression.js";
 export * from "./riders.js";
 export * from "./movement.js";
 export * from "./encounters.js";
+export * from "./monster-stats.js";

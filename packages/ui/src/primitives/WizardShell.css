@@ -30,7 +30,7 @@
   display: grid;
   gap: var(--space-1);
 }
-/* Display face, not the wordmark: the step indicator is already the loud element in this region. */
+/* Display face, and no wordmark: the step indicator is already the loud element in this region. */
 .nh-wizard-title {
   margin: 0;
   font: 400 var(--fs-h2) / var(--lh-snug) var(--font-display);
@@ -116,7 +116,7 @@
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
-/* Back plus an optional second action. Wraps rather than squeezing, because `.nh-btn` is `nowrap` and a shrunk
+/* Back plus an optional second action. Wraps and never squeezes, because `.nh-btn` is `nowrap` and a shrunk
    button would spill its label. */
 .nh-wizard-foot-back {
   justify-self: start;
@@ -138,7 +138,7 @@
   margin: 0;
   min-height: 1.2em;
   text-align: center;
-  /* "Not finished yet" is caution, not danger: nothing has gone wrong. */
+  /* "Not finished yet" is caution: nothing has gone wrong. */
   color: var(--caution-hi);
   font-size: var(--fs-sm);
 }
@@ -163,7 +163,7 @@
   line-height: var(--lh-body);
 }
 
-/* ---- Narrow: master-detail (swap panes rather than stacking them). 760px, the same step Steps uses. ---- */
+/* ---- Narrow: master-detail (swap panes, with no stacking). 760px, the same step Steps uses. ---- */
 @media (max-width: 760px) {
   .nh-wizard-body--split.has-detail .nh-wizard-main {
     display: none;
@@ -203,7 +203,7 @@
   }
 }
 
-/* ---- Laptop: a full page inside the app shell, not a floating card ---- */
+/* ---- Laptop: a full page inside the app shell, with no floating card ---- */
 @media (min-width: 761px) {
   .nh-wizard-body--split {
     display: grid;

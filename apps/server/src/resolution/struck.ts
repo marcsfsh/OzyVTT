@@ -3,7 +3,7 @@ import { holdsFeature } from "../class-features.js";
 import { addEffect, makeEffect } from "../effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "../hit-points.js";
 import { traitOf } from "../statblock-traits.js";
-import type { ResolveContext } from "./context.js";
+import { tableLineOf, type ResolveContext } from "./context.js";
 
 /** The tag, and the option id, of a Hunter's Multiattack Defense. */
 export const MULTIATTACK_DEFENSE_TAG = "multiattack-defense";
@@ -50,13 +50,7 @@ export function strikeBackOnHit(ctx: ResolveContext): void {
     text: `${attacker.name} takes ${application.totalApplied} damage from ${target.name}'s ${trait.name}${damageAdjustmentDetail(application)}.`,
     actorIds: [attacker.id, target.id]
   });
-  for (const event of events)
-    ctx.tableNarration.push({
-      kind: "effect",
-      text: event.text,
-      actorIds: [event.actorId],
-      ...(event.gmOnly ? { gmOnly: true } : {})
-    });
+  for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /** SRD Multiattack Defense: "When a creature hits you with an attack roll, that creature has Disadvantage on all other

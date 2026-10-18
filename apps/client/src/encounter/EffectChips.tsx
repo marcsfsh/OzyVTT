@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { type EffectInstance, type PlayerEffect } from "@vtt/domain";
+import { withArticle, type EffectInstance, type PlayerEffect } from "@vtt/domain";
 import { Button, Chip } from "@vtt/ui";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
 import "./effect-chips.css";
 
 /** The GM's copy also carries the ongoing damage dice, which players never receive. */
-type ChipEffect = PlayerEffect & { escapeDc?: number | null; ongoingDamage?: EffectInstance["ongoingDamage"] };
+export type ChipEffect = PlayerEffect & { escapeDc?: number | null; ongoingDamage?: EffectInstance["ongoingDamage"] };
 
 /** How long an effect has left, in the table's words. */
 export function effectDurationLabel(effect: Pick<PlayerEffect, "duration">): string {
@@ -55,7 +55,7 @@ function ongoingDamageNote(effect: ChipEffect): string | null {
   const when = ongoing.at.startsWith("bearer-") ? "its turns" : "its source's turns";
   const edge = ongoing.at.endsWith("-end") ? "end" : "start";
   const save = ongoing.saveToEnd
-    ? `, then a ${ongoing.saveToEnd.ability.toUpperCase()} save DC ${ongoing.saveToEnd.dc} that ends it`
+    ? `, then ${withArticle(`${ongoing.saveToEnd.ability.toUpperCase()} save`)} DC ${ongoing.saveToEnd.dc} that ends it`
     : "";
   return `${what} at the ${edge} of each of ${when}${save}`;
 }
@@ -87,37 +87,9 @@ export function EffectChips({
   canAct?: boolean;
   onFeedback: (text: string) => void;
 }>) {
-  const [busy, setBusy] = useState(false);
   const [shown, setShown] = useState<string | null>(null);
   if (effects.length === 0) return null;
   const open = effects.find((effect) => effect.id === shown);
-  const end = (effectId: string, name: string) => {
-    setBusy(true);
-    void command("effect:end", { actorId, effectId }).then((result) => {
-      setBusy(false);
-      onFeedback(result.ok ? `${name} ended.` : (result.message ?? "The effect could not be ended."));
-      if (result.ok) setShown(null);
-    });
-  };
-  // The server routes it: the bearer's action in its turn, a question for the GM off it, free outside a fight.
-  const putOut = () => {
-    setBusy(true);
-    void command("action:use", { actorId, actionId: PUT_OUT_FIRE_ACTION_ID }).then((result) => {
-      setBusy(false);
-      onFeedback(result.ok ? "The fire is out." : (result.message ?? "The fire could not be put out."));
-      if (result.ok) setShown(null);
-    });
-  };
-  const ask = (effectId: string) => {
-    setBusy(true);
-    void command("rules:ask", { type: "effect.end", payload: { commandId: newId(), actorId, effectId } }).then(
-      (result) => {
-        setBusy(false);
-        if (!result.ok) onFeedback(result.message ?? "That question could not be sent.");
-        else onFeedback(result.ran ? "Done - no question needed." : "Asked the GM. Waiting for their call.");
-      }
-    );
-  };
   return (
     <div className="effect-chips-block">
       <span className="effect-chips">
@@ -127,8 +99,7 @@ export function EffectChips({
             tone="info"
             pressed={shown === effect.id}
             aria-expanded={shown === effect.id}
-            disabled={busy}
-            title={`${effect.name}${effect.sourceName ? ` - from ${effect.sourceName}` : ""} · ${effectDurationLabel(effect)}`}
+            title={`${effect.name}${effect.sourceName ? ` from ${effect.sourceName}` : ""} · ${effectDurationLabel(effect)}`}
             onClick={() => setShown((current) => (current === effect.id ? null : effect.id))}
           >
             {effect.name}
@@ -137,46 +108,110 @@ export function EffectChips({
         ))}
       </span>
       {open && (
-        <div className="effect-detail" role="region" aria-label={`${open.name} details`}>
-          <p className="effect-detail-name">{open.name}</p>
-          <p className="effect-detail-line">
-            {open.sourceName ? `From ${open.sourceName} · ` : ""}
-            {effectDurationLabel(open)}
-            {endingNotes(open).length > 0 ? ` · ${endingNotes(open).join(" · ")}` : ""}
-          </p>
-          {ongoingDamageNote(open) ? (
-            <p className="effect-detail-line">{ongoingDamageNote(open)}</p>
-          ) : open.tags.includes(BURNING_TAG) ? (
-            <p className="effect-detail-line">1d4 Fire at the start of each of its turns until the fire is put out</p>
-          ) : null}
-          {canAct && open.tags.includes(BURNING_TAG) && (
-            <p className="effect-detail-line">
-              Rolling on the ground puts it out: it takes an action and leaves it Prone.
-            </p>
-          )}
-          <div className="effect-detail-actions">
-            {canAct && open.tags.includes(BURNING_TAG) && (
-              <Button size="sm" variant="secondary" disabled={busy} onClick={putOut}>
-                Put out the fire
-              </Button>
-            )}
-            {canEnd || open.yours ? (
-              <Button size="sm" variant="secondary" disabled={busy} onClick={() => end(open.id, open.name)}>
-                End {open.name}
-              </Button>
-            ) : canAsk ? (
-              <Button size="sm" variant="secondary" disabled={busy} onClick={() => ask(open.id)}>
-                Ask the GM to end it
-              </Button>
-            ) : (
-              <p className="effect-detail-muted">It ends by its own rules or when the GM ends it.</p>
-            )}
-            <Button size="sm" variant="ghost" onClick={() => setShown(null)}>
-              Close
-            </Button>
-          </div>
-        </div>
+        <EffectDetail
+          actorId={actorId}
+          effect={open}
+          canEnd={canEnd}
+          canAsk={canAsk}
+          canAct={canAct}
+          onFeedback={onFeedback}
+          onClose={() => setShown(null)}
+        />
       )}
+    </div>
+  );
+}
+
+/**
+ * One effect opened from its chip: where it came from, how long it lasts, what else ends it, and the way to end it
+ * this viewer has. The sheet's status strip opens the same detail.
+ */
+export function EffectDetail({
+  actorId,
+  effect,
+  canEnd,
+  canAsk = false,
+  canAct = canEnd,
+  onFeedback,
+  onClose
+}: Readonly<{
+  actorId: string;
+  effect: ChipEffect;
+  canEnd: boolean;
+  canAsk?: boolean;
+  canAct?: boolean;
+  onFeedback: (text: string) => void;
+  onClose: () => void;
+}>) {
+  const [busy, setBusy] = useState(false);
+  const end = () => {
+    setBusy(true);
+    void command("effect:end", { actorId, effectId: effect.id }).then((result) => {
+      setBusy(false);
+      onFeedback(result.ok ? `${effect.name} ended.` : (result.message ?? "The effect could not be ended."));
+      if (result.ok) onClose();
+    });
+  };
+  // The server routes it: the bearer's action in its turn, a question for the GM off it, free outside a fight.
+  const putOut = () => {
+    setBusy(true);
+    void command("action:use", { actorId, actionId: PUT_OUT_FIRE_ACTION_ID }).then((result) => {
+      setBusy(false);
+      onFeedback(result.ok ? "The fire is out." : (result.message ?? "The fire could not be put out."));
+      if (result.ok) onClose();
+    });
+  };
+  const ask = () => {
+    setBusy(true);
+    void command("rules:ask", {
+      type: "effect.end",
+      payload: { commandId: newId(), actorId, effectId: effect.id }
+    }).then((result) => {
+      setBusy(false);
+      if (!result.ok) onFeedback(result.message ?? "That question could not be sent.");
+      else onFeedback(result.ran ? "Done. No question was needed." : "Asked the GM. Waiting for their call.");
+    });
+  };
+  const notes = endingNotes(effect);
+  const ongoing = ongoingDamageNote(effect);
+  const burning = effect.tags.includes(BURNING_TAG);
+  return (
+    <div className="effect-detail" role="region" aria-label={`${effect.name} details`}>
+      <p className="effect-detail-name">{effect.name}</p>
+      <p className="effect-detail-line">
+        {effect.sourceName ? `From ${effect.sourceName} · ` : ""}
+        {effectDurationLabel(effect)}
+        {notes.length > 0 ? ` · ${notes.join(" · ")}` : ""}
+      </p>
+      {ongoing ? (
+        <p className="effect-detail-line">{ongoing}</p>
+      ) : burning ? (
+        <p className="effect-detail-line">1d4 Fire at the start of each of its turns until the fire is put out</p>
+      ) : null}
+      {canAct && burning && (
+        <p className="effect-detail-line">Rolling on the ground puts it out: it takes an action and leaves it Prone.</p>
+      )}
+      <div className="effect-detail-actions">
+        {canAct && burning && (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={putOut}>
+            Put out the fire
+          </Button>
+        )}
+        {canEnd || effect.yours ? (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={end}>
+            End {effect.name}
+          </Button>
+        ) : canAsk ? (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={ask}>
+            Ask the GM to end it
+          </Button>
+        ) : (
+          <p className="effect-detail-muted">It ends by its own rules or when the GM ends it.</p>
+        )}
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      </div>
     </div>
   );
 }

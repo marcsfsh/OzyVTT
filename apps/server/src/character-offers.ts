@@ -5,6 +5,7 @@ import {
   extraPickAmount,
   resolveCatalogChoice,
   resolvePickChoice,
+  withArticle,
   type CatalogChoiceCatalogs,
   type CatalogChoiceOption
 } from "@vtt/domain";
@@ -81,7 +82,7 @@ export function classSequenceOf(input: ClassSequenceInput): string[] {
   if (sequence.length !== input.level)
     reject(`The class levels name ${sequence.length} levels, but the character is level ${input.level}.`);
   if (sequence[0] !== input.classId)
-    reject(`The first level must be the starting class "${input.classId}", not "${sequence[0]}".`);
+    reject(`The first level must be the starting class "${input.classId}". This build starts with "${sequence[0]}".`);
   if (new Set(sequence).size > MAX_CLASSES) reject(`A character can have at most ${MAX_CLASSES} classes.`);
   return sequence;
 }
@@ -290,7 +291,7 @@ export function levelGatesFit(
   return true;
 }
 
-/** The level a pick at index `index` of this offer belongs to - see `ChoiceOffer.levels`. */
+/** The level a pick at index `index` of this offer belongs to: see `ChoiceOffer.levels`. */
 export function levelOfPick(offer: Pick<ChoiceOffer, "levels" | "capacity">, index: number): number {
   const perGrant = Math.max(1, Math.ceil(offer.capacity / Math.max(1, offer.levels.length)));
   return offer.levels[Math.min(offer.levels.length - 1, Math.floor(index / perGrant))] ?? 1;
@@ -326,7 +327,7 @@ function optionAsFeature(option: FeatureOption): FeatureRecord {
     actions: option.actions,
     effects: option.effects,
     modifiers: option.modifiers,
-    // Listed explicitly rather than spread, so a field added to one carrier but not the other is a type error.
+    // Listed explicitly and never spread, so a field added to one carrier but not the other is a type error.
     extraPicks: option.extraPicks,
     replaces: option.replaces,
     ...(option.uses ? { uses: option.uses } : {}),
@@ -383,14 +384,14 @@ function validateBackgroundAllocation(input: CharacterCreateRequestInput, backgr
     return;
   }
   if (input.backgroundBonusAllocation.length === 0)
-    reject(`${background.name} grants ability increases - choose a +2/+1 or +1/+1/+1 spread.`);
+    reject(`${background.name} grants ability increases. Choose a +2/+1 or +1/+1/+1 spread.`);
   const abilities = input.backgroundBonusAllocation.map((entry) => entry.ability);
   if (new Set(abilities).size !== abilities.length)
     reject("Background ability increases must go to distinct abilities.");
   for (const ability of abilities) {
     if (!options.from.includes(ability))
       reject(
-        `${background.name} increases ${options.from.map((a) => a.toUpperCase()).join("/")}, not ${ability.toUpperCase()}.`
+        `${background.name} can increase only ${options.from.map((a) => a.toUpperCase()).join("/")}, and ${ability.toUpperCase()} is not one of them.`
       );
   }
   const spread = spreadKey(input.backgroundBonusAllocation.map((entry) => entry.amount));
@@ -563,14 +564,15 @@ function surveyBuild(
     if (level < record.subclassLevel) {
       if (chosenId)
         reject(
-          `${record.name} chooses its ${label} at level ${record.subclassLevel}; a level-${level} ${record.name} has none.`
+          `${record.name} chooses its ${label} at level ${record.subclassLevel}; a level ${level} ${record.name} has none.`
         );
       return null;
     }
-    if (!chosenId) reject(`A level-${level} ${record.name} has a ${label} (chosen at level ${record.subclassLevel}).`);
+    if (!chosenId)
+      reject(`A level ${level} ${record.name} has ${withArticle(label)} (chosen at level ${record.subclassLevel}).`);
     const subclass = library.subclassRecord(chosenId) ?? reject(`No subclass "${chosenId}" is in the content catalog.`);
     if (subclass.classId !== record.id)
-      reject(`${subclass.name} is a ${subclass.classId} subclass, not a ${record.name} one.`);
+      reject(`${subclass.name} is a ${subclass.classId} subclass, so a ${record.name} can't take it.`);
     return subclass;
   };
   const classes = buildClassesOf(sequence, library, subclassOf);
@@ -613,7 +615,7 @@ function surveyBuild(
     background,
     progression: library.classProgressionTable(),
     scoresBeforeIncreases: finalScores,
-    // SRD Multiclassing: the Proficiency Bonus follows the total character level, not any one class's.
+    // SRD Multiclassing: the Proficiency Bonus follows the total character level across every class.
     proficiencyBonus: proficiencyBonusForLevel(input.level)
   };
 }
@@ -675,8 +677,6 @@ const PICK_PREDICATE: Readonly<Record<string, string>> = {
   "ranged-damage": "that deals damage at a range of 10 feet or more"
 };
 
-const withArticle = (word: string) => `${/^[aeiou]/i.test(word) ? "an" : "a"} ${word}`;
-
 /**
  * Collects every granted feature, builds the choice offers, and matches each ledger row to one. Strict, a
  * row that fits no offer refuses the build; lenient (a wizard draft), it is skipped and changes nothing.
@@ -713,7 +713,7 @@ function placeChoices(
     ? (library.featRecord(background.originFeatId) ??
       reject(`${background.name} grants unknown feat "${background.originFeatId}".`))
     : null;
-  // Every feat this character already holds, granted or chosen - the cross-offer duplicate guard in pass A.
+  // Every feat this character already holds, granted or chosen: the cross-offer duplicate guard in pass A.
   const heldFeatIds = new Set<string>(originFeat ? [originFeat.id] : []);
   // `origin` becomes `definition.character.features` (how roll-time riders reach the table); null means
   // already on `character.feats`. `site` is where the feature's picks sit in the wizard; a class feature's sits at
@@ -874,7 +874,7 @@ function placeChoices(
           (row.payload && typeof row.payload.featureId === "string" && row.payload.featureId === featureId))
     );
   };
-  /** Options a gate determined rather than offered; drained into `granted` once every offer is built. */
+  /** Options a gate determined and never offered; drained into `granted` once every offer is built. */
   const determined: Array<{ option: FeatureOption; parentId: string; site: OfferSite }> = [];
   /** What a budget already holds, read off the ledger (narrowed by `fromPicks`). */
   const NAMED_BUDGET_KIND: Readonly<Record<string, string>> = {
@@ -1013,9 +1013,9 @@ function placeChoices(
     } else if (named.length > 0) options = new Set(named);
     else if (!choice.fromCatalog) {
       // `{kind, choose, from: []}` passes the content schema but cannot resolve; reject it as bad content
-      // instead of letting a raw TypeError reach the client.
+      // so a raw TypeError never reaches the client.
       reject(
-        `"${record.name}" offers a "${choice.kind}" choice with no options - its content record needs a non-empty "from" list or a "fromCatalog" slug.`
+        `"${record.name}" offers a "${choice.kind}" choice with no options. Its content record needs a non-empty "from" list or a "fromCatalog" slug.`
       );
     } else {
       try {
@@ -1118,7 +1118,7 @@ function placeChoices(
       candidates[0]
     );
   };
-  /** Extra picks raise a budget rather than grant an outcome. Grants add up; each is folded in as soon as
+  /** Extra picks raise a budget and grant no outcome. Grants add up; each is folded in as soon as
    *  its source is settled, because `matchRow` refuses picks over `capacity`. A class's feature raises that class's
    *  budgets, read off that class's own table at its own level. */
   const extraPickBudgets = new Map<string, number>();
@@ -1261,10 +1261,10 @@ function placeChoices(
       if (heldFeatIds.has(feat.id)) {
         if (!feat.repeatable)
           reject(
-            `${feat.name} is already on this character - a feat can only be taken once unless it says it is repeatable.`
+            `${feat.name} is already on this character. A feat can be taken only once unless it says it is repeatable.`
           );
         if (repeatsOnlyWithADifferentSpellList(feat))
-          reject(`${feat.name} may be taken again only with a DIFFERENT spell list - choose another one.`);
+          reject(`${feat.name} may be taken again only with a DIFFERENT spell list. Choose another one.`);
       }
       matched.taken.push(row.id);
       heldFeatIds.add(feat.id);

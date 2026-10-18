@@ -13,6 +13,7 @@
  */
 
 import { featurePicks, HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
+import { plainSchemaIssue, type SchemaIssue } from "@vtt/content-srd-5.2.1/homebrew-issues";
 import { forStorage } from "./defaults";
 import { getAt } from "./paths";
 // The gating vocabulary comes from the form that offers it, so new conditions are checked here too.
@@ -28,6 +29,8 @@ export type BlockedReason = Readonly<{
   /** The dotted path this requirement is about, used only to drop a schema issue about the same
       field. The hand-written sentence always wins. */
   path?: string;
+  /** The issue's whole path, indexes included, so a step can claim one row of a list (a legendary action). */
+  segments?: ReadonlyArray<string | number>;
 }>;
 
 const blank = (value: unknown): boolean =>
@@ -86,12 +89,12 @@ function badGating(draft: Draft, sectionId: string): BlockedReason | null {
       const kinds = when.map((entry) => triggerKindOf((entry as { type?: unknown })?.type));
       const name = modifierLabel(record.type);
       if (kinds.filter((kind) => kind === "moment").length > 1) {
-        found = { text: `Leave “${name}” one “Only when…” line — a modifier fires at one moment, not two.`, sectionId };
+        found = { text: `Leave "${name}" one "Only when…" line. A modifier fires at only one moment.`, sectionId };
         return;
       }
       if (kinds.includes("filter") && !kinds.includes("moment")) {
         found = {
-          text: `Add an “Only when…” line to “${name}” — an “Only for…” line has nothing to narrow on its own.`,
+          text: `Add an "Only when…" line to "${name}". An "Only for…" line has nothing to narrow on its own.`,
           sectionId
         };
         return;
@@ -127,7 +130,7 @@ function ungrantedChoice(draft: Draft): BlockedReason | null {
   for (const entry of featuresOf(draft)) {
     if (draftPicksOf(entry).length === 0 || typeof entry.id !== "string" || granted.has(entry.id)) continue;
     return {
-      text: `Give “${entry.name || "an unnamed feature"}” a level. It asks the player to choose, and a choice granted at no level makes the character impossible to create.`,
+      text: `Give "${entry.name || "an unnamed feature"}" a level. It asks the player to choose, and a choice granted at no level makes the character impossible to create.`,
       sectionId: "features"
     };
   }
@@ -143,14 +146,14 @@ const draftPicksOf = (entry: Record<string, unknown> | undefined): ReadonlyArray
     this record, and its answer arrives in `doc.validity`. */
 function brokenCatalog(draft: Draft, ctx: SchemaContext, sectionId: string): BlockedReason | null {
   for (const entry of featuresOf(draft)) {
-    // Every pick, not just the first.
+    // Every pick, the first and the rest.
     for (const choice of draftPicksOf(entry)) {
       const slug = typeof choice?.fromCatalog === "string" ? choice.fromCatalog : "";
       if (!slug || namesOwnRecord(slug, ctx.recordId)) continue;
       const result = ctx.resolveCatalog(slug);
       if ("error" in result) {
         return {
-          text: `Fix the catalog for “${entry.name || "an unnamed feature"}” — it matches nothing, so the choice would be skipped.`,
+          text: `Fix the catalog for "${entry.name || "an unnamed feature"}". It matches nothing, so the choice would be skipped.`,
           sectionId
         };
       }
@@ -186,19 +189,19 @@ const hasDerivedCard = (draft: Draft): boolean => {
 const SHOWN_TO_PLAYERS: Partial<
   Record<HomebrewType, Readonly<{ path: string; text: string; unless?: (draft: Draft) => boolean }>>
 > = {
-  class: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this class from." },
+  class: { path: "summary", text: "Write the one-line summary. It's the whole card a player picks this class from." },
   species: {
     path: "summary",
-    text: "Write the one-line summary — it's the whole card a player picks this species from."
+    text: "Write the one-line summary. It's the whole card a player picks this species from."
   },
   background: {
     path: "summary",
-    text: "Write the one-line summary — it's the whole card a player picks this background from."
+    text: "Write the one-line summary. It's the whole card a player picks this background from."
   },
-  feat: { path: "summary", text: "Write the one-line summary — it's the whole card a player picks this feat from." },
+  feat: { path: "summary", text: "Write the one-line summary. It's the whole card a player picks this feat from." },
   equipment: {
     path: "description",
-    text: "Describe this item — with no weapon or armour numbers, the description is the whole card the inventory shows.",
+    text: "Describe this item. With no weapon or armour numbers, the description is the whole card the inventory shows.",
     unless: hasDerivedCard
   }
 };
@@ -217,7 +220,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
 
   const formula = badFormula(draft);
   const formulaBlocker: BlockedReason | null = formula
-    ? { text: `Fix the damage formula “${formula}” — it isn't a dice roll the game can make.`, sectionId: "features" }
+    ? { text: `Fix the damage formula "${formula}". It isn't a dice roll the game can make.`, sectionId: "features" }
     : null;
 
   switch (type) {
@@ -297,7 +300,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         need(draft, "castingTime", "Say how long this spell takes to cast.", "casting"),
         need(draft, "duration", "Give this spell a duration.", "casting"),
         typeof getAt(draft, "damage.roll") === "string" && !isDiceFormula(String(getAt(draft, "damage.roll")))
-          ? { text: `Fix the damage formula “${getAt(draft, "damage.roll")}”.`, sectionId: "effect" }
+          ? { text: `Fix the damage formula "${getAt(draft, "damage.roll")}".`, sectionId: "effect" }
           : null,
         !blank(getAt(draft, "damage.roll")) && blank(getAt(draft, "damage.types"))
           ? { text: "Give this spell a damage type.", sectionId: "effect" }
@@ -311,7 +314,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         blankCard,
         add.length === 0 && basedOn.length === 0
           ? {
-              text: "Add at least one spell to this list — a class using an empty list can't be created.",
+              text: "Add at least one spell to this list. A class using an empty list can't be created.",
               sectionId: "contents"
             }
           : null
@@ -328,7 +331,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         // dice: an attack that rolls nothing.
         weapon && blank(weapon.damageDice)
           ? {
-              text: "Give this weapon its damage, or clear the whole Weapon section — a weapon with no dice rolls nothing.",
+              text: "Give this weapon its damage, or clear the whole Weapon section. A weapon with no dice rolls nothing.",
               sectionId: "weapon",
               path: "weapon.damageDice"
             }
@@ -340,7 +343,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
           typeof weapon.damageDice === "string" &&
           weapon.damageDice.trim() !== "" &&
           !isDiceFormula(weapon.damageDice)
-          ? { text: `Fix the damage formula “${weapon.damageDice}”.`, sectionId: "weapon" }
+          ? { text: `Fix the damage formula "${weapon.damageDice}".`, sectionId: "weapon" }
           : null,
         casts.some((cast) => blank(cast.spellId))
           ? { text: "Choose which spell this item casts, or take the empty row off.", sectionId: "magic" }
@@ -348,14 +351,14 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         // `appliesTo` is both-or-neither: label and bases are required together.
         !blank(getAt(draft, "appliesTo.label")) && blank(getAt(draft, "appliesTo.baseIds"))
           ? {
-              text: "List the bases this item can be, or clear its “applies to” line.",
+              text: 'List the bases this item can be, or clear its "applies to" line.',
               sectionId: "magic",
               path: "appliesTo.baseIds"
             }
           : null,
         blank(getAt(draft, "appliesTo.label")) && !blank(getAt(draft, "appliesTo.baseIds"))
           ? {
-              text: "Give the “applies to” choice its printed wording, or clear the base list.",
+              text: 'Give the "applies to" choice its printed wording, or clear the base list.',
               sectionId: "magic",
               path: "appliesTo.label"
             }
@@ -363,7 +366,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         // Attunement is what springs a curse and the boundary the hiding rule needs.
         draft.cursed === true && getAt(draft, "attunement.required") !== true
           ? {
-              text: "Make this item require attunement — attuning is what springs a curse and what reveals it.",
+              text: "Make this item require attunement. Attuning is what springs a curse and what reveals it.",
               sectionId: "magic"
             }
           : null,
@@ -391,7 +394,7 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
         typeof getAt(draft, "hitPoints.formula") === "string" &&
           String(getAt(draft, "hitPoints.formula")).trim() !== "" &&
           !isDiceFormula(String(getAt(draft, "hitPoints.formula")))
-          ? { text: `Fix the hit-point formula “${getAt(draft, "hitPoints.formula")}”.`, sectionId: "defences" }
+          ? { text: `Fix the hit-point formula "${getAt(draft, "hitPoints.formula")}".`, sectionId: "defences" }
           : null,
         formulaBlocker
       );
@@ -402,31 +405,20 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
   }
 }
 
-/** One validity issue (server or shared schema) in the standard sentence shape. The label and
-    section come from the form schema via the issue's `path`. `missing` marks a value the body does
-    not have at all, which reads as "Fill in" rather than as the schema's wording. */
+/** One validity issue as the checklist places it. The sentence is the gate's own (the server's verdict, or the same
+    words from `plainSchemaIssue` for the shared schemas), and the form schema says which section owns its path. */
 export function issueReason(
   type: HomebrewType,
-  issue: { path: ReadonlyArray<string | number>; message: string; missing?: boolean } | undefined,
-  lookup: (
-    path: ReadonlyArray<string | number>
-  ) => Readonly<{ label: string; sectionId: string; sectionTitle: string }> | null = (path) => fieldAt(type, path)
+  issue: Readonly<{ path: ReadonlyArray<string | number>; message: string }> | undefined
 ): BlockedReason | null {
   if (!issue) return null;
   const dotted = issue.path.filter((segment) => typeof segment === "string").join(".");
-  const found = lookup(issue.path);
-  if (!found) {
-    // No field owns this path (whole-record rule, extension bag); pass the message through.
-    return { text: issue.message, path: dotted || undefined };
-  }
-  // Zod messages lack terminal punctuation; the template adds it once.
-  const detail = issue.message.replace(/[.\s]+$/, "");
+  const found = fieldAt(type, issue.path);
   return {
-    text: issue.missing
-      ? `Fill in ${found.label}.`
-      : `Fix ${found.label} — ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`,
-    sectionId: found.sectionId,
-    path: dotted || undefined
+    text: issue.message,
+    ...(found ? { sectionId: found.sectionId } : {}),
+    path: dotted || undefined,
+    segments: issue.path
   };
 }
 
@@ -457,24 +449,22 @@ export function bodyForPublish(type: HomebrewType, draft: Draft, recordId: strin
   return body;
 }
 
-/** Issues from the record's own schema, the same `HOMEBREW_BODY_SCHEMAS` entry the server's publish
-    gate and store read-back use. Unnamed records short-circuit before this runs. */
+/** Issues from the record's own schema, the same `HOMEBREW_BODY_SCHEMAS` entry the server's publish gate and store
+    read-back use, in the gate's own sentences. Unnamed records short-circuit before this runs. */
 function schemaIssues(type: HomebrewType, draft: Draft, recordId: string): readonly BlockedReason[] {
   const schema = HOMEBREW_BODY_SCHEMAS[type];
   if (!schema) return [];
   const body = bodyForPublish(type, draft, recordId);
   const parsed = schema.safeParse(body) as {
     success: boolean;
-    error?: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }> };
+    error?: { issues: ReadonlyArray<SchemaIssue> };
   };
   if (parsed.success) return [];
   const out: BlockedReason[] = [];
   for (const issue of parsed.error?.issues ?? []) {
-    const path = issue.path.map((key) => (typeof key === "number" ? key : String(key)));
     // `id` is forced by the store; the server's identity check reports id problems better.
-    if (path[0] === "id") continue;
-    const missing = path.length > 0 && getAt(body, path.join(".")) === undefined;
-    const reason = issueReason(type, { path, message: issue.message, missing });
+    if (issue.path[0] === "id") continue;
+    const reason = issueReason(type, plainSchemaIssue(issue, body, null));
     if (reason) out.push(reason);
   }
   return out;

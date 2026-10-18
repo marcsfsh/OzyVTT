@@ -1,0 +1,117 @@
+import { useEffect, useEffectEvent, useSyncExternalStore } from "react";
+import type { GridCalibration } from "./gridPreview";
+
+/**
+ * The live map's grid and size, published by the map once it has read them, so the panel and the header beside the
+ * map can measure the same distances (a target's range) and present the same map on the TV without a second read or
+ * the map's own props.
+ */
+type Geometry = Readonly<{
+  assetId: string;
+  calibration: GridCalibration | null;
+  size: Readonly<{ width: number; height: number }> | null;
+}>;
+let current: Geometry | null = null;
+const listeners = new Set<() => void>();
+
+export function publishTableGeometry(
+  assetId: string,
+  calibration: GridCalibration | null,
+  size: Readonly<{ width: number; height: number }> | null = null
+) {
+  if (
+    current?.assetId === assetId &&
+    current.calibration === calibration &&
+    current.size?.width === size?.width &&
+    current.size?.height === size?.height
+  )
+    return;
+  current = { assetId, calibration, size };
+  for (const listener of listeners) listener();
+}
+
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+function useGeometry() {
+  return useSyncExternalStore(
+    subscribe,
+    () => current,
+    () => current
+  );
+}
+
+/** The grid of the map now on the table, or null before it has loaded or on a map without one. */
+export function useTableCalibration(assetId: string | null): GridCalibration | null {
+  const geometry = useGeometry();
+  return geometry && geometry.assetId === assetId ? geometry.calibration : null;
+}
+
+/** The pixel size of the map now on the table, or null before it has loaded. */
+export function useTableMapSize(assetId: string | null): Readonly<{ width: number; height: number }> | null {
+  const geometry = useGeometry();
+  return geometry && geometry.assetId === assetId ? geometry.size : null;
+}
+
+/* A request to bring a creature's token into view, from a control outside the map (the header's Me). */
+const focusListeners = new Set<(actorId: string) => void>();
+
+export function focusTokenOnMap(actorId: string) {
+  for (const listener of focusListeners) listener(actorId);
+}
+
+/** Runs `onFocus` whenever something asks the map to bring a token into view. */
+export function useTokenFocusRequests(onFocus: (actorId: string) => void) {
+  const handle = useEffectEvent(onFocus);
+  useEffect(() => {
+    const listener = (actorId: string) => handle(actorId);
+    focusListeners.add(listener);
+    return () => {
+      focusListeners.delete(listener);
+    };
+  }, []);
+}
+
+/* A request to open one of the map's tool groups, from the header's fog and vision chips or a scene's questions. */
+export type MapToolGroupRequest = "fog" | "light" | "walls";
+const groupListeners = new Set<(group: MapToolGroupRequest) => void>();
+
+export function openMapToolGroup(group: MapToolGroupRequest) {
+  for (const listener of groupListeners) listener(group);
+}
+
+/** Runs `onOpen` whenever something asks the map's rail to open a tool group. */
+export function useMapToolGroupRequests(onOpen: (group: MapToolGroupRequest) => void) {
+  const handle = useEffectEvent(onOpen);
+  useEffect(() => {
+    const listener = (group: MapToolGroupRequest) => handle(group);
+    groupListeners.add(listener);
+    return () => {
+      groupListeners.delete(listener);
+    };
+  }, []);
+}
+
+/* A request to place a creature at the next spot tapped on the map: the button half of button-then-click, from a
+   control outside the map (a scene's list of creatures). Null withdraws it. */
+const placementListeners = new Set<(actorId: string | null) => void>();
+
+export function armPlacement(actorId: string | null) {
+  for (const listener of placementListeners) listener(actorId);
+}
+
+/** Runs `onArm` whenever something asks the map to place a creature at the next tapped spot. */
+export function usePlacementRequests(onArm: (actorId: string | null) => void) {
+  const handle = useEffectEvent(onArm);
+  useEffect(() => {
+    const listener = (actorId: string | null) => handle(actorId);
+    placementListeners.add(listener);
+    return () => {
+      placementListeners.delete(listener);
+    };
+  }, []);
+}

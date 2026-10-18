@@ -8,11 +8,11 @@ import {
   BuilderAbilityMethodSchema,
   EncounterTokenPositionSchema,
   PartyVisibilitySchema,
-  RollPurposeSchema,
   RollVisibilitySchema,
   RuleExceptionsSchema,
   RuleFamilySchema,
-  RuleModeSchema
+  RuleModeSchema,
+  TableRollPurposeSchema
 } from "./state.js";
 import {
   AbilitySchema,
@@ -22,8 +22,11 @@ import {
   DamageTypeSchema,
   EffectModifiersSchema,
   InventoryItemSchema,
+  MAX_FAVOURITE_OPTIONS,
+  OptionIdSchema,
   ProficienciesSchema
 } from "@vtt/schemas";
+import { MAX_SOUND_EFFECTS, MAX_SOUND_LAYERS, MAX_SOUND_TRACKS, SoundVolumeSchema } from "./sound.js";
 
 // Wire schemas for every game command, shared by the socket handlers and the HTTP API. `commandId` is
 // the idempotency key; `expectedRevision` the optimistic-concurrency guard.
@@ -61,7 +64,7 @@ export const EncounterStartSchema = z
   .object({
     commandId: z.uuid(),
     mapAssetId: z.uuid(),
-    /** Omitted means the server derives combatants from the live scene's staged list rather than trusting the client's copy. */
+    /** Omitted means the server derives combatants from the live scene's staged list and ignores any client copy. */
     entries: z
       .array(
         z
@@ -191,6 +194,15 @@ export const ActorRemoveSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** `inFight` is the GM's second yes: releasing a character who is in the running fight. */
+export const CharacterForceReleaseSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    inFight: z.literal(true).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const SetTokenImageSchema = z
   .object({
     commandId: z.uuid(),
@@ -264,7 +276,7 @@ export const ApplyDamageSchema = z
       .optional(),
     sourceName: z.string().min(1).max(120).optional(),
     critical: z.boolean().optional(),
-    /** Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable instead of dying/defeated. */
+    /** Knocking out a creature (SRD): a drop to 0 leaves the target Unconscious and stable, neither dying nor defeated. */
     nonlethal: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -355,7 +367,7 @@ export const ActionResolveSchema = z
     cover: z.enum(["half", "three-quarters", "total"]).optional(),
     /** Free-text annotation (the Ready action's trigger), shown in the granted effect's name. */
     note: z.string().trim().min(1).max(100).optional(),
-    /** Ready this spell rather than cast it now (SRD Ready): its slot is spent and it is held with Concentration until
+    /** Ready this spell for later (SRD Ready): its slot is spent and it is held with Concentration until
      *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
     ready: z.boolean().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
@@ -401,13 +413,13 @@ export const ActionResolveSchema = z
   })
   .strict()
   .refine((payload) => payload.targetIds === undefined || payload.template === undefined, {
-    error: "Provide either explicit targets or an area template, not both."
+    error: "Provide explicit targets or an area template, and only one of the two."
   })
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, {
-    error: "Supply either a natural d20 or a final total, not both."
+    error: "Supply a natural d20 or a final total, and only one of the two."
   })
   .refine((payload) => !(payload.critical === true && payload.fumble === true), {
-    error: "A roll is a natural 20 or a natural 1, not both."
+    error: "A roll can't be both a natural 20 and a natural 1."
   });
 // The message `save.answer` surfaces for out-of-bounds hand-entered damage (it reports the zod issue's own text).
 const SAVE_DAMAGE_BOUND = "Enter the damage as a whole number from 0 to 1000.";
@@ -484,10 +496,12 @@ export const ReactionDismissSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Read-only availability lookup (no commandId - nothing mutates). */
+/** Read-only availability lookup (no commandId: nothing mutates). */
 export const ActorAvailableActionsSchema = z.object({ actorId: z.uuid() }).strict();
 /** The movement read: how much of this turn's movement a combatant has left. */
 export const ActorMovementSchema = z.object({ actorId: z.uuid() }).strict();
+/** The next-level read: what a character's next level brings. Nothing mutates. */
+export const CharacterNextLevelSchema = z.object({ actorId: z.uuid() }).strict();
 export const ContentActionsSchema = z
   .object({
     definitionId: z
@@ -640,7 +654,7 @@ export const SaveRollSchema = z
   })
   .strict()
   .refine((payload) => payload.face === undefined || payload.total === undefined, {
-    error: "Supply either a typed d20 or a final total, not both."
+    error: "Supply a typed d20 or a final total, and only one of the two."
   });
 
 const SkillOrToolIdSchema = z
@@ -837,7 +851,7 @@ export const SetEnvironmentSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep instead of the live table. */
+/** Manual fog of war (GM-only). `sceneId` targets a parked scene's private prep; without it, the live table. */
 export const FogSetEnabledSchema = z
   .object({
     commandId: z.uuid(),
@@ -888,6 +902,117 @@ export const TerrainResetSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+
+// Dynamic vision (ADR-0023). The GM's edits take `sceneId` to prep a parked scene, as fog and terrain do.
+/** A map point in image pixels, before the server snaps and clamps it. */
+const VisionPointWireSchema = z
+  .object({ x: z.number().min(-100000).max(1_000_000), y: z.number().min(-100000).max(1_000_000) })
+  .strict();
+export const VisionSetEnabledSchema = z
+  .object({
+    commandId: z.uuid(),
+    enabled: z.boolean(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const VisionSetAmbientSchema = z
+  .object({
+    commandId: z.uuid(),
+    ambient: z.enum(["bright", "dim", "dark"]),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const VisionResetExploredSchema = z
+  .object({
+    commandId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A chain of walls, doors or windows: each pair of consecutive points is one segment. */
+export const WallAddSchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["wall", "door", "window"]),
+    points: z.array(VisionPointWireSchema).min(2).max(64),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const WallMoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    a: VisionPointWireSchema,
+    b: VisionPointWireSchema,
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const WallRemoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const WallClearSchema = z
+  .object({
+    commandId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Open or close a door. A player may, for a door next to their own character's token on the live table. */
+export const DoorSetOpenSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    open: z.boolean(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A light placed on the map (`position`) or carried by a token (`actorId`). */
+export const LightAddSchema = z
+  .object({
+    commandId: z.uuid(),
+    position: VisionPointWireSchema.optional(),
+    actorId: z.uuid().optional(),
+    brightFeet: z.number().min(0).max(240),
+    dimFeet: z.number().min(0).max(240),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((light) => (light.position === undefined) !== (light.actorId === undefined), {
+    message: "Give the light a place on the map or a token to carry it. It can't have both."
+  });
+export const LightMoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    lightId: z.uuid(),
+    position: VisionPointWireSchema,
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+export const LightRemoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    lightId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM's look through one creature's eyes, or the whole party's when `actorId` is absent. */
+export const VisionPreviewSchema = z.object({ actorId: z.uuid().optional() }).strict();
+/** What a prepared or live scene shows one audience: the shared screen, or with `actorId` that party character's
+ *  player. */
+export const ScenePreviewSchema = z.object({ sceneId: z.uuid(), actorId: z.uuid().optional() }).strict();
 export const ActorRestSchema = z
   .object({
     commandId: z.uuid(),
@@ -921,7 +1046,7 @@ export const ActorRechooseSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Spend Hit Point Dice to heal on a short rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
+/** Spend Hit Point Dice to heal on a Short Rest (SRD 5.2.1: each die heals its roll + Con modifier, minimum 1). GM any actor; a player only their claimed character. */
 export const ActorSpendHitDiceSchema = z
   .object({
     commandId: z.uuid(),
@@ -1008,7 +1133,7 @@ export const CharacterSetSlotSchema = z
     actorId: z.uuid(),
     level: z.number().int().min(1).max(9),
     remaining: z.number().int().min(0).max(9),
-    /** The Warlock's Pact Magic pool at `level`, not the spell slots. */
+    /** The Warlock's Pact Magic pool at `level`; without it, the spell slots. */
     pact: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
@@ -1083,6 +1208,18 @@ export const CharacterGiveItemSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The options a character pins to the sheet's turn card, in order. An empty list clears them. */
+export const CharacterSetFavouritesSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    optionIds: z
+      .array(OptionIdSchema)
+      .max(MAX_FAVOURITE_OPTIONS, `Pin at most ${MAX_FAVOURITE_OPTIONS} options.`)
+      .refine((ids) => new Set(ids).size === ids.length, "Each option may be pinned once."),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetCurrencySchema = z
   .object({
     commandId: z.uuid(),
@@ -1118,7 +1255,7 @@ const ClassLevelsSchema = z
   .min(1)
   .max(20);
 
-/** Create a character from choices, not a finished sheet; `character-build.ts` validates and assembles it. */
+/** Create a character from choices; `character-build.ts` validates and assembles it. */
 export const CharacterCreateSchema = z
   .object({
     commandId: z.uuid(),
@@ -1185,19 +1322,27 @@ export const BuilderOffersSchema = z
     backgroundId: BuilderContentIdSchema.optional(),
     classId: BuilderContentIdSchema.optional(),
     level: z.number().int().min(1).max(20),
-    classLevels: ClassLevelsSchema.optional(),
+    classLevels: ClassLevelsSchema.optional().describe(
+      "A multiclass draft: the class each level went to, in order. Index 0 is level 1 and is `classId`; absent for one class."
+    ),
     picks: z
       .record(OfferKeySchema, z.array(BuilderContentIdSchema).max(40))
       .refine((picks) => Object.keys(picks).length <= 200)
-      .optional(),
+      .optional()
+      .describe("Offer key to the option ids chosen for it."),
     asiIncreases: z
       .record(
         OfferKeySchema,
         z.array(z.object({ ability: AbilitySchema, amount: z.number().int().min(1).max(2) }).strict()).max(2)
       )
       .refine((increases) => Object.keys(increases).length <= 40)
-      .optional(),
-    choices: z.array(CharacterChoiceSchema).max(200).optional(),
+      .optional()
+      .describe("Offer key to the +2 split, for an Ability Score Improvement answered with `asi`."),
+    choices: z
+      .array(CharacterChoiceSchema)
+      .max(200)
+      .optional()
+      .describe("A stored choice ledger, read back onto the offers it answers."),
     sheet: z
       .object({
         level: z.number().int().min(1).max(20),
@@ -1214,10 +1359,23 @@ export const BuilderOffersSchema = z
       })
       .strict()
       .optional()
+      .describe(
+        "With `choices`: the stored sheet's own level and ability scores, so the reply's `abilities` can say how those scores were made."
+      )
   })
   .strict()
-  .refine((draft) => !(draft.picks && draft.choices), "Send the answers as picks or as a ledger, not both.");
+  .refine(
+    (draft) => !(draft.picks && draft.choices),
+    "Send the answers as picks or as a ledger, and only one of the two."
+  )
+  .describe(
+    "A character-builder draft: the identity chosen so far, and the answers by offer key or as a stored ledger, one of the two."
+  );
 
+/** The GM's See as: the builder's offers for this draft, as one player would get them. */
+export const HomebrewSeeAsBuilderOffersSchema = z
+  .object({ as: z.union([z.literal("everyone"), z.uuid()]), draft: BuilderOffersSchema })
+  .strict();
 /** Level up/down or respec: `CharacterCreateSchema` minus the name, plus the actor. Fully re-validated. */
 export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.uuid() }).strict();
 
@@ -1298,14 +1456,14 @@ export const DiceRollSchema = z
   .object({
     commandId: z.uuid(),
     formula: z.string().min(1).max(160),
-    purpose: RollPurposeSchema,
+    purpose: TableRollPurposeSchema,
     visibility: RollVisibilitySchema,
     label: z.string().min(1).max(80).optional(),
     actorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** How a token move travels (SRD Movement): on foot or by one of the special speeds, spending movement; by
+/** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
 export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
 export type MoveMode = z.infer<typeof MoveModeSchema>;
@@ -1342,7 +1500,7 @@ export const ActorSetArmorClassSchema = z
   })
   .strict();
 export const SceneNameSchema = z.string().trim().min(1).max(120);
-/** `activate: true` goes live on the new scene in the same command, parking whatever was live (as `scene.activate` does). */
+/** `activate: true` goes live on the new scene in the same command and parks whatever was live (as `scene.activate` does). */
 export const SceneCreateSchema = z
   .object({
     commandId: z.uuid(),
@@ -1368,7 +1526,7 @@ export const SceneIdSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** Make one recorded moment live. `turnIndex` indexes the archive document's `turns`, not a timeline revision. */
+/** Make one recorded moment live. `turnIndex` indexes the archive document's `turns`. */
 export const ReplayLaunchSchema = z
   .object({
     commandId: z.uuid(),
@@ -1485,3 +1643,58 @@ export const AnnotationClearSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+
+// ---------- The sound board (ADR-0024): GM-only, and kept in its own store, so none of these carry a game revision.
+
+const SoundSlotInputSchema = z.object({ assetId: z.uuid(), volume: SoundVolumeSchema }).strict();
+/** Replaces any part of the board's arrangement; a part left out stays as it is. */
+export const SoundArrangeSchema = z
+  .object({
+    commandId: z.uuid(),
+    masterVolume: SoundVolumeSchema.optional(),
+    music: z
+      .object({ tracks: z.array(SoundSlotInputSchema).max(MAX_SOUND_TRACKS), shuffle: z.boolean() })
+      .strict()
+      .optional(),
+    ambient: z.array(SoundSlotInputSchema).max(MAX_SOUND_LAYERS).optional(),
+    effects: z.array(SoundSlotInputSchema).max(MAX_SOUND_EFFECTS).optional()
+  })
+  .strict();
+/** Starts the playlist (at `assetId`, or its top), an ambient layer, an effect, or a scene's saved sound. */
+export const SoundPlaySchema = z
+  .object({
+    commandId: z.uuid(),
+    target: z.enum(["music", "ambient", "effect", "scene"]),
+    assetId: z.uuid().optional(),
+    sceneId: z.uuid().optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.target === "ambient" || value.target === "effect") && !value.assetId)
+      context.addIssue({ code: "custom", path: ["assetId"], message: "Name the sound to play." });
+    if (value.target === "scene" && !value.sceneId)
+      context.addIssue({ code: "custom", path: ["sceneId"], message: "Name the scene whose sound to play." });
+  });
+/** Stops the music, one ambient layer, or everything. */
+export const SoundStopSchema = z
+  .object({ commandId: z.uuid(), target: z.enum(["music", "ambient", "all"]), assetId: z.uuid().optional() })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.target === "ambient" && !value.assetId)
+      context.addIssue({ code: "custom", path: ["assetId"], message: "Name the ambient layer to stop." });
+  });
+export const SoundNextTrackSchema = z.object({ commandId: z.uuid() }).strict();
+export const SoundPauseSchema = z.object({ commandId: z.uuid(), paused: z.boolean() }).strict();
+/** Saves what the board holds now as a scene's sound, clears it, or turns its start-when-live on or off. */
+export const SoundScenePresetSchema = z
+  .object({
+    commandId: z.uuid(),
+    sceneId: z.uuid(),
+    preset: z.enum(["save-current", "clear"]).optional(),
+    autoplay: z.boolean().optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.preset === undefined && value.autoplay === undefined)
+      context.addIssue({ code: "custom", path: ["preset"], message: "Say whether to save, clear or switch it." });
+  });

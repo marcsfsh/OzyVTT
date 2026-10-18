@@ -1,3 +1,4 @@
+import { HomebrewMarks, useHomebrewMarks } from "../homebrew/marks";
 import { useEffect, useMemo, useState } from "react";
 import type { ContentEquipmentSummary, ContentSpellSummary } from "@vtt/domain";
 import { Input, Modal } from "@vtt/ui";
@@ -5,6 +6,8 @@ import { read } from "../lib/command";
 import { registerContentCache } from "../content/invalidate";
 import { titleCase } from "./format";
 import { useSpellReference } from "./spells";
+import { withArticle } from "@vtt/domain";
+import "./pickers.css";
 
 /**
  * One shared, session-cached fetch of the equipment catalog, so every sheet browses the same list.
@@ -97,8 +100,9 @@ function formatCost(costGp: number | null): string | null {
   return `${Math.round(costGp * 100)} cp`;
 }
 
-/** The one-line detail under each catalog row: what it is plus the numbers that matter for that kind. */
-function metaLine(item: ContentEquipmentSummary): string {
+/** The one-line detail under each catalog row: what it is plus the numbers that matter for that kind. Shared with
+ *  the homebrew item wizard's preview, so a new item reads as the picker will show it. */
+export function metaLine(item: ContentEquipmentSummary): string {
   const parts: string[] = [categoryLabel(item.category)];
   if (item.weapon) {
     parts.push(`${item.weapon.damageDice} ${item.weapon.damageType}`);
@@ -123,7 +127,7 @@ function metaLine(item: ContentEquipmentSummary): string {
   return parts.join(" · ");
 }
 
-/** A piece of magic ammunition is one kind of the gear table's ammunition: "Arrows", not "Arrows (20)". */
+/** A piece of magic ammunition is one kind of the gear table's ammunition: "Arrows", with no "(20)". */
 export const ammunitionKindName = (base: Pick<ContentEquipmentSummary, "name">) => base.name.replace(/\s*\(\d+\)$/, "");
 
 /** What picking a base decides, for the chooser's lead line. */
@@ -177,7 +181,7 @@ export function BaseOptionList({
             type="button"
             className="sheet-picker-add tap-target"
             disabled={busy}
-            aria-label={kinds ? `Make it ${ammunitionKindName(base)}` : `Make it a ${base.name}`}
+            aria-label={kinds ? `Make it ${ammunitionKindName(base)}` : `Make it ${withArticle(base.name)}`}
             onClick={() => onPick(base.id)}
           >
             Pick
@@ -228,8 +232,8 @@ export function ScrollSpellPicker({
   return (
     <>
       <p className="sheet-picker-empty">
-        A Spell Scroll bears one spell. Pick it - a reader whose spell list has it can cast it once, and the scroll
-        crumbles.
+        A Spell Scroll bears one spell. Pick it here. A reader whose spell list has it can cast it once, and then the
+        scroll crumbles.
       </p>
       <div className="sheet-picker-controls">
         <Input
@@ -338,7 +342,7 @@ export function BindItemModal({
       onClose={onClose}
       size="lg"
       accent="cyan"
-      title={`${template.name} — what is it?`}
+      title={`Choose what ${template.name} is`}
       ariaLabel={`Choose which ${template.category} ${template.name} is`}
     >
       <p className="sheet-picker-empty">
@@ -375,13 +379,17 @@ export function EquipmentPicker({
   ownedCounts,
   busy,
   onAdd,
-  onClose
+  onClose,
+  gm = false
 }: Readonly<{
   ownedCounts: ReadonlyMap<string, number>;
   busy: boolean;
   onAdd: (item: ContentEquipmentSummary, baseId?: string, spellId?: string) => void;
   onClose: () => void;
+  /** The GM's picker also marks a Hidden homebrew item, read from the GM's own homebrew list. */
+  gm?: boolean;
 }>) {
+  const marks = useHomebrewMarks(gm);
   const { catalog, attribution } = useEquipmentReference();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -442,7 +450,7 @@ export function EquipmentPicker({
         onClose={onClose}
         size="lg"
         accent="cyan"
-        title={`${choosing.name} — what is it?`}
+        title={`Choose what ${choosing.name} is`}
         ariaLabel={`Choose which ${choosing.category} ${choosing.name} is`}
       >
         <p className="sheet-picker-empty">
@@ -495,7 +503,7 @@ export function EquipmentPicker({
       size="lg"
       accent="cyan"
       title="Add equipment"
-      ariaLabel="Browse the SRD equipment catalog"
+      ariaLabel="Browse the equipment catalog"
     >
       <div className="sheet-picker-controls">
         <Input
@@ -538,6 +546,7 @@ export function EquipmentPicker({
                 <div className="sheet-picker-item">
                   <span className="sheet-picker-name">
                     {item.name}
+                    <HomebrewMarks source={item.source} mark={marks.get(item.id)} />
                     {owned > 0 && (
                       <span className="sheet-picker-owned" aria-label={`${owned} in pack`}>
                         ×{owned}

@@ -1,0 +1,143 @@
+/* Quests: the list in the filter flyout, the quest page with its objectives. */
+
+.cx-quests {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cx-quests-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cx-quests-main > .cx-page {
+  flex: 1 1 auto;
+}
+/* On a wide screen the open flyout sits beside the quest and the quest moves over for it. */
+@media (min-width: 980px) {
+  .cx-quests-main:has(> .nh-flyout) > :not(.nh-flyout) {
+    margin-left: min(330px, 100%);
+  }
+}
+.cx-questlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cx-questrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 3.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.cx-questrow:hover {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+.cx-questrow.is-on {
+  background: var(--tab-on);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.cx-questrow-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 500 var(--fs-xs) / 1.3 var(--font-body);
+  color: var(--text-dim);
+}
+.cx-questrow-text b {
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.cx-quest-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.cx-objectives {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-3) 0;
+}
+.cx-objlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+}
+.cx-obj {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font: 500 var(--fs-sm) / 1.35 var(--font-body);
+}
+.cx-obj:last-child {
+  border-bottom: 0;
+}
+.cx-obj.is-hidden {
+  box-shadow: inset 3px 0 0 var(--rim-gm);
+  background: color-mix(in srgb, var(--rim-gm) 8%, transparent);
+}
+.cx-obj.is-done .cx-obj-text {
+  color: var(--text-dim);
+}
+.cx-obj-check {
+  display: grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin: calc(-1 * var(--space-1)) 0;
+  flex: none;
+  cursor: pointer;
+}
+.cx-obj-check input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--cyan);
+}
+.cx-obj-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cx-obj.is-writing .nh-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cx-obj-mark {
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  flex: none;
+  color: var(--cyan-hi);
+}
+.cx-obj-dash {
+  width: 0.7rem;
+  height: 2px;
+  background: var(--text-muted);
+}
+.cx-obj-add {
+  display: flex;
+  gap: var(--space-2);
+}
+.cx-obj-add .nh-input {
+  flex: 1 1 auto;
+}

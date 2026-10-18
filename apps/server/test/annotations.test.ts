@@ -45,7 +45,7 @@ function activeState() {
 }
 
 describe("authoritative annotation geometry", () => {
-  it("rejects measuring or placing without an active encounter or completed calibration", () => {
+  it("rejects measuring or placing without a live map or completed calibration", () => {
     const inactive = GameStateSchema.parse({ schemaVersion: 1 });
     expect(() =>
       addAnnotation(
@@ -61,7 +61,25 @@ describe("authoritative annotation geometry", () => {
         },
         geometry
       )
-    ).toThrow("Start an encounter");
+    ).toThrow("Make a scene live");
+    // A live scene's map takes a measurement before its fight starts.
+    const beforeFight = activeState();
+    beforeFight.combat = { ...beforeFight.combat, active: false, turnActorId: null };
+    expect(
+      addAnnotation(
+        beforeFight,
+        {
+          id: "a0000000-0000-4000-8000-000000000002",
+          kind: "measurement",
+          origin: { x: 25, y: 25 },
+          target: { x: 125, y: 25 },
+          visibility: "public",
+          actor: playerActor,
+          now: 0
+        },
+        geometry
+      ).geometry.sizeFeet
+    ).toBe(10);
     const state = activeState();
     expect(() =>
       addAnnotation(
@@ -216,7 +234,7 @@ describe("authoritative annotation geometry", () => {
         },
         geometry
       )
-    ).toThrow("Everyone, Just me");
+    ).toThrow("Shown to players, Only me");
   });
 
   it("lets the owner move/resize and delete their own shape, but not another player's unless shared", () => {
@@ -406,7 +424,7 @@ describe("authoritative annotation geometry", () => {
 
   it("points a cone in any direction: both ends snap to cell centers, not to fixed angles", () => {
     const state = activeState();
-    // Drag ~3 cells right and 1 cell down - a ~18° angle that must survive (not snap to 0/45°).
+    // Drag ~3 cells right and 1 cell down: a ~18° angle that must survive (not snap to 0/45°).
     const cone = addAnnotation(
       state,
       {
@@ -429,6 +447,52 @@ describe("authoritative annotation geometry", () => {
         Math.PI
     );
     expect(angle % 45).not.toBe(0);
+  });
+
+  it("moves a cast's area that reaches past the map's edge along that edge, but keeps a drawn shape on the map", () => {
+    const state = activeState();
+    const shape = (id: string, target: { x: number; y: number }, reachesPastMap?: boolean) =>
+      addAnnotation(
+        state,
+        {
+          id,
+          kind: "shape",
+          shape: "circle",
+          origin: { x: 975, y: 525 },
+          target,
+          visibility: "public",
+          ...(reachesPastMap ? { reachesPastMap } : {}),
+          actor: gmActor,
+          now: 0
+        },
+        geometry
+      );
+    // A 20-foot-radius blast placed in the last column reaches past the right edge.
+    shape("a0000000-0000-4000-8000-000000000001", { x: 1175, y: 525 }, true);
+    moveAnnotation(
+      state,
+      "a0000000-0000-4000-8000-000000000001",
+      { x: 975, y: 225 },
+      { x: 1175, y: 225 },
+      gmActor,
+      geometry
+    );
+    const moved = state.combat.annotations.find(
+      (annotation) => annotation.id === "a0000000-0000-4000-8000-000000000001"
+    )!;
+    expect(moved.geometry).toMatchObject({ origin: { x: 975, y: 225 }, sizeFeet: 20 });
+    // A circle drawn by hand stays on the map when it moves.
+    shape("a0000000-0000-4000-8000-000000000002", { x: 925, y: 525 });
+    expect(() =>
+      moveAnnotation(
+        state,
+        "a0000000-0000-4000-8000-000000000002",
+        { x: 975, y: 225 },
+        { x: 1025, y: 225 },
+        gmActor,
+        geometry
+      )
+    ).toThrow("The endpoint must be inside the map.");
   });
 
   it("pings are public, labeled with who sent them, and expire after 4s", () => {

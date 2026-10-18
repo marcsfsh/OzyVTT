@@ -118,7 +118,7 @@
   color: var(--text-dim);
 }
 
-/* Jump back to a completed step. Meets the 44px floor by padding, not by paint. */
+/* Jump back to a completed step. Meets the 44px floor by padding, with no extra paint. */
 .nh-step-jump {
   display: inline-flex;
   align-items: center;
@@ -135,6 +135,35 @@
 }
 .nh-step-jump:hover .nh-step-marker {
   border-color: var(--cyan-hi);
+}
+
+/* The vertical list: a column beside a step body. Each row keeps the 44px floor whether or not it is a jump target,
+   and a long name wraps and never widens the column. */
+.nh-steps--vertical {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow-x: visible;
+}
+.nh-steps--vertical .nh-step {
+  display: flex;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+}
+.nh-steps--vertical .nh-step:has(> .nh-step-jump) {
+  padding: 0;
+}
+.nh-steps--vertical .nh-step:not(:last-child)::after {
+  display: none;
+}
+.nh-steps--vertical .nh-step-label {
+  white-space: normal;
+}
+.nh-steps--vertical .nh-step-jump {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 @media (min-width: 761px) {

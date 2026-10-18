@@ -3,10 +3,10 @@
 
 /* The landing: the Chrome sun title screen (star field, a slatted sunset sun between two mountain ranges,
    the grid rolling toward the viewer, the chrome wordmark and two buttons). Raw colours live in the
-   --landing-* tokens, re-skinned per theme. Reduced motion freezes the motion rather than hiding the scene. */
+   --landing-* tokens, re-skinned per theme. Reduced motion freezes the motion and keeps the scene. */
 .landing {
   position: relative;
-  /* `clip`, not `hidden`: the scene overflows the frame, and a hidden box still scrolls when focus moves
+  /* `clip`: the scene overflows the frame, and a `hidden` box still scrolls when focus moves
      into it, which pushed the sign-in card off a phone screen. */
   overflow: clip;
   display: flex;
@@ -139,7 +139,7 @@
   background: var(--landing-horizon);
   box-shadow: var(--landing-horizon-glow);
 }
-/* The grid floor, anchored at the horizon. Its own class rather than `.grid-floor`, which is
+/* The grid floor, anchored at the horizon. Its own class, because `.grid-floor` is
    theme-gated; this scene is not. */
 .landing-grid {
   position: absolute;
@@ -154,8 +154,8 @@
   transform-origin: center top;
 }
 
-/* Analog grain with a per-theme opacity token (`.static-noise` is hidden in light, but daybreak still
-   wants a little). */
+/* Analog grain with a per-theme opacity token (`.static-noise` is hidden in light, but Day and Dawn
+   still want a little). */
 .landing-noise {
   position: absolute;
   inset: 0;
@@ -283,7 +283,7 @@
     opacity: 0;
   }
 }
-/* `filter: opacity()` rather than `opacity`, so `landing-twinkle` keeps the property it owns. */
+/* `filter: opacity()` in place of `opacity`, so `landing-twinkle` keeps the property it owns. */
 @keyframes entry-stars {
   from {
     transform: scale(1);
@@ -385,6 +385,46 @@
     var(--shadow-2);
 }
 
+.landing-gm-form {
+  display: grid;
+  gap: var(--space-3);
+}
+/* The password and its Show toggle share one row; the field takes the width. */
+.landing-password {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.landing .landing-password input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.landing-keep {
+  justify-self: start;
+}
+.landing-gm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.landing-reset {
+  margin-top: var(--space-3);
+}
+/* In a dialog, which still inherits the landing's centred text. */
+.landing-reset-steps {
+  text-align: start;
+  color: var(--text-dim);
+}
+.landing-reset-steps ol {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-6);
+}
+.landing-reset-steps li + li {
+  margin-top: var(--space-1);
+}
+
 /* Motion: ignition, twinkle and the drive; frozen under reduced motion. `will-change` is declared at
    rest so layers are not created mid-drive. Nothing fixed lives inside the landing, so the containing
    block it creates is harmless. */
@@ -451,7 +491,7 @@
       0 var(--landing-grid-cell);
   }
 }
-/* The resting rise animates `translate`, not `transform`: individual transform properties compose with
+/* The resting rise animates `translate`: individual transform properties compose with
    `transform`, so the base `translateX(-50%)` survives and the drive can animate `transform` without
    contest. */
 @keyframes landing-sunrise {

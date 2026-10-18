@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Input } from "@vtt/ui";
+import type { ViewerSoundProjection } from "@vtt/domain";
+import { useDragSurface } from "@vtt/ui";
 import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
-import { FogOverlay } from "../scene/FogOverlay";
+import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
 import { TerrainOverlay } from "../scene/TerrainOverlay";
 import { bandFraction, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
+import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
+import { ScreenPairing } from "./ScreenPairing";
+import { TableSound } from "./TableSound";
 import "./viewer.css";
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -72,7 +76,11 @@ export type Presentation = Readonly<{
     }>;
     /** Difficult terrain the fog reveals. */
     terrain?: Readonly<{ difficult: readonly Readonly<{ x: number; y: number; width: number; height: number }>[] }>;
+    /** Dynamic vision: where the party sees now and what it has seen. */
+    vision?: VisionMask;
   }>;
+  /** What the sound board is playing, with how far in each sound was when this was sent. */
+  sound?: ViewerSoundProjection;
 }>;
 
 type ConnectionState = "pairing" | "connecting" | "live" | "reconnecting";
@@ -85,62 +93,12 @@ function imageUrl(assetId: string) {
   return `/api/v1/map-assets/${encodeURIComponent(assetId)}/content`;
 }
 
-function Pairing({ onPaired }: Readonly<{ onPaired: () => void }>) {
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("Table display");
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setMessage("");
-    try {
-      await apiRequest("/api/v1/viewer/pairings/exchange", { body: { code, name }, failure });
-      onPaired();
-    } catch (error) {
-      setMessage((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <main className="viewer-pairing">
-      <form onSubmit={submit} aria-labelledby="pair-title">
-        <span className="viewer-eyebrow">SHARED TABLE VIEWER</span>
-        <h1 id="pair-title">Pair this screen</h1>
-        <p>Ask the GM for the temporary pairing code. This screen receives only player-safe presentation data.</p>
-        <label>
-          Display name
-          <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} autoComplete="off" />
-        </label>
-        <label>
-          Pairing code
-          <Input
-            value={code}
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
-            placeholder="XXXX-XXXX-XXXX"
-            inputMode="text"
-            autoCapitalize="characters"
-            autoComplete="one-time-code"
-            autoFocus
-          />
-        </label>
-        <Button variant="primary" type="submit" disabled={busy}>
-          {busy ? "Pairing…" : "Pair viewer"}
-        </Button>
-        <p className="viewer-feedback" role="alert">
-          {message}
-        </p>
-      </form>
-    </main>
-  );
-}
-
 export function Initiative({
   presentation,
   onResize
 }: Readonly<{ presentation: Presentation; onResize?: (width: number) => void }>) {
   const asideRef = useRef<HTMLElement | null>(null);
+  const resizeSurface = useDragSurface<HTMLDivElement>();
   if (!presentation.initiative.visible) return null;
   // Same shape as the player's list: active combatant on top, then turn order; no HP bars or controls.
   const { entries, round, hiddenTurn } = presentation.initiative;
@@ -165,6 +123,7 @@ export function Initiative({
     <aside ref={asideRef} className="viewer-initiative frame-col" aria-label={`Initiative, round ${round}`}>
       {onResize && (
         <div
+          ref={resizeSurface}
           className="viewer-initiative-resize"
           role="separator"
           aria-orientation="vertical"
@@ -214,13 +173,24 @@ const LOCAL_MAX_ZOOM = 8;
  * so each display can be framed independently. Follows the GM's camera again when the presented map
  * changes or "Follow GM view" is pressed.
  */
-export function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
+export function MapStage({
+  presentation,
+  mapImageUrl,
+  authToken
+}: Readonly<{
+  presentation: Presentation;
+  /** The GM's preview draws the map from a bearer-authorized copy; the screen itself reads it with its cookie. */
+  mapImageUrl?: string | null;
+  /** The GM's preview loads token art with the GM's bearer token. */
+  authToken?: string;
+}>) {
   const [size, setSize] = useState({ width: 16, height: 9 });
   const [localCamera, setLocalCamera] = useState<LocalCamera | null>(null);
   const [pan, setPan] = useState<PanGesture | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
-  const href = presentation.activeMap ? imageUrl(presentation.activeMap.assetId) : "";
+  const stageSurface = useDragSurface(stageRef);
+  const href = mapImageUrl ?? (presentation.activeMap ? imageUrl(presentation.activeMap.assetId) : "");
   useEffect(() => {
     setLocalCamera(null);
   }, [presentation.activeMap?.assetId]);
@@ -299,7 +269,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
   if (!presentation.activeMap)
     return (
       <section className="viewer-waiting">
-        <span className="viewer-eyebrow">VIEWER CONNECTED</span>
+        <span className="viewer-eyebrow">Connected</span>
         <h1>Waiting for a map</h1>
         <p>The GM controls what appears here.</p>
       </section>
@@ -313,7 +283,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
   return (
     <section
       className="viewer-stage"
-      ref={stageRef}
+      ref={stageSurface}
       aria-label={presentation.activeMap.altText || "Shared battlemap"}
       onPointerDown={beginPan}
       onPointerMove={continuePan}
@@ -371,6 +341,11 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
             );
           return <AnnotationGlyph key={annotation.id} data={data} arrowSize={arrowSize} color={annotation.color} />;
         })}
+        {/* With dynamic vision on, dark where the party can't see; below the tokens, which are only those it
+          perceives. */}
+        {onActiveMap && presentation.encounter.vision && (
+          <FogOverlay width={size.width} height={size.height} vision={presentation.encounter.vision} variant="player" />
+        )}
         {tokens.map((token) => (
           <g
             className={`viewer-token ${token.kind}${token.active ? " active" : ""}`}
@@ -380,19 +355,34 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
             {token.healthDisplay?.style === "aura" && (
               <TokenHealthAura sizePx={token.sizePx} fraction={bandFraction(token.health ?? "healthy")} />
             )}
-            <TokenGlyph
-              sizePx={token.sizePx}
-              name={token.name}
-              active={token.active}
-              imageUrl={
-                token.tokenAssetId ? `/api/v1/token-assets/${encodeURIComponent(token.tokenAssetId)}/content` : null
-              }
-              turnClassName="viewer-token-turn"
-              bodyClassName="viewer-token-body"
-              initialsClassName="viewer-token-initials"
-              nameClassName="viewer-token-name"
-              nameY={token.sizePx * 0.78}
-            />
+            {authToken ? (
+              <AuthorizedTokenGlyph
+                assetId={token.tokenAssetId ?? null}
+                token={authToken}
+                sizePx={token.sizePx}
+                name={token.name}
+                active={token.active}
+                turnClassName="viewer-token-turn"
+                bodyClassName="viewer-token-body"
+                initialsClassName="viewer-token-initials"
+                nameClassName="viewer-token-name"
+                nameY={token.sizePx * 0.78}
+              />
+            ) : (
+              <TokenGlyph
+                sizePx={token.sizePx}
+                name={token.name}
+                active={token.active}
+                imageUrl={
+                  token.tokenAssetId ? `/api/v1/token-assets/${encodeURIComponent(token.tokenAssetId)}/content` : null
+                }
+                turnClassName="viewer-token-turn"
+                bodyClassName="viewer-token-body"
+                initialsClassName="viewer-token-initials"
+                nameClassName="viewer-token-name"
+                nameY={token.sizePx * 0.78}
+              />
+            )}
             <TokenStatusBadges
               sizePx={token.sizePx}
               health={token.health ?? "healthy"}
@@ -456,6 +446,8 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
 export function ViewerApp() {
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [presentation, setPresentation] = useState<Presentation | null>(null);
+  // When the presentation arrived, on the clock the sound engine counts from.
+  const [receivedAt, setReceivedAt] = useState(0);
   const [message, setMessage] = useState("");
   const sourceRef = useRef<EventSource | null>(null);
   // The initiative column is drag-resizable (persisted) so long names can fit.
@@ -475,11 +467,13 @@ export function ViewerApp() {
     try {
       const { presentation } = await apiRequest<{ presentation: Presentation }>(PRESENTATION_PATH, { failure });
       setPresentation(presentation);
+      setReceivedAt(performance.now());
       setConnection("live");
       const source = new EventSource("/api/v1/viewer/events");
       sourceRef.current = source;
       source.addEventListener("presentation", (event) => {
         setPresentation(JSON.parse((event as MessageEvent).data));
+        setReceivedAt(performance.now());
         setConnection("live");
       });
       source.onerror = async () => {
@@ -508,21 +502,24 @@ export function ViewerApp() {
     void connect();
     return () => sourceRef.current?.close();
   }, [connect]);
-  if (connection === "pairing") return <Pairing onPaired={() => void connect()} />;
+  if (connection === "pairing") return <ScreenPairing onPaired={() => void connect()} />;
   if (!presentation)
     return (
       <main className="viewer-waiting">
-        <span className="viewer-eyebrow">SHARED TABLE VIEWER</span>
+        <span className="viewer-eyebrow">Table screen</span>
         <h1>{connection === "reconnecting" ? "Reconnecting…" : "Connecting…"}</h1>
         <p role="alert">{message}</p>
       </main>
     );
+  // Sound plays whether or not a map is shown: music during a break is the GM's call alone.
+  const sound = <TableSound sound={presentation.sound} receivedAt={receivedAt} live={connection === "live"} />;
   if (!presentation.enabled)
     return (
       <main className="viewer-waiting">
-        <span className="viewer-eyebrow">VIEWER CONNECTED</span>
+        <span className="viewer-eyebrow">Connected</span>
         <h1>Presentation paused</h1>
         <p>The GM will begin when the table is ready.</p>
+        {sound}
       </main>
     );
   return (
@@ -545,6 +542,7 @@ export function ViewerApp() {
       </div>
       <MapStage presentation={presentation} />
       <Initiative presentation={presentation} onResize={resizeInitiative} />
+      {sound}
     </main>
   );
 }

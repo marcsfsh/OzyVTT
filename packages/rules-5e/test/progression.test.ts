@@ -55,7 +55,7 @@ describe("SRD class data", () => {
     expect(hitDieFor("cleric")).toBe("d8");
     expect(hitDieFor("wizard")).toBe("d6");
     expect(hitDieFor("sorcerer")).toBe("d6");
-    // An unknown (homebrew, not yet loaded) class falls back rather than throwing.
+    // An unknown (homebrew, not yet loaded) class falls back and throws nothing.
     expect(hitDieFor("moon-warden")).toBe("d8");
   });
 
@@ -299,7 +299,7 @@ describe("multiclass casting", () => {
     expect(multiclassCasterLevel([{ classId: "fighter", level: 7, casterProgression: "third" }])).toBe(2);
   });
 
-  it("gives a Paladin 3 / Wizard 1 the 2nd-level slot row the round-down bug ate", () => {
+  it("gives a Paladin 3 / Wizard 1 the level 2 spell slot row the round-down bug ate", () => {
     // Paladin 3 -> ceil(3/2) = 2, Wizard 1 -> 1: caster level 3, which is 4/2 on the shared table.
     expect(
       multiclassCasterLevel([

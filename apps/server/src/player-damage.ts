@@ -32,7 +32,7 @@ export type AppliedDamage = Readonly<{
 }>;
 
 /** A committed attack that still owes damage: a real (non-preview) swing that rolled damage, a miss included when
- *  Graze dealt some, not already parked on a reaction window (Uncanny Dodge applies it there). */
+ *  Graze dealt some, unless it is already parked on a reaction window (Uncanny Dodge applies it there). */
 export function playerHitOwesDamage(resolution: ActionResolution): boolean {
   const attack = resolution.attack;
   return (
@@ -58,7 +58,7 @@ function damageDepsOf(deps: PlayerDamageDeps): DamageDeps {
   };
 }
 
-/** Settles a player's confirmed hit per the player-damage policy, mutating `state` (parks a proposal or
+/** Settles a player's confirmed hit per the player-damage policy and mutates `state` (parks a proposal or
  *  applies the damage GM-scoped). Returns the applied outcome in direct mode, or null when parked or not
  *  a qualifying hit. */
 export function settlePlayerHit(
@@ -178,7 +178,7 @@ export function resolvePendingDamage(
   deps: PlayerDamageDeps
 ): AppliedDamage | null {
   const proposal = state.combat.pendingDamage.find((entry) => entry.id === proposalId);
-  if (!proposal) return null; // already resolved or dismissed - idempotent retry
+  if (!proposal) return null; // already resolved or dismissed: idempotent retry
   let applied: AppliedDamage | null = null;
   if (apply) {
     const label = `${proposal.sourceName}'s ${proposal.actionName}`;

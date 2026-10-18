@@ -13,6 +13,7 @@ import type { EquipmentCatalog } from "./equipment-derivation.js";
 import type { DefinitionAction, LiveActor, ResolveInput } from "./resolution/context.js";
 import { damagePartsOf } from "./resolution/damage.js";
 import { commitEconomy, planEconomy } from "./resolution/economy.js";
+import { hiddenFrom } from "./vision/audience.js";
 import { checkPlan } from "./ability-checks.js";
 import { rollSettledCheck } from "./check-rolls.js";
 import { withOneUsedUp } from "./consumables.js";
@@ -278,7 +279,7 @@ function answerStrike(
       : undefined;
     if (picked && !meleeSwing(picked))
       throw new CommandRejectedError(
-        `${pending.kind === "leaves-reach" ? "An opportunity attack" : pending.actionName} is one melee attack with a weapon or an Unarmed Strike - ${picked.name} isn't one.`
+        `${pending.kind === "leaves-reach" ? "An opportunity attack" : pending.actionName} is one melee attack with a weapon or an Unarmed Strike, and ${picked.name} isn't one.`
       );
     const fallbackMelee = available.find(meleeSwing);
     // The swing is the reaction, so it spends the reaction slot even on the reactor's own turn.
@@ -417,8 +418,19 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
             (candidate) => candidate.id === parked.actionId
           )
       : undefined;
-  if (!attacker || !parked || !action || !state.combat.initiative.some((entry) => entry.actorId === attacker.id))
-    throw new CommandRejectedError(`${pending.sourceName}'s attack can't be finished any more - dismiss the prompt.`);
+  if (!attacker || !parked || !action || !state.combat.initiative.some((entry) => entry.actorId === attacker.id)) {
+    // An attacker hidden from whoever answers stays unnamed, as the prompt itself shows it.
+    const hidden =
+      pending.sourceActorId === null ||
+      hiddenFrom(
+        state,
+        { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) },
+        answer.scope.role === "player" ? answer.scope.sessionId : undefined
+      )(pending.sourceActorId);
+    throw new CommandRejectedError(
+      `${hidden ? "The" : `${pending.sourceName}'s`} attack can't be finished any more. Dismiss the prompt.`
+    );
+  }
 
   clearPrompt(false);
   let effectName: string | null = null;
@@ -531,7 +543,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
   };
 }
 
-/** Drop a reaction prompt without applying its damage (GM housekeeping - e.g. the damage was applied manually). */
+/** Drop a reaction prompt without applying its damage (GM housekeeping, e.g. the damage was applied manually). */
 export function dismissReaction(state: GameState, reactionId: string, scope: Initiator) {
   requireGm(scope, "Only the GM can dismiss a reaction prompt.");
   if (!state.combat.pendingReactions.some((entry) => entry.id === reactionId))

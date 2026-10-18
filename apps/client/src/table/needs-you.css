@@ -1,0 +1,88 @@
+/* The GM's Needs you queue: a strip above the panel's tabs, one card per decision. */
+
+.needs-you {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 45%;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--magenta) 6%, var(--surface-1));
+  overscroll-behavior: contain;
+}
+.needs-you-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--magenta-text);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  text-shadow: none;
+}
+.needs-you-head svg {
+  font-size: 1rem;
+}
+.needs-you-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.needs-card {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--info);
+  background: var(--material-lip), var(--material-plate);
+}
+.needs-card--caution {
+  border-left-color: var(--caution);
+}
+.needs-card--danger {
+  border-left-color: var(--danger);
+}
+.needs-card--gm {
+  border-left-color: var(--rim-gm);
+}
+.needs-card-title {
+  margin: 0;
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.3 var(--font-body);
+}
+.needs-card-detail {
+  margin: 0;
+  color: var(--text-dim);
+  font: 400 var(--fs-xs) / 1.4 var(--font-body);
+}
+.needs-card-body {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.needs-card-buttons,
+.pending-damage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.pending-damage-amount {
+  width: 5.5rem;
+}
+/* The prompts keep their own controls; inside a card they lose the row margins they had under a turn-order row. */
+.needs-card .save-prompt,
+.needs-card .dying-tracker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+/* The card is the frame, so the prompt's own plate (painted on `::before`) would draw an empty box round the
+   buttons. */
+.needs-card .save-prompt::before,
+.needs-card .dying-tracker::before {
+  display: none;
+}

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { rosterActors, type GmActor, type GmView, type PlayerActor, type PlayerView } from "@vtt/domain";
 import { Avatar, Button } from "@vtt/ui";
-import { CharacterSheet } from "../encounter/CharacterSheet";
+import { CharacterSheet } from "../sheet/CharacterSheet";
+import { navigate } from "../router";
 import { CLAIM_WORD, claimStateOf, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { partyVisibilityOf } from "./MyCharacter";
 import "./party-strip.css";
@@ -11,7 +12,7 @@ import "./party-strip.css";
  * shows the same people).
  *
  * Renders only projection-carried fields. A player's copy follows the party-visibility tier, read
- * from the field rather than inferred: no strip at `off`, and other characters' exact HP only from
+ * from the field itself: no strip at `off`, and other characters' exact HP only from
  * `full-sheet` up. The GM's strip is never gated.
  *
  * A player may open only their own entry: `CharacterSheet` renders damage/heal controls the server
@@ -39,7 +40,7 @@ export function PartyStrip(props: Props) {
     // A player who has claimed nobody never gets here, so an empty party is always the GM's.
     return (
       <section className="party-strip party-strip-empty" aria-label="The party">
-        <p>No characters yet — create or import them on the Roster tab.</p>
+        <p>No characters yet. Create or import them on the Roster tab.</p>
         {props.onOpenRoster && (
           <Button variant="ghost" size="sm" onClick={props.onOpenRoster}>
             Open Roster
@@ -63,7 +64,7 @@ export function PartyStrip(props: Props) {
           const openable = props.role === "gm" || claim === "mine";
           const label = [actor.name, detail, CLAIM_WORD[claim], actor.presence ? presenceLabel(actor.presence) : null]
             .filter((part): part is string => Boolean(part))
-            .join(" — ");
+            .join(", ");
           const body = (
             <>
               <Avatar name={actor.name} size="sm" presence={actor.presence ? presenceDot(actor.presence) : undefined} />
@@ -84,7 +85,7 @@ export function PartyStrip(props: Props) {
                   {body}
                 </button>
               ) : (
-                /* A plain readout rather than a disabled button: a player cannot open someone else's sheet. */
+                /* A plain readout: a player cannot open someone else's sheet, so there is no button. */
                 <span className="party-strip-entry is-static" role="group" aria-label={label}>
                   {body}
                 </span>
@@ -94,7 +95,17 @@ export function PartyStrip(props: Props) {
         })}
       </ul>
       {openActor && (
-        <CharacterSheet actor={openActor} role={props.role} state={props.state} onClose={() => setOpenId(null)} />
+        <CharacterSheet
+          actor={openActor}
+          role={props.role}
+          state={props.state}
+          onClose={() => setOpenId(null)}
+          /* The GM levels anyone here; a player only opens their own entry. */
+          onLevel={() => {
+            setOpenId(null);
+            navigate(`/characters/${openActor.id}/level`);
+          }}
+        />
       )}
     </section>
   );

@@ -69,7 +69,7 @@ export function rechooseInLedger(
   const request = definition && index >= 0 ? buildRequestOf(definition, deps.library) : null;
   if (!request)
     throw new CommandRejectedError(
-      `${actor.name}'s sheet doesn't record how it was built, so this pick can't change here - make it in the Level flow.`
+      `${actor.name}'s sheet doesn't record how it was built, so this pick can't change here. Make it in the Level flow.`
     );
   if (choices[index].id === id) return false;
   const rechosen = choices.map((row, at) => (at === index ? { ...row, id } : row));

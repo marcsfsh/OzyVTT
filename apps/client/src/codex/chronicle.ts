@@ -1,21 +1,19 @@
 /**
- * The chronicle's shared reading rules: what a row says and how the two lenses group. The GM and player
- * Journals are separate implementations, so the meaning of a row lives here once and both import it.
+ * The chronicle's shared reading rules: what a row says, what a deadline's state is, and when showing a record
+ * would tell players the date moved. The GM's and the players' Story both import them, so a row means one thing.
  */
 
 import type { BadgeTone, MeterTone } from "@vtt/ui";
 import {
   calendarDaysPerYear,
-  calendarYearOf,
   clampToCalendar,
   dateToInstant,
-  formatWorldYear,
   instantToDate,
   type CodexCalendar,
   type CodexChronicleKind,
+  type CodexJournalKind,
   type CodexDowntimePayload,
   type CodexInWorldDate,
-  type CodexJournalKind,
   type CodexJournalPayload,
   type CodexMilestonePayload,
   type CodexQuestStatus,
@@ -26,18 +24,21 @@ import {
   type PlayerCodexStandingPayload
 } from "@vtt/domain";
 
-/** How a record says when it happened, in order of preference. Shared by both journals and the dashboard. */
+/**
+ * How a record says when it happened, in order of preference. Shared by both journals and the dashboard. The last
+ * resort is the GM's `createdAt` for a GM row and `firstShownAt` for a player row, which carries no creation time.
+ */
 export type ChronicleWhen = Readonly<{
   inWorldLabel: string | null;
   sessionNumber: number | null;
   realDate: string | null;
-  createdAt: string;
-}>;
+}> &
+  (Readonly<{ createdAt: string }> | Readonly<{ firstShownAt: string }>);
 export function chronicleWhenLabel(record: ChronicleWhen): string {
   if (record.inWorldLabel) return record.inWorldLabel;
   if (record.sessionNumber !== null) return `Session ${record.sessionNumber}`;
   if (record.realDate) return record.realDate;
-  return new Date(record.createdAt).toLocaleDateString();
+  return new Date("firstShownAt" in record ? record.firstShownAt : record.createdAt).toLocaleDateString();
 }
 
 /** The Journal filter's kinds, in reading order. Shared so both journals offer the same options. */
@@ -103,7 +104,7 @@ export const STANDING_TIERS: ReadonlyArray<Readonly<{ id: StandingTier; label: s
 export const STANDING_MIN = -100;
 export const STANDING_MAX = 100;
 
-/** The stored value, bounded and integral. A non-finite value lands on 0 rather than propagating. */
+/** The stored value, bounded and integral. A non-finite value lands on 0 and stops there. */
 export function clampStanding(value: number): number {
   const whole = Math.trunc(value);
   if (!Number.isFinite(whole)) return 0;
@@ -292,16 +293,6 @@ export function chronicleKindOfJournal(kind: CodexJournalKind): CodexChronicleKi
 }
 
 /**
- * Kinds the dashboard's "Recent journal activity" feed omits because a card already shows them: `event`
- * pages are listed as pages, deadlines have their own card, and the standing card lists every faction.
- */
-export const DASHBOARD_CARDED_KINDS: ReadonlySet<CodexChronicleKind> = new Set<CodexChronicleKind>([
-  "event",
-  "deadline",
-  "standing"
-]);
-
-/**
  * Would revealing this record show players a date past their published clock? Records are dated at the
  * GM's prep clock, so this warns at reveal time. Silent for undated records and when nothing has been
  * published yet. Strictly after: a record at the published date is the party's present.
@@ -310,14 +301,14 @@ export function revealAheadOfPlayers(
   record: Readonly<{ calendarInstant: number | null }>,
   calendar: GmCodexCalendar | null
 ): boolean {
-  // Falsy checks, not `=== null`: a caller with a narrower calendar shape passes `undefined`.
+  // Falsy checks: a caller with a narrower calendar shape passes `undefined`, which `=== null` misses.
   const published = calendar?.publishedDate;
   if (!calendar || !published || typeof record.calendarInstant !== "number") return false;
   // Snap the published date like the server does before comparing.
   return record.calendarInstant > dateToInstant(calendar, clampToCalendar(calendar, published));
 }
 
-/** One row's text on a summary surface. Standing, milestone and quest records carry their meaning in the payload, not prose. */
+/** One row's text on a summary surface. Standing, milestone and quest records carry their meaning in the payload, beyond the prose. */
 export function chronicleRowSummary(
   record: AnyPayloadRef & Readonly<{ text: string; gmText?: string | null }>
 ): string {
@@ -347,53 +338,4 @@ export function sameInWorldDate(
 ): boolean {
   if (!a || !b) return !a && !b;
   return a.year === b.year && a.month === b.month && a.day === b.day;
-}
-
-/** Both lenses regroup the same loaded records, never refetching. */
-export type ChronicleLens = "date" | "session";
-export const CHRONICLE_LENSES: ReadonlyArray<Readonly<{ id: ChronicleLens; label: string }>> = [
-  { id: "date", label: "By in-world date" },
-  { id: "session", label: "By session" }
-];
-
-export type ChronicleGroup<R> = Readonly<{ key: string; label: string; records: readonly R[] }>;
-type Groupable = Readonly<{ sessionNumber: number | null; calendarInstant: number | null }>;
-
-/**
- * Both lenses read earliest first, with keyless records last. Within a group the server's order is kept.
- * By session, an `event` page always lands in "No session yet". Both journals group this way.
- */
-export function groupChronicle<R extends Groupable>(
-  records: readonly R[],
-  lens: ChronicleLens,
-  calendar: CodexCalendar | null
-): ChronicleGroup<R>[] {
-  const buckets = new Map<number | null, R[]>();
-  for (const record of records) {
-    const key =
-      lens === "session"
-        ? record.sessionNumber
-        : record.calendarInstant !== null && calendar
-          ? calendarYearOf(calendar, record.calendarInstant)
-          : null;
-    const bucket = buckets.get(key) ?? [];
-    bucket.push(record);
-    buckets.set(key, bucket);
-  }
-  return [...buckets.keys()]
-    .sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b))
-    .map((key) => ({
-      key: key === null ? "none" : String(key),
-      label:
-        key === null
-          ? lens === "session"
-            ? "No session yet"
-            : "Undated"
-          : lens === "session"
-            ? `Session ${key}`
-            : calendar
-              ? formatWorldYear(calendar, key)
-              : String(key),
-      records: buckets.get(key)!
-    }));
 }

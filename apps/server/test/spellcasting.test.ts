@@ -62,7 +62,7 @@ describe("setSpellSlotRemaining", () => {
   });
   it("rejects an unknown slot level", () => {
     const state = stateWith([{ level: 1, remaining: 4 }], []);
-    expect(() => setSpellSlotRemaining(state, actorId, 5, 1, resolve(state))).toThrowError(/no level-5/);
+    expect(() => setSpellSlotRemaining(state, actorId, 5, 1, resolve(state))).toThrowError(/no level 5/);
   });
 });
 
@@ -77,7 +77,7 @@ describe("setPreparedSpell", () => {
   });
 });
 
-describe("long rest restores spellcasting", () => {
+describe("Long Rest restores spellcasting", () => {
   // SRD: a Long Rest lets a prepared caster change its list; it no longer undoes the changes the player made.
   it("refills slots and keeps the prepared list the player chose", () => {
     const state = stateWith(

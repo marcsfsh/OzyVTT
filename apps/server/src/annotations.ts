@@ -24,12 +24,14 @@ function requireCalibration(geometry: AnnotationMapGeometry): SquareGridCalibrat
   return geometry.calibration;
 }
 
+const onMap = (point: AnnotationPoint, geometry: AnnotationMapGeometry) =>
+  point.x >= 0 && point.x <= geometry.width && point.y >= 0 && point.y <= geometry.height;
+
 function withinMap(point: AnnotationPoint, geometry: AnnotationMapGeometry, label: string) {
-  if (point.x < 0 || point.x > geometry.width || point.y < 0 || point.y > geometry.height)
-    throw new CommandRejectedError(`${label} must be inside the map.`);
+  if (!onMap(point, geometry)) throw new CommandRejectedError(`${label} must be inside the map.`);
 }
 
-/** Snaps both endpoints to grid cell centers and measures whole-cell Chebyshev distance (every cell = one grid step, no diagonal penalty), matching 5e's simplified movement rule. */
+/** Snaps both endpoints to grid cell centers and measures whole-cell Chebyshev distance (every cell = one grid step, no diagonal penalty), as 5e's simplified movement rule does. */
 function measurementGeometry(
   calibration: SquareGridCalibration,
   origin: AnnotationPoint,
@@ -91,8 +93,8 @@ function radialGeometry(
 
 /**
  * Cone/line: the origin (apex) and the far end (a cone's base center) each snap to a grid cell
- * center, so the shape points in any direction while both ends stay grid-aligned, instead of
- * snapping the rotation to fixed increments.
+ * center, so the shape points in any direction while both ends stay grid-aligned, and the rotation never
+ * snaps to fixed increments.
  */
 function pointableGeometry(
   calibration: SquareGridCalibration,
@@ -197,7 +199,7 @@ function resolveVisibility(
 ): { visibility: AnnotationVisibility; visibleToActorId: string | null } {
   if (actor.role === "gm") {
     if (!(["public", "gm-only", "gm-actor"] as const).includes(visibility as "public" | "gm-only" | "gm-actor"))
-      throw new CommandRejectedError("Choose Everyone, Just the GM, or a specific character.");
+      throw new CommandRejectedError("Choose Shown to players, GM only, or one character.");
     if (visibility === "gm-actor") {
       if (!visibleToActorId || !state.actors.some((candidate) => candidate.id === visibleToActorId))
         throw new CommandRejectedError("Pick a character to reveal this to.");
@@ -206,7 +208,7 @@ function resolveVisibility(
     return { visibility, visibleToActorId: null };
   }
   if (!(["public", "owner-only", "owner-gm"] as const).includes(visibility as "public" | "owner-only" | "owner-gm"))
-    throw new CommandRejectedError("Choose Everyone, Just me, or Just me and the GM.");
+    throw new CommandRejectedError("Choose Shown to players, Only me, or Only me and the GM.");
   return { visibility, visibleToActorId: null };
 }
 
@@ -222,16 +224,19 @@ export function addAnnotation(
     visibleToActorId?: string | null;
     movableByOthers?: boolean;
     color?: string;
+    /** An action's own area keeps its size at the map's edge, so only where it was placed must be on the map. */
+    reachesPastMap?: boolean;
     actor: AnnotationActor;
     now: number;
   }>,
   geometryInput: AnnotationMapGeometry
 ): Annotation {
-  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before measuring or placing shapes.");
+  // A live scene's map takes drawings before a fight as well; with no map there is nothing to draw on.
+  if (!state.combat.mapAssetId) throw new CommandRejectedError("Make a scene live before measuring or placing shapes.");
   if (input.kind === "shape" && !input.shape) throw new CommandRejectedError("Choose a shape before placing it.");
   const calibration = requireCalibration(geometryInput);
   withinMap(input.origin, geometryInput, "The starting point");
-  withinMap(input.target, geometryInput, "The endpoint");
+  if (input.reachesPastMap !== true) withinMap(input.target, geometryInput, "The endpoint");
   const geometry =
     input.kind === "measurement"
       ? measurementGeometry(calibration, input.origin, input.target)
@@ -281,7 +286,7 @@ export function addPing(
   }>,
   geometryInput: AnnotationMapGeometry
 ): Annotation {
-  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before pinging the map.");
+  if (!state.combat.mapAssetId) throw new CommandRejectedError("Make a scene live before pinging the map.");
   withinMap(input.point, geometryInput, "The ping");
   const pruned = state.combat.annotations.filter(
     (existing) => existing.expiresAt === null || existing.expiresAt > input.now
@@ -331,9 +336,13 @@ export function moveAnnotation(
   if (existing.kind !== "shape") throw new CommandRejectedError("Only placed shapes can be moved or resized.");
   requireMoveAllowed(existing, actor);
   const calibration = requireCalibration(geometryInput);
+  // A spell's lingering area moves the way it was placed: it keeps the spell's own size, and only where it stands
+  // must be on the map. Any other area placed reaching past the edge (a cast's blast) may go on reaching past it.
+  const area = state.combat.spellZones.find((zone) => zone.annotationId === id)?.area ?? null;
   withinMap(origin, geometryInput, "The starting point");
-  withinMap(target, geometryInput, "The endpoint");
-  const geometry = shapeGeometry(calibration, existing.shape!, origin, target);
+  if (area === null && onMap(existing.geometry.target, geometryInput)) withinMap(target, geometryInput, "The endpoint");
+  const placed = area ? templateOfArea(calibration, { origin, target }, area) : { origin, target };
+  const geometry = shapeGeometry(calibration, existing.shape!, placed.origin, placed.target);
   state.combat = {
     ...state.combat,
     annotations: state.combat.annotations.map((annotation) =>
@@ -398,7 +407,7 @@ export function setAnnotationMovable(state: GameState, id: string, movableByOthe
   };
 }
 
-/** Soonest future expiry among current annotations, or null if none are ephemeral - used to schedule the next expiry re-broadcast. */
+/** Soonest future expiry among current annotations, or null if none are ephemeral: used to schedule the next expiry re-broadcast. */
 export function nextAnnotationExpiry(state: GameState, now: number): number | null {
   const expiries = state.combat.annotations
     .map((annotation) => annotation.expiresAt)
