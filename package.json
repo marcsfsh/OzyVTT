@@ -13,6 +13,7 @@
     "check": "npm run check --workspaces --if-present && tsc -p e2e",
     "test": "npm run test --workspaces --if-present",
     "start": "npm run build && npm run start --workspace=@vtt/server",
+    "gm-password": "npm run gm-password --workspace=@vtt/server",
     "map": "npm run map --workspace=@vtt/server",
     "content": "npm run content --workspace=@vtt/content-srd-5.2.1",
     "format": "prettier --write .",

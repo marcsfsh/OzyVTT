@@ -17,6 +17,8 @@ export type HostRouterOptions = Readonly<{
   onBootstrapped?: () => Promise<void>;
   /** The addresses this host serves the app on: `http://localhost:<port>` first, then one per LAN interface. */
   viewerBaseUrls?: readonly string[];
+  /** Where the first GM password is set, when opening the localhost address on the host is not the way (Docker). */
+  gmSetupHint?: string;
   /** How long after a password change the other GM devices are told their session ended, so the device that made
    *  the change can move its socket to the new token first. */
   passwordChangeGraceMs?: number;
@@ -50,7 +52,7 @@ export function createHostRouter(options: HostRouterOptions) {
         response,
         403,
         "forbidden",
-        `Set the GM password on the computer that runs OzyVTT. Open ${hostUrl} there.`
+        options.gmSetupHint ?? `Set the GM password on the computer that runs OzyVTT. Open ${hostUrl} there.`
       );
     const body = routes.setGmPassword.body.schema.safeParse(request.body);
     if (!body.success)

@@ -92,6 +92,8 @@ export type CreateServerOptions = {
   applicationVersion?: string;
   /** Browser origins that a GM can copy to a separate LAN display. */
   viewerBaseUrls?: readonly string[];
+  /** Where the first GM password is set, said to a request from anywhere but loopback. */
+  gmSetupHint?: string;
   /** How long a session stays "reconnecting" after its last connection drops before going "offline". */
   presenceGraceMs?: number;
   /** How often connected sockets are re-checked for a session that ran out. */
@@ -713,6 +715,7 @@ export function createServer(options: CreateServerOptions) {
       broadcast,
       onBootstrapped: releaseEveryClaim,
       viewerBaseUrls: options.viewerBaseUrls,
+      ...(options.gmSetupHint !== undefined ? { gmSetupHint: options.gmSetupHint } : {}),
       ...(options.passwordChangeGraceMs !== undefined ? { passwordChangeGraceMs: options.passwordChangeGraceMs } : {})
     })
   );

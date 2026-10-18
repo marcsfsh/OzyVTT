@@ -52,39 +52,52 @@ async function boot(initialGameState = GameStateSchema.parse({ schemaVersion: 1,
   return { server, call };
 }
 
+/** Asks to set the first password from another device, with every request read as not loopback. */
+async function setupFromAnotherDevice(gmSetupHint?: string) {
+  const directory = await mkdtemp(join(tmpdir(), "vtt-host-remote-"));
+  const auth = new AuthService(join(directory, "auth.json"));
+  await auth.initialize();
+  const app = express();
+  app.use(express.json());
+  app.use(
+    createHostRouter({
+      auth,
+      verifiers: { gm: (token) => auth.verify(token), player: (token) => auth.verifyPlayer(token) },
+      loginLimiter: new LoginRateLimiter(),
+      isLoopback: () => false,
+      broadcast: () => {},
+      viewerBaseUrls: ["http://localhost:3001", "http://192.168.1.50:3001"],
+      ...(gmSetupHint === undefined ? {} : { gmSetupHint })
+    })
+  );
+  const listening = app.listen(0, "127.0.0.1");
+  await once(listening, "listening");
+  cleanups.push(async () => {
+    listening.close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const response = await fetch(`http://127.0.0.1:${(listening.address() as AddressInfo).port}${HOST_PATHS.setup}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: PASSWORD })
+  });
+  return { auth, status: response.status, message: (await response.json()).error.message as string };
+}
+
 describe("the GM's own account", () => {
   it("tells a GM on another device where to set the password", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "vtt-host-remote-"));
-    const auth = new AuthService(join(directory, "auth.json"));
-    await auth.initialize();
-    const app = express();
-    app.use(express.json());
-    app.use(
-      createHostRouter({
-        auth,
-        verifiers: { gm: (token) => auth.verify(token), player: (token) => auth.verifyPlayer(token) },
-        loginLimiter: new LoginRateLimiter(),
-        // Every request reads as coming from another device on the network.
-        isLoopback: () => false,
-        broadcast: () => {},
-        viewerBaseUrls: ["http://localhost:3001", "http://192.168.1.50:3001"]
-      })
-    );
-    const listening = app.listen(0, "127.0.0.1");
-    await once(listening, "listening");
-    cleanups.push(async () => {
-      listening.close();
-      await rm(directory, { recursive: true, force: true });
-    });
-    const response = await fetch(`http://127.0.0.1:${(listening.address() as AddressInfo).port}${HOST_PATHS.setup}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password: PASSWORD })
-    });
-    expect(response.status).toBe(403);
-    expect((await response.json()).error.message).toBe(
-      "Set the GM password on the computer that runs OzyVTT. Open http://localhost:3001 there."
-    );
+    const { auth, status, message } = await setupFromAnotherDevice();
+    expect(status).toBe(403);
+    expect(message).toBe("Set the GM password on the computer that runs OzyVTT. Open http://localhost:3001 there.");
+    expect(auth.isBootstrapped).toBe(false);
+  });
+
+  // In Docker even the host's own browser arrives from the container network, so the hint names the command.
+  it("says how to set the password where opening localhost is not the way", async () => {
+    const hint = "OzyVTT runs in Docker. On the computer that runs it, set the GM password with docker exec.";
+    const { auth, status, message } = await setupFromAnotherDevice(hint);
+    expect(status).toBe(403);
+    expect(message).toBe(hint);
     expect(auth.isBootstrapped).toBe(false);
   });
 
