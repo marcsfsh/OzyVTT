@@ -37,7 +37,8 @@ import {
 import { CommandRejectedError, GameStore } from "./game-store.js";
 import { CodexStore } from "./codex-store.js";
 import { createCodexImportGuard, createCodexRouter } from "./codex-http.js";
-import { PlayerCodexChanges } from "./codex/player-reads.js";
+import { PlayerCodexChanges, readerKey, readerOf } from "./codex/player-reads.js";
+import { EVERYONE, type CodexReader } from "./codex-projections.js";
 import { HomebrewStore } from "./homebrew-store.js";
 import { createHomebrewRouter, homebrewPackBodyParser, HOMEBREW_PACK_IMPORT_PATH } from "./homebrew-http.js";
 import { createHomebrewValidator, scenarioCatalogs } from "./homebrew-validate.js";
@@ -232,7 +233,10 @@ export function createServer(options: CreateServerOptions) {
     socket.emit("session:ended");
     socket.disconnect(true);
   }
-  /** Also reauthorizes every connected socket, so a revoked GM client is told and disconnected promptly. */
+  /**
+   * Also reauthorizes every connected socket, so a revoked GM client is told and disconnected promptly, and pings a
+   * player socket's Codex when a claim changed what it can read there.
+   */
   function broadcast() {
     const current = committedState.read();
     for (const socket of io.sockets.sockets.values()) {
@@ -247,6 +251,49 @@ export function createServer(options: CreateServerOptions) {
         "state:updated",
         gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor, Date.now(), sightContent())
       );
+      if (!gm) followCodexReader(socket);
+    }
+  }
+  /** The player characters a session has claimed: what it reads in the Codex beyond what everyone reads. */
+  function claimedCharacters(sessionId: string): string[] {
+    return committedState
+      .read()
+      .actors.filter((actor) => actor.kind === "player-character" && actor.ownerSessionId === sessionId)
+      .map((actor) => actor.id);
+  }
+  /** The party's player characters: the only ids a Codex audience may name. */
+  function partyCharacters(): ReadonlySet<string> {
+    return new Set(
+      committedState
+        .read()
+        .actors.filter((actor) => actor.kind === "player-character" && actor.replaySceneId === undefined)
+        .map((actor) => actor.id)
+    );
+  }
+  /** Who a socket's Codex pings are for: its player's claimed characters, or the ones a preview names. */
+  function codexReaderOf(socket: Socket<ClientToServerEvents, ServerToClientEvents>): CodexReader {
+    const player = auth.verifyPlayer(socket.handshake.auth?.token);
+    if (!player) return EVERYONE;
+    return readerOf(player.preview ? player.preview.characterIds : claimedCharacters(player.sessionId));
+  }
+  /** Each player socket's reader as its last ping counted it. */
+  const codexReaders = new WeakMap<Socket<ClientToServerEvents, ServerToClientEvents>, string>();
+  /**
+   * Keeps a player socket's Codex reader current. A claim or a release changes what the socket can read, so it is
+   * pinged with its new reader's count; the first sight of a socket only starts counting for it.
+   */
+  function followCodexReader(socket: Socket<ClientToServerEvents, ServerToClientEvents>) {
+    if (!playerCodexChanges) return;
+    const reader = codexReaderOf(socket);
+    const key = readerKey(reader);
+    const known = codexReaders.get(socket);
+    if (known === key) return;
+    codexReaders.set(socket, key);
+    try {
+      const count = playerCodexChanges.watch(reader);
+      if (known !== undefined) socket.emit("codex:changed", { codexRevision: count });
+    } catch (error) {
+      console.error("checking a player's codex failed:", error instanceof Error ? error.message : error);
     }
   }
   /** A session that runs out ends with no state change to notice it, so every socket is re-checked on a timer. */
@@ -263,16 +310,16 @@ export function createServer(options: CreateServerOptions) {
     for (const socket of io.sockets.sockets.values())
       if (auth.verify(socket.handshake.auth?.token)) socket.emit("sound:changed", view);
   }
-  /** Set once the Codex store is open; counts the changes players can read. */
+  /** Set once the Codex store is open; counts the changes each audience of players can read. */
   let playerCodexChanges: PlayerCodexChanges | undefined;
   /** The players' check waiting to run, so writes in one tick share it. */
   let playerCodexCheck: NodeJS.Immediate | undefined;
   /**
    * Tells clients the codex changed so each refetches its own projected view. Content-free (only a revision):
    * naming the changed scope would leak what the GM is working on. The GM's devices hear of every write. A
-   * player's device hears only of a change it can read, with a count of those alone, since a ping on a GM-only
-   * write would tell the table when the GM is writing secrets. That check reads the players' whole Codex, so it
-   * runs after the write has answered.
+   * player's device hears only of a change it can read, with a count of its own audience's changes alone, since a
+   * ping on a GM-only write would tell the table when the GM is writing secrets, and one on a reveal to Lyra would
+   * tell Borin's player. That check reads each audience's whole Codex, so it runs after the write has answered.
    */
   function notifyCodexChanged() {
     for (const socket of io.sockets.sockets.values())
@@ -280,16 +327,20 @@ export function createServer(options: CreateServerOptions) {
         socket.emit("codex:changed", { codexRevision: codexStore.revision });
     playerCodexCheck ??= setImmediate(() => {
       playerCodexCheck = undefined;
-      let playerRevision: number | null = null;
+      const readers = [...io.sockets.sockets.values()]
+        .filter((socket) => !auth.verify(socket.handshake.auth?.token))
+        .map((socket) => [socket, codexReaderOf(socket)] as const);
+      let moved = new Map<string, number>();
       try {
-        playerRevision = playerCodexChanges?.next() ?? null;
+        moved = playerCodexChanges?.next(readers.map(([, reader]) => reader)) ?? moved;
       } catch (error) {
         // Best-effort (the write already committed), but logged. With no answer, players are not pinged.
         console.error("checking the players' codex failed:", error instanceof Error ? error.message : error);
       }
-      if (playerRevision === null) return;
-      for (const socket of io.sockets.sockets.values())
-        if (!auth.verify(socket.handshake.auth?.token)) socket.emit("codex:changed", { codexRevision: playerRevision });
+      for (const [socket, reader] of readers) {
+        const count = moved.get(readerKey(reader));
+        if (count !== undefined) socket.emit("codex:changed", { codexRevision: count });
+      }
     });
   }
   /** Tells every client the homebrew library changed so it refetches its own merged catalog. Content-free
@@ -696,7 +747,9 @@ export function createServer(options: CreateServerOptions) {
       assets: codexAssets,
       ...codexAuth,
       notifyChanged: notifyCodexChanged,
-      issuePreviewSession: () => auth.issuePreviewPlayerSession()
+      issuePreviewSession: (characterIds) => auth.issuePreviewPlayerSession(characterIds),
+      playerCharacters: claimedCharacters,
+      partyCharacters
     })
   );
   // GM-only end to end: any other valid credential gets 403.
@@ -825,7 +878,10 @@ export function createServer(options: CreateServerOptions) {
       const gm = auth.verify(token);
       if (gm) return { kind: "gm", sessionId: gm.sessionId };
       const player = auth.verifyPlayer(token);
-      return player ? { kind: "player", sessionId: player.sessionId } : null;
+      if (!player) return null;
+      return player.preview
+        ? { kind: "player", sessionId: player.sessionId, preview: true }
+        : { kind: "player", sessionId: player.sessionId };
     };
     /** Whether this socket joined with a token that has since been revoked or run out. */
     const sessionEnded = () => {

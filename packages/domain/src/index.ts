@@ -13,12 +13,14 @@ export * from "./rest-clock.js";
 /** Articles and counts, shared so a line the server writes and one the client builds read the same. */
 export * from "./words.js";
 
-/** Codex field vocabulary, shared so the GM UI and the server's prune-and-seal read one copy. */
+/** Codex field vocabulary, shared so the GM UI and the server's prune and default audiences read one copy. */
 export * from "./codex-entities.js";
 /** In-world calendar arithmetic, shared so stored labels and the client's display agree. */
 export * from "./codex-calendar.js";
 /** The Codex's HTTP shapes, shared so the server's projections and the client's reads are one type. */
 export * from "./codex-wire.js";
+/** Where hidden blocks sit in a page's text, shared so the server's assembly and the client's editor agree. */
+export * from "./codex-blocks.js";
 
 export {
   ACTOR_SCHEMA_VERSION,

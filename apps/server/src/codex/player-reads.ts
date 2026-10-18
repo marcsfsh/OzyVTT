@@ -16,6 +16,7 @@ import type {
 } from "@vtt/domain";
 import type { CodexStore } from "../codex-store.js";
 import {
+  EVERYONE,
   orderPlayerAttached,
   orderPlayerChronicle,
   orderPlayerTimeline,
@@ -32,8 +33,10 @@ import {
   projectPlayerSearchHit,
   projectPlayerSession,
   projectPlayerStanding,
+  type CodexReader,
   type PlayerChronicleContext,
   type PlayerConnectionContext,
+  type PlayerReaderContext,
   type PlayerSessionNumberContext
 } from "../codex-projections.js";
 import { capSearch } from "./search.js";
@@ -47,6 +50,7 @@ import {
   mapContext,
   markerRecord,
   questContext,
+  readerContext,
   searchRecord,
   standingContext
 } from "./visibility.js";
@@ -86,46 +90,81 @@ function rememberingReads(store: CodexStore): CodexStore {
   });
 }
 
+/** The key that groups readers who read the same thing: their characters, sorted. */
+export function readerKey(reader: CodexReader): string {
+  return [...reader.characterIds].sort().join(",");
+}
+export function readerOf(characterIds: Iterable<string>): CodexReader {
+  return { characterIds: new Set(characterIds) };
+}
+
+/** Ties by id, so two records shown in one write keep one order. */
+function byFirstShown<T extends { id: string; firstShownAt: string | null }>(rows: readonly T[]): T[] {
+  return [...rows].sort(
+    (a, b) => (a.firstShownAt ?? "").localeCompare(b.firstShownAt ?? "") || a.id.localeCompare(b.id)
+  );
+}
+
 /**
  * Every Codex read a player can make, built here for the router and for `playerCodexFingerprint`, so the hash
  * that decides a player's ping covers the bodies a player is sent. Each method answers the response's `data`, or
- * null where the router answers 404. One instance serves one moment of the store: the contexts it resolves and
- * the reads it repeats are kept for its later reads.
+ * null where the router answers 404. One instance serves one reader at one moment of the store: the contexts it
+ * resolves and the reads it repeats are kept for its later reads. Lists players read come in the order players could
+ * first read their rows, never the order the GM made them.
  */
 export class PlayerCodexReads {
   readonly #store: CodexStore;
+  readonly #reader: CodexReader;
   #journal: PlayerSessionNumberContext | undefined;
   #chronicle: PlayerChronicleContext | undefined;
   #connections: PlayerConnectionContext | undefined;
+  #readerContext: PlayerReaderContext | undefined;
 
-  constructor(store: CodexStore) {
+  constructor(store: CodexStore, reader: CodexReader = EVERYONE) {
     this.#store = rememberingReads(store);
+    this.#reader = reader;
   }
 
   /** The store as this instance reads it. */
   get store(): CodexStore {
     return this.#store;
   }
+  get reader(): CodexReader {
+    return this.#reader;
+  }
 
   get #journalContext() {
     return (this.#journal ??= journalContext(this.#store));
   }
   get #chronicleContext() {
-    return (this.#chronicle ??= chronicleContext(this.#store));
+    return (this.#chronicle ??= chronicleContext(this.#store, this.#reader));
   }
   get #connectionContext() {
-    return (this.#connections ??= connectionContext(this.#store));
+    return (this.#connections ??= connectionContext(this.#store, this.#reader));
+  }
+  get #pageContext() {
+    return (this.#readerContext ??= readerContext(this.#store, this.#reader));
+  }
+
+  /** Every page this reader can open, each as `page` sends it. */
+  fullPages(): PlayerCodexPage[] {
+    return this.#store
+      .listFullPages()
+      .map((page) => projectPlayerPage(page, this.#pageContext))
+      .filter((page) => page !== null);
   }
 
   pages(tag?: string): { pages: PlayerCodexPageSummary[] } {
     const rows = this.#store.listPages(tag === undefined ? undefined : { tag });
-    return { pages: rows.map(projectPlayerPageSummary).filter((page) => page !== null) };
+    return {
+      pages: rows.map((row) => projectPlayerPageSummary(row, this.#reader)).filter((page) => page !== null)
+    };
   }
 
   /** The same context as the graph feed, so the panel and the graph are gated by one rule. */
   page(pageId: string): { page: PlayerCodexPage; connections: PlayerCodexPageConnection[] } | null {
     const page = this.#store.getPage(pageId);
-    const projected = page && projectPlayerPage(page);
+    const projected = page && projectPlayerPage(page, this.#pageContext);
     if (!page || !projected) return null;
     return {
       page: projected,
@@ -145,8 +184,7 @@ export class PlayerCodexReads {
 
   maps(): { maps: PlayerCodexMap[] } {
     return {
-      maps: this.#store
-        .listMaps()
+      maps: byFirstShown(this.#store.listMaps())
         .map((row) => projectPlayerMap(row, mapContext(this.#store, row)))
         .filter((map) => map !== null)
     };
@@ -195,12 +233,15 @@ export class PlayerCodexReads {
   }
 
   /** `activeSessionId` is always null for a player, since it may name a hidden session; the key keeps one shape. */
+  /** Numbered sessions by number, as the store lists them; the unnumbered after them in first-shown order. */
   sessions(): { sessions: PlayerCodexSession[]; activeSessionId: null } {
+    const rows = this.#store.listSessions();
+    const ordered = [
+      ...rows.filter((session) => session.sessionNumber !== null),
+      ...byFirstShown(rows.filter((session) => session.sessionNumber === null))
+    ];
     return {
-      sessions: this.#store
-        .listSessions()
-        .map(projectPlayerSession)
-        .filter((session) => session !== null),
+      sessions: ordered.map(projectPlayerSession).filter((session) => session !== null),
       activeSessionId: null
     };
   }
@@ -213,23 +254,21 @@ export class PlayerCodexReads {
 
   quests(): { quests: PlayerCodexQuest[] } {
     return {
-      quests: this.#store
-        .listQuests()
-        .map((row) => projectPlayerQuest(row, questContext(this.#store, row)))
+      quests: byFirstShown(this.#store.listQuests())
+        .map((row) => projectPlayerQuest(row, questContext(this.#store, row, this.#pageContext)))
         .filter((quest) => quest !== null)
     };
   }
 
   quest(questId: string): { quest: PlayerCodexQuest } | null {
     const quest = this.#store.getQuest(questId);
-    const projected = quest && projectPlayerQuest(quest, questContext(this.#store, quest));
+    const projected = quest && projectPlayerQuest(quest, questContext(this.#store, quest, this.#pageContext));
     return projected ? { quest: projected } : null;
   }
 
   standing(): { standing: PlayerCodexStanding[] } {
     return {
-      standing: this.#store
-        .listStanding()
+      standing: byFirstShown(this.#store.listStanding())
         .map((row) => projectPlayerStanding(row, standingContext(this.#store, row)))
         .filter((row) => row !== null)
     };
@@ -244,7 +283,7 @@ export class PlayerCodexReads {
     const context = this.#journalContext;
     return capSearch(
       this.#store
-        .searchPlayerMatches(query)
+        .searchPlayerMatches(query, this.#reader.characterIds)
         .map((ref) => searchRecord(this.#store, ref))
         .filter((record) => record !== null)
         .map((record) => projectPlayerSearchHit(record, context))
@@ -252,28 +291,33 @@ export class PlayerCodexReads {
     );
   }
 
+  /** Whether this reader may load an image. */
+  media(assetId: string): boolean {
+    return this.#store.isMediaVisibleToPlayers(assetId, this.#reader);
+  }
+
   #projectMarkers(rows: ReturnType<CodexStore["listMarkers"]>): PlayerCodexMarker[] {
-    return rows
+    return byFirstShown(rows)
       .map((row) => projectPlayerPageMarker(markerRecord(this.#store, row)))
       .filter((marker) => marker !== null);
   }
 }
 
 /**
- * A hash of everything a player can read, so the `codex:changed` ping reaches players exactly when some of it
- * changed. It holds each list read and each page as a player receives it, plus which pin and page each shown
- * journal entry is attached to, where players can see that pin or page. The rest of what a player can ask for is
- * built from those, so it cannot change while they stay the same:
+ * A hash of everything one reader can read, so the `codex:changed` ping reaches a player exactly when some of what
+ * they can read changed. It holds each list read and each page as the reader receives it, plus which pin and page
+ * each shown journal entry is attached to, where the reader can see that pin or page. The rest of what a player can
+ * ask for is built from those, so it cannot change while they stay the same:
  *
  * - A page's Connections panel: from the graph's edges, the titles and the player text of both ends.
  * - A page's or a pin's journal: the shown entries with that attachment, in first-shown order.
  * - A page's pins: the shown pins whose page links name it.
  * - One pin, session or quest: the same projection as its row in the list.
  * - Search: each hit's title, text and reveal state, ranked on its own title.
- * - An image: a player may fetch one only when a revealed body or banner here names it.
+ * - An image: a reader may fetch one only when a body, block or banner here names it.
  */
-export function playerCodexFingerprint(store: CodexStore): string {
-  const reads = new PlayerCodexReads(store);
+export function playerCodexFingerprint(store: CodexStore, reader: CodexReader = EVERYONE): string {
+  const reads = new PlayerCodexReads(store, reader);
   const pages = reads.pages();
   const maps = reads.maps();
   const markers = maps.maps.map((map) => reads.mapMarkers(map.id));
@@ -291,10 +335,7 @@ export function playerCodexFingerprint(store: CodexStore): string {
     ]);
   const parts: unknown[] = [
     pages,
-    reads.store
-      .listFullPages()
-      .map(projectPlayerPage)
-      .filter((page) => page !== null),
+    reads.fullPages(),
     maps,
     markers,
     reads.connections(),
@@ -311,25 +352,48 @@ export function playerCodexFingerprint(store: CodexStore): string {
 }
 
 /**
- * The count a player's `codex:changed` ping carries. It moves only when `playerCodexFingerprint` does, so a
- * GM-only write sends a player nothing, and its value counts only changes players could read.
+ * The counts players' `codex:changed` pings carry, one per audience (the characters a reader holds). An audience's
+ * count moves only when its own `playerCodexFingerprint` does, so a GM-only write sends a player nothing, a reveal to
+ * Lyra moves only Lyra's audience, and each value counts only changes that audience could read.
  */
 export class PlayerCodexChanges {
   readonly #store: CodexStore;
-  #fingerprint: string;
-  #count = 0;
+  readonly #seen = new Map<string, { fingerprint: string; count: number }>();
 
   constructor(store: CodexStore) {
     this.#store = store;
-    this.#fingerprint = playerCodexFingerprint(store);
+    this.watch(EVERYONE);
   }
 
-  /** The new count when something a player can read changed since the last call, otherwise null. */
-  next(): number | null {
-    const fingerprint = playerCodexFingerprint(this.#store);
-    if (fingerprint === this.#fingerprint) return null;
-    this.#fingerprint = fingerprint;
-    this.#count += 1;
-    return this.#count;
+  /** Starts counting an audience from now, unless it is counted already; answers its count. */
+  watch(reader: CodexReader): number {
+    const key = readerKey(reader);
+    const known = this.#seen.get(key);
+    if (known) return known.count;
+    this.#seen.set(key, { fingerprint: playerCodexFingerprint(this.#store, reader), count: 0 });
+    return 0;
+  }
+
+  /**
+   * The new count of each audience in `readers` whose reads changed since the last call. An audience no reader holds
+   * any more stops being counted; one not counted yet starts from now, with nothing to report.
+   */
+  next(readers: Iterable<CodexReader> = [EVERYONE]): Map<string, number> {
+    const active = new Map([...readers].map((reader) => [readerKey(reader), reader]));
+    for (const key of [...this.#seen.keys()]) if (!active.has(key)) this.#seen.delete(key);
+    const moved = new Map<string, number>();
+    for (const [key, reader] of active) {
+      const fingerprint = playerCodexFingerprint(this.#store, reader);
+      const known = this.#seen.get(key);
+      if (!known) {
+        this.#seen.set(key, { fingerprint, count: 0 });
+        continue;
+      }
+      if (known.fingerprint === fingerprint) continue;
+      known.fingerprint = fingerprint;
+      known.count += 1;
+      moved.set(key, known.count);
+    }
+    return moved;
   }
 }

@@ -1,10 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
 import { migrate, type Migration } from "../database.js";
-import { backfillFirstShown } from "./first-shown.js";
+import { backfillPagesAndEntries } from "./first-shown.js";
+import { migrateToHiddenBlocks } from "./hidden-blocks-migration.js";
 
 /**
- * The Codex tables. Records keep both layers in one row (`player_*` and `gm_*` columns plus `revealed`); only
- * `codex-projections.ts` decides what a player receives. `codex_links` and the two search tables are derived
+ * The Codex tables as the baseline made them; later migrations change them. Records keep both layers in one row
+ * (player text, hidden blocks with their audiences, and `revealed`); only `codex-projections.ts` decides what a player
+ * receives. `codex_links` and the two search tables are derived
  * from record text and rewritten by every write that changes it. Ids that point at other records carry no
  * foreign key where the deleting write clears them itself, so a dangling id is cleaned and never refused.
  */
@@ -234,9 +236,12 @@ export const CODEX_MIGRATIONS: readonly Migration[] = [
         ALTER TABLE codex_pages ADD COLUMN first_shown_at TEXT;
         ALTER TABLE codex_journal ADD COLUMN first_shown_at TEXT;
       `);
-      backfillFirstShown(database);
+      backfillPagesAndEntries(database);
     }
-  }
+  },
+  // Hidden blocks in place of the GM body, an audience on each field and objective, relationship dates, and
+  // first-shown dates on every record players list. See `hidden-blocks-migration.ts`.
+  { version: 4, up: migrateToHiddenBlocks }
 ];
 
 /** Creates or checks the Codex tables. A file from before the migration history was reset is refused. */
@@ -271,5 +276,6 @@ export const CODEX_CONTENT_TABLES = [
   "codex_folders",
   "codex_pages",
   "codex_search_player",
-  "codex_search_gm"
+  "codex_search_gm",
+  "codex_search_character"
 ] as const;

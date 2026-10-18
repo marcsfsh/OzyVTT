@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CodexAutosaveSettingsSchema, CodexInWorldDateSchema, CodexQuestObjectiveSchema } from "@vtt/domain";
+import { CodexAutosaveSettingsSchema, CodexInWorldDateSchema } from "@vtt/domain";
 import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
 
 /**
@@ -15,16 +15,34 @@ export const InWorldDateFields = CodexInWorldDateSchema;
 const InWorldDateSchema = InWorldDateFields.nullable();
 const EntityTypeSchema = z.enum(["note", "character", "location", "faction", "item", "species", "religion", "event"]);
 const FieldsSchema = z.record(z.string().max(40), z.string().max(2000));
+const ExpectedRevSchema = z.number().int().nonnegative().optional();
+/** A paragraph count: where a block sits in the player text. */
+const AnchorSchema = z.number().int().min(0).max(100_000);
+const BlockTitleSchema = z.string().max(160).nullable();
+const BlockTextSchema = z.string().max(100_000);
+/** A block as create takes it; it is created hidden. Omitted `anchor`: after the player text. */
+export const BlockInputSchema = z
+  .object({ title: BlockTitleSchema.optional(), text: BlockTextSchema, anchor: AnchorSchema.optional() })
+  .strict();
+const BlocksSchema = z.array(BlockInputSchema).max(200);
+/** Where one block sits. */
+export const BlockPlacementSchema = z.object({ id: z.uuid(), anchor: AnchorSchema }).strict();
+/** Every block of the record exactly once, in document order. */
+const LayoutSchema = z.array(BlockPlacementSchema).max(200);
+const AudienceSchema = z.enum(["hidden", "everyone", "characters"]);
+const CharacterIdsSchema = z.array(z.uuid()).max(12);
 export const PageCreateSchema = z
   .object({
     title: z.string().trim().min(1).max(160),
     entityType: EntityTypeSchema.optional(),
+    /** Every field value, whatever its audience. */
     fields: FieldsSchema.optional(),
-    gmFields: FieldsSchema.optional(),
+    /** Omitted: the kind's default-hidden keys. */
+    hiddenFields: z.array(z.string().max(40)).max(40).optional(),
     folder: z.string().max(160).nullable().optional(),
     tags: TagsSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
-    gmBody: z.string().max(100_000).optional(),
+    blocks: BlocksSchema.optional(),
     revealedToPlayers: z.boolean().optional(),
     bannerAssetId: z.uuid().nullable().optional(),
     /** What places an `event` page on the chronicle. Omitted = unchanged/undated; `null` = clear the date. */
@@ -32,21 +50,63 @@ export const PageCreateSchema = z
     commandId: CommandIdSchema
   })
   .strict();
+/** No reveal flag, field audience or block content: each has its own route. */
 export const PageUpdateSchema = z
   .object({
     title: z.string().trim().min(1).max(160).optional(),
     entityType: EntityTypeSchema.optional(),
     fields: FieldsSchema.optional(),
-    gmFields: FieldsSchema.optional(),
     folder: z.string().max(160).nullable().optional(),
     tags: TagsSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
-    gmBody: z.string().max(100_000).optional(),
+    layout: LayoutSchema.optional(),
     bannerAssetId: z.uuid().nullable().optional(),
     inWorldDate: InWorldDateSchema.optional(),
-    expectedRev: z.number().int().nonnegative().optional(),
+    expectedRev: ExpectedRevSchema,
     commandId: CommandIdSchema
   })
+  .strict();
+/** A new hidden block at `anchor`; `slot` places it among the blocks there (default: last). */
+export const BlockAddSchema = z
+  .object({
+    anchor: AnchorSchema,
+    slot: z.number().int().min(0).optional(),
+    title: BlockTitleSchema.optional(),
+    text: BlockTextSchema,
+    expectedRev: ExpectedRevSchema,
+    commandId: CommandIdSchema
+  })
+  .strict();
+export const BlockEditSchema = z
+  .object({
+    title: BlockTitleSchema.optional(),
+    text: BlockTextSchema.optional(),
+    expectedRev: ExpectedRevSchema,
+    commandId: CommandIdSchema
+  })
+  .strict();
+export const BlockMoveSchema = z
+  .object({
+    anchor: AnchorSchema,
+    slot: z.number().int().min(0).optional(),
+    expectedRev: ExpectedRevSchema,
+    commandId: CommandIdSchema
+  })
+  .strict();
+/** Who sees a block or an objective. `characterIds` only, and then at least one, with `characters`. */
+export const AudienceSetSchema = z
+  .object({ audience: AudienceSchema, characterIds: CharacterIdsSchema.optional(), commandId: CommandIdSchema })
+  .strict();
+export const FieldAudienceSchema = z
+  .object({ audience: z.enum(["hidden", "everyone"]), commandId: CommandIdSchema })
+  .strict();
+/** Which party character a preview reads as; omitted or null is a preview as everyone. */
+export const PreviewSessionSchema = z
+  .object({ characterId: z.uuid().nullable().optional(), commandId: CommandIdSchema })
+  .strict();
+/** When a tie began: a date, or before the campaign (`inWorldDate` null). `null` clears it. */
+export const RelationshipBeganSchema = z
+  .object({ inWorldDate: InWorldDateFields.nullable(), beforeCampaign: z.boolean() })
   .strict();
 /** `label` is optional: an unlabelled connection just means "related", as a `[[wiki link]]` does. */
 export const ConnectionCreateSchema = z
@@ -54,14 +114,16 @@ export const ConnectionCreateSchema = z
     toPageId: z.uuid(),
     label: z.string().trim().max(40).nullable().optional(),
     layer: z.enum(["player", "gm"]).optional(),
+    began: RelationshipBeganSchema.nullable().optional(),
     commandId: CommandIdSchema
   })
   .strict();
-/** Relabel or re-layer a declared connection. An omitted field is left alone. */
+/** Relabel, re-layer or re-date a declared connection. An omitted field is left alone. */
 export const ConnectionUpdateSchema = z
   .object({
     label: z.string().trim().max(40).nullable().optional(),
     layer: z.enum(["player", "gm"]).optional(),
+    began: RelationshipBeganSchema.nullable().optional(),
     commandId: CommandIdSchema
   })
   .strict();
@@ -223,7 +285,19 @@ export const SessionUpdateSchema = z
   .strict();
 /** Bounds mirror the store's. Objective text may be empty (the editor autosaves right after "Add item"). */
 const QuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
-export const ObjectiveSchema = CodexQuestObjectiveSchema;
+/**
+ * An objective as a write lists it: `id` for one the server gave, none for a new one. `audience` only on a new one
+ * (default everyone); an existing objective's audience has its own route.
+ */
+export const ObjectiveSchema = z
+  .object({
+    id: z.uuid().optional(),
+    text: z.string().max(120),
+    done: z.boolean(),
+    audience: AudienceSchema.optional(),
+    characterIds: CharacterIdsSchema.optional()
+  })
+  .strict();
 const ObjectivesSchema = z.array(ObjectiveSchema).max(24);
 const QuestEntityIdsSchema = z.array(z.uuid()).max(24);
 export const QuestCreateSchema = z
@@ -231,7 +305,7 @@ export const QuestCreateSchema = z
     title: z.string().trim().min(1).max(160),
     status: QuestStatusSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
-    gmBody: z.string().max(100_000).optional(),
+    blocks: BlocksSchema.optional(),
     objectives: ObjectivesSchema.optional(),
     entityIds: QuestEntityIdsSchema.optional(),
     revealedToPlayers: z.boolean().optional(),
@@ -245,7 +319,7 @@ export const QuestUpdateSchema = z
     title: z.string().trim().min(1).max(160).optional(),
     status: QuestStatusSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
-    gmBody: z.string().max(100_000).optional(),
+    layout: LayoutSchema.optional(),
     objectives: ObjectivesSchema.optional(),
     entityIds: QuestEntityIdsSchema.optional(),
     tags: TagsSchema.optional(),
@@ -277,14 +351,18 @@ export const CodexSettingsSchema = z
   .strict();
 /** The Codex's one destructive route, so bad values are rejected and never clamped; the max matches the store's `MAX_PRUNE_DAYS`. */
 export const RevisionsDeleteSchema = z.object({ olderThanDays: z.number().int().min(0).max(36_500) }).strict();
-/** A saved export's `data`, posted back unedited. A missing `bundleVersion` is an older v1 backup; other versions are refused. */
+/**
+ * A saved export's `data`, posted back unedited. A missing `bundleVersion` is an older v1 backup; v1 and v2 restore,
+ * and a newer version is refused.
+ */
 export const CodexImportSchema = z
   .object({
     codex: z.record(z.string(), z.unknown()),
     bundleVersion: z
       .number()
       .int()
-      .refine((value) => value === CODEX_BUNDLE_VERSION, {
+      .min(1)
+      .refine((value) => value <= CODEX_BUNDLE_VERSION, {
         error: "This backup was made by a newer version of the app. Update, then restore."
       })
       .optional(),

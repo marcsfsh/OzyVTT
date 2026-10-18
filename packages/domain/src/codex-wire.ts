@@ -43,9 +43,24 @@ export type CodexSessionStatus = z.infer<typeof CodexSessionStatusSchema>;
 /** Lifecycle order. `not-started` and `active` are open; the rest are done. */
 const CodexQuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
 export type CodexQuestStatus = z.infer<typeof CodexQuestStatusSchema>;
+/** Who sees a hidden block or a quest objective: the GM only, everyone, or the chosen party characters. */
+const CodexAudienceSchema = z.enum(["hidden", "everyone", "characters"]);
+export type CodexAudience = z.infer<typeof CodexAudienceSchema>;
+/** Who sees a page's field: a key in the page's `hiddenFields` is Hidden, any other is shown to everyone. */
+export type CodexFieldAudience = "hidden" | "everyone";
 /** A blank `text` is a legitimate transient state (a row just added), so blank rows are never stripped. */
-export const CodexQuestObjectiveSchema = z.strictObject({ text: z.string().max(120), done: z.boolean() });
+export const CodexQuestObjectiveSchema = z.strictObject({
+  id: z.uuid(),
+  text: z.string().max(120),
+  done: z.boolean(),
+  audience: CodexAudienceSchema,
+  /** Non-empty exactly when `audience` is `characters`. */
+  characterIds: z.array(z.uuid()).max(12)
+});
 export type CodexQuestObjective = Wire<z.infer<typeof CodexQuestObjectiveSchema>>;
+/** Only the objectives the reader may see reach them, so this carries no audience. */
+export const PlayerCodexQuestObjectiveSchema = z.strictObject({ text: z.string().max(120), done: z.boolean() });
+export type PlayerCodexQuestObjective = Wire<z.infer<typeof PlayerCodexQuestObjectiveSchema>>;
 /** The kinds the suite-wide search indexes. */
 const CodexRecordKindSchema = z.enum(["page", "journal", "map", "marker", "quest", "session"]);
 export type CodexRecordKind = z.infer<typeof CodexRecordKindSchema>;
@@ -55,6 +70,76 @@ export type CodexRevealAuditKind = z.infer<typeof CodexRevealAuditKindSchema>;
 
 const tags = () => z.array(z.string());
 const timestamp = () => z.iso.datetime();
+
+// ----- Reveal stamps and hidden blocks -----
+
+/**
+ * When something first reached an audience: the moment, the session active then, and the players' published date
+ * then (never the GM's). Set by the write after which that audience could read it, and never moved after.
+ */
+export const CodexRevealStampSchema = z.strictObject({
+  at: timestamp(),
+  sessionId: z.uuid().nullable(),
+  /** The session's number now, or the number it had when it was deleted. */
+  sessionNumber: z.number().int().nullable(),
+  inWorldDate: CodexInWorldDateSchema.nullable(),
+  inWorldLabel: z.string().nullable()
+});
+export type CodexRevealStamp = Wire<z.infer<typeof CodexRevealStampSchema>>;
+/** A stamp as a player receives it: the session's number only while that session is revealed. */
+export const PlayerCodexRevealStampSchema = z.strictObject({
+  at: timestamp(),
+  sessionNumber: z.number().int().nullable(),
+  inWorldDate: CodexInWorldDateSchema.nullable(),
+  inWorldLabel: z.string().nullable()
+});
+export type PlayerCodexRevealStamp = Wire<z.infer<typeof PlayerCodexRevealStampSchema>>;
+
+/** One audience a block reached: `everyone`, or a character id. */
+export const CodexBlockRevealSchema = CodexRevealStampSchema.extend({
+  to: z.union([z.literal("everyone"), z.uuid()])
+});
+export type CodexBlockReveal = Wire<z.infer<typeof CodexBlockRevealSchema>>;
+
+/**
+ * A hidden block: markdown placed in a page's or quest's text with its own audience. `anchor` is the number of
+ * player-text paragraphs before it (`codexParagraphs`); blocks come in document order.
+ */
+export const CodexBlockSchema = z.strictObject({
+  id: z.uuid(),
+  anchor: z.number().int().min(0),
+  title: z.string().max(160).nullable(),
+  text: z.string(),
+  audience: CodexAudienceSchema,
+  /** Non-empty exactly when `audience` is `characters`. */
+  characterIds: z.array(z.uuid()).max(12),
+  /** One per audience the block has reached, oldest first. A hide keeps them. */
+  reveals: z.array(CodexBlockRevealSchema)
+});
+export type CodexBlock = Wire<z.infer<typeof CodexBlockSchema>>;
+/** A block as a page revision keeps it: content and place, no audience. */
+export const CodexBlockContentSchema = z.strictObject({
+  id: z.uuid(),
+  anchor: z.number().int().min(0),
+  title: z.string().max(160).nullable(),
+  text: z.string()
+});
+export type CodexBlockContentRow = Wire<z.infer<typeof CodexBlockContentSchema>>;
+/**
+ * A block a player may read, as it sits in their assembled `body`. No id, anchor or audience, and nothing about a
+ * block they may not read.
+ */
+export const PlayerCodexBlockSchema = z.strictObject({
+  title: z.string().nullable(),
+  /** UTF-16 offsets of the block's markdown in `body`, `end` exclusive. */
+  start: z.number().int().min(0),
+  end: z.number().int().min(0),
+  /** Which of the reader's characters it is shown to; empty when it is shown to everyone. */
+  characterIds: z.array(z.uuid()),
+  /** When it first reached the reader. */
+  revealed: PlayerCodexRevealStampSchema
+});
+export type PlayerCodexBlock = Wire<z.infer<typeof PlayerCodexBlockSchema>>;
 
 // ----- Pages -----
 
@@ -69,8 +154,10 @@ export const CodexPageSummarySchema = z.strictObject({
   id: z.uuid(),
   title: z.string(),
   entityType: CodexEntityTypeSchema,
-  /** Player-facing structured fields; secret keys rest in `gmFields`. */
+  /** Every field value, whatever its audience. */
   fields: z.record(z.string(), z.string()),
+  /** The field keys only the GM sees. */
+  hiddenFields: z.array(z.string()),
   folder: z.string().nullable(),
   tags: tags(),
   revealedToPlayers: z.boolean(),
@@ -80,22 +167,24 @@ export const CodexPageSummarySchema = z.strictObject({
   createdAt: timestamp(),
   /** Moves on every save. */
   updatedAt: timestamp(),
-  /** Moves only when something a player can see changes, so it is the one edit time players get. */
+  /** Moves only when something everyone who can read the page sees changes. */
   playerUpdatedAt: timestamp(),
+  /** By character id: when something shown only to some characters last changed for that character. */
+  characterUpdatedAt: z.record(z.uuid(), timestamp()),
   /** When players could first read the page; null until then. Never moves after, through a hide or a re-reveal. */
   firstShownAt: timestamp().nullable()
 });
 export type CodexPageSummary = Wire<z.infer<typeof CodexPageSummarySchema>>;
 export const CodexPageSchema = CodexPageSummarySchema.extend({
+  /** The text everyone who can read the page reads, with no block in it. */
   playerBody: z.string(),
-  gmBody: z.string(),
-  gmFields: z.record(z.string(), z.string())
+  blocks: z.array(CodexBlockSchema)
 });
 export type CodexPage = Wire<z.infer<typeof CodexPageSchema>>;
 
 /**
- * Only when revealed. No GM body, GM fields, reveal flag, date or `rev`. No `folder`, which is the GM's private
- * filing, and no `updatedAt`, which a GM-only save moves.
+ * Only when revealed. No blocks they may not read, no Hidden fields, reveal flag, date or `rev`. No `folder`, which
+ * is the GM's private filing, and no `updatedAt`, which a GM-only save moves. `playerUpdatedAt` is the reader's own.
  */
 export const PlayerCodexPageSummarySchema = z.strictObject({
   id: z.uuid(),
@@ -106,10 +195,12 @@ export const PlayerCodexPageSummarySchema = z.strictObject({
   playerUpdatedAt: timestamp()
 });
 export type PlayerCodexPageSummary = Wire<z.infer<typeof PlayerCodexPageSummarySchema>>;
-/** `playerBody` arrives as `body`. */
+/** `body` is the player text with the blocks the reader may see in place. */
 export const PlayerCodexPageSchema = PlayerCodexPageSummarySchema.extend({
   fields: z.record(z.string(), z.string()),
-  body: z.string()
+  body: z.string(),
+  firstShownAt: timestamp(),
+  blocks: z.array(PlayerCodexBlockSchema)
 });
 export type PlayerCodexPage = Wire<z.infer<typeof PlayerCodexPageSchema>>;
 
@@ -120,7 +211,7 @@ export const CodexPageRevisionSchema = z.strictObject({
   rev: z.number().int().min(0),
   title: z.string(),
   playerBody: z.string(),
-  gmBody: z.string(),
+  blocks: z.array(CodexBlockContentSchema),
   bannerAssetId: z.uuid().nullable(),
   tags: tags(),
   authoredAt: timestamp(),
@@ -129,6 +220,16 @@ export const CodexPageRevisionSchema = z.strictObject({
 export type CodexPageRevision = Wire<z.infer<typeof CodexPageRevisionSchema>>;
 
 // ----- Connections: declared edges and `[[wiki link]]` mentions are one system -----
+
+/** When a declared connection began in the world: a date, or before the campaign. */
+export const CodexRelationshipBeganSchema = z.strictObject({
+  /** Null when it began before the campaign. */
+  inWorldDate: CodexInWorldDateSchema.nullable(),
+  beforeCampaign: z.boolean(),
+  inWorldLabel: z.string().nullable(),
+  calendarInstant: z.number().nullable()
+});
+export type CodexRelationshipBegan = Wire<z.infer<typeof CodexRelationshipBeganSchema>>;
 
 /** One graph edge. `id` is null exactly for a mention, which is edited through its source text. */
 export const CodexConnectionSchema = z.strictObject({
@@ -140,16 +241,24 @@ export const CodexConnectionSchema = z.strictObject({
   label: z.string().min(1).max(40).nullable(),
   origin: CodexConnectionOriginSchema,
   layer: CodexConnectionLayerSchema,
+  /** A GM-layer mention from a block shown to these characters; empty otherwise. */
+  characterIds: z.array(z.uuid()),
+  /** Declared connections only. */
+  began: CodexRelationshipBeganSchema.nullable(),
+  /** When players could first read it. Declared connections only; null for one players read before stamps existed. */
+  learned: CodexRevealStampSchema.nullable(),
   createdAt: timestamp().nullable()
 });
 export type CodexConnection = Wire<z.infer<typeof CodexConnectionSchema>>;
-/** Player-layer edges between records the player can see; no `id`, `layer` or `createdAt`. */
+/** Edges between records the reader can see, on the player layer or from a block shown to their characters. */
 export const PlayerCodexConnectionSchema = z.strictObject({
   fromKind: CodexConnectionSourceKindSchema,
   fromId: z.uuid(),
   toPageId: z.uuid(),
   label: z.string().min(1).max(40).nullable(),
-  origin: CodexConnectionOriginSchema
+  origin: CodexConnectionOriginSchema,
+  began: CodexRelationshipBeganSchema.nullable(),
+  learned: PlayerCodexRevealStampSchema.nullable()
 });
 export type PlayerCodexConnection = Wire<z.infer<typeof PlayerCodexConnectionSchema>>;
 
@@ -167,11 +276,14 @@ export const CodexPageConnectionSchema = z.strictObject({
   label: z.string().nullable(),
   origin: CodexConnectionOriginSchema,
   layer: CodexConnectionLayerSchema,
+  characterIds: z.array(z.uuid()),
   /** The heading a mention sits under; null for a declared connection. */
-  section: z.string().nullable()
+  section: z.string().nullable(),
+  began: CodexRelationshipBeganSchema.nullable(),
+  learned: CodexRevealStampSchema.nullable()
 });
 export type CodexPageConnection = Wire<z.infer<typeof CodexPageConnectionSchema>>;
-/** Gated like the graph feed; no `id`, `layer` or `otherRevealed`. */
+/** Gated like the graph feed; no `id`, `layer`, `characterIds` or `otherRevealed`. */
 export const PlayerCodexPageConnectionSchema = z.strictObject({
   direction: z.enum(["out", "in"]),
   otherKind: CodexConnectionSourceKindSchema,
@@ -180,7 +292,9 @@ export const PlayerCodexPageConnectionSchema = z.strictObject({
   otherEntityType: CodexEntityTypeSchema.nullable(),
   label: z.string().nullable(),
   origin: CodexConnectionOriginSchema,
-  section: z.string().nullable()
+  section: z.string().nullable(),
+  began: CodexRelationshipBeganSchema.nullable(),
+  learned: PlayerCodexRevealStampSchema.nullable()
 });
 export type PlayerCodexPageConnection = Wire<z.infer<typeof PlayerCodexPageConnectionSchema>>;
 
@@ -196,7 +310,9 @@ export const CodexMapSchema = z.strictObject({
   sortKey: z.number(),
   tags: tags(),
   createdAt: timestamp(),
-  updatedAt: timestamp()
+  updatedAt: timestamp(),
+  /** When players could first read the map; null until then. Orders the players' list. */
+  firstShownAt: timestamp().nullable()
 });
 export type CodexMap = Wire<z.infer<typeof CodexMapSchema>>;
 /** Only when revealed. `parentMapId` is null unless the parent is revealed too. */
@@ -230,7 +346,9 @@ export const CodexMarkerSchema = z.strictObject({
   sceneIds: z.array(z.uuid()),
   actorId: z.uuid().nullable(),
   createdAt: timestamp(),
-  updatedAt: timestamp()
+  updatedAt: timestamp(),
+  /** When players could first read the pin (it and its map revealed); null until then. Orders the players' lists. */
+  firstShownAt: timestamp().nullable()
 });
 export type CodexMarker = Wire<z.infer<typeof CodexMarkerSchema>>;
 /** Only when the pin and its map are revealed. No scene or actor links; page and sub-map links only when revealed. */
@@ -434,7 +552,9 @@ export const CodexSessionSchema = z.strictObject({
   sceneIds: z.array(z.uuid()),
   rev: z.number().int().min(0),
   createdAt: timestamp(),
-  updatedAt: timestamp()
+  updatedAt: timestamp(),
+  /** When players could first read the session; null until then. Orders the players' unnumbered sessions. */
+  firstShownAt: timestamp().nullable()
 });
 export type CodexSession = Wire<z.infer<typeof CodexSessionSchema>>;
 /**
@@ -450,14 +570,15 @@ export const PlayerCodexSessionSchema = z.strictObject({
 });
 export type PlayerCodexSession = Wire<z.infer<typeof PlayerCodexSessionSchema>>;
 
-// ----- Quests: the player body is what the party was told, the GM body where it is really going -----
+// ----- Quests: the player body is what the party was told, hidden blocks where it is really going -----
 
 export const CodexQuestSchema = z.strictObject({
   id: z.uuid(),
   title: z.string(),
   status: CodexQuestStatusSchema,
+  /** The text everyone who can read the quest reads, with no block in it. */
   playerBody: z.string(),
-  gmBody: z.string(),
+  blocks: z.array(CodexBlockSchema),
   /** Ordered: the GM's sequence is the meaning. */
   objectives: z.array(CodexQuestObjectiveSchema).max(24),
   /** Pages this quest concerns. */
@@ -466,16 +587,22 @@ export const CodexQuestSchema = z.strictObject({
   tags: tags(),
   rev: z.number().int().min(0),
   createdAt: timestamp(),
-  updatedAt: timestamp()
+  updatedAt: timestamp(),
+  /** When players could first read the quest; null until then. Orders the players' list. */
+  firstShownAt: timestamp().nullable()
 });
 export type CodexQuest = Wire<z.infer<typeof CodexQuestSchema>>;
-/** Only when revealed. No GM body or `rev`; `entityIds` only for revealed pages. */
+/**
+ * Only when revealed. No hidden block or objective the reader may not see, and no `rev`; `entityIds` only for
+ * revealed pages. `body` is the player text with the reader's blocks in place.
+ */
 export const PlayerCodexQuestSchema = z.strictObject({
   id: z.uuid(),
   title: z.string(),
   status: CodexQuestStatusSchema,
   body: z.string(),
-  objectives: z.array(CodexQuestObjectiveSchema).max(24),
+  blocks: z.array(PlayerCodexBlockSchema),
+  objectives: z.array(PlayerCodexQuestObjectiveSchema).max(24),
   entityIds: z.array(z.uuid()).max(24),
   tags: tags()
 });
@@ -490,7 +617,9 @@ export const CodexStandingSchema = z.strictObject({
   value: z.number().int().min(-100).max(100),
   revealedToPlayers: z.boolean(),
   createdAt: timestamp(),
-  updatedAt: timestamp()
+  updatedAt: timestamp(),
+  /** When players could first read it (it and its faction page revealed); null until then. Orders the players' list. */
+  firstShownAt: timestamp().nullable()
 });
 export type CodexStanding = Wire<z.infer<typeof CodexStandingSchema>>;
 /** Only when both the standing and its faction page are revealed. The faction page id identifies it. */

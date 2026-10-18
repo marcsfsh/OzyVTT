@@ -18,9 +18,12 @@ import { bearerToken, cookie, sendFailure } from "./http-kit.js";
 export type IntegrationVerdict = Readonly<{ id: string; name: string; inScope: boolean }>;
 
 /** How a server checks each kind of credential. A kind a router leaves out is not accepted there. */
+/** The GM's See as players session reads as these characters (none: as everyone), and only reads. */
+export type PreviewMark = Readonly<{ characterIds: readonly string[] }>;
+
 export type CredentialVerifiers = Readonly<{
   gm: (token: string) => Readonly<{ sessionId: string }> | null;
-  player: (token: string) => Readonly<{ sessionId: string }> | null;
+  player: (token: string) => Readonly<{ sessionId: string; preview?: PreviewMark }> | null;
   /** Null when the token is not a live integration credential. `scope` is null on a route that takes none, so a
    *  valid credential there is out of scope; `any` asks only whether the credential is live. */
   integration?: (token: string, scope: IntegrationScope | null | "any") => IntegrationVerdict | null;
@@ -32,7 +35,7 @@ export type Caller =
   | Readonly<{ kind: "none" }>
   | Readonly<{ kind: "invalid" }>
   | Readonly<{ kind: "gm"; sessionId: string; token: string }>
-  | Readonly<{ kind: "player"; sessionId: string; token: string }>
+  | Readonly<{ kind: "player"; sessionId: string; token: string; preview?: PreviewMark }>
   | Readonly<{ kind: "integration"; id: string; name: string; inScope: boolean }>
   | Readonly<{ kind: "viewer"; token: string }>;
 
@@ -51,7 +54,12 @@ export function callerOfToken(token: string | undefined, verifiers: CredentialVe
   const gm = verifiers.gm(token);
   if (gm) return { kind: "gm", sessionId: gm.sessionId, token } as const satisfies Caller;
   const player = verifiers.player(token);
-  if (player) return { kind: "player", sessionId: player.sessionId, token } as const satisfies Caller;
+  if (player)
+    return (
+      player.preview
+        ? { kind: "player", sessionId: player.sessionId, token, preview: player.preview }
+        : { kind: "player", sessionId: player.sessionId, token }
+    ) satisfies Caller;
   const integration = verifiers.integration?.(token, needs.scope ?? null);
   if (integration)
     return {

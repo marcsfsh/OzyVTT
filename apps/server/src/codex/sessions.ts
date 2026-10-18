@@ -60,9 +60,10 @@ type SessionRowRaw = {
   rev: number;
   created_at: string;
   updated_at: string;
+  first_shown_at: string | null;
 };
 const SESSION_COLUMNS =
-  "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, tags_json, scene_ids_json, rev, created_at, updated_at";
+  "id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status, tags_json, scene_ids_json, rev, created_at, updated_at, first_shown_at";
 
 function toSession(row: SessionRowRaw): CodexSession {
   return {
@@ -79,14 +80,15 @@ function toSession(row: SessionRowRaw): CodexSession {
     sceneIds: parseStringArray(row.scene_ids_json),
     rev: row.rev,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    firstShownAt: row.first_shown_at
   };
 }
 
 /** Leaf write of a whole, already-validated session (create and restore). */
 export function insertSession(db: CodexDb, session: CodexSession): void {
   db.database
-    .prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO codex_sessions (${SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       session.id,
       session.sessionNumber,
@@ -100,7 +102,8 @@ export function insertSession(db: CodexDb, session: CodexSession): void {
       JSON.stringify(session.sceneIds),
       session.rev,
       session.createdAt,
-      session.updatedAt
+      session.updatedAt,
+      session.firstShownAt
     );
   indexSession(db, session);
   // The recap is the player layer and prep the GM layer, so a page named only in prep is a GM-only connection.
@@ -133,7 +136,9 @@ export function createSession(db: CodexDb, input: CodexSessionCreateInput): Code
     sceneIds: sessionSceneIds(input.sceneIds),
     rev: 1,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    // The write dates it if it is created revealed.
+    firstShownAt: null
   };
   guardSessionNumber(session.sessionNumber, () => write(db, () => insertSession(db, session)));
   return getSession(db, session.id)!;

@@ -13,7 +13,17 @@ type PersistedAuthData = {
 };
 
 export type GmSession = { role: "gm"; sessionId: string; issuedAt: number; expiresAt: number };
-export type PlayerSession = { role: "player"; sessionId: string; issuedAt: number; expiresAt: number };
+/**
+ * `preview` marks the GM's See as players session: it reads the Codex as the characters it names (none: as
+ * everyone), whatever it claims, and is read-only everywhere.
+ */
+export type PlayerSession = {
+  role: "player";
+  sessionId: string;
+  issuedAt: number;
+  expiresAt: number;
+  preview?: { characterIds: string[] };
+};
 type Session = GmSession | PlayerSession;
 
 /** How long a GM sign-in lasts. */
@@ -98,13 +108,19 @@ export class AuthService {
       expiresAt: now + 30 * 24 * 60 * 60 * 1000
     });
   }
-  /** A short-lived player principal for the GM's preview of the player Codex. A real player token, so
-   *  every read goes through `authorizePlayer` and the player projection and the preview can't show more
-   *  than a player sees. Minting does not register presence, so no phantom player appears. */
-  issuePreviewPlayerSession(ttlMs = 12 * 60 * 60 * 1000) {
+  /** A short-lived player principal for the GM's preview of the player Codex, as everyone or as the characters
+   *  given. A real player token, so every read goes through the player projection and the preview can't show more
+   *  than that character's player sees. Minting does not register presence, so no phantom player appears. */
+  issuePreviewPlayerSession(characterIds: readonly string[] = [], ttlMs = 12 * 60 * 60 * 1000) {
     if (!this.data) throw new Error("The host must complete GM setup before players join.");
     const now = Date.now();
-    return this.sign({ role: "player", sessionId: randomUUID(), issuedAt: now, expiresAt: now + ttlMs });
+    return this.sign({
+      role: "player",
+      sessionId: randomUUID(),
+      issuedAt: now,
+      expiresAt: now + ttlMs,
+      preview: { characterIds: [...characterIds] }
+    });
   }
   verify(token: string | undefined): GmSession | null {
     const session = this.verifySession(token);
@@ -145,6 +161,11 @@ export class AuthService {
       const session = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as Session;
       if (session.role !== "gm" && session.role !== "player") return null;
       if (typeof session.expiresAt !== "number" || session.expiresAt <= Date.now()) return null;
+      // A malformed preview mark fails closed: the token is refused, never read as an ordinary player's.
+      if (session.role === "player" && session.preview !== undefined) {
+        const ids = (session.preview as { characterIds?: unknown } | null)?.characterIds;
+        if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) return null;
+      }
       if (session.role === "gm") {
         if (this.data.gmSessionsRevokedBefore && session.issuedAt <= this.data.gmSessionsRevokedBefore) return null;
         if (this.data.revokedGmSessionIds?.[session.sessionId] !== undefined) return null;

@@ -25,6 +25,9 @@ import * as settings from "./codex/settings.js";
 import * as standing from "./codex/standing.js";
 import { isId } from "./codex/validate.js";
 import { mapAssetVisibleToPlayers, mediaVisibleToPlayers } from "./codex/visibility.js";
+import type { CodexReader } from "./codex-projections.js";
+import type { CodexBlockInput } from "./codex/blocks.js";
+import type { CodexBeganInput } from "./codex/connections.js";
 import { openDatabase } from "./database.js";
 
 /**
@@ -84,6 +87,35 @@ export class CodexStore {
   }
   setPageRevealed(pageId: string, revealed: boolean) {
     return pages.setPageRevealed(this.#db, pageId, revealed);
+  }
+  addPageBlock(pageId: string, input: CodexBlockInput & Readonly<{ slot?: number }>, expectedRev?: number) {
+    return pages.addPageBlock(this.#db, pageId, input, expectedRev);
+  }
+  editPageBlock(
+    pageId: string,
+    blockId: string,
+    input: Readonly<{ title?: string | null; text?: string }>,
+    expectedRev?: number
+  ) {
+    return pages.editPageBlock(this.#db, pageId, blockId, input, expectedRev);
+  }
+  movePageBlock(
+    pageId: string,
+    blockId: string,
+    place: Readonly<{ anchor: number; slot?: number }>,
+    expectedRev?: number
+  ) {
+    return pages.movePageBlock(this.#db, pageId, blockId, place, expectedRev);
+  }
+  deletePageBlock(pageId: string, blockId: string, expectedRev?: number) {
+    return pages.deletePageBlock(this.#db, pageId, blockId, expectedRev);
+  }
+  /** Not an edit: who sees one block. Character ids are the caller's to check against the party. */
+  setPageBlockAudience(pageId: string, blockId: string, audience: string, characterIds?: readonly string[]) {
+    return pages.setPageBlockAudience(this.#db, pageId, blockId, audience, characterIds);
+  }
+  setPageFieldAudience(pageId: string, key: string, audience: string) {
+    return pages.setPageFieldAudience(this.#db, pageId, key, audience);
   }
   /** References to the page elsewhere become label-only and never dangle; its revisions go with it. */
   deletePage(pageId: string): void {
@@ -157,12 +189,37 @@ export class CodexStore {
 
   createConnection(
     fromPageId: string,
-    input: Readonly<{ toPageId: string; label?: string | null; layer?: "player" | "gm" | null }>
+    input: Readonly<{
+      toPageId: string;
+      label?: string | null;
+      layer?: "player" | "gm" | null;
+      began?: CodexBeganInput | null;
+    }>
   ) {
     return connections.createConnection(this.#db, fromPageId, input);
   }
-  updateConnection(connectionId: string, input: Readonly<{ label?: string | null; layer?: "player" | "gm" }>) {
+  updateConnection(
+    connectionId: string,
+    input: Readonly<{ label?: string | null; layer?: "player" | "gm"; began?: CodexBeganInput | null }>
+  ) {
     return connections.updateConnection(this.#db, connectionId, input);
+  }
+  /** A declared connection in its graph-edge shape, as the connection writes answer. */
+  connectionEdge(relationship: connections.CodexRelationshipRow) {
+    const reader = pages.stampReader(this.#db);
+    return {
+      id: relationship.id,
+      fromKind: "page" as const,
+      fromId: relationship.fromPageId,
+      toPageId: relationship.toPageId,
+      label: relationship.label,
+      origin: "declared" as const,
+      layer: relationship.layer,
+      characterIds: [],
+      began: connections.beganOf(relationship.began, reader),
+      learned: connections.learnedOf(relationship, reader),
+      createdAt: relationship.createdAt
+    };
   }
   deleteConnection(connectionId: string): void {
     connections.deleteConnection(this.#db, connectionId);
@@ -183,9 +240,12 @@ export class CodexStore {
   searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRefs {
     return searchAll(this.#db, audience, query, kinds);
   }
-  /** Every match a player may see, ranked and uncapped, for a caller that gates hits and caps what is left. */
-  searchPlayerMatches(query: string): CodexSearchRef[] {
-    return searchPlayerMatches(this.#db, query);
+  /**
+   * Every match a player may see, ranked and uncapped, for a caller that gates hits and caps what is left. Text
+   * shown to `characterIds` matches too.
+   */
+  searchPlayerMatches(query: string, characterIds: ReadonlySet<string> = new Set()): CodexSearchRef[] {
+    return searchPlayerMatches(this.#db, query, undefined, characterIds);
   }
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
     return this.searchAll(audience, query, ["page"]).hits.map((hit) => ({ pageId: hit.id }));
@@ -262,9 +322,9 @@ export class CodexStore {
   isAssetRevealedToPlayers(assetId: string): boolean {
     return mapAssetVisibleToPlayers(this.#db, assetId);
   }
-  /** Whether a player may fetch this page image. */
-  isMediaVisibleToPlayers(assetId: string): boolean {
-    return mediaVisibleToPlayers(this.#db, assetId);
+  /** Whether this reader may fetch this page image. */
+  isMediaVisibleToPlayers(assetId: string, reader?: CodexReader): boolean {
+    return mediaVisibleToPlayers(this.#db, assetId, reader);
   }
 
   // The calendar
@@ -416,6 +476,34 @@ export class CodexStore {
   }
   setQuestRevealed(questId: string, revealed: boolean) {
     return quests.setQuestRevealed(this.#db, questId, revealed);
+  }
+  addQuestBlock(questId: string, input: CodexBlockInput & Readonly<{ slot?: number }>, expectedRev?: number) {
+    return quests.addQuestBlock(this.#db, questId, input, expectedRev);
+  }
+  editQuestBlock(
+    questId: string,
+    blockId: string,
+    input: Readonly<{ title?: string | null; text?: string }>,
+    expectedRev?: number
+  ) {
+    return quests.editQuestBlock(this.#db, questId, blockId, input, expectedRev);
+  }
+  moveQuestBlock(
+    questId: string,
+    blockId: string,
+    place: Readonly<{ anchor: number; slot?: number }>,
+    expectedRev?: number
+  ) {
+    return quests.moveQuestBlock(this.#db, questId, blockId, place, expectedRev);
+  }
+  deleteQuestBlock(questId: string, blockId: string, expectedRev?: number) {
+    return quests.deleteQuestBlock(this.#db, questId, blockId, expectedRev);
+  }
+  setQuestBlockAudience(questId: string, blockId: string, audience: string, characterIds?: readonly string[]) {
+    return quests.setQuestBlockAudience(this.#db, questId, blockId, audience, characterIds);
+  }
+  setObjectiveAudience(questId: string, objectiveId: string, audience: string, characterIds?: readonly string[]) {
+    return quests.setObjectiveAudience(this.#db, questId, objectiveId, audience, characterIds);
   }
   deleteQuest(questId: string): void {
     if (!isId(questId)) return;

@@ -1,4 +1,8 @@
+import { assembleCodexBody, pageLinkKey } from "@vtt/domain";
 import type {
+  CodexAudience,
+  CodexBlock,
+  CodexBlockReveal,
   CodexCalendar,
   CodexChronicleKind,
   CodexChronicleRecord,
@@ -21,6 +25,7 @@ import type {
   CodexSession,
   CodexStanding,
   GmCodexCalendar,
+  PlayerCodexBlock,
   PlayerCodexCalendar,
   PlayerCodexChronicleRecord,
   PlayerCodexConnection,
@@ -32,6 +37,7 @@ import type {
   PlayerCodexPageConnection,
   PlayerCodexPageSummary,
   PlayerCodexQuest,
+  PlayerCodexRevealStamp,
   PlayerCodexSession,
   PlayerCodexStanding
 } from "@vtt/domain";
@@ -49,22 +55,156 @@ export function projectGmPage(row: CodexPage): CodexPage {
   return row;
 }
 
+// Readers: who a player read is for
+
 /**
- * null when the page is not revealed to players; otherwise the player-facing projection. Allow-list: the GM body,
- * GM fields, `rev`, the folder (the GM's private filing) and `updatedAt` (which a GM-only save moves) never enter
- * it. `playerUpdatedAt` is the edit time players get.
+ * Who a player read is for: the party characters the session holds. A player with none, and the GM's preview as
+ * everyone, hold none, and read only what everyone reads.
  */
-export function projectPlayerPage(row: CodexPage): PlayerCodexPage | null {
-  if (!row.revealedToPlayers) return null;
+export type CodexReader = Readonly<{ characterIds: ReadonlySet<string> }>;
+export const EVERYONE: CodexReader = { characterIds: new Set() };
+
+/** Whether a reader may read something with this audience. */
+function reaches(target: Readonly<{ audience: CodexAudience; characterIds: readonly string[] }>, reader: CodexReader) {
+  if (target.audience === "everyone") return true;
+  return target.audience === "characters" && target.characterIds.some((id) => reader.characterIds.has(id));
+}
+
+/** The facts a page or quest projection needs beyond its row, built by `codex/visibility.ts`. */
+export type PlayerReaderContext = Readonly<{
+  reader: CodexReader;
+  /** Link keys of the pages the reader can open; a `[[link]]` to anything else reads as plain text. */
+  openableLinkKeys: ReadonlySet<string>;
+  /** A stamp names its session only while that session is revealed. */
+  revealedSessionIds: ReadonlySet<string>;
+}>;
+/** The quietest context: no character, no page to link, no session to name. */
+export const EVERYONE_CONTEXT: PlayerReaderContext = {
+  reader: EVERYONE,
+  openableLinkKeys: new Set(),
+  revealedSessionIds: new Set()
+};
+
+const WIKILINK = /\[\[([^\]]+)\]\]/g;
+/** Link prefixes for records other than pages, read as `parseWikiLinks` reads them. */
+const OTHER_LINK_KINDS: ReadonlySet<string> = new Set(["actor", "monster", "spell", "map", "marker"]);
+/**
+ * `[[Title]]`, `[[page:Title]]` and `[[Title#Section]]` stay links only when the reader can open the page; any other
+ * becomes its plain text, so a link never says a hidden page exists. Links to other kinds of record are left as
+ * written.
+ */
+function plainUnopenableLinks(text: string, openable: ReadonlySet<string>): string {
+  return text.replace(WIKILINK, (link, inner: string) => {
+    const [targetPart = "", sectionPart] = inner.trim().split("#", 2);
+    let target = targetPart.trim();
+    const colon = target.indexOf(":");
+    if (colon > 0) {
+      const prefix = target.slice(0, colon).trim().toLowerCase();
+      if (OTHER_LINK_KINDS.has(prefix)) return link;
+      if (prefix === "page") target = target.slice(colon + 1).trim();
+    }
+    if (target === "" || openable.has(pageLinkKey(target))) return link;
+    const section = sectionPart?.trim();
+    return section ? `${target} › ${section}` : target;
+  });
+}
+
+/** A stamp as a reader may see it: its session's number only while that session is revealed. */
+function playerStamp(
+  stamp: Omit<CodexBlockReveal, "to">,
+  revealedSessionIds: ReadonlySet<string>
+): PlayerCodexRevealStamp {
+  return {
+    at: stamp.at,
+    sessionNumber: stamp.sessionId !== null && revealedSessionIds.has(stamp.sessionId) ? stamp.sessionNumber : null,
+    inWorldDate: stamp.inWorldDate,
+    inWorldLabel: stamp.inWorldLabel
+  };
+}
+
+/**
+ * The player text with the blocks the reader may see in place, and those blocks as the reader sees them. A block
+ * reaches the reader through "everyone" or one of their characters, and only once a write stamped that audience: a
+ * block no write has stamped has never been shown, so it fails closed. Its stamp is the first time it reached the
+ * reader: the earliest of the stamps for "everyone" and for the reader's characters.
+ */
+function assembled(
+  playerBody: string,
+  blocks: readonly CodexBlock[],
+  context: PlayerReaderContext
+): Readonly<{ body: string; blocks: PlayerCodexBlock[] }> {
+  const { reader } = context;
+  const shown = blocks.flatMap((block) => {
+    if (!reaches(block, reader)) return [];
+    const giving = (to: string) =>
+      to === "everyone" ? block.audience === "everyone" : block.characterIds.includes(to);
+    const mine = block.reveals
+      .filter((reveal) => reveal.to === "everyone" || reader.characterIds.has(reveal.to))
+      .sort((a, b) => a.at.localeCompare(b.at));
+    if (!mine.some((reveal) => giving(reveal.to))) return [];
+    return [{ block, stamp: mine[0]! }];
+  });
+  const openable = context.openableLinkKeys;
+  const { body, ranges } = assembleCodexBody(
+    plainUnopenableLinks(playerBody, openable),
+    shown.map(({ block }) => ({
+      anchor: block.anchor,
+      title: block.title === null ? null : plainUnopenableLinks(block.title, openable),
+      text: plainUnopenableLinks(block.text, openable)
+    }))
+  );
+  return {
+    body,
+    blocks: shown.flatMap(({ block, stamp }, index) => {
+      const range = ranges[index];
+      if (!range) return [];
+      return [
+        {
+          title: block.title === null ? null : plainUnopenableLinks(block.title, openable),
+          start: range.start,
+          end: range.end,
+          characterIds:
+            block.audience === "characters" ? block.characterIds.filter((id) => reader.characterIds.has(id)) : [],
+          revealed: playerStamp(stamp, context.revealedSessionIds)
+        }
+      ];
+    })
+  };
+}
+
+/** The reader's own edit time: the page's, or a later change only their characters see. */
+function readerUpdatedAt(row: CodexPageSummary, reader: CodexReader): string {
+  let latest = row.playerUpdatedAt;
+  for (const characterId of reader.characterIds) {
+    const at = row.characterUpdatedAt[characterId];
+    if (at !== undefined && at > latest) latest = at;
+  }
+  return latest;
+}
+
+/**
+ * null when the page is not revealed to players; otherwise the reader's projection. Allow-list: no block the reader
+ * may not see, no Hidden field, no `rev`, no folder (the GM's private filing) and no `updatedAt` (which a GM-only save
+ * moves). An undated page has never been shown, so it fails closed.
+ */
+export function projectPlayerPage(
+  row: CodexPage,
+  context: PlayerReaderContext = EVERYONE_CONTEXT
+): PlayerCodexPage | null {
+  if (!row.revealedToPlayers || row.firstShownAt === null) return null;
+  const hidden = new Set(row.hiddenFields);
+  const { body, blocks } = assembled(row.playerBody, row.blocks, context);
   return {
     id: row.id,
     title: row.title,
     entityType: row.entityType,
-    fields: row.fields,
+    fields: Object.fromEntries(Object.entries(row.fields).filter(([key]) => !hidden.has(key))),
     tags: row.tags,
-    body: row.playerBody,
+    body,
     bannerAssetId: row.bannerAssetId,
-    playerUpdatedAt: row.playerUpdatedAt
+    playerUpdatedAt: readerUpdatedAt(row, context.reader),
+    firstShownAt: row.firstShownAt,
+    blocks
   };
 }
 
@@ -72,27 +212,37 @@ export function projectGmPageSummary(row: CodexPageSummary): CodexPageSummary {
   return row;
 }
 
-/** As `projectPlayerPage`, without the body and fields. */
-export function projectPlayerPageSummary(row: CodexPageSummary): PlayerCodexPageSummary | null {
-  if (!row.revealedToPlayers) return null;
+/** As `projectPlayerPage`, without the body, fields and blocks. */
+export function projectPlayerPageSummary(
+  row: CodexPageSummary,
+  reader: CodexReader = EVERYONE
+): PlayerCodexPageSummary | null {
+  if (!row.revealedToPlayers || row.firstShownAt === null) return null;
   return {
     id: row.id,
     title: row.title,
     entityType: row.entityType,
     tags: row.tags,
     bannerAssetId: row.bannerAssetId,
-    playerUpdatedAt: row.playerUpdatedAt
+    playerUpdatedAt: readerUpdatedAt(row, reader)
   };
 }
 
 // Connections (one gate for declared and mention edges)
 
-/** A connection reaches a player only if its target page is revealed, its source is player-visible, and `layer === "player"`. */
+/**
+ * A connection reaches a player only if its target page is revealed, its source is player-visible, and it is on
+ * the player layer or is a GM-layer mention from a block shown to one of the reader's characters.
+ */
 export type PlayerConnectionContext = Readonly<{
   /** Page ids the player may see. Both a connection's target and a page-kind source are checked against it. */
   revealedPageIds: ReadonlySet<string>;
   /** Non-page sources the player may see, resolved through each kind's player projection. Absent ids fail closed. */
   revealedSourceIds: ReadonlySet<string>;
+  /** Absent: a reader with no character. */
+  reader?: CodexReader;
+  /** A `learned` stamp names its session only while that session is revealed. Absent: none is. */
+  revealedSessionIds?: ReadonlySet<string>;
 }>;
 
 function connectionSourceVisible(
@@ -103,30 +253,54 @@ function connectionSourceVisible(
   return kind === "page" ? context.revealedPageIds.has(sourceId) : context.revealedSourceIds.has(sourceId);
 }
 
+/** The player layer, or a GM-layer mention from a block shown to one of the reader's characters. */
+function layerReaches(
+  edge: Readonly<{ layer: "player" | "gm"; characterIds: readonly string[] }>,
+  context: PlayerConnectionContext
+): boolean {
+  if (edge.layer === "player") return true;
+  const reader = context.reader ?? EVERYONE;
+  return edge.characterIds.some((id) => reader.characterIds.has(id));
+}
+
+const NO_SESSIONS: ReadonlySet<string> = new Set();
+
 export function projectGmConnections(edges: readonly CodexConnection[]): CodexConnection[] {
   return [...edges];
 }
 
+/** In a fixed order of their own, never the order they were made in, which would show what the GM prepared first. */
 export function projectPlayerConnections(
   edges: readonly CodexConnection[],
   context: PlayerConnectionContext
 ): PlayerCodexConnection[] {
+  const sessions = context.revealedSessionIds ?? NO_SESSIONS;
   return (
     edges
       .filter(
         (edge) =>
-          edge.layer === "player" &&
+          layerReaches(edge, context) &&
           context.revealedPageIds.has(edge.toPageId) &&
           connectionSourceVisible(edge.fromKind, edge.fromId, context)
       )
       // Allow-list: a field added to `CodexConnection` stays secret until added here.
-      .map((edge) => ({
+      .map((edge): PlayerCodexConnection => ({
         fromKind: edge.fromKind,
         fromId: edge.fromId,
         toPageId: edge.toPageId,
         label: edge.label,
-        origin: edge.origin
+        origin: edge.origin,
+        began: edge.began,
+        learned: edge.learned && playerStamp(edge.learned, sessions)
       }))
+      .sort(
+        (a, b) =>
+          a.fromKind.localeCompare(b.fromKind) ||
+          a.fromId.localeCompare(b.fromId) ||
+          a.toPageId.localeCompare(b.toPageId) ||
+          (a.label ?? "").localeCompare(b.label ?? "") ||
+          a.origin.localeCompare(b.origin)
+      )
   );
 }
 
@@ -138,8 +312,9 @@ export function projectPlayerPageConnections(
   rows: readonly CodexPageConnection[],
   context: PlayerConnectionContext
 ): PlayerCodexPageConnection[] {
+  const sessions = context.revealedSessionIds ?? NO_SESSIONS;
   return rows
-    .filter((row) => row.layer === "player" && connectionSourceVisible(row.otherKind, row.otherId, context))
+    .filter((row) => layerReaches(row, context) && connectionSourceVisible(row.otherKind, row.otherId, context))
     .map((row) => ({
       direction: row.direction,
       otherKind: row.otherKind,
@@ -148,7 +323,9 @@ export function projectPlayerPageConnections(
       otherEntityType: row.otherEntityType,
       label: row.label,
       origin: row.origin,
-      section: row.section
+      section: row.section,
+      began: row.began,
+      learned: row.learned && playerStamp(row.learned, sessions)
     }));
 }
 
@@ -334,19 +511,27 @@ export function projectGmQuest(row: CodexQuest): CodexQuest {
   return row;
 }
 
-/** null when unrevealed. `entityIds` keeps only revealed pages, so a quest never advertises secret page ids. */
+/**
+ * null when unrevealed. `entityIds` keeps only revealed pages, so a quest never advertises secret page ids. Only the
+ * blocks and objectives the reader may see come through, so a count of objectives counts only those.
+ */
 export function projectPlayerQuest(
   row: CodexQuest,
-  context: Readonly<{ revealedEntityIds: ReadonlySet<string> }>
+  context: Readonly<{ revealedEntityIds: ReadonlySet<string> }> & Partial<PlayerReaderContext>
 ): PlayerCodexQuest | null {
   if (!row.revealedToPlayers) return null;
+  const readerContext: PlayerReaderContext = { ...EVERYONE_CONTEXT, ...context };
+  const { body, blocks } = assembled(row.playerBody, row.blocks, readerContext);
   // Allow-list: a field added to `CodexQuest` stays secret until added here.
   return {
     id: row.id,
     title: row.title,
     status: row.status,
-    body: row.playerBody,
-    objectives: row.objectives,
+    body,
+    blocks,
+    objectives: row.objectives
+      .filter((objective) => reaches(objective, readerContext.reader))
+      .map((objective) => ({ text: objective.text, done: objective.done })),
     entityIds: row.entityIds.filter((entityId) => context.revealedEntityIds.has(entityId)),
     tags: row.tags
   };
@@ -366,6 +551,11 @@ export function projectPlayerStanding(
   if (!row.revealedToPlayers) return null;
   if (!context.factionRevealed) return null;
   return { factionPageId: row.factionPageId, value: row.value };
+}
+
+/** A block's title over its text, for a one-line excerpt. */
+function blockText(block: CodexBlock): string {
+  return block.title ? `${block.title} ${block.text}` : block.text;
 }
 
 /** A bounded one-line rendering of a record's prose for list rows (search hits, chronicle rows). */
@@ -485,6 +675,8 @@ export type PlayerChronicleContext = PlayerSessionNumberContext &
     publishedInstant?: number | null;
     /** Revealed page ids, for payload links to pages. Absent means empty, which nulls the id. */
     revealedPageIds?: ReadonlySet<string>;
+    /** Who an event page's text is for. Absent: a reader with no character, every link plain text. */
+    pages?: PlayerReaderContext;
   }>;
 
 export function projectGmChronicleRecord(
@@ -524,7 +716,7 @@ export function projectGmChronicleRecord(
     id: page.id,
     title: page.title,
     text: excerpt(page.playerBody),
-    gmText: page.gmBody.trim() ? excerpt(page.gmBody) : null,
+    gmText: page.blocks.length > 0 ? excerpt(page.blocks.map(blockText).join(" ")) || null : null,
     revealedToPlayers: page.revealedToPlayers,
     sessionId: null,
     sessionNumber: null,
@@ -575,7 +767,7 @@ export function projectPlayerChronicleRecord(
       firstShownAt: projected.firstShownAt
     };
   }
-  const projected = projectPlayerPage(record.page);
+  const projected = projectPlayerPage(record.page, context.pages ?? EVERYONE_CONTEXT);
   // As for an entry: an undated page has never been shown, so it fails closed.
   if (!projected || record.page.firstShownAt === null) return null;
   return {
@@ -648,7 +840,8 @@ export function projectPlayerSearchHit(
 ): CodexSearchHit | null {
   switch (record.kind) {
     case "page":
-      return record.page.revealedToPlayers
+      // Delegates so a hit follows the page read's gate.
+      return projectPlayerPageSummary(record.page) !== null
         ? {
             kind: "page",
             id: record.page.id,

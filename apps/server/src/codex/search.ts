@@ -1,15 +1,17 @@
-import type { CodexQuestObjective, CodexRecordKind } from "@vtt/domain";
+import type { CodexAudience, CodexRecordKind } from "@vtt/domain";
+import { audienceReaches, blockSourceText, type StoredBlock } from "./blocks.js";
 import type { CodexDb } from "./db.js";
-import { PLAYER_SEARCH_VISIBLE_SQL } from "./visibility.js";
+import { playerSearchVisibleSql } from "./visibility.js";
 
 /**
- * The search index: one FTS table per audience. Every write that changes a record's text reindexes it in the
- * same transaction and every delete unindexes it; a reveal needs no reindex because visibility is checked
- * against the live row when the player table is read.
+ * The search index: one FTS table per audience, plus `codex_search_character` for text shown only to some party
+ * characters (one row per record and character). Every write that changes a record's text or an audience in it
+ * reindexes it in the same transaction and every delete unindexes it; a record's reveal needs no reindex because
+ * visibility is checked against the live row when a player table is read.
  *
- * Adding a kind is a viewer-safety change with three gates: its `index*` writer puts only player-layer text in
- * `codex_search_player` (nothing downstream catches GM text there), `PLAYER_SEARCH_VISIBLE_SQL`, and
- * `projectPlayerSearchHit`.
+ * Adding a kind is a viewer-safety change with three gates: its `index*` writer puts only text everyone may read in
+ * `codex_search_player`, and only text a character may read in that character's rows (nothing downstream catches
+ * GM text there), `playerSearchVisibleSql`, and `projectPlayerSearchHit`.
  */
 export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker", "quest", "session"];
 /** One search hit as the store returns it: what kind of record matched, and which one. */
@@ -26,8 +28,18 @@ export function capSearch<T>(hits: readonly T[]): Readonly<{ hits: T[]; truncate
 
 type IndexText = Readonly<{ title: string; body: string }>;
 
-/** Replace one record's row in both indexes. `player` must contain player-layer text only. */
-function indexRecord(db: CodexDb, kind: CodexRecordKind, recordId: string, player: IndexText, gm: IndexText) {
+/**
+ * Replace one record's rows in every index. `player` must contain only text everyone who can read the record may
+ * read, and each `characters` entry only text that character may read beyond it.
+ */
+function indexRecord(
+  db: CodexDb,
+  kind: CodexRecordKind,
+  recordId: string,
+  player: IndexText,
+  gm: IndexText,
+  characters: ReadonlyMap<string, IndexText> = new Map()
+) {
   unindex(db, kind, recordId);
   db.database
     .prepare("INSERT INTO codex_search_player (kind, record_id, title, body) VALUES (?, ?, ?, ?)")
@@ -35,35 +47,60 @@ function indexRecord(db: CodexDb, kind: CodexRecordKind, recordId: string, playe
   db.database
     .prepare("INSERT INTO codex_search_gm (kind, record_id, title, body) VALUES (?, ?, ?, ?)")
     .run(kind, recordId, gm.title, gm.body);
+  const insert = db.database.prepare(
+    "INSERT INTO codex_search_character (kind, record_id, character_id, title, body) VALUES (?, ?, ?, ?, ?)"
+  );
+  for (const [characterId, text] of characters) insert.run(kind, recordId, characterId, text.title, text.body);
 }
 
 export function unindex(db: CodexDb, kind: CodexRecordKind, recordId: string): void {
-  db.database.prepare("DELETE FROM codex_search_player WHERE kind = ? AND record_id = ?").run(kind, recordId);
-  db.database.prepare("DELETE FROM codex_search_gm WHERE kind = ? AND record_id = ?").run(kind, recordId);
+  for (const table of ["codex_search_player", "codex_search_gm", "codex_search_character"])
+    db.database.prepare(`DELETE FROM ${table} WHERE kind = ? AND record_id = ?`).run(kind, recordId);
 }
 
-/** The player row gets the body, public field values and tags; GM fields and the GM body go only to the GM row. */
+type Shown = Readonly<{ audience: CodexAudience; characterIds: readonly string[] }>;
+/** Each character's own text: what is shown to them by name, beyond what everyone reads. */
+function characterTexts(title: string, items: ReadonlyArray<Shown & Readonly<{ text: string }>>) {
+  const byCharacter = new Map<string, string[]>();
+  for (const item of items)
+    if (item.audience === "characters")
+      for (const characterId of item.characterIds)
+        byCharacter.set(characterId, [...(byCharacter.get(characterId) ?? []), item.text]);
+  return new Map([...byCharacter].map(([characterId, texts]) => [characterId, { title, body: texts.join("\n") }]));
+}
+const everyoneText = (items: ReadonlyArray<Shown & Readonly<{ text: string }>>) =>
+  items.filter((item) => audienceReaches(item, new Set())).map((item) => item.text);
+
+/** The player row gets the player text, blocks shown to everyone, fields shown to everyone and tags. */
 export function indexPage(
   db: CodexDb,
   page: Readonly<{
     id: string;
     title: string;
     playerBody: string;
-    gmBody: string;
+    blocks: readonly StoredBlock[];
     fields: Readonly<Record<string, string>>;
-    gmFields: Readonly<Record<string, string>>;
+    hiddenFields: readonly string[];
     tags: readonly string[];
   }>
 ): void {
+  const hidden = new Set(page.hiddenFields);
+  const shownFieldText = Object.entries(page.fields)
+    .filter(([key]) => !hidden.has(key))
+    .map(([, value]) => value)
+    .join(" ");
   const fieldText = Object.values(page.fields).join(" ");
-  const gmFieldText = Object.values(page.gmFields).join(" ");
   const tagText = page.tags.join(" ");
+  const blocks = page.blocks.map((block) => ({ ...block, text: blockSourceText(block) }));
+  const shownBlocks = everyoneText(blocks).join("\n");
+  const allBlocks = blocks.map((block) => block.text).join("\n");
   indexRecord(
     db,
     "page",
     page.id,
-    { title: page.title, body: `${page.playerBody}\n${fieldText}\n${tagText}` },
-    { title: page.title, body: `${page.playerBody}\n${page.gmBody}\n${fieldText}\n${gmFieldText}\n${tagText}` }
+    { title: page.title, body: `${page.playerBody}\n${shownBlocks}\n${shownFieldText}\n${tagText}` },
+    { title: page.title, body: `${page.playerBody}\n${allBlocks}\n${fieldText}\n${tagText}` },
+    characterTexts(page.title, blocks)
   );
 }
 
@@ -79,26 +116,32 @@ export function indexMarker(db: CodexDb, markerId: string, label: string | null,
   indexRecord(db, "marker", markerId, row, row);
 }
 
-/** `gmBody` only in the GM row: a revealed quest passes the other two gates, so GM text here would leak via hits. */
+/**
+ * Hidden blocks and objectives only in the rows of those they are shown to: a revealed quest passes the other two
+ * gates, so hidden text here would leak via hits.
+ */
 export function indexQuest(
   db: CodexDb,
   quest: Readonly<{
     id: string;
     title: string;
     playerBody: string;
-    gmBody: string;
-    objectives: readonly CodexQuestObjective[];
+    blocks: readonly StoredBlock[];
+    objectives: ReadonlyArray<Shown & Readonly<{ text: string }>>;
     tags: readonly string[];
   }>
 ): void {
-  const objectiveText = quest.objectives.map((objective) => objective.text).join(" ");
   const tagText = quest.tags.join(" ");
+  const items = [...quest.blocks.map((block) => ({ ...block, text: blockSourceText(block) })), ...quest.objectives];
+  const shown = everyoneText(items).join("\n");
+  const all = items.map((item) => item.text).join("\n");
   indexRecord(
     db,
     "quest",
     quest.id,
-    { title: quest.title, body: `${quest.playerBody}\n${objectiveText}\n${tagText}` },
-    { title: quest.title, body: `${quest.playerBody}\n${quest.gmBody}\n${objectiveText}\n${tagText}` }
+    { title: quest.title, body: `${quest.playerBody}\n${shown}\n${tagText}` },
+    { title: quest.title, body: `${quest.playerBody}\n${all}\n${tagText}` },
+    characterTexts(quest.title, items)
   );
 }
 
@@ -174,15 +217,17 @@ function searchGm(db: CodexDb, query: string, kinds: readonly CodexRecordKind[])
 }
 
 /**
- * Every match a player may see, ranked, with no cap, so the caller can gate hits and then cap. Ranking: a title
- * equal to the query, then a title holding every query word, then the rest; within a tier by kind, title and id.
- * Each row is ranked on its own title alone. bm25 would weigh a word by how many rows hold it, hidden rows
- * included, and so let a GM's hidden prep reorder a player's hits.
+ * Every match a player may see, ranked, with no cap, so the caller can gate hits and then cap. A reader holding
+ * characters also matches the text shown to those characters. Ranking: a title equal to the query, then a title
+ * holding every query word, then the rest; within a tier by kind, title and id. Each row is ranked on its own title
+ * alone. bm25 would weigh a word by how many rows hold it, hidden rows included, and so let a GM's hidden prep
+ * reorder a player's hits.
  */
 export function searchPlayerMatches(
   db: CodexDb,
   query: string,
-  kinds: readonly CodexRecordKind[] = CODEX_RECORD_KINDS
+  kinds: readonly CodexRecordKind[] = CODEX_RECORD_KINDS,
+  characterIds: ReadonlySet<string> = new Set()
 ): CodexSearchRef[] {
   const match = ftsQuery(query);
   if (!match) return [];
@@ -190,10 +235,18 @@ export function searchPlayerMatches(
   // Never "" here (a query needs a letter or digit to get this far), so empty-titled rows cannot match tier 0.
   const exactTitle = folded(query.trim());
   const wanted = kinds.length > 0 ? kinds : CODEX_RECORD_KINDS;
-  const sql = `SELECT kind, record_id, title FROM codex_search_player WHERE codex_search_player MATCH ? AND codex_search_player.kind IN (${wanted.map(() => "?").join(", ")}) AND ${PLAYER_SEARCH_VISIBLE_SQL}`;
+  const kindList = wanted.map(() => "?").join(", ");
+  const characterList = [...characterIds].map(() => "?").join(", ");
+  const sql = `SELECT kind, record_id, title FROM codex_search_player WHERE codex_search_player MATCH ? AND codex_search_player.kind IN (${kindList}) AND ${playerSearchVisibleSql("codex_search_player")}${
+    characterIds.size === 0
+      ? ""
+      : ` UNION SELECT kind, record_id, title FROM codex_search_character WHERE codex_search_character MATCH ? AND codex_search_character.kind IN (${kindList}) AND codex_search_character.character_id IN (${characterList}) AND ${playerSearchVisibleSql("codex_search_character")}`
+  }`;
+  const parameters =
+    characterIds.size === 0 ? [match, ...wanted] : [match, ...wanted, match, ...wanted, ...characterIds];
   let rows: Array<{ kind: CodexRecordKind; record_id: string; title: string }>;
   try {
-    rows = db.database.prepare(sql).all(match, ...wanted) as typeof rows;
+    rows = db.database.prepare(sql).all(...parameters) as typeof rows;
   } catch {
     return [];
   }
@@ -211,10 +264,12 @@ export function searchPlayerMatches(
         compareText(a.title, b.title) ||
         compareText(a.row.record_id, b.row.record_id)
     )
+    .filter(({ row }, index, sorted) => index === 0 || sorted[index - 1]!.row.record_id !== row.record_id)
     .map(({ row }) => ({ kind: row.kind, id: row.record_id }));
 }
 
 /** One audience's first `SEARCH_LIMIT` matches. Only known kinds are asked for, so the cap counts usable rows. */
+/** A player audience here is a reader with no character. */
 export function searchAll(
   db: CodexDb,
   audience: "player" | "gm",

@@ -80,7 +80,10 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
   function resolvePrincipal(req: Request, res: Response, scope: IntegrationScope): GamePrincipal | null {
     const caller = callerOf(req, res, options.verifiers, { scope });
     if (caller.kind === "gm") return { kind: "gm", sessionId: caller.sessionId };
-    if (caller.kind === "player") return { kind: "player", sessionId: caller.sessionId };
+    if (caller.kind === "player")
+      return caller.preview
+        ? { kind: "player", sessionId: caller.sessionId, preview: true }
+        : { kind: "player", sessionId: caller.sessionId };
     if (caller.kind === "integration" && caller.inScope)
       return { kind: "integration", credentialId: caller.id, name: caller.name };
     refuse(res, caller, "This credential does not carry the scope this route needs.");

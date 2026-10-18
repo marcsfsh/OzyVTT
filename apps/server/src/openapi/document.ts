@@ -106,6 +106,8 @@ const codexProjected = (base: string) => ({
  * bearer credential. `conflict` takes a description because only one kind of codex 409 carries
  * `error.currentRevision`.
  */
+const STALE_PAGE = "A stale `expectedRev`; `error.currentRevision` carries the page's current revision.";
+const STALE_QUEST = "A stale `expectedRev`; `error.currentRevision` carries the quest's current revision.";
 const codexOp = (
   operationId: string,
   security: readonly unknown[],
@@ -1573,6 +1575,63 @@ export const openApiDocument = {
         description: "Shows/hides a page to players."
       })
     },
+    [CODEX_PATHS.pageBlocks]: {
+      post: codexOp("addCodexPageBlock", codexWrite, "CodexPageBlockCreatedResponse", {
+        ok: "201",
+        body: "CodexBlockAddRequest",
+        params: [uuidParam("id")],
+        notFound: true,
+        conflict: STALE_PAGE,
+        description:
+          "Adds a hidden block to a page at an anchor. It starts Hidden: no player receives it until its audience route shows it. An edit, so `rev` and `updatedAt` move."
+      })
+    },
+    [CODEX_PATHS.pageBlockById]: {
+      patch: codexOp("editCodexPageBlock", codexWrite, "CodexPageResponse", {
+        body: "CodexBlockEditRequest",
+        params: [uuidParam("id"), uuidParam("blockId")],
+        notFound: true,
+        conflict: STALE_PAGE,
+        description: "Edits a block's title or text. Its audience stays. An edit."
+      }),
+      delete: codexOp("deleteCodexPageBlock", codexWrite, "CodexPageResponse", {
+        bad: false,
+        params: [uuidParam("id"), uuidParam("blockId")],
+        notFound: true,
+        description:
+          "Deletes a block and answers the page. Idempotent: a block already gone answers the page as it is. 404 only when the page is gone."
+      })
+    },
+    [CODEX_PATHS.pageBlockMove]: {
+      post: codexOp("moveCodexPageBlock", codexWrite, "CodexPageResponse", {
+        body: "CodexBlockMoveRequest",
+        params: [uuidParam("id"), uuidParam("blockId")],
+        notFound: true,
+        conflict: STALE_PAGE,
+        description: "Moves a block to another anchor, or another slot at its anchor. An edit."
+      })
+    },
+    [CODEX_PATHS.pageBlockAudience]: {
+      put: codexOp("setCodexPageBlockAudience", codexWrite, "CodexPageResponse", {
+        body: "CodexAudienceRequest",
+        params: [uuidParam("id"), uuidParam("blockId")],
+        notFound: true,
+        description:
+          "Sets who sees a block: Hidden, everyone, or chosen party characters. Not an edit: neither `rev` nor `updatedAt` moves. Once the page is revealed, the write stamps each audience the block reaches for the first time with the moment, the active session and the players' date. A player receives the block only when it is shown to everyone or to a character they hold, and a `[[link]]` in it reaches them only then."
+      })
+    },
+    [CODEX_PATHS.pageFieldAudience]: {
+      put: codexOp("setCodexPageFieldAudience", codexWrite, "CodexPageResponse", {
+        body: "CodexFieldAudienceRequest",
+        params: [
+          uuidParam("id"),
+          { name: "key", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9][a-z0-9-]*$" } }
+        ],
+        notFound: true,
+        description:
+          "Sets who sees one field: everyone or Hidden. Not an edit. The key must be a field of the page's kind (400 otherwise); one with no value yet keeps its audience for when it gets one."
+      })
+    },
     [CODEX_PATHS.pageConnections]: {
       post: codexOp("createCodexConnection", codexWrite, "CodexConnectionResponse", {
         ok: "201",
@@ -1613,12 +1672,14 @@ export const openApiDocument = {
       })
     },
     [CODEX_PATHS.previewSession]: {
-      post: codexOp("createCodexPreviewSession", codexGmSessionOnly, "CodexPreviewSessionResponse", {
-        ok: "201",
-        bad: false,
-        description:
-          "Mints a short-lived PLAYER session token so the GM can preview the player Codex truthfully. Deliberately a real player principal, with no role flag on the GM's session; every read then walks the same authorization and projection path a genuine player gets, so the preview can never show what a player could not see."
-      })
+      post: {
+        ...codexOp("createCodexPreviewSession", codexGmSessionOnly, "CodexPreviewSessionResponse", {
+          ok: "201",
+          description:
+            "Mints a short-lived PLAYER session token so the GM can preview the player Codex truthfully, as everyone or as one party character. Deliberately a real player principal, with no role flag on the GM's session; every read then walks the same authorization and projection path a genuine player gets, so a preview as Lyra reads exactly what Lyra's player reads. The token only reads: game commands and token uploads refuse it with 403, and it holds no character."
+        }),
+        requestBody: { required: false, ...codexJson("CodexPreviewSessionRequest") }
+      }
     },
     [CODEX_PATHS.folders]: {
       get: codexOp("listCodexFolders", codexGmRead, "CodexFolderListResponse", {
@@ -1649,7 +1710,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "Every connection in the codex: ONE edge kind for the whole graph. A typed relationship and a `[[wiki link]]` are the same thing with a different `origin`; a connection may carry an optional `label`. Role-scoped by three gates, all of which must hold for a player: the target page is revealed, the SOURCE record is revealed by its own kind's player rule, and the connection sits on the `player` layer (a link written in a GM body is a GM note about a connection, which the party has not been shown)."
+          "Every connection in the codex: ONE edge kind for the whole graph. A typed relationship and a `[[wiki link]]` are the same thing with a different `origin`; a connection may carry an optional `label`. Role-scoped by three gates, all of which must hold for a player: the target page is revealed, the SOURCE record is revealed by its own kind's player rule, and the connection sits on the `player` layer, or is a mention from a block shown to a character the player holds (a link written in a hidden block is a GM note about a connection, which the party has not been shown). A player's list comes in a fixed order of its own, never the order connections were made in."
       })
     },
     [CODEX_PATHS.connectionById]: {
@@ -1786,7 +1847,7 @@ export const openApiDocument = {
         notModified: true,
         bad: false,
         description:
-          "The ONE chronicle: every journal entry and every dated `event` page, interleaved in one in-world chronological order and returned in one row shape (`kind` discriminates: `entry`, `combat`, `event`). The client's \"by session\" lens is a regrouping of these same records, never a second fetch. Role-scoped: a player receives only revealed entries and revealed event pages, with GM-only text (`gmText`, an event's GM body), the replay linkage and the raw sort key stripped; the projection delegates to the journal and page player projections and restates neither, so this read can never be weaker than either."
+          "The ONE chronicle: every journal entry and every dated `event` page, interleaved in one in-world chronological order and returned in one row shape (`kind` discriminates: `entry`, `combat`, `event`). The client's \"by session\" lens is a regrouping of these same records, never a second fetch. Role-scoped: a player receives only revealed entries and revealed event pages, with GM-only text (`gmText`, an event's hidden blocks), the replay linkage and the raw sort key stripped; the projection delegates to the journal and page player projections and restates neither, so this read can never be weaker than either."
       })
     },
     [CODEX_PATHS.journal]: {
@@ -1971,6 +2032,58 @@ export const openApiDocument = {
           "Shows/hides a quest to players. Revealing is not an edit: it moves neither `rev` nor `updatedAt`, so an open console is not forced into a conflict and a reveal sweep cannot make an untouched quest look freshly changed."
       })
     },
+    [CODEX_PATHS.questBlocks]: {
+      post: codexOp("addCodexQuestBlock", codexWrite, "CodexQuestBlockCreatedResponse", {
+        ok: "201",
+        body: "CodexBlockAddRequest",
+        params: [uuidParam("id")],
+        notFound: true,
+        conflict: STALE_QUEST,
+        description: "Adds a hidden block to a quest, as on a page. It starts Hidden. An edit."
+      })
+    },
+    [CODEX_PATHS.questBlockById]: {
+      patch: codexOp("editCodexQuestBlock", codexWrite, "CodexQuestResponse", {
+        body: "CodexBlockEditRequest",
+        params: [uuidParam("id"), uuidParam("blockId")],
+        notFound: true,
+        conflict: STALE_QUEST,
+        description: "Edits a quest block's title or text. Its audience stays. An edit."
+      }),
+      delete: codexOp("deleteCodexQuestBlock", codexWrite, "CodexQuestResponse", {
+        bad: false,
+        params: [uuidParam("id"), uuidParam("blockId")],
+        notFound: true,
+        description: "Deletes a quest block and answers the quest. Idempotent, as on a page."
+      })
+    },
+    [CODEX_PATHS.questBlockMove]: {
+      post: codexOp("moveCodexQuestBlock", codexWrite, "CodexQuestResponse", {
+        body: "CodexBlockMoveRequest",
+        params: [uuidParam("id"), uuidParam("blockId")],
+        notFound: true,
+        conflict: STALE_QUEST,
+        description: "Moves a quest block. An edit."
+      })
+    },
+    [CODEX_PATHS.questBlockAudience]: {
+      put: codexOp("setCodexQuestBlockAudience", codexWrite, "CodexQuestResponse", {
+        body: "CodexAudienceRequest",
+        params: [uuidParam("id"), uuidParam("blockId")],
+        notFound: true,
+        description:
+          "Sets who sees a quest block, as on a page. Not an edit. The quest's reveal flag plays the page's part: a block is stamped and read only once the quest is revealed."
+      })
+    },
+    [CODEX_PATHS.questObjectiveAudience]: {
+      put: codexOp("setCodexQuestObjectiveAudience", codexWrite, "CodexQuestResponse", {
+        body: "CodexAudienceRequest",
+        params: [uuidParam("id"), uuidParam("objectiveId")],
+        notFound: true,
+        description:
+          "Sets who sees one objective: Hidden, everyone, or chosen party characters. Not an edit. A player's quest drops every objective they may not read, so its count counts only the rest."
+      })
+    },
     [CODEX_PATHS.standing]: {
       get: codexOp("listCodexStanding", codexRead, "CodexStandingListResponse", {
         notModified: true,
@@ -2070,7 +2183,7 @@ export const openApiDocument = {
         body: "CodexImportRequest",
         tooLarge: true,
         description:
-          "Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex table is wiped and reloaded from the bundle inside ONE transaction, so a bad row aborts the lot with a 400 and nothing is written. Accepts the `data` of a `GET /codex/export` response verbatim: `exportedAt` is accepted and ignored, so a saved export file POSTs unchanged. `bundleVersion` is OPTIONAL: absent means a pre-versioning export of the same v1 shape (every backup taken before this feature existed lacks the key and MUST restore), and a value other than 1 is a 400. This is the one genuinely destructive route in the Codex; the guardrails are GM/`codex:write` authorization and the caller's own confirmation, and the honest advice is to export first."
+          "Restores a full backup bundle. REPLACE-ONLY and all-or-nothing: every codex table is wiped and reloaded from the bundle inside ONE transaction, so a bad row aborts the lot with a 400 and nothing is written. Accepts the `data` of a `GET /codex/export` response verbatim: `exportedAt` is accepted and ignored, so a saved export file POSTs unchanged. `bundleVersion` is OPTIONAL: absent means a pre-versioning export of the v1 shape (every backup taken before this feature existed lacks the key and MUST restore). Versions 1 and 2 restore; a v1 page's or quest's GM body becomes Hidden blocks and its secret fields Hidden fields, as the upgrade converts them. A newer version is a 400. This is the one genuinely destructive route in the Codex; the guardrails are GM/`codex:write` authorization and the caller's own confirmation, and the honest advice is to export first."
       })
     },
     [CODEX_ASSET_PATHS.collection]: {
@@ -2704,6 +2817,17 @@ export const openApiDocument = {
       CodexPageDocumentResponse: envelopeSchema("#/components/schemas/CodexPageDocumentData"),
       CodexPageData: codexDataObject("page", { $ref: "#/components/schemas/CodexPage" }),
       CodexPageResponse: envelopeSchema("#/components/schemas/CodexPageData"),
+      // A new block beside the record it was added to, so neither uses `codexDataObject`.
+      CodexPageBlockCreatedData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["page", "block"],
+        properties: {
+          page: { $ref: "#/components/schemas/CodexPage" },
+          block: { $ref: "#/components/schemas/CodexBlock" }
+        }
+      },
+      CodexPageBlockCreatedResponse: envelopeSchema("#/components/schemas/CodexPageBlockCreatedData"),
       CodexFolderListData: codexDataObject("folders", { type: "array", items: { type: "string" } }),
       CodexFolderListResponse: envelopeSchema("#/components/schemas/CodexFolderListData"),
       CodexPreviewSessionData: codexDataObject("token", { type: "string" }),
@@ -2807,6 +2931,16 @@ export const openApiDocument = {
       CodexQuestListResponse: envelopeSchema("#/components/schemas/CodexQuestListData"),
       CodexQuestData: codexDataObject("quest", { $ref: "#/components/schemas/CodexQuest" }),
       CodexQuestResponse: envelopeSchema("#/components/schemas/CodexQuestData"),
+      CodexQuestBlockCreatedData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["quest", "block"],
+        properties: {
+          quest: { $ref: "#/components/schemas/CodexQuest" },
+          block: { $ref: "#/components/schemas/CodexBlock" }
+        }
+      },
+      CodexQuestBlockCreatedResponse: envelopeSchema("#/components/schemas/CodexQuestBlockCreatedData"),
       CodexQuestProjectedData: codexDataObject("quest", { $ref: "#/components/schemas/CodexQuestProjected" }),
       CodexQuestProjectedResponse: envelopeSchema("#/components/schemas/CodexQuestProjectedData"),
       CodexStandingListData: codexDataObject("standing", codexArrayRef("CodexStandingProjected")),
@@ -2844,9 +2978,9 @@ export const openApiDocument = {
           },
           exportedAt: { type: "string", format: "date-time" },
           bundleVersion: {
-            const: 1,
+            const: 2,
             description:
-              "The bundle FORMAT version: a fact about the file, which is why it sits beside `codex`. `POST /codex/import` refuses anything else."
+              "The bundle FORMAT version: a fact about the file, which is why it sits beside `codex`. `POST /codex/import` restores this version and version 1, and refuses a newer one."
           }
         }
       },

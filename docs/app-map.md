@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 269 HTTP paths
+- 14 GameState fields · 137 commands · 279 HTTP paths
 
 ## GameState shape
 
@@ -215,7 +215,12 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `DELETE /api/v1/codex/page-revisions`
 - `GET POST /api/v1/codex/pages`
 - `DELETE GET PATCH /api/v1/codex/pages/{id}`
+- `POST /api/v1/codex/pages/{id}/blocks`
+- `DELETE PATCH /api/v1/codex/pages/{id}/blocks/{blockId}`
+- `PUT /api/v1/codex/pages/{id}/blocks/{blockId}/audience`
+- `POST /api/v1/codex/pages/{id}/blocks/{blockId}/move`
 - `POST /api/v1/codex/pages/{id}/connections`
+- `PUT /api/v1/codex/pages/{id}/fields/{key}/audience`
 - `GET /api/v1/codex/pages/{id}/markers`
 - `POST /api/v1/codex/pages/{id}/reveal`
 - `GET /api/v1/codex/pages/{id}/revisions`
@@ -224,6 +229,11 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/codex/preview-session`
 - `GET POST /api/v1/codex/quests`
 - `DELETE GET PATCH /api/v1/codex/quests/{id}`
+- `POST /api/v1/codex/quests/{id}/blocks`
+- `DELETE PATCH /api/v1/codex/quests/{id}/blocks/{blockId}`
+- `PUT /api/v1/codex/quests/{id}/blocks/{blockId}/audience`
+- `POST /api/v1/codex/quests/{id}/blocks/{blockId}/move`
+- `PUT /api/v1/codex/quests/{id}/objectives/{objectiveId}/audience`
 - `POST /api/v1/codex/quests/{id}/reveal`
 - `GET /api/v1/codex/reveal-audit`
 - `GET /api/v1/codex/search`

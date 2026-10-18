@@ -2,20 +2,21 @@ import { describe, expect, it } from "vitest";
 import {
   CODEX_ENTITY_FIELD_KEYS,
   CODEX_ENTITY_TYPES,
-  CODEX_SECRET_FIELD_KEYS,
+  codexDefaultHiddenFields,
   codexFieldKeys,
   isCodexEntityType,
   pageLinkKey,
   pruneCodexFields
 } from "./codex-entities.js";
 
-// The server seals from this table, so a change here changes what players receive.
+// A new page's Hidden fields come from this table, so a change here changes what players receive.
 describe("codex entity field table", () => {
-  it("derives the secret-key set from the table rather than a hand-kept list", () => {
-    // Matches the server's original hardcoded set.
-    expect([...CODEX_SECRET_FIELD_KEYS].sort()).toEqual(["goals"]);
-    for (const fields of Object.values(CODEX_ENTITY_FIELD_KEYS))
-      for (const field of fields) if (field.secret) expect(CODEX_SECRET_FIELD_KEYS.has(field.key)).toBe(true);
+  it("starts Motives and Secret agenda Hidden, and nothing else", () => {
+    expect(codexDefaultHiddenFields("character")).toEqual(["goals"]);
+    expect(codexDefaultHiddenFields("faction")).toEqual(["goals"]);
+    for (const type of CODEX_ENTITY_TYPES.filter((type) => type !== "character" && type !== "faction"))
+      expect(codexDefaultHiddenFields(type)).toEqual([]);
+    expect(codexDefaultHiddenFields(undefined)).toEqual([]);
   });
 
   it("marks `goals` secret on exactly the two types that carry it", () => {
