@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 279 HTTP paths
+- 14 GameState fields · 137 commands · 290 HTTP paths
 
 ## GameState shape
 
@@ -185,6 +185,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 
 - `POST /api/v1/codex-assets`
 - `GET /api/v1/codex-assets/{id}/content`
+- `GET /api/v1/codex/board`
 - `GET PUT /api/v1/codex/calendar`
 - `POST /api/v1/codex/calendar/check`
 - `POST /api/v1/codex/calendar/publish`
@@ -195,6 +196,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET POST /api/v1/codex/folders`
 - `POST /api/v1/codex/folders/delete`
 - `POST /api/v1/codex/folders/move`
+- `GET /api/v1/codex/home`
 - `POST /api/v1/codex/import`
 - `GET POST /api/v1/codex/journal`
 - `DELETE PATCH /api/v1/codex/journal/{id}`
@@ -225,7 +227,11 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/codex/pages/{id}/reveal`
 - `GET /api/v1/codex/pages/{id}/revisions`
 - `POST /api/v1/codex/pages/{id}/revisions/{revisionId}/restore`
-- `GET /api/v1/codex/party`
+- `GET POST /api/v1/codex/party`
+- `GET POST /api/v1/codex/prep-templates`
+- `DELETE PATCH /api/v1/codex/prep-templates/{id}`
+- `POST /api/v1/codex/prep-templates/{id}/default`
+- `POST /api/v1/codex/prep-templates/{id}/duplicate`
 - `POST /api/v1/codex/preview-session`
 - `GET POST /api/v1/codex/quests`
 - `DELETE GET PATCH /api/v1/codex/quests/{id}`
@@ -240,7 +246,12 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET POST /api/v1/codex/sessions`
 - `DELETE GET PATCH /api/v1/codex/sessions/{id}`
 - `POST /api/v1/codex/sessions/{id}/activate`
+- `POST /api/v1/codex/sessions/{id}/apply-template`
+- `POST /api/v1/codex/sessions/{id}/current-scene`
+- `GET /api/v1/codex/sessions/{id}/happened`
+- `POST /api/v1/codex/sessions/{id}/log`
 - `POST /api/v1/codex/sessions/{id}/reveal`
+- `POST /api/v1/codex/sessions/{id}/tick`
 - `GET PUT /api/v1/codex/settings`
 - `GET /api/v1/codex/standing`
 - `PUT /api/v1/codex/standing/{factionPageId}`

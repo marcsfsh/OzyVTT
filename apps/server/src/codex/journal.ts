@@ -268,6 +268,34 @@ export function appendCombatEntry(db: CodexDb, input: CodexCombatEntryInput): Co
   });
 }
 
+/** The longest line the live board logs. */
+const MAX_LOG_LINE = 2000;
+
+/** A line logged at the table: a note filed under the session (active or not), dated at the GM's clock. */
+export function logSessionLine(
+  db: CodexDb,
+  sessionId: string,
+  input: Readonly<{ text: string; revealedToPlayers?: boolean }>
+): CodexJournalEntry {
+  const session = requireSession(db, sessionId);
+  const text = typeof input.text === "string" ? input.text.trim() : "";
+  if (!text) throw new CodexValidationError("Write the line to log.");
+  if (text.length > MAX_LOG_LINE) throw new CodexValidationError(`A logged line is up to ${MAX_LOG_LINE} characters.`);
+  return createOne(db, {
+    playerText: entryText(text),
+    gmText: null,
+    revealedToPlayers: input.revealedToPlayers === true,
+    attachMarkerId: null,
+    attachPageId: null,
+    kind: "note",
+    sourceEncounterId: null,
+    sessionId: session,
+    realDate: null,
+    dated: resolveNow(db),
+    payload: null
+  });
+}
+
 /** A deadline needs a structured date, since a label cannot be compared with a clock. `fired` is derived. */
 export function createDeadline(db: CodexDb, input: CodexJournalCreateInput): CodexJournalEntry {
   const dated = resolveDate(db, input.inWorldDate, input.inWorldLabel);

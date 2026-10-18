@@ -19,7 +19,8 @@ import * as quests from "./codex/quests.js";
 import * as receipts from "./codex/receipts.js";
 import * as revisions from "./codex/revisions.js";
 import { migrateCodex } from "./codex/schema.js";
-import { searchAll, searchPlayerMatches, type CodexSearchRef, type CodexSearchRefs } from "./codex/search.js";
+import * as prep from "./codex/prep.js";
+import { searchAll, searchGmMatches, type CodexSearchRef, type CodexSearchRefs } from "./codex/search.js";
 import * as sessions from "./codex/sessions.js";
 import * as settings from "./codex/settings.js";
 import * as standing from "./codex/standing.js";
@@ -240,12 +241,9 @@ export class CodexStore {
   searchAll(audience: "player" | "gm", query: string, kinds?: readonly CodexRecordKind[]): CodexSearchRefs {
     return searchAll(this.#db, audience, query, kinds);
   }
-  /**
-   * Every match a player may see, ranked and uncapped, for a caller that gates hits and caps what is left. Text
-   * shown to `characterIds` matches too.
-   */
-  searchPlayerMatches(query: string, characterIds: ReadonlySet<string> = new Set()): CodexSearchRef[] {
-    return searchPlayerMatches(this.#db, query, undefined, characterIds);
+  /** Every GM match, ranked and uncapped, for a caller that filters, sorts and caps (`codex/find.ts`). */
+  searchGmMatches(query: string): CodexSearchRef[] {
+    return searchGmMatches(this.#db, query);
   }
   searchPages(audience: "player" | "gm", query: string): Array<{ pageId: string }> {
     return this.searchAll(audience, query, ["page"]).hits.map((hit) => ({ pageId: hit.id }));
@@ -317,6 +315,10 @@ export class CodexStore {
   }
   partyMarker() {
     return atlas.partyMarker(this.#db);
+  }
+  /** Moves the party pin to a point on any map, or makes one there, in one write. */
+  placeParty(input: atlas.CodexPartyPlaceInput) {
+    return atlas.placeParty(this.#db, input);
   }
   /** Whether a player may fetch this map image. */
   isAssetRevealedToPlayers(assetId: string): boolean {
@@ -455,6 +457,43 @@ export class CodexStore {
   }
   getSession(sessionId: string) {
     return sessions.getSession(this.#db, sessionId);
+  }
+  applyPrepTemplate(sessionId: string, templateId: string, expectedRev: number | undefined) {
+    return sessions.applyTemplate(this.#db, sessionId, templateId, expectedRev);
+  }
+  tickPrepItem(sessionId: string, itemId: string, done: boolean) {
+    return sessions.tickPrepItem(this.#db, sessionId, itemId, done);
+  }
+  setCurrentScene(sessionId: string, sceneId: string | null) {
+    return sessions.setCurrentScene(this.#db, sessionId, sceneId);
+  }
+  /** A line logged at the table, filed under the session and dated at the GM's clock. */
+  logSessionLine(sessionId: string, input: Readonly<{ text: string; revealedToPlayers?: boolean }>) {
+    return journal.logSessionLine(this.#db, sessionId, input);
+  }
+
+  // Prep templates
+
+  listPrepTemplates() {
+    return prep.listTemplates(this.#db);
+  }
+  getPrepTemplate(templateId: string) {
+    return prep.getTemplate(this.#db, templateId);
+  }
+  createPrepTemplate(input: prep.PrepTemplateInput) {
+    return prep.createTemplate(this.#db, input);
+  }
+  updatePrepTemplate(templateId: string, input: Partial<prep.PrepTemplateInput>, expectedRev: number | undefined) {
+    return prep.updateTemplate(this.#db, templateId, input, expectedRev);
+  }
+  deletePrepTemplate(templateId: string): void {
+    prep.deleteTemplate(this.#db, templateId);
+  }
+  duplicatePrepTemplate(templateId: string, name?: string) {
+    return prep.duplicateTemplate(this.#db, templateId, name);
+  }
+  setDefaultPrepTemplate(templateId: string) {
+    return prep.setDefaultTemplate(this.#db, templateId);
   }
   listSessions() {
     return sessions.listSessions(this.#db);

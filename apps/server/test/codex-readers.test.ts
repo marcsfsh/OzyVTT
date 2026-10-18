@@ -10,6 +10,7 @@ import { GAME_PATHS } from "@vtt/api-contract";
 import { GameStateSchema } from "@vtt/domain";
 import { CodexStore } from "../src/codex-store.js";
 import { createCodexRouter } from "../src/codex-http.js";
+import { parseSearchQuery } from "../src/codex-requests.js";
 import { EVERYONE } from "../src/codex-projections.js";
 import { CODEX_MIGRATIONS } from "../src/codex/schema.js";
 import { PlayerCodexChanges, PlayerCodexReads, readerKey, readerOf } from "../src/codex/player-reads.js";
@@ -683,7 +684,7 @@ describe("Codex readers: dates players read", () => {
     });
 
     // Learned while a hidden session runs: the GM sees its number, players do not.
-    const secret = store.createSession({ sessionNumber: 4, prepBody: "The ambush." });
+    const secret = store.createSession({ sessionNumber: 4 });
     store.setActiveSession(secret.id);
     const hall = store.createPage({ title: "Lantern hall" });
     store.createConnection(hall.id, { toPageId: town.id, label: "stands in" });
@@ -754,6 +755,8 @@ describe("Codex migration 4 and older backups", () => {
   const AMBER = "7d4e5f6a-7b8c-4d9e-9f0a-1b2c3d4e5f6a";
   const QUEST = "8e5f6a7b-8c9d-4e0f-8a1b-2c3d4e5f6a7b";
   const TIE = "9f6a7b8c-9d0e-4f1a-9b2c-3d4e5f6a7b8c";
+  const SESSION = "0a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d";
+  const SESSION_PREP = "The ambush waits at [[The Amber Temple]].";
   const AT = "2026-05-01T00:00:00.000Z";
   const STRAHD_PLAYER = "A pale lord.\n\nHe rules [[Barovia]].";
   // Text before the first heading, two headings, and one section twice.
@@ -876,6 +879,14 @@ describe("Codex migration 4 and older backups", () => {
         "INSERT INTO codex_relationships (id, from_page_id, to_page_id, label, layer, created_at) VALUES (?, ?, ?, 'rules', 'player', ?)"
       )
       .run(TIE, STRAHD, BAROVIA, AT);
+    // A revealed session whose free-text prep migration 5 turns into a section.
+    raw
+      .prepare(
+        `INSERT INTO codex_sessions (id, session_number, real_date, attendees_json, prep_body, recap_body, revealed, status,
+           tags_json, scene_ids_json, rev, created_at, updated_at)
+         VALUES (?, 1, NULL, '[]', ?, 'We met Strahd.', 1, 'played', '[]', '[]', 1, ?, ?)`
+      )
+      .run(SESSION, SESSION_PREP, AT, AT);
     raw.close();
   }
 
@@ -936,7 +947,23 @@ describe("Codex migration 4 and older backups", () => {
     maps: [],
     markers: [],
     journal: [],
-    sessions: [],
+    sessions: [
+      {
+        id: SESSION,
+        sessionNumber: 1,
+        realDate: null,
+        attendees: [],
+        prepBody: SESSION_PREP,
+        recapBody: "We met Strahd.",
+        revealedToPlayers: true,
+        status: "played",
+        tags: [],
+        sceneIds: [],
+        rev: 1,
+        createdAt: AT,
+        updatedAt: AT
+      }
+    ],
     standing: [],
     folders: []
   };
@@ -955,10 +982,13 @@ describe("Codex migration 4 and older backups", () => {
       strahd: reads.page(STRAHD),
       quest: reads.quest(QUEST),
       connections: reads.connections(),
-      search: [reads.search("vampire"), reads.search("trap"), reads.search("pale")],
+      search: ["vampire", "trap", "pale"].map((q) => reads.search(parseSearchQuery({ q }))),
       gmPage: store.getPage(STRAHD),
       gmQuest: store.getQuest(QUEST),
-      revisions: store.listRevisions(STRAHD)
+      revisions: store.listRevisions(STRAHD),
+      session: reads.session(SESSION),
+      gmSession: store.getSession(SESSION),
+      ambush: reads.search(parseSearchQuery({ q: "ambush" }))
     };
   }
 
@@ -1019,6 +1049,19 @@ describe("Codex migration 4 and older backups", () => {
     expect(gmQuest!.objectives).toEqual(
       OBJECTIVES.map((objective) => ({ ...objective, id: expect.any(String), audience: "everyone", characterIds: [] }))
     );
+    // Migration 5's half: the prep is one Text section the GM keeps, and players read the recap alone.
+    expect(reads.gmSession!.prep).toEqual([
+      expect.objectContaining({ type: "text", title: "Prep notes", text: SESSION_PREP })
+    ]);
+    expect(reads.gmSession!.firstShownAt).toBe(AT);
+    expect(reads.session!.session).toEqual({
+      id: SESSION,
+      sessionNumber: 1,
+      realDate: null,
+      recap: "We met Strahd.",
+      tags: []
+    });
+    expect(reads.ambush.hits).toEqual([]);
   }
 
   it("turns a page's GM body into hidden blocks, one per heading, and players read what they read before", async () => {
@@ -1045,6 +1088,75 @@ describe("Codex migration 4 and older backups", () => {
     expect(columns("codex_pages")).not.toContain("gm_fields_json");
     expect(columns("codex_quests")).not.toContain("gm_body");
     raw.close();
+  });
+
+  it("runs migration 4 on a file that took migration 5 first, as a file from the features branch has", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vtt-codex-migration-5-then-4-"));
+    cleanups.push(() => rm(directory, { recursive: true, force: true }));
+    const path = join(directory, "vtt.sqlite");
+    writeVersion3(path);
+    const raw = new DatabaseSync(path);
+    migrate(
+      raw,
+      "codex",
+      CODEX_MIGRATIONS.filter((migration) => migration.version !== 4),
+      { path }
+    );
+    raw.close();
+    const store = await openStore(directory);
+    expectUpgraded(readsOf(store));
+    const applied = new DatabaseSync(path);
+    expect(
+      (
+        applied.prepare("SELECT version FROM migrations WHERE store = 'codex' ORDER BY version").all() as Array<{
+          version: number;
+        }>
+      ).map((row) => row.version)
+    ).toEqual([1, 2, 3, 4, 5]);
+    applied.close();
+  });
+
+  it("restores a backup from either branch: GM bodies with prep sections, and blocks with free-text prep", async () => {
+    const migratedDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-migration-4-"));
+    const restoredDirectory = await mkdtemp(join(tmpdir(), "vtt-codex-backups-"));
+    cleanups.push(() => rm(migratedDirectory, { recursive: true, force: true }));
+    cleanups.push(() => rm(restoredDirectory, { recursive: true, force: true }));
+    writeVersion3(join(migratedDirectory, "vtt.sqlite"));
+    const upgraded = readsOf(await openStore(migratedDirectory));
+    const restored = await openStore(restoredDirectory);
+
+    // The features branch's version 1: old GM bodies beside prep sections and a template library.
+    const prep = [{ type: "checklist", title: "Clues", items: [{ text: "The ledger is forged." }] }];
+    restored.importBundle({
+      ...VERSION_1_BACKUP,
+      sessions: VERSION_1_BACKUP.sessions.map(({ prepBody: _prepBody, ...session }) => ({ ...session, prep })),
+      prepTemplates: [],
+      defaultPrepTemplateId: null
+    });
+    expect(readsOf(restored).gmPage!.blocks).toEqual(upgraded.gmPage!.blocks);
+    expect(restored.getSession(SESSION)!.prep).toEqual([
+      expect.objectContaining({
+        type: "checklist",
+        title: "Clues",
+        items: [expect.objectContaining({ text: "The ledger is forged." })]
+      })
+    ]);
+
+    // This branch's version 2 before prep sections: blocks as written, and free-text prep as one Text section.
+    const exported = JSON.parse(JSON.stringify(restored.exportBundle())) as Record<string, unknown> & {
+      sessions: Array<Record<string, unknown>>;
+    };
+    const { prepTemplates: _templates, defaultPrepTemplateId: _default, ...modelOnly } = exported;
+    restored.importBundle({
+      ...modelOnly,
+      sessions: exported.sessions.map(({ prep: _prep, prepTemplateId: _id, currentSceneId: _scene, ...session }) => ({
+        ...session,
+        prepBody: SESSION_PREP
+      }))
+    });
+    const reads = readsOf(restored);
+    expectUpgraded(reads);
+    expect(reads.gmPage!.blocks).toEqual(upgraded.gmPage!.blocks);
   });
 
   it("restores a version 1 backup the way the migration upgrades a file, with the same block ids", async () => {

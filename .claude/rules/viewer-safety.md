@@ -8,6 +8,7 @@ paths:
   - "apps/server/src/codex/player-reads.ts"
   - "apps/server/src/codex/first-shown.ts"
   - "apps/server/src/codex/blocks.ts"
+  - "apps/server/src/codex/find.ts"
   - "apps/server/src/codex-http.ts"
   - "apps/client/src/viewer/**"
   - "apps/server/src/vision/audience.ts"

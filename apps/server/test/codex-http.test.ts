@@ -1113,11 +1113,23 @@ describe("codex suite-wide search viewer safety", () => {
     expect((await search(base, "Ireena", GM)).map((hit) => hit.kind)).toEqual(["page"]);
   });
 
-  it("a player hit carries only navigation fields: no bodies, reveal flags, or secret-map linkage", async () => {
+  it("a player hit carries no bodies, reveal flags, or secret-map linkage", async () => {
     const { base, openMap, shownMarker } = await world();
     // Assert the exact key set, so any new field in the player search projection fails here.
     const marker = (await search(base, "Blinsky", PLAYER))[0];
-    expect(Object.keys(marker).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    expect(Object.keys(marker).sort()).toEqual([
+      "columns",
+      "entityType",
+      "id",
+      "kind",
+      "mapId",
+      "match",
+      "modifiedAt",
+      "tags",
+      "title",
+      "type"
+    ]);
+    expect(marker).not.toHaveProperty("revealedToPlayers");
     expect(marker.mapId).toBe(openMap); // a player only ever gets a pin whose map is revealed
     expect(marker.id).toBe(shownMarker);
   });
@@ -1271,7 +1283,7 @@ describe("codex chronicle HTTP boundary", () => {
   });
 });
 
-// Sessions: `prepBody` is the GM's plan, `recapBody` is what the table reads. Pipeline tests; the
+// Sessions: the prep sections are the GM's plan, `recapBody` is what the table reads. Pipeline tests; the
 // projection is tested directly in `codex-store.test.ts`.
 describe("codex sessions HTTP boundary", () => {
   const PREP = "The ambush is at the bridge; Ireena is the real target.";
@@ -1284,7 +1296,7 @@ describe("codex sessions HTTP boundary", () => {
         sessionNumber: 6,
         realDate: "2026-07-26",
         attendees: ["Ozy", "Mara"],
-        prepBody: PREP,
+        prep: [{ type: "text", title: "Prep notes", text: PREP }],
         recapBody: RECAP
       })
     );
@@ -1292,7 +1304,7 @@ describe("codex sessions HTTP boundary", () => {
     const secret = await body(
       await post(base, "/api/v1/codex/sessions", GM, {
         sessionNumber: 7,
-        prepBody: "Strahd attends the ball in person.",
+        prep: [{ type: "text", title: "Prep notes", text: "Strahd attends the ball in person." }],
         recapBody: "The ball ended badly."
       })
     );
@@ -1358,7 +1370,9 @@ describe("codex sessions HTTP boundary", () => {
     const sessionId = created.data.session.id as string;
     for (const response of [
       await post(base, "/api/v1/codex/sessions", PLAYER, { sessionNumber: 2 }),
-      await patch(base, `/api/v1/codex/sessions/${sessionId}`, PLAYER, { prepBody: "mine now" }),
+      await patch(base, `/api/v1/codex/sessions/${sessionId}`, PLAYER, {
+        prep: [{ type: "text", title: "Prep notes", text: "mine now" }]
+      }),
       await post(base, `/api/v1/codex/sessions/${sessionId}/reveal`, PLAYER, { revealed: true }),
       await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, PLAYER, {}),
       await fetch(`${base}/api/v1/codex/sessions/${sessionId}`, { method: "DELETE", headers: PLAYER })
@@ -1374,7 +1388,10 @@ describe("codex sessions HTTP boundary", () => {
     const { base } = await fixture();
     const created = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 1 }));
     const sessionId = created.data.session.id as string;
-    const stale = await patch(base, `/api/v1/codex/sessions/${sessionId}`, GM, { prepBody: "later", expectedRev: 0 });
+    const stale = await patch(base, `/api/v1/codex/sessions/${sessionId}`, GM, {
+      prep: [{ type: "text", title: "Prep notes", text: "later" }],
+      expectedRev: 0
+    });
     expect(stale.status).toBe(409);
     expect((await body(stale)).error.code).toBe("conflict");
 
@@ -1478,7 +1495,12 @@ describe("codex sessions HTTP boundary", () => {
     // The GM activates unrevealed session 4 and auto-linking stamps it onto a note. Revealing the note must not
     // publish the session, which its number would.
     const { base } = await fixture();
-    const created = await body(await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 4, prepBody: PREP }));
+    const created = await body(
+      await post(base, "/api/v1/codex/sessions", GM, {
+        sessionNumber: 4,
+        prep: [{ type: "text", title: "Prep notes", text: PREP }]
+      })
+    );
     const sessionId = created.data.session.id as string;
     await post(base, `/api/v1/codex/sessions/${sessionId}/activate`, GM, {});
 
@@ -1728,7 +1750,18 @@ describe("codex quests HTTP boundary", () => {
     const hits = await search("Wyrmwood", PLAYER);
     expect(hits).toEqual([expect.objectContaining({ kind: "quest", id: questId })]);
     // The same uniform row shape every other kind emits. Quests carry no tags, hence `[]`.
-    expect(Object.keys(hits[0]).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    expect(Object.keys(hits[0]).sort()).toEqual([
+      "columns",
+      "entityType",
+      "id",
+      "kind",
+      "mapId",
+      "match",
+      "modifiedAt",
+      "tags",
+      "title",
+      "type"
+    ]);
     expect(hits[0].tags).toEqual([]);
     expect(await search("forgery", PLAYER)).toEqual([]);
     expect(await search("forgery", GM)).toEqual([expect.objectContaining({ kind: "quest", id: questId })]);
@@ -2404,7 +2437,10 @@ describe("codex standing, party marker and reveal audit, HTTP boundary", () => {
         revealedToPlayers: true
       })
     );
-    await post(base, "/api/v1/codex/sessions", GM, { sessionNumber: 5, prepBody: "The ambush." });
+    await post(base, "/api/v1/codex/sessions", GM, {
+      sessionNumber: 5,
+      prep: [{ type: "text", title: "Prep notes", text: "The ambush." }]
+    });
     const shownQuest = await body(await post(base, "/api/v1/codex/quests", GM, { title: "The Wyrmwood Contract" }));
     await post(base, `/api/v1/codex/quests/${shownQuest.data.quest.id}/reveal`, GM, { revealed: true });
     await post(base, "/api/v1/codex/quests", GM, { title: "The Amber Bargain" });

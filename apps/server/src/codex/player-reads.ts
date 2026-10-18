@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import type {
-  CodexSearchResult,
   PlayerCodexCalendar,
   PlayerCodexChronicleRecord,
   PlayerCodexConnection,
+  PlayerCodexHome,
   PlayerCodexJournalEntry,
   PlayerCodexMap,
   PlayerCodexMarker,
@@ -11,12 +11,15 @@ import type {
   PlayerCodexPageConnection,
   PlayerCodexPageSummary,
   PlayerCodexQuest,
+  PlayerCodexSearchResult,
   PlayerCodexSession,
   PlayerCodexStanding
 } from "@vtt/domain";
 import type { CodexStore } from "../codex-store.js";
 import {
+  AUDIT_JOURNAL_FALLBACK,
   EVERYONE,
+  excerpt,
   orderPlayerAttached,
   orderPlayerChronicle,
   orderPlayerTimeline,
@@ -31,16 +34,16 @@ import {
   projectPlayerPageMarker,
   projectPlayerPageSummary,
   projectPlayerQuest,
-  projectPlayerSearchHit,
   projectPlayerSession,
   projectPlayerStanding,
+  sessionDisplayTitle,
   type CodexReader,
   type PlayerChronicleContext,
   type PlayerConnectionContext,
   type PlayerReaderContext,
   type PlayerSessionNumberContext
 } from "../codex-projections.js";
-import { capSearch } from "./search.js";
+import { columnsOf, findPlayer, linesOf, type CodexFindQuery, type FindRecord } from "./find.js";
 import {
   chronicleContext,
   connectionContext,
@@ -52,13 +55,16 @@ import {
   markerRecord,
   questContext,
   readerContext,
-  searchRecord,
   standingContext
 } from "./visibility.js";
+
+/** The most a player's home lists as new since their last visit. */
+const NEW_SINCE_LIMIT = 50;
 
 /** The store reads that player reads repeat, by name. Each is answered once per `PlayerCodexReads`. */
 const REPEATED_READS: ReadonlySet<PropertyKey> = new Set([
   "listPages",
+  "listFullPages",
   "listTimeline",
   "listSessions",
   "listQuests",
@@ -288,17 +294,155 @@ export class PlayerCodexReads {
     return { calendar: projectPlayerCalendar(this.#store.getCalendar(), this.#store.getPublishedDate()) };
   }
 
-  /** Capped after the player gates, so a record a player cannot see never takes a place under the cap. */
-  search(query: string): CodexSearchResult {
-    const context = this.#journalContext;
-    return capSearch(
-      this.#store
-        .searchPlayerMatches(query, this.#reader.characterIds)
-        .map((ref) => searchRecord(this.#store, ref))
-        .filter((record) => record !== null)
-        .map((record) => projectPlayerSearchHit(record, context))
-        .filter((hit) => hit !== null)
-    );
+  /**
+   * Search over what this player reads: each record is built from its player read, so a hit never matches, quotes
+   * or ranks on hidden text, and the cap counts only what the player can see. There is no visibility filter.
+   */
+  search(query: CodexFindQuery): PlayerCodexSearchResult {
+    return findPlayer(this.#findRecords(), { ...query, visibility: "all" });
+  }
+
+  /**
+   * What this player can read that is new or changed after `since`, newest first: pages by this reader's
+   * `playerUpdatedAt` (new when first shown after `since`), every other record by its first-shown date. Built from
+   * the same records as search, so it lists and names only what this reader reads. Without `since` everything is new.
+   */
+  home(since: string | null): { home: PlayerCodexHome } {
+    const after = (at: string | null) => at !== null && (since === null || at > since);
+    const firstShown = this.#firstShownAt();
+    const items: Array<PlayerCodexHome["newSince"][number]> = [];
+    for (const record of this.#findRecords()) {
+      const shownAt = firstShown.get(`${record.kind}|${record.id}`) ?? null;
+      // A page's own time moves when it changes for this reader; anything else has only the day it was first shown.
+      const at = record.kind === "page" ? record.modifiedAt : shownAt;
+      if (!after(at)) continue;
+      items.push({
+        kind: record.kind,
+        id: record.id,
+        title: record.title,
+        type: record.type,
+        mapId: record.mapId,
+        at: at!,
+        change: record.kind !== "page" || after(shownAt) ? "new" : "updated"
+      });
+    }
+    items.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return { home: { newSince: items.slice(0, NEW_SINCE_LIMIT), truncated: items.length > NEW_SINCE_LIMIT } };
+  }
+
+  /**
+   * When players could first read each record, by `kind|id`, from the rows behind this reader's projections. The
+   * date is the same for every reader, and set by the write that first let players read the record.
+   */
+  #firstShownAt(): Map<string, string | null> {
+    const dates = new Map<string, string | null>();
+    for (const page of this.#store.listFullPages()) dates.set(`page|${page.id}`, page.firstShownAt);
+    for (const entry of this.#store.listTimeline()) dates.set(`journal|${entry.id}`, entry.firstShownAt);
+    for (const map of this.#store.listMaps()) {
+      dates.set(`map|${map.id}`, map.firstShownAt);
+      for (const marker of this.#store.listMarkers(map.id)) dates.set(`marker|${marker.id}`, marker.firstShownAt);
+    }
+    for (const quest of this.#store.listQuests()) dates.set(`quest|${quest.id}`, quest.firstShownAt);
+    for (const session of this.#store.listSessions()) dates.set(`session|${session.id}`, session.firstShownAt);
+    return dates;
+  }
+
+  /**
+   * Every record this reader reads, as search sees it, built only from their player reads: the bodies hold only the
+   * blocks that reach them, the fields only the ones they read, and every link to a page they can't open is plain.
+   */
+  #findRecords(): FindRecord[] {
+    const firstShown = this.#firstShownAt();
+    const shownAt = (kind: string, id: string) => firstShown.get(`${kind}|${id}`) ?? null;
+    const records: FindRecord[] = [];
+    for (const row of this.#store.listFullPages()) {
+      const page = projectPlayerPage(row, this.#pageContext);
+      if (!page) continue;
+      records.push({
+        kind: "page",
+        id: page.id,
+        title: page.title,
+        tags: page.tags,
+        entityType: page.entityType,
+        mapId: null,
+        type: page.entityType,
+        modifiedAt: page.playerUpdatedAt,
+        columns: columnsOf(page.fields),
+        shown: [...linesOf(page.body), ...Object.values(page.fields)]
+      });
+    }
+    for (const entry of this.journal({})?.entries ?? [])
+      records.push({
+        kind: "journal",
+        id: entry.id,
+        title: excerpt(entry.text) || AUDIT_JOURNAL_FALLBACK[entry.kind],
+        tags: entry.tags,
+        entityType: null,
+        mapId: null,
+        type: "journal",
+        modifiedAt: entry.firstShownAt,
+        columns: columnsOf({ kind: entry.kind, date: entry.inWorldLabel }),
+        shown: linesOf(entry.text)
+      });
+    const maps = this.maps().maps;
+    const mapNames = new Map(maps.map((map) => [map.id, map.name]));
+    for (const map of maps) {
+      records.push({
+        kind: "map",
+        id: map.id,
+        title: map.name,
+        tags: map.tags,
+        entityType: null,
+        mapId: null,
+        type: "map",
+        modifiedAt: shownAt("map", map.id),
+        columns: columnsOf({ kind: map.kind, parent: map.parentMapId ? mapNames.get(map.parentMapId) : null }),
+        shown: []
+      });
+      for (const marker of this.mapMarkers(map.id)?.markers ?? [])
+        records.push({
+          kind: "marker",
+          id: marker.id,
+          title: marker.label ?? "",
+          tags: marker.tags,
+          entityType: null,
+          mapId: marker.mapId,
+          type: "marker",
+          modifiedAt: shownAt("marker", marker.id),
+          columns: columnsOf({ map: map.name }),
+          shown: []
+        });
+    }
+    for (const quest of this.quests().quests)
+      records.push({
+        kind: "quest",
+        id: quest.id,
+        title: quest.title,
+        tags: quest.tags,
+        entityType: null,
+        mapId: null,
+        type: "quest",
+        modifiedAt: shownAt("quest", quest.id),
+        columns: columnsOf({ status: quest.status }),
+        shown: [...linesOf(quest.body), ...quest.objectives.map((objective) => objective.text)]
+      });
+    for (const session of this.sessions().sessions)
+      records.push({
+        kind: "session",
+        id: session.id,
+        title: sessionDisplayTitle(session),
+        tags: session.tags,
+        entityType: null,
+        mapId: null,
+        type: "session",
+        modifiedAt: shownAt("session", session.id),
+        columns: columnsOf({
+          number: session.sessionNumber === null ? null : String(session.sessionNumber),
+          date: session.realDate
+        }),
+        shown: [...linesOf(session.recap), ...(session.realDate ? [session.realDate] : [])]
+      });
+    return records;
   }
 
   /** Whether this reader may load an image. */
@@ -324,7 +468,9 @@ export class PlayerCodexReads {
  * - A page's or a pin's journal: the shown entries with that attachment, in first-shown order.
  * - A page's pins: the shown pins whose page links name it.
  * - One pin, session or quest: the same projection as its row in the list.
- * - Search: each hit's title, text and reveal state, ranked on its own title.
+ * - Search: the pages, entries, maps, pins, quests and sessions above, matched and ranked on their own text.
+ * - Home: the pages' player edit times, and the first-shown dates of the records above, each set by the write that
+ *   first put that record in these reads.
  * - An image: a reader may fetch one only when a body, block or banner here names it.
  */
 export function playerCodexFingerprint(store: CodexStore, reader: CodexReader = EVERYONE): string {

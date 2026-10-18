@@ -8,7 +8,9 @@ import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
 import { PlayerCodexChanges, readerOf } from "../src/codex/player-reads.js";
+import { BUILT_IN_TEMPLATE_ID } from "../src/codex/prep.js";
 import { EVERYONE } from "../src/codex-projections.js";
+import { prepNotes } from "./codex-prep-notes.js";
 import { fixedVerifiers } from "./fixed-verifiers.js";
 
 // A GM-only edit must leave every byte a player can read where it was: the bodies, the lists, the search hits
@@ -328,7 +330,7 @@ function seedCampaign(store: CodexStore) {
     recapBody: "We met the Lantern Order. [[The Cult]] watched."
   });
   store.setSessionRevealed(shownSession.id, true);
-  const hiddenSession = store.createSession({ sessionNumber: 2, prepBody: "The ambush." });
+  const hiddenSession = store.createSession({ sessionNumber: 2, prep: prepNotes("The ambush.") });
   const note = store.createEntry({
     playerText: "The lamps of the Lantern Order burn blue near [[The Cult]].",
     gmText: "Blue means the cult is near.",
@@ -398,7 +400,21 @@ function seedCampaign(store: CodexStore) {
     "/calendar",
     "/search?q=lantern",
     "/search?q=vallaki",
-    "/search?q=session"
+    "/search?q=session",
+    // The filtered and sorted search, and the home, read only the player's own dates and text.
+    "/search?q=lantern&sort=modified:desc,name&limit=500",
+    "/search?types=faction,location,quest,session&sort=type,leader:desc",
+    "/search?modifiedFrom=2026-01-01&sort=modified",
+    "/search?visibility=hidden",
+    // Words that hidden blocks, Hidden fields and hidden objectives hold, and the block shown to Lyra.
+    "/search?q=cult",
+    "/search?q=front",
+    "/search?q=pays",
+    "/search?q=capital",
+    "/search?q=oil&sort=modified:desc",
+    "/home",
+    "/home?since=2026-01-01T00:00:00.000Z",
+    "/home?since=2026-08-01T00:01:00.000Z"
   ];
   return {
     order,
@@ -425,6 +441,19 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
     const { order, town, cult, map, secretMap, pin, hiddenPin, shownSession, hiddenSession, note, downtime } = seeded;
     const { quest, hiddenQuest } = seeded;
     const changes = new PlayerCodexChanges(store);
+    /** The template the run makes, and the first checklist item or scene of a session's prep, read at call time. */
+    const lanternTemplate = () =>
+      store.listPrepTemplates().templates.find((row) => row.name.startsWith("Lantern night"))!;
+    const firstOf = (sessionId: string, key: "items" | "scenes"): string =>
+      store
+        .getSession(sessionId)!
+        .prep.flatMap((section): readonly { id: string }[] =>
+          key === "items" && section.type === "checklist"
+            ? section.items
+            : key === "scenes" && section.type === "scenes"
+              ? section.scenes
+              : []
+        )[0]!.id;
 
     const edits: ReadonlyArray<readonly [string, () => unknown]> = [
       [
@@ -508,7 +537,12 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
         () =>
           store.updateSession(
             shownSession.id,
-            { prepBody: "Next: the ambush.", attendees: ["Sam"], status: "played", sceneIds: [crypto.randomUUID()] },
+            {
+              prep: prepNotes("Next: the ambush."),
+              attendees: ["Sam"],
+              status: "played",
+              sceneIds: [crypto.randomUUID()]
+            },
             undefined
           )
       ],
@@ -517,6 +551,44 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
         () => store.updateSession(hiddenSession.id, { sessionNumber: 5, recapBody: "Lantern recap." }, undefined)
       ],
       ["active session", () => store.setActiveSession(hiddenSession.id)],
+      [
+        "prep template",
+        () =>
+          store.createPrepTemplate({
+            name: "Lantern night",
+            sections: [
+              { title: "Lantern clues", prompt: "Lantern lantern.", type: "checklist" },
+              { title: "Scenes", type: "scenes" }
+            ]
+          })
+      ],
+      ["template rename", () => store.updatePrepTemplate(lanternTemplate().id, { name: "Lantern nights" }, undefined)],
+      ["template default", () => store.setDefaultPrepTemplate(lanternTemplate().id)],
+      ["template copy", () => store.duplicatePrepTemplate(BUILT_IN_TEMPLATE_ID, "Lantern copy")],
+      ["template apply", () => store.applyPrepTemplate(shownSession.id, lanternTemplate().id, undefined)],
+      [
+        "prep clues and scenes",
+        () =>
+          store.updateSession(
+            shownSession.id,
+            {
+              prep: store
+                .getSession(shownSession.id)!
+                .prep.map((section) =>
+                  section.type === "checklist"
+                    ? { ...section, items: [{ text: "The lantern oil is poisoned." }] }
+                    : section.type === "scenes"
+                      ? { ...section, scenes: [{ title: "Lantern hall", placePageId: order.id }] }
+                      : section
+                )
+            },
+            undefined
+          )
+      ],
+      ["clue tick", () => store.tickPrepItem(shownSession.id, firstOf(shownSession.id, "items"), true)],
+      ["current scene", () => store.setCurrentScene(shownSession.id, firstOf(shownSession.id, "scenes"))],
+      ["logged line", () => store.logSessionLine(shownSession.id, { text: "Lantern oil spilled." })],
+      ["template delete", () => store.deletePrepTemplate(lanternTemplate().id)],
       ["quest hidden block", () => store.editQuestBlock(quest.id, quest.blocks[0]!.id, { text: "The oil is cursed." })],
       [
         "quest hidden objective",
@@ -573,6 +645,50 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
     expect(await readAll(base, seeded.paths)).not.toEqual(before);
     // Some five thousand reads: every path, as each reader, after every edit.
   }, 90_000);
+
+  // The player search and home are built from each reader's own reads, so a block shown to Lyra is Lyra's to find.
+  it("lets Lyra's search and home find a block shown to Lyra, and moves nothing in anyone else's", async () => {
+    const { base, store } = await fixture();
+    const page = store.createPage({
+      title: "Vallaki",
+      playerBody: "A walled town.",
+      blocks: [{ title: "Your aunt", text: "She hid the key in the ossuary of [[The Cult]]." }],
+      revealedToPlayers: true
+    });
+    const since = encodeURIComponent(store.getPage(page.id)!.firstShownAt!);
+    const paths = ["/search?q=ossuary", "/search?q=aunt&types=location,note", `/home?since=${since}`];
+    const others = [PLAYER_TOKEN, BORIN_TOKEN, PREVIEW_TOKEN];
+    const before = [];
+    for (const token of others) for (const path of paths) before.push(await read(base, path, token));
+    const data = async (path: string, token: string) => JSON.parse((await read(base, path, token)).body).data;
+    expect((await data("/search?q=ossuary", LYRA_TOKEN)).hits).toEqual([]);
+
+    store.setPageBlockAudience(page.id, page.blocks[0]!.id, "characters", [LYRA]);
+    for (const token of [LYRA_TOKEN, PREVIEW_LYRA_TOKEN]) {
+      const found = (await data("/search?q=ossuary", token)).hits;
+      // The line comes from the block, with the link to the hidden page as plain text.
+      expect(
+        found.map((hit: Record<string, unknown>) => [hit.id, hit.match]),
+        token
+      ).toEqual([[page.id, { line: "She hid the key in the ossuary of The Cult." }]]);
+      expect(found[0].modifiedAt).toBe(store.getPage(page.id)!.characterUpdatedAt[LYRA]);
+      expect((await data(paths[2]!, token)).home.newSince, token).toEqual([
+        {
+          kind: "page",
+          id: page.id,
+          title: "Vallaki",
+          type: "note",
+          mapId: null,
+          at: store.getPage(page.id)!.characterUpdatedAt[LYRA],
+          change: "updated"
+        }
+      ]);
+    }
+    const after = [];
+    for (const token of others) for (const path of paths) after.push(await read(base, path, token));
+    expect(after).toEqual(before);
+    expect(JSON.parse(after[0]!.body).data.hits).toEqual([]);
+  });
 
   // A link to a hidden page reads as plain text, so revealing the page is a change players can read wherever
   // their text links it, and every audience hears of it.

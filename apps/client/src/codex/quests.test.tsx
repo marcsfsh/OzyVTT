@@ -268,7 +268,12 @@ describe("The dashboard's open-quests card", () => {
           title: "The Amber Temple",
           tags: [],
           entityType: null,
-          mapId: null
+          mapId: null,
+          type: "quest",
+          revealedToPlayers: true,
+          modifiedAt: "2026-07-28T00:00:00.000Z",
+          columns: {},
+          match: null
         } as CodexSearchHit
       ],
       truncated: false
@@ -583,7 +588,12 @@ describe("The player's quest reader", () => {
           title: "The Bell of Vallaki",
           tags: [],
           entityType: null,
-          mapId: null
+          mapId: null,
+          type: "quest",
+          revealedToPlayers: true,
+          modifiedAt: "2026-07-28T00:00:00.000Z",
+          columns: {},
+          match: null
         } as CodexSearchHit
       ],
       truncated: false
@@ -684,7 +694,12 @@ describe("A quest in suite-wide search", () => {
     title: "The Amber Temple",
     tags: [],
     entityType: null,
-    mapId: null
+    mapId: null,
+    type: "quest",
+    revealedToPlayers: true,
+    modifiedAt: "2026-07-28T00:00:00.000Z",
+    columns: {},
+    match: null
   };
 
   it("names its kind in TEXT and opens the quest log ON that quest", async () => {

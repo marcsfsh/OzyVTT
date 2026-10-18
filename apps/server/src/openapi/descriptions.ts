@@ -1359,7 +1359,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     firstShownAt: FIRST_SHOWN_AT_PLAYER
   },
   CodexSession: {
-    "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record: `recapBody` is the player-facing half and `prepBody` is the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused, so no group silently turns ambiguous.",
+    "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record: `recapBody` is the player-facing half and the `prep` sections are the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`) and `tags`, with every `[[link]]` to a page the reader cannot open as plain text. Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused, so no group silently turns ambiguous.",
     sessionNumber:
       '"Session 12": the session\'s DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID and resolve this live, so renumbering a session relabels every one of its entries with no journal write.',
     realDate:
@@ -1367,8 +1367,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     attendees: "Who was at the table. GM-only; absent from a player projection.",
     sceneIds:
       "the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-ONLY, ALWAYS: stricter than the session's own reveal, because a revealed session publishes its RECAP and tonight's planned fights are spoilers even then.",
-    prepBody:
-      "GM-only prep notes for the session (markdown). NEVER present in a player projection, revealed or not; revealing a session publishes its recap, never its prep.",
+    prep: "GM-only: the session's prep sections, its own copy of a template's. NEVER present in a player projection, revealed or not; revealing a session publishes its recap, never its prep.",
+    prepTemplateId: "GM-only: the template the prep was last copied from. It may name a deleted template.",
+    currentSceneId: "GM-only: the live board's current scene, a scene id in one of the prep's Scenes sections.",
     recapBody: "The player-facing recap (markdown). Reaches a revealed session's player projection as `recap`.",
     revealedToPlayers:
       "GM-only field; absent from a player projection (a player only ever receives revealed sessions).",
@@ -1381,7 +1382,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     firstShownAt: `${FIRST_SHOWN_AT} It orders the players' unnumbered sessions.`
   },
   CodexSessionPlayer: {
-    "": "A session as a PLAYER receives it: the tightest projection in the Codex, and every omission is a decision. `prepBody` is the GM's plan for the evening and has no player form; `attendees` is real-world personal data; `status` is the GM's own scheduling state; `rev` is the editor's conflict token. `recapBody` arrives renamed `recap`, because with only one layer left the prefix means nothing.",
+    "": "A session as a PLAYER receives it: the tightest projection in the Codex, and every omission is a decision. `prep` is the GM's plan for the evening and has no player form; `attendees` is real-world personal data; `status` is the GM's own scheduling state; `rev` is the editor's conflict token. `recapBody` arrives renamed `recap`, because with only one layer left the prefix means nothing.",
     recap: "The session's `recapBody`.",
     tags: "tags are SINGLE-LAYER in this codex (there is no GM-only tag) and every other record kind already ships its tags to players. A revealed session's tags are its player-facing categorization, and they are already in the player search index by the same rule."
   },
@@ -1455,12 +1456,51 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     tags: "Always present, so no consumer branches on key presence.",
     entityType: "The page's entity type; null for every other kind.",
     mapId:
-      "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed."
+      "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed.",
+    type: "A page's entity type, else the record kind: what the `types` filter and the `type` sort read.",
+    revealedToPlayers:
+      "Whether players can read the record, by its kind's player read: a pin also needs its map. What the `visibility` filter reads.",
+    modifiedAt: "When the GM last saved the record.",
+    columns:
+      "The values the record's kind shows as table columns, by column key: a page's fields (hidden ones included), a quest's `status`, a session's `number`, `date` and `status`, an entry's `kind` and `date`, a pin's `map`, a map's `kind` and `parent`. A column with no value is absent.",
+    match:
+      "The line that matched, cut to about 160 characters; null without `q` or when only the title or tags matched. `hidden` is true when the line is text not every player reads: a block not shown to everyone, a Hidden field, an objective not shown to everyone, a journal entry's GM note, prep or attendees."
   },
-  CodexSearchData: {
-    hits: "The one ranked result list, all record kinds. A title equal to the query comes first for both roles. After it, a GM's hits are ranked by relevance (bm25, the title weighted 10x). A player's come by tier: a title holding every query word, then the rest, each tier ordered by kind, title and id. A player hit's place depends on its own title alone, so records a player cannot see never move it.",
-    truncated:
-      'The result list was CUT at the cap. Narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference, and it tells "exactly 50 matches" from "50 and more". A player\'s list is counted after every player gate, so a record they cannot see never takes a place under the cap or sets this flag.'
+  CodexSearchHitPlayer: {
+    "": "One search hit as a PLAYER receives it, built from what that player reads: the blocks, fields and objectives that reach their characters, with every `[[link]]` to a page they cannot open as plain text. No `revealedToPlayers`, and its line never comes from text that does not reach them.",
+    modifiedAt:
+      "A page's `playerUpdatedAt` as this player reads it, else the record's `firstShownAt`. Never when the GM saved the record.",
+    columns: "As the GM's, from the player's own read: a page's fields are the ones the player can read.",
+    match: "The line of the player's own text that matched; null without `q` or when only the title or tags matched."
+  },
+  CodexHome: {
+    "": "The GM's front page aggregates.",
+    collections:
+      "Every search type in a fixed order, zeros included. `revealed` counts what players can read by each kind's player read; `hidden` is the rest. The same split as the search's `visibility` filter.",
+    recent:
+      "The 12 latest changed records, newest first. `change` says what it was; only a page tells a reveal or a hide from an edit. `audience` is who sees the change: `everyone` when players can read the record and, for a page, the change moved what they all read; `characters` when, on a revealed page, it moved only what some characters read (a block or field shown to them), named in `characterIds`; `hidden` otherwise.",
+    revealCheck:
+      "Revealed records that point at something players can't read: a link to a hidden page or map, a field players read that holds a placeholder, a hidden pin on a revealed map. Players get plain text there, so each is safe. At most 100 rows; `total` counts them all."
+  },
+  CodexHomePlayer: {
+    "": "A player's front page: what they can read that is new or changed since `since`.",
+    newSince:
+      "Newest first, at most 50: pages by their `playerUpdatedAt` as this player reads it, every other record by its `firstShownAt`. `change` is `new` when the record was first shown after `since`, else `updated`. Built from this player's own reads, so it lists, names and dates only what reaches them."
+  },
+  CodexPrepTemplate: {
+    "": "A reusable plan for session prep: an ordered list of sections, each with a title, a prompt and a type. GM-only.",
+    builtIn: "The starting template ships with the app and is read-only. Duplicate it to edit a copy.",
+    isDefault: "The template a new session copies when it names none.",
+    rev: "The conflict token for `PATCH`; 0 on the built-in.",
+    createdAt: "Null on the built-in.",
+    updatedAt: "Null on the built-in."
+  },
+  CodexLiveBoard: {
+    "": "The active session's live board, read from its prep. GM-only.",
+    rev: "The session's `rev`, so an open editor can stay current.",
+    pageGroups: "One group per Linked pages section. A page that no longer exists is left out.",
+    clocks: "The deadlines of every Clocks section, deduped. `fired` is measured against the GM's date.",
+    logged: "The 50 latest journal entries filed under the session, oldest first."
   },
   CodexRevisionHistorySettings: {
     "": "How much page version history the codex keeps, and what keeping it costs. The two knobs are exactly `CodexRevisionHistoryInput`'s; the two usage figures are server-computed and READ-ONLY, and they ride along here in one object because a settings screen wants the cost beside the control that changes it.",

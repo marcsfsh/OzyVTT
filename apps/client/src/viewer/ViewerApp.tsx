@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewerSoundProjection } from "@vtt/domain";
+import { useDragSurface } from "@vtt/ui";
 import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
 import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
@@ -96,6 +97,7 @@ export function Initiative({
   onResize
 }: Readonly<{ presentation: Presentation; onResize?: (width: number) => void }>) {
   const asideRef = useRef<HTMLElement | null>(null);
+  const resizeSurface = useDragSurface<HTMLDivElement>();
   if (!presentation.initiative.visible) return null;
   // Same shape as the player's list: active combatant on top, then turn order; no HP bars or controls.
   const { entries, round, hiddenTurn } = presentation.initiative;
@@ -120,6 +122,7 @@ export function Initiative({
     <aside ref={asideRef} className="viewer-initiative frame-col" aria-label={`Initiative, round ${round}`}>
       {onResize && (
         <div
+          ref={resizeSurface}
           className="viewer-initiative-resize"
           role="separator"
           aria-orientation="vertical"
@@ -175,6 +178,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
   const [pan, setPan] = useState<PanGesture | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
+  const stageSurface = useDragSurface(stageRef);
   const href = presentation.activeMap ? imageUrl(presentation.activeMap.assetId) : "";
   useEffect(() => {
     setLocalCamera(null);
@@ -268,7 +272,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
   return (
     <section
       className="viewer-stage"
-      ref={stageRef}
+      ref={stageSurface}
       aria-label={presentation.activeMap.altText || "Shared battlemap"}
       onPointerDown={beginPan}
       onPointerMove={continuePan}

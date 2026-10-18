@@ -161,31 +161,35 @@ audience. There are four:
   blocks that reach them, so a block they may not see leaves no trace, and its `[[links]]` stay on
   the GM layer until it reaches them. A `[[link]]` to a page the reader cannot open reads as plain
   text in every piece of record text a player receives (bodies, recaps, entries and their details,
-  titles, labels, fields, objectives, search hits), since the link alone would say the page exists;
-  every player context carries the openable pages for it. A block reaches a reader only once a
-  write has stamped it for their audience, so an unstamped block fails closed. Reveal is a graph:
-  a child never leaks an unrevealed parent or target, and `codex/visibility.ts` resolves a
-  record's neighbours for the projection. Some fields are GM-only even when revealed: staged scene
-  ids on markers and sessions, and a page's
-  folder path, which is the GM's private filing (a player's `folder` filter on the page list is
-  ignored). A page's `updatedAt` moves on every save, so it stays with the GM too; players get
-  `playerUpdatedAt`, which moves only when something that reader can read changes. A record's
-  `createdAt` would tell players when the GM prepared it, so the player shapes leave it out and
-  carry or are ordered by `firstShownAt`: the moment players could first read the record, set by
-  that write (`codex/first-shown.ts` runs in every Codex write) and never moved after, through a
-  hide or a re-reveal. A block's reveal and a connection's learned date are stamped the same way,
-  with the active session and the players' published date. The order and length of a player's
-  lists come from what the player can read too: a player's search ranks each hit on its own
-  title and is capped after the player gates (the GM's keeps relevance ranking, since the GM
-  reads every row anyway), a player's journal places an entry by the session number the player
-  receives and then by `firstShownAt`, pins, maps, quests, standing and unnumbered sessions come
-  in first-shown order, a page's mentions keep a fixed order, a hidden page never takes a
-  revealed page's title for `[[links]]`, and a GM-layer connection never folds away a
-  player-layer mention. A hidden record is a 404, never a 403, and ETags are computed after every
-  gate. A GM's ETag carries the store revision; a player's hashes the body they receive, so a
-  GM-only write, or a reveal to another character, leaves it as it was. The GM's preview is a
-  signed player session that reads as everyone or as one party character and only reads: game
-  commands and uploads refuse it.
+  titles, labels, fields, objectives, search hits and lines, home rows), since the link alone would
+  say the page exists; every player context carries the openable pages for it. A block reaches a
+  reader only once a write has stamped it for their audience, so an unstamped block fails closed.
+  Reveal is a graph: a child never leaks an unrevealed parent or target, and `codex/visibility.ts`
+  resolves a record's neighbours for the projection. Some fields are GM-only even when revealed:
+  staged scene ids on markers and sessions, and a page's folder path, which is the GM's private
+  filing (a player's `folder` filter on the page list is ignored). A page's `updatedAt` moves on
+  every save, so it stays with the GM too; players get `playerUpdatedAt`, which moves only when
+  something that reader can read changes. A record's `createdAt` would tell players when the GM
+  prepared it, so the player shapes leave it out and carry or are ordered by `firstShownAt`: the
+  moment players could first read the record, set by that write (`codex/first-shown.ts` runs in
+  every Codex write) and never moved after, through a hide or a re-reveal. A block's reveal and a
+  connection's learned date are stamped the same way, with the active session and the players'
+  published date. The order and length of a player's lists come from what the player can read
+  too: a player's search is built from that player's own reads, so a hit matches, quotes and ranks
+  only on text that reaches that reader (a block shown to Lyra is found by Lyra's player alone),
+  its modified date is the reader's `playerUpdatedAt` or the record's `firstShownAt`, and it is
+  capped after the gates (the GM's keeps relevance ranking from the index, since the GM reads
+  every row anyway). A player's home lists what is new since their last visit from the same
+  records and dates. Prep templates, session prep, the live board and the GM's home aggregates
+  have no player read at all. A player's journal places an entry by the session number the player
+  receives and then by `firstShownAt`, pins, maps, quests, standing and unnumbered sessions come in
+  first-shown order, a page's mentions keep a fixed order, a hidden page never takes a revealed
+  page's title for `[[links]]`, and a GM-layer connection never folds away a player-layer mention.
+  A hidden record is a 404, never a 403, and ETags are computed after every gate. A GM's ETag
+  carries the store revision; a player's hashes the body they receive, so a GM-only write, or a
+  reveal to another character, leaves it as it was. The GM's preview is a signed player session
+  that reads as everyone or as one party character and only reads: game commands and uploads
+  refuse it.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
   list of shared replays carries the GM's name for one, never the name of the scene it was fought on.
@@ -373,17 +377,30 @@ A page or quest keeps what only some readers see as hidden blocks (`codex/blocks
 anchored between paragraphs of the player text, each with its own audience and the stamps of when
 it reached each one, stored as a JSON list on the record. A page's fields each have an audience
 too (a per-page list of Hidden keys), and so does each quest objective. The other records keep a
-GM half beside the player half (a session's prep, an entry's GM text). Its HTTP shapes are
-defined once in `packages/domain/src/codex-wire.ts`: a record's GM shape is the stored row, its
-player shape is a separate allow-list type, and the projections and the client's reads are typed
-against both. Every read a player can make is built in one place, `PlayerCodexReads` in
-`codex/player-reads.ts`, for one reader (the characters the session has claimed), which the router
-serves and the players' ping hashes. The GM can preview the player view through
-`POST /api/v1/codex/preview-session`, which mints a real player session that reads as everyone or
-as one party character. The player calendar and the GM calendar are separate dates; a date
-reaches players only when it is published. Codex migration 4
+GM half beside the player half (a session's prep sections, an entry's GM text). Its HTTP shapes
+are defined once in `packages/domain/src/codex-wire.ts` (session prep's in `codex-prep-wire.ts`
+beside it): a record's GM shape is the stored row, its player shape is a separate allow-list
+type, and the projections and the client's reads are typed against both. Every read a player can
+make is built in one place, `PlayerCodexReads` in `codex/player-reads.ts`, for one reader (the
+characters the session has claimed), which the router serves and the players' ping hashes. The GM
+can preview the player view through `POST /api/v1/codex/preview-session`, which mints a real
+player session that reads as everyone or as one party character. The player calendar and the GM
+calendar are separate dates; a date reaches players only when it is published. Codex migration 4
 (`codex/hidden-blocks-migration.ts`) turned the old single GM body into Hidden blocks, one per
-`##` heading after the player text, and a version 1 backup restores through the same conversion.
+`##` heading after the player text, and migration 5 turned a session's free-text prep into one
+Text section; a version 1 backup restores through the same conversions.
+
+Session prep is a list of typed sections (Text, Checklist, Linked pages, Scenes, Clocks, Quests in
+play, Encounters; `codex/prep.ts`, shapes in `codex-prep-wire.ts`). A session copies its sections
+from a prep template when it is made, from the GM's library of templates or the built-in starting
+template, and owns the copy: editing a template never changes a session, and re-applying one keeps
+what was written in the sections that still match. The live board (`codex/live.ts`) reads the active
+session's prep; its commands tick a clue, set the current scene and log a line as a note filed under
+the session. A tick and the current scene change the prep, so they move the session's `rev`, and an
+editor holding the old one gets a conflict instead of overwriting the tick. Party position is one
+write that moves the party pin to a point on any map, or makes one. Search filters and sorts, and the
+GM's home counts, recent changes and reveal check, are built in `codex/find.ts`; a player's search
+and home are built in `player-reads.ts` from that player's own reads.
 
 The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
 (`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that

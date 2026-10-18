@@ -21,6 +21,8 @@ export * from "./codex-calendar.js";
 export * from "./codex-wire.js";
 /** Where hidden blocks sit in a page's text, shared so the server's assembly and the client's editor agree. */
 export * from "./codex-blocks.js";
+/** Session prep's HTTP shapes: the template library and a session's prep sections. */
+export * from "./codex-prep-wire.js";
 
 export {
   ACTOR_SCHEMA_VERSION,

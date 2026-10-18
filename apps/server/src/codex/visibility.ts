@@ -7,7 +7,6 @@ import {
   type CodexPageMarkerRecord,
   type CodexReader,
   type CodexRevealAuditRecord,
-  type CodexSearchRecord,
   type PlayerChronicleContext,
   type PlayerConnectionContext,
   type PlayerLinkContext,
@@ -16,7 +15,6 @@ import {
 } from "../codex-projections.js";
 import { audienceReaches, blockSourceText, parseBlocks } from "./blocks.js";
 import type { CodexDb } from "./db.js";
-import type { CodexSearchRef } from "./search.js";
 import { isId } from "./validate.js";
 
 /**
@@ -27,20 +25,18 @@ import { isId } from "./validate.js";
  */
 
 /**
- * Player search visibility for one of the player tables, one arm per kind matching that kind's player read (a
- * weaker arm would make search the leak). A marker also needs its map revealed. `ELSE 0` fails closed.
+ * Player search visibility, one arm per kind matching that kind's player read (a weaker arm would make search
+ * the leak). A marker also needs its map revealed. `ELSE 0` fails closed.
  */
-export function playerSearchVisibleSql(table: "codex_search_player" | "codex_search_character"): string {
-  return `(CASE ${table}.kind
-  WHEN 'page' THEN EXISTS (SELECT 1 FROM codex_pages WHERE codex_pages.id = ${table}.record_id AND codex_pages.revealed = 1)
-  WHEN 'journal' THEN EXISTS (SELECT 1 FROM codex_journal WHERE codex_journal.id = ${table}.record_id AND codex_journal.revealed = 1)
-  WHEN 'map' THEN EXISTS (SELECT 1 FROM codex_maps WHERE codex_maps.id = ${table}.record_id AND codex_maps.revealed = 1)
+export const PLAYER_SEARCH_VISIBLE_SQL = `(CASE codex_search_player.kind
+  WHEN 'page' THEN EXISTS (SELECT 1 FROM codex_pages WHERE codex_pages.id = codex_search_player.record_id AND codex_pages.revealed = 1)
+  WHEN 'journal' THEN EXISTS (SELECT 1 FROM codex_journal WHERE codex_journal.id = codex_search_player.record_id AND codex_journal.revealed = 1)
+  WHEN 'map' THEN EXISTS (SELECT 1 FROM codex_maps WHERE codex_maps.id = codex_search_player.record_id AND codex_maps.revealed = 1)
   WHEN 'marker' THEN EXISTS (SELECT 1 FROM codex_markers JOIN codex_maps ON codex_maps.id = codex_markers.map_id
-    WHERE codex_markers.id = ${table}.record_id AND codex_markers.revealed = 1 AND codex_maps.revealed = 1)
-  WHEN 'quest' THEN EXISTS (SELECT 1 FROM codex_quests WHERE codex_quests.id = ${table}.record_id AND codex_quests.revealed = 1)
-  WHEN 'session' THEN EXISTS (SELECT 1 FROM codex_sessions WHERE codex_sessions.id = ${table}.record_id AND codex_sessions.revealed = 1)
+    WHERE codex_markers.id = codex_search_player.record_id AND codex_markers.revealed = 1 AND codex_maps.revealed = 1)
+  WHEN 'quest' THEN EXISTS (SELECT 1 FROM codex_quests WHERE codex_quests.id = codex_search_player.record_id AND codex_quests.revealed = 1)
+  WHEN 'session' THEN EXISTS (SELECT 1 FROM codex_sessions WHERE codex_sessions.id = codex_search_player.record_id AND codex_sessions.revealed = 1)
   ELSE 0 END)`;
-}
 
 /**
  * Whether a player may load an uploaded image: it is a revealed page's banner, or it appears in the player text of
@@ -241,36 +237,6 @@ export function connectionContext(store: CodexStore, reader: CodexReader = EVERY
   for (const entry of store.listTimeline())
     if (projectPlayerJournalEntry(entry, context) !== null) revealedSourceIds.add(entry.id);
   return { revealedPageIds, revealedSourceIds, reader, revealedSessionIds, openableLinkKeys: openableLinkKeys(store) };
-}
-
-/** A search hit's live record plus what its player predicate needs. Null when the record is gone. */
-export function searchRecord(store: CodexStore, ref: CodexSearchRef): CodexSearchRecord | null {
-  switch (ref.kind) {
-    case "page": {
-      const page = store.getPage(ref.id);
-      return page ? { kind: "page", page } : null;
-    }
-    case "journal": {
-      const entry = store.getEntry(ref.id);
-      return entry ? { kind: "journal", entry } : null;
-    }
-    case "map": {
-      const map = store.getMap(ref.id);
-      return map ? { kind: "map", map } : null;
-    }
-    case "marker": {
-      const marker = store.getMarker(ref.id);
-      return marker ? { kind: "marker", marker, mapRevealed: isMapVisible(store, marker.mapId) } : null;
-    }
-    case "quest": {
-      const quest = store.getQuest(ref.id);
-      return quest ? { kind: "quest", quest } : null;
-    }
-    case "session": {
-      const session = store.getSession(ref.id);
-      return session ? { kind: "session", session } : null;
-    }
-  }
 }
 
 /** Every record the reveal audit considers, each with the context its player projection takes. */

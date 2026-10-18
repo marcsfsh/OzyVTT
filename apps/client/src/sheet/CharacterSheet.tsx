@@ -19,6 +19,7 @@ import {
   Meter,
   Modal,
   ToastOutlet,
+  useDragSurface,
   useToast
 } from "@vtt/ui";
 import { abilityModifier } from "@vtt/rules-5e";
@@ -771,8 +772,9 @@ function LatestRollReroll({
 }
 
 /** The GM's sheet popped out of its dialog into a panel that moves and resizes over the page. */
-function FloatingSheet({ name, children }: Readonly<{ name: string; children: ReactNode }>) {
+export function FloatingSheet({ name, children }: Readonly<{ name: string; children: ReactNode }>) {
   const [rect, setRect] = useState({ x: 48, y: 48, width: 760, height: 620 });
+  const dragSurface = useDragSurface<HTMLDivElement>();
   const [drag, setDrag] = useState<null | {
     mode: "move" | "resize";
     grabX: number;
@@ -809,9 +811,9 @@ function FloatingSheet({ name, children }: Readonly<{ name: string; children: Re
       role="dialog"
       aria-label={`${name} character sheet`}
     >
-      <div className="cs-float-grip" onPointerDown={begin("move")} aria-hidden="true" />
+      <div ref={dragSurface} className="cs-float-grip" onPointerDown={begin("move")} aria-hidden="true" />
       {children}
-      <div className="cs-float-resize" aria-hidden="true" onPointerDown={begin("resize")} />
+      <div ref={dragSurface} className="cs-float-resize" aria-hidden="true" onPointerDown={begin("resize")} />
     </div>
   );
 }

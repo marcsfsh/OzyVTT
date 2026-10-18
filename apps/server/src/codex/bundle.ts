@@ -40,6 +40,19 @@ import {
   toWirePage,
   type CodexPageRecord
 } from "./pages.js";
+import {
+  BUILT_IN_TEMPLATE_ID,
+  insertTemplate,
+  legacyPrep,
+  listStoredTemplates,
+  prepSections,
+  storedDefaultTemplateId,
+  templateSections,
+  writeDefaultTemplate,
+  type PrepSectionInput,
+  type PrepTemplateSectionInput,
+  type StoredPrepTemplate
+} from "./prep.js";
 import { listQuestRecords, parseObjectives, restoreQuest, toWireQuest, type CodexQuestRecord } from "./quests.js";
 import { insertRevision, listAllRevisions, type CodexPageRevisionExportRow } from "./revisions.js";
 import { CODEX_CONTENT_TABLES } from "./schema.js";
@@ -119,6 +132,8 @@ export type CodexBundle = Readonly<{
   folders: readonly string[];
   revisions: readonly CodexPageRevisionExportRow[];
   settings?: CodexSettingsInput;
+  prepTemplates: readonly StoredPrepTemplate[];
+  defaultPrepTemplateId: string | null;
 }>;
 
 export function exportBundle(db: CodexDb): CodexBundle {
@@ -140,7 +155,9 @@ export function exportBundle(db: CodexDb): CodexBundle {
     calendar: getCalendar(db),
     folders: listFolders(db),
     revisions: listAllRevisions(db),
-    settings: { revisionHistory: revisionSettings(db), autosave: autosaveSettings(db) }
+    settings: { revisionHistory: revisionSettings(db), autosave: autosaveSettings(db) },
+    prepTemplates: listStoredTemplates(db),
+    defaultPrepTemplateId: storedDefaultTemplateId(db)
   };
 }
 
@@ -184,6 +201,14 @@ export function importBundle(db: CodexDb, raw: unknown): CodexImportCounts {
     for (const relationship of bundle.relationships) insertRelationship(db, relationship);
     // Revisions keep their ids, so `.../revisions/{revisionId}/restore` URLs survive a restore.
     for (const revision of bundle.revisions) insertRevision(db, revision);
+    for (const template of bundle.prepTemplates) insertTemplate(db, template);
+    const templateIds = new Set(bundle.prepTemplates.map((template) => template.id));
+    writeDefaultTemplate(
+      db,
+      bundle.defaultPrepTemplateId !== null && templateIds.has(bundle.defaultPrepTemplateId)
+        ? bundle.defaultPrepTemplateId
+        : null
+    );
     writeActiveSession(
       db,
       bundle.activeSessionId !== null && sessionIds.has(bundle.activeSessionId) ? bundle.activeSessionId : null
@@ -216,9 +241,17 @@ const BUNDLE_LIST_KEYS = [
   "quests",
   "standing",
   "revisions",
-  "folders"
+  "folders",
+  "prepTemplates"
 ] as const;
-const BUNDLE_VALUE_KEYS = ["activeSessionId", "publishedDate", "partyMarkerId", "calendar", "settings"] as const;
+const BUNDLE_VALUE_KEYS = [
+  "activeSessionId",
+  "publishedDate",
+  "partyMarkerId",
+  "calendar",
+  "settings",
+  "defaultPrepTemplateId"
+] as const;
 const BUNDLE_KEYS: ReadonlySet<string> = new Set<string>([...BUNDLE_LIST_KEYS, ...BUNDLE_VALUE_KEYS]);
 
 /**
@@ -391,22 +424,50 @@ function normalizeBundle(raw: unknown): NormalizedBundle {
     updatedAt: text(row.updatedAt),
     firstShownAt: nullableText(row.firstShownAt)
   }));
-  const sessions = rows("sessions", (row): CodexSession => ({
-    id: id(text(row.id)),
-    sessionNumber: sessionNo(typeof row.sessionNumber === "number" ? row.sessionNumber : null),
-    realDate: shortLabel(nullableText(row.realDate), 40, "date"),
-    attendees: attendees(stringList(row.attendees)),
-    prepBody: body(text(row.prepBody)),
-    recapBody: body(text(row.recapBody)),
-    revealedToPlayers: flag(row.revealedToPlayers),
-    status: sessionStatus(typeof row.status === "string" ? row.status : undefined),
-    tags: tags(stringList(row.tags)),
-    sceneIds: sessionSceneIds(stringList(row.sceneIds)),
-    rev: Math.max(1, count(row.rev, 1)),
-    createdAt: text(row.createdAt),
-    updatedAt: text(row.updatedAt),
-    firstShownAt: nullableText(row.firstShownAt)
-  }));
+  // The restore keeps each tick's own time, so the recap still reads when each clue was found.
+  const restoredAt = new Date().toISOString();
+  const sessions = rows("sessions", (row): CodexSession => {
+    // A backup from before prep sections carries `prepBody`, which restores as one Text section, as the migration does.
+    const prep = Array.isArray(row.prep)
+      ? prepSections(row.prep as PrepSectionInput[], { now: restoredAt, restore: true })
+      : legacyPrep(body(text(row.prepBody)));
+    const currentSceneId = typeof row.currentSceneId === "string" ? optionalId(row.currentSceneId) : null;
+    return {
+      id: id(text(row.id)),
+      sessionNumber: sessionNo(typeof row.sessionNumber === "number" ? row.sessionNumber : null),
+      realDate: shortLabel(nullableText(row.realDate), 40, "date"),
+      attendees: attendees(stringList(row.attendees)),
+      prep,
+      prepTemplateId: typeof row.prepTemplateId === "string" ? optionalId(row.prepTemplateId) : null,
+      currentSceneId:
+        currentSceneId !== null &&
+        prep.some((section) => section.type === "scenes" && section.scenes.some((scene) => scene.id === currentSceneId))
+          ? currentSceneId
+          : null,
+      recapBody: body(text(row.recapBody)),
+      revealedToPlayers: flag(row.revealedToPlayers),
+      status: sessionStatus(typeof row.status === "string" ? row.status : undefined),
+      tags: tags(stringList(row.tags)),
+      sceneIds: sessionSceneIds(stringList(row.sceneIds)),
+      rev: Math.max(1, count(row.rev, 1)),
+      createdAt: text(row.createdAt),
+      updatedAt: text(row.updatedAt),
+      firstShownAt: nullableText(row.firstShownAt)
+    };
+  });
+  const prepTemplates = rows("prepTemplates", (row): StoredPrepTemplate => {
+    const templateId = id(text(row.id));
+    if (templateId === BUILT_IN_TEMPLATE_ID)
+      throw new CodexValidationError("The starting template ships with the app, so a backup can't carry it.");
+    return {
+      id: templateId,
+      name: shortLabel(nullableText(row.name), 80, "template name") ?? "Template",
+      sections: templateSections(Array.isArray(row.sections) ? (row.sections as PrepTemplateSectionInput[]) : []),
+      rev: Math.max(1, count(row.rev, 1)),
+      createdAt: text(row.createdAt),
+      updatedAt: text(row.updatedAt)
+    };
+  });
   const journal = rows("journal", (row): CodexJournalEntry => {
     const kind = journalKind(text(row.kind));
     return {
@@ -550,7 +611,8 @@ function normalizeBundle(raw: unknown): NormalizedBundle {
     ["quests", quests],
     ["standing", standing],
     ["relationships", relationships],
-    ["revisions", revisions]
+    ["revisions", revisions],
+    ["prepTemplates", prepTemplates]
   ] as const) {
     const seen = new Set<string | number>();
     for (const { id: recordId } of records as ReadonlyArray<{ id: string | number }>) {
@@ -601,6 +663,9 @@ function normalizeBundle(raw: unknown): NormalizedBundle {
     quests,
     standing,
     revisions,
+    prepTemplates,
+    defaultPrepTemplateId:
+      typeof bundle.defaultPrepTemplateId === "string" ? optionalId(bundle.defaultPrepTemplateId) : null,
     settings: settingsRaw
       ? {
           revisionHistory: {

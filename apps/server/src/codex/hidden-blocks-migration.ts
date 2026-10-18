@@ -47,8 +47,6 @@ ALTER TABLE codex_relationships ADD COLUMN learned_year INTEGER;
 ALTER TABLE codex_relationships ADD COLUMN learned_month INTEGER;
 ALTER TABLE codex_relationships ADD COLUMN learned_day INTEGER;
 ALTER TABLE codex_links ADD COLUMN character_ids_json TEXT NOT NULL DEFAULT '[]';
--- Text shown only to some party characters, one row per record and character.
-CREATE VIRTUAL TABLE codex_search_character USING fts5(kind UNINDEXED, record_id UNINDEXED, character_id UNINDEXED, title, body);
 `;
 
 const DROPPED = `

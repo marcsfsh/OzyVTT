@@ -105,7 +105,18 @@ const SESSION = (over: Partial<CodexSession> = {}): CodexSession => ({
   tags: [],
   realDate: "2026-07-12",
   attendees: ["Ozy"],
-  prepBody: "Strahd ambushes them at the bridge.",
+  prep: [
+    {
+      id: "prep-1",
+      templateSectionId: null,
+      title: "Prep notes",
+      prompt: null,
+      type: "text",
+      text: "Strahd ambushes them at the bridge."
+    }
+  ],
+  prepTemplateId: null,
+  currentSceneId: null,
   recapBody: "The party crossed the mists.",
   revealedToPlayers: false,
   status: "planned",
@@ -121,7 +132,16 @@ const S8 = SESSION({
   id: "s8",
   sessionNumber: 8,
   realDate: "2026-07-26",
-  prepBody: "The heart of the castle.",
+  prep: [
+    {
+      id: "prep-8",
+      templateSectionId: null,
+      title: "Prep notes",
+      prompt: null,
+      type: "text",
+      text: "The heart of the castle."
+    }
+  ],
   recapBody: "They reached the spire.",
   rev: 2
 });
@@ -369,7 +389,16 @@ describe("The player's session card (viewer safety)", () => {
     playerSessions.mockResolvedValue([
       {
         ...PLAYER_SESSION,
-        prepBody: "The heart of the castle.",
+        prep: [
+          {
+            id: "prep-8",
+            templateSectionId: null,
+            title: "Prep notes",
+            prompt: null,
+            type: "text",
+            text: "The heart of the castle."
+          }
+        ],
         attendees: ["Ana", "Bo"],
         status: "planned",
         rev: 7,

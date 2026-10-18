@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { migrate, type Migration } from "../database.js";
 import { backfillPagesAndEntries } from "./first-shown.js";
 import { migrateToHiddenBlocks } from "./hidden-blocks-migration.js";
+import { legacyPrep } from "./prep.js";
 
 /**
  * The Codex tables as the baseline made them; later migrations change them. Records keep both layers in one row
@@ -241,7 +242,36 @@ export const CODEX_MIGRATIONS: readonly Migration[] = [
   },
   // Hidden blocks in place of the GM body, an audience on each field and objective, relationship dates, and
   // first-shown dates on every record players list. See `hidden-blocks-migration.ts`.
-  { version: 4, up: migrateToHiddenBlocks }
+  { version: 4, up: migrateToHiddenBlocks },
+  {
+    // Session prep becomes sections copied from a template, with a library of templates and a default. A session's
+    // free-text prep becomes one Text section, so nothing is lost; its text is the same, so its search row and
+    // links stand as they are.
+    version: 5,
+    up: (database) => {
+      database.exec(`
+        ALTER TABLE codex_sessions ADD COLUMN prep_json TEXT NOT NULL DEFAULT '[]';
+        ALTER TABLE codex_sessions ADD COLUMN prep_template_id TEXT;
+        ALTER TABLE codex_sessions ADD COLUMN current_scene_id TEXT;
+        ALTER TABLE codex_meta ADD COLUMN default_prep_template_id TEXT;
+        CREATE TABLE codex_prep_templates (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          sections_json TEXT NOT NULL,
+          rev INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        ) STRICT;
+      `);
+      const sessions = database.prepare("SELECT id, prep_body FROM codex_sessions").all() as Array<{
+        id: string;
+        prep_body: string;
+      }>;
+      const update = database.prepare("UPDATE codex_sessions SET prep_json = ? WHERE id = ?");
+      for (const session of sessions) update.run(JSON.stringify(legacyPrep(session.prep_body)), session.id);
+      database.exec("ALTER TABLE codex_sessions DROP COLUMN prep_body");
+    }
+  }
 ];
 
 /** Creates or checks the Codex tables. A file from before the migration history was reset is refused. */
@@ -262,8 +292,9 @@ export const CODEX_AUTHORED_TABLES = [
   "codex_standing"
 ] as const;
 
-/** Everything a restore replaces: the authored tables plus what derives from them, children first. */
+/** Everything a restore replaces: the authored tables, the prep templates and what derives from them, children first. */
 export const CODEX_CONTENT_TABLES = [
+  "codex_prep_templates",
   "codex_page_revisions",
   "codex_links",
   "codex_relationships",
@@ -276,6 +307,5 @@ export const CODEX_CONTENT_TABLES = [
   "codex_folders",
   "codex_pages",
   "codex_search_player",
-  "codex_search_gm",
-  "codex_search_character"
+  "codex_search_gm"
 ] as const;

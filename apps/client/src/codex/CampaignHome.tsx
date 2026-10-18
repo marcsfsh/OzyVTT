@@ -37,7 +37,7 @@ export type CampaignEntry = Readonly<{
 /** `revealedToPlayers` is GM-only and absent from a player's maps. */
 export type CampaignMap = Readonly<{ id: string; name: string; revealedToPlayers?: boolean }>;
 /**
- * No `prep` field, deliberately: a shared type that could carry `prepBody` would put the GM's plan one
+ * No `prep` field, deliberately: a shared type that could carry the prep would put the GM's plan one
  * spread away from a component players render. The caller computes `heading` ("Next", "This" or "Last session").
  */
 export type CampaignSession = Readonly<{

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CodexStore } from "../src/codex-store.js";
 import { projectGmSession, projectPlayerSession } from "../src/codex-projections.js";
+import { prepNotes } from "./codex-prep-notes.js";
 
 // A session's `sceneIds` follow the marker pattern (JSON id array, no foreign key, dangling links
 // shown as such) with one difference: they are always GM-only. Revealing a session publishes its
@@ -29,14 +30,14 @@ describe("session scene attachments", () => {
   it("round-trips, dedupes, and merges like every other session field", () => {
     const session = store.createSession({
       sessionNumber: 4,
-      prepBody: "Ambush at the bridge.",
+      prep: prepNotes("Ambush at the bridge."),
       sceneIds: [SCENE_A, SCENE_B, SCENE_A]
     });
     expect(session.sceneIds).toEqual([SCENE_A, SCENE_B]);
     expect(store.getSession(session.id)!.sceneIds).toEqual([SCENE_A, SCENE_B]);
 
     // Omitted means unchanged: the console PATCHes a whole draft on every autosave.
-    const edited = store.updateSession(session.id, { prepBody: "Ambush at the ford." }, session.rev);
+    const edited = store.updateSession(session.id, { prep: prepNotes("Ambush at the ford.") }, session.rev);
     expect(edited.sceneIds).toEqual([SCENE_A, SCENE_B]);
     // Supplied means replaced, as with markers.
     const detached = store.updateSession(session.id, { sceneIds: [SCENE_B] }, edited.rev);
@@ -72,7 +73,7 @@ describe("session scene attachments", () => {
   it("keeps scene ids out of both search indexes: they are ids, not text", () => {
     const session = store.createSession({
       sessionNumber: 6,
-      prepBody: "Prep",
+      prep: prepNotes("Prep"),
       recapBody: "Recap",
       sceneIds: [SCENE_A]
     });
