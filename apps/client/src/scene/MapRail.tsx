@@ -65,12 +65,18 @@ export function MapRail(
     Readonly<{
       /** The selected drawing's editor: it takes the options column while a drawing is selected. */
       inspector?: ReactNode;
+      /** A map that only shows (a preview, a map's own page): View alone, since nothing on it may change. */
+      readOnly?: boolean;
     }>
 ) {
-  const { role, tool, onToolChange, calibrated, onLocate, inspector } = props;
+  const { role, tool, onToolChange, calibrated, onLocate, inspector, readOnly = false } = props;
   const [openGroup, setOpenGroup] = useState<GroupId | null>(null);
   const baseId = useId();
-  const groups: GroupId[] = role === "gm" ? ["draw", "fog", "terrain", "walls", "light", "view"] : ["draw", "view"];
+  const groups: GroupId[] = readOnly
+    ? ["view"]
+    : role === "gm"
+      ? ["draw", "fog", "terrain", "walls", "light", "view"]
+      : ["draw", "view"];
   const activeGroup = groupOf(tool);
   // The header's fog and vision chips open their tool here.
   useMapToolGroupRequests((group) => {
@@ -101,7 +107,7 @@ export function MapRail(
   return (
     <div className={`map-rail-wrap${shown ? " has-options" : ""}`}>
       <div className="map-rail" role="toolbar" aria-label="Map tools">
-        {DIRECT_TOOLS.map((entry) => {
+        {(readOnly ? [] : DIRECT_TOOLS).map((entry) => {
           const blocked = entry.needsGrid === true && !calibrated;
           return (
             <button

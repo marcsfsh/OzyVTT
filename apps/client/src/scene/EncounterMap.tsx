@@ -37,7 +37,9 @@ import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
 import { cameraFocus, useCameraFollow } from "./cameraFollow";
 import { VisionLayer } from "./VisionLayer";
-import { publishTableGeometry, useTokenFocusRequests } from "./tableGeometry";
+import { publishTableGeometry, usePlacementRequests, useTokenFocusRequests } from "./tableGeometry";
+import { MapSpotMenu, type SpotChoice } from "./MapSpotMenu";
+import { GridLines } from "./GridLines";
 import { selectToken } from "./selectedToken";
 import { creatureNumbers, tokenLabel } from "../table/numbering";
 import { caughtByArea } from "../table/targetHints";
@@ -122,7 +124,9 @@ export function EncounterMap({
   vision,
   moveSceneId,
   healthDisplay,
-  state
+  state,
+  readOnly = false,
+  showGrid = false
 }: Readonly<{
   assetId: string;
   token: string | null;
@@ -147,6 +151,10 @@ export function EncounterMap({
   healthDisplay?: HealthDisplay;
   /** Full view, passed to a token's character sheet so its dice log works when opened from the map. */
   state?: GmView | PlayerView;
+  /** The map only shows (a preview, a map's own page): pan and zoom, and nothing is sent. */
+  readOnly?: boolean;
+  /** Draws the calibrated grid over the art, to check that it lines up. */
+  showGrid?: boolean;
 }>) {
   const image = useAuthorizedMapImage(assetId, token);
   const grid = useMapCalibration(assetId, token);
@@ -154,6 +162,13 @@ export function EncounterMap({
   const [defaultVisibility, setDefaultVisibility] = useState<AnnotationVisibility>("public");
   const [defaultActorId, setDefaultActorId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
+  /** What a right-click or long press on an empty spot offers to put there. */
+  const [spotMenu, setSpotMenu] = useState<{ point: { x: number; y: number }; x: number; y: number } | null>(null);
+  /** A creature armed from outside the map (a scene's list): the next press on the map places it. */
+  const [armedActorId, setArmedActorId] = useState<string | null>(null);
+  usePlacementRequests((actorId) => {
+    if (!readOnly) setArmedActorId(actorId);
+  });
   // Tap-to-target: the GM's for any creature, a player's for their own character's action. Both send the same
   // `action:resolve`, and the server decides range and who may be targeted.
   const targetingSession = useTargeting();
@@ -211,6 +226,7 @@ export function EncounterMap({
   };
 
   const canMove = (actorId: string) => {
+    if (readOnly) return false;
     if (role === "gm") return true;
     const actor = actorsById.get(actorId);
     return actor !== undefined && "claimStatus" in actor && actor.claimStatus === "mine";
@@ -372,7 +388,18 @@ export function EncounterMap({
     onPlaceLight: (point) => {
       const preset = LIGHT_PRESETS.find((entry) => entry.id === lightPreset) ?? LIGHT_PRESETS[0];
       commands.addLight(point, preset);
-    }
+    },
+    readOnly,
+    armedActorId,
+    onPlaceArmed: (point) => {
+      if (!armedActorId) return;
+      setArmedActorId(null);
+      void commands.submitMove(armedActorId, point);
+    },
+    // A player's spot menu only places their own waiting token, so it opens only while one waits.
+    ...(readOnly || (role === "player" && !tokens.some((placed) => placed.position === null && canMove(placed.actorId)))
+      ? {}
+      : { onMapMenu: setSpotMenu })
   });
 
   useEffect(() => {
@@ -416,10 +443,44 @@ export function EncounterMap({
   const unplaced = tokens.filter(
     (encounterToken) => encounterToken.position === null && canMove(encounterToken.actorId)
   );
+  // Escape withdraws an armed placement.
+  useEffect(() => {
+    if (!armedActorId) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setArmedActorId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [armedActorId]);
+  const armedName = armedActorId ? (actorsById.get(armedActorId)?.name ?? null) : null;
+  const spotChoices = (point: { x: number; y: number }): SpotChoice[] => [
+    ...unplaced.flatMap((waiting) => {
+      const actor = actorsById.get(waiting.actorId);
+      return actor
+        ? [
+            {
+              id: actor.id,
+              label: `Place ${tokenLabel(actor, numbers.get(actor.id))} here`,
+              onChoose: () => void commands.submitMove(actor.id, point)
+            }
+          ]
+        : [];
+    }),
+    ...(role === "gm"
+      ? [
+          {
+            id: "light",
+            label: `Place a light here · ${(LIGHT_PRESETS.find((entry) => entry.id === lightPreset) ?? LIGHT_PRESETS[0]).label}`,
+            onChoose: () =>
+              commands.addLight(point, LIGHT_PRESETS.find((entry) => entry.id === lightPreset) ?? LIGHT_PRESETS[0])
+          }
+        ]
+      : [])
+  ];
   const dragging = gesture?.kind === "token" ? gesture : null;
   // The tray shows only while tokens wait in it; a token goes back to it from its menu, so a drag never pulls the tray
   // over the map.
-  const trayShown = unplaced.length > 0;
+  const trayShown = unplaced.length > 0 && !readOnly;
   // Show the dragged token snapped to the grid live (mirrors the server snap on release).
   const draggingSizeCells = dragging ? (tokensById.get(dragging.actorId)?.sizeCells ?? 1) : 1;
   const dragSnappedPoint = dragging?.point
@@ -553,8 +614,9 @@ export function EncounterMap({
       onToggleFullscreen={view.toggleFullscreen}
       notificationsMuted={notificationsMuted}
       onNotificationsMutedChange={setNotificationsMuted}
-      {...(role === "player" && ownActorId ? { onLocate: () => focusOn(ownActorId) } : {})}
+      {...(role === "player" && ownActorId && !readOnly ? { onLocate: () => focusOn(ownActorId) } : {})}
       {...(inspector ? { inspector } : {})}
+      readOnly={readOnly}
     />
   );
   // Whose eyes the GM is looking through, named in the banner above the map.
@@ -570,6 +632,14 @@ export function EncounterMap({
             <span>Seeing what {seeingAs} sees · GM only</span>
             <Button variant="secondary" size="sm" onClick={() => setLookThrough(null)}>
               Exit
+            </Button>
+          </div>
+        )}
+        {armedName && (
+          <div className="map-seeing-as map-placing" role="status">
+            <span>Tap the map where {armedName} goes.</span>
+            <Button variant="secondary" size="sm" onClick={() => setArmedActorId(null)}>
+              Cancel
             </Button>
           </div>
         )}
@@ -595,6 +665,9 @@ export function EncounterMap({
                   aria-label={`${altText}. Interactive tokens are layered above this map.`}
                 >
                   <image href={image.url} width={size.width} height={size.height} role="img" aria-label={altText} />
+                  {showGrid && calibration && (
+                    <GridLines calibration={calibration} width={size.width} height={size.height} />
+                  )}
                   <TerrainOverlay difficult={difficult} cellSizePx={calibration?.cellSizePx ?? 50} />
 
                   {/* Shapes render below tokens; measurements render above them. */}
@@ -764,6 +837,14 @@ export function EncounterMap({
             <p className="encounter-map-feedback" role="status" aria-live="polite">
               {message}
             </p>
+          )}
+          {spotMenu && (
+            <MapSpotMenu
+              x={spotMenu.x}
+              y={spotMenu.y}
+              choices={spotChoices(spotMenu.point)}
+              onClose={() => setSpotMenu(null)}
+            />
           )}
           {contextMenu &&
             (() => {

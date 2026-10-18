@@ -36,6 +36,19 @@
   font-size: var(--fs-sm);
   font-weight: 700;
 }
+/* A creature armed to be placed: the next press on the map puts it there. Cyan, since it is the GM's selection. */
+.map-seeing-as.map-placing {
+  border-bottom-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, var(--surface-1));
+  color: var(--cyan-hi);
+}
+/* The calibrated grid, drawn to check it against the printed squares; one pixel at any zoom. */
+.map-grid-lines line {
+  stroke: var(--cyan);
+  stroke-opacity: 0.75;
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
 @media (max-width: 979px) {
   .map-bench {
     flex-direction: column;

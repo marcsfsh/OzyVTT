@@ -85,7 +85,11 @@ export function useMapGestures({
   onSelect,
   onContextMenu: openMenu,
   onPlaceLight,
-  onTokenPress
+  onTokenPress,
+  readOnly = false,
+  armedActorId = null,
+  onPlaceArmed,
+  onMapMenu
 }: Readonly<{
   role: "gm" | "player";
   tool: MapTool;
@@ -111,6 +115,13 @@ export function useMapGestures({
   onPlaceLight?: (point: Point) => void;
   /** A token pressed with the Select tool, or opened for its menu. */
   onTokenPress?: (actorId: string) => void;
+  /** The map only shows: a drag pans and two fingers zoom, and nothing is sent. */
+  readOnly?: boolean;
+  /** A creature waiting to be placed: the next press on the map puts it there (button, then click). */
+  armedActorId?: string | null;
+  onPlaceArmed?: (point: Point) => void;
+  /** A right-click or a long press on an empty spot: the menu of what can go there. */
+  onMapMenu?: (menu: Readonly<{ point: Point; x: number; y: number }>) => void;
 }>) {
   const { camera, setCamera, boxFraction } = view;
   const { busyActorId, setMessage } = commands;
@@ -186,13 +197,63 @@ export function useMapGestures({
     onSelect(null);
     openMenu({ actorId, x, y });
   };
-  // Mouse right-click opens the token menu; touch uses a long press started in beginGesture.
+  // Mouse right-click opens the token menu, or off a token the spot's menu; touch uses a long press started in
+  // beginGesture.
   const onContextMenu = (event: MouseEvent<HTMLDivElement>) => {
+    if (readOnly) return;
     const actorId = (event.target as Element).closest<HTMLElement>("[data-token-id]")?.dataset.tokenId;
-    if (!actorId || !tokensById.has(actorId)) return; // let the browser's default menu show off-token
+    if (!actorId || !tokensById.has(actorId)) {
+      const point =
+        onMapMenu && !(event.target as Element).closest(MAP_OVERLAYS)
+          ? pointFromScreen(event.clientX, event.clientY)
+          : null;
+      // Off the map, the browser's own menu shows.
+      if (!point || !onMapMenu) return;
+      event.preventDefault();
+      onSelect(null);
+      onMapMenu({ point, x: event.clientX, y: event.clientY });
+      return;
+    }
     if (role === "player" && !canMove(actorId)) return;
     event.preventDefault();
     openContextMenuFor(actorId, event.clientX, event.clientY);
+  };
+  /** Pans from an empty spot (or anywhere on a map that only shows). A finger held still opens the spot's menu. */
+  const startPan = (event: PointerEvent<HTMLDivElement>) => {
+    const svg = svgRef.current;
+    if (!svg || !size || !(event.target as Element).closest("svg")) return;
+    onSelect(null);
+    event.preventDefault();
+    capturePointer(event);
+    const rect = svg.getBoundingClientRect();
+    const shown = viewSize(size, view.box, camera.zoom);
+    setGesture({
+      kind: "pan",
+      startClient: { x: event.clientX, y: event.clientY },
+      startCenter: camera.center,
+      scaleX: shown.width / rect.width,
+      scaleY: shown.height / rect.height
+    });
+    const point =
+      onMapMenu && !readOnly && event.pointerType === "touch" ? pointFromScreen(event.clientX, event.clientY) : null;
+    if (point && onMapMenu) {
+      const captureEl = event.currentTarget,
+        pointerId = event.pointerId,
+        startX = event.clientX,
+        startY = event.clientY;
+      clearLongPress();
+      longPressRef.current = { startX, startY };
+      longPressTimerRef.current = setTimeout(() => {
+        clearLongPress();
+        try {
+          captureEl.releasePointerCapture(pointerId);
+        } catch {
+          /* pointer already released */
+        }
+        setGesture(null);
+        onMapMenu({ point, x: startX, y: startY });
+      }, 500);
+    }
   };
 
   const beginGesture = (event: PointerEvent<HTMLDivElement>) => {
@@ -225,6 +286,18 @@ export function useMapGestures({
             }
           : null
       );
+      return;
+    }
+    if (readOnly) {
+      startPan(event);
+      return;
+    }
+    // A creature armed from outside the map goes where the map is pressed next.
+    if (armedActorId && onPlaceArmed) {
+      const point = pointFromScreen(event.clientX, event.clientY);
+      if (!point) return;
+      event.preventDefault();
+      onPlaceArmed(point);
       return;
     }
     if (tool === "ping") {
@@ -398,20 +471,7 @@ export function useMapGestures({
       return;
     }
     // Empty background in select mode: deselect + pan.
-    const svg = svgRef.current;
-    if (tool !== "select" || !svg || !size || !(event.target as Element).closest("svg")) return;
-    onSelect(null);
-    event.preventDefault();
-    capturePointer(event);
-    const rect = svg.getBoundingClientRect();
-    const shown = viewSize(size, view.box, camera.zoom);
-    setGesture({
-      kind: "pan",
-      startClient: { x: event.clientX, y: event.clientY },
-      startCenter: camera.center,
-      scaleX: shown.width / rect.width,
-      scaleY: shown.height / rect.height
-    });
+    if (tool === "select") startPan(event);
   };
   const continueGesture = (event: PointerEvent<HTMLDivElement>) => {
     if (pointers.current.has(event.pointerId))
@@ -456,6 +516,12 @@ export function useMapGestures({
       return;
     }
     if (gesture.kind === "pan") {
+      if (
+        longPressRef.current &&
+        (Math.abs(event.clientX - longPressRef.current.startX) > TAP_SLOP ||
+          Math.abs(event.clientY - longPressRef.current.startY) > TAP_SLOP)
+      )
+        clearLongPress();
       const dx = (event.clientX - gesture.startClient.x) * gesture.scaleX;
       const dy = (event.clientY - gesture.startClient.y) * gesture.scaleY;
       setCamera((current) => ({
