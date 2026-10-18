@@ -3,14 +3,14 @@ import { Alert, Button, Input, RevealSwitch, SaveState } from "@vtt/ui";
 import type { CodexAutosaveSettings, CodexPage, CodexPageConnection, CodexPageSummary } from "@vtt/domain";
 import { calendarApi, codexApi, uploadCodexAsset } from "./api";
 import { CodexEditor } from "./CodexEditor";
-import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";
+import { BODY_LAYER } from "./TwoLayerBodyTabs";
 import { dateDraftOf, dateOfDraft } from "./InWorldDateFields";
 import { PageDetails, type PageDraft } from "./PageDetails";
 import { RevisionHistory } from "./RevisionHistory";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
 import { useCodexQuery } from "./useCodexQuery";
-import { ENTITY_DEFS, entityDef, splitEntityFields, type EntityType } from "./entities";
+import { ENTITY_DEFS, entityDef, type EntityType } from "./entities";
 
 /**
  * The page editor. The centre column holds only the body being written; properties and connections live
@@ -24,11 +24,10 @@ function draftOf(page: CodexPage): PageDraft {
   return {
     title: page.title,
     entityType: page.entityType,
-    fields: { ...page.fields, ...page.gmFields },
+    fields: page.fields,
     folder: page.folder ?? "",
     tags: page.tags,
     playerBody: page.playerBody,
-    gmBody: page.gmBody,
     bannerAssetId: page.bannerAssetId,
     // The raw date the GM typed, still valid if the calendar changed.
     ...dateDraftOf(page.inWorldDate)
@@ -76,7 +75,6 @@ export function PageEditor({
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<PageDraft>(() => draftOf(page));
   const [revealed, setRevealed] = useState(page.revealedToPlayers);
-  const [tab, setTab] = useState<BodyLayer>("player");
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const revRef = useRef(page.rev);
@@ -105,16 +103,14 @@ export function PageEditor({
   /** Autosave at the GM's cadence; when off, the same hook drives Save, the dirty readout and the navigation guards. */
   const save = useCallback(
     async (next: PageDraft) => {
-      const { fields, gmFields } = splitEntityFields(next.entityType, next.fields);
+      // Every value goes in one map; the server keeps which fields are Hidden.
       const updated = await codexApi.updatePage(gmToken, page.id, {
         title: next.title.trim() || "Untitled",
         entityType: next.entityType,
-        fields,
-        gmFields,
+        fields: next.fields,
         folder: next.folder.trim() || null,
         tags: next.tags,
         playerBody: next.playerBody,
-        gmBody: next.gmBody,
         bannerAssetId: next.bannerAssetId,
         // Only `event` pages send a date. Omitting it leaves the stored date alone, so switching kinds is lossless.
         ...(next.entityType === "event" ? { inWorldDate: dateOfDraft(next) } : {}),
@@ -154,9 +150,7 @@ export function PageEditor({
     markSaved(next);
   }, [page, markSaved]);
 
-  const body = tab === "player" ? draft.playerBody : draft.gmBody;
-  const setBody = (next: string) =>
-    setDraft((prev) => ({ ...prev, [tab === "player" ? "playerBody" : "gmBody"]: next }));
+  const setBody = (next: string) => setDraft((prev) => ({ ...prev, playerBody: next }));
   const setField = (key: string, value: string) =>
     setDraft((prev) => ({ ...prev, fields: { ...prev.fields, [key]: value } }));
   const isEvent = draft.entityType === "event";
@@ -312,26 +306,20 @@ export function PageEditor({
 
       <div className="codex-editor-cols">
         <div className="codex-editor-center">
-          <TwoLayerBodyTabs value={tab} onChange={setTab} />
-
-          {/* `fill` makes the editor take the frame's height in place of the primitive's 14rem floor. */}
+          {/* `fill` makes the editor take the frame's height in place of the primitive's 14rem floor. Hidden
+              blocks have their own routes; this edits the player text. */}
           <CodexEditor
             token={gmToken}
-            value={body}
+            value={draft.playerBody}
             onChange={setBody}
             fill
-            ariaLabel={BODY_LAYER[tab].label}
-            placeholder={
-              tab === "player"
-                ? "What players can read about this page…"
-                : "Hidden from players: hooks, stats, the twist…"
-            }
+            ariaLabel={BODY_LAYER.player.label}
+            placeholder="What players can read about this page…"
             pages={pages}
             excludePageId={page.id}
             onNavigate={onNavigate}
             /* The pages view's link handler opens quick-create for a title no page has. */
             onCreatePage={onNavigate}
-            gmLayer={tab === "gm"}
           />
         </div>
 

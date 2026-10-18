@@ -132,7 +132,7 @@ beforeEach(() => {
   listFolders.mockResolvedValue([]);
   listConnections.mockResolvedValue([]);
   party.mockResolvedValue(null);
-  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", gmBody: "", gmFields: {} }, connections: [] });
+  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", blocks: [] }, connections: [] });
   getSettings.mockResolvedValue({ revealWarn: true, autosave: { enabled: true, intervalSeconds: 1 } });
   search.mockResolvedValue({ hits: [], truncated: false });
   playerSearch.mockResolvedValue({ hits: [], truncated: false });

@@ -99,7 +99,7 @@ const quest = (id: string, title: string, status: "active" | "completed" | "fail
   title,
   status,
   playerBody: "",
-  gmBody: "",
+  blocks: [],
   objectives: [],
   entityIds: [],
   tags: [],

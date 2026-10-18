@@ -8,7 +8,7 @@ import { InWorldDateFields, type DateDraft } from "./InWorldDateFields";
 import { PageMarkers } from "./PageMarkers";
 import { PageTimeline } from "./PageTimeline";
 
-/** What the page editor holds while the GM writes. Secret field values sit in `fields` until a save splits them. */
+/** What the page editor holds while the GM writes. `fields` holds every value; the server keeps which are Hidden. */
 export type PageDraft = DateDraft & {
   title: string;
   entityType: EntityType;
@@ -16,7 +16,6 @@ export type PageDraft = DateDraft & {
   folder: string;
   tags: readonly string[];
   playerBody: string;
-  gmBody: string;
   bannerAssetId: string | null;
 };
 

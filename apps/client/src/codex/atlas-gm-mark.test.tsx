@@ -38,7 +38,8 @@ const MAP = (id: string, name: string, revealedToPlayers: boolean, parentMapId: 
   sortKey: 0,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 });
 
 /** Two roots (so the top-level switcher renders) and a child (so "Drill into" renders). Only the unrevealed chips carry the mark. */

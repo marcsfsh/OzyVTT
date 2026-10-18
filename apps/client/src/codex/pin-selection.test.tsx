@@ -65,7 +65,8 @@ const MAP: CodexMap = {
   sortKey: 0,
   tags: [],
   createdAt: "2026-07-31T00:00:00.000Z",
-  updatedAt: "2026-07-31T00:00:00.000Z"
+  updatedAt: "2026-07-31T00:00:00.000Z",
+  firstShownAt: null
 };
 const marker = (id: string, label: string): CodexMarker => ({
   id,
@@ -83,7 +84,8 @@ const marker = (id: string, label: string): CodexMarker => ({
   isParty: false,
   revealedToPlayers: false,
   createdAt: "2026-07-31T00:00:00.000Z",
-  updatedAt: "2026-07-31T00:00:00.000Z"
+  updatedAt: "2026-07-31T00:00:00.000Z",
+  firstShownAt: null
 });
 const MARKERS = [marker("k1", "Village"), marker("k2", "Castle")];
 

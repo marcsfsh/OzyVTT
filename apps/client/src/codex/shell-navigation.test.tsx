@@ -113,7 +113,7 @@ beforeEach(() => {
   listSessions.mockResolvedValue({ sessions: [], activeSessionId: null });
   listQuests.mockResolvedValue([]);
   listStanding.mockResolvedValue([]);
-  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", gmBody: "", gmFields: {} }, connections: [] });
+  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", blocks: [] }, connections: [] });
 });
 
 /** Every navigating sidebar item as `[label, address]`, from the table the sidebar renders. */
