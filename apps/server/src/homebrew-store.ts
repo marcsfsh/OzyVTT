@@ -189,7 +189,8 @@ const MAX_LIMIT = 200;
 /** Literal because migration SQL must be frozen; a test asserts it still matches the contract. */
 const TYPE_CHECK_LIST = "'class','subclass','species','background','feat','spell','equipment','monster','spell-list'";
 
-const MIGRATIONS: readonly Migration[] = [
+/** Exported so a test can build a file as an older server left it. */
+export const HOMEBREW_MIGRATIONS: readonly Migration[] = [
   {
     version: 1,
     up: (database) =>
@@ -370,7 +371,7 @@ export class HomebrewStore implements HomebrewContentSource {
     if (this.database) return;
     const database = openDatabase(this.databasePath);
     try {
-      migrate(database, "homebrew", MIGRATIONS, {
+      migrate(database, "homebrew", HOMEBREW_MIGRATIONS, {
         path: this.databasePath,
         legacyTables: ["homebrew_schema_migrations"]
       });
