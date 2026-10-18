@@ -1,0 +1,834 @@
+/* The atlas: the map and its toolbar beside a panel of pins, maps inside and details. Tokens only. */
+
+.atlas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 40%, 520px);
+  height: 100%;
+  min-height: 0;
+}
+.atlas-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.atlas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-height: var(--tap-min);
+}
+.atlas-grow {
+  flex: 1 1 auto;
+}
+.atlas-mapframe {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+/* ----- The way up ----- */
+.atlas-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.atlas-crumbstep {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.atlas-crumbsep {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+/* Grows to 44px: the crumbs wrap and sit too close for an ::after hit area. */
+.atlas-crumb {
+  min-height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  background: none;
+  border: 0;
+  color: var(--cyan-hi);
+  font: 700 var(--fs-sm) / 1.2 var(--font-label);
+  cursor: pointer;
+}
+.atlas-crumb:hover {
+  text-decoration: underline;
+}
+.atlas-crumb.is-current {
+  color: var(--text);
+  cursor: default;
+  text-decoration: none;
+}
+
+/* ----- Layers ----- */
+.atlas-layers {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+/* A chip that grows its own 44px: the chips wrap, so an ::after would overlap the row below. */
+.atlas-layer {
+  min-height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1 var(--font-label);
+  cursor: pointer;
+}
+.atlas-layer[aria-pressed="true"] {
+  color: var(--text);
+  border-color: var(--cyan);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.atlas-layer.is-gm[aria-pressed="true"] {
+  border-color: var(--violet);
+  box-shadow: inset 3px 0 0 var(--violet);
+  color: var(--violet-hi);
+}
+.atlas-layer-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+}
+.atlas-layersmenu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.atlas-check {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line-strong);
+  flex: none;
+}
+.atlas-check.is-on {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  box-shadow: inset 0 0 0 2px var(--surface-2);
+}
+.atlas-btnicon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+
+/* ----- The map ----- */
+.atlas-map {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 12rem;
+  overflow: hidden;
+  background: var(--void);
+  border: var(--rim-w) solid var(--rim-color);
+  touch-action: none;
+}
+.atlas-map.is-placing {
+  cursor: crosshair;
+}
+.atlas-map-status {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+.atlas-map-status.is-error {
+  color: var(--danger-text);
+}
+.atlas-map-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.atlas-map-svg:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+.atlas-map-hint {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  max-width: calc(100% - 2 * var(--space-3));
+  padding: var(--space-1) var(--space-3);
+  background: var(--overlay);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-align: center;
+  pointer-events: none;
+}
+.atlas-map-overlay {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+}
+
+.atlas-pin {
+  cursor: pointer;
+}
+.atlas-pin-bg {
+  fill: var(--surface-1);
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+.atlas-pin-ico {
+  fill: currentColor;
+}
+.atlas-pin.is-hidden .atlas-pin-bg {
+  stroke: var(--violet);
+}
+.atlas-pin.is-hidden .atlas-pin-ico {
+  fill: var(--violet-hi);
+}
+.atlas-pin.is-dimmed {
+  opacity: 0.35;
+}
+.atlas-pin-selectring {
+  fill: none;
+  stroke: var(--cyan);
+}
+.atlas-pin-partyring {
+  fill: none;
+  stroke: var(--magenta);
+}
+.atlas-pin-label,
+.atlas-pin-partylabel,
+.atlas-ground-label,
+.atlas-person-more {
+  paint-order: stroke;
+  stroke: var(--void);
+  stroke-linejoin: round;
+  font-family: var(--font-label);
+  font-weight: 700;
+}
+.atlas-pin-label {
+  fill: var(--text);
+}
+.atlas-pin.is-hidden .atlas-pin-label {
+  fill: var(--violet-hi);
+}
+.atlas-pin-partylabel {
+  fill: var(--magenta-text);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.atlas-person circle {
+  fill: var(--surface-2);
+  stroke: var(--indigo-text);
+}
+.atlas-person text {
+  fill: var(--text);
+  font-family: var(--font-label);
+  font-weight: 700;
+}
+.atlas-person.is-hidden circle {
+  fill: var(--surface-1);
+  stroke: var(--violet);
+}
+.atlas-person.is-hidden text {
+  fill: var(--violet-hi);
+}
+.atlas-person-more {
+  fill: var(--text-dim);
+}
+.atlas-ground circle {
+  fill: currentColor;
+  fill-opacity: 0.16;
+  stroke: currentColor;
+}
+.atlas-ground.is-hidden {
+  color: var(--violet);
+}
+.atlas-ground-label {
+  fill: var(--text);
+}
+.atlas-ground.is-hidden .atlas-ground-label {
+  fill: var(--violet-hi);
+}
+
+/* The spot menu: a right-click or a long press on the map. Rows grow their own 44px in a stacked list. */
+.atlas-spotmenu {
+  position: absolute;
+  z-index: 3;
+  min-width: 14rem;
+  max-width: calc(100% - 2 * var(--space-2));
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-2);
+}
+.atlas-spotmenu-item {
+  width: 100%;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.2 var(--font-label);
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-spotmenu-item:hover,
+.atlas-spotmenu-item:focus-visible {
+  background: var(--surface-3);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.atlas-spotmenu-icon {
+  width: 1.1em;
+  height: 1.1em;
+  color: var(--text-dim);
+}
+
+/* ----- The panel ----- */
+.atlas-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--surface-1);
+  border-left: 1px solid var(--line-strong);
+}
+.atlas-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-2);
+}
+.atlas-panel-titles {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.atlas-panel-title {
+  margin: 0;
+  font: 400 var(--fs-h2) / 1.1 var(--font-display);
+  color: var(--heading-ink);
+  text-shadow: var(--heading-shadow);
+  overflow-wrap: anywhere;
+}
+.atlas-panel-kind {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.atlas-visline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.atlas-panel-tabs {
+  margin: 0 var(--space-4);
+}
+.atlas-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.atlas-back {
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: 0;
+  padding: 0 var(--space-1);
+  color: var(--cyan-hi);
+  font: 700 var(--fs-sm) / 1 var(--font-label);
+  cursor: pointer;
+}
+
+.atlas-pinfilter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.atlas-pinfilter > :first-child {
+  flex: 1 1 10rem;
+}
+.atlas-pinfilter-count {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.atlas-pintable {
+  table-layout: fixed;
+}
+.atlas-pintable th:nth-child(1).atlas-pintable-eye,
+.atlas-pintable td.atlas-pintable-eye {
+  width: 2.5rem;
+  padding-right: 0;
+}
+.atlas-pintable .atlas-pintable-pin {
+  width: 45%;
+}
+.atlas-pintable .atlas-pintable-opens {
+  width: 22%;
+}
+.atlas-pintable tbody th,
+.atlas-pintable tbody td {
+  padding-block: 0;
+}
+.atlas-pintable tbody tr {
+  cursor: pointer;
+}
+.atlas-pintable tbody tr.is-selected {
+  background: var(--tab-on);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.atlas-pintable tbody tr.is-dimmed {
+  opacity: 0.5;
+}
+.atlas-pintable tbody th {
+  font-weight: 600;
+}
+/* The row's real control grows to 44px; rows are stacked, so no ::after overhang. */
+.atlas-pintable-open {
+  width: 100%;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-partytag {
+  flex: none;
+  padding: 0 var(--space-1);
+  border-left: 3px solid var(--magenta);
+  color: var(--magenta-text);
+  font: 700 var(--fs-2xs) / 1.6 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.atlas-pintable-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+}
+.atlas-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-mapsinside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+.atlas-mapsinside > .nh-btn {
+  align-self: flex-start;
+}
+.atlas-maplist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.atlas-maprow {
+  width: 100%;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.2 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-maprow:hover {
+  background: var(--surface-2);
+}
+.atlas-maprow-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  color: var(--text-dim);
+}
+.atlas-maprow-name {
+  flex: 1 1 auto;
+}
+.atlas-maprow-chevron {
+  color: var(--text-muted);
+}
+.atlas-hiddenmark,
+.atlas-shownmark {
+  display: inline-flex;
+  color: var(--violet-hi);
+}
+.atlas-shownmark {
+  color: var(--text-dim);
+}
+.atlas-eyebrow {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.atlas-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.atlas-note {
+  margin: 0;
+  color: var(--magenta-text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.atlas-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.atlas-linkbutton {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--cyan-hi);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ----- A pin, read and edited ----- */
+.atlas-pinview,
+.atlas-pineditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.atlas-pinview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.atlas-pinview-icon {
+  width: 1.4em;
+  height: 1.4em;
+  flex: none;
+}
+.atlas-pinview-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: 400 var(--fs-h3) / 1.15 var(--font-display);
+  color: var(--heading-ink);
+  overflow-wrap: anywhere;
+}
+.atlas-pagelist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.atlas-pagerow {
+  width: 100%;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-pagerow:hover {
+  background: var(--surface-2);
+}
+.atlas-pagerow-icon {
+  width: 1.2em;
+  height: 1.2em;
+  flex: none;
+}
+.atlas-pagerow-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.atlas-pagerow-title {
+  font-weight: 700;
+  font-size: var(--fs-sm);
+}
+.atlas-pagerow-line {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.atlas-pagerow-chevron {
+  color: var(--text-muted);
+}
+.atlas-pinview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.atlas-pinview-scenes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.atlas-scenerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.atlas-tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.atlas-pinjournal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+.atlas-pinjournal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.atlas-pinjournal-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+}
+.atlas-pinjournal-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* A value box shortened so its Who sees it switch sits beside it, the switch's word under the switch. */
+.atlas-field-inline {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.atlas-field-inline > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.atlas-partyflag {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.atlas-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.atlas-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.atlas-link-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-link-open:hover {
+  border-color: var(--cyan);
+}
+.atlas-link-name {
+  flex: 1 1 auto;
+}
+.atlas-submap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.atlas-submap > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.atlas-appearance-summary {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font: 700 var(--fs-sm) / 1 var(--font-label);
+}
+.atlas-pineditor-foot,
+.atlas-details-danger {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+
+/* ----- A map's details and the map picker ----- */
+.atlas-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.atlas-details-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.atlas-nestrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+.atlas-upload {
+  margin-bottom: var(--space-3);
+}
+.atlas-assetgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-2);
+}
+.atlas-assetcard {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-assetcard:hover,
+.atlas-assetcard:focus-visible {
+  border-color: var(--magenta);
+}
+.atlas-loading,
+.atlas-firstmap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+}
+.atlas-firstmap h3 {
+  margin: 0;
+  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+}
+.atlas-firstmap p {
+  margin: 0;
+  color: var(--text-dim);
+}
+.atlas-firstmap .nh-btn {
+  align-self: flex-start;
+}
+
+/* ----- A phone: the map, the pins, the maps inside and the details as one switch ----- */
+.atlas.is-phone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.atlas-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) 0;
+}
+.atlas-phoneswitch {
+  margin: 0 var(--space-3);
+}
+.atlas-phonemap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+.atlas-phonemap .atlas-map {
+  border-left: 0;
+  border-right: 0;
+}
+.atlas-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  max-height: 55%;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: var(--surface-1);
+  border-top: var(--lip-h) solid var(--magenta);
+  box-shadow: var(--shadow-2);
+}
+.atlas-sheet.is-tall {
+  max-height: 100%;
+  top: 0;
+}
+.atlas-phonelist {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-4);
+}
+.atlas.is-phone > .nh-alert {
+  margin: 0 var(--space-3);
+}

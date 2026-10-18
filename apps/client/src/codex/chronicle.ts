@@ -1,18 +1,17 @@
 /**
- * The chronicle's shared reading rules: what a row says and how the two lenses group. The GM and player
- * Journals are separate implementations, so the meaning of a row lives here once and both import it.
+ * The chronicle's shared reading rules: what a row says, what a deadline's state is, and when showing a record
+ * would tell players the date moved. The GM's and the players' Story both import them, so a row means one thing.
  */
 
 import type { BadgeTone, MeterTone } from "@vtt/ui";
 import {
   calendarDaysPerYear,
-  calendarYearOf,
   clampToCalendar,
   dateToInstant,
-  formatWorldYear,
   instantToDate,
   type CodexCalendar,
   type CodexChronicleKind,
+  type CodexJournalKind,
   type CodexDowntimePayload,
   type CodexInWorldDate,
   type CodexJournalPayload,
@@ -279,6 +278,20 @@ export function deadlinesPassedBy(
   ).length;
 }
 
+/** The journal's `note` is the chronicle's `entry`; every other kind has the same name. */
+const JOURNAL_TO_CHRONICLE_KIND: Readonly<Record<CodexJournalKind, CodexChronicleKind>> = {
+  note: "entry",
+  combat: "combat",
+  deadline: "deadline",
+  downtime: "downtime",
+  milestone: "milestone",
+  standing: "standing",
+  quest: "quest"
+};
+export function chronicleKindOfJournal(kind: CodexJournalKind): CodexChronicleKind {
+  return JOURNAL_TO_CHRONICLE_KIND[kind];
+}
+
 /**
  * Would revealing this record show players a date past their published clock? Records are dated at the
  * GM's prep clock, so this warns at reveal time. Silent for undated records and when nothing has been
@@ -325,53 +338,4 @@ export function sameInWorldDate(
 ): boolean {
   if (!a || !b) return !a && !b;
   return a.year === b.year && a.month === b.month && a.day === b.day;
-}
-
-/** Both lenses regroup the same loaded records, never refetching. */
-export type ChronicleLens = "date" | "session";
-export const CHRONICLE_LENSES: ReadonlyArray<Readonly<{ id: ChronicleLens; label: string }>> = [
-  { id: "date", label: "By in-world date" },
-  { id: "session", label: "By session" }
-];
-
-export type ChronicleGroup<R> = Readonly<{ key: string; label: string; records: readonly R[] }>;
-type Groupable = Readonly<{ sessionNumber: number | null; calendarInstant: number | null }>;
-
-/**
- * Both lenses read earliest first, with keyless records last. Within a group the server's order is kept.
- * By session, an `event` page always lands in "No session yet". Both journals group this way.
- */
-export function groupChronicle<R extends Groupable>(
-  records: readonly R[],
-  lens: ChronicleLens,
-  calendar: CodexCalendar | null
-): ChronicleGroup<R>[] {
-  const buckets = new Map<number | null, R[]>();
-  for (const record of records) {
-    const key =
-      lens === "session"
-        ? record.sessionNumber
-        : record.calendarInstant !== null && calendar
-          ? calendarYearOf(calendar, record.calendarInstant)
-          : null;
-    const bucket = buckets.get(key) ?? [];
-    bucket.push(record);
-    buckets.set(key, bucket);
-  }
-  return [...buckets.keys()]
-    .sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b))
-    .map((key) => ({
-      key: key === null ? "none" : String(key),
-      label:
-        key === null
-          ? lens === "session"
-            ? "No session yet"
-            : "Undated"
-          : lens === "session"
-            ? `Session ${key}`
-            : calendar
-              ? formatWorldYear(calendar, key)
-              : String(key),
-      records: buckets.get(key)!
-    }));
 }

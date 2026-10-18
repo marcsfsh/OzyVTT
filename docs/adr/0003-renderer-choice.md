@@ -13,7 +13,7 @@ ADR-0003 deferred the renderer choice pending an interaction spike. The spike wa
 `apps/client/src/scene/RendererProof.tsx`) and then **abandoned before it concluded**. The
 map that shipped is DOM/SVG on every surface: `apps/client/src/scene/EncounterMap.tsx` for the
 table, `apps/client/src/viewer/ViewerApp.tsx` for the public screen, and
-`apps/client/src/codex/MapSurface.tsx` for the atlas. The two interactive surfaces convert
+`apps/client/src/codex/atlas/AtlasMap.tsx` for the atlas. The two interactive surfaces convert
 screen→image coordinates with `getScreenCTM` via `imagePointFromClient`
 (`apps/client/src/scene/mapImage.tsx`), an SVG API with no canvas equivalent, so the choice
 is now load-bearing. The viewer does its own screen→image maths against

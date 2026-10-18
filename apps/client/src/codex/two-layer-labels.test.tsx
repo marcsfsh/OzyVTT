@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
 
@@ -38,7 +37,6 @@ vi.mock("./api", async (importOriginal) => {
 
 import { ToastProvider } from "@vtt/ui";
 import { BODY_LAYER } from "./TwoLayerBodyTabs";
-import { JournalView } from "./JournalView";
 import { BackupView } from "./BackupView";
 import type { CodexCalendar } from "@vtt/domain";
 
@@ -76,20 +74,6 @@ describe("The two-layer notes control names its layers the same way everywhere (
     expect(BODY_LAYER.player.label).toBe("Player-visible notes");
     expect(BODY_LAYER.gm.label).toBe("GM-only notes");
   });
-
-  /** All four journal kinds, switched by tapping the kind control. */
-  for (const kind of ["Entry", "Deadline", "Downtime", "Milestone"] as const) {
-    it(`says it the same way on a ${kind.toLowerCase()} as on every other kind`, async () => {
-      render(
-        <JournalView gmToken="gm" autosave={{ enabled: true, intervalSeconds: 1 }} pages={[]} onOpenPage={vi.fn()} />
-      );
-      await waitFor(() => expect(chronicle).toHaveBeenCalled());
-      await userEvent.setup().click(screen.getByRole("button", { name: kind }));
-      await expectCanonicalPair();
-      // The player layer's accessible name follows the tab.
-      expect(screen.getByRole("textbox", { name: BODY_LAYER.player.label })).toBeInTheDocument();
-    });
-  }
 
   it("says it the same way on the notes importer, which asks the same question about a destination", async () => {
     render(

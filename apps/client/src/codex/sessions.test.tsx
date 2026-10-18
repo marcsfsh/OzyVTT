@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-vi.mock("./MapSurface", () => ({ MapSurface: () => <div data-testid="map-surface" /> }));
+vi.mock("./atlas/AtlasMap", () => ({ AtlasMap: () => <div data-testid="map-surface" /> }));
 
 const listPages = vi.fn();
 const listRelationships = vi.fn();
@@ -46,7 +46,8 @@ vi.mock("./api", async (importOriginal) => {
       listFolders: (...a: unknown[]) => listFolders(...a),
       getPage: (...a: unknown[]) => getPage(...a),
       search: (...a: unknown[]) => search(...a),
-      markersForPage: (...a: unknown[]) => markersForPage(...a)
+      markersForPage: (...a: unknown[]) => markersForPage(...a),
+      party: async () => null
     },
     journalApi: {
       ...actual.journalApi,
@@ -55,6 +56,8 @@ vi.mock("./api", async (importOriginal) => {
       forPage: (...a: unknown[]) => forPage(...a)
     },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
+    // Story reads the shell's campaign feed, which reads standing alongside the chronicle.
+    standingApi: { ...actual.standingApi, list: async () => [] },
     atlasApi: {
       ...actual.atlasApi,
       listMaps: (...a: unknown[]) => listMaps(...a),
@@ -98,61 +101,48 @@ import type { CodexCalendar, CodexChronicleRecord, CodexSession, PlayerCodexSess
  */
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
-const SESSION = (over: Partial<CodexSession> = {}): CodexSession => ({
-  id: "s1",
-  sessionNumber: 3,
-  tags: [],
-  realDate: "2026-07-12",
-  attendees: ["Ozy"],
-  prep: [
-    {
-      id: "prep-1",
-      templateSectionId: null,
-      title: "Prep notes",
-      prompt: null,
-      type: "text",
-      text: "Strahd ambushes them at the bridge."
-    }
-  ],
-  prepTemplateId: null,
-  currentSceneId: null,
-  recapBody: "The party crossed the mists.",
-  revealedToPlayers: false,
-  status: "planned",
-  sceneIds: [],
-  rev: 1,
-  createdAt: "2026-07-01T00:00:00.000Z",
-  updatedAt: "2026-07-01T00:00:00.000Z",
-  firstShownAt: null,
-  ...over
-});
+/** The session's prep is typed sections; one notes section stands in for the whole plan. */
+const notes = (text: string) => [
+  { id: "p1", type: "text" as const, title: "Prep for this session", prompt: null, templateSectionId: null, text }
+];
+const SESSION = (over: Partial<CodexSession> & Readonly<{ prep?: unknown }> = {}): CodexSession =>
+  ({
+    id: "s1",
+    sessionNumber: 3,
+    tags: [],
+    realDate: "2026-07-12",
+    attendees: ["Ozy"],
+    prep: notes("Strahd ambushes them at the bridge."),
+    prepTemplateId: null,
+    currentSceneId: null,
+    recapBody: "The party crossed the mists.",
+    revealedToPlayers: false,
+    status: "planned",
+    sceneIds: [],
+    rev: 1,
+    createdAt: "2026-07-01T00:00:00.000Z",
+    updatedAt: "2026-07-01T00:00:00.000Z",
+    firstShownAt: null,
+    ...over
+  }) as CodexSession;
 const S3 = SESSION({ id: "s3" });
 const S8 = SESSION({
   id: "s8",
   sessionNumber: 8,
   realDate: "2026-07-26",
-  prep: [
-    {
-      id: "prep-8",
-      templateSectionId: null,
-      title: "Prep notes",
-      prompt: null,
-      type: "text",
-      text: "The heart of the castle."
-    }
-  ],
+  prep: notes("The heart of the castle."),
   recapBody: "They reached the spire.",
   rev: 2
 });
 
-const record = (id: string, sessionNumber: number | null): CodexChronicleRecord => ({
+const record = (id: string, sessionNumber: number | null, sessionId: string | null = null): CodexChronicleRecord => ({
   kind: "entry",
   id,
   title: null,
   text: `Entry ${id}`,
   gmText: null,
   revealedToPlayers: false,
-  sessionId: null,
+  sessionId,
   sessionNumber,
   realDate: null,
   inWorldLabel: null,
@@ -226,33 +216,30 @@ describe("Which session is 'now' (the rule, below the components)", () => {
 });
 
 describe("Getting to a session (R1: every jump prepares its destination)", () => {
-  it("from a by-session journal heading, but ONLY where a session record exists", async () => {
-    // Session 3 has a record; session 4 does not. Both have entries.
+  it("from a session on the chronicle's spine, but ONLY where a session record exists", async () => {
+    // Session 3 has a record; the session that held j4 is gone. Both have entries.
     gmDefaults([S3], "s1");
-    chronicle.mockResolvedValue([record("j3", 3), record("j4", 4)]);
+    chronicle.mockResolvedValue([record("j3", 3, "s3"), record("j4", 4, "s4")]);
     const user = userEvent.setup();
     await renderWorkspace();
 
     await user.click(screen.getByRole("button", { name: "Story" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "By session" }));
 
-    // Session 4's group heading must stay plain. Query the headings, since entry rows also say "Session 4".
-    const heading = (label: string) =>
-      [...document.querySelectorAll(".codex-timeline-year")].find((node) => node.textContent?.startsWith(label))!;
-    expect(heading("Session 4").tagName).toBe("DIV");
-    expect(heading("Session 3").tagName).toBe("BUTTON");
+    // The entry whose session is gone files under a plain heading; only a real session's heading opens it.
+    const spine = within(await screen.findByRole("list", { name: "Sessions and what happened" }));
+    expect(spine.getByText("Not in a session").tagName).toBe("SPAN");
+    expect(spine.queryByRole("button", { name: /^Session 4/ })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^Session 3/ }));
-    const log = within(await screen.findByRole("navigation", { name: "Sessions" }));
-    await waitFor(() => expect(log.getByRole("button", { name: /Session 3/ })).toHaveAttribute("aria-current", "true"));
-    expect(screen.getByRole("textbox", { name: /Prep for this session/ })).toHaveValue(
+    await user.click(spine.getByRole("button", { name: /^Session 3/ }));
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/sessions/s3"));
+    expect(await screen.findByRole("textbox", { name: /Prep for this session/ })).toHaveValue(
       "Strahd ambushes them at the bridge."
     );
   });
 
-  it("does not turn a calendar YEAR into a session number under the date lens", async () => {
-    // Under the date lens the key is a year, never a session number.
+  it("does not turn a calendar YEAR into a session number", async () => {
+    // A session numbered like the year, and a record dated in that year under no session.
     gmDefaults([SESSION({ id: "s1492", sessionNumber: 1492 })], null);
     chronicle.mockResolvedValue([
       {
@@ -268,7 +255,8 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     await user.click(screen.getByRole("button", { name: "Story" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
 
-    expect(screen.getByText("1492 DR")).toBeInTheDocument();
+    const spine = within(await screen.findByRole("list", { name: "Sessions and what happened" }));
+    expect(spine.getByText("Not in a session")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /1492 DR/ })).not.toBeInTheDocument();
   });
 });

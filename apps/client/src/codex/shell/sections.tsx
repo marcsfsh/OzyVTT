@@ -9,16 +9,16 @@ import { SearchView } from "../search/SearchView";
 import { GmQuests, PlayerQuests } from "../quests/QuestsView";
 import { RelationshipsView } from "../relationships/RelationshipsView";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "./context";
+import { GmAtlasSection, PlayerAtlasSection } from "../atlas/sections";
+import { GmTemplatesSection } from "../templates/sections";
 import {
-  GmAtlasLegacy,
-  GmSessionsLegacy,
-  GmStoryLegacy,
-  GmTimelineLegacy,
-  PlayerAtlasLegacy,
-  PlayerSessionsLegacy,
-  PlayerStoryLegacy,
-  PlayerTimelineLegacy
-} from "./legacy";
+  GmSessionsSection,
+  GmStorySection,
+  GmTimelineSection,
+  PlayerSessionsSection,
+  PlayerStorySection,
+  PlayerTimelineSection
+} from "../story/sections";
 
 /**
  * The section registry: which view each Codex section renders, for the GM and for a player. A view is a component
@@ -100,11 +100,6 @@ function GmSettings() {
   );
 }
 
-/** Prep templates: the GM's library and editor. */
-function GmTemplates() {
-  return <p className="cx-empty">Prep templates open here.</p>;
-}
-
 export const CODEX_SECTIONS: Readonly<Record<CodexSection, CodexSectionEntry>> = {
   // ----- The shell and the page -----
   home: { gm: GmHome, player: PlayerHome },
@@ -117,9 +112,9 @@ export const CODEX_SECTIONS: Readonly<Record<CodexSection, CodexSectionEntry>> =
   settings: { gm: GmSettings, player: null },
 
   // ----- The atlas, the story, sessions and templates -----
-  atlas: { gm: GmAtlasLegacy, player: PlayerAtlasLegacy },
-  story: { gm: GmStoryLegacy, player: PlayerStoryLegacy },
-  timeline: { gm: GmTimelineLegacy, player: PlayerTimelineLegacy },
-  sessions: { gm: GmSessionsLegacy, player: PlayerSessionsLegacy },
-  templates: { gm: GmTemplates, player: null }
+  atlas: { gm: GmAtlasSection, player: PlayerAtlasSection },
+  story: { gm: GmStorySection, player: PlayerStorySection },
+  timeline: { gm: GmTimelineSection, player: PlayerTimelineSection },
+  sessions: { gm: GmSessionsSection, player: PlayerSessionsSection },
+  templates: { gm: GmTemplatesSection, player: null }
 };
