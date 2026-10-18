@@ -63,12 +63,12 @@ export function linkLine(link: CodexPrepLink, context: PrepContext, blockTitle?:
   const name = record ?? (link.recordKind === "page" ? "A deleted page" : "A deleted quest");
   if (!link.blockId) return name;
   const title = blockTitle ?? context.blockTitles?.get(link.blockId) ?? null;
-  return `${name} · ${title?.trim() || "hidden block"}`;
+  return `${name} · ${title?.trim() || "a hidden block"}`;
 }
 
 /**
  * The titles of the blocks a prep's clues link, read from each linked page or quest once. A record that can't be
- * read leaves its blocks untitled, and the clue says "hidden block".
+ * read leaves its blocks untitled, and the clue says "a hidden block", as Tonight does.
  */
 export function useBlockTitles(token: string, prep: readonly CodexPrepSection[]): ReadonlyMap<string, string | null> {
   const records = [
