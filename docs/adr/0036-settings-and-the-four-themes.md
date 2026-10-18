@@ -61,8 +61,10 @@ of checkboxes, every tag ticked; filters (method, who can call, scope) in the Co
 chips; and the Codex search's multi-column Sort dialog, now given its columns by the caller. An operation opens at
 `/settings/api/<operation id>` as one document (request, responses, an example in four languages) with a metadata
 panel (method, path, who can call and with which scopes, operation id, tag) that follows the document on a phone. The
-command catalog is a second table. The tag is the operation's first OpenAPI tag; a document without tags is grouped
-by path as before, and an operation without a summary is named from its description or its id.
+command catalog is a second table. The tag is the operation's tag from the route registry (ADR-0034), listed and
+sorted in the document's order; a document without tags is grouped by path as before, and an operation without a
+summary is named from its description or its id. An operation's example uses the document's example body where it
+has one and builds one from the schema otherwise.
 
 **Themes.** Night, Dusk, Dawn and Day, stored as `dark`, `dusk`, `dawn` and `light`. Dawn is Day's rules on a warm
 ground: apricot and cream surfaces, plum ink, a rose and gold lip, and accents spread so the primary, selection,

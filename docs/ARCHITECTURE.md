@@ -491,9 +491,11 @@ Access and API) with their audience and every setting's label and hint; the page
 `SettingsPage.tsx` draws the Codex shell's section bar or phone tab bar around the section the address names
 (`/settings/<section>`); a player's page is Device alone, so GM sections never mount for a player. Each section is
 its own component and writes through the same commands as before (`table-writes.ts`). The integration credentials
-(`integrations/CredentialsTable.tsx`) and the API reference (`integrations/ApiReference.tsx`, an operation at
-`/settings/api/<operation id>` in `OperationDocument.tsx`) read the served OpenAPI document through
-`integrations/openapi-model.ts` and `api-rows.ts`.
+(`integrations/CredentialsTable.tsx`) read and write their GM routes. The API reference
+(`integrations/ApiReference.tsx`, an operation at `/settings/api/<operation id>` in `OperationDocument.tsx`) reads the
+OpenAPI document the route registry generates, through `integrations/openapi-model.ts` and `api-rows.ts`: the
+document's tags, in its order, group the table, and an operation's page shows the document's example body where it
+has one.
 
 The themes are Night, Dusk, Dawn and Day (`dark`, `dusk`, `dawn`, `light` on `<html data-theme>`), one token set in
 `packages/ui/src/styles/design-tokens.css`. Each HTML entry sets the stored theme before first paint, and `ThemeSwitch`

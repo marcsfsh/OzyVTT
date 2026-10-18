@@ -12,6 +12,7 @@ import {
   NO_FILTERS,
   operationRows,
   SORT_WORDS,
+  tagsOf,
   visibleRows,
   type ApiFilters,
   type ApiSortKey,
@@ -81,7 +82,7 @@ export function ApiReference({
 
   const document = state.document;
   const rows = useMemo(() => (document ? operationRows(document) : []), [document]);
-  const tags = useMemo(() => [...new Set(rows.map((row) => row.tag))], [rows]);
+  const tags = useMemo(() => tagsOf(rows), [rows]);
   const scopes = useMemo(() => [...new Set(rows.flatMap((row) => row.scopes))].sort(), [rows]);
   const shown = useMemo(() => visibleRows(rows, filters, sort), [rows, filters, sort]);
   const open = openKey ? rows.find((row) => row.key === openKey) : undefined;

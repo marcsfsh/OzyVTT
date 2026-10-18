@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const DOC = {
   info: { title: "VTT", description: "Send a commandId to make a write safe to repeat." },
+  tags: [{ name: "Credentials", description: "Keys that let a tool reach this table." }],
   paths: {
     "/api/v1/system/health": {
       get: {
@@ -25,7 +26,12 @@ const DOC = {
         security: [{ gmAuth: [] }],
         requestBody: {
           required: true,
-          content: { "application/json": { schema: { $ref: "#/components/schemas/Create" } } }
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/Create" },
+              example: { name: "Stream overlay", scopes: ["game:read"] }
+            }
+          }
         },
         responses: { "201": { description: "Created." }, "400": { $ref: "#/components/responses/Error" } }
       }
@@ -41,7 +47,15 @@ const DOC = {
       delete: {
         operationId: "deleteCodexPage",
         security: [{ bearerAuth: ["codex:write"] }, { gmAuth: [] }],
-        parameters: [{ name: "pageId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        parameters: [
+          {
+            name: "pageId",
+            in: "path",
+            required: true,
+            description: "The page to delete.",
+            schema: { type: "string", format: "uuid" }
+          }
+        ],
         responses: { "204": { description: "Gone." } }
       }
     }
@@ -65,7 +79,7 @@ vi.mock("../lib/api", () => ({
 import { ToastProvider } from "@vtt/ui";
 import type { OpenApiDocument } from "./openapi-model";
 import { ApiReference } from "./ApiReference";
-import { NO_FILTERS, operationRows, visibleRows } from "./api-rows";
+import { NO_FILTERS, operationRows, tagsOf, visibleRows } from "./api-rows";
 
 const rows = operationRows(DOC as unknown as OpenApiDocument);
 const byKey = (key: string) => rows.find((row) => row.key === key)!;
@@ -78,6 +92,19 @@ describe("the reference's rows", () => {
     expect(byKey("getHealth").summary).toBe("Says the server is up.");
     // No summary and no description: the operation id in words.
     expect(byKey("listIntegrationCredentials").summary).toBe("List integration credentials");
+  });
+
+  it("lists the tags in the document's order, then the path groups, then Other", () => {
+    expect(tagsOf(rows)).toEqual([
+      "Credentials",
+      "System & discovery",
+      "Integration credentials (GM)",
+      "Live game",
+      "Codex (pages, atlas, journal & calendar)"
+    ]);
+    expect(byKey("createIntegrationCredential").tagNote).toBe("Keys that let a tool reach this table.");
+    const byTag = visibleRows(rows, NO_FILTERS, [{ key: "tag", direction: "asc" }]).map((row) => row.tag);
+    expect(byTag[0]).toBe("Credentials");
   });
 
   it("says who can call each operation, with the scopes an integration needs", () => {
@@ -106,6 +133,11 @@ describe("the reference's rows", () => {
       "delete /api/v1/codex/pages/{pageId}"
     ]);
   });
+});
+
+// The chosen example language is remembered on the device; each test starts from the first.
+beforeEach(() => {
+  localStorage.clear();
 });
 
 function renderReference(openKey: string | null = null) {
@@ -183,16 +215,29 @@ describe("an operation", () => {
     const meta = screen.getByRole("complementary", { name: "About this operation" });
     expect(within(meta).getByText("Operation id").nextElementSibling).toHaveTextContent("createIntegrationCredential");
     expect(within(meta).getByText("Who can call").nextElementSibling).toHaveTextContent("GM session");
-    expect(within(meta).getByText("Tag").nextElementSibling).toHaveTextContent("Credentials");
+    expect(within(meta).getByText("Tag").nextElementSibling).toHaveTextContent(
+      "Credentials" + "Keys that let a tool reach this table."
+    );
     expect(within(meta).getByText("Path").nextElementSibling).toHaveTextContent("/api/v1/gm/integration-credentials");
     // The request's body fields, the responses and an example in the chosen language.
     expect(screen.getByRole("table", { name: "Body fields" })).toHaveTextContent("scopes");
     expect(screen.getByText("201")).toBeInTheDocument();
+    // The server's own example body, which says more than one built from the schema.
     expect(document.querySelector(".api-code")).toHaveTextContent("curl -X POST");
+    expect(document.querySelector(".api-code")).toHaveTextContent("Stream overlay");
     await user.click(screen.getByRole("button", { name: "Python" }));
     expect(document.querySelector(".api-code")).toHaveTextContent("import requests");
     await user.click(screen.getByRole("button", { name: "All operations" }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("names each parameter's place, type and notes, and builds an example when the document has none", async () => {
+    renderReference("deleteCodexPage");
+    const parameters = await screen.findByRole("table", { name: "Parameters" });
+    expect(within(parameters).getAllByRole("row")[1]).toHaveTextContent(
+      "pageIdpathstring (uuid)YesThe page to delete."
+    );
+    expect(document.querySelector(".api-code")).toHaveTextContent("curl -X DELETE");
   });
 
   it("says when the address names no operation", async () => {

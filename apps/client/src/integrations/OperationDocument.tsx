@@ -4,6 +4,7 @@ import { CALLER_WORDS, type OperationRow } from "./api-rows";
 import {
   authOptions,
   codeSample,
+  documentedExample,
   EXAMPLE_UUID,
   exampleBody,
   fieldRows,
@@ -84,7 +85,8 @@ export function OperationDocument({
   const rawBodyTypes = operation.requestBody && !jsonBody ? Object.keys(operation.requestBody.content ?? {}) : [];
   const needsAuth = !row.callers.includes("anyone");
   const examplePath = path.replace(/\{[a-zA-Z]+\}/g, EXAMPLE_UUID);
-  const exampleJson = bodySchema ? exampleBody(bodySchema, components) : null;
+  // The server's own worked example where it has one; otherwise one built from the body's schema.
+  const exampleJson = documentedExample(operation) ?? (bodySchema ? exampleBody(bodySchema, components) : null);
   const sample = codeSample(language, method, `${origin}${examplePath}`, needsAuth, exampleJson, rawBodyTypes);
 
   const choose = (next: Language) => {
@@ -135,6 +137,7 @@ export function OperationDocument({
                     <th scope="col">In</th>
                     <th scope="col">Type</th>
                     <th scope="col">Required</th>
+                    <th scope="col">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -144,8 +147,12 @@ export function OperationDocument({
                         <code>{parameter.name}</code>
                       </td>
                       <td>{parameter.in}</td>
-                      <td>{typeLabel(parameter.schema, components)}</td>
+                      {/* A JSON-encoded query value carries its schema under `content`. */}
+                      <td>
+                        {typeLabel(parameter.schema ?? parameter.content?.["application/json"]?.schema, components)}
+                      </td>
                       <td>{parameter.required ? "Yes" : "No"}</td>
+                      <td>{parameter.description}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -155,13 +162,17 @@ export function OperationDocument({
           {bodySchema && (
             <>
               <h4>Body{operation.requestBody?.required ? "" : ", optional"}</h4>
+              {operation.requestBody?.description && <p>{operation.requestBody.description}</p>}
               <FieldTable rows={fieldRows(bodySchema, components)} caption="Body fields" />
             </>
           )}
           {rawBodyTypes.length > 0 && (
-            <p>
-              The body is the raw bytes of a <code>{rawBodyTypes.join(", ")}</code> file.
-            </p>
+            <>
+              <p>
+                The body is the raw bytes of a <code>{rawBodyTypes.join(", ")}</code> file.
+              </p>
+              {operation.requestBody?.description && <p>{operation.requestBody.description}</p>}
+            </>
           )}
         </section>
 
@@ -252,7 +263,10 @@ export function OperationDocument({
           </div>
           <div>
             <dt>Tag</dt>
-            <dd>{row.tag}</dd>
+            <dd>
+              {row.tag}
+              {row.tagNote && <span className="api-meta-detail">{row.tagNote}</span>}
+            </dd>
           </div>
         </dl>
       </aside>

@@ -6,9 +6,6 @@ import { GROUPS, METHOD_ORDER, type OpenApiDocument, type Operation } from "./op
  * the filters and sort the table applies to them.
  */
 
-/** What the document may add to an operation beyond the fields `openapi-model.ts` reads. */
-type Described = Operation & Readonly<{ tags?: readonly string[]; summary?: string }>;
-
 export type OperationRow = Readonly<{
   /** The operation id, or a stand-in made from its method and path; the address names it. */
   key: string;
@@ -16,6 +13,10 @@ export type OperationRow = Readonly<{
   path: string;
   operation: Operation;
   tag: string;
+  /** Where the tag stands in the document's own list of groups, so sorting by tag keeps the server's order. */
+  tagRank: number;
+  /** The document's sentence about the tag, when it has one. */
+  tagNote?: string;
   summary: string;
   callers: readonly Caller[];
   scopes: readonly string[];
@@ -61,15 +62,27 @@ const firstSentence = (text: string | undefined) => {
 
 /** The document's operations as rows. The tag comes from the document; a document without tags is grouped by path. */
 export function operationRows(document: OpenApiDocument): readonly OperationRow[] {
+  const declared = (document.tags ?? []).map((tag) => tag.name);
+  const fallback = GROUPS.map((group) => group.title);
   return Object.entries(document.paths).flatMap(([path, operations]) =>
     METHOD_ORDER.filter((method) => operations[method]).map((method) => {
-      const operation = operations[method] as Described;
+      const operation = operations[method] as Operation;
+      const tag = operation.tags?.[0] ?? GROUPS.find((group) => group.match(path))?.title ?? "Other";
+      const [declaredAt, fallbackAt] = [declared.indexOf(tag), fallback.indexOf(tag)];
       return {
         key: operation.operationId ?? `${method}${path.replace(/[^A-Za-z0-9]+/g, "_")}`,
         method,
         path,
         operation,
-        tag: operation.tags?.[0] ?? GROUPS.find((group) => group.match(path))?.title ?? "Other",
+        tag,
+        // The document's groups first, then the path groups an untagged document falls back on, then the rest.
+        tagRank:
+          declaredAt >= 0
+            ? declaredAt
+            : fallbackAt >= 0
+              ? declared.length + fallbackAt
+              : declared.length + fallback.length,
+        tagNote: document.tags?.find((entry) => entry.name === tag)?.description,
         // A document without a summary or a description still names the operation, from its id.
         summary:
           operation.summary ??
@@ -105,6 +118,13 @@ export type ApiFilters = Readonly<{
 }>;
 export const NO_FILTERS: ApiFilters = { text: "", tags: null, methods: [], callers: [], scopes: [] };
 
+const byTag = (a: OperationRow, b: OperationRow) => a.tagRank - b.tagRank || a.tag.localeCompare(b.tag);
+
+/** The tags in the order the document lists its groups, each once. */
+export function tagsOf(rows: readonly OperationRow[]): readonly string[] {
+  return [...new Set([...rows].sort(byTag).map((row) => row.tag))];
+}
+
 /** The rows the table shows: every filter narrows them, and an empty filter group narrows nothing. */
 export function visibleRows(
   rows: readonly OperationRow[],
@@ -120,18 +140,18 @@ export function visibleRows(
       (filters.scopes.length === 0 || row.scopes.some((scope) => filters.scopes.includes(scope))) &&
       words.every((word) => `${row.path} ${row.key} ${row.summary}`.toLowerCase().includes(word))
   );
-  const value = (row: OperationRow, key: ApiSortKey): string | number =>
-    key === "method"
-      ? METHOD_ORDER.indexOf(row.method as (typeof METHOD_ORDER)[number])
-      : key === "tag"
-        ? row.tag
+  const compare = (a: OperationRow, b: OperationRow, key: ApiSortKey): number =>
+    key === "tag"
+      ? byTag(a, b)
+      : key === "method"
+        ? METHOD_ORDER.indexOf(a.method as (typeof METHOD_ORDER)[number]) -
+          METHOD_ORDER.indexOf(b.method as (typeof METHOD_ORDER)[number])
         : key === "operation"
-          ? row.key
-          : row.path;
+          ? a.key.localeCompare(b.key)
+          : a.path.localeCompare(b.path);
   return [...kept].sort((a, b) => {
     for (const level of sort) {
-      const [x, y] = [value(a, level.key), value(b, level.key)];
-      const order = typeof x === "number" ? x - (y as number) : x.localeCompare(y as string);
+      const order = compare(a, b, level.key);
       if (order !== 0) return level.direction === "asc" ? order : -order;
     }
     return 0;
