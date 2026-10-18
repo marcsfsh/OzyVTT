@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Chip, IconPlus, Input, useToast } from "@vtt/ui";
 import { useCachedMapThumbnail } from "../scene/mapImage";
-import type { MapSelection } from "./MapManager";
+import type { MapSelection } from "./map-catalog";
 import { uploadMap, useMapCatalog, type PickerMap } from "./map-catalog";
 import "./map-picker.css";
 

@@ -8,6 +8,7 @@ import { useSyncExternalStore } from "react";
 // The Codex owns its address space (`codex/routes.ts`) and this module asks it. The import cycle via
 // `withQuery` is safe: neither module calls across it during evaluation.
 import { codexSectionOf } from "./codex/routes";
+import { redirectForOldMapAddress, scenesViewOf, type ScenesView } from "./scenes/routes";
 
 export type Route = Readonly<{
   /** The pathname, always leading-slash, never trailing-slash (except the bare root). */
@@ -206,10 +207,11 @@ export const SOUND_BOARD_PATH = `${GM_TAB_PATHS.viewer}/sound`;
 /** Retired addresses, redirected so old bookmarks land. */
 const RETIRED_PATHS: Readonly<Record<string, string>> = { "/encounter": "/table", "/setup": "/settings" };
 
-/** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too. */
+/** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too, and so does the
+ *  map library's `?map=` for one map's grid. */
 export function redirectForRetiredPath(path: string, query: URLSearchParams): string | null {
   if (path === "/scenes" && query.get("view") === "maps") return "/scenes/maps";
-  return RETIRED_PATHS[path] ?? null;
+  return redirectForOldMapAddress(path, query) ?? RETIRED_PATHS[path] ?? null;
 }
 
 /** Which GM tab an address renders, or null when the address is not a GM tab at all. */
@@ -269,7 +271,7 @@ export function isKnownPath(path: string): boolean {
     if (segments.length === 2) return segments[1].length > 0;
     return segments.length === 3 && segments[2] === "level";
   }
-  if (segments[0] === "scenes") return segments.length === 1 || (segments.length === 2 && segments[1].length > 0);
+  if (segments[0] === "scenes") return scenesViewOf(segments, new URLSearchParams()) !== null;
   // The player's own tab: one segment, nothing under it.
   if (segments[0] === "me") return segments.length === 1;
   // `/settings/api` is the only two-segment settings address.
@@ -283,25 +285,24 @@ export function isKnownPath(path: string): boolean {
   return gmTabForPath(path) !== null && segments.length === 1;
 }
 
-/** A layer open over a tab (sheet, builder, level flow, replay, scene prep, maps), parsed in one place. */
+/** A layer open over a tab (sheet, builder, level flow, replay, a view inside Scenes), parsed in one place. */
 export type AddressLayer =
   | Readonly<{ kind: "sheet"; actorId: string }>
   | Readonly<{ kind: "level"; actorId: string }>
   | Readonly<{ kind: "builder" }>
   | Readonly<{ kind: "replay"; archiveId: number }>
-  | Readonly<{ kind: "scene-prep"; sceneId: string | null }>
-  | Readonly<{ kind: "maps" }>;
+  | Readonly<{ kind: "scenes"; view: ScenesView }>;
 
-export function layerOf(path: string): AddressLayer | null {
+export function layerOf(path: string, query: URLSearchParams = new URLSearchParams()): AddressLayer | null {
   const segments = path.split("/").filter(Boolean);
   if (segments[0] === "characters" && segments[1]) {
     return segments[2] === "level" ? { kind: "level", actorId: segments[1] } : { kind: "sheet", actorId: segments[1] };
   }
   if (segments[0] === "builder" && segments.length === 1) return { kind: "builder" };
   if (segments[0] === "replays" && segments.length === 2) return { kind: "replay", archiveId: Number(segments[1]) };
-  if (segments[0] === "scenes" && segments.length === 2) {
-    if (segments[1] === "maps") return { kind: "maps" };
-    return { kind: "scene-prep", sceneId: segments[1] === "new" ? null : segments[1] };
+  if (segments[0] === "scenes" && segments.length >= 2) {
+    const view = scenesViewOf(segments, query);
+    return view ? { kind: "scenes", view } : null;
   }
   return null;
 }

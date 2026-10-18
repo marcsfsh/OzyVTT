@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Button, IconChevronLeft, Select, Steps, useDragSurface, useToast } from "@vtt/ui";
+import { Button, useDragSurface, useToast } from "@vtt/ui";
 import { clampPoint, GridOverlay, imagePointFromClient, type OverlayLine } from "../scene/mapImage";
-import { usePrompt } from "../components/feedback";
 import { ApiError, apiRequest } from "../lib/api";
 import { useGridAreaGesture, usePreviewZoom, type Area } from "./calibration-canvas";
 import { CrosshairOverlay, DEFAULT_CROSSHAIR, GridAreaPreview, type Crosshair } from "./calibration-overlays";
@@ -28,11 +27,13 @@ type WizardReply = Readonly<{
   overlayWarning?: string | null;
 }>;
 
+/** The calibration's own steps, which the map's Grid and Check steps hold: type, mark and fine-tune, then verify. */
+export const CALIBRATION_STEPS = 4;
+
 /**
- * One map's calibration, as four steps (mode, canvas, fields, verify) around a canvas that is mounted
- * once, flex-fills the pane, is never inside a step panel and never unmounted, so it keeps real height
- * in every step; `.map-step-body` is bounded so it cannot squeeze the canvas out. The library keys this
- * pane by map, so choosing another map starts its calibration fresh.
+ * One map's calibration, as four steps (mode, canvas, fields, verify) around a canvas that is mounted once and keeps
+ * real height in every step. The map's own steps place the pieces: the canvas beside the questions, the instruction,
+ * the step's body and its actions. The map's page keys this by map, so another map starts its calibration fresh.
  *
  * The UI's four steps are not the server's (`grid-calibration-wizard.ts`: measure -> refine ->
  * verify -> complete). The UI step is `Math.min(rawStep, maxStep)` from local state only:
@@ -51,25 +52,23 @@ type WizardReply = Readonly<{
  * gridless distance (`PUT .../scale`); regional and world maps only have the scale path. The scale
  * path never calls the wizard, so its fourth step is a review with no verification.
  */
-export function CalibrationPane({
+export function useCalibration({
   map,
   previewUrl,
   gmToken,
-  folderNames,
   onSaved,
-  onShowRail,
-  next
+  onStep,
+  onFinished
 }: Readonly<{
   map: MapAsset;
   previewUrl: string | null;
   gmToken: string;
-  folderNames: readonly string[];
-  /** The library refetches after a save and keeps this map selected. */
-  onSaved: (mapId: string) => Promise<void>;
-  /** Below 850px: back to the rail of maps. */
-  onShowRail: () => void;
-  /** Where the GM goes once the grid is set, as the done state's primary ("Back to the table"). */
-  next?: Readonly<{ label: string; go: () => void }>;
+  /** The library is read again after a save. */
+  onSaved: (mapId: string) => Promise<unknown>;
+  /** The calibration moved itself to a step (Continue, Measure, Looks right), so the map's steps can follow. */
+  onStep?: (step: number) => void;
+  /** The grid or scale is saved, with the sentence that says so. */
+  onFinished?: (message: string) => void;
 }>) {
   const [points, setPoints] = useState<Point[]>([]);
   const [pendingArea, setPendingArea] = useState<Area | null>(null);
@@ -86,13 +85,17 @@ export function CalibrationPane({
   const [unit, setUnit] = useState(map.scale?.unit ?? (map.kind === "battlemap" ? "feet" : "miles"));
   const [busy, setBusy] = useState(false);
   /** The position in the four-step UI flow, clamped by `maxStep` below. */
-  const [rawStep, setRawStep] = useState(0);
+  const [rawStep, setRawStepState] = useState(0);
+  /** A move the calibration makes itself, which the map's steps follow. */
+  const setRawStep = (next: number) => {
+    setRawStepState(next);
+    onStep?.(next);
+  };
   /** The wizard's 30-minute TTL ran out: an explicit, recoverable state with one way back, rather
       than a silent re-measure that would discard the GM's placement. */
   const [expired, setExpired] = useState(false);
   /** The saved result, shown until the GM moves on or calibrates again: a reset to step 1 read as "nothing saved". */
   const [done, setDone] = useState<string | null>(null);
-  const { prompt, dialog } = usePrompt();
   const { toast } = useToast();
   const squareMode = map.kind === "battlemap" && battlemapMode === "square";
   const zoom = usePreviewZoom(map);
@@ -140,12 +143,6 @@ export function CalibrationPane({
       failure: "Map request failed."
     });
 
-  const moveToFolder = (folder: string | null) =>
-    run(async () => {
-      await request("", { folder }, "PATCH");
-      await onSaved(map.id);
-      toast(folder ? `Moved to "${folder}".` : "Removed from its folder.", { tone: "success" });
-    });
   const restartCalibration = () => {
     setPoints([]);
     gesture.reset();
@@ -224,8 +221,9 @@ export function CalibrationPane({
   const finished = (message: string) => {
     restartCalibration();
     setPoints([]);
-    setRawStep(0);
+    setRawStepState(0);
     setDone(message);
+    onFinished?.(message);
   };
   const completeWizard = () =>
     runWizard(async () => {
@@ -255,7 +253,7 @@ export function CalibrationPane({
       reopenArea();
       return;
     }
-    setRawStep(index);
+    setRawStepState(index);
   };
   // The verify step is the "check a distant point" mode.
   const verifying = squareMode && step === 3 && wizard !== null;
@@ -285,11 +283,7 @@ export function CalibrationPane({
   const actions = (() => {
     if (done)
       return {
-        primary: next ? (
-          <Button variant="primary" onClick={next.go}>
-            {next.label}
-          </Button>
-        ) : null,
+        primary: null,
         secondary: (
           <Button variant="secondary" onClick={() => setDone(null)}>
             Set it again
@@ -416,190 +410,125 @@ export function CalibrationPane({
         };
   })();
 
-  return (
-    <section className="map-pane" aria-label={`Calibrate ${map.name}`}>
-      <div className="map-pane-head">
-        <Button variant="ghost" className="map-pane-back" onClick={onShowRail}>
-          <IconChevronLeft /> All maps
-        </Button>
-        <div className="map-pane-title">
-          <strong>{map.name}</strong>
-          <span className="tabular">
-            {map.width}×{map.height} · {map.calibration ? "grid set" : map.scale ? "gridless" : "no grid yet"}
-          </span>
-        </div>
-        <div className="map-folder-move" role="group" aria-label="Organize this map">
-          <Select
-            value={map.folder ?? ""}
-            onChange={(event) => moveToFolder(event.target.value || null)}
-            disabled={busy}
-            aria-label="Move map to folder"
+  const note = (
+    <p className={`map-step-note${done ? " is-done" : ""}`} id="map-step-note" role="status">
+      {done ?? instruction}
+    </p>
+  );
+  const canvas = (
+    <div className="map-canvas-col">
+      <div
+        ref={previewSurface}
+        className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""} ${pendingArea ? (gesture.areaAction === "resize" ? "resizing" : "movable") : ""}`}
+        onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint}
+        {...gesture.handlers}
+        aria-describedby="map-step-note"
+        aria-label={`Map preview for ${map.name}. ${pendingArea ? "Drag to move or resize the placed grid area." : squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}
+      >
+        {previewUrl ? (
+          <svg
+            ref={zoom.svgRef}
+            viewBox={zoom.viewBox}
+            width={map.width}
+            height={map.height}
+            preserveAspectRatio="xMidYMid meet"
           >
-            <option value="">Unfiled</option>
-            {folderNames.map((folder) => (
-              <option key={folder} value={folder}>
-                {folder}
-              </option>
-            ))}
-          </Select>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={async () => {
-              const folder = await prompt({
-                title: "New folder",
-                body: "Move this map to a new folder.",
-                placeholder: "Folder name",
-                confirmLabel: "Move"
-              });
-              if (folder) moveToFolder(folder);
-            }}
-          >
-            New folder…
-          </Button>
-        </div>
-      </div>
-
-      {!done && (
-        <Steps
-          className="map-steps"
-          steps={stepItems}
-          current={step}
-          maxSelectable={maxStep}
-          onStepSelect={goToStep}
-          ariaLabel="Grid calibration"
-        />
-      )}
-      {/* The one live status region on this surface; errors go to the toast. */}
-      <p className={`map-step-note${done ? " is-done" : ""}`} id="map-step-note" role="status">
-        {done ?? instruction}
-      </p>
-
-      {/* The canvas: mounted once, never inside a step panel, never unmounted, and the pane's only
-        flex-filling child. `touch-action: none` is unconditional in the stylesheet: this surface is a
-        drag target, never a scroller. */}
-      <div className="map-canvas-col">
-        <div
-          ref={previewSurface}
-          className={`map-preview ${squareMode && !wizard ? "grid-area-mode" : ""} ${pendingArea ? (gesture.areaAction === "resize" ? "resizing" : "movable") : ""}`}
-          onClick={squareMode ? (wizard && verifying ? choosePoint : undefined) : choosePoint}
-          {...gesture.handlers}
-          aria-describedby="map-step-note"
-          aria-label={`Map preview for ${map.name}. ${pendingArea ? "Drag to move or resize the placed grid area." : squareMode && !wizard ? "Drag across a three-by-three grid area." : "Click to place the instructed point."}`}
-        >
-          {previewUrl ? (
-            <svg
-              ref={zoom.svgRef}
-              viewBox={zoom.viewBox}
-              width={map.width}
-              height={map.height}
-              preserveAspectRatio="xMidYMid meet"
-            >
-              <image href={previewUrl} width={map.width} height={map.height} role="img" aria-label={map.name} />
-              <GridOverlay lines={overlay} />
-              {gesture.drag && <GridAreaPreview start={gesture.drag.start} end={gesture.drag.end} />}
-              {pendingArea && <GridAreaPreview start={pendingArea.start} end={pendingArea.end} handle />}
-              {gesture.crosshairPoints.length > 0 && (
-                <CrosshairOverlay
-                  points={gesture.crosshairPoints}
-                  width={map.width}
-                  height={map.height}
-                  crosshair={crosshair}
-                />
-              )}
-              {showPoints &&
-                points.slice(0, wizard ? 3 : 2).map((point, index) => (
-                  <g key={index}>
-                    <circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(map.width, map.height) / 80)} />
-                    <text x={point.x} y={point.y}>
-                      {index === 0 ? "A" : index === 1 ? "C" : "V"}
-                    </text>
-                  </g>
-                ))}
-            </svg>
-          ) : (
-            <p>Loading map preview…</p>
-          )}
-        </div>
-        <div className="map-canvas-tools" role="group" aria-label="Map preview zoom">
-          <Button
-            variant="secondary"
-            disabled={!previewUrl}
-            onClick={() => zoom.zoomFromCentre(1 / 1.3)}
-            aria-label="Zoom out"
-          >
-            −
-          </Button>
-          <span className="map-zoom-level tabular">{zoom.camera ? `${zoom.camera.zoom.toFixed(1)}×` : "1.0×"}</span>
-          <Button
-            variant="secondary"
-            disabled={!previewUrl}
-            onClick={() => zoom.zoomFromCentre(1.3)}
-            aria-label="Zoom in"
-          >
-            +
-          </Button>
-          <Button variant="secondary" disabled={!zoom.camera} onClick={zoom.reset}>
-            Reset zoom
-          </Button>
-        </div>
-      </div>
-
-      <div className="map-step-body scroll-y">
-        {done ? null : expired ? (
-          <ExpiredNotice />
-        ) : step === 0 ? (
-          <ModeStep
-            map={map}
-            mode={battlemapMode}
-            onChange={(value) => {
-              // Re-picking the current answer must not throw away a placed area.
-              if (map.kind !== "battlemap" || value === battlemapMode) return;
-              setBattlemapMode(value);
-              if (value === "gridless") setUnit("feet");
-              // A half-built square-grid wizard must not survive into the gridless path.
-              restartCalibration();
-            }}
-          />
-        ) : step === 1 ? (
-          <MarkStep squareMode={squareMode} crosshair={crosshair} onCrosshairChange={setCrosshair} />
-        ) : step === 2 ? (
-          squareMode ? (
-            <TuneGridStep
-              wizard={wizard}
-              points={points}
-              busy={busy}
-              onAction={wizardAction}
-              onPointChange={updatePoint}
-              onRemeasure={() => void startAreaWizard(points[0], points[1])}
-            />
-          ) : (
-            <DistanceStep
-              map={map}
-              knownDistance={knownDistance}
-              unit={unit}
-              onKnownDistanceChange={setKnownDistance}
-              onUnitChange={setUnit}
-            />
-          )
-        ) : squareMode ? (
-          <VerifyStep wizard={wizard} points={points} busy={busy} onAction={wizardAction} />
+            <image href={previewUrl} width={map.width} height={map.height} role="img" aria-label={map.name} />
+            <GridOverlay lines={overlay} />
+            {gesture.drag && <GridAreaPreview start={gesture.drag.start} end={gesture.drag.end} />}
+            {pendingArea && <GridAreaPreview start={pendingArea.start} end={pendingArea.end} handle />}
+            {gesture.crosshairPoints.length > 0 && (
+              <CrosshairOverlay
+                points={gesture.crosshairPoints}
+                width={map.width}
+                height={map.height}
+                crosshair={crosshair}
+              />
+            )}
+            {showPoints &&
+              points.slice(0, wizard ? 3 : 2).map((point, index) => (
+                <g key={index}>
+                  <circle cx={point.x} cy={point.y} r={Math.max(4, Math.min(map.width, map.height) / 80)} />
+                  <text x={point.x} y={point.y}>
+                    {index === 0 ? "A" : index === 1 ? "C" : "V"}
+                  </text>
+                </g>
+              ))}
+          </svg>
         ) : (
-          <ScaleReviewStep
-            points={points}
-            knownDistance={knownDistance}
-            unit={unit}
-            scaleSpanPx={scaleSpanPx}
-            distancePerPixel={distancePerPixel}
-          />
+          <p>Loading map preview…</p>
         )}
       </div>
-
-      <div className="map-step-actions">
-        {actions.primary}
-        {actions.secondary}
+      <div className="map-canvas-tools" role="group" aria-label="Map preview zoom">
+        <Button
+          variant="secondary"
+          disabled={!previewUrl}
+          onClick={() => zoom.zoomFromCentre(1 / 1.3)}
+          aria-label="Zoom out"
+        >
+          −
+        </Button>
+        <span className="map-zoom-level tabular">{zoom.camera ? `${zoom.camera.zoom.toFixed(1)}×` : "1.0×"}</span>
+        <Button
+          variant="secondary"
+          disabled={!previewUrl}
+          onClick={() => zoom.zoomFromCentre(1.3)}
+          aria-label="Zoom in"
+        >
+          +
+        </Button>
+        <Button variant="secondary" disabled={!zoom.camera} onClick={zoom.reset}>
+          Reset zoom
+        </Button>
       </div>
-      {dialog}
-    </section>
+    </div>
   );
+  const body = done ? null : expired ? (
+    <ExpiredNotice />
+  ) : step === 0 ? (
+    <ModeStep
+      map={map}
+      mode={battlemapMode}
+      onChange={(value) => {
+        // Re-picking the current answer must not throw away a placed area.
+        if (map.kind !== "battlemap" || value === battlemapMode) return;
+        setBattlemapMode(value);
+        if (value === "gridless") setUnit("feet");
+        // A half-built square-grid wizard must not survive into the gridless path.
+        restartCalibration();
+      }}
+    />
+  ) : step === 1 ? (
+    <MarkStep squareMode={squareMode} crosshair={crosshair} onCrosshairChange={setCrosshair} />
+  ) : step === 2 ? (
+    squareMode ? (
+      <TuneGridStep
+        wizard={wizard}
+        points={points}
+        busy={busy}
+        onAction={wizardAction}
+        onPointChange={updatePoint}
+        onRemeasure={() => void startAreaWizard(points[0], points[1])}
+      />
+    ) : (
+      <DistanceStep
+        map={map}
+        knownDistance={knownDistance}
+        unit={unit}
+        onKnownDistanceChange={setKnownDistance}
+        onUnitChange={setUnit}
+      />
+    )
+  ) : squareMode ? (
+    <VerifyStep wizard={wizard} points={points} busy={busy} onAction={wizardAction} />
+  ) : (
+    <ScaleReviewStep
+      points={points}
+      knownDistance={knownDistance}
+      unit={unit}
+      scaleSpanPx={scaleSpanPx}
+      distancePerPixel={distancePerPixel}
+    />
+  );
+  return { canvas, note, body, actions, step, stepItems, maxStep, goToStep, done, squareMode, busy };
 }

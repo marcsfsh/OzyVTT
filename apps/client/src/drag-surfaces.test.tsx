@@ -24,9 +24,10 @@ vi.mock("./lib/api", async (original) => ({
 import { touchMoveCancelled } from "../test/drag-surface";
 import { MapSurface } from "./codex/MapSurface";
 import { ConnectionGraph } from "./codex/RelationshipGraph";
-import { CalibrationPane } from "./maps/CalibrationPane";
+import { useCalibration } from "./maps/useCalibration";
 import { MapTokenTray } from "./scene/MapTokenTray";
-import { SceneGallery } from "./scenes/SceneGallery";
+import { ScenesContext, type ScenesContextValue } from "./scenes/context";
+import { SceneList } from "./scenes/SceneList";
 import { FloatingSheet } from "./sheet/CharacterSheet";
 import { PaneDivider } from "./table/PaneDivider";
 import { Initiative, MapStage, type Presentation } from "./viewer/ViewerApp";
@@ -56,33 +57,50 @@ const presentation: Presentation = {
 const scene = (id: string, name: string) =>
   SceneSchema.parse({ id: `30000000-0000-4000-8000-00000000000${id}`, name, mapAssetId: MAP_ID });
 
+/** The calibration's canvas, the surface the 3 x 3 block is dragged on. */
+function CalibrationCanvas() {
+  const calibration = useCalibration({
+    map: {
+      id: MAP_ID,
+      name: "Smoke cavern",
+      kind: "battlemap",
+      folder: null,
+      originalName: "smoke.png",
+      format: "png",
+      mediaType: "image/png",
+      width: 700,
+      height: 500,
+      byteLength: 1,
+      importedAt: "2026-10-17T00:00:00.000Z",
+      updatedAt: "2026-10-17T00:00:00.000Z",
+      calibration: null,
+      scale: null
+    },
+    previewUrl: "blob:map",
+    gmToken: "gm",
+    onSaved: async () => {}
+  });
+  return calibration.canvas;
+}
+
+/** What the Scenes tab's views read, with these scenes in the GM's view. */
+const scenesContext = (scenes: ReturnType<typeof scene>[]): ScenesContextValue => ({
+  state: { combat: { scenes, activeSceneId: null, active: false }, actors: [] } as never,
+  token: "gm",
+  maps: [],
+  reloadMaps: async () => [],
+  links: new Map(),
+  reloadLinks: () => {},
+  phone: false,
+  narrow: false,
+  go: () => {},
+  onOpenMap: () => {}
+});
+
 const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElement }>> = [
   {
     selector: ".map-preview",
-    ui: () => (
-      <CalibrationPane
-        map={{
-          id: MAP_ID,
-          name: "Smoke cavern",
-          kind: "battlemap",
-          folder: null,
-          originalName: "smoke.png",
-          format: "png",
-          mediaType: "image/png",
-          width: 700,
-          height: 500,
-          byteLength: 1,
-          importedAt: "2026-10-17T00:00:00.000Z",
-          calibration: null,
-          scale: null
-        }}
-        previewUrl="blob:map"
-        gmToken="gm"
-        folderNames={[]}
-        onSaved={async () => {}}
-        onShowRail={() => {}}
-      />
-    )
+    ui: () => <CalibrationCanvas />
   },
   {
     selector: ".tray-token",
@@ -141,16 +159,11 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
   { selector: ".cs-float-grip", ui: () => <FloatingSheet name="Lyra">Sheet</FloatingSheet> },
   { selector: ".cs-float-resize", ui: () => <FloatingSheet name="Lyra">Sheet</FloatingSheet> },
   {
-    selector: ".scene-card-grip",
+    selector: ".sc-grip",
     ui: () => (
-      <SceneGallery
-        scenes={[scene("1", "Cavern"), scene("2", "Bridge")]}
-        activeSceneId={null}
-        combatActive={false}
-        liveCombatantCount={0}
-        previewingSceneId={null}
-        onNewScene={() => {}}
-      />
+      <ScenesContext.Provider value={scenesContext([scene("1", "Cavern"), scene("2", "Bridge")])}>
+        <SceneList />
+      </ScenesContext.Provider>
     )
   }
 ];

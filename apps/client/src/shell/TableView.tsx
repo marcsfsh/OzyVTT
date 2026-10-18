@@ -10,11 +10,11 @@ import { CombatLogPanel } from "../encounter/CombatLog";
 import { EncounterPanel } from "../encounter/EncounterPanel";
 import { useTargeting } from "../encounter/targeting";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import type { MapSelection } from "../maps/MapManager";
+import type { MapSelection } from "../maps/map-catalog";
 import { ReplayShelf } from "../replay/ReplayShelf";
 import { EncounterMap } from "../scene/EncounterMap";
-import { SceneBuilder } from "../scenes/SceneBuilder";
 import { navigate, pathForGmTab } from "../router";
+import { SCENES_PATHS } from "../scenes/routes";
 import { PartyRest } from "../rest/PartyRest";
 import { ShortRestPrompt } from "../rest/ShortRestPrompt";
 import { needsItems } from "../table/needs";
@@ -25,21 +25,11 @@ import { TableHeader } from "../table/TableHeader";
 import { TokenTab } from "../table/TokenTab";
 import "./table-view.css";
 
-type StagedScene = GmView["combat"]["scenes"][number];
-
-/** What only the GM's table has: the map choice, private scene staging and the shared-screen preview. */
+/** What only the GM's table has: the map choice and the shared-screen preview. Scenes are prepared on the Scenes tab. */
 export type GmTable = Readonly<{
   selectedMap: MapSelection | null;
   mapLibrary: readonly MapSelection[];
   onSelectMap: (map: MapSelection | null) => void;
-  /** The prepared scene being staged privately on the GM's map, if any. */
-  stagedScene: StagedScene | null;
-  onPrepareScene: () => void;
-  onViewAllScenes: () => void;
-  onBackToLive: () => void;
-  onMakeLive: (sceneId: string) => void;
-  /** Opens a map's grid calibration, from the staged scene's header when its map has none. */
-  onSetGrid: (mapId: string) => void;
   viewerPreview: Readonly<{ on: boolean; onToggle: () => void }>;
 }>;
 
@@ -68,9 +58,6 @@ export function TableView(props: TableViewProps) {
   const playerHasClaimed =
     props.role === "player" &&
     props.state.actors.some((actor) => actor.kind === "player-character" && actor.claimStatus === "mine");
-  const staged = gm?.stagedScene ?? null;
-  const stagedMap = staged ? gm?.mapLibrary.find((map) => map.id === staged.mapAssetId) : undefined;
-  const stagedNeedsGrid = stagedMap !== undefined && !stagedMap.calibration && !stagedMap.scale;
   // A player who has claimed nobody while no map is live sees the picker across the whole table, never under an empty
   // map box.
   const claimingOnly = props.role === "player" && !playerHasClaimed && !state.combat.mapAssetId;
@@ -88,44 +75,12 @@ export function TableView(props: TableViewProps) {
 
   const header =
     props.role === "gm" ? (
-      <TableHeader
-        role="gm"
-        state={props.state}
-        gm={{
-          token,
-          stagedScene: staged,
-          liveMapName,
-          onPrepareScene: props.gm.onPrepareScene,
-          onViewAllScenes: props.gm.onViewAllScenes,
-          onBackToLive: props.gm.onBackToLive,
-          onMakeLive: props.gm.onMakeLive,
-          onSetGrid: stagedNeedsGrid ? props.gm.onSetGrid : null,
-          viewerPreview: props.gm.viewerPreview
-        }}
-      />
+      <TableHeader role="gm" state={props.state} gm={{ token, liveMapName, viewerPreview: props.gm.viewerPreview }} />
     ) : (
       <TableHeader role="player" state={props.state} />
     );
 
-  const map = staged ? (
-    <EncounterMap
-      assetId={staged.mapAssetId}
-      token={token}
-      altText={`Staging ${staged.name}`}
-      role="gm"
-      actors={state.actors}
-      tokens={staged.combat.tokens}
-      annotations={[]}
-      revision={state.revision}
-      activeActorId={null}
-      fog={staged.combat.fog}
-      terrain={staged.combat.terrain}
-      vision={staged.combat.vision}
-      moveSceneId={staged.id}
-      healthDisplay={staged.combat.healthDisplay}
-      state={state}
-    />
-  ) : state.combat.mapAssetId ? (
+  const map = state.combat.mapAssetId ? (
     <EncounterMap
       assetId={state.combat.mapAssetId}
       token={token}
@@ -157,7 +112,7 @@ export function TableView(props: TableViewProps) {
           : "The map appears here when the GM makes a scene live."}
       </span>
       {gm && (
-        <Button variant="secondary" className="empty-scene-prep" onClick={gm.onPrepareScene}>
+        <Button variant="secondary" className="empty-scene-prep" onClick={() => navigate(SCENES_PATHS.newScene)}>
           <IconScene /> Prepare a scene
         </Button>
       )}
@@ -169,16 +124,7 @@ export function TableView(props: TableViewProps) {
   const log = <CombatLogPanel />;
   let panel;
   if (props.role === "gm") {
-    panel = staged ? (
-      <section className="table-panel table-panel-staging scroll-y" aria-label={`Staging ${staged.name}`}>
-        <SceneBuilder
-          scene={staged}
-          actors={props.state.actors}
-          revision={state.revision}
-          stagingDefaults={props.state.stagingDefaults}
-        />
-      </section>
-    ) : (
+    panel = (
       <EncounterPanel
         role="gm"
         state={props.state}
@@ -239,7 +185,7 @@ export function TableView(props: TableViewProps) {
   }
 
   return (
-    <div className={`table-bench anim-view ${role}${staged ? " is-staging" : ""}${claimingOnly ? " is-claiming" : ""}`}>
+    <div className={`table-bench anim-view ${role}${claimingOnly ? " is-claiming" : ""}`}>
       {header}
       <div
         className="table-bench-split"

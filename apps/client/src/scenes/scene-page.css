@@ -1,0 +1,434 @@
+/* A scene or a map as one document, and the steps that make one. The document is the table's docked workbench
+   (`.table-bench`: the header bar, the map with its rail, the panel with its footer); these rules add what a record
+   has and the table does not. The editors share one frame: steps, questions and the pinned map. */
+
+/* ----- The document's header bar ----- */
+.sc-scene-head {
+  flex-wrap: nowrap;
+}
+.sc-scene-head.is-preview {
+  border-bottom-color: var(--cyan);
+}
+.sc-scene-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-kind {
+  flex: none;
+  color: var(--text-muted);
+  font: 600 var(--fs-2xs) / 1 var(--font-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* See as: the label sits beside the choice on a laptop, and only the choice shows on a phone. */
+.sc-see-as {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+.sc-see-as-label {
+  color: var(--text-muted);
+  font: 600 var(--fs-xs) / 1 var(--font-label);
+  white-space: nowrap;
+}
+.sc-see-as .nh-select {
+  max-width: 13rem;
+}
+.sc-preview-banner {
+  border-bottom-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, var(--surface-1));
+  color: var(--cyan-hi);
+}
+.sc-preview-note {
+  margin: auto;
+  padding: var(--space-4);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+/* The table screen's own stage, framed as the room sees it. */
+.sc-preview-screen {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: var(--space-2) var(--space-3);
+  background: var(--void);
+}
+.sc-preview-screen > .viewer-stage {
+  flex: 1 1 auto;
+}
+
+/* ----- The metadata panel ----- */
+.sc-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.sc-meta-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.sc-meta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.sc-meta-head h3 {
+  margin: 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.sc-meta-needs,
+.sc-links,
+.sc-names {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-meta-needs li,
+.sc-links li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  font-size: var(--fs-sm);
+}
+.sc-meta-needs li {
+  padding-left: var(--space-2);
+  border-left: 3px solid var(--caution);
+  color: var(--text);
+}
+.sc-names li {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.sc-names strong {
+  color: var(--text);
+}
+.sc-q {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.sc-q-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sc-facts-line {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.sc-mapfacts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.sc-mapfacts .sc-q-actions {
+  grid-column: 1 / -1;
+}
+.sc-mapfacts-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+.sc-dl {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+.sc-dl > div {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+.sc-dl dt {
+  color: var(--text-muted);
+}
+.sc-dl dd {
+  margin: 0;
+  color: var(--text);
+}
+.sc-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.sc-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.sc-field-row > .sc-field {
+  flex: 1 1 10rem;
+}
+.sc-label {
+  color: var(--text-muted);
+  font: 600 var(--fs-xs) / 1.2 var(--font-label);
+}
+.sc-sound-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.staging-row-place {
+  flex: none;
+}
+.sc-flyout .nh-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ----- The editors: the head, the steps, the questions and the pinned map ----- */
+.sc-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+.sc-editor-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  min-height: 3.25rem;
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+/* How many steps are done, as a square counter beside the title. */
+.sc-ring {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 2.75rem;
+  height: 2rem;
+  border: 2px solid var(--cyan);
+  color: var(--cyan-hi);
+  font: 700 var(--fs-xs) / 1 var(--font-numeric);
+}
+.sc-editor-body {
+  display: grid;
+  grid-template-columns: 13rem minmax(20rem, 26rem) minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.sc-steps {
+  min-height: 0;
+  padding: var(--space-3);
+  border-right: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-1) 60%, transparent);
+}
+.sc-editor-questions {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line-strong);
+  background:
+    var(--material-lip),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-1) 88%, transparent) 0%,
+      color-mix(in srgb, var(--surface-2) 92%, transparent) 100%
+    );
+}
+.sc-editor-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-6);
+}
+.sc-step-title {
+  margin: 0;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h2) / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-shadow: var(--heading-shadow);
+}
+.sc-step-ask {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+/* The step's one primary and the way back, under the questions and under the thumb on a phone. */
+.sc-editor-foot,
+.sc-editor-inline-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex: none;
+}
+.sc-editor-foot {
+  padding: var(--space-2) var(--space-3);
+  padding-bottom: max(var(--space-2), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.sc-editor-preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--void);
+}
+.sc-editor-preview > .map-canvas-col {
+  flex: 1 1 auto;
+  padding: var(--space-3);
+}
+.sc-upload-preview {
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  object-fit: contain;
+}
+.map-step-body-inline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Below 980px the steps are a strip, the questions take the pane, and the map waits in a bar over the bottom. */
+@media (max-width: 979px) {
+  .sc-editor-body {
+    display: flex;
+    flex-direction: column;
+  }
+  .sc-editor-questions {
+    flex: 1 1 auto;
+    border-right: 0;
+  }
+  .sc-steps-strip {
+    flex: none;
+    margin: var(--space-2) var(--space-3) 0;
+  }
+  .sc-editor-scroll {
+    padding: var(--space-3);
+  }
+  /* A step answered on the map (marking a grid) keeps the map above the questions. */
+  .sc-editor-canvas {
+    display: flex;
+    flex: 0 0 45%;
+    min-height: 12rem;
+    padding: var(--space-2) var(--space-3) 0;
+  }
+  .sc-editor-canvas > .map-canvas-col {
+    flex: 1 1 auto;
+  }
+  .sc-editor-foot > .nh-btn {
+    flex: 1 1 8rem;
+  }
+}
+.sc-peek {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  min-height: calc(var(--tap-min) + var(--space-2));
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-top: 2px solid var(--line-strong);
+  background: var(--material-lip), var(--surface-2);
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.sc-peek > svg {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  color: var(--cyan-hi);
+}
+.sc-peek-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sc-peek-text strong,
+.sc-peek-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-peek-text small {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.sc-peek-open {
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-raised);
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.6 var(--font-label);
+}
+/* The map full screen on a phone: the workbench as the table's phone layout draws it, with Done above. It is a layer
+   of the pane, so the app's own tabs stay reachable. */
+.sc-mapsheet {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
+.sc-mapsheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: none;
+  min-height: 3.25rem;
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.sc-mapsheet-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+@media (max-width: 760px) {
+  .sc-see-as-label {
+    display: none;
+  }
+  .sc-see-as .nh-select {
+    max-width: 8.5rem;
+  }
+}

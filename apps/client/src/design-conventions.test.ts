@@ -197,7 +197,7 @@ const COLOR = /#[0-9a-fA-F]{3,8}\b|%23[0-9a-fA-F]{3,6}|rgba?\(|hsla?\(/g;
 const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: string]> = [
   ["apps/client/src/actors/pdf-import.css", 5, "import-status hues (amber/red/violet) that never became tokens"],
   ["apps/client/src/codex/codex.css", 1, "graph node-icon fill over arbitrary map art"],
-  ["apps/client/src/maps/map-manager.css", 11, "SVG paint: grid strokes and drop-shadows over image content"],
+  ["apps/client/src/maps/calibration.css", 11, "SVG paint: grid strokes and drop-shadows over image content"],
   ["apps/client/src/scene/annotation.css", 3, "SVG paint: annotation strokes over image content"],
   ["apps/client/src/scene/encounter-map.css", 8, "SVG paint, and the black/white pair a token ring needs on any map"],
   ["apps/client/src/styles.css", 2, "a two-stop black mask, read only for its alpha"],
@@ -239,8 +239,6 @@ const FEEDBACK_ALLOW: ReadonlyArray<readonly [file: string, count: number]> = [
   ["apps/client/src/encounter/MonsterBrowser.tsx", 1],
   ["apps/client/src/encounter/PlayerEncounterPanel.tsx", 1],
   ["apps/client/src/scene/TokenContextMenu.tsx", 4],
-  ["apps/client/src/scenes/SceneBuilder.tsx", 6],
-  ["apps/client/src/scenes/ScenePanel.tsx", 3],
   ["apps/client/src/viewer/ScreenPairing.tsx", 4],
   ["apps/client/src/viewer/ViewerApp.tsx", 2]
 ];

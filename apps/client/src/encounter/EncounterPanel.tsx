@@ -1,5 +1,5 @@
 import type { GmView, PlayerView } from "@vtt/domain";
-import type { MapSelection } from "../maps/MapManager";
+import type { MapSelection } from "../maps/map-catalog";
 import { GmEncounterPanel, type GmPanelSlots } from "./GmEncounterPanel";
 import { PlayerEncounterPanel, type PlayerPanelSlots } from "./PlayerEncounterPanel";
 import "./encounter-panel.css";
