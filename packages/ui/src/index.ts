@@ -113,7 +113,7 @@ export {
   IconConcentration
 } from "./primitives/icons";
 export { Combobox } from "./primitives/Combobox";
-export { MarkdownEditor } from "./primitives/MarkdownEditor";
+export { MarkdownEditor, applyMarkdownFormat } from "./primitives/MarkdownEditor";
 
 /* Guided-flow primitives (character builder, and any other long wizard) */
 export { WizardShell } from "./primitives/WizardShell";

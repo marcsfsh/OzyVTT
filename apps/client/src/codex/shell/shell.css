@@ -1,0 +1,226 @@
+/* The Codex shell: a section bar over the content on a laptop; a top bar, the content and a tab bar under the thumb
+   on a phone. The shell never scrolls; each view's regions scroll themselves with `.scroll-y`. */
+
+.cx-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+.cx-shell.is-embedded {
+  flex: 1 1 auto;
+}
+.cx-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.cx-content > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.cx-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+}
+.cx-grow {
+  flex: 1 1 auto;
+}
+
+/* ----- Laptop: the section bar ----- */
+.cx-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--material-lip), var(--surface-1);
+  border-bottom: 1px solid var(--line-strong);
+  flex: none;
+}
+.cx-bar-sections {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.cx-bar-tab {
+  font-size: var(--fs-sm);
+  padding-inline: var(--space-3);
+}
+.cx-searchbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-raised);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: 500 var(--fs-sm) / 1.2 var(--font-body);
+  text-align: start;
+  cursor: pointer;
+}
+.cx-searchbox:hover,
+.cx-searchbox:focus-visible {
+  border-color: var(--rim-color-hi);
+  color: var(--text);
+}
+.cx-searchbox-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-gm-menu[open] > summary,
+.cx-gm-menu.is-on > summary {
+  border-color: var(--rim-gm);
+  color: var(--violet-hi);
+}
+/* Below 1280px the search box keeps its glyph and the shortcut, and gives the width to the sections. */
+.cx-searchbox-label {
+  display: none;
+}
+@media (min-width: 1280px) {
+  .cx-searchbox {
+    width: 240px;
+  }
+  .cx-searchbox-label {
+    display: inline;
+  }
+}
+
+/* ----- Phone: the top bar, Campaign's switch and the tab bar ----- */
+.cx-phonebar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: calc(var(--tap-min) + var(--space-2));
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  background: var(--material-lip), var(--surface-1);
+  border-bottom: 1px solid var(--line-strong);
+  flex: none;
+}
+.cx-phonebar-slot {
+  display: contents;
+}
+.cx-phonebar-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font: 400 var(--fs-h3) / 1.2 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--heading-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-phonebar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+.cx-campaign {
+  padding: var(--space-2) var(--space-3) 0;
+  flex: none;
+}
+.cx-campaign .nh-segmented {
+  display: flex;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+.cx-campaign .nh-segmented-option {
+  flex: 1 1 auto;
+  padding-inline: var(--space-1);
+}
+.cx-campaign .nh-segmented-option[aria-current="page"] {
+  color: var(--text);
+  background: var(--tab-on);
+  box-shadow:
+    var(--tab-on-sheen),
+    inset 0 -2px 0 var(--cyan);
+}
+.cx-tabbar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--material-lip), var(--surface-1);
+  border-top: 1px solid var(--line-strong);
+  flex: none;
+}
+.cx-tabbar-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: calc(var(--tap-min) + var(--space-3));
+  padding: var(--space-1) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 var(--fs-2xs) / 1.1 var(--font-label);
+  cursor: pointer;
+}
+.cx-tabbar-tab .cx-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+.cx-tabbar-tab span {
+  margin: 0;
+  color: inherit;
+}
+.cx-tabbar-tab:hover {
+  color: var(--text);
+}
+/* The tab that is on is raised, with the cyan selection edge along its top. */
+.cx-tabbar-tab.is-on {
+  color: var(--text);
+  background: var(--tab-on);
+  box-shadow:
+    var(--tab-on-sheen),
+    inset 0 2px 0 var(--cyan);
+}
+
+/* ----- Pieces every view uses ----- */
+
+/* A view's own row under the section bar: its filters, view switch and actions. */
+.cx-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-1) 55%, transparent);
+  flex: none;
+}
+.cx-legacy {
+  min-height: 0;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
+}
+.cx-empty {
+  margin: var(--space-6) auto;
+  max-width: 32rem;
+  color: var(--text-dim);
+  font: 500 var(--fs-body) / var(--lh-body) var(--font-body);
+  text-align: center;
+}
+.cx-notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) 0;
+  flex: none;
+}

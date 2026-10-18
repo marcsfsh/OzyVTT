@@ -26,6 +26,7 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { goTo } from "../../test/route";
+import { setViewport } from "../../test/viewport";
 import { PlayerCodex } from "./PlayerCodex";
 import { rememberLocation, resumeTarget } from "../router";
 
@@ -50,7 +51,7 @@ async function textAt(path: string): Promise<string> {
 }
 
 describe("A player at a GM-only address", () => {
-  it.each(["/codex/audit", "/codex/backup", "/codex/settings"])(
+  it.each(["/codex/audit", "/codex/templates", "/codex/templates/t1", "/codex/backup", "/codex/settings"])(
     "%s renders exactly what an unknown address renders: no GM section name anywhere",
     async (gmOnlyPath) => {
       const unknown = await textAt("/codex/zzz");
@@ -61,28 +62,31 @@ describe("A player at a GM-only address", () => {
   );
 
   it("never puts a GM section's name in the chrome", async () => {
-    for (const path of ["/codex/audit", "/codex/backup", "/codex/settings"]) {
+    for (const path of ["/codex/audit", "/codex/templates", "/codex/backup", "/codex/settings"]) {
       const text = await textAt(path);
       expect(text, path).not.toMatch(/Reveal audit/);
+      expect(text, path).not.toMatch(/Prep templates/);
       // Whole words: the not-found copy contains neither.
       expect(text, path).not.toMatch(/\bBackup\b/);
       expect(text, path).not.toMatch(/\bSettings\b/);
     }
   });
 
-  it("titles the bar 'Codex', the same as it does for an address that means nothing", async () => {
+  it("titles the phone's top bar 'Codex', the same as it does for an address that means nothing", async () => {
+    setViewport(390);
     goTo("/codex/audit");
     render(<PlayerCodex token="player" />);
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     expect(screen.getByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
   });
 
-  it("still titles the bar with the section on an address a player MAY reach", async () => {
+  it("still titles the phone's top bar with the section on an address a player MAY reach", async () => {
     // Control: a guard that blanked every title would pass the tests above.
-    goTo("/codex/journal");
+    setViewport(390);
+    goTo("/codex/relationships");
     render(<PlayerCodex token="player" />);
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    expect(screen.getByRole("heading", { level: 2, name: "Journal" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Relationships" })).toBeInTheDocument();
   });
 });
 
@@ -94,7 +98,7 @@ describe("Resume never volunteers a GM-only address", () => {
   });
 
   it("still resumes the GM there, because it is their screen", () => {
-    rememberLocation("gm", "/codex/audit");
-    expect(resumeTarget("gm", "/")).toBe("/codex/audit");
+    rememberLocation("gm", "/codex/backup");
+    expect(resumeTarget("gm", "/")).toBe("/codex/backup");
   });
 });

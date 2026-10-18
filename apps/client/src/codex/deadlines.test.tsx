@@ -58,7 +58,6 @@ vi.mock("./api", async (importOriginal) => {
 import { JournalView } from "./JournalView";
 import { goTo } from "../../test/route";
 import { PlayerCodex } from "./PlayerCodex";
-import { CampaignHome } from "./CampaignHome";
 import {
   CHRONICLE_KIND_META,
   campaignDeadlines,
@@ -455,7 +454,7 @@ describe("The player's chronicle and the player's clock", () => {
         payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null }
       })
     ]);
-    await user.click(screen.getByRole("button", { name: "Journal" }));
+    await user.click(screen.getByRole("button", { name: "Story" }));
 
     expect(playerRowOf("d1").textContent).toContain("Deadline");
     expect(playerRowOf("d1").querySelector(".codex-entry-kindglyph")).not.toBeNull();
@@ -477,60 +476,11 @@ describe("The player's chronicle and the player's clock", () => {
     // What a client test can prove: this surface asks the player route, never `calendarApi.get`.
     expect(playerCalendar).toHaveBeenCalledWith("player");
     expect(getCalendar).not.toHaveBeenCalled();
-    expect(await screen.findByText(/(Your date|Today): Hammer 3, 1492 DR/)).toBeInTheDocument();
+    expect(await screen.findByText("Hammer 3, 1492 DR")).toBeInTheDocument();
+    expect(screen.getByText("Today")).toBeInTheDocument();
     // Applying downtime is GM-only; `applied` isn't even on the player payload.
     expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Advance the campaign clock/)).not.toBeInTheDocument();
-  });
-});
-
-describe("The Campaign dashboard's deadlines card", () => {
-  const CARDS = [
-    { id: "d2", summary: "The comet fell.", when: "Hammer 1, 1492 DR", fired: true },
-    { id: "d1", summary: "The duke's ultimatum expires.", when: "Hammer 10, 1492 DR", fired: false }
-  ];
-
-  it("lists what has passed and what is coming, each saying which, and opens the record", async () => {
-    const onOpenEntry = vi.fn();
-    const user = userEvent.setup();
-    render(
-      <CampaignHome
-        pages={[]}
-        deadlines={CARDS}
-        onOpenEntry={onOpenEntry}
-        onPickType={vi.fn()}
-        onPickTag={vi.fn()}
-        onOpenPage={vi.fn()}
-        onOpenMap={vi.fn()}
-      />
-    );
-
-    const card = within(screen.getByRole("navigation", { name: "Deadlines" }));
-    const rows = card.getAllByRole("button").map((row) => row.textContent ?? "");
-    // Passed first: the clock finished it, and it needs the GM's attention.
-    expect(rows[0]).toContain("The comet fell.");
-    expect(rows[0]).toContain("Passed");
-    expect(rows[1]).toContain("The duke's ultimatum expires.");
-    expect(rows[1]).toContain("Approaching");
-
-    await user.click(card.getByText("The duke's ultimatum expires."));
-    expect(onOpenEntry).toHaveBeenCalledWith("d1");
-  });
-
-  it("renders no card at all when there are no deadlines", () => {
-    render(
-      <CampaignHome
-        pages={[
-          { id: "p1", title: "Strahd", entityType: "character", tags: [], playerUpdatedAt: "2026-07-28T00:00:00.000Z" }
-        ]}
-        onOpenEntry={vi.fn()}
-        onPickType={vi.fn()}
-        onPickTag={vi.fn()}
-        onOpenPage={vi.fn()}
-        onOpenMap={vi.fn()}
-      />
-    );
-    expect(screen.queryByRole("navigation", { name: "Deadlines" })).not.toBeInTheDocument();
   });
 });
 
@@ -555,24 +505,6 @@ describe("The new controls take the tap route a stacked control needs", () => {
     // `@vtt/ui` inputs carry the tap floor themselves.
     await userEvent.setup().click(screen.getByRole("button", { name: "Downtime" }));
     for (const label of ["Who", "Activity", "Days"]) expect(screen.getByLabelText(label)).toHaveClass("nh-input");
-  });
-
-  it("a deadline card row is the dashboard's own row chassis, not a new control", () => {
-    render(
-      <CampaignHome
-        pages={[]}
-        deadlines={[{ id: "d1", summary: "The duke's ultimatum expires.", when: "Hammer 10, 1492 DR", fired: false }]}
-        onOpenEntry={vi.fn()}
-        onPickType={vi.fn()}
-        onPickTag={vi.fn()}
-        onOpenPage={vi.fn()}
-        onOpenMap={vi.fn()}
-      />
-    );
-    // Reuses the row class that carries the floor, with no bespoke one.
-    expect(within(screen.getByRole("navigation", { name: "Deadlines" })).getByRole("button")).toHaveClass(
-      "codex-campaign-recentitem"
-    );
   });
 });
 

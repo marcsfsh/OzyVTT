@@ -87,7 +87,6 @@ vi.mock("./api", async (importOriginal) => {
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CodexShell } from "./CodexShell";
-import { PlayerCodex } from "./PlayerCodex";
 import { useRecapBadge } from "./useRecapBadge";
 import { pickNextSession, sessionByNumber, sessionTitle } from "./sessions";
 import { socket } from "../socket";
@@ -226,78 +225,7 @@ describe("Which session is 'now' (the rule, below the components)", () => {
   });
 });
 
-describe("The session console is a VIEW", () => {
-  it("opens from three different modes on one fetch, and writes nothing", async () => {
-    gmDefaults();
-    const user = userEvent.setup();
-    await renderWorkspace();
-
-    // The console is a drawer so it is reachable from every section.
-    for (const tab of ["Pages", "Home", "Atlas"]) {
-      await user.click(screen.getAllByRole("button", { name: tab })[0]);
-      await user.click(screen.getByRole("button", { name: "Session prep" }));
-      const panel = screen.getByRole("complementary", { name: "Session prep" });
-      // The drawer stays mounted while closed, so check `inert`; presence proves nothing.
-      expect(panel).not.toHaveAttribute("inert");
-      // The active session's prep rendered, so the call counts below aren't against an empty panel.
-      expect(within(panel).getByRole("heading", { name: "Session 8" })).toBeInTheDocument();
-      expect(within(panel).getByText("The heart of the castle.")).toBeInTheDocument();
-      await user.click(within(panel).getByRole("button", { name: "Close" }));
-      expect(panel).toHaveAttribute("inert");
-    }
-
-    // One read for the whole workspace, no writes.
-    expect(listSessions).toHaveBeenCalledTimes(1);
-    for (const write of [createSession, updateSession, revealSession, activateSession, removeSession]) {
-      expect(write).not.toHaveBeenCalled();
-    }
-  });
-
-  it("remembers whether it was left open, under a codex- key", async () => {
-    // Both the write and the read back on a fresh mount.
-    gmDefaults();
-    const user = userEvent.setup();
-    const first = (goTo("/codex/sessions"), render)(
-      <ToastProvider>
-        <CodexShell gmToken="gm" />
-      </ToastProvider>
-    );
-    await waitFor(() => expect(listSessions).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Session prep" }));
-    expect(localStorage.getItem("codex-session-console")).toBe("open");
-    first.unmount();
-
-    (goTo("/codex/sessions"), render)(
-      <ToastProvider>
-        <CodexShell gmToken="gm" />
-      </ToastProvider>
-    );
-    await waitFor(() => expect(listSessions).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole("complementary", { name: "Session prep" })).not.toHaveAttribute("inert");
-  });
-});
-
 describe("Getting to a session (R1: every jump prepares its destination)", () => {
-  it("from the Campaign card, landing ON that session with the other one unmarked", async () => {
-    // The active session is the lower-numbered one, so the GM's pointer has to win for this to pass.
-    gmDefaults([S3, S8], "s3");
-    const user = userEvent.setup();
-    await renderWorkspace();
-
-    await user.click(screen.getByRole("button", { name: "Home" }));
-    const card = within(await screen.findByRole("navigation", { name: "Next session" }));
-    expect(card.queryByText("Session 8")).not.toBeInTheDocument();
-    await user.click(card.getByText("Session 3"));
-
-    const log = within(await screen.findByRole("navigation", { name: "Sessions" }));
-    await waitFor(() => expect(log.getByRole("button", { name: /Session 3/ })).toHaveAttribute("aria-current", "true"));
-    expect(log.getByRole("button", { name: /Session 8/ })).not.toHaveAttribute("aria-current");
-    // The record is open and its prep editable, beyond a highlight.
-    expect(screen.getByRole("textbox", { name: /Prep for this session/ })).toHaveValue(
-      "Strahd ambushes them at the bridge."
-    );
-  });
-
   it("from a by-session journal heading, but ONLY where a session record exists", async () => {
     // Session 3 has a record; session 4 does not. Both have entries.
     gmDefaults([S3], "s1");
@@ -305,7 +233,7 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Journal" }));
+    await user.click(screen.getByRole("button", { name: "Story" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "By session" }));
 
@@ -337,82 +265,11 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Journal" }));
+    await user.click(screen.getByRole("button", { name: "Story" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
 
     expect(screen.getByText("1492 DR")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /1492 DR/ })).not.toBeInTheDocument();
-  });
-});
-
-describe("The player's session card (viewer safety)", () => {
-  const PLAYER_SESSION: PlayerCodexSession = {
-    id: "s8",
-    sessionNumber: 8,
-    realDate: "2026-07-26",
-    recap: "They reached the spire.",
-    tags: []
-  };
-  beforeEach(() => {
-    playerListPages.mockResolvedValue([]);
-    playerListMaps.mockResolvedValue([]);
-    playerListMarkers.mockResolvedValue([]);
-    playerChronicle.mockResolvedValue([]);
-    playerListRelationships.mockResolvedValue([]);
-    playerListLinks.mockResolvedValue(null);
-    getCalendar.mockResolvedValue(CALENDAR);
-    playerSessions.mockResolvedValue([PLAYER_SESSION]);
-  });
-
-  /** The recap row navigates, so the test checks the tap actually lands. */
-  it("names the card for a recap, not a plan, and lands the tap on that session", async () => {
-    const user = userEvent.setup();
-    (goTo("/codex"), render)(<PlayerCodex token="player" />);
-    // Players only see revealed (already played) sessions, so the card says "Latest recap".
-    expect(screen.queryByRole("navigation", { name: "Next session" })).not.toBeInTheDocument();
-    const card = within(await screen.findByRole("navigation", { name: "Latest recap" }));
-
-    expect(card.getByText("Session 8")).toBeInTheDocument();
-    expect(await screen.findByText("They reached the spire.")).toBeInTheDocument();
-
-    await user.click(card.getByRole("button", { name: /Session 8/ }));
-    expect(window.location.pathname).toBe("/codex/sessions/s8");
-    const sidebar = within(screen.getByRole("navigation", { name: "Codex sections" }));
-    expect(sidebar.getByRole("button", { name: "Sessions" })).toHaveAttribute("aria-current", "page");
-  });
-
-  /**
-   * The player endpoint returns a GM-shaped row (what a regressed `projectPlayerSession` would send), so
-   * the absence assertions are meaningful.
-   */
-  it("renders nothing from extra keys if the server ever regresses and sends a GM row", async () => {
-    playerSessions.mockResolvedValue([
-      {
-        ...PLAYER_SESSION,
-        prep: [
-          {
-            id: "prep-8",
-            templateSectionId: null,
-            title: "Prep notes",
-            prompt: null,
-            type: "text",
-            text: "The heart of the castle."
-          }
-        ],
-        attendees: ["Ana", "Bo"],
-        status: "planned",
-        rev: 7,
-        recapBody: "a GM-shaped duplicate of the recap"
-      } as never
-    ]);
-    (goTo("/codex"), render)(<PlayerCodex token="player" />);
-
-    const card = within(await screen.findByRole("navigation", { name: "Latest recap" }));
-    expect(card.getByText("Session 8")).toBeInTheDocument();
-    const text = document.body.textContent ?? "";
-    expect(text).not.toContain("The heart of the castle.");
-    expect(text).not.toContain("Ana");
-    expect(text).not.toContain("a GM-shaped duplicate of the recap");
   });
 });
 

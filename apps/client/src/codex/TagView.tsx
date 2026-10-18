@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { Badge, Skeleton } from "@vtt/ui";
 import type { CodexJournalPayload, CodexQuestStatus, PlayerCodexJournalPayload } from "@vtt/domain";
-import { codexApi, playerCodexApi } from "./api";
+import { findApi } from "./api-records";
 import { chronicleRowSummary, type ChroniclePayloadRef } from "./chronicle";
 import { sessionTitle, type SessionRef } from "./sessions";
 import { QUEST_STATUS_LABEL, questStatusTone } from "./quests";
@@ -62,7 +62,7 @@ export function TagView({
 }: TagViewProps) {
   const slug = tag.trim().toLowerCase();
   const runSearch = useCallback(
-    (query: string) => (player ? playerCodexApi.search(gmToken, query) : codexApi.search(gmToken, query)),
+    (query: string) => (player ? findApi.searchAsPlayer(gmToken, { q: query }) : findApi.search(gmToken, { q: query })),
     [gmToken, player]
   );
   const pinSearch = useCodexSearch(slug, runSearch);
