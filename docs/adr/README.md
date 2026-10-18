@@ -33,6 +33,7 @@
 | [029](0029-one-game-clock.md)                   | Accepted                                       | One game clock: the Codex calendar keeps the day and the game keeps the hour, and time that passes at the table moves the Codex date by the midnights it crossed                                              |
 | [030](0030-character-sheet-remaster.md)         | Accepted                                       | The character sheet remaster: A's tabbed sheet everywhere, with C's turn and cast cards and B's Vitals, spell list and Level box on a player's phone                                                          |
 | [031](0031-codex-remaster.md)                   | Accepted                                       | The Codex remaster: one document per page with hidden blocks for chosen readers, a section bar and phone tabs, and search, home and relationships rebuilt                                                     |
+| [036](0036-settings-and-the-four-themes.md)     | Accepted                                       | Settings as six sections in a bar with a search, credentials and the API reference as tables, and the four themes Night, Dusk, Dawn and Day with a switch in every app bar                                    |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 
