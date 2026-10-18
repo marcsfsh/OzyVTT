@@ -53,8 +53,9 @@ and a test holds them to the registry's schemas.
 
 ## Consequences and tradeoffs
 
-- `document.ts`, `descriptions.ts`, `components.ts` and `game-commands.ts` under `apps/server/src/openapi/` are gone.
-  The prose moved onto the Zod schemas in `@vtt/domain`, `@vtt/schemas`, the SRD content package and the contract.
+- `document.ts`, `descriptions.ts` and `game-commands.ts` under `apps/server/src/openapi/` are gone, and its
+  `components.ts` moved to the registry. The prose moved onto the Zod schemas in `@vtt/domain`, `@vtt/schemas`, the
+  SRD content package and the contract.
 - The document now lists 297 paths and 335 operations; the seven missing ones are in it. Operation ids and paths are
   unchanged.
 - The document is stricter about callers and answers: player-only commands offer only a player session; players
