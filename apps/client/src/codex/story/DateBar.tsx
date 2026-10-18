@@ -110,11 +110,9 @@ export function GmDateBar({
         <Button variant="secondary" size="sm" disabled={busy || same} onClick={() => void publish()}>
           Publish
         </Button>
-        {!tight && (
-          <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>
-            Edit calendar
-          </Button>
-        )}
+        <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>
+          Edit calendar
+        </Button>
       </span>
       {!tight && (
         <p className="story-datebar-hint">

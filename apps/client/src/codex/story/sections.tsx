@@ -248,6 +248,23 @@ function StoryComposer({ story }: Readonly<{ story: ReturnType<typeof useGmStory
   );
 }
 
+/** The Downtime card: days per person, what waits to be confirmed, and Log downtime into the composer. */
+function StoryDowntime({ story }: Readonly<{ story: ReturnType<typeof useGmStory> }>) {
+  const { shell, gm, feeds, records, calendar, reload, setComposer } = story;
+  return (
+    <GmDowntime
+      gmToken={shell.token}
+      records={records}
+      calendar={calendar}
+      pages={feeds.pages}
+      actors={gm.actors}
+      onChanged={reload}
+      onOpenPage={(pageId) => shell.go(pagePath(pageId))}
+      onLog={() => setComposer({ editing: null, kind: "downtime" })}
+    />
+  );
+}
+
 /** The GM's next planned session, for the month's Next card: its number, when, and the clues it plans. */
 function useNextSession(sessions: readonly CodexSession[]): NextSessionCard | null {
   return useMemo(() => {
@@ -277,6 +294,8 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
   const next = useNextSession(feeds.sessions);
   const shown = filterRecords(records, shell.query);
   const openedRecord = records.find((record) => record.id === opened) ?? null;
+  // An old Downtime address lands here filtered to downtime, so its card leads.
+  const downtimeFirst = kindsOf(shell.query).length === 1 && kindsOf(shell.query)[0] === "downtime";
   // No phone bar of its own: the frame's default bar titles Story and keeps Search in reach.
   if (story.loading)
     return (
@@ -291,6 +310,7 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
         <IconPlus /> Add to the chronicle
       </Button>
       {(error ?? feeds.campaignFeed.error) && <Alert tone="danger">{error ?? feeds.campaignFeed.error}</Alert>}
+      {downtimeFirst && <StoryDowntime story={story} />}
       <Timeline
         lineOf={lineOf}
         audience="gm"
@@ -310,6 +330,7 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
         }
         onSelect={(record) => setOpened(record.id)}
       />
+      {!downtimeFirst && <StoryDowntime story={story} />}
       <RecordDialog
         record={openedRecord}
         onClose={() => setOpened(null)}
@@ -330,18 +351,7 @@ export function GmStorySection() {
   if (shell.phone) return <GmPhoneStory story={story} />;
   const shown = filterRecords(records, shell.query);
   const downtimeFirst = kindsOf(shell.query).length === 1 && kindsOf(shell.query)[0] === "downtime";
-  const downtime = (
-    <GmDowntime
-      gmToken={shell.token}
-      records={records}
-      calendar={calendar}
-      pages={feeds.pages}
-      actors={gm.actors}
-      onChanged={reload}
-      onOpenPage={(pageId) => shell.go(pagePath(pageId))}
-      onLog={() => setComposer({ editing: null, kind: "downtime" })}
-    />
-  );
+  const downtime = <StoryDowntime story={story} />;
   return (
     <div className="story">
       <StoryBar
@@ -753,6 +763,7 @@ function PlayerPhoneStory({ story }: Readonly<{ story: ReturnType<typeof usePlay
           each.kind === "event" && hasPage(each.id) ? shell.go(pagePath(each.id)) : setOpened(each.id)
         }
       />
+      <PlayerDowntime records={feeds.timeline} pages={feeds.pages} onOpenPage={(id) => shell.go(pagePath(id))} />
       <Modal
         open={record !== null}
         onClose={() => setOpened(null)}

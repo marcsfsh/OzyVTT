@@ -179,6 +179,16 @@ describe("The GM's timeline", () => {
     expect(month.getAllByText("The party").length).toBeGreaterThan(0);
     expect(month.getAllByText("In the world").length).toBeGreaterThan(0);
   });
+
+  it("keeps the Downtime card on a phone, leading when an old Downtime address lands here", () => {
+    renderGmStory(GmStorySection, "/codex/story?kind=downtime", { records: [], calendar: CALENDAR, phone: true });
+    const downtime = screen.getByRole("region", { name: "Downtime" });
+    const zoom = screen.getByRole("group", { name: "Zoom" });
+    expect(downtime.compareDocumentPosition(zoom) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      within(screen.getByRole("group", { name: "The two dates" })).getByRole("button", { name: "Edit calendar" })
+    ).toBeInTheDocument();
+  });
 });
 
 describe("A player's Story", () => {
