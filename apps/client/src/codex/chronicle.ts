@@ -15,7 +15,6 @@ import {
   type CodexChronicleKind,
   type CodexDowntimePayload,
   type CodexInWorldDate,
-  type CodexJournalKind,
   type CodexJournalPayload,
   type CodexMilestonePayload,
   type CodexQuestStatus,
@@ -278,20 +277,6 @@ export function deadlinesPassedBy(
       record.calendarInstant !== null &&
       record.calendarInstant <= targetInstant
   ).length;
-}
-
-/** The journal's `note` is the chronicle's `entry`; every other kind has the same name. */
-const JOURNAL_TO_CHRONICLE_KIND: Readonly<Record<CodexJournalKind, CodexChronicleKind>> = {
-  note: "entry",
-  combat: "combat",
-  deadline: "deadline",
-  downtime: "downtime",
-  milestone: "milestone",
-  standing: "standing",
-  quest: "quest"
-};
-export function chronicleKindOfJournal(kind: CodexJournalKind): CodexChronicleKind {
-  return JOURNAL_TO_CHRONICLE_KIND[kind];
 }
 
 /**
