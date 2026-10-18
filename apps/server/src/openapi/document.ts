@@ -493,11 +493,12 @@ export const openApiDocument = {
         operationId: "uploadMapAsset",
         security: [{ gmAuth: [] }],
         description:
-          "Uploads raw image bytes as the request body. `filename`, `name`, and `kind` (battlemap/regional/world) are query parameters, and there is no JSON body. Content-addressed: uploading identical bytes again returns the existing asset with `duplicate: true`, and no copy is made.",
+          "Uploads raw image bytes as the request body. `filename`, `name`, `kind` (battlemap/regional/world) and an optional `folder` are query parameters, and there is no JSON body. Content-addressed: uploading identical bytes again returns the existing asset with `duplicate: true`, and no copy is made; the existing asset keeps its own name, kind and folder.",
         parameters: [
           { name: "filename", in: "query", schema: { type: "string" } },
           { name: "name", in: "query", schema: { type: "string" } },
-          { name: "kind", in: "query", schema: { type: "string", enum: ["battlemap", "regional", "world"] } }
+          { name: "kind", in: "query", schema: { type: "string", enum: ["battlemap", "regional", "world"] } },
+          { name: "folder", in: "query", schema: { type: "string", maxLength: 60 } }
         ],
         requestBody: { required: true, content: { "image/*": { schema: { type: "string", format: "binary" } } } },
         responses: {

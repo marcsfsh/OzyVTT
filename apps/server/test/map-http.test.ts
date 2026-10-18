@@ -129,6 +129,28 @@ describe("map asset HTTP workflow", () => {
     );
   });
 
+  it("files a new upload under the folder it names, and stores nothing for a folder it refuses", async () => {
+    const test = await fixture();
+    const upload = (query: string, bytes: Buffer) =>
+      fetch(`${test.base}/api/v1/map-assets?filename=crypt.png&name=Crypt&kind=battlemap&${query}`, {
+        method: "POST",
+        headers: gm("image/png"),
+        body: bytes
+      });
+    const filed = await upload("folder=%20Dungeons%20", test.input);
+    expect(filed.status).toBe(201);
+    expect((await body(filed)).data.asset.folder).toBe("Dungeons");
+
+    const refused = await upload("folder=a%2Fb", png(320, 200));
+    expect(refused.status).toBe(400);
+    const listed = await body(await fetch(`${test.base}/api/v1/map-assets`, { headers: gm() }));
+    expect(listed.data.assets).toHaveLength(1);
+
+    // The same bytes again keep the folder they were first filed under.
+    const again = await upload("folder=Elsewhere", test.input);
+    expect((await body(again)).data.asset.folder).toBe("Dungeons");
+  });
+
   it("serves grid calibration to anyone who can already read the map's content, but not to strangers", async () => {
     const test = await fixture();
     const upload = await body(
