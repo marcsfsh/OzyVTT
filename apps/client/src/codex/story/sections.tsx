@@ -24,7 +24,7 @@ import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "../shell/context";
 import { useCodexQuery } from "../useCodexQuery";
 import { GmChronicle, PlayerChronicle, recordLine } from "./Chronicle";
-import { GmDateBar, PlayerDateBar } from "./DateBar";
+import { DateBar } from "../shared/DateBar";
 import { GmDowntime, PlayerDowntime } from "./Downtime";
 import { EntryCard } from "./EntryCard";
 import { EntryComposer, type ComposerKind } from "./EntryComposer";
@@ -316,7 +316,7 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
     );
   return (
     <div className="story is-phone scroll-y">
-      <GmDateBar gmToken={shell.token} calendar={calendar} gameHours={gm.gameHours} tight onChanged={reload} />
+      <DateBar role="gm" token={shell.token} calendar={calendar} gameHours={gm.gameHours} tight onChanged={reload} />
       <Button variant="secondary" block onClick={() => setComposer({ editing: null, kind: "entry" })}>
         <IconPlus /> Add to the chronicle
       </Button>
@@ -399,7 +399,13 @@ export function GmStorySection() {
             dateBar={
               <>
                 {downtimeFirst && downtime}
-                <GmDateBar gmToken={shell.token} calendar={calendar} gameHours={gm.gameHours} onChanged={reload} />
+                <DateBar
+                  role="gm"
+                  token={shell.token}
+                  calendar={calendar}
+                  gameHours={gm.gameHours}
+                  onChanged={reload}
+                />
                 {!card.actions.warn && (
                   <Button variant="ghost" size="sm" onClick={card.actions.warnAgain}>
                     Warn me again before showing a record
@@ -754,7 +760,7 @@ function PlayerPhoneStory({ story }: Readonly<{ story: ReturnType<typeof usePlay
   const record = feeds.timeline.find((each) => each.id === opened) ?? null;
   return (
     <div className="story is-phone scroll-y">
-      <PlayerDateBar calendar={feeds.calendar} />
+      <DateBar role="player" calendar={feeds.calendar} />
       <Timeline
         lineOf={lineOf}
         audience="player"
@@ -830,7 +836,7 @@ export function PlayerStorySection() {
           onMonthChange={(year, month) => shell.setFilter({ y: String(year), m: String(month) })}
           onOpenSession={(sessionId) => shell.go(sessionPath(sessionId))}
           onFollow={follow}
-          dateBar={<PlayerDateBar calendar={feeds.calendar} />}
+          dateBar={<DateBar role="player" calendar={feeds.calendar} />}
           downtime={
             <PlayerDowntime records={feeds.timeline} pages={feeds.pages} onOpenPage={(id) => shell.go(pagePath(id))} />
           }

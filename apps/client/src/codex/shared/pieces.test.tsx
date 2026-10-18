@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { ToastProvider } from "@vtt/ui";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../api", async (actual) => (await import("../../../test/codex-fakes")).fakeApiModule(await actual()));
 
-import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
+import type { CodexCalendar, CodexInWorldDate, GmCodexCalendar } from "@vtt/domain";
 import { api, block, resetFakes } from "../../../test/codex-fakes";
-import { DateBar, worldDateLabel } from "./DateBar";
+import { DateBar } from "./DateBar";
 import { linksSentence, stampOf } from "./reveals";
 
 const CALENDAR: CodexCalendar = {
@@ -18,8 +19,9 @@ const CALENDAR: CodexCalendar = {
   weekdays: ["Moonday", "Galeday"]
 };
 const day = (value: number): CodexInWorldDate => ({ year: 412, month: 1, day: value });
-const gmCalendar = (current: number, published: number | null) => ({
+const gmCalendar = (current: number, published: number | null): GmCodexCalendar => ({
   ...CALENDAR,
+  eras: [],
   currentDate: day(current),
   publishedDate: published === null ? null : day(published)
 });
@@ -27,55 +29,62 @@ const gmCalendar = (current: number, published: number | null) => ({
 beforeEach(resetFakes);
 
 describe("The date bar", () => {
-  it("says a date with its weekday, or the day alone in a tight bar", () => {
-    expect(worldDateLabel(CALENDAR, day(14))).toMatch(/^(Moonday|Galeday), Emberfall 14, 412 SR$/);
-    expect(worldDateLabel(CALENDAR, day(14), true)).toBe("Emberfall 14");
-  });
+  const bar = () => within(screen.getByRole("group", { name: "The two dates" }));
+  const gmBar = (current: number, published: number | null, onChanged = vi.fn()) =>
+    render(
+      <ToastProvider>
+        <DateBar role="gm" token="gm" calendar={gmCalendar(current, published)} onChanged={onChanged} />
+      </ToastProvider>
+    );
 
   it("gives the GM both dates, and Publish only once they differ", () => {
-    const view = render(<DateBar calendar={gmCalendar(14, 14)} role="gm" token="gm" />);
-    expect(screen.getByText("Your date")).toBeInTheDocument();
-    expect(screen.getByText("Players' date")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    const view = gmBar(14, 14);
+    expect(bar().getByText("Yours")).toBeInTheDocument();
+    expect(bar().getByText("Players")).toBeInTheDocument();
+    expect(bar().getByRole("button", { name: "Publish" })).toBeDisabled();
     view.unmount();
 
-    render(<DateBar calendar={gmCalendar(15, 14)} role="gm" token="gm" />);
-    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+    gmBar(15, 14);
+    expect(bar().getByRole("button", { name: "Publish" })).toBeEnabled();
   });
 
   it("publishes the GM's date through the calendar route, and can hide the players' date again", async () => {
     const user = userEvent.setup();
-    const onPublished = vi.fn();
+    const onChanged = vi.fn();
     api.calendarApi.publish.mockResolvedValue({});
     api.calendarApi.unpublish.mockResolvedValue({});
-    render(<DateBar calendar={gmCalendar(15, 14)} role="gm" token="gm" onPublished={onPublished} />);
-    await user.click(screen.getByRole("button", { name: "Publish" }));
+    gmBar(15, 14, onChanged);
+    await user.click(bar().getByRole("button", { name: "Publish" }));
     await waitFor(() => expect(api.calendarApi.publish).toHaveBeenCalledWith("gm"));
-    await waitFor(() => expect(onPublished).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole("button", { name: "Hide the date from players" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    await user.click(bar().getByRole("button", { name: "Hide the date from players" }));
     await waitFor(() => expect(api.calendarApi.unpublish).toHaveBeenCalledWith("gm"));
   });
 
   it("offers nothing to hide before a date is published, and says when publishing failed", async () => {
     const user = userEvent.setup();
     api.calendarApi.publish.mockRejectedValue(new Error("The codex request failed (500)."));
-    render(<DateBar calendar={gmCalendar(15, null)} role="gm" token="gm" />);
-    expect(screen.getByText("No date yet")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Hide the date from players" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Publish" }));
+    gmBar(15, null);
+    expect(bar().getByText("Not shared yet")).toBeInTheDocument();
+    expect(bar().queryByRole("button", { name: "Hide the date from players" })).not.toBeInTheDocument();
+    await user.click(bar().getByRole("button", { name: "Publish" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The codex request failed (500).");
   });
 
-  it("gives a player Today alone, and nothing to press", () => {
-    render(<DateBar calendar={{ ...CALENDAR, currentDate: day(14) }} role="player" token="player" />);
-    expect(screen.getByText("Today")).toBeInTheDocument();
-    expect(screen.queryByText("Your date")).not.toBeInTheDocument();
+  it("gives a player Today alone, the day without the year in a tight bar, and nothing to press", () => {
+    const view = render(<DateBar role="player" calendar={{ ...CALENDAR, currentDate: day(14) }} />);
+    expect(screen.getByRole("group", { name: "Today" })).toHaveTextContent("Emberfall 14, 412 SR");
+    expect(screen.queryByText("Yours")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    view.unmount();
+
+    render(<DateBar role="player" calendar={{ ...CALENDAR, currentDate: day(14) }} tight />);
+    expect(screen.getByRole("group", { name: "Today" })).toHaveTextContent(/^TodayEmberfall 14$/);
   });
 
-  it("renders nothing without a calendar", () => {
-    const { container } = render(<DateBar calendar={null} role="gm" token="gm" />);
-    expect(container).toBeEmptyDOMElement();
+  it("tells a player when no date has been shared", () => {
+    render(<DateBar role="player" calendar={null} />);
+    expect(screen.getByRole("group", { name: "Today" })).toHaveTextContent("Not shared yet");
   });
 });
 

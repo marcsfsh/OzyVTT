@@ -3,7 +3,6 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-vi.mock("../MapSurface", () => ({ MapSurface: () => <div data-testid="map-surface" /> }));
 vi.mock("../api", async (actual) => (await import("../../../test/codex-fakes")).fakeApiModule(await actual()));
 vi.mock("../api-records", async () => (await import("../../../test/codex-fakes")).fakeRecordsModule());
 
@@ -174,12 +173,14 @@ describe("Home is the section name", () => {
 });
 
 describe("The GM's Home", () => {
-  it("shows both dates in one bar", async () => {
+  it("shows both dates in one bar, the same bar as Story's", async () => {
     renderGmCodex("/codex");
-    expect(await screen.findByText("Your date")).toBeInTheDocument();
-    expect(screen.getByText("Players' date")).toBeInTheDocument();
-    expect(screen.getByText(/Hammer 3, 1492 DR/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+    const dates = within(await screen.findByRole("group", { name: "The two dates" }));
+    expect(dates.getByRole("button", { name: "Your date is Hammer 3, 1492 DR. Change it." })).toHaveTextContent(
+      "Hammer 3"
+    );
+    expect(dates.getByText("Hammer 1")).toBeInTheDocument();
+    expect(dates.getByRole("button", { name: "Publish" })).toBeEnabled();
   });
 
   it("counts each collection in words from the server's numbers, and the hidden part opens Search filtered to Hidden", async () => {
@@ -378,7 +379,7 @@ describe("A player's Home reads only the player's projection (viewer safety)", (
     renderPlayerCodex("/codex");
     await screen.findByRole("region", { name: "New since your last visit" });
     expect(screen.queryByRole("region", { name: "Reveal check" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Your date")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "The two dates" })).not.toBeInTheDocument();
     expect(screen.queryByText(/No pin marks the party/)).not.toBeInTheDocument();
     expect(screen.getByText("The party's place isn't on a map you can see yet.")).toBeInTheDocument();
   });

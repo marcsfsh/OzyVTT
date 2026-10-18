@@ -245,11 +245,12 @@ export function GmHome() {
     go(searchPath({ visibility: "hidden", types: (group?.types ?? [...PAGE_TYPES]).join(",") }));
   const dateBar = (
     <DateBar
-      calendar={calendar}
       role="gm"
       token={token}
+      calendar={calendar}
+      gameHours={gm.gameHours}
       tight={phone}
-      onPublished={() => void feeds.campaignFeed.reload()}
+      onChanged={() => feeds.campaignFeed.reload()}
     />
   );
   const firstPage = home && pageRevealed + pageHidden === 0 && (
@@ -495,7 +496,7 @@ export function PlayerHome() {
       </Button>
     </Card>
   );
-  const dateBar = <DateBar calendar={feeds.calendar} role="player" token={token} tight={phone} />;
+  const dateBar = <DateBar role="player" calendar={feeds.calendar} tight={phone} />;
 
   if (phone)
     return (

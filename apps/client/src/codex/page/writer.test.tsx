@@ -3,7 +3,6 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-vi.mock("../MapSurface", () => ({ MapSurface: () => <div data-testid="map-surface" /> }));
 vi.mock("../api", async (actual) => (await import("../../../test/codex-fakes")).fakeApiModule(await actual()));
 vi.mock("../api-records", async () => (await import("../../../test/codex-fakes")).fakeRecordsModule());
 

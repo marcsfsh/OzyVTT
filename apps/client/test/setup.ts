@@ -11,10 +11,10 @@ import { goTo } from "./route";
  *
  * **What this means for what these tests can prove:** a test passing under a shim is evidence about this
  * app's logic. These stay real-browser checks, because a shim can't stand in for the browser:
- * layout and pointer geometry (`MapSurface` panning, `RelationshipGraph` hit-testing, the 44px touch
+ * layout and pointer geometry (`AtlasMap` panning, `RelationshipGraph` hit-testing, the 44px touch
  * floor: `getScreenCTM` is deliberately NOT shimmed, since faking a matrix would invent geometry);
  * Modal focus-trap / Escape / click-outside (the shim below has `show()` semantics, where the browser has `showModal()`);
- * and anything CSS-dependent, since no stylesheet is loaded. See `docs/ai-context/testing.md`.
+ * and anything CSS-dependent, since no stylesheet is loaded.
  */
 
 // Native <dialog>: the app's Modal calls showModal()/close(). jsdom implements neither.
@@ -29,7 +29,7 @@ if (typeof HTMLDialogElement !== "undefined" && !HTMLDialogElement.prototype.sho
   };
 }
 
-// Pointer capture: MapSurface/RelationshipGraph call these on every drag gesture.
+// Pointer capture: AtlasMap/RelationshipGraph call these on every drag gesture.
 if (typeof Element !== "undefined" && !Element.prototype.setPointerCapture) {
   Element.prototype.setPointerCapture = () => {};
   Element.prototype.releasePointerCapture = () => {};

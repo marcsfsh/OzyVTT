@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
-vi.mock("./MapSurface", () => ({ MapSurface: () => <div data-testid="map-surface" /> }));
 vi.mock("./api", async (actual) => (await import("../../test/codex-fakes")).fakeApiModule(await actual()));
 vi.mock("./api-records", async () => (await import("../../test/codex-fakes")).fakeRecordsModule());
 
