@@ -499,7 +499,7 @@ describe("The Downtime card", () => {
     expect(window.location.pathname).toBe("/codex/pages/c1");
   });
 
-  it("says the log is empty rather than showing a table of nothing", () => {
+  it("says the log is empty and shows no table", () => {
     renderStory([]);
     expect(card().getByText("No downtime logged yet.")).toBeInTheDocument();
     expect(card().queryByRole("table")).toBeNull();
