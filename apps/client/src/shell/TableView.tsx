@@ -24,6 +24,7 @@ import { PaneDivider, useMomentShare } from "../table/PaneDivider";
 import { PromptSlot } from "../table/PromptSlot";
 import { TableHeader } from "../table/TableHeader";
 import { TokenTab } from "../table/TokenTab";
+import { useCodexNotice } from "../table/useCodexNotice";
 import "./table-view.css";
 
 // The Codex's two table tabs load on first use, like the Codex itself, so the table's first paint stays small.
@@ -90,6 +91,11 @@ export function TableView(props: TableViewProps) {
   const moment = choosing ? "choosing" : phone && sheetShown && playerHasClaimed ? "sheet" : null;
   const [mapShare, moveSplit] = useMomentShare(moment);
   const liveMapName = gm?.selectedMap?.id === state.combat.mapAssetId ? (gm?.selectedMap?.name ?? null) : null;
+  // A player hears, in the status line, when the Codex gives them something new.
+  useCodexNotice(role === "player" ? token : null);
+  const party = state.actors
+    .filter((actor) => actor.kind === "player-character" && !("archived" in actor && actor.archived))
+    .map((actor) => ({ id: actor.id, name: actor.name }));
 
   const header =
     props.role === "gm" ? (
@@ -200,7 +206,7 @@ export function TableView(props: TableViewProps) {
           party: <PartyStrip role="gm" state={props.state} onOpenRoster={() => navigate(pathForGmTab("roster"))} />,
           rest: <PartyRest state={props.state} token={token} />,
           tonight: <TonightTab token={token} />,
-          codex: <CodexTab role="gm" token={token} />
+          codex: <CodexTab role="gm" token={token} party={party} />
         }}
       />
     );

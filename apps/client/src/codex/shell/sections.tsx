@@ -3,25 +3,21 @@ import { BackupView } from "../BackupView";
 import { CodexSettingsView } from "../CodexSettings";
 import { TagView } from "../TagView";
 import type { CodexSection } from "../routes";
+import { GmPagesSection, PlayerPagesSection } from "../page/PageSection";
+import { GmHome, PlayerHome } from "../home/HomeView";
+import { SearchView } from "../search/SearchView";
+import { GmQuests, PlayerQuests } from "../quests/QuestsView";
+import { RelationshipsView } from "../relationships/RelationshipsView";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "./context";
 import {
   GmAtlasLegacy,
-  GmHomeLegacy,
-  GmPagesLegacy,
-  GmQuestsLegacy,
-  GmRelationshipsLegacy,
   GmSessionsLegacy,
   GmStoryLegacy,
   GmTimelineLegacy,
   PlayerAtlasLegacy,
-  PlayerHomeLegacy,
-  PlayerPagesLegacy,
-  PlayerQuestsLegacy,
-  PlayerRelationshipsLegacy,
   PlayerSessionsLegacy,
   PlayerStoryLegacy,
-  PlayerTimelineLegacy,
-  SearchLegacy
+  PlayerTimelineLegacy
 } from "./legacy";
 
 /**
@@ -111,11 +107,11 @@ function GmTemplates() {
 
 export const CODEX_SECTIONS: Readonly<Record<CodexSection, CodexSectionEntry>> = {
   // ----- The shell and the page -----
-  home: { gm: GmHomeLegacy, player: PlayerHomeLegacy },
-  search: { gm: SearchLegacy, player: SearchLegacy },
-  pages: { gm: GmPagesLegacy, player: PlayerPagesLegacy },
-  quests: { gm: GmQuestsLegacy, player: PlayerQuestsLegacy },
-  relationships: { gm: GmRelationshipsLegacy, player: PlayerRelationshipsLegacy },
+  home: { gm: GmHome, player: PlayerHome },
+  search: { gm: SearchView, player: SearchView },
+  pages: { gm: GmPagesSection, player: PlayerPagesSection },
+  quests: { gm: GmQuests, player: PlayerQuests },
+  relationships: { gm: RelationshipsView, player: RelationshipsView },
   tags: { gm: GmTags, player: PlayerTags },
   backup: { gm: GmBackup, player: null },
   settings: { gm: GmSettings, player: null },

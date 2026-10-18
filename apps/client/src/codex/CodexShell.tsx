@@ -127,7 +127,7 @@ export function CodexShell({
     try {
       const quest = await createQuest(gmToken);
       await questFeed.reload();
-      void navigate(questPath(quest.id));
+      void navigate(questPath(quest.id, "edit"));
     } catch (createError) {
       setActionError(createError instanceof Error ? createError.message : "Couldn't create the quest.");
     }
@@ -223,7 +223,7 @@ export function CodexShell({
                 gmToken={gmToken}
                 request={quickCreate}
                 onClose={() => setQuickCreate(null)}
-                onOpen={(pageId) => go(pagePath(pageId))}
+                onOpen={(pageId) => go(pagePath(pageId, "edit"))}
                 onChanged={feeds.list.reload}
               />
             )}

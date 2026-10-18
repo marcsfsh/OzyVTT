@@ -29,6 +29,8 @@ export type QuickCreateRequest = Readonly<{
   note?: string;
   /** Run with the new page before navigation, e.g. to link it to the pin that made it. */
   onCreated?: (page: CodexPage) => void | Promise<void>;
+  /** Make the page and stay where you are, as a `[[link]]` typed in the editor does. */
+  stay?: boolean;
 }>;
 
 export type QuickCreateProps = Readonly<{
@@ -72,7 +74,7 @@ export function QuickCreate({ gmToken, request, onClose, onOpen, onChanged }: Qu
       await request.onCreated?.(page);
       await onChanged();
       onClose();
-      onOpen(page.id);
+      if (!request.stay) onOpen(page.id);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Couldn't create the page.");
       setBusy(false);

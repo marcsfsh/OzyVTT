@@ -1,34 +1,25 @@
 import { describe, expect, it } from "vitest";
-import {
-  campaignFeedProps,
-  nextSessionCard,
-  pendingDowntime,
-  playerCampaignFeedProps,
-  recordsOnInstant
-} from "./dashboard";
-import type { CodexChronicleRecord, PlayerCodexChronicleRecord } from "@vtt/domain";
+import { clocksOf, nextSessionCard } from "./rules";
+import type { CodexChronicleRecord } from "@vtt/domain";
 
-/** The dashboard's pure selection rules. The session card's heading must reflect the record, never a constant. */
+/** Home's pure selection rules. The session card's heading must reflect the record, never a constant. */
 
 const SESSION = (
   over: Partial<{
     id: string;
     sessionNumber: number | null;
     realDate: string | null;
-    recapBody: string;
     status: "planned" | "played";
-    revealedToPlayers: boolean;
   }> = {}
 ) => ({
   id: "s1",
   sessionNumber: 1,
   realDate: null,
-  recapBody: "",
   status: "planned" as const,
   ...over
 });
 
-describe("Which session the dashboard names, and what it calls it", () => {
+describe("Which session Home names, and what it calls it", () => {
   it("says 'Next session' about one that has not been played", () => {
     const card = nextSessionCard([SESSION({ id: "s4", sessionNumber: 4 })], null);
     expect(card?.heading).toBe("Next session");
@@ -66,15 +57,9 @@ describe("Which session the dashboard names, and what it calls it", () => {
   it("has no card at all when there are no sessions", () => {
     expect(nextSessionCard([], null)).toBeNull();
   });
-
-  it("carries the recap's reveal state when the caller has one, and omits it when they do not", () => {
-    // Only a GM row carries `revealedToPlayers`, so only the GM card shows a badge.
-    expect(nextSessionCard([SESSION({ revealedToPlayers: false })], null)?.revealed).toBe(false);
-    expect(nextSessionCard([SESSION()], null)?.revealed).toBeUndefined();
-  });
 });
 
-// ----- Downtime -----
+// ----- Clocks -----
 
 const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord =>
   ({
@@ -97,83 +82,17 @@ const RECORD = (over: Partial<CodexChronicleRecord> = {}): CodexChronicleRecord 
     ...over
   }) as CodexChronicleRecord;
 
-const DOWNTIME = (id: string, applied: boolean, who = "Ana", revealed = false) =>
-  RECORD({
-    kind: "downtime",
-    id,
-    text: `${who} took time.`,
-    revealedToPlayers: revealed,
-    payload: { who, activity: "Forging", days: 7, characterPageId: null, applied }
-  } as Partial<CodexChronicleRecord>);
-
-describe("Downtime waiting on the GM (D18 #5)", () => {
-  it("lists only the unconfirmed rows", () => {
-    const rows = pendingDowntime([DOWNTIME("w1", false), DOWNTIME("w2", true), RECORD()]);
-    expect(rows.map((row) => row.id)).toEqual(["w1"]);
-  });
-
-  it("states each row's reveal state, like every other dashboard row that names a record", () => {
-    expect(pendingDowntime([DOWNTIME("w1", false, "Ana", true)])[0].revealed).toBe(true);
-    expect(pendingDowntime([DOWNTIME("w2", false, "Bo", false)])[0].revealed).toBe(false);
-  });
-
-  it("does not also leave a pending row in the feed: one record, one place on the dashboard", () => {
-    // Pending downtime has its own card with Confirm, so it leaves the feed.
-    const feed = campaignFeedProps({
-      records: [DOWNTIME("w1", false), DOWNTIME("w2", true), RECORD({ id: "e9" })],
-      calendar: null
-    });
-    expect(feed.downtimePending.map((row) => row.id)).toEqual(["w1"]);
-    expect(feed.entries.map((entry) => entry.id)).toEqual(["w2", "e9"]);
-  });
-
-  it("keeps CONFIRMED downtime in the feed, because nothing else on the dashboard carries it", () => {
-    const feed = campaignFeedProps({ records: [DOWNTIME("w2", true)], calendar: null });
-    expect(feed.entries.map((entry) => entry.id)).toEqual(["w2"]);
-  });
-});
-
-describe("Records on one in-world day (the Calendar's day panel)", () => {
-  it("matches the server's instant exactly, and never re-derives a date", () => {
-    const rows = [
-      RECORD({ id: "a", calendarInstant: 100 }),
-      RECORD({ id: "b", calendarInstant: 101 }),
-      RECORD({ id: "c", calendarInstant: null })
-    ];
-    expect(recordsOnInstant(rows, 100).map((row) => row.id)).toEqual(["a"]);
-    expect(recordsOnInstant(rows, 999)).toEqual([]);
-  });
-});
-
-// A player row carries when it was first shown, so a record the GM prepared weeks ago and revealed today is the
-// player's newest activity.
-describe("The player's latest journal activity", () => {
-  const PLAYER_ROW = (id: string, text: string, firstShownAt: string): PlayerCodexChronicleRecord => ({
-    kind: "entry",
-    id,
-    title: null,
-    text,
-    sessionId: null,
-    sessionNumber: null,
-    realDate: null,
-    inWorldLabel: null,
-    inWorldDate: null,
-    calendarInstant: null,
-    tags: [],
-    fired: false,
-    payload: null,
-    firstShownAt
-  });
-
-  it("puts the record shown most recently first, and dates an undated row by when it was shown", () => {
-    const feed = playerCampaignFeedProps({
-      records: [
-        PLAYER_ROW("j1", "We reached the town.", "2026-07-20T12:00:00.000Z"),
-        PLAYER_ROW("j2", "The order meets at midnight.", "2026-08-07T12:00:00.000Z")
-      ],
-      today: null
-    });
-    expect(feed.entries.map((entry) => entry.id)).toEqual(["j2", "j1"]);
-    expect(feed.entries[0].when).toBe(new Date("2026-08-07T12:00:00.000Z").toLocaleDateString());
+describe("The clocks a player's Home lists", () => {
+  it("puts passed deadlines first, says each in one line, and leaves every other kind out", () => {
+    const clocks = clocksOf([
+      RECORD({ kind: "deadline", id: "d1", text: "The duke's ultimatum expires.", fired: false }),
+      RECORD({ id: "e9" }),
+      RECORD({ kind: "deadline", id: "d2", text: "The tide turns.", fired: true })
+    ]);
+    expect(clocks.map((clock) => [clock.id, clock.fired])).toEqual([
+      ["d2", true],
+      ["d1", false]
+    ]);
+    expect(clocks[1].summary).toBe("The duke's ultimatum expires.");
   });
 });
