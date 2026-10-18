@@ -108,7 +108,12 @@ export function RecordDetail({
   const [brokeOthers, setBrokeOthers] = useState<readonly HomebrewRecordSummary[]>([]);
   const reasonId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const { ctx, spells } = useSchemaContext(initial.id, initial.type, records);
+  const { ctx, spells } = useSchemaContext(
+    initial.id,
+    initial.type,
+    records,
+    (doc as { references?: Readonly<Record<string, { name: string }>> }).references
+  );
   const schema = SCHEMAS[initial.type];
   const wizard = WIZARDS[initial.type];
   const inWizard = mode === "wizard" && !!wizard && !initial.deletedAt;

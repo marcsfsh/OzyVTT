@@ -66,6 +66,9 @@ export type SchemaContext = Readonly<{
 
   /** Resolves a `fromCatalog` slug with the server's own `resolveCatalogChoice`. */
   resolveCatalog: (slug: string) => Readonly<{ count: number }> | Readonly<{ error: string }>;
+  /** Every record the saved body names by id, with its name, as the server read it. A draft or an archived record
+      is here too, where no catalog has it. */
+  references: Readonly<Record<string, Readonly<{ name: string }>>>;
 }>;
 
 export const EMPTY_CONTEXT: SchemaContext = {
@@ -86,8 +89,22 @@ export const EMPTY_CONTEXT: SchemaContext = {
   schools: MAGIC_SCHOOL_IDS,
   creatureTypes: CREATURE_TYPE_IDS,
   weaponProperties: [...WEAPON_PROPERTY_IDS, ...WEAPON_MASTERY_IDS],
-  resolveCatalog: () => ({ error: "Catalogs haven't loaded yet." })
+  resolveCatalog: () => ({ error: "Catalogs haven't loaded yet." }),
+  references: {}
 };
+
+/** The name of a record an id names: the server's reference first, then the catalogs, and the id spelled out only
+    when nothing knows it. */
+export function referenceName(ctx: SchemaContext, id: string, catalog: readonly CatalogEntry[] = ctx.spells): string {
+  return (
+    ctx.references[id]?.name ??
+    catalog.find((entry) => entry.id === id)?.name ??
+    id
+      .replace(/^hb-/, "")
+      .replace(/-/g, " ")
+      .replace(/^./, (first) => first.toUpperCase())
+  );
+}
 
 export type FieldKind =
   | "text" //        Input
@@ -158,7 +175,7 @@ export type FieldDef = Readonly<{
   rowKey?: (row: unknown, index: number) => string;
   /** `kind: "rows"`: mints a row (with `newId()`). */
   newRow?: () => unknown;
-  rowLabel?: (row: unknown, index: number) => string;
+  rowLabel?: (row: unknown, index: number, ctx: SchemaContext) => string;
   addLabel?: string;
   emptyText?: string;
   maxRows?: number;

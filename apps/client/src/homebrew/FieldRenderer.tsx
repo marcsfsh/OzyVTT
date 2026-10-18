@@ -320,7 +320,7 @@ export function FieldRenderer(props: FieldRendererProps) {
             rowKey={(row) => field.rowKey?.(row, rows.indexOf(row)) ?? String(rows.indexOf(row))}
             onAdd={() => field.newRow?.() ?? {}}
             addLabel={field.addLabel ?? `Add to ${field.label.toLowerCase()}`}
-            rowLabel={field.rowLabel ? (row, index) => field.rowLabel!(row, index) : undefined}
+            rowLabel={field.rowLabel ? (row, index) => field.rowLabel!(row, index, ctx) : undefined}
             collapsible={rowFields.length > 2}
             emptyText={field.emptyText}
             max={field.maxRows}

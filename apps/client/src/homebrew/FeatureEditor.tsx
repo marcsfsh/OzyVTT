@@ -365,7 +365,7 @@ export function FeatureEditor({
               emptyText={optionsField.emptyText}
               collapsible
               ariaLabel={optionsField.label}
-              rowLabel={(option, optionIndex) => optionsField.rowLabel!(option, optionIndex)}
+              rowLabel={(option, optionIndex) => optionsField.rowLabel!(option, optionIndex, ctx)}
               renderRow={(option, optionIndex) => {
                 /** Replace the row, never merge: both callers hand over a whole option, and a merge
                     would restore keys a write deleted (e.g. clearing `requires`). */

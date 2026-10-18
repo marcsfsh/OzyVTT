@@ -12,6 +12,7 @@ import {
   humanise,
   inContainer,
   opt,
+  referenceName,
   saveOutcomeFields,
   type Draft,
   type FieldDef,
@@ -1075,10 +1076,11 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           maxRowsReason: "Eight spells is as many as one item carries.",
           rowKey: (row, index) => String((row as { rowId?: string }).rowId ?? index),
           newRow: () => ({ rowId: newId(), spellId: "", consumesSpellSlot: false }),
-          rowLabel: (row) => {
+          rowLabel: (row, _index, ctx) => {
             const cast = row as Record<string, unknown>;
             const limit = getAt(cast, "uses.limit");
-            const name = typeof cast.spellId === "string" && cast.spellId ? humanise(cast.spellId) : "No spell chosen";
+            const name =
+              typeof cast.spellId === "string" && cast.spellId ? referenceName(ctx, cast.spellId) : "No spell chosen";
             return typeof limit === "number"
               ? `${name} · ${limit} per ${getAt(cast, "uses.per") === "short-rest" ? "Short Rest" : "Long Rest"}`
               : name;
