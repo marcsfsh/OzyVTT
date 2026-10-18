@@ -15,7 +15,17 @@ import {
   TagInput,
   useToast
 } from "@vtt/ui";
-import type { CodexAutosaveSettings, CodexChronicleRecord, CodexSessionStatus, GmCodexCalendar } from "@vtt/domain";
+import type {
+  CodexAutosaveSettings,
+  CodexChronicleRecord,
+  CodexPrepLink,
+  CodexPrepSection,
+  CodexPrepTemplate,
+  CodexSession,
+  CodexSessionHappened,
+  CodexSessionStatus,
+  GmCodexCalendar
+} from "@vtt/domain";
 import { useConfirm } from "../../components/feedback";
 import { sessionApi } from "../api";
 import { useCodexAutosave } from "../autosave";
@@ -24,13 +34,7 @@ import { CHRONICLE_KIND_META, chronicleRowSummary } from "../chronicle";
 import { CodexEditor } from "../CodexEditor";
 import { CodexIcon } from "../icons";
 import { liveApi, prepSessionApi, templateApi } from "../prep/api";
-import type {
-  CodexPrepLink,
-  CodexPrepSection,
-  CodexPrepTemplate,
-  CodexSessionHappened,
-  PrepSession
-} from "../prep/contract";
+
 import { sessionTitle } from "../sessions";
 import { revealedLabel, type PartyCharacter } from "../shared/audience";
 import { CodexPhoneBar } from "../shell/PhoneBar";
@@ -48,7 +52,7 @@ type Draft = Readonly<{
   prep: readonly CodexPrepSection[];
 }>;
 
-const draftOf = (session: PrepSession): Draft => ({
+const draftOf = (session: CodexSession): Draft => ({
   sessionNumber: session.sessionNumber?.toString() ?? "",
   realDate: session.realDate ?? "",
   attendees: session.attendees,
@@ -85,8 +89,8 @@ export function SessionPage({
   onOpenTemplate
 }: Readonly<{
   gmToken: string;
-  session: PrepSession;
-  sessions: readonly PrepSession[];
+  session: CodexSession;
+  sessions: readonly CodexSession[];
   isActive: boolean;
   records: readonly CodexChronicleRecord[];
   calendar: GmCodexCalendar | null;
@@ -122,7 +126,7 @@ export function SessionPage({
   const save = useCallback(
     async (next: Draft) => {
       const number = next.sessionNumber.trim() === "" ? null : Math.trunc(Number(next.sessionNumber));
-      const saved = await prepSessionApi.update(gmToken, session.id, {
+      const saved = await sessionApi.update(gmToken, session.id, {
         sessionNumber: number !== null && Number.isFinite(number) ? number : null,
         realDate: next.realDate.trim() || null,
         attendees: next.attendees,
@@ -144,7 +148,7 @@ export function SessionPage({
     save,
     // A tick or a log at the table moved the session on: show that version, which is the one the table has.
     onConflict: async () => {
-      const fresh = await prepSessionApi.get(gmToken, session.id);
+      const fresh = await sessionApi.get(gmToken, session.id);
       revRef.current = fresh.rev;
       const next = draftOf(fresh);
       setDraft(next);
@@ -537,8 +541,8 @@ function RecapStep({
   phone
 }: Readonly<{
   gmToken: string;
-  session: PrepSession;
-  sessions: readonly PrepSession[];
+  session: CodexSession;
+  sessions: readonly CodexSession[];
   party: readonly PartyCharacter[];
   context: PrepContext;
   recapBody: string;
@@ -571,7 +575,7 @@ function RecapStep({
   const carry = async (text: string, link: CodexPrepLink | null) => {
     if (!next) return;
     try {
-      const fresh = await prepSessionApi.get(gmToken, next.id);
+      const fresh = await sessionApi.get(gmToken, next.id);
       const prepNext = fresh.prep ?? [];
       const at = prepNext.findIndex((section) => section.type === "checklist");
       const item = { text, done: false, link };
@@ -590,7 +594,7 @@ function RecapStep({
           : prepNext.map((section, index) =>
               index === at && section.type === "checklist" ? { ...section, items: [...section.items, item] } : section
             );
-      await prepSessionApi.update(gmToken, next.id, { prep: updated, expectedRev: fresh.rev });
+      await sessionApi.update(gmToken, next.id, { prep: updated, expectedRev: fresh.rev });
       toast(`Added to ${sessionTitle(next)}'s clues.`, { tone: "success" });
     } catch (cause) {
       toast(cause instanceof Error ? cause.message : "Couldn't move the clue.", { tone: "error" });

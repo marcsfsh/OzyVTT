@@ -1,4 +1,4 @@
-import type { CodexPrepSection, CodexPrepSectionInput, CodexPrepSectionType } from "./contract";
+import type { CodexPrepSection, CodexPrepSectionInput, CodexPrepSectionType } from "@vtt/domain";
 
 /** What each section type is called and holds, in the order Add a section offers them. */
 export const SECTION_TYPES: ReadonlyArray<Readonly<{ type: CodexPrepSectionType; label: string; holds: string }>> = [

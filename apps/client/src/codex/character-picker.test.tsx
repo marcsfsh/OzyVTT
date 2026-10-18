@@ -17,12 +17,9 @@ vi.mock("./api", async (importOriginal) => {
   return {
     ...actual,
     journalApi: { ...actual.journalApi, createDowntime, chronicle: vi.fn(async () => []) },
-    calendarApi: { ...actual.calendarApi, get: vi.fn(async () => null) }
+    calendarApi: { ...actual.calendarApi, get: vi.fn(async () => null) },
+    sessionApi: { ...actual.sessionApi, update }
   };
-});
-vi.mock("./prep/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./prep/api")>();
-  return { ...actual, prepSessionApi: { ...actual.prepSessionApi, update } };
 });
 
 import { charactersFor } from "./characters";

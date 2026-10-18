@@ -19,7 +19,7 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import { nextSessionNumber } from "../creates";
 import { CodexIcon } from "../icons";
 import { prepSessionApi, templateApi } from "../prep/api";
-import { CODEX_PREP_LIMITS, type CodexPrepTemplate, type PrepSession } from "../prep/contract";
+import { CODEX_PREP_LIMITS, type CodexPrepTemplate, type CodexSession } from "@vtt/domain";
 import { sectionTypeLabel } from "../prep/sections";
 import { sessionTitle } from "../sessions";
 import { useCodexQuery } from "../useCodexQuery";
@@ -50,7 +50,7 @@ export function TemplatesView({
   gmToken: string;
   autosave: CodexAutosaveSettings;
   /** The shell's session feed. */
-  sessions: readonly PrepSession[];
+  sessions: readonly CodexSession[];
   /** From the address; null shows the default template. */
   templateId: string | null;
   onSelectTemplate: (templateId: string) => void;
@@ -304,7 +304,7 @@ function NewSessionFromTemplate({
   gmToken: string;
   template: CodexPrepTemplate;
   templates: readonly CodexPrepTemplate[];
-  sessions: readonly PrepSession[];
+  sessions: readonly CodexSession[];
   /** A phone's one button: the next number, this template, nothing else to fill in. */
   compact?: boolean;
   onCreated: (sessionId: string) => void | Promise<void>;
@@ -407,7 +407,7 @@ function MadeFromTemplate({
 }: Readonly<{
   gmToken: string;
   template: CodexPrepTemplate;
-  sessions: readonly PrepSession[];
+  sessions: readonly CodexSession[];
   onOpenSession: (sessionId: string) => void;
   onChanged: () => void | Promise<void>;
 }>) {
@@ -420,7 +420,7 @@ function MadeFromTemplate({
         .sort((a, b) => (b.sessionNumber ?? 0) - (a.sessionNumber ?? 0)),
     [sessions, template.id]
   );
-  const reapply = async (session: PrepSession) => {
+  const reapply = async (session: CodexSession) => {
     setError(null);
     try {
       await prepSessionApi.applyTemplate(gmToken, session.id, template.id, session.rev);

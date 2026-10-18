@@ -1,4 +1,3 @@
-import type { PrepSession } from "../prep/contract";
 import { sessionPath, templatePath } from "../routes";
 import { useCodexShell, useGmCodex } from "../shell/context";
 import { TemplatesView } from "./TemplatesView";
@@ -11,7 +10,7 @@ export function GmTemplatesSection() {
     <TemplatesView
       gmToken={token}
       autosave={autosave}
-      sessions={feeds.sessions as unknown as readonly PrepSession[]}
+      sessions={feeds.sessions}
       templateId={recordId}
       onSelectTemplate={(id) => go(templatePath(id), { replace: true })}
       onOpenSession={(id) => go(sessionPath(id))}

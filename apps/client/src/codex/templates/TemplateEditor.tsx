@@ -4,7 +4,7 @@ import type { CodexAutosaveSettings } from "@vtt/domain";
 import { newId } from "../../lib/ids";
 import { useCodexAutosave } from "../autosave";
 import { templateApi } from "../prep/api";
-import { CODEX_PREP_LIMITS, type CodexPrepSectionType, type CodexPrepTemplate } from "../prep/contract";
+import { CODEX_PREP_LIMITS, type CodexPrepSectionType, type CodexPrepTemplate } from "@vtt/domain";
 import { useReorder } from "../prep/reorder";
 import { SECTION_TYPES, sectionTypeLabel } from "../prep/sections";
 

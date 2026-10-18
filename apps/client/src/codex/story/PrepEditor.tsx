@@ -21,13 +21,13 @@ import { CodexEditor } from "../CodexEditor";
 import { EntityIcon, CodexIcon } from "../icons";
 import {
   CODEX_PREP_LIMITS,
-  type CodexBlockRef,
+  type CodexBlock,
   type CodexPrepChecklistItem,
   type CodexPrepLink,
   type CodexPrepScene,
   type CodexPrepSection,
   type CodexPrepSectionType
-} from "../prep/contract";
+} from "@vtt/domain";
 import { SECTION_TYPES, emptySection, moveItem, sectionTypeLabel } from "../prep/sections";
 import { PagePicker } from "../shared/PagePicker";
 import "../templates/templates.css";
@@ -447,16 +447,14 @@ function LinkDialog({
 }>) {
   const [recordKey, setRecordKey] = useState<string | null>(link ? `${link.recordKind}:${link.recordId}` : null);
   const [blockId, setBlockId] = useState<string | null>(link?.blockId ?? null);
-  const [blocks, setBlocks] = useState<readonly CodexBlockRef[]>([]);
+  const [blocks, setBlocks] = useState<readonly CodexBlock[]>([]);
   const [kind, id] = recordKey ? (recordKey.split(":") as ["page" | "quest", string]) : [null, null];
   const readBlocks = useCallback(async () => {
     if (!kind || !id) return [];
     const record =
       kind === "page" ? (await codexApi.getPage(context.token, id)).page : await questApi.get(context.token, id);
-    // The model's blocks; a record without any links only as a whole.
-    return ((record as { blocks?: readonly CodexBlockRef[] }).blocks ?? []).filter(
-      (block) => block.audience === "hidden"
-    );
+    // A clue reveals a block, so only a block someone can't read yet is offered; a record without one links whole.
+    return record.blocks.filter((block) => block.audience !== "everyone");
   }, [kind, id, context.token]);
   useEffect(() => {
     let live = true;

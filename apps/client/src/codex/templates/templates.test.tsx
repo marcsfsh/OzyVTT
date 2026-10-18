@@ -28,7 +28,10 @@ vi.mock("../prep/api", () => ({
 }));
 
 import { ToastProvider } from "@vtt/ui";
-import { BUILT_IN_TEMPLATE_ID, type CodexPrepTemplate, type PrepSession } from "../prep/contract";
+import type { CodexPrepTemplate, CodexSession } from "@vtt/domain";
+
+/** The server's id for the starting template. */
+const BUILT_IN_TEMPLATE_ID = "00000000-0000-4000-8000-00000000b001";
 import { TemplatesView } from "./TemplatesView";
 
 const BUILT_IN: CodexPrepTemplate = {
@@ -63,7 +66,7 @@ const MINE: CodexPrepTemplate = {
   createdAt: "2026-10-01T00:00:00.000Z",
   updatedAt: "2026-10-01T00:00:00.000Z"
 };
-const SESSION = (over: Partial<PrepSession> = {}): PrepSession =>
+const SESSION = (over: Partial<CodexSession> = {}): CodexSession =>
   ({
     id: "x6",
     sessionNumber: 6,
@@ -81,7 +84,7 @@ const SESSION = (over: Partial<PrepSession> = {}): PrepSession =>
     prepTemplateId: "t1",
     currentSceneId: null,
     ...over
-  }) as PrepSession;
+  }) as CodexSession;
 
 function renderView(over: Partial<Parameters<typeof TemplatesView>[0]> = {}) {
   const props = {

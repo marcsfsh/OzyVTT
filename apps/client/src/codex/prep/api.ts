@@ -1,21 +1,21 @@
-import type { CodexMarker, CodexJournalEntry } from "@vtt/domain";
-import { apiRequest } from "../../lib/api";
-import { newId } from "../../lib/ids";
 import type {
-  CodexAudienceInput,
+  CodexJournalEntry,
   CodexLiveBoard,
   CodexLiveClue,
-  CodexPrepSectionInput,
+  CodexMarker,
   CodexPrepTemplate,
   CodexPrepTemplateList,
   CodexPrepTemplateSectionInput,
-  CodexSessionHappened,
-  PrepSession
-} from "./contract";
+  CodexSession,
+  CodexSessionHappened
+} from "@vtt/domain";
+import { apiRequest } from "../../lib/api";
+import { newId } from "../../lib/ids";
 
 /**
- * The GM-only reads and writes behind prep: the template library, a session's prep sections, the live board, the
- * recap's sources and the party's position. Every write carries a `commandId`, so a retried request replays.
+ * The GM-only reads and writes behind prep that `api.ts` doesn't carry: the template library, making a session from
+ * a template, the live board, the recap's sources and the party's position. A session's own reads and saves are
+ * `sessionApi`. Every write carries a `commandId`, so a retried request replays.
  */
 
 const BASE = "/api/v1/codex";
@@ -66,33 +66,15 @@ export type NewSessionInput = Readonly<{
   templateId?: string | null;
 }>;
 
-/** Everything the session page saves at once; `prep` is the whole list of sections. */
-export type SessionPageInput = Readonly<{
-  sessionNumber?: number | null;
-  realDate?: string | null;
-  attendees?: readonly string[];
-  recapBody?: string;
-  status?: "planned" | "played";
-  tags?: readonly string[];
-  prep?: readonly CodexPrepSectionInput[];
-  expectedRev?: number;
-}>;
-
 export const prepSessionApi = {
-  get: (token: string, id: string) =>
-    call<{ session: PrepSession }>(token, `/sessions/${id}`).then((data) => data.session),
-  update: (token: string, id: string, input: SessionPageInput) =>
-    call<{ session: PrepSession }>(token, `/sessions/${id}`, { method: "PATCH", body: input }).then(
-      (data) => data.session
-    ),
   create: (token: string, input: NewSessionInput) =>
-    call<{ session: PrepSession }>(token, "/sessions", {
+    call<{ session: CodexSession }>(token, "/sessions", {
       method: "POST",
       body: { status: "planned", ...input }
     }).then((data) => data.session),
   /** Copies the template's sections in its order and keeps what each matching section holds. */
   applyTemplate: (token: string, id: string, templateId: string, expectedRev?: number) =>
-    call<{ session: PrepSession }>(token, `/sessions/${id}/apply-template`, {
+    call<{ session: CodexSession }>(token, `/sessions/${id}/apply-template`, {
       method: "POST",
       body: { templateId, ...(expectedRev === undefined ? {} : { expectedRev }) }
     }).then((data) => data.session)
@@ -109,24 +91,15 @@ export const liveApi = {
       body: { text, revealedToPlayers }
     }).then((data) => data.entry),
   tick: (token: string, sessionId: string, itemId: string, done: boolean) =>
-    call<{ session: PrepSession; clue: CodexLiveClue }>(token, `/sessions/${sessionId}/tick`, {
+    call<{ session: CodexSession; clue: CodexLiveClue }>(token, `/sessions/${sessionId}/tick`, {
       method: "POST",
       body: { itemId, done }
     }),
   currentScene: (token: string, sessionId: string, sceneId: string | null) =>
-    call<{ session: PrepSession }>(token, `/sessions/${sessionId}/current-scene`, {
+    call<{ session: CodexSession }>(token, `/sessions/${sessionId}/current-scene`, {
       method: "POST",
       body: { sceneId }
     }).then((data) => data.session)
-};
-
-/** Who reads one block of a page or a quest. Not an edit: it moves no `rev`. */
-export const audienceApi = {
-  block: (token: string, recordKind: "page" | "quest", recordId: string, blockId: string, input: CodexAudienceInput) =>
-    call<unknown>(token, `/${recordKind === "page" ? "pages" : "quests"}/${recordId}/blocks/${blockId}/audience`, {
-      method: "PUT",
-      body: input
-    })
 };
 
 export const partyApi = {

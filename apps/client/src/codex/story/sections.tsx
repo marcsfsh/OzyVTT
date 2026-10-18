@@ -1,11 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { Alert, Badge, Button, IconPlus, Modal, SegmentedControl, Skeleton, Input } from "@vtt/ui";
-import type { CodexChronicleRecord } from "@vtt/domain";
+import type { CodexChronicleRecord, CodexSession } from "@vtt/domain";
 import { calendarApi, journalApi } from "../api";
 import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META } from "../chronicle";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { usePageLinks } from "../pageLinks";
-import type { PrepSession } from "../prep/contract";
 import { prepSessionApi } from "../prep/api";
 import { atlasPath, pagePath, pathForSection, sessionPath, templatePath } from "../routes";
 import { sessionTitle } from "../sessions";
@@ -249,7 +248,7 @@ function StoryComposer({ story }: Readonly<{ story: ReturnType<typeof useGmStory
 }
 
 /** The GM's next planned session, for the month's Next card: its number, when, and the clues it plans. */
-function useNextSession(sessions: readonly PrepSession[]): NextSessionCard | null {
+function useNextSession(sessions: readonly CodexSession[]): NextSessionCard | null {
   return useMemo(() => {
     const planned = sessions
       .filter((session) => session.status === "planned")
@@ -274,7 +273,7 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
   const [opened, setOpened] = useState<string | null>(shell.query.get("entry"));
   const card = useRecordCard(story, () => setOpened(null));
   const zoom = zoomOf(shell.query, "month");
-  const next = useNextSession(feeds.sessions as unknown as readonly PrepSession[]);
+  const next = useNextSession(feeds.sessions);
   const shown = filterRecords(records, shell.query);
   const openedRecord = records.find((record) => record.id === opened) ?? null;
   // No phone bar of its own: the frame's default bar titles Story and keeps Search in reach.
@@ -469,7 +468,7 @@ export function GmTimelineSection() {
   const { shell, feeds, records, calendar, error, followLink, lineOf } = story;
   const [selected, setSelected] = useState<string | null>(null);
   const card = useRecordCard(story, () => setSelected(null));
-  const next = useNextSession(feeds.sessions as unknown as readonly PrepSession[]);
+  const next = useNextSession(feeds.sessions);
   if (shell.phone) return <GmPhoneStory story={story} />;
   const zoom = zoomOf(shell.query, "ages");
   const record = records.find((each) => each.id === selected) ?? null;
@@ -548,12 +547,12 @@ export function GmSessionsSection() {
   const campaign = useSessionsCampaign(shell.token);
   const records = useMemo(() => campaign.data?.records ?? [], [campaign.data]);
   const calendar = campaign.data?.calendar ?? null;
-  const sessions = feeds.sessions as unknown as readonly PrepSession[];
+  const sessions = feeds.sessions;
   const [filter, setFilter, filtered] = useSessionFilter();
   // A filtered address opens on its filtered list.
   const [filtersOpen, setFiltersOpen] = useState(filtered);
   const [error, setError] = useActionError(feeds.sessionFeed.data);
-  const listed = useMemo<(ListedSession & { source: PrepSession })[]>(
+  const listed = useMemo<(ListedSession & { source: CodexSession })[]>(
     () =>
       sessions.map((session) => ({
         id: session.id,
