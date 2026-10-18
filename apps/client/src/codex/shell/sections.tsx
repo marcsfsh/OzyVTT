@@ -8,6 +8,7 @@ import { GmHome, PlayerHome } from "../home/HomeView";
 import { SearchView } from "../search/SearchView";
 import { GmQuests, PlayerQuests } from "../quests/QuestsView";
 import { RelationshipsView } from "../relationships/RelationshipsView";
+import { GmCompendiumSection, PlayerCompendiumSection } from "../../compendium/player/CodexCompendium";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "./context";
 import { GmAtlasSection, PlayerAtlasSection } from "../atlas/sections";
 import { GmTemplatesSection } from "../templates/sections";
@@ -107,6 +108,8 @@ export const CODEX_SECTIONS: Readonly<Record<CodexSection, CodexSectionEntry>> =
   pages: { gm: GmPagesSection, player: PlayerPagesSection },
   quests: { gm: GmQuests, player: PlayerQuests },
   relationships: { gm: RelationshipsView, player: RelationshipsView },
+  // The SRD and the homebrew each reader receives, read only; the GM edits it in the Compendium tab.
+  compendium: { gm: GmCompendiumSection, player: PlayerCompendiumSection },
   tags: { gm: GmTags, player: PlayerTags },
   backup: { gm: GmBackup, player: null },
   settings: { gm: GmSettings, player: null },

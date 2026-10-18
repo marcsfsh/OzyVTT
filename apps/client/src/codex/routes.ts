@@ -17,6 +17,7 @@ export type CodexSection =
   | "sessions"
   | "quests"
   | "relationships"
+  | "compendium"
   | "templates"
   | "tags"
   | "backup"
@@ -35,7 +36,14 @@ export function pathForSection(section: CodexSection): string {
 }
 
 /** Sections whose address may carry one record id: `/codex/pages/:id`. */
-export const RECORD_SECTION_IDS: readonly CodexAddress[] = ["pages", "atlas", "sessions", "quests", "templates"];
+export const RECORD_SECTION_IDS: readonly CodexAddress[] = [
+  "pages",
+  "atlas",
+  "sessions",
+  "quests",
+  "templates",
+  "compendium"
+];
 /** Sections that are exactly their own address. Their filters and focus live in the query. */
 export const BARE_SECTION_IDS: readonly CodexAddress[] = [
   "search",
@@ -115,7 +123,8 @@ export const CODEX_BAR: readonly CodexBarItem[] = [
   { id: "atlas", label: "Atlas", iconId: "compass", path: pathForSection("atlas") },
   { id: "story", label: "Story", iconId: "book", path: pathForSection("story") },
   { id: "quests", label: "Quests", iconId: "quest", path: pathForSection("quests") },
-  { id: "relationships", label: "Relationships", iconId: "graph", path: pathForSection("relationships") }
+  { id: "relationships", label: "Relationships", iconId: "graph", path: pathForSection("relationships") },
+  { id: "compendium", label: "Compendium", iconId: "scroll", path: pathForSection("compendium") }
 ];
 
 /**
@@ -129,6 +138,7 @@ export function barItemOf(section: CodexSection): string | null {
     case "atlas":
     case "quests":
     case "relationships":
+    case "compendium":
       return section;
     case "story":
     case "timeline":
@@ -163,6 +173,7 @@ export function phoneTabOf(section: CodexSection): CodexPhoneTab | null {
       return section;
     case "pages":
     case "tags":
+    case "compendium":
       return "pages";
     case "story":
     case "timeline":
@@ -211,6 +222,7 @@ export const SECTION_TITLE: Readonly<Record<CodexSection, string>> = {
   sessions: "Sessions",
   quests: "Quests",
   relationships: "Relationships",
+  compendium: "Compendium",
   templates: "Prep templates",
   tags: "Tag",
   backup: "Backup",
@@ -231,7 +243,8 @@ export function codexDestinations(role: "gm" | "player"): ReadonlyArray<Readonly
     "timeline",
     "sessions",
     "quests",
-    "relationships"
+    "relationships",
+    "compendium"
   ];
   if (role === "gm") sections.push(...GM_MENU_SECTIONS);
   return sections.map((section) => ({ label: SECTION_TITLE[section], path: pathForSection(section) }));
