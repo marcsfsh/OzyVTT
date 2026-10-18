@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Button, IconEyeOff, useToast } from "@vtt/ui";
+import { Alert, Button, IconButton, IconEyeOff, useToast } from "@vtt/ui";
 import { formatWorldDate, type CodexCalendar, type CodexInWorldDate, type GmCodexCalendar } from "@vtt/domain";
 import { calendarApi } from "../api";
 import { CalendarEditor, CampaignDateEditor } from "../CalendarEditor";
@@ -61,6 +61,21 @@ export function GmDateBar({
     }
   };
 
+  // Players then see no date at all until the next Publish.
+  const unpublish = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await calendarApi.unpublish(gmToken);
+      await onChanged();
+      toast("Players no longer see a date.", { tone: "success" });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't hide the players' date.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!calendar || calendar.months.length === 0)
     return (
       <div className={`story-datebar${tight ? " is-tight" : ""}`}>
@@ -110,6 +125,11 @@ export function GmDateBar({
         <Button variant="secondary" size="sm" disabled={busy || same} onClick={() => void publish()}>
           Publish
         </Button>
+        {published && (
+          <IconButton label="Hide the date from players" size="sm" disabled={busy} onClick={() => void unpublish()}>
+            <IconEyeOff />
+          </IconButton>
+        )}
         <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>
           Edit calendar
         </Button>

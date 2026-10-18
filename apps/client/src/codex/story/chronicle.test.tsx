@@ -6,6 +6,7 @@ vi.mock("../../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.f
 
 const api = vi.hoisted(() => ({
   publish: vi.fn(),
+  unpublish: vi.fn(),
   setCalendar: vi.fn(),
   create: vi.fn(),
   createDeadline: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
   return {
     ...actual,
-    calendarApi: { ...actual.calendarApi, publish: api.publish, set: api.setCalendar },
+    calendarApi: { ...actual.calendarApi, publish: api.publish, unpublish: api.unpublish, set: api.setCalendar },
     codexApi: { ...actual.codexApi, revealPage: api.revealPage },
     journalApi: {
       ...actual.journalApi,
@@ -887,6 +888,16 @@ describe("The two dates", () => {
     renderStory([]);
     expect(bar().getByRole("button", { name: "Publish" })).toBeDisabled();
     expect(bar().getByText(/The party is on your date/)).toBeInTheDocument();
+  });
+
+  it("hides the players' date again, so they see none until the next Publish", async () => {
+    const user = userEvent.setup();
+    api.unpublish.mockResolvedValue({});
+    const view = renderStory([], { calendar: SPLIT });
+    await user.click(bar().getByRole("button", { name: "Hide the date from players" }));
+    await waitFor(() => expect(api.unpublish).toHaveBeenCalledWith("gm"));
+    expect(view.reload).toHaveBeenCalled();
+    expect(await screen.findByText("Players no longer see a date.")).toBeInTheDocument();
   });
 
   it("offers Publish from the unset state, where the party has no date at all", () => {
