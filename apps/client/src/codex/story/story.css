@@ -557,6 +557,12 @@ button.story-datebar-date {
   gap: var(--space-2);
   font-size: var(--fs-sm);
 }
+/* `.nh-btn` is `nowrap`; this one names a full world date, so it wraps inside the row on a phone. */
+.story-downtime-row > .nh-btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: start;
+}
 .story-downtime-edit {
   flex: 1 1 100%;
   display: flex;
@@ -606,6 +612,11 @@ button.story-datebar-date {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+}
+/* A phone scrolls Story as one column, so the timeline keeps its full height and Downtime follows it. */
+.story-timeline.is-phone,
+.story-timeline.is-phone .story-ages-wrap {
+  flex: none;
 }
 .story-ages-main,
 .story-month-main {
