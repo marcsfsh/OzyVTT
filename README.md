@@ -22,9 +22,10 @@ It has two parts:
   has revealed to them.
 
 Characters can be built in a guided builder, imported from a D&D Beyond PDF, or authored as
-homebrew. SRD 5.2.1 monsters, spells, equipment and magic items are included. The GM makes
-homebrew of every kind, from a class to a monster, step by step in a wizard, with the full editor
-one tap away.
+homebrew. SRD 5.2.1 monsters, spells, equipment and magic items are included. The Compendium lists
+the SRD and the table's homebrew together, one table per kind. The GM makes homebrew of every kind,
+from a class to a monster, in steps beside a preview drawn as the table shows it, and shares each
+record with everyone or with chosen characters. Players read what they have been shown in the Codex.
 
 ## Running it
 
