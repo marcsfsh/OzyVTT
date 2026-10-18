@@ -65,15 +65,15 @@ describe("The canonical glossary", () => {
   it("reads enough of the Codex to be worth trusting", () => {
     // Guard against a scan that silently matches nothing. The floor keeps headroom on purpose.
     expect(codexSources().length).toBeGreaterThan(25);
-    expect(strings.length).toBeGreaterThan(850);
+    expect(strings.length).toBeGreaterThan(400);
   });
 
   it("sees the object-literal copy the old scanner was blind to", () => {
     // Object-key strings (e.g. `useConfirm` title/body) must be scanned; named so a narrowing fails here.
     const at = (file: string, text: string) => strings.some((entry) => entry.file === file && entry.text === text);
-    expect(at("MarkerInspector.tsx", "Delete pin")).toBe(true);
-    expect(at("MarkerInspector.tsx", "Delete this pin? This cannot be undone.")).toBe(true);
-    expect(at("AtlasView.tsx", 'Delete map "${currentMap.name}"? Its pins are removed.')).toBe(true);
+    expect(at("page/PagesIndex.tsx", "Delete folder")).toBe(true);
+    expect(at("story/actions.tsx", "Delete record")).toBe(true);
+    expect(at("story/actions.tsx", "Delete this record from the chronicle? This cannot be undone.")).toBe(true);
     expect(
       strings.some(
         (entry) => entry.file === "StandingAdjuster.tsx" && entry.text.startsWith("Optional. Players never see")

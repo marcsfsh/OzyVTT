@@ -34,7 +34,8 @@ describe("Codex loading states: a read still open never reads as empty", () => {
       recent: [],
       revealCheck: { rows: [], total: 0 }
     });
-    expect(await screen.findByRole("region", { name: "People" })).toHaveTextContent("1 revealed");
+    // The People region is already there with zeros while the read is open, so wait for the count itself.
+    await waitFor(() => expect(screen.getByRole("region", { name: "People" })).toHaveTextContent("1 revealed"));
     expect(screen.queryByRole("region", { name: "Make your first page" })).not.toBeInTheDocument();
   });
 

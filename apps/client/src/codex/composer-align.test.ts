@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 /** Vite rewrites `import.meta.url`, so read sources from the workspace root. */
 const read = (path: string) => readFileSync(`${process.cwd()}/${path}`, "utf8");
-const CODEX_CSS = read("src/codex/codex.css");
+const STORY_CSS = read("src/codex/story/story.css");
 const FORMS_CSS = read("../../packages/ui/src/primitives/forms.css");
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
@@ -22,26 +22,19 @@ describe("the premise: .nh-field does not align its own content", () => {
   });
 });
 
-describe("the fix: the three composer containers, and only those", () => {
-  const CONTAINERS = [".codex-composer-meta", ".codex-downtime-form", ".codex-downtime-edit"];
+describe("the fix: the composer's row of fields, and only that", () => {
+  const CONTAINER = ".story-composer-row";
 
-  it("scopes `align-content: start` to each container's own `.nh-field` children", () => {
-    const css = withoutComments(CODEX_CSS);
-    for (const container of CONTAINERS) {
-      const selector = new RegExp(
-        `\\${container} > \\.nh-field[^{]*\\{[^}]*align-content:\\s*start|\\${container} > \\.nh-field\\s*,`
-      );
-      expect(css, `${container} no longer keeps its fields' rows from stretching`).toMatch(selector);
-    }
-    // One `align-content: start` block for all three rows.
-    const block = css.match(/([^{}]*)\{\s*align-content:\s*start;?\s*\}/);
-    expect(block, "no `align-content: start` block in codex.css").not.toBeNull();
-    for (const container of CONTAINERS) expect(block![1]).toContain(`${container} > .nh-field`);
+  it("scopes `align-content: start` to the row's own `.nh-field` children", () => {
+    const css = withoutComments(STORY_CSS);
+    expect(css, `${CONTAINER} no longer keeps its fields' rows from stretching`).toMatch(
+      /\.story-composer-row > \.nh-field\s*\{[^}]*align-content:\s*start/
+    );
   });
 
   it("never puts it on a bare `.nh-field`, which would break every field that wants the stretch", () => {
     // Must not apply to bare `.nh-field`: `CodexEditor fill` and textarea fields rely on stretching.
-    const bare = withoutComments(CODEX_CSS)
+    const bare = withoutComments(STORY_CSS)
       .split("}")
       .map((chunk) => chunk.split("{"))
       .filter(([, body]) => body !== undefined && /align-content/.test(body))
@@ -55,7 +48,9 @@ describe("the fix: the three composer containers, and only those", () => {
 describe("the copy half: the two help sentences that set the tall row are gone", () => {
   it("leaves 'Date played' and downtime's 'Who' with no help string", () => {
     // These two help strings were removed; the downtime edit row's help stays.
-    expect(read("src/codex/SessionsView.tsx")).not.toContain("The real-world date. The Calendar holds in-world dates.");
-    expect(read("src/codex/DowntimeView.tsx")).not.toContain("Pick a character page, or type a name.");
+    expect(read("src/codex/story/SessionPage.tsx")).not.toContain(
+      "The real-world date. The Calendar holds in-world dates."
+    );
+    expect(read("src/codex/story/EntryComposer.tsx")).not.toContain("Pick a character page, or type a name.");
   });
 });

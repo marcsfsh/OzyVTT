@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GmView } from "@vtt/domain";
-import { useToast, Wordmark } from "@vtt/ui";
+import { Wordmark } from "@vtt/ui";
 import { PartyRosterTab } from "../actors/PartyRosterTab";
 import { useConfirm } from "../components/feedback";
 import { lazySurface } from "../components/lazySurface";
 import { NotFoundPage } from "../components/NotFoundView";
-import { command } from "../lib/command";
 import { listMaps, type MapAsset, type MapSelection } from "../maps/map-catalog";
 import {
   isKnownPath,
@@ -18,6 +17,7 @@ import {
   useRoute,
   type GmTab
 } from "../router";
+import { useSceneActions } from "../scenes/sceneActions";
 import { AppTabs, type TabFit } from "./AppTabs";
 import { isFullPageLayer, LayerView } from "./LayerView";
 import { TableView } from "./TableView";
@@ -118,13 +118,18 @@ export function GmShell({
   const [mapLibrary, setMapLibrary] = useState<readonly MapSelection[]>([]);
   const [showViewerPreview, setShowViewerPreview] = useState(false);
   const { confirm, dialog } = useConfirm();
-  const { toast } = useToast();
   /**
    * Read defensively: the first `state:updated` a signing-in GM receives can still be the player-shaped
    * projection, which has no scenes. The scene surfaces wait for the GM's.
    */
   const scenesLoaded = Array.isArray(state.combat.scenes);
   const scenes = useMemo(() => state.combat.scenes ?? [], [state.combat.scenes]);
+  const sceneActions = useSceneActions(scenes, { combatActive: state.combat.active });
+  // One way to make a scene live from anywhere: asked first while a fight is on, since that fight is parked.
+  const makeSceneLive = async (sceneId: string): Promise<boolean> => {
+    const scene = scenes.find((candidate) => candidate.id === sceneId);
+    return scene ? sceneActions.makeLive(scene) : false;
+  };
 
   // The map library loads with the GM session (refreshed when returning to Table or Scenes, and after a change in
   // Scenes), so starting a fight or the shared screen never needs a visit to the library.
@@ -173,10 +178,6 @@ export function GmShell({
       ),
     []
   );
-  const makeSceneLive = (sceneId: string) =>
-    void command("scene:activate", { sceneId }).then((result) => {
-      if (!result.ok) toast(result.message ?? "The scene could not be switched.", { tone: "error" });
-    });
   const revokeAll = async () => {
     const ok = await confirm({
       title: "Revoke every GM session?",
@@ -204,6 +205,7 @@ export function GmShell({
             selectedMap,
             mapLibrary,
             onSelectMap: setSelectedMap,
+            onMakeLive: (sceneId) => void makeSceneLive(sceneId),
             viewerPreview: { on: showViewerPreview, onToggle: () => setShowViewerPreview((current) => !current) }
           }}
         />
@@ -261,10 +263,11 @@ export function GmShell({
           }))}
           activeSceneId={state.combat.activeSceneId ?? null}
           gameHours={state.rest?.clockHours ?? null}
-          onActivateScene={(sceneId: string) => {
-            makeSceneLive(sceneId);
-            navigate(pathForGmTab("table"));
-          }}
+          onActivateScene={(sceneId: string) =>
+            void makeSceneLive(sceneId).then((live) => {
+              if (live) navigate(pathForGmTab("table"));
+            })
+          }
           onOpenReplay={(archiveId: number) => navigate(`/replays/${archiveId}`)}
         />
       )}
@@ -295,6 +298,7 @@ export function GmShell({
           />
         ))}
       {dialog}
+      {sceneActions.dialogs}
     </>
   );
 }

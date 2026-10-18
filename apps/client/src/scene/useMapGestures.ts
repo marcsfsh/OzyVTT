@@ -130,7 +130,7 @@ export function useMapGestures({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
    * Live touch points by `pointerId`. Every other gesture is single-pointer via `setPointerCapture`,
-   * so without this a second finger is invisible. Mirrors the Codex atlas (`codex/MapSurface.tsx`).
+   * so without this a second finger is invisible. Mirrors the Codex atlas (`codex/atlas/AtlasMap.tsx`).
    * Mouse pointers are never tracked: a mouse cannot pinch, and an untracked pointer can never be
    * mistaken for a pinch's second finger.
    */

@@ -36,6 +36,8 @@ export type GmTable = Readonly<{
   selectedMap: MapSelection | null;
   mapLibrary: readonly MapSelection[];
   onSelectMap: (map: MapSelection | null) => void;
+  /** Makes a prepared scene live, asked first while a fight is on: Tonight's board names its fights' scenes. */
+  onMakeLive: (sceneId: string) => void;
   viewerPreview: Readonly<{ on: boolean; onToggle: () => void }>;
 }>;
 
@@ -151,7 +153,15 @@ export function TableView(props: TableViewProps) {
           token: <TokenTab state={props.state} token={token} />,
           party: <PartyStrip role="gm" state={props.state} onOpenRoster={() => navigate(pathForGmTab("roster"))} />,
           rest: <PartyRest state={props.state} token={token} />,
-          tonight: <TonightTab token={token} />,
+          tonight: (
+            <TonightTab
+              token={token}
+              party={party}
+              scenes={props.state.combat.scenes}
+              liveSceneId={props.state.combat.activeSceneId}
+              onMakeLive={props.gm.onMakeLive}
+            />
+          ),
           codex: <CodexTab role="gm" token={token} party={party} />
         }}
       />
