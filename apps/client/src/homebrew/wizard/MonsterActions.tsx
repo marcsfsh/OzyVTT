@@ -5,7 +5,7 @@
  * on this monster's scores, and the text follows the answers in the SRD's words until the GM edits it.
  */
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { SaveConditionSchema } from "@vtt/schemas";
 import { Chip, Field, FieldGrid, Input, NumberField, RowEditor, Select, Stepper, Switch, Textarea } from "@vtt/ui";
 import type { Draft } from "../schema";
@@ -801,12 +801,21 @@ function DamageParts({
   hint: string;
   onChange: (next: Array<{ formula: string; type: string }>) => void;
 }>) {
-  const shown = parts.length > 0 ? parts : [];
+  // A row whose dice are cleared stays on screen to be typed into, but the record keeps only parts with dice, so a
+  // saving throw left with no dice is one with no damage.
+  const [rows, setRows] = useState<ReadonlyArray<{ formula: string; type: string }>>(parts);
+  const written = (list: ReadonlyArray<{ formula: string; type: string }>) =>
+    list.filter((part) => part.formula.trim() !== "");
+  if (JSON.stringify(written(rows)) !== JSON.stringify(parts)) setRows(parts);
+  const change = (next: Array<{ formula: string; type: string }>) => {
+    setRows(next);
+    onChange(written(next));
+  };
   return (
     <div className="hb-field">
       <span className="nh-field-label">Damage</span>
       <p className="nh-field-help">{hint}</p>
-      {shown.map((part, index) => (
+      {rows.map((part, index) => (
         <FieldGrid min="9rem" key={index}>
           <Field label={index === 0 ? "Dice" : "Plus"} htmlFor={`${idPrefix}-dice-${index}`}>
             <Input
@@ -814,7 +823,7 @@ function DamageParts({
               value={part.formula}
               placeholder="1d8 + 3"
               onChange={(event) =>
-                onChange(shown.map((entry, i) => (i === index ? { ...entry, formula: event.target.value } : entry)))
+                change(rows.map((entry, i) => (i === index ? { ...entry, formula: event.target.value } : entry)))
               }
             />
           </Field>
@@ -823,7 +832,7 @@ function DamageParts({
               id={`${idPrefix}-type-${index}`}
               value={part.type}
               onChange={(event) =>
-                onChange(shown.map((entry, i) => (i === index ? { ...entry, type: event.target.value } : entry)))
+                change(rows.map((entry, i) => (i === index ? { ...entry, type: event.target.value } : entry)))
               }
             >
               {DAMAGE_TYPES.map((type) => (
@@ -836,12 +845,12 @@ function DamageParts({
         </FieldGrid>
       ))}
       <div className="hb-chips">
-        {shown.length < 3 && (
-          <Chip onClick={() => onChange([...shown, { formula: shown.length === 0 ? "1d6" : "1d6", type: "fire" }])}>
-            {shown.length === 0 ? "Add damage" : "Add more damage"}
+        {rows.length < 3 && (
+          <Chip onClick={() => change([...rows, { formula: "1d6", type: "fire" }])}>
+            {rows.length === 0 ? "Add damage" : "Add more damage"}
           </Chip>
         )}
-        {shown.length > 0 && <Chip onClick={() => onChange(shown.slice(0, -1))}>Remove the last damage</Chip>}
+        {rows.length > 0 && <Chip onClick={() => change(rows.slice(0, -1))}>Remove the last damage</Chip>}
       </div>
     </div>
   );

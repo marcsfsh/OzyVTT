@@ -102,7 +102,7 @@ describe("one complete record of each type", () => {
     const draft = blankDraft(type);
     const steps = wizardSteps(WIZARDS[type], draft);
     const reasons = publishIssues(type, draft, contextFor("hb-wizard-probe"), "hb-wizard-probe");
-    const placed = placeIssues(steps, reasons);
+    const placed = placeIssues(steps, reasons, draft);
     for (const issue of placed) expect(issue.stepId, `"${issue.text}" (${issue.path ?? "no path"})`).not.toBeNull();
   });
 

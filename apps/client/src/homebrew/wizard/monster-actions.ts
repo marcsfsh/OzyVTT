@@ -44,8 +44,12 @@ const words = (list: readonly string[]) =>
 
 const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six"];
 
+/** The damage the action deals. A part whose dice are blank deals nothing, so it is no part: a saving throw with its
+ *  dice cleared prints no damage and halves none. */
 export const partsOf = (action: MonsterAction): readonly Part[] =>
-  Array.isArray(action.damage) ? (action.damage as Part[]) : [];
+  Array.isArray(action.damage)
+    ? (action.damage as Part[]).filter((part) => typeof part.formula === "string" && part.formula.trim() !== "")
+    : [];
 
 export function kindOf(action: MonsterAction): ActionKind {
   if (Array.isArray(action.multiattack)) return "multiattack";

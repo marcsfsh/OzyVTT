@@ -28,6 +28,8 @@ export type BlockedReason = Readonly<{
   /** The dotted path this requirement is about, used only to drop a schema issue about the same
       field. The hand-written sentence always wins. */
   path?: string;
+  /** The issue's whole path, indexes included, so a step can claim one row of a list (a legendary action). */
+  segments?: ReadonlyArray<string | number>;
 }>;
 
 const blank = (value: unknown): boolean =>
@@ -417,7 +419,7 @@ export function issueReason(
   const found = lookup(issue.path);
   if (!found) {
     // No field owns this path (whole-record rule, extension bag); pass the message through.
-    return { text: issue.message, path: dotted || undefined };
+    return { text: issue.message, path: dotted || undefined, segments: issue.path };
   }
   // Zod messages lack terminal punctuation; the template adds it once.
   const detail = issue.message.replace(/[.\s]+$/, "");
@@ -426,7 +428,8 @@ export function issueReason(
       ? `Fill in ${found.label}.`
       : `Fix ${found.label}: ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`,
     sectionId: found.sectionId,
-    path: dotted || undefined
+    path: dotted || undefined,
+    segments: issue.path
   };
 }
 

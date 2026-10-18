@@ -41,7 +41,7 @@ import {
   type AbilityId,
   type Tier
 } from "./monster-build";
-import { withName } from "./monster-actions";
+import { actionsOf, activationOf, withName, type Activation } from "./monster-actions";
 import type { StepProps, WizardDef } from "./types";
 
 const ratingWords = (rating: number) =>
@@ -480,6 +480,16 @@ function LegendaryQuestion({ draft, onDraft, idPrefix }: StepProps) {
 
 /* ----------------------------------------------------------------- the wizard ---- */
 
+/** An issue in one of the monster's actions belongs to the step for that action's timing: a legendary action's dice
+ *  are fixed on Legendary Actions. */
+function claimsActions(activation: Activation) {
+  return (segments: ReadonlyArray<string | number>, draft: Draft) => {
+    if (segments[0] !== "actions" || typeof segments[1] !== "number") return false;
+    const action = actionsOf(draft)[segments[1]];
+    return action !== undefined && activationOf(action) === activation;
+  };
+}
+
 export const MONSTER_WIZARD: WizardDef = {
   type: "monster",
   steps: [
@@ -604,6 +614,7 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "Its attacks and other actions go here. A Multiattack makes several of them as one action.",
       owns: ["actions"],
       sections: ["actions"],
+      claims: claimsActions("action"),
       questions: [
         {
           key: "actions",
@@ -625,6 +636,7 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "A Bonus Action comes on top of its action, like the goblin's Nimble Escape. Most monsters have none.",
       owns: [],
       sections: [],
+      claims: claimsActions("bonus-action"),
       questions: [
         {
           key: "actions",
@@ -645,6 +657,7 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "A Reaction answers a trigger, even on another turn, like the knight's Parry.",
       owns: [],
       sections: [],
+      claims: claimsActions("reaction"),
       questions: [
         {
           key: "actions",
@@ -664,6 +677,7 @@ export const MONSTER_WIZARD: WizardDef = {
       title: "Legendary Actions",
       owns: ["legendary"],
       sections: ["token"],
+      claims: claimsActions("legendary"),
       questions: [{ key: "legendary", render: (props) => <LegendaryQuestion {...props} /> }]
     }
   ],

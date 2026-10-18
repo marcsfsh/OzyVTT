@@ -40,6 +40,9 @@ export type WizardStep = Readonly<{
   sections: readonly string[];
   /** A step the record's answers make irrelevant is left out of the flow (an item's weapon step for armor). */
   visibleWhen?: (draft: Draft) => boolean;
+  /** Claims an issue by its whole path before `owns` is read: one row of a list that several steps share, such as a
+      monster's actions, which belong to the step for their timing. */
+  claims?: (segments: ReadonlyArray<string | number>, draft: Draft) => boolean;
 }>;
 
 export type PreviewProps = Readonly<{ draft: Draft; ctx: SchemaContext; recordId: string }>;

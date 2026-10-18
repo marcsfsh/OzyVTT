@@ -75,7 +75,7 @@ export function WizardView(props: WizardViewProps) {
   );
   const step = steps[index];
   const isReview = step.id === REVIEW_STEP;
-  const placed = useMemo(() => placeIssues(steps, checklist), [steps, checklist]);
+  const placed = useMemo(() => placeIssues(steps, checklist, draft), [steps, checklist, draft]);
   const issuesOf = (id: string) => placed.filter((issue) => issue.stepId === id);
   const [previewOpen, setPreviewOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
