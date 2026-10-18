@@ -5,9 +5,10 @@ import { CAMPAIGN_PARTS, CODEX_BAR, CODEX_PHONE_TABS, SECTION_TITLE, codexDestin
 import { CHRONICLE_KIND_META } from "./chronicle";
 
 /**
- * The Codex glossary as a test: fails on retired words in user-facing strings under `src/codex/` (JSX
+ * The Codex glossary as a test: fails on retired words in user-facing strings anywhere under `src/codex/` (JSX
  * text, label-like props or object keys, and `setError`/`toast`/`setNotice` arguments). Identifiers,
- * comments, CSS classes and wire field names are out of scope.
+ * comments, CSS classes and wire field names are out of scope. The visibility words are Hidden, Revealed (to
+ * everyone or to a character by name), Reveal and Hide again, and Who sees it.
  */
 
 /** Vite rewrites `import.meta.url`, so use the cwd (the client workspace root, asserted below). */
@@ -25,13 +26,11 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
   { pattern: /\bquest log\b/i, use: "Quests" },
   { pattern: /\bsession log\b/i, use: "Sessions" },
   { pattern: /\bcampaign clock\b/i, use: "your date / today" },
-  { pattern: /\breveal(s|ed|ing)?\b/i, use: '"Shown to players" / "Hidden from players" / "Show … to players"' },
-  { pattern: /\bpublic\b/i, use: '"Shown to players"' },
+  { pattern: /\bpublic\b/i, use: '"Revealed to everyone"' },
   // No lookahead: "secret" mid-sentence must match too.
-  { pattern: /\bsecret\b/i, use: '"Hidden from players" or "GM only"' },
-  // The feature is the Journal in copy; `chronicle` identifiers are fine.
-  { pattern: /\bchronicles?\b/i, use: "Journal" },
-  { pattern: /\btimelines?\b/i, use: "Journal" },
+  { pattern: /\bsecret\b/i, use: '"Hidden"' },
+  { pattern: /\bgraph\b/i, use: "Relationships (its views are Web, Factions grid and Over time)" },
+  { pattern: /\breveal audit\b/i, use: "Search filtered to Hidden, or Home's reveal check" },
   /**
    * The old names of the two-layer notes control. Anchored to the whole string, because the same words
    * appear legitimately in prose and "GM only" is the content-axis pill.
@@ -53,9 +52,9 @@ const ALLOWED = new Set<string>([
   "Secret agenda"
 ]);
 
-/** The scanner is shared with `play-vocabulary.test.ts` via `copy-scan.ts`. */
+/** Every source file under the Codex, its views' folders included. The scanner is shared via `copy-scan.ts`. */
 function codexSources(): readonly string[] {
-  return readdirSync(CODEX_DIR)
+  return (readdirSync(CODEX_DIR, { recursive: true }) as string[])
     .filter((file) => /\.tsx?$/.test(file) && !file.includes(".test."))
     .sort();
 }
