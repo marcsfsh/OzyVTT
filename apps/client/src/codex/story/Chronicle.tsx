@@ -27,7 +27,7 @@ import {
 import { CodexIcon } from "../icons";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { sessionTitle } from "../sessions";
-import { daySpanLabel, sessionDays, spineGroups, type StoryRecord } from "./model";
+import { recordDay, sessionDays, spineGroups, type StoryRecord } from "./model";
 import { MonthBar, MonthGrid, useMonthView } from "./MonthGrid";
 
 /**
@@ -52,12 +52,6 @@ export function recordLine(record: StoryRecord, quests: readonly Named[], pages:
   if (standing)
     return standingChangeLabel(standing, pages.find((page) => page.id === standing.factionPageId)?.title ?? null);
   return chronicleRowSummary(record as never) || meta.label;
-}
-
-/** A record's day, short: "Emberfall 13". The month view above it carries the year. */
-function shortDay(record: StoryRecord, calendar: CodexCalendar | null): string | null {
-  if (record.calendarInstant === null) return record.inWorldLabel;
-  return daySpanLabel(calendar, record.calendarInstant, record.calendarInstant) || record.inWorldLabel;
 }
 
 type SpineSession = Readonly<{
@@ -205,7 +199,7 @@ function Spine<R extends StoryRecord>({
                     key={`${record.kind}-${record.id}`}
                     record={record}
                     line={lineOf(record)}
-                    day={shortDay(record, calendar)}
+                    day={recordDay(record, calendar)}
                     gm={audience === "gm"}
                     open={openId === record.id}
                     current={focusedId === record.id}
@@ -340,7 +334,7 @@ function Clocks<R extends StoryRecord>({
               <CodexIcon iconId="hourglass" className="story-spinerow-icon" />
               <span className="story-spinerow-text">
                 <span className="story-spinerow-line">{lineOf(record)}</span>
-                <span className="story-spinerow-meta">{shortDay(record, calendar) ?? "Undated"}</span>
+                <span className="story-spinerow-meta">{recordDay(record, calendar) ?? "Undated"}</span>
               </span>
               <Badge tone={deadlineStateTone(fired)}>{deadlineStateLabel(fired)}</Badge>
               {hidden && (

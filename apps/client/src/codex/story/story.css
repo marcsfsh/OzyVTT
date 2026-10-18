@@ -1350,3 +1350,70 @@ button.story-datebar-date {
     padding-inline: var(--space-3);
   }
 }
+
+/* ----- The prep read through on a phone ----- */
+.prep-read {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.prep-read-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.prep-read-text {
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--violet);
+  background: var(--surface-1);
+  font-size: var(--fs-sm);
+}
+.prep-read-scenes,
+.prep-read-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.prep-read-scenes {
+  gap: var(--space-2);
+}
+.prep-read-scene {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--line-strong);
+}
+.prep-read-list {
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.prep-read-row,
+.prep-read-check {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.prep-read-list > li:last-child .prep-read-check,
+.prep-read-list > .prep-read-row:last-child {
+  border-bottom: 0;
+}
+.prep-read-check {
+  cursor: pointer;
+}
+.prep-read-check input {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--cyan);
+}
+.prep-read-check.is-done .prep-row-title {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}

@@ -30,7 +30,7 @@ import { useConfirm } from "../../components/feedback";
 import { sessionApi } from "../api";
 import { useCodexAutosave } from "../autosave";
 import { archivedOptionLabel, charactersFor, type ArchivableActor } from "../characters";
-import { CHRONICLE_KIND_META, chronicleRowSummary } from "../chronicle";
+import { CHRONICLE_KIND_META, chronicleKindOfJournal } from "../chronicle";
 import { CodexEditor } from "../CodexEditor";
 import { CodexIcon } from "../icons";
 import { liveApi, prepSessionApi, templateApi } from "../prep/api";
@@ -39,8 +39,10 @@ import { sessionTitle } from "../sessions";
 import { revealedLabel, type PartyCharacter } from "../shared/audience";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexQuery } from "../useCodexQuery";
-import { sessionDays } from "./model";
-import { PrepEditor, linkLine, type PrepContext } from "./PrepEditor";
+import { realDateLabel, recordDay, sessionDays } from "./model";
+import { PrepEditor, linkLine, useBlockTitles, type PrepContext } from "./PrepEditor";
+import { PrepReader } from "./PrepReader";
+import { recordLine } from "./Chronicle";
 
 type Draft = Readonly<{
   sessionNumber: string;
@@ -113,6 +115,8 @@ export function SessionPage({
   const [mode, setMode] = useState<SessionMode>(session.status === "played" ? "recap" : "prep");
   const [phoneTab, setPhoneTab] = useState<PhoneTab>("prep");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  /** A phone reads the prep through; Edit the prep in the menu swaps in the editors. */
+  const [editingPrep, setEditingPrep] = useState(false);
   const [reapplyOpen, setReapplyOpen] = useState(false);
   const patch = (next: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...next }));
 
@@ -162,10 +166,15 @@ export function SessionPage({
   }, [saving.status]);
 
   const days = sessionDays(records, session.id, calendar);
-  const meta = [session.realDate, days, session.attendees.length > 0 ? session.attendees.join(", ") : null]
+  const meta = [
+    realDateLabel(session.realDate, true),
+    days,
+    session.attendees.length > 0 ? session.attendees.join(", ") : null
+  ]
     .filter(Boolean)
     .join(" · ");
-  const prepContext = context;
+  const blockTitles = useBlockTitles(gmToken, draft.prep);
+  const prepContext = useMemo(() => ({ ...context, blockTitles }), [context, blockTitles]);
 
   const act = async (run: () => Promise<unknown>, failure: string, done?: string) => {
     setError(null);
@@ -236,6 +245,11 @@ export function SessionPage({
   const more = (
     <Menu icon align="end" label={`${sessionTitle(session)} options`} trigger={<IconMore />}>
       <MenuItem onClick={() => setDetailsOpen(true)}>Edit details</MenuItem>
+      {phone && (
+        <MenuItem onClick={() => setEditingPrep((now) => !now)}>
+          {editingPrep ? "Read the prep" : "Edit the prep"}
+        </MenuItem>
+      )}
       <MenuItem onClick={() => setReapplyOpen(true)}>Re-apply a template</MenuItem>
       {!isActive && <MenuItem onClick={() => void start()}>Make active</MenuItem>}
       {session.status === "planned" ? (
@@ -269,16 +283,31 @@ export function SessionPage({
     </div>
   );
 
-  const prepEditor = (
-    <PrepEditor
-      sections={draft.prep}
-      context={prepContext}
-      onChange={(prep) => patch({ prep })}
-      filter={
-        phone ? (section) => (phoneTab === "places" ? section.type === "pages" : section.type !== "pages") : undefined
-      }
-    />
-  );
+  const onPhoneTab = (section: CodexPrepSection) =>
+    phoneTab === "places" ? section.type === "pages" : section.type !== "pages";
+  const prepEditor =
+    phone && !editingPrep ? (
+      <PrepReader
+        sections={draft.prep.filter(onPhoneTab)}
+        context={prepContext}
+        onTick={(sectionId, itemId, done) =>
+          patch({
+            prep: draft.prep.map((section) =>
+              section.id === sectionId && section.type === "checklist"
+                ? { ...section, items: section.items.map((item) => (item.id === itemId ? { ...item, done } : item)) }
+                : section
+            )
+          })
+        }
+      />
+    ) : (
+      <PrepEditor
+        sections={draft.prep}
+        context={prepContext}
+        onChange={(prep) => patch({ prep })}
+        filter={phone ? onPhoneTab : undefined}
+      />
+    );
   const recap = (
     <RecapStep
       gmToken={gmToken}
@@ -345,7 +374,13 @@ export function SessionPage({
             {more}
           </div>
           {(phoneTab === "prep" || phoneTab === "places") && prepEditor}
-          {phoneTab === "entries" && <EntryList records={entries} />}
+          {phoneTab === "entries" && (
+            <EntryList
+              records={entries}
+              calendar={calendar}
+              lineOf={(record) => recordLine(record, context.quests, context.pages)}
+            />
+          )}
           {phoneTab === "recap" && recap}
         </div>
       ) : (
@@ -504,7 +539,15 @@ function ReapplyDialog({
   );
 }
 
-function EntryList({ records }: Readonly<{ records: readonly CodexChronicleRecord[] }>) {
+function EntryList({
+  records,
+  calendar,
+  lineOf
+}: Readonly<{
+  records: readonly CodexChronicleRecord[];
+  calendar: GmCodexCalendar | null;
+  lineOf: (record: CodexChronicleRecord) => string;
+}>) {
   if (records.length === 0) return <p className="story-hint">Nothing is filed under this session yet.</p>;
   return (
     <ul className="session-lines">
@@ -514,8 +557,10 @@ function EntryList({ records }: Readonly<{ records: readonly CodexChronicleRecor
           <li key={record.id} className="session-line">
             <CodexIcon iconId={meta.iconId} className="story-item-icon" />
             <span className="prep-row-text">
-              <span className="prep-row-line">{[record.inWorldLabel, meta.label].filter(Boolean).join(" · ")}</span>
-              <span className="prep-row-title">{record.title ?? chronicleRowSummary(record)}</span>
+              <span className="prep-row-line">
+                {[recordDay(record, calendar), meta.label].filter(Boolean).join(" · ")}
+              </span>
+              <span className="prep-row-title">{lineOf(record)}</span>
             </span>
           </li>
         );
@@ -555,7 +600,10 @@ function RecapStep({
     useCallback(() => liveApi.happened(gmToken, session.id), [gmToken, session.id]),
     { failure: "Couldn't read what happened in this session." }
   );
-  const lines = useMemo(() => happenedLines(happened.data ?? null, party), [happened.data, party]);
+  const lines = useMemo(
+    () => happenedLines(happened.data ?? null, party, context.quests, context.pages),
+    [happened.data, party, context.quests, context.pages]
+  );
   const notReached = prep.flatMap((section) =>
     section.type === "checklist" ? section.items.filter((item) => !item.done).map((item) => ({ item, section })) : []
   );
@@ -675,7 +723,13 @@ function RecapStep({
 }
 
 /** The recap's sources as lines, oldest first: reveals, ticked clues, then everything filed under the session. */
-export function happenedLines(happened: CodexSessionHappened | null, party: readonly PartyCharacter[]): HappenedLine[] {
+type Named = Readonly<{ id: string; title: string }>;
+export function happenedLines(
+  happened: CodexSessionHappened | null,
+  party: readonly PartyCharacter[],
+  quests: readonly Named[] = [],
+  pages: readonly Named[] = []
+): HappenedLine[] {
   if (!happened) return [];
   const reveals: HappenedLine[] = happened.reveals.map((reveal) => ({
     key: `reveal-${reveal.blockId}-${reveal.to}`,
@@ -694,11 +748,15 @@ export function happenedLines(happened: CodexSessionHappened | null, party: read
     meta: "Clue ticked",
     text: clue.text
   }));
-  const logged: HappenedLine[] = happened.entries.map((entry) => ({
-    key: `entry-${entry.id}`,
-    iconId: "book",
-    meta: [entry.inWorldLabel, "logged"].filter(Boolean).join(" · "),
-    text: entry.playerText.trim() || entry.gmText?.trim() || "A record with no text"
-  }));
+  const logged: HappenedLine[] = happened.entries.map((entry) => {
+    const kind = chronicleKindOfJournal(entry.kind);
+    const record = { ...entry, kind, text: entry.playerText, title: null, calendarInstant: null, sessionNumber: null };
+    return {
+      key: `entry-${entry.id}`,
+      iconId: CHRONICLE_KIND_META[kind].iconId,
+      meta: [entry.inWorldLabel, CHRONICLE_KIND_META[kind].label].filter(Boolean).join(" · "),
+      text: recordLine(record, quests, pages) || "A record with no text"
+    };
+  });
   return [...reveals, ...clues, ...logged];
 }

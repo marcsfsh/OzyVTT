@@ -1,12 +1,13 @@
 import { useMemo, type ReactNode } from "react";
 import { Input } from "@vtt/ui";
-import type { PlayerCodexChronicleRecord, PlayerCodexSession } from "@vtt/domain";
-import { CHRONICLE_KIND_META, chronicleRowSummary } from "../chronicle";
+import type { CodexCalendar, PlayerCodexChronicleRecord, PlayerCodexSession } from "@vtt/domain";
+import { CHRONICLE_KIND_META } from "../chronicle";
 import { CodexIcon } from "../icons";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { sessionTitle } from "../sessions";
 import { FilterChips, FilterFlyout } from "../shared/FilterFlyout";
 import { useCodexShell } from "../shell/context";
+import { realDateLabel, recordDay, type StoryRecord } from "./model";
 
 /** A session as the list shows it, for both audiences. */
 export type ListedSession = Readonly<{
@@ -144,7 +145,7 @@ export function SessionRows<S extends ListedSession>({
               <span className="prep-row-title">{sessionTitle(session)}</span>
               <span className="prep-row-line">
                 {[
-                  session.realDate,
+                  realDateLabel(session.realDate),
                   gm
                     ? session.status === "planned"
                       ? "Planned"
@@ -169,14 +170,19 @@ export function PlayerSessionPage({
   token,
   session,
   records,
+  calendar,
   days,
   knownTitles,
+  lineOf,
   onFollow
 }: Readonly<{
   token: string;
   session: PlayerCodexSession;
   records: readonly PlayerCodexChronicleRecord[];
+  calendar: CodexCalendar | null;
   days: string;
+  /** A record's line, naming its quest or faction (see `recordLine`). */
+  lineOf: (record: StoryRecord) => string;
   knownTitles: ReadonlySet<string>;
   onFollow: (target: string) => void;
 }>) {
@@ -186,7 +192,7 @@ export function PlayerSessionPage({
       <header className="session-titlerow">
         <h2 className="session-title">{sessionTitle(session)}</h2>
         <span className="story-grow" />
-        <span className="session-meta">{[session.realDate, days].filter(Boolean).join(" · ")}</span>
+        <span className="session-meta">{[realDateLabel(session.realDate), days].filter(Boolean).join(" · ")}</span>
       </header>
       {session.recap.trim() ? (
         <div className="session-recap">
@@ -212,9 +218,9 @@ export function PlayerSessionPage({
                   <CodexIcon iconId={meta.iconId} className="story-item-icon" />
                   <span className="prep-row-text">
                     <span className="prep-row-line">
-                      {[record.inWorldLabel, meta.label].filter(Boolean).join(" · ")}
+                      {[recordDay(record, calendar), meta.label].filter(Boolean).join(" · ")}
                     </span>
-                    <span className="prep-row-title">{record.title ?? chronicleRowSummary(record)}</span>
+                    <span className="prep-row-title">{lineOf(record)}</span>
                   </span>
                 </li>
               );
@@ -255,7 +261,7 @@ export function RecapCards({
             <span className="session-title is-small">{sessionTitle(session)}</span>
             {unseen.has(session.id) && <span className="story-newchip">New</span>}
             <span className="story-grow" />
-            {session.realDate && <span className="session-meta">{session.realDate}</span>}
+            {session.realDate && <span className="session-meta">{realDateLabel(session.realDate)}</span>}
           </button>
           {session.recap.trim() && (
             <div className="session-recap is-clamped">

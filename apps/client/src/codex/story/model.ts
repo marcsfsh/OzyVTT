@@ -44,6 +44,33 @@ export function onSpine(kind: CodexChronicleKind): boolean {
 const byInstant = <R extends StoryRecord>(a: R, b: R) =>
   (a.calendarInstant ?? Number.MAX_SAFE_INTEGER) - (b.calendarInstant ?? Number.MAX_SAFE_INTEGER);
 
+/**
+ * A session's real date as people say it: "October 24", or "Saturday, October 24" with the weekday. Text that isn't
+ * an ISO date is shown as it was typed.
+ */
+export function realDateLabel(value: string | null, withWeekday = false): string | null {
+  if (!value?.trim()) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return value;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "long",
+    day: "numeric",
+    ...(withWeekday ? { weekday: "long" } : {})
+  });
+}
+
+/** A record's day, short: "Emberfall 13". The month or the session around it carries the year. */
+export function recordDay(
+  record: Readonly<{ calendarInstant: number | null; inWorldLabel: string | null }>,
+  calendar: CodexCalendar | null
+): string | null {
+  if (record.calendarInstant === null) return record.inWorldLabel;
+  return daySpanLabel(calendar, record.calendarInstant, record.calendarInstant) || record.inWorldLabel;
+}
+
 /** "Emberfall 12", or "Emberfall 12 to 13", or across months "Emberfall 30 to Harvest 2". */
 export function daySpanLabel(calendar: CodexCalendar | null, from: number, to: number): string {
   if (!calendar || calendar.months.length === 0) return "";

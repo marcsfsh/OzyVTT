@@ -83,7 +83,8 @@ export const prepSessionApi = {
 export const liveApi = {
   /** The active session's board, or null when no session is active. */
   board: (token: string) => call<{ board: CodexLiveBoard | null }>(token, "/board").then((data) => data.board),
-  happened: (token: string, sessionId: string) => call<CodexSessionHappened>(token, `/sessions/${sessionId}/happened`),
+  happened: (token: string, sessionId: string) =>
+    call<{ happened: CodexSessionHappened }>(token, `/sessions/${sessionId}/happened`).then((data) => data.happened),
   /** Files a note under the session, dated at the GM's date. Hidden unless `revealedToPlayers`. */
   log: (token: string, sessionId: string, text: string, revealedToPlayers = false) =>
     call<{ entry: CodexJournalEntry }>(token, `/sessions/${sessionId}/log`, {

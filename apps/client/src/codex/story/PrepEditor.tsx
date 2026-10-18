@@ -45,6 +45,8 @@ export type PrepContext = Readonly<{
   scenes: ReadonlyArray<Readonly<{ id: string; name: string }>>;
   /** Follows a `[[link]]` in a section's text: to the page of that title, or to create it. */
   onFollow?: (target: string) => void;
+  /** The titles of the hidden blocks the prep's clues link, by block id (see `useBlockTitles`). */
+  blockTitles?: ReadonlyMap<string, string | null>;
 }>;
 
 /** A section's contents, typed by its section. */
@@ -60,7 +62,48 @@ export function linkLine(link: CodexPrepLink, context: PrepContext, blockTitle?:
       : context.quests.find((quest) => quest.id === link.recordId)?.title;
   const name = record ?? (link.recordKind === "page" ? "A deleted page" : "A deleted quest");
   if (!link.blockId) return name;
-  return `${name} · ${blockTitle?.trim() || "hidden block"}`;
+  const title = blockTitle ?? context.blockTitles?.get(link.blockId) ?? null;
+  return `${name} · ${title?.trim() || "hidden block"}`;
+}
+
+/**
+ * The titles of the blocks a prep's clues link, read from each linked page or quest once. A record that can't be
+ * read leaves its blocks untitled, and the clue says "hidden block".
+ */
+export function useBlockTitles(token: string, prep: readonly CodexPrepSection[]): ReadonlyMap<string, string | null> {
+  const records = [
+    ...new Set(
+      prep.flatMap((section) =>
+        section.type === "checklist"
+          ? section.items.flatMap((item) =>
+              item.link?.blockId ? [`${item.link.recordKind}:${item.link.recordId}`] : []
+            )
+          : []
+      )
+    )
+  ]
+    .sort()
+    .join(",");
+  const [titles, setTitles] = useState<ReadonlyMap<string, string | null>>(new Map());
+  useEffect(() => {
+    if (!records) return;
+    let live = true;
+    void Promise.all(
+      records.split(",").map(async (key) => {
+        const [kind, id] = key.split(":") as ["page" | "quest", string];
+        try {
+          const record = kind === "page" ? (await codexApi.getPage(token, id)).page : await questApi.get(token, id);
+          return record.blocks.map((block) => [block.id, block.title] as const);
+        } catch {
+          return [];
+        }
+      })
+    ).then((found) => live && setTitles(new Map(found.flat())));
+    return () => {
+      live = false;
+    };
+  }, [token, records]);
+  return titles;
 }
 
 /**

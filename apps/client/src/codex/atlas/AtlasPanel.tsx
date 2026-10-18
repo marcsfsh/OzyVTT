@@ -177,9 +177,13 @@ export function PinTable({
               <span className="nh-sr-only">Who sees it</span>
             </th>
           )}
-          <th scope="col">Pin</th>
+          <th scope="col" className="atlas-pintable-pin">
+            Pin
+          </th>
           <th scope="col">Links</th>
-          <th scope="col">Opens</th>
+          <th scope="col" className="atlas-pintable-opens">
+            Opens
+          </th>
         </tr>
       </thead>
       <tbody>

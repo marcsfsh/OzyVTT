@@ -17,7 +17,7 @@ import { GmDateBar, PlayerDateBar } from "./DateBar";
 import { GmDowntime, PlayerDowntime } from "./Downtime";
 import { EntryCard } from "./EntryCard";
 import { EntryComposer, type ComposerKind } from "./EntryComposer";
-import { sessionDays, type StoryRecord } from "./model";
+import { realDateLabel, sessionDays, type StoryRecord } from "./model";
 import { SessionPage } from "./SessionPage";
 import {
   PlayerSessionPage,
@@ -258,7 +258,7 @@ function useNextSession(sessions: readonly CodexSession[]): NextSessionCard | nu
       section.type === "checklist" ? section.items.filter((item) => !item.done).map((item) => item.text) : []
     );
     return {
-      title: [`Next · ${sessionTitle(planned)}`, planned.realDate].filter(Boolean).join(" · "),
+      title: [`Next · ${sessionTitle(planned)}`, realDateLabel(planned.realDate, true)].filter(Boolean).join(" · "),
       line:
         clues.length > 0
           ? `Planned clues: ${clues.slice(0, 4).join("; ")}.`
@@ -872,7 +872,7 @@ export function PlayerTimelineSection() {
 }
 
 export function PlayerSessionsSection() {
-  const { shell, feeds, knownTitles, follow } = usePlayerStory();
+  const { shell, feeds, knownTitles, follow, lineOf } = usePlayerStory();
   const [filter, setFilter, filtered] = useSessionFilter();
   const [filtersOpen, setFiltersOpen] = useState(filtered);
   const reads = useReadRecaps(feeds.sessions);
@@ -900,8 +900,10 @@ export function PlayerSessionsSection() {
       token={shell.token}
       session={session}
       records={feeds.timeline}
+      calendar={feeds.calendar}
       days={sessionDays(feeds.timeline, session.id, feeds.calendar)}
       knownTitles={knownTitles}
+      lineOf={lineOf}
       onFollow={follow}
     />
   );
