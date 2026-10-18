@@ -20,6 +20,7 @@ import { liveBoard, liveClue, sessionHappened } from "./codex/live.js";
 import { PlayerCodexReads, readerOf } from "./codex/player-reads.js";
 import { prepItems } from "./codex/prep.js";
 import { CodexNotFoundError, CodexRevisionConflictError, CodexValidationError } from "./codex/validate.js";
+import { sceneLinks } from "./codex/scene-links.js";
 import { revealAuditRecords } from "./codex/visibility.js";
 import type { CodexStore } from "./codex-store.js";
 import { callerOf, refuse, sendUnauthenticated, type CredentialVerifiers } from "./request-auth.js";
@@ -872,6 +873,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
   // What the party can currently see, for the GM. `projectRevealAudit` decides every row.
   mount(router, routes.getCodexRevealAudit, requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", { audit: projectRevealAudit(revealAuditRecords(store)) })
+  );
+
+  // The sessions and pins that name each table scene, for the Scenes tab. GM-only: scene links never reach a player.
+  mount(router, routes.getCodexSceneLinks, requireGmRead, (request, response) =>
+    readEnvelope(request, response, "gm", { links: sceneLinks(store) })
   );
 
   // The calendar: the GM gets their own clock plus the published one; a player gets only the published one.

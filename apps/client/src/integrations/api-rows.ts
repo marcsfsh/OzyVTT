@@ -1,4 +1,4 @@
-import type { SortChoice } from "../codex/search/SearchView";
+import type { SortLevelOf } from "../codex/shared/SortDialog";
 import { GROUPS, METHOD_ORDER, type OpenApiDocument, type Operation } from "./openapi-model";
 
 /**
@@ -103,7 +103,7 @@ export const SORT_WORDS: Readonly<Record<ApiSortKey, string>> = {
   method: "Method",
   operation: "Operation id"
 };
-export const DEFAULT_SORT: readonly SortChoice<ApiSortKey>[] = [
+export const DEFAULT_SORT: readonly SortLevelOf<ApiSortKey>[] = [
   { key: "tag", direction: "asc" },
   { key: "path", direction: "asc" }
 ];
@@ -129,7 +129,7 @@ export function tagsOf(rows: readonly OperationRow[]): readonly string[] {
 export function visibleRows(
   rows: readonly OperationRow[],
   filters: ApiFilters,
-  sort: readonly SortChoice<ApiSortKey>[]
+  sort: readonly SortLevelOf<ApiSortKey>[]
 ): readonly OperationRow[] {
   const words = filters.text.toLowerCase().split(/\s+/).filter(Boolean);
   const kept = rows.filter(

@@ -947,6 +947,11 @@ export const SceneSchema = z
     name: z.string().min(1).max(120),
     mapAssetId: z.uuid(),
     combat: SceneCombatSchema.prefault({}),
+    /** When the GM prepared it, last changed its record and last made it live, in epoch ms. GM-only, as every scene
+     * is; a scene saved before these existed has none. */
+    createdAt: z.number().int().nonnegative().optional(),
+    updatedAt: z.number().int().nonnegative().optional(),
+    liveAt: z.number().int().nonnegative().optional(),
     /** Set when this scene is a launched replay. Such scenes are disposable: `scenes.ts` drops the scene and its
      * cloned combatants (`Actor.replaySceneId`) when the table leaves it. GM-only. */
     replayOf: z

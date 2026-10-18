@@ -76,8 +76,8 @@ export function useTokenFocusRequests(onFocus: (actorId: string) => void) {
   }, []);
 }
 
-/* A request to open one of the map's tool groups, from the header's fog and vision chips. */
-export type MapToolGroupRequest = "fog" | "light";
+/* A request to open one of the map's tool groups, from the header's fog and vision chips or a scene's questions. */
+export type MapToolGroupRequest = "fog" | "light" | "walls";
 const groupListeners = new Set<(group: MapToolGroupRequest) => void>();
 
 export function openMapToolGroup(group: MapToolGroupRequest) {
@@ -92,6 +92,26 @@ export function useMapToolGroupRequests(onOpen: (group: MapToolGroupRequest) => 
     groupListeners.add(listener);
     return () => {
       groupListeners.delete(listener);
+    };
+  }, []);
+}
+
+/* A request to place a creature at the next spot tapped on the map: the button half of button-then-click, from a
+   control outside the map (a scene's list of creatures). Null withdraws it. */
+const placementListeners = new Set<(actorId: string | null) => void>();
+
+export function armPlacement(actorId: string | null) {
+  for (const listener of placementListeners) listener(actorId);
+}
+
+/** Runs `onArm` whenever something asks the map to place a creature at the next tapped spot. */
+export function usePlacementRequests(onArm: (actorId: string | null) => void) {
+  const handle = useEffectEvent(onArm);
+  useEffect(() => {
+    const listener = (actorId: string | null) => handle(actorId);
+    placementListeners.add(listener);
+    return () => {
+      placementListeners.delete(listener);
     };
   }, []);
 }

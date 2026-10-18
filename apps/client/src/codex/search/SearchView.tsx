@@ -1,18 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  Button,
-  Eyebrow,
-  IconButton,
-  IconEye,
-  IconEyeOff,
-  IconX,
-  Input,
-  Modal,
-  Select,
-  Skeleton,
-  cx
-} from "@vtt/ui";
+import { Alert, Button, Eyebrow, IconEye, IconEyeOff, Input, Skeleton, cx } from "@vtt/ui";
 import type { CodexEntityType, CodexRecordKind } from "@vtt/domain";
 import { findApi } from "../api-records";
 import type { CodexSearchHit, CodexSearchType, PlayerCodexSearchHit } from "@vtt/domain";
@@ -23,6 +10,7 @@ import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell } from "../shell/context";
 import { AudienceChip } from "../shared/WhoSeesIt";
 import { Dropdown } from "../shared/Dropdown";
+import { SortDialog } from "../shared/SortDialog";
 import { EVERYONE, HIDDEN } from "../shared/audience";
 import { KIND_GROUPS } from "../page/document";
 import { useCodexQuery } from "../useCodexQuery";
@@ -38,7 +26,9 @@ import {
   modifiedLabel,
   readFilters,
   sortSummary,
-  type SearchFilters
+  type SearchFilters,
+  type SortKey,
+  type SortLevel
 } from "./searchParams";
 import "./search.css";
 
@@ -356,19 +346,10 @@ export function SearchView() {
         )}
       </div>
       {sorting && (
-        <SortDialog
+        <SearchSortDialog
           levels={sort}
-          keys={[
-            ...(filters.q.trim() ? (["relevance"] as const) : []),
-            "name",
-            "type",
-            "modified",
-            ...(gm ? (["visibility"] as const) : [])
-          ]}
-          labelOf={(key) => SORT_KEY_LABEL[key]}
-          directionLabel={directionLabel}
-          defaultDirection={(key) => (key === "modified" ? "desc" : "asc")}
-          maxLevels={MAX_SORT_LEVELS}
+          gm={gm}
+          hasQuery={Boolean(filters.q.trim())}
           onCancel={() => setSorting(false)}
           onSort={(levels) => {
             update({ sort: levels });
@@ -380,134 +361,38 @@ export function SearchView() {
   );
 }
 
-/** One level of a sort: a column and its direction. */
-export type SortChoice<K extends string> = Readonly<{ key: K; direction: "asc" | "desc" }>;
-
-/**
- * Sort by several columns in order, as a spreadsheet does: rows sort by the first level, then by each level under it.
- * The caller names its columns, their words and which way each sorts first, so any table can use it.
- */
-export function SortDialog<K extends string>({
+/** Search's Sort dialog: the shared one over Search's columns, with Best match only while there are words. */
+function SearchSortDialog({
   levels,
-  keys,
-  labelOf,
-  directionLabel: directionWords,
-  defaultDirection = () => "asc",
-  maxLevels = 4,
+  gm,
+  hasQuery,
   onCancel,
   onSort
 }: Readonly<{
-  levels: readonly SortChoice<K>[];
-  /** The columns that can be sorted on, in the order the dialog offers them. */
-  keys: readonly K[];
-  labelOf: (key: K) => string;
-  /** The words for a direction of a column: "A to Z", "Newest first". */
-  directionLabel: (key: K, direction: "asc" | "desc") => string;
-  /** Which way a column sorts when it is first chosen. */
-  defaultDirection?: (key: K) => "asc" | "desc";
-  maxLevels?: number;
+  levels: readonly SortLevel[];
+  gm: boolean;
+  hasQuery: boolean;
   onCancel: () => void;
-  onSort: (levels: readonly SortChoice<K>[]) => void;
+  onSort: (levels: readonly SortLevel[]) => void;
 }>) {
-  const [draft, setDraft] = useState<readonly SortChoice<K>[]>(levels);
-  const [selected, setSelected] = useState(0);
-  const unused = keys.find((key) => !draft.some((level) => level.key === key));
-  const set = (index: number, patch: Partial<SortChoice<K>>) =>
-    setDraft((current) => current.map((level, at) => (at === index ? { ...level, ...patch } : level)));
-  const moveUp = () => {
-    if (selected <= 0) return;
-    setDraft((current) => {
-      const next = [...current];
-      [next[selected - 1], next[selected]] = [next[selected], next[selected - 1]];
-      return next;
-    });
-    setSelected(selected - 1);
-  };
+  const keys: SortKey[] = [
+    ...(hasQuery ? (["relevance"] as const) : []),
+    "name",
+    "type",
+    "modified",
+    ...(gm ? (["visibility"] as const) : [])
+  ];
   return (
-    <Modal
-      open
-      onClose={onCancel}
-      size="sm"
-      title="Sort"
-      className="cx-sortdialog"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={() => onSort(draft)}>
-            Sort
-          </Button>
-        </>
-      }
-    >
-      <p className="cx-hint">Rows sort by the first level, then by each level under it, as in a spreadsheet.</p>
-      <div className="cx-sortlevels" role="list">
-        {draft.map((level, index) => (
-          <div
-            key={index}
-            role="listitem"
-            className={cx("cx-sortrow", selected === index && "is-on")}
-            onFocus={() => setSelected(index)}
-            onClick={() => setSelected(index)}
-          >
-            <Eyebrow>{index === 0 ? "Sort by" : "Then by"}</Eyebrow>
-            <Select
-              aria-label={`${index === 0 ? "Sort by" : "Then by"}: column`}
-              value={level.key}
-              onChange={(event) =>
-                set(index, {
-                  key: event.target.value as K,
-                  direction: defaultDirection(event.target.value as K)
-                })
-              }
-            >
-              {keys.map((key) => (
-                <option key={key} value={key} disabled={key !== level.key && draft.some((other) => other.key === key)}>
-                  {labelOf(key)}
-                </option>
-              ))}
-            </Select>
-            <Select
-              aria-label={`${index === 0 ? "Sort by" : "Then by"}: order`}
-              value={level.direction}
-              onChange={(event) => set(index, { direction: event.target.value as "asc" | "desc" })}
-            >
-              <option value="asc">{directionWords(level.key, "asc")}</option>
-              <option value="desc">{directionWords(level.key, "desc")}</option>
-            </Select>
-            <IconButton
-              label={`Delete this level: ${labelOf(level.key)}`}
-              size="sm"
-              disabled={draft.length === 1}
-              onClick={(event) => {
-                event.stopPropagation();
-                setDraft((current) => current.filter((_, at) => at !== index));
-                setSelected(0);
-              }}
-            >
-              <IconX />
-            </IconButton>
-          </div>
-        ))}
-      </div>
-      <div className="cx-dropdown-row">
-        <Button
-          size="sm"
-          disabled={!unused || draft.length >= maxLevels}
-          onClick={() => {
-            if (!unused) return;
-            setDraft((current) => [...current, { key: unused, direction: defaultDirection(unused) }]);
-            setSelected(draft.length);
-          }}
-        >
-          Add a level
-        </Button>
-        <Button size="sm" disabled={selected <= 0} onClick={moveUp}>
-          Move up
-        </Button>
-      </div>
-    </Modal>
+    <SortDialog
+      levels={levels}
+      keys={keys}
+      keyLabel={(key) => SORT_KEY_LABEL[key]}
+      directionLabel={directionLabel}
+      firstDirection={(key) => (key === "modified" ? "desc" : "asc")}
+      maxLevels={MAX_SORT_LEVELS}
+      onCancel={onCancel}
+      onSort={onSort}
+    />
   );
 }
 

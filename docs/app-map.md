@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 297 HTTP paths
+- 14 GameState fields · 137 commands · 299 HTTP paths
 
 ## GameState shape
 
@@ -242,6 +242,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `PUT /api/v1/codex/quests/{id}/objectives/{objectiveId}/audience`
 - `POST /api/v1/codex/quests/{id}/reveal`
 - `GET /api/v1/codex/reveal-audit`
+- `GET /api/v1/codex/scene-links`
 - `GET /api/v1/codex/search`
 - `GET POST /api/v1/codex/sessions`
 - `DELETE GET PATCH /api/v1/codex/sessions/{id}`
@@ -395,6 +396,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/scenes/{sceneId}/activate`
 - `POST /api/v1/game/scenes/{sceneId}/combatants`
 - `POST /api/v1/game/scenes/{sceneId}/duplicate`
+- `GET /api/v1/game/scenes/{sceneId}/preview`
 - `POST /api/v1/game/scenes/{sceneId}/rename`
 - `POST /api/v1/game/scenes/{sceneId}/sound`
 - `POST /api/v1/game/scenes/reorder`

@@ -16,7 +16,7 @@ const ReplayViewer = lazySurface(() => import("../replay/ReplayViewer").then((m)
 export type FullPageLayer = Extract<AddressLayer, { kind: "builder" | "level" | "replay" | "sheet" }>;
 
 export const isFullPageLayer = (layer: AddressLayer | null): layer is FullPageLayer =>
-  layer !== null && layer.kind !== "maps" && layer.kind !== "scene-prep";
+  layer !== null && layer.kind !== "scenes";
 
 /**
  * A full-page layer for either role: the builder (or its policy gate), the level flow, a replay, or a

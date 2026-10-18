@@ -53,7 +53,11 @@ export const ImagePointSchema = z.object({ x: z.number(), y: z.number() }).stric
 export const MapUploadQuerySchema = z.object({
   filename: z.string().optional(),
   name: z.string().optional(),
-  kind: MapKindSchema.optional()
+  kind: MapKindSchema.optional(),
+  folder: z
+    .string()
+    .optional()
+    .describe("The folder to file the map in: one level, up to 60 characters. Absent or empty files it in none.")
 });
 
 export const MapDetailsRequestSchema = z

@@ -723,3 +723,21 @@ export function IconConcentration({ className }: Readonly<{ className?: string }
     </Glyph>
   );
 }
+
+/** A front page: where a section starts. */
+export function IconHome({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M12 2 1.8 11.2l1.9 2.1 1.1-1V22h5.4v-6.4h3.6V22h5.4v-9.7l1.1 1 1.9-2.1z" />
+    </Glyph>
+  );
+}
+
+/** A map in the library: three folded panels. */
+export function IconMap({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M2 5.2 8.3 3l7.4 2.6L22 3.4v15.4l-6.3 2.2-7.4-2.6L2 20.6zm6.6.9v10.6l6.8 2.4V8.5z" />
+    </Glyph>
+  );
+}

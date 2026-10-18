@@ -43,6 +43,7 @@ import type {
   StabilizeResult,
   LightAddResult,
   VisionPreviewResult,
+  ScenePreviewResult,
   WallAddResult
 } from "./results.js";
 import type { ClientRole, CombatLogEntry, GmView, PlayerView } from "./views.js";
@@ -175,6 +176,7 @@ import type {
   SoundScenePresetSchema,
   SoundStopSchema,
   VisionPreviewSchema,
+  ScenePreviewSchema,
   VisionResetExploredSchema,
   VisionSetAmbientSchema,
   VisionSetEnabledSchema,
@@ -775,6 +777,11 @@ export interface ClientToServerEvents {
   "scene:reorder": (
     payload: CommandPayload<typeof SceneReorderSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM only: what the shared screen or one party character's player would receive if the scene were live now. */
+  "scene:preview": (
+    payload: CommandPayload<typeof ScenePreviewSchema>,
+    acknowledgement: (result: ScenePreviewResult) => void
   ) => void;
   "fog:set-enabled": (
     payload: CommandPayload<typeof FogSetEnabledSchema>,

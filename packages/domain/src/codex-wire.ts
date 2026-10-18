@@ -1625,6 +1625,27 @@ export const CodexRevealAuditSchema = z
   );
 export type CodexRevealAudit = Wire<z.infer<typeof CodexRevealAuditSchema>>;
 
+// ----- Table scenes the Codex names (GM-only) -----
+
+/** One table scene and the Codex records that name it: sessions (staged for the session or in its prep's Encounters)
+ *  and pins on the atlas. Scene ids are GM-only everywhere, so this read is too. */
+export const CodexSceneLinkSchema = z.strictObject({
+  sceneId: z.uuid(),
+  sessions: z.array(
+    z.strictObject({
+      id: z.uuid(),
+      sessionNumber: z.number().int().nullable(),
+      status: CodexSessionStatusSchema,
+      /** Staged for the session itself, or picked in one of its prep's Encounters sections. */
+      via: z.enum(["session", "prep"])
+    })
+  ),
+  pins: z.array(z.strictObject({ id: z.uuid(), label: z.string().nullable(), mapId: z.uuid(), mapName: z.string() }))
+});
+export type CodexSceneLink = Wire<z.infer<typeof CodexSceneLinkSchema>>;
+export const CodexSceneLinksSchema = z.strictObject({ links: z.array(CodexSceneLinkSchema) });
+export type CodexSceneLinks = Wire<z.infer<typeof CodexSceneLinksSchema>>;
+
 // ----- Assets and backup -----
 
 /** An uploaded Codex image. */

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by ADR-0035: a prepared scene is edited on the Scenes tab, so the header shows the live scene.
 
 ## Context and decision drivers
 

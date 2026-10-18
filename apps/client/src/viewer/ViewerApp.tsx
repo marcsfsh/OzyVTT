@@ -6,6 +6,7 @@ import { probeImageDimensions } from "../scene/mapImage";
 import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
 import { TerrainOverlay } from "../scene/TerrainOverlay";
 import { bandFraction, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
+import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
 import { ScreenPairing } from "./ScreenPairing";
@@ -172,14 +173,24 @@ const LOCAL_MAX_ZOOM = 8;
  * so each display can be framed independently. Follows the GM's camera again when the presented map
  * changes or "Follow GM view" is pressed.
  */
-export function MapStage({ presentation }: Readonly<{ presentation: Presentation }>) {
+export function MapStage({
+  presentation,
+  mapImageUrl,
+  authToken
+}: Readonly<{
+  presentation: Presentation;
+  /** The GM's preview draws the map from a bearer-authorized copy; the screen itself reads it with its cookie. */
+  mapImageUrl?: string | null;
+  /** The GM's preview loads token art with the GM's bearer token. */
+  authToken?: string;
+}>) {
   const [size, setSize] = useState({ width: 16, height: 9 });
   const [localCamera, setLocalCamera] = useState<LocalCamera | null>(null);
   const [pan, setPan] = useState<PanGesture | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
   const stageSurface = useDragSurface(stageRef);
-  const href = presentation.activeMap ? imageUrl(presentation.activeMap.assetId) : "";
+  const href = mapImageUrl ?? (presentation.activeMap ? imageUrl(presentation.activeMap.assetId) : "");
   useEffect(() => {
     setLocalCamera(null);
   }, [presentation.activeMap?.assetId]);
@@ -344,19 +355,34 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
             {token.healthDisplay?.style === "aura" && (
               <TokenHealthAura sizePx={token.sizePx} fraction={bandFraction(token.health ?? "healthy")} />
             )}
-            <TokenGlyph
-              sizePx={token.sizePx}
-              name={token.name}
-              active={token.active}
-              imageUrl={
-                token.tokenAssetId ? `/api/v1/token-assets/${encodeURIComponent(token.tokenAssetId)}/content` : null
-              }
-              turnClassName="viewer-token-turn"
-              bodyClassName="viewer-token-body"
-              initialsClassName="viewer-token-initials"
-              nameClassName="viewer-token-name"
-              nameY={token.sizePx * 0.78}
-            />
+            {authToken ? (
+              <AuthorizedTokenGlyph
+                assetId={token.tokenAssetId ?? null}
+                token={authToken}
+                sizePx={token.sizePx}
+                name={token.name}
+                active={token.active}
+                turnClassName="viewer-token-turn"
+                bodyClassName="viewer-token-body"
+                initialsClassName="viewer-token-initials"
+                nameClassName="viewer-token-name"
+                nameY={token.sizePx * 0.78}
+              />
+            ) : (
+              <TokenGlyph
+                sizePx={token.sizePx}
+                name={token.name}
+                active={token.active}
+                imageUrl={
+                  token.tokenAssetId ? `/api/v1/token-assets/${encodeURIComponent(token.tokenAssetId)}/content` : null
+                }
+                turnClassName="viewer-token-turn"
+                bodyClassName="viewer-token-body"
+                initialsClassName="viewer-token-initials"
+                nameClassName="viewer-token-name"
+                nameY={token.sizePx * 0.78}
+              />
+            )}
             <TokenStatusBadges
               sizePx={token.sizePx}
               health={token.health ?? "healthy"}

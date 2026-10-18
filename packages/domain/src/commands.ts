@@ -1010,6 +1010,9 @@ export const LightRemoveSchema = z
   .strict();
 /** The GM's look through one creature's eyes, or the whole party's when `actorId` is absent. */
 export const VisionPreviewSchema = z.object({ actorId: z.uuid().optional() }).strict();
+/** What a prepared or live scene shows one audience: the shared screen, or with `actorId` that party character's
+ *  player. */
+export const ScenePreviewSchema = z.object({ sceneId: z.uuid(), actorId: z.uuid().optional() }).strict();
 export const ActorRestSchema = z
   .object({
     commandId: z.uuid(),

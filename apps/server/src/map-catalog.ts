@@ -145,17 +145,19 @@ export class MapCatalogStore {
     this.database = database;
   }
 
-  register(assetIdInput: string, nameInput: string, kindInput: MapKind) {
+  /** A new map, filed under `folder` when one is given. Bytes already in the library keep their entry as it is. */
+  register(assetIdInput: string, nameInput: string, kindInput: MapKind, folderInput: string | null = null) {
     const database = this.requireDatabase();
     const id = assetId(assetIdInput);
     const name = mapName(nameInput);
     const kind = mapKind(kindInput);
+    const folder = mapFolder(folderInput);
     const now = new Date(this.now()).toISOString();
     database
       .prepare(
-        "INSERT INTO map_catalog (asset_id, name, kind, calibration_json, scale_json, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, ?, ?) ON CONFLICT(asset_id) DO NOTHING"
+        "INSERT INTO map_catalog (asset_id, name, kind, folder, calibration_json, scale_json, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?) ON CONFLICT(asset_id) DO NOTHING"
       )
-      .run(id, name, kind, now, now);
+      .run(id, name, kind, folder, now, now);
     return this.get(id)!;
   }
 

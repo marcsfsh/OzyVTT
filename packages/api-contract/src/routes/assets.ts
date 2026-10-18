@@ -81,14 +81,14 @@ export const uploadMapAsset = defineRoute({
   tag: "Map assets",
   summary: "Upload a map image",
   description:
-    "Takes the image's bytes as the request body, at most 50 MiB, with its file name, display name and kind as query parameters. The bytes are checked to be a real image. Bytes already stored answer the stored map with `duplicate: true`.",
+    "Takes the image's bytes as the request body, at most 50 MiB, with its file name, display name, kind and folder as query parameters. The bytes are checked to be a real image. Bytes already stored answer the stored map with `duplicate: true`, which keeps its own name, kind and folder.",
   access: GM_SESSION,
   query: MapUploadQuerySchema,
   body: binary("image/*", "The image file's bytes."),
   responses: {
     200: ok(MapAssetUploadDataSchema, "These bytes were already stored. The stored map."),
     201: ok(MapAssetUploadDataSchema, "The new map."),
-    400: refused("The body is not an image this server reads."),
+    400: refused("The body is not an image this server reads, or the folder is not one level."),
     401: refused(),
     403: refused(),
     413: refused("The file is over 50 MiB.")

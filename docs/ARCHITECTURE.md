@@ -224,6 +224,13 @@ of a hidden thing. When in doubt, leave it out.
   preview that mirrors the server.
 - Drawings, measurements and pings live in `annotations.ts`. Fog is an ordered list of
   reveal/hide rectangles per scene (`fog.ts`). Scenes park and resume a fight (`scenes.ts`).
+- A prepared scene is edited through the same commands as the live table, each with the scene's
+  `sceneId`. Each scene carries when it was made, last changed and last live (`createdAt`,
+  `updatedAt`, `liveAt`), GM-only like the rest of `combat.scenes`; the server stamps a change
+  after each mutation (`stampSceneChanges`). `scene:preview` (GM only, `scene-preview.ts`)
+  answers what the table screen or one party character would get if a scene went live now: it
+  makes the scene live in a copy of the state and runs the real projections over it, and nothing
+  is committed (ADR-0035).
 - Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
   image-pixel segments, placed and carried lights, and an ambient light level
   (`vision/edit.ts`). The server builds each viewer's visibility polygon against the walls, cuts it
@@ -402,6 +409,10 @@ write that moves the party pin to a point on any map, or makes one. Search filte
 GM's home counts, recent changes and reveal check, are built in `codex/find.ts`; a player's search
 and home are built in `player-reads.ts` from that player's own reads.
 
+The Scenes tab asks the Codex which records point at each table scene: `GET /api/v1/codex/scene-links` (GM only,
+`codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the
+atlas that name it.
+
 The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
 (`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that
 crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
@@ -463,6 +474,15 @@ the status line (`table/TableHeader.tsx`), the map's tool rail beside it (`scene
 its footer. Nothing floats over the map but tokens and marks; notices land in the status line through
 `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
+
+Scenes and maps are prepared on the Scenes tab (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx` draws
+the section bar (or a phone's tab bar) and renders the view the address names (`scenes/routes.ts`): the front page,
+the scene and map tables, a scene or a map as one document, or the steps that make or edit one
+(`scenes/EditorFrame.tsx`). A scene's page and steps are built from the table's parts (`EncounterMap`, `MapRail`,
+`TablePanel`, the tray) and edit the parked scene with its `sceneId`, so the table itself always shows the live
+scene. Placing on any map is a button and then a press on it (`armPlacement` in `scene/tableGeometry.ts`), or the
+spot menu a right-click or long press opens (`scene/MapSpotMenu.tsx`). The grid's calibration keeps its logic in
+`maps/useCalibration.tsx`, which returns its parts (note, body, actions, canvas) for the map's steps to place.
 
 The character sheet lives in `sheet/` (ADR-0030). `CharacterSheet.tsx` is one component for every place it sits: a
 page (My character, `/characters/<id>`, `sheet.html`), the GM's dialog, or the table panel's Me and Sheet tabs. It

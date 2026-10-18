@@ -175,6 +175,7 @@ const QuestProjectedData = data("CodexQuestProjectedData", { quest: QuestProject
 const StandingList = data("CodexStandingListData", { standing: z.array(StandingProjected) });
 const Standing = data("CodexStandingData", { standing: wire.CodexStandingSchema });
 const RevealAudit = data("CodexRevealAuditData", { audit: wire.CodexRevealAuditSchema });
+const SceneLinks = data("CodexSceneLinksData", { links: z.array(wire.CodexSceneLinkSchema) });
 const Calendar = data("CodexCalendarData", { calendar: wire.GmCodexCalendarSchema });
 const CalendarProjectedData = data("CodexCalendarProjectedData", { calendar: CalendarProjected });
 const CalendarCheck = data("CodexCalendarCheckData", { moves: z.array(wire.CodexCalendarMoveSchema) });
@@ -1395,6 +1396,20 @@ export const getCodexRevealAudit = defineRoute({
   responses: read(ok(RevealAudit, "What the party can see."))
 });
 
+// ----- The table scenes the Codex names -----
+
+export const getCodexSceneLinks = defineRoute({
+  method: "get",
+  path: CODEX_PATHS.sceneLinks,
+  operationId: "getCodexSceneLinks",
+  tag: "Codex",
+  summary: "Read the Codex records that name each table scene",
+  description:
+    "For each table scene the Codex names, the sessions that stage it (`via: session` on the session itself, `prep` in an Encounters section of its prep) and the atlas pins that link it, with the map each pin sits on. A scene the Codex never names is absent, and an id the table no longer has is listed as it is. GM-only, as every scene id is.",
+  access: GM_READ,
+  responses: read(ok(SceneLinks, "The scenes and the records that name them."))
+});
+
 // ----- The calendar -----
 
 export const getCodexCalendar = defineRoute({
@@ -1661,6 +1676,7 @@ export const CODEX_ROUTES = [
   setCodexStanding,
   revealCodexStanding,
   getCodexRevealAudit,
+  getCodexSceneLinks,
   getCodexCalendar,
   setCodexCalendar,
   checkCodexCalendar,

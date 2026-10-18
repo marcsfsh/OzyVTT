@@ -112,7 +112,10 @@ export {
   IconPin,
   IconList,
   IconSkull,
-  IconConcentration
+  IconConcentration,
+  // Section front pages and the map library.
+  IconHome,
+  IconMap
 } from "./primitives/icons";
 export { Combobox } from "./primitives/Combobox";
 export { MarkdownEditor, applyMarkdownFormat } from "./primitives/MarkdownEditor";

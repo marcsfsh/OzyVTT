@@ -5,7 +5,7 @@ import "./shared.css";
 /** A funnel, the mark of a list's filters. */
 function FilterGlyph() {
   return (
-    <svg className="cx-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <svg className="cx-icon" viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
       <path d="M2.6 3.6h18.8v2.8l-7.2 7.6v6.4l-4.4 2v-8.4L2.6 6.4z" />
     </svg>
   );

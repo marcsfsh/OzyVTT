@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { Alert, Button, Chip, IconDownload, Input, SegmentedControl, Skeleton } from "@vtt/ui";
 import { Dropdown } from "../codex/shared/Dropdown";
 import { FilterChips, FilterFlyout, FiltersButton } from "../codex/shared/FilterFlyout";
-import { SortDialog, type SortChoice } from "../codex/search/SearchView";
+import { SortDialog, type SortLevelOf } from "../codex/shared/SortDialog";
 import { apiRequest, jsonRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { SettingsPrimary } from "../settings/SettingRow";
@@ -53,7 +53,7 @@ export function ApiReference({
   const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState<"operations" | "commands">("operations");
   const [filters, setFilters] = useState<ApiFilters>(NO_FILTERS);
-  const [sort, setSort] = useState<readonly SortChoice<ApiSortKey>[]>(DEFAULT_SORT);
+  const [sort, setSort] = useState<readonly SortLevelOf<ApiSortKey>[]>(DEFAULT_SORT);
   const [sorting, setSorting] = useState(false);
   const [flyout, setFlyout] = useState(false);
   const flyoutId = useId();
@@ -369,7 +369,8 @@ export function ApiReference({
         <SortDialog
           levels={sort}
           keys={["tag", "path", "method", "operation"] as const}
-          labelOf={(key) => SORT_WORDS[key]}
+          keyLabel={(key) => SORT_WORDS[key]}
+          firstDirection={() => "asc"}
           directionLabel={(key, direction) =>
             key === "method"
               ? direction === "asc"

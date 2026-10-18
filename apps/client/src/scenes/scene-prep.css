@@ -142,21 +142,6 @@
   border-top: 1px solid var(--line);
 }
 
-/* The staging door's frame: `SceneBuilder` is a `frame-col frame-fill` column with a fixed head, the
-   feedback line at the bottom, and this room as its one region (`.scroll-y` in the markup). This
-   adds containment and scroll-padding so a keyboard-focused field stays off the region's edges. */
-.scene-builder-body {
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--space-6);
-}
-/* Below 980px the head's explanatory line is hidden: as a pinned row it costs too much of a phone
-   sheet, and the staging banner and eyebrow already say "GM only". */
-@media (max-width: 979px) {
-  .scene-builder-head p {
-    display: none;
-  }
-}
-
 /* Panel material on a backing layer behind the content. The Recent disclosure is nested, so the edge
    over a flat plate and no lip. */
 .scene-prep-recent > summary {

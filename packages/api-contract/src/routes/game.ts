@@ -5,6 +5,7 @@ import {
   BuilderOffersReplySchema,
   CharacterDraftReplySchema,
   NextLevelReplySchema,
+  ScenePreviewReplySchema,
   SoundBoardViewSchema,
   VisionPreviewReplySchema
 } from "@vtt/domain";
@@ -13,6 +14,7 @@ import {
   ActorMovementSchema,
   BuilderOffersSchema,
   CharacterNextLevelSchema,
+  ScenePreviewSchema,
   VisionPreviewSchema
 } from "@vtt/domain/commands";
 import {
@@ -235,6 +237,26 @@ export const previewVision = defineRoute({
   }
 });
 
+export const previewScene = defineRoute({
+  method: "get",
+  path: GAME_PATHS.scenePreview,
+  operationId: "previewScene",
+  tag: "Live game",
+  summary: "See a scene as the table screen or a player would",
+  description:
+    "What one audience would receive of a prepared or live scene if it were live now: with no `actorId` the table screen (`screen`: its encounter and turn order, as the presentation carries them), with a party character's `actorId` the player who holds that character (`player`: the combat of their projection and the creatures it names). The same projections build it over a copy of the state, so fog, dynamic vision and hidden creatures apply as they will, and nothing is changed. GM-grade only.",
+  access: gmGrade("scene:read"),
+  params: ScenePreviewSchema.pick({ sceneId: true }),
+  query: ScenePreviewSchema.pick({ actorId: true }),
+  responses: {
+    200: ok(ScenePreviewReplySchema, "What that audience would receive."),
+    400: refused(),
+    401: refused(),
+    403: refused(),
+    404: refused("No scene or party character has that id.")
+  }
+});
+
 export const listGameCommands = defineRoute({
   method: "get",
   path: GAME_PATHS.commands,
@@ -287,6 +309,7 @@ export const GAME_ROUTES = [
   getCharacterDraft,
   getBuilderOffers,
   previewVision,
+  previewScene,
   listGameCommands,
   submitGameCommand
 ] as const;

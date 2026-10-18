@@ -300,6 +300,7 @@ nameAll([
   ["CodexRevealAuditRow", wire.CodexRevealAuditRowSchema],
   ["CodexRevealAuditSection", wire.CodexRevealAuditSectionSchema],
   ["CodexRevealAudit", wire.CodexRevealAuditSchema],
+  ["CodexSceneLink", wire.CodexSceneLinkSchema],
   ["CodexImportCounts", wire.CodexImportCountsSchema],
   ["CodexAsset", wire.CodexAssetSchema]
 ]);
@@ -326,6 +327,7 @@ nameAll([
   ["ActorMovementData", wire.ActorMovementReplySchema],
   ["CharacterNextLevelData", wire.NextLevelReplySchema],
   ["VisionPreviewData", wire.VisionPreviewReplySchema],
+  ["ScenePreviewData", wire.ScenePreviewReplySchema],
   ["CharacterDraftData", wire.CharacterDraftReplySchema],
   ["BuilderOffersData", wire.BuilderOffersReplySchema],
   ["BuilderAbilityIncreases", wire.BuilderAbilityIncreasesSchema],

@@ -27,7 +27,7 @@ import {
 import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import { deriveMapDistanceScale } from "./map-measurement.js";
-import type { MapCatalogEntry, MapCatalogStore, PublicMapAsset } from "./map-catalog.js";
+import { mapFolder, type MapCatalogEntry, type MapCatalogStore, type PublicMapAsset } from "./map-catalog.js";
 import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 
 const FAULT = "Map request failed.";
@@ -139,8 +139,10 @@ export function createMapRouter(options: MapRouterOptions) {
         const filename = query.filename ?? "map";
         const name = query.name ?? filename.replace(/\.[^.]+$/, "");
         const kind = query.kind ?? "battlemap";
+        // Read before the import, so a folder the catalog refuses stores no file.
+        const folder = mapFolder(query.folder ?? null);
         const imported = await options.assets.import(request.body, filename);
-        const entry = options.catalog.register(imported.metadata.id, name, kind);
+        const entry = options.catalog.register(imported.metadata.id, name, kind, folder);
         return sendData(response, imported.duplicate ? 200 : 201, {
           asset: publicAsset(imported.metadata, entry),
           duplicate: imported.duplicate

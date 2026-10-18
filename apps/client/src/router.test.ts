@@ -88,9 +88,19 @@ describe("The address table", () => {
     expect(layerOf("/characters/a1/level")).toEqual({ kind: "level", actorId: "a1" });
     expect(layerOf("/builder")).toEqual({ kind: "builder" });
     expect(layerOf("/replays/12")).toEqual({ kind: "replay", archiveId: 12 });
-    expect(layerOf("/scenes/maps")).toEqual({ kind: "maps" });
-    expect(layerOf("/scenes/new")).toEqual({ kind: "scene-prep", sceneId: null });
-    expect(layerOf("/scenes/s1")).toEqual({ kind: "scene-prep", sceneId: "s1" });
+    expect(layerOf("/scenes/maps")).toEqual({ kind: "scenes", view: { view: "maps" } });
+    expect(layerOf("/scenes/list")).toEqual({ kind: "scenes", view: { view: "scenes" } });
+    expect(layerOf("/scenes/new")).toEqual({ kind: "scenes", view: { view: "scene", sceneId: null, step: "map" } });
+    expect(layerOf("/scenes/s1")).toEqual({ kind: "scenes", view: { view: "scene", sceneId: "s1", step: null } });
+    expect(layerOf("/scenes/s1", new URLSearchParams("step=light"))).toEqual({
+      kind: "scenes",
+      view: { view: "scene", sceneId: "s1", step: "light" }
+    });
+    expect(layerOf("/scenes/maps/m1")).toEqual({ kind: "scenes", view: { view: "map", mapId: "m1", step: null } });
+    expect(layerOf("/scenes/maps/new")).toEqual({
+      kind: "scenes",
+      view: { view: "map", mapId: null, step: "upload" }
+    });
     // A tab's own address is not a layer, or every tab would render one.
     expect(layerOf("/table")).toBeNull();
     expect(layerOf("/replays")).toBeNull();
@@ -104,6 +114,11 @@ describe("The address table", () => {
     expect(redirectForRetiredPath("/encounter", new URLSearchParams())).toBe("/table");
     expect(redirectForRetiredPath("/setup", new URLSearchParams())).toBe("/settings");
     expect(redirectForRetiredPath("/scenes", new URLSearchParams("view=maps"))).toBe("/scenes/maps");
+    // The map library's one-map address lands on that map's grid step, still knowing to go back to the table.
+    expect(redirectForRetiredPath("/scenes/maps", new URLSearchParams("map=m1&from=table"))).toBe(
+      "/scenes/maps/m1?step=grid&back=%2Ftable"
+    );
+    expect(redirectForRetiredPath("/scenes/maps", new URLSearchParams())).toBeNull();
     expect(redirectForRetiredPath("/scenes", new URLSearchParams())).toBeNull();
     expect(redirectForRetiredPath("/table", new URLSearchParams())).toBeNull();
     expect(redirectForRetiredPath("/codex/pages", new URLSearchParams())).toBeNull();
@@ -306,6 +321,11 @@ describe("The addresses D29 added", () => {
     expect(isKnownPath("/scenes/new")).toBe(true);
     expect(isKnownPath("/scenes/maps")).toBe(true);
     expect(isKnownPath("/scenes/s1")).toBe(true);
+    expect(isKnownPath("/scenes/list")).toBe(true);
+    expect(isKnownPath("/scenes/maps/new")).toBe(true);
+    expect(isKnownPath("/scenes/maps/m1")).toBe(true);
+    expect(isKnownPath("/scenes/s1/more")).toBe(false);
+    expect(isKnownPath("/scenes/maps/m1/more")).toBe(false);
     expect(isKnownPath("/replays")).toBe(true);
     expect(isKnownPath("/replays/12")).toBe(true);
     expect(isKnownPath("/me")).toBe(true);

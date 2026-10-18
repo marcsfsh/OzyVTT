@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { rosterActors, type GmView, type MutationResult } from "@vtt/domain";
-import type { MapSelection } from "../maps/MapManager";
+import type { MapSelection } from "../maps/map-catalog";
 import { Button, Chip, Switch, IconArrow, IconChevronLeft, Eyebrow } from "@vtt/ui";
 import { command } from "../lib/command";
 import { CharacterSheet } from "../sheet/CharacterSheet";

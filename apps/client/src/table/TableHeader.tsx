@@ -1,24 +1,18 @@
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, IconChevronLeft, IconLocate, IconPlay, IconScene, Menu, MenuItem, ToastOutlet } from "@vtt/ui";
+import { Button, IconLocate, IconPlay, IconPlus, IconScene, Menu, MenuItem, ToastOutlet } from "@vtt/ui";
+import { navigate } from "../router";
+import { pathForScene, SCENES_PATHS } from "../scenes/routes";
+import { useSceneActions } from "../scenes/sceneActions";
 import { focusTokenOnMap, openMapToolGroup } from "../scene/tableGeometry";
 import { NowPlaying } from "../sound/NowPlaying";
 import { tableStatus } from "./status";
 import { TvControl } from "./TvControl";
 import "./table-header.css";
 
-type StagedScene = GmView["combat"]["scenes"][number];
-
-/** What only the GM's header has: the scenes, the staged scene's way back or live, and the TV's preview. */
+/** What only the GM's header has: the scenes to switch to, and the TV's preview. */
 export type GmHeader = Readonly<{
   token: string;
-  stagedScene: StagedScene | null;
   liveMapName: string | null;
-  onPrepareScene: () => void;
-  onViewAllScenes: () => void;
-  onBackToLive: () => void;
-  onMakeLive: (sceneId: string) => void;
-  /** Opens the staged map's grid calibration; null when the map has its grid. */
-  onSetGrid: ((mapId: string) => void) | null;
   viewerPreview: Readonly<{ on: boolean; onToggle: () => void }>;
 }>;
 
@@ -56,58 +50,51 @@ export function TableHeader(
       </header>
     );
   }
-  const { state, gm } = props;
-  const live = state.combat.scenes?.find((scene) => scene.id === state.combat.activeSceneId) ?? null;
-  const staged = gm.stagedScene;
-  const fog = staged ? staged.combat.fog : state.combat.fog;
-  const vision = staged ? staged.combat.vision : state.combat.vision;
+  return <GmTableHeader state={props.state} gm={props.gm} status={status} />;
+}
+
+/**
+ * The GM's header: the live scene with a menu that makes another scene live (asked first while a fight is on), opens
+ * a scene, all scenes, or a new one on the Scenes tab; then the status line, the fog and vision chips, the TV and the
+ * music. Scenes are prepared on the Scenes tab, so the table always shows the live scene.
+ */
+function GmTableHeader({ state, gm, status }: Readonly<{ state: GmView; gm: GmHeader; status: React.ReactNode }>) {
+  const scenes = state.combat.scenes ?? [];
+  const live = scenes.find((scene) => scene.id === state.combat.activeSceneId) ?? null;
+  const fog = state.combat.fog;
+  const vision = state.combat.vision;
+  const actions = useSceneActions(scenes, { combatActive: state.combat.active });
   return (
-    <header className={`table-header${staged ? " is-staging" : ""}`} aria-label="The table">
-      {staged ? (
-        <span className="table-header-staging" role="group" aria-label="Staged scene">
-          <span className="table-header-staged-name">
+    <header className="table-header" aria-label="The table">
+      <Menu
+        className="table-header-scenes"
+        triggerClassName="table-header-scene"
+        label={live ? `Scenes · ${live.name} is live` : "Scenes"}
+        trigger={
+          <>
             <IconScene />
-            <span className="table-header-staged-text">
-              <span className="table-header-staged-word">Staging </span>
-              <strong>{staged.name}</strong>
-              <span className="table-header-staged-word"> · GM only</span>
-            </span>
-          </span>
-          {/* Back to live only when a scene is live to go back to. */}
-          {live && (
-            <Button variant="ghost" size="sm" onClick={gm.onBackToLive} title="Return to the scene players see">
-              <IconChevronLeft />
-              <span className="table-header-back-label">Back to live</span>
-            </Button>
-          )}
-          {/* Before Make live: a map without its grid lets tokens sit anywhere, off the squares. */}
-          {gm.onSetGrid && (
-            <Button variant="secondary" size="sm" onClick={() => gm.onSetGrid?.(staged.mapAssetId)}>
-              Set the grid
-            </Button>
-          )}
-          <Button variant="primary" size="sm" onClick={() => gm.onMakeLive(staged.id)}>
-            <IconPlay />
-            Make live
-          </Button>
-        </span>
-      ) : (
-        <Menu
-          className="table-header-scenes"
-          triggerClassName="table-header-scene"
-          label={live ? `Scenes · ${live.name} is live` : "Scenes"}
-          trigger={
-            <>
-              <IconScene />
-              <span className="table-header-scene-name">{live?.name ?? "No scene live"}</span>
-              {live && <span className="table-header-live">Live</span>}
-            </>
-          }
-        >
-          <MenuItem onClick={gm.onViewAllScenes}>View all scenes</MenuItem>
-          <MenuItem onClick={gm.onPrepareScene}>New scene…</MenuItem>
-        </Menu>
-      )}
+            <span className="table-header-scene-name">{live?.name ?? "No scene live"}</span>
+            {live && <span className="table-header-live">Live</span>}
+          </>
+        }
+      >
+        {scenes
+          .filter((scene) => scene.id !== live?.id && !scene.replayOf)
+          .map((scene) => (
+            <MenuItem key={scene.id} icon={<IconPlay />} onClick={() => void actions.makeLive(scene)}>
+              Make {scene.name} live
+            </MenuItem>
+          ))}
+        {live && (
+          <MenuItem icon={<IconScene />} onClick={() => void navigate(pathForScene(live.id))}>
+            Open {live.name}
+          </MenuItem>
+        )}
+        <MenuItem onClick={() => void navigate(SCENES_PATHS.list)}>All scenes</MenuItem>
+        <MenuItem icon={<IconPlus />} onClick={() => void navigate(SCENES_PATHS.newScene)}>
+          New scene
+        </MenuItem>
+      </Menu>
       {status}
       {/* Fog and vision as quiet chips while off; each opens its tool beside the map. */}
       <span className="table-header-chips">
@@ -138,6 +125,7 @@ export function TableHeader(
         preview={gm.viewerPreview}
       />
       <NowPlaying token={gm.token} compact />
+      {actions.dialogs}
     </header>
   );
 }

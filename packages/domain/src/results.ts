@@ -8,6 +8,7 @@ import {
 } from "@vtt/schemas";
 import { CharacterDraftSchema } from "./character-draft.js";
 import { AbilityIdSchema, BuilderAbilityMethodSchema, RuleModeSchema, type AnnotationPoint } from "./state.js";
+import type { PlayerView } from "./views.js";
 import type { Wire } from "./wire.js";
 
 /**
@@ -680,6 +681,25 @@ export const VisionPreviewReplySchema = z.strictObject({
 });
 export type VisionPreviewReply = Wire<z.infer<typeof VisionPreviewReplySchema>>;
 export type VisionPreviewResult = { ok: boolean; message?: string } & Partial<VisionPreviewReply>;
+
+/**
+ * What `scene:preview` answers the GM: what one audience would receive if the scene were live now, from the same
+ * projections that build the real feeds. `screen` is the shared screen's map (its encounter and turn order, as the
+ * presentation carries them); `player` is that character's player's combat and the creatures in it.
+ */
+export const ScenePreviewReplySchema = z.strictObject({
+  sceneId: z.uuid(),
+  live: z.boolean(),
+  mapAssetId: z.uuid(),
+  actorId: z.uuid().nullable(),
+  screen: z.strictObject({ encounter: z.looseObject({}), initiative: z.looseObject({}) }).nullable(),
+  player: z.strictObject({ combat: z.looseObject({}), actors: z.array(z.looseObject({})) }).nullable()
+});
+export type ScenePreviewReply = Omit<Wire<z.infer<typeof ScenePreviewReplySchema>>, "player" | "screen"> & {
+  screen: { encounter: Record<string, unknown>; initiative: Record<string, unknown> } | null;
+  player: { combat: PlayerView["combat"]; actors: PlayerView["actors"] } | null;
+};
+export type ScenePreviewResult = { ok: boolean; message?: string } & Partial<ScenePreviewReply>;
 export type WallAddResult = MutationResult & { wallIds?: readonly string[] };
 export type LightAddResult = MutationResult & { lightId?: string };
 
