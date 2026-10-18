@@ -472,6 +472,62 @@ export const ParkedAttackSchema = z
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
 
+/** A spell being cast that a Counterspell may still stop (SRD Counterspell), held before anything of it happens until
+ *  every such prompt is answered. Its action was spent when it was cast; its slot and the materials it consumes are
+ *  spent only if it goes ahead ("If that spell was cast with a spell slot, the slot isn't expended"). GM-only. */
+export const ParkedCastSchema = z
+  .object({
+    actionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    /** The cast's own command, whose id its area's template and its effects carry. */
+    castCommandId: z.uuid(),
+    targetIds: z.array(z.uuid()).max(60),
+    /** The targets are the catch of a template placed on the map. */
+    areaPlaced: z.boolean(),
+    /** The slot the spell is cast with, spent if it goes ahead. */
+    slot: z
+      .object({ level: z.number().int().min(1).max(9), pact: z.boolean() })
+      .strict()
+      .nullable(),
+    /** The limited use it is cast with (a stat block's 1/Day), spent if it goes ahead, as a slot would be. */
+    use: z
+      .object({
+        key: z.string().min(1).max(120),
+        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
+        amount: z.number().int().min(1).max(100)
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    /** Materials and coins the cast uses up if it goes ahead. */
+    componentSpends: z
+      .array(
+        z.union([
+          z.object({ rowId: z.string().min(1).max(80), count: z.number().int().min(1).max(20) }).strict(),
+          z
+            .object({
+              coins: z
+                .object({ unit: z.enum(["cp", "sp", "ep", "gp", "pp"]), amount: z.number().int().min(1).max(10_000) })
+                .strict()
+            })
+            .strict()
+        ])
+      )
+      .max(8)
+      .default([]),
+    conditionId: z.string().max(60).nullable(),
+    damageType: z.string().max(40).nullable(),
+    ability: AbilityIdSchema.nullable(),
+    /** The key the cast's attack d20 is held under, if a preview rolled one. */
+    holdKey: z.string().max(120).nullable(),
+    initiatorRole: z.enum(["gm", "player"]),
+    initiatorSessionId: z.string().min(1).max(200)
+  })
+  .strict();
+export type ParkedCast = z.infer<typeof ParkedCastSchema>;
+
 /** A declared reaction (ADR-0020) awaiting an answer, which persists until it is answered or the GM dismisses it, so
  * nothing it holds is lost. What it holds depends on the trigger: a hit's damage (Uncanny Dodge), an attack not yet
  * landed (Parry), or nothing, when answering strikes a creature (an opportunity attack, Hellish Rebuke). */
@@ -479,8 +535,11 @@ export const PendingReactionSchema = z
   .object({
     id: z.uuid(),
     /** What opened the window: an attack that hit the reactor, an enemy leaving its reach (opportunity attack), an
-     *  attack that would hit before its damage (`attack-would-hit`), or a creature damaging the reactor. */
-    kind: z.enum(["hit-by-attack", "leaves-reach", "attack-would-hit", "damaged-by-creature"]).default("hit-by-attack"),
+     *  attack that would hit before its damage (`attack-would-hit`), a creature damaging the reactor, or a creature
+     *  casting a spell the reactor may counter (`casts-spell`). */
+    kind: z
+      .enum(["hit-by-attack", "leaves-reach", "attack-would-hit", "damaged-by-creature", "casts-spell"])
+      .default("hit-by-attack"),
     actorId: z.uuid(),
     actionId: z
       .string()
@@ -516,8 +575,13 @@ export const PendingReactionSchema = z
     rollsAttack: z.boolean().default(false),
     /** attack-would-hit: the attack the answer finishes. */
     parkedAttack: ParkedAttackSchema.nullable().default(null),
+    /** casts-spell (Counterspell): the cast the answers decide. */
+    parkedCast: ParkedCastSchema.optional(),
     /** attack-would-hit: the held attack's total, against the reactor's AC before the reaction. */
     attackTotal: z.number().int().min(-100).max(1000).optional(),
+    /** A reaction spell cast with a slot (Shield, Hellish Rebuke, Counterspell): the slot levels the reactor has one
+     *  of, lowest first, so the answer can pick a higher one. Absent for a reaction that spends no slot. */
+    slotLevels: z.array(z.number().int().min(1).max(9)).max(9).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

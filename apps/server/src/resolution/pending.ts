@@ -5,7 +5,7 @@ import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
 import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
-import { offerableReaction } from "../reaction-offers.js";
+import { offerableReaction, slotChoiceOf } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { rollDice } from "@vtt/rules-5e";
@@ -144,6 +144,7 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
           // The extras chosen for the hit ride the replay, spent only if it still hits.
           hitOptions: (input.hitOptions ?? []).map((choice) => ({ ...choice }))
         },
+        ...slotChoiceOf(target, offer.action),
         createdAt: Date.parse(deps.now())
       }
     ]

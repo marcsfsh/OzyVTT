@@ -19,6 +19,7 @@ import { rollSettledCheck } from "./check-rolls.js";
 import { withOneUsedUp } from "./consumables.js";
 import { deriveEquipment } from "./equipment-derivation.js";
 import { scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "./scrolls.js";
+import { answerCounter as answerCounterPrompt } from "./counter-answers.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -54,9 +55,13 @@ export type ReactionOutcome = Readonly<{
   kind: PendingReaction["kind"];
   /** The creature struck (an opportunity attack, Hellish Rebuke), or the attacker whose parked attack was finished. */
   other?: Readonly<{ id: string; name: string }>;
-  /** The strike's full resolution, or the parked attack's once the answer finished it. */
+  /** The strike's full resolution, or the parked attack's or cast's once the answer finished it. */
   resolution?: ActionResolution;
   events: readonly EffectNarration[];
+  /** casts-spell: the Counterspell stopped the cast, which dissipates. */
+  countered?: boolean;
+  /** casts-spell: the cast's own command, whose rolls its finish recorded. */
+  castCommandId?: string;
 }>;
 
 /** Preview/confirm options for a strike that rolls an attack (an opportunity attack, Retaliation). The strike's d20 is
@@ -73,6 +78,8 @@ export type OpportunityAttackOptions = Readonly<{
   pushFeet?: number;
   /** The extras chosen for the hit on its preview (Sneak Attack). */
   hitOptions?: ResolveInput["hitOptions"];
+  /** The slot a reaction spell is cast with (Hellish Rebuke's dice, Shield's slot); absent, the lowest that can. */
+  slotLevel?: number;
 }>;
 
 /** The key a reaction's strike holds its d20 under. */
@@ -156,7 +163,9 @@ export function answerReaction(
     case "damaged-by-creature":
       return answerStrike(answer, actionId, attackOptions);
     case "attack-would-hit":
-      return answerParkedAttack(answer);
+      return answerParkedAttack(answer, attackOptions.slotLevel);
+    case "casts-spell":
+      return answerCounter(answer, attackOptions.slotLevel);
     case "hit-by-attack":
       return answerParkedDamage(answer);
   }
@@ -309,7 +318,9 @@ function answerStrike(
       // The resolver can't infer how the attack was made from the action, so announce it for `attack-kind-is` riders.
       attackKinds: pending.kind === "leaves-reach" ? ["reaction", "opportunity"] : ["reaction"],
       ...(options.pushFeet !== undefined ? { pushFeet: options.pushFeet } : {}),
-      ...(options.hitOptions ? { hitOptions: options.hitOptions } : {})
+      ...(options.hitOptions ? { hitOptions: options.hitOptions } : {}),
+      // A reaction spell cast with a higher slot rolls that slot's dice (Hellish Rebuke's 3d10 from level 2).
+      ...(options.slotLevel !== undefined && chosen.spellSlot ? { slotLevel: options.slotLevel } : {})
     },
     {
       random: deps.random,
@@ -403,7 +414,22 @@ function scrollReadAsReaction(answer: Answer, declared: DefinitionAction): Effec
 /** Parry or Shield: the attack stopped at its roll. "use" spends the reaction and what the action costs and raises AC
  *  (against this attack, or until the reactor's next turn); either answer then finishes the attack with the same die,
  *  and a hit's damage lands. */
-function answerParkedAttack(answer: Answer): ReactionOutcome {
+/** Counterspell: the cast waits on every prompt it opened; see `counter-answers.ts`. */
+function answerCounter(answer: Answer, slotLevel: number | undefined): ReactionOutcome {
+  const outcome = answerCounterPrompt(answer, slotLevel);
+  return {
+    ...answer.base,
+    used: outcome.used,
+    appliedDamage: outcome.appliedDamage,
+    other: outcome.caster,
+    ...(outcome.resolution ? { resolution: outcome.resolution } : {}),
+    events: outcome.events,
+    countered: outcome.countered,
+    castCommandId: outcome.castCommandId
+  };
+}
+
+function answerParkedAttack(answer: Answer, slotLevel: number | undefined): ReactionOutcome {
   const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
   const parked = pending.parkedAttack;
   const attacker = pending.sourceActorId
@@ -447,11 +473,13 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       state,
       reactor,
       declared,
-      { actorId: reactor.id, targetIds: [], commandId },
+      { actorId: reactor.id, targetIds: [], commandId, ...(slotLevel !== undefined ? { slotLevel } : {}) },
       definition,
       [],
       undefined,
-      siblings
+      siblings,
+      false,
+      deps.catalog
     );
     commitEconomy({ state, attacker: reactor, input: {}, plan: economy.plan, overridden: economy.overridden });
     scrollLost = scrollReadAsReaction(answer, declared);

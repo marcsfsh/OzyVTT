@@ -1488,24 +1488,28 @@ export function commitEconomy({
       turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
     };
   }
-  if (plan.spendUse) {
-    if (plan.spendUse.per === "turn") {
-      const key = `${attacker.id}:${plan.spendUse.key}`;
-      state.combat = {
-        ...state.combat,
-        turn: {
-          ...state.combat.turn,
-          turnUses: {
-            ...state.combat.turn.turnUses,
-            [key]: (state.combat.turn.turnUses[key] ?? 0) + plan.spendUse.amount
-          }
-        }
-      };
-    } else {
-      attacker.actionUses = {
-        ...attacker.actionUses,
-        [plan.spendUse.key]: (attacker.actionUses[plan.spendUse.key] ?? 0) + plan.spendUse.amount
-      };
-    }
+  if (plan.spendUse) commitUse(state, attacker, plan.spendUse);
+}
+
+/** Records `amount` uses of a limited use: this turn's for a per-turn use, else the creature's own count. */
+export function commitUse(
+  state: GameState,
+  attacker: LiveActor,
+  spendUse: NonNullable<EconomyPlan["spendUse"]>
+): void {
+  if (spendUse.per === "turn") {
+    const key = `${attacker.id}:${spendUse.key}`;
+    state.combat = {
+      ...state.combat,
+      turn: {
+        ...state.combat.turn,
+        turnUses: { ...state.combat.turn.turnUses, [key]: (state.combat.turn.turnUses[key] ?? 0) + spendUse.amount }
+      }
+    };
+    return;
   }
+  attacker.actionUses = {
+    ...attacker.actionUses,
+    [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount
+  };
 }

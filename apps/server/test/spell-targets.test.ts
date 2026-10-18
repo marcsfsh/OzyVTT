@@ -137,7 +137,7 @@ describe("a spell's range", () => {
     expect(() => cast(beasts().state, "mass-cure-wounds", { targetIds: [FOE] }, distance)).toThrowError(
       /Wolf is 95 ft away, beyond the 30-foot sphere Mass Cure Wounds centers within 60 ft/
     );
-    const both = { ...apart, [`${HERO}|${FOE}`]: 40 };
+    const both: Record<string, number> = { ...apart, [`${HERO}|${FOE}`]: 40 };
     const close = (a: string, b: string) => both[`${a}|${b}`] ?? both[`${b}|${a}`] ?? 0;
     expect(() => cast(beasts().state, "mass-cure-wounds", { targetIds: [ALLY, FOE] }, close)).toThrowError(
       /Bran and Wolf are 70 ft apart, too far for one 30-foot sphere of Mass Cure Wounds/

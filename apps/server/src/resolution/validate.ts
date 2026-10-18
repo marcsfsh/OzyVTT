@@ -165,7 +165,7 @@ export function openResolve(
       `${action.name} makes ${action.darts} darts; ${input.targetIds.length} were assigned.`
     );
   const economy = input.economyPaid
-    ? { plan: paidPlan(state), overridden: null }
+    ? { plan: paidPlan(state, input.slotLevel), overridden: null }
     : planEconomy(
         state,
         attacker,
@@ -340,8 +340,8 @@ function laterActionReminders(
   ];
 }
 
-/** The plan of a resolve whose economy was already spent: it changes nothing. */
-function paidPlan(state: GameState): EconomyPlan {
+/** The plan of a resolve whose economy was already spent: it changes nothing, and casts at the slot it was made with. */
+function paidPlan(state: GameState, slotLevel: number | undefined): EconomyPlan {
   return {
     markAction: false,
     markBonus: false,
@@ -351,7 +351,7 @@ function paidPlan(state: GameState): EconomyPlan {
     spendUse: null,
     spendLegendary: null,
     spendSpellSlot: null,
-    castLevel: null,
+    castLevel: slotLevel ?? null,
     extraAction: null,
     magicAction: false,
     surge: false

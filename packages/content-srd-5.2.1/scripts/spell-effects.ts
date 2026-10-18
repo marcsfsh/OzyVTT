@@ -318,8 +318,6 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "conjure-animals",
   "conjure-elemental",
   "conjure-woodland-beings",
-  // The caster it interrupts makes the save, when the reaction is used (`CAST_REACTIONS`).
-  "counterspell",
   "delayed-blast-fireball",
   "dragons-breath",
   "dream",

@@ -486,6 +486,9 @@ export const ReactionAnswerSchema = z
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
+    /** The spell slot a reaction spell is cast with (Shield, Hellish Rebuke, Counterspell): absent, its own level or the
+     *  lowest above it with a slot left. A higher slot upcasts it as a cast on the caster's turn does. */
+    slotLevel: z.number().int().min(1).max(9).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

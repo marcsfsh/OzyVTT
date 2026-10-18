@@ -217,9 +217,34 @@ export function withSpellcasting(
   });
 
   const entries = [...listed, ...added].filter((entry) => knownSpell(entry.spellId));
-  return rewired.map((action) =>
-    action === spellcasting && listNumbers && entries.length > 0
-      ? { ...action, castsSpells: { ...listNumbers, spells: entries } }
-      : action
-  );
+  return rewired.flatMap((action) => {
+    if (action === spellcasting && listNumbers && entries.length > 0)
+      return [{ ...action, castsSpells: { ...listNumbers, spells: entries } }];
+    const counter = counterspellOf(action, listNumbers, knownSpell);
+    return counter ? [action, counter] : [action];
+  });
+}
+
+/**
+ * "The mage casts Counterspell or Shield in response to the spell's trigger" (Protective Magic): the reaction's Shield
+ * is its own reaction, and its Counterspell becomes a reaction beside it, cast with Spellcasting's numbers and sharing
+ * the reaction's uses, so the table offers it when a creature the caster sees casts a spell.
+ */
+function counterspellOf(
+  action: ActorAction,
+  numbers: Numbers | null,
+  knownSpell: (spellId: string) => boolean
+): ActorAction | null {
+  if (action.activation !== "reaction" || !numbers || !knownSpell("counterspell")) return null;
+  if (!/\bcasts Counterspell\b/.test(action.description)) return null;
+  const id = `${action.id}-counterspell`;
+  return {
+    id,
+    name: "Counterspell",
+    activation: "reaction",
+    description: action.description,
+    damage: [],
+    ...(action.uses ? { uses: { ...action.uses, pool: action.uses.pool ?? action.id } } : {}),
+    castsSpells: { ...numbers, self: true, spells: [{ id, spellId: "counterspell", name: "Counterspell" }] }
+  };
 }

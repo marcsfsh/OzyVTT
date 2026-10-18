@@ -87,7 +87,11 @@ function castOf(
     ...action,
     ...mechanics,
     spellId: spell.id,
-    ...castAreaOf(spell, mechanics)
+    ...castAreaOf(spell, mechanics),
+    // A reaction spell's trigger rides a reaction's cast (Protective Magic's Counterspell), so the table offers it.
+    ...(spell.effect?.reaction && action.activation === "reaction"
+      ? { reaction: structuredClone(spell.effect.reaction) }
+      : {})
   };
   const level = entry.atLevel ?? spell.level;
   const {

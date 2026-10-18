@@ -267,11 +267,15 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // The reactor's own slots, which its owner already reads on the sheet; only the reactor's owner gets the prompt.
+  slotLevels: "player",
   createdAt: "player",
   sourceName: "derived",
   sourceActorId: "never",
   // Names the attacker's action and how it rolled, which the reactor's player has no need of.
   parkedAttack: "never",
+  // The cast a Counterspell decides: its action, targets and slot are the caster's, not the reactor's.
+  parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
   attackTotal: "derived"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;

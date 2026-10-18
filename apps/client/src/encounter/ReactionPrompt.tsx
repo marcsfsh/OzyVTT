@@ -6,7 +6,7 @@ import {
   type PendingReaction,
   type PlayerPendingReaction
 } from "@vtt/domain";
-import { Button, IconX } from "@vtt/ui";
+import { Button, IconX, SegmentedControl } from "@vtt/ui";
 import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
 import { castsSpell, damageAdjustments, plainActionName } from "./format";
@@ -24,6 +24,8 @@ import "./prompts.css";
  *   its hit can carry (Sneak Attack) to add; the server holds the die, so only Heroic Inspiration or the GM throws it
  *   again. Let them go clears.
  * - Hellish Rebuke or Storm's Thunder: Use strikes the creature that dealt the damage.
+ * - Counterspell: the spell another creature is casting waits; Use makes its caster save, and the spell may fail.
+ * A reaction spell cast with a slot offers the slot levels the reactor has one of, so a higher one upcasts it.
  * The GM's dismiss clears the prompt without applying anything it holds, for a moment settled by hand.
  */
 export function ReactionPrompt({
@@ -68,6 +70,10 @@ export function ReactionPrompt({
   const push = rolled?.push ?? null;
   const pushFeet = push ? Math.min(pushPick ?? push.maxFeet, push.maxFeet) : undefined;
   const autoRolled = useRef(false);
+  // The slot a reaction spell is cast with: the lowest by default, a higher one when picked.
+  const slotLevels = reaction.slotLevels ?? [];
+  const [slotPick, setSlotPick] = useState<number | null>(null);
+  const slotLevel = slotPick !== null && slotLevels.includes(slotPick) ? slotPick : slotLevels[0];
   const weighed = reaction.weighed;
   const takeIfUsed =
     weighed?.use ?? reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
@@ -91,7 +97,8 @@ export function ReactionPrompt({
       reactionId: reaction.id,
       use,
       ...rest,
-      ...(use && mode ? { rollMode: mode } : {})
+      ...(use && mode ? { rollMode: mode } : {}),
+      ...(use && slotLevel !== undefined ? { slotLevel } : {})
     }).then((result) => {
       setBusy(false);
       if (!result.ok) {
@@ -133,6 +140,12 @@ export function ReactionPrompt({
               ? `The attack hits${outcome.appliedDamage > 0 ? ` for ${outcome.appliedDamage} damage` : ""}`
               : "The attack misses"
           }.`
+        );
+      } else if (reaction.kind === "casts-spell") {
+        onFeedback(
+          use
+            ? `${actorName} used ${reaction.actionName} against ${reaction.sourceName}'s spell.`
+            : `${actorName} let ${reaction.sourceName}'s spell go.`
         );
       } else if (reaction.kind === "damaged-by-creature") {
         const save = outcome.resolution?.save;
@@ -194,6 +207,10 @@ export function ReactionPrompt({
           <>
             <strong>{name}</strong> · {reaction.sourceName} damaged {actorName}
           </>
+        ) : reaction.kind === "casts-spell" ? (
+          <>
+            <strong>{name}</strong> · {reaction.sourceName} is casting a spell, which waits on the answer
+          </>
         ) : reaction.kind === "attack-would-hit" ? (
           <>
             <strong>{name}</strong> · {reaction.sourceName}'s attack would hit {actorName}. +{reaction.acBonus} AC turns
@@ -206,6 +223,21 @@ export function ReactionPrompt({
           </>
         )}
       </span>
+      {slotLevels.length > 1 && slotLevel !== undefined && (
+        <SegmentedControl
+          size="sm"
+          className="reaction-slot"
+          ariaLabel={`Spell slot for ${name}`}
+          value={String(slotLevel)}
+          disabled={busy}
+          onChange={(value) => setSlotPick(Number(value))}
+          options={slotLevels.map((level) => ({
+            value: String(level),
+            label: `Level ${level}`,
+            ariaLabel: `Cast with a level ${level} spell slot`
+          }))}
+        />
+      )}
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       {rolled?.hitOffers && rolled.hitOffers.length > 0 && (
         <HitOfferChoices offers={rolled.hitOffers} chosen={hitOptions} busy={busy} onChange={setExtras} />
@@ -301,7 +333,9 @@ export function ReactionPrompt({
                 {letGo}
               </button>
             </>
-          ) : reaction.kind === "attack-would-hit" || reaction.kind === "damaged-by-creature" ? (
+          ) : reaction.kind === "attack-would-hit" ||
+            reaction.kind === "damaged-by-creature" ||
+            reaction.kind === "casts-spell" ? (
             <>
               {/* Taking the hit comes first; using the reaction is the prompt's one primary. */}
               <Button
@@ -309,11 +343,15 @@ export function ReactionPrompt({
                 variant="secondary"
                 disabled={busy}
                 title={
-                  reaction.kind === "attack-would-hit" ? "Keep the reaction. The attack hits." : "Keep the reaction."
+                  reaction.kind === "attack-would-hit"
+                    ? "Keep the reaction. The attack hits."
+                    : reaction.kind === "casts-spell"
+                      ? "Keep the reaction. The spell goes ahead."
+                      : "Keep the reaction."
                 }
                 onClick={() => answer(false)}
               >
-                {reaction.kind === "attack-would-hit" ? "Take the hit" : "Decline"}
+                {reaction.kind === "attack-would-hit" ? "Take the hit" : reaction.kind === "casts-spell" ? "Let it go" : "Decline"}
               </Button>
               <button
                 type="button"
@@ -322,7 +360,9 @@ export function ReactionPrompt({
                 title={
                   reaction.kind === "attack-would-hit"
                     ? `Spend the reaction for +${reaction.acBonus} AC against the attack.`
-                    : `Spend the reaction against ${reaction.sourceName}.`
+                    : reaction.kind === "casts-spell"
+                      ? `Spend the reaction to try to stop ${reaction.sourceName}'s spell.`
+                      : `Spend the reaction against ${reaction.sourceName}.`
                 }
                 onClick={() => answer(true)}
               >

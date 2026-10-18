@@ -134,7 +134,7 @@ export type PlayerPendingSave = Omit<
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
  *  is in the player's own dice log; `lastsUntilNextTurn` says the reactor's reaction lasts (Shield). */
-export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack"> & {
+export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack" | "parkedCast"> & {
   attackRoll?: number;
   lastsUntilNextTurn?: true;
 };

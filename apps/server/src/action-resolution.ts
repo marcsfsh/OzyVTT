@@ -58,6 +58,7 @@ import {
   parkReaction
 } from "./resolution/pending.js";
 import { markCastTurn, markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
+import { parkForCounterspell } from "./resolution/counter.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -99,6 +100,14 @@ export function resolveDefinitionAction(
   if (slowedSpellFails(ctx)) {
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
+  }
+  // A cast a Counterspell may stop waits before anything of it happens: its action is spent and it was seen cast, but
+  // its slot, its limited use and the materials it consumes wait to see whether it goes ahead.
+  if (parkForCounterspell(ctx)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
   rollAttack(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
