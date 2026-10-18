@@ -18,8 +18,19 @@ describe("the scenes the Codex names", () => {
       sessionNumber: 4,
       prep: [{ type: "encounters", title: "Fights", sceneIds: [SCENE_A, SCENE_B] }]
     });
-    const map = store.createMap({ assetId: "20000000-0000-5000-8000-000000000001", name: "Saltmere", kind: "regional" });
-    store.createMarker(map.id, { x: 10, y: 20, iconId: "pin", iconColor: "#ff2e9a", label: "Bridge", sceneIds: [SCENE_B] });
+    const map = store.createMap({
+      assetId: "20000000-0000-5000-8000-000000000001",
+      name: "Saltmere",
+      kind: "regional"
+    });
+    store.createMarker(map.id, {
+      x: 10,
+      y: 20,
+      iconId: "pin",
+      iconColor: "#ff2e9a",
+      label: "Bridge",
+      sceneIds: [SCENE_B]
+    });
 
     const answer = await get(path);
     expect(answer.status).toBe(200);

@@ -980,9 +980,7 @@ export const CodexSceneLinkSchema = z.strictObject({
       via: z.enum(["session", "prep"])
     })
   ),
-  pins: z.array(
-    z.strictObject({ id: z.uuid(), label: z.string().nullable(), mapId: z.uuid(), mapName: z.string() })
-  )
+  pins: z.array(z.strictObject({ id: z.uuid(), label: z.string().nullable(), mapId: z.uuid(), mapName: z.string() }))
 });
 export type CodexSceneLink = Wire<z.infer<typeof CodexSceneLinkSchema>>;
 export const CodexSceneLinksSchema = z.strictObject({ links: z.array(CodexSceneLinkSchema) });

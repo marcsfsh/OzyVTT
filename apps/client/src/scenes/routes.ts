@@ -94,5 +94,5 @@ export function redirectForOldMapAddress(path: string, query: URLSearchParams): 
   return pathForMap(mapId, "grid", query.get("from") === "table" ? "/table" : null);
 }
 
-/** Scenes created here and not yet in the state the server sent: their pages wait instead of saying they are gone. */
+/** Scenes created here and not yet in the state the server sent: their pages say they are opening, until it arrives. */
 export const arrivingScenes = new Set<string>();

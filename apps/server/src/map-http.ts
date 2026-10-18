@@ -18,7 +18,13 @@ import { apiErrorHandler, bearerToken, isUuidV4, pathParam, sendData, sendFailur
 import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import { deriveMapDistanceScale } from "./map-measurement.js";
-import { mapFolder, type MapCatalogEntry, type MapCatalogStore, type MapKind, type PublicMapAsset } from "./map-catalog.js";
+import {
+  mapFolder,
+  type MapCatalogEntry,
+  type MapCatalogStore,
+  type MapKind,
+  type PublicMapAsset
+} from "./map-catalog.js";
 import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 
 const MAP_COLLECTION = "/api/v1/map-assets";

@@ -239,12 +239,7 @@ export function reorderScenes(state: GameState, order: readonly string[]) {
 
 /** Park-and-resume: parks the live combat into its slot (or an implicit scene), then resumes the target
  *  and empties its slot. */
-export function activateScene(
-  state: GameState,
-  sceneId: string,
-  implicitSceneId: string,
-  now: number = Date.now()
-) {
+export function activateScene(state: GameState, sceneId: string, implicitSceneId: string, now: number = Date.now()) {
   const target = state.combat.scenes.find((scene) => scene.id === sceneId);
   if (!target) throw new CommandRejectedError("That scene no longer exists.");
   if (state.combat.activeSceneId === sceneId) throw new CommandRejectedError("That scene is already live.");

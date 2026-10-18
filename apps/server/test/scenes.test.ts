@@ -417,8 +417,18 @@ describe("scene stamps", () => {
 
   it("stamps when a scene was made, last changed and last made live", () => {
     const game = state();
-    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY, 100);
-    createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY, 150);
+    createScene(
+      game,
+      { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] },
+      GEOMETRY,
+      100
+    );
+    createScene(
+      game,
+      { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] },
+      GEOMETRY,
+      150
+    );
     expect(sceneOf(game, IDS.sceneA)).toMatchObject({ createdAt: 100, updatedAt: 100 });
     expect(sceneOf(game, IDS.sceneA).liveAt).toBeUndefined();
     activateScene(game, IDS.sceneA, IDS.implicit, 200);
@@ -431,8 +441,18 @@ describe("scene stamps", () => {
 
   it("marks a scene changed by any edit to its record, and leaves the others and the one going live alone", () => {
     const game = state();
-    createScene(game, { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] }, GEOMETRY, 100);
-    createScene(game, { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] }, GEOMETRY, 100);
+    createScene(
+      game,
+      { sceneId: IDS.sceneA, name: "A", mapAssetId: IDS.map1, combatantIds: [IDS.alpha] },
+      GEOMETRY,
+      100
+    );
+    createScene(
+      game,
+      { sceneId: IDS.sceneB, name: "B", mapAssetId: IDS.map2, combatantIds: [IDS.beta] },
+      GEOMETRY,
+      100
+    );
     const edit = (change: (draft: typeof game) => void, now: number) => {
       const before = structuredClone(game);
       change(game);
