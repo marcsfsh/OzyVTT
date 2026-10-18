@@ -34,6 +34,16 @@
   --nh-rim-w: var(--rim-w);
   --nh-sheen: none;
   --nh-glow: none;
+  /* The label's ink. `currentColor` follows the button's own colour; the primary and the disabled state name an
+     ink, because the plate behind them is the primitive's and a page can't repaint it. */
+  --nh-ink: currentColor;
+}
+
+/* The label box, `<nh-label>`, takes no layout of its own (the children sit in the button's flex row) and carries
+   the ink. */
+.nh-btn > nh-label {
+  display: contents;
+  color: var(--nh-ink);
 }
 
 .nh-btn::before {
@@ -70,12 +80,13 @@
 }
 
 /* Primary: the sun frame. A 3px sunset edge around a dark warm-tinted fill, with the label in Bungee. The label is
-   white on dark (deep ink on pale in daybreak), never dark ink on the sun itself. */
+   white on dark (deep ink on pale in Day and Dawn), never dark ink on the sun itself. */
 .nh-btn--primary {
   font: 400 var(--fs-body) / 1 var(--font-display);
   letter-spacing: 0.02em;
   color: var(--primary-ink);
   text-shadow: var(--primary-ink-shadow);
+  --nh-ink: var(--primary-ink);
 }
 .nh-btn--primary::before {
   border: 3px solid transparent;
@@ -137,9 +148,12 @@
 }
 
 /* Disabled is a flat box: no edge, no sheen, no glow. The primary loses its frame too, so a disabled primary can't
-   read as the thing to press. */
+   read as the thing to press. It dims each property and never the whole button: the client's bare
+   `button:disabled { opacity }` would take the label under 4.5:1. */
 .nh-btn:disabled {
+  opacity: 1;
   color: var(--text-muted);
+  --nh-ink: var(--text-muted);
   text-shadow: none;
   cursor: not-allowed;
   --nh-fill: var(--surface-2);
@@ -206,6 +220,7 @@
   --nh-sheen: none;
 }
 .nh-iconbtn:disabled {
+  opacity: 1;
   color: var(--text-muted);
   cursor: not-allowed;
   --nh-fill: var(--surface-2);

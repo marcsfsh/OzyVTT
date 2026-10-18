@@ -60,6 +60,7 @@
 /* Disabled dims the ink alone (DESIGN: never group opacity); the pressed option keeps its underline, so the
    standing value still reads. */
 .nh-segmented-option:disabled {
+  opacity: 1;
   color: var(--text-muted);
   cursor: not-allowed;
 }

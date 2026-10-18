@@ -116,17 +116,6 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
-.dice-form button {
-  background: var(--primary);
-  color: var(--text-on-neon);
-  border: 0;
-  text-align: center;
-  padding: 0.85rem 1.2rem;
-}
-.dice-form button:hover:not(:disabled) {
-  background: var(--magenta-hi);
-  box-shadow: var(--glow-magenta);
-}
 .roll-list-head {
   display: flex;
   align-items: center;

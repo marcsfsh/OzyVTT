@@ -43,7 +43,7 @@
 .nh-card-actions .nh-btn--primary:not(:hover):not(:active):not(:focus-visible) {
   --nh-fill: transparent;
   --nh-rim: var(--magenta);
-  color: var(--magenta-text);
+  --nh-ink: var(--magenta-text);
 }
 
 .scene-live-note {

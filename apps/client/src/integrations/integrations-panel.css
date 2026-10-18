@@ -99,14 +99,6 @@
 }
 .integration-form button[type="submit"] {
   grid-column: 1 / -1;
-  background: var(--primary);
-  color: var(--text-on-neon);
-  border: 0;
-  padding: 0.85rem 1.2rem;
-}
-.integration-form button[type="submit"]:hover:not(:disabled) {
-  background: var(--magenta-hi);
-  box-shadow: var(--glow-magenta);
 }
 .integration-list {
   list-style: none;
