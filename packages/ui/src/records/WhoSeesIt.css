@@ -1,0 +1,137 @@
+/* Who sees a record or a part of one. Hidden is violet with the crossed eye, Everyone is indigo with the eye,
+   chosen characters are cyan with a person. */
+.nh-aud {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.75rem;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 var(--fs-xs) / 1.1 var(--font-label);
+  white-space: nowrap;
+}
+.nh-aud-icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+.nh-aud.is-everyone {
+  border-color: color-mix(in srgb, var(--indigo) 70%, transparent);
+  color: var(--indigo-text);
+}
+.nh-aud.is-hidden {
+  border-color: var(--rim-gm);
+  background: color-mix(in srgb, var(--rim-gm) 14%, var(--surface-1));
+  color: var(--violet-hi);
+}
+.nh-aud.is-characters {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, var(--surface-2));
+  color: var(--cyan-hi);
+}
+/* The control is the chip, raised as a trigger with the menu's own caret. */
+/* As small as the chip it is, with the full tap height around it. */
+.nh-menu-trigger.nh-aud {
+  min-height: 1.75rem;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  font: 600 var(--fs-xs) / 1.1 var(--font-label);
+}
+.nh-menu-trigger.nh-aud::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: max(100%, var(--tap-min));
+  transform: translateY(-50%);
+}
+.nh-menu-trigger.nh-aud::before {
+  border-color: inherit;
+  background: transparent;
+}
+.nh-aud-item-hidden {
+  color: var(--violet-hi);
+}
+
+/* A field's switch over its word: the word changes, the switch stays put. */
+.nh-fieldaud {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 4.5rem;
+}
+.nh-fieldaud .nh-switch {
+  min-height: 1.5rem;
+}
+.nh-fieldaud-word {
+  color: var(--text-dim);
+  font: 600 var(--fs-2xs) / 1 var(--font-label);
+}
+.nh-fieldaud.is-hidden .nh-fieldaud-word {
+  color: var(--violet-hi);
+}
+
+/* ----- Who sees a whole record: three segments with the word under them ----- */
+.nh-whoswitch {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.nh-whoswitch-track {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.nh-whoswitch-option,
+.nh-menu-trigger.nh-whoswitch-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.1 var(--font-label);
+  cursor: pointer;
+}
+.nh-whoswitch-option:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+.nh-whoswitch-option.is-on {
+  background: var(--tab-on);
+  box-shadow: var(--tab-on-sheen);
+  color: var(--text);
+}
+.nh-whoswitch-option.is-hidden.is-on {
+  border-color: var(--rim-gm);
+  color: var(--violet-hi);
+}
+.nh-whoswitch-option.is-everyone.is-on {
+  border-color: var(--indigo);
+  color: var(--indigo-text);
+}
+.nh-whoswitch-option.is-characters.is-on {
+  border-color: var(--cyan);
+  color: var(--cyan-hi);
+}
+.nh-whoswitch-word {
+  max-width: 22rem;
+  overflow: hidden;
+  color: var(--text-dim);
+  font: 600 var(--fs-2xs) / 1.2 var(--font-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nh-whoswitch-word.is-reason {
+  color: var(--text-muted);
+}

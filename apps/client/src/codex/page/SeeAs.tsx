@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { IconEye, IconUser, Menu, MenuItem, Switch } from "@vtt/ui";
+import { IconEye, IconUser, Menu, MenuItem, Switch, type PartyCharacter } from "@vtt/ui";
 import { codexApi } from "../api";
-import type { PartyCharacter } from "../shared/audience";
 
 /** Who the GM is reading as: Everyone (null) or one party character. */
 export type SeeAsViewer = Readonly<{ characterId: string | null }>;

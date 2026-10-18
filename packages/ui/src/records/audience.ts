@@ -1,6 +1,7 @@
 /**
- * Who sees a piece of the Codex, in the remaster's words: Hidden (the GM only), Everyone, or chosen party
- * characters. One copy of the words, so a block, a field, an objective and a list row all say the same thing.
+ * Who sees a record or a part of one, in the record surfaces' words: Hidden (the GM only), Everyone, or chosen
+ * party characters. One copy of the words, so a Codex block, a field, an objective, a homebrew record and a list
+ * row all say the same thing.
  */
 
 export type AudienceKind = "hidden" | "everyone" | "characters";

@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, IconCheck, IconChevronRight, IconEyeOff, cx, useToast } from "@vtt/ui";
-import { Dropdown } from "../codex/shared/Dropdown";
-import { AudienceChip, WhoSeesItSwitch } from "../codex/shared/WhoSeesIt";
-import { HIDDEN, toggleCharacter, type Audience } from "../codex/shared/audience";
+import {
+  Button,
+  IconCheck,
+  IconChevronRight,
+  IconEyeOff,
+  cx,
+  useToast,
+  Dropdown,
+  AudienceChip,
+  WhoSeesItSwitch,
+  HIDDEN,
+  toggleCharacter,
+  type Audience
+} from "@vtt/ui";
 import { homebrewApi, type HomebrewRecordDocument, type HomebrewRecordSummary } from "../homebrew/api";
 import { TickDropdown } from "../scenes/listTools";
 import { useCompendium } from "./context";

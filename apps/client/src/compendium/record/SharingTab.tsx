@@ -1,6 +1,4 @@
-import { IconEyeOff, IconUser, cx } from "@vtt/ui";
-import { WhoSeesItSwitch } from "../../codex/shared/WhoSeesIt";
-import { toggleCharacter, type PartyCharacter } from "../../codex/shared/audience";
+import { IconEyeOff, IconUser, cx, WhoSeesItSwitch, toggleCharacter, type PartyCharacter } from "@vtt/ui";
 import type { HomebrewRecordDocument, RecordAudience } from "../../homebrew/api";
 import type { Kind } from "../kinds";
 import { placesFor } from "./words";
@@ -70,7 +68,7 @@ export function SharingTab({
             const since = on ? stamp(doc.audience === "everyone" ? "everyone" : character.id) : null;
             return (
               <li key={character.id}>
-                <label className={cx("cx-check", on && "is-on")}>
+                <label className={cx("nh-check", on && "is-on")}>
                   <input
                     type="checkbox"
                     checked={on}

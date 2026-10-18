@@ -1,8 +1,19 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import { Alert, Button, Chip, IconDownload, Input, SegmentedControl, Skeleton } from "@vtt/ui";
-import { Dropdown } from "../codex/shared/Dropdown";
-import { FilterChips, FilterFlyout, FiltersButton } from "../codex/shared/FilterFlyout";
-import { SortDialog, type SortLevelOf } from "../codex/shared/SortDialog";
+import {
+  Alert,
+  Button,
+  Chip,
+  IconDownload,
+  Input,
+  SegmentedControl,
+  Skeleton,
+  Dropdown,
+  FilterChips,
+  FilterFlyout,
+  FiltersButton,
+  SortDialog,
+  type SortLevelOf
+} from "@vtt/ui";
 import { apiRequest, jsonRequest } from "../lib/api";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { SettingsPrimary } from "../settings/SettingRow";
@@ -155,7 +166,7 @@ export function ApiReference({
     >
       {() => (
         <>
-          <div className="cx-dropdown-row">
+          <div className="nh-dropdown-row">
             <Button size="sm" variant="ghost" onClick={() => set({ tags: null })}>
               Select all
             </Button>
@@ -164,7 +175,7 @@ export function ApiReference({
             </Button>
           </div>
           {tags.map((tag) => (
-            <label key={tag} className="cx-check">
+            <label key={tag} className="nh-check">
               <input
                 type="checkbox"
                 checked={tagsOn.includes(tag)}

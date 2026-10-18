@@ -9,7 +9,10 @@ import {
   SegmentedControl,
   Skeleton,
   Tabs,
-  useToast
+  useToast,
+  EVERYONE,
+  HIDDEN,
+  AudienceChip
 } from "@vtt/ui";
 import {
   countOf,
@@ -29,8 +32,6 @@ import { CODEX_ROOT, atlasPath, pagePath } from "../routes";
 import type { QuickCreateRequest } from "../QuickCreate";
 import { useCodexQuery } from "../useCodexQuery";
 import { CodexPhoneBar } from "../shell/PhoneBar";
-import { EVERYONE, HIDDEN } from "../shared/audience";
-import { AudienceChip } from "../shared/WhoSeesIt";
 import { AtlasMap, type MapMenuItem, type MapPoint } from "./AtlasMap";
 import { AtlasCrumbs, LayerChips, LayersMenu, MapsInside, PinFilter, PinTable } from "./AtlasPanel";
 import { factionGround, peopleAtPins, useAtlasLayers } from "./layers";
@@ -575,8 +576,8 @@ export function AtlasView({
     <div className="atlas-visline">
       <AudienceChip value={currentMap.revealedToPlayers ? EVERYONE : HIDDEN} party={[]} />
       {(hiddenPinCount > 0 || hiddenMapCount > 0) && (
-        <span className="cx-aud is-hidden">
-          <IconEyeOff className="cx-aud-icon" />
+        <span className="nh-aud is-hidden">
+          <IconEyeOff className="nh-aud-icon" />
           {[
             hiddenPinCount > 0 ? countOf(hiddenPinCount, "pin") : null,
             hiddenMapCount > 0 ? countOf(hiddenMapCount, "map") : null

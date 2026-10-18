@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, IconChevronRight, IconSparkle, Skeleton, cx } from "@vtt/ui";
+import { Alert, Button, IconChevronRight, IconSparkle, Skeleton, cx, AudienceChip } from "@vtt/ui";
 import type { CodexRecordKind } from "@vtt/domain";
 import { sessionApi } from "../api";
 import { findApi } from "../api-records";
@@ -14,7 +14,6 @@ import { atlasPath, journalEntryPath, pathForHit, pathForSection, questPath, sea
 import { withQuery } from "../../router";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "../shell/context";
-import { AudienceChip } from "../shared/WhoSeesIt";
 import { DateBar } from "../shared/DateBar";
 import { MiniMap } from "../shared/MiniMap";
 import { KIND_GROUPS, type KindGroup } from "../page/document";

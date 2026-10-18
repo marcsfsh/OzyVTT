@@ -471,14 +471,14 @@
   min-height: 0;
   border-right: 1px solid var(--line-raised);
 }
-.cx-flyout.cp-table-flyout {
+.nh-flyout.cp-table-flyout {
   width: min(440px, 100%);
   padding-inline: 0;
 }
-.cp-table-flyout .cx-flyout-head {
+.cp-table-flyout .nh-flyout-head {
   padding-inline: var(--space-3);
 }
-.cp-table-flyout .cx-flyout-body {
+.cp-table-flyout .nh-flyout-body {
   padding-bottom: 0;
 }
 

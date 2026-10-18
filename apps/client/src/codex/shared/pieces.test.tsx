@@ -7,7 +7,6 @@ vi.mock("../api", async (actual) => (await import("../../../test/codex-fakes")).
 import type { CodexCalendar, CodexInWorldDate } from "@vtt/domain";
 import { api, block, resetFakes } from "../../../test/codex-fakes";
 import { DateBar, worldDateLabel } from "./DateBar";
-import { Dropdown } from "./Dropdown";
 import { linksSentence, stampOf } from "./reveals";
 
 const CALENDAR: CodexCalendar = {
@@ -77,27 +76,6 @@ describe("The date bar", () => {
   it("renders nothing without a calendar", () => {
     const { container } = render(<DateBar calendar={null} role="gm" token="gm" />);
     expect(container).toBeEmptyDOMElement();
-  });
-});
-
-describe("The dropdown", () => {
-  it("opens its panel from the button, and the panel can close itself", async () => {
-    const user = userEvent.setup();
-    render(
-      <Dropdown label="Visibility: All">
-        {(close) => (
-          <button type="button" onClick={close}>
-            Hidden
-          </button>
-        )}
-      </Dropdown>
-    );
-    const button = screen.getByRole("button", { name: "Visibility: All" });
-    expect(button).toHaveAttribute("aria-expanded", "false");
-    await user.click(button);
-    expect(button).toHaveAttribute("aria-expanded", "true");
-    await user.click(screen.getByRole("button", { name: "Hidden" }));
-    expect(button).toHaveAttribute("aria-expanded", "false");
   });
 });
 

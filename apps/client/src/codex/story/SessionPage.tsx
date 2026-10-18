@@ -13,7 +13,9 @@ import {
   SegmentedControl,
   Select,
   TagInput,
-  useToast
+  useToast,
+  revealedLabel,
+  type PartyCharacter
 } from "@vtt/ui";
 import type {
   CodexAutosaveSettings,
@@ -36,7 +38,6 @@ import { CodexIcon } from "../icons";
 import { liveApi, prepSessionApi, templateApi } from "../prep/api";
 
 import { sessionTitle } from "../sessions";
-import { revealedLabel, type PartyCharacter } from "../shared/audience";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexQuery } from "../useCodexQuery";
 import { realDateLabel, recordDay, sessionDays } from "./model";

@@ -1,4 +1,4 @@
-import type { SortLevelOf } from "../codex/shared/SortDialog";
+import { type SortLevelOf } from "@vtt/ui";
 import { GROUPS, METHOD_ORDER, type OpenApiDocument, type Operation } from "./openapi-model";
 
 /**

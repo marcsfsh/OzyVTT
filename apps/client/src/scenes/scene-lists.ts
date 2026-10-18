@@ -1,4 +1,4 @@
-import type { SortDirection, SortLevelOf } from "../codex/shared/SortDialog";
+import { type SortDirection, type SortLevelOf } from "@vtt/ui";
 import type { SceneFacts, SceneState } from "./sceneFacts";
 import { modifiedAt } from "./sceneFacts";
 

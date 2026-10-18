@@ -1,12 +1,22 @@
 import { useCallback } from "react";
-import { Badge, Button, HiddenFromPlayers, IconButton, IconChevronRight, IconPencil, IconPlay, IconX } from "@vtt/ui";
+import {
+  Badge,
+  Button,
+  HiddenFromPlayers,
+  IconButton,
+  IconChevronRight,
+  IconPencil,
+  IconPlay,
+  IconX,
+  EVERYONE,
+  HIDDEN,
+  AudienceChip
+} from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
 import { journalApi } from "../api";
 import { ENTITY_DEFS } from "../entities";
 import { CodexIcon, EntityIcon, pinSwatchVar } from "../icons";
 import { useCodexQuery } from "../useCodexQuery";
-import { EVERYONE, HIDDEN } from "../shared/audience";
-import { AudienceChip } from "../shared/WhoSeesIt";
 
 type ViewedPin = Readonly<{
   id: string;

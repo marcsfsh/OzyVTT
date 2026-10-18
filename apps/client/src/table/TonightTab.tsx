@@ -1,5 +1,19 @@
 import { useCallback, useMemo, useState } from "react";
-import { Alert, Badge, Button, IconEyeOff, Input, Skeleton, useToast } from "@vtt/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  IconEyeOff,
+  Input,
+  Skeleton,
+  useToast,
+  FieldAudienceToggle,
+  EVERYONE,
+  characterNames,
+  namesLabel,
+  type Audience,
+  type PartyCharacter
+} from "@vtt/ui";
 import {
   dateToInstant,
   formatWorldDate,
@@ -17,8 +31,6 @@ import { liveApi } from "../codex/prep/api";
 import { QUEST_STATUS_LABEL } from "../codex/quests";
 import { pagePath, pathForSection, questPath } from "../codex/routes";
 import { RevealPanel } from "../codex/shared/RevealPanel";
-import { FieldAudienceToggle } from "../codex/shared/WhoSeesIt";
-import { EVERYONE, characterNames, namesLabel, type Audience, type PartyCharacter } from "../codex/shared/audience";
 import { useCodexQuery } from "../codex/useCodexQuery";
 import { navigate } from "../router";
 import "../codex/shared/shared.css";

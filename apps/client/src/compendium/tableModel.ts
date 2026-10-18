@@ -1,5 +1,5 @@
 import type { HomebrewTableColumns } from "@vtt/api-contract";
-import type { SortDirection, SortLevelOf } from "../codex/shared/SortDialog";
+import type { SortDirection, SortLevelOf } from "@vtt/ui";
 import { dayOf, dayRange, readSort, setOrDelete } from "../scenes/scene-lists";
 import { KIND_COLUMNS, KIND_FILTERS, kindLabel, kindPlural, type Kind, type Names } from "./kinds";
 

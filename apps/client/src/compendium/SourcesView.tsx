@@ -501,7 +501,7 @@ function ExportDialog({ packs, onClose }: Readonly<{ packs: readonly HomebrewPac
           <ul className="cp-checklist scroll-y" aria-label="Published records">
             {published.map((row) => (
               <li key={row.id}>
-                <label className="cx-check">
+                <label className="nh-check">
                   <input
                     type="checkbox"
                     checked={chosen.has(row.id)}

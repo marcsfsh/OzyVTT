@@ -72,8 +72,9 @@ its matching line is hidden text. The player home lists what is new since a time
 - A page reads as one document with its blocks in place, the metadata panel beside it and a Timeline of its reveals at
   its end. Edit opens the same address in the writer (`?mode=edit`), where a block is written in place and each field
   has its own Who sees it switch.
-- Shared pieces live in `codex/shared/`: the Who sees it control and its chip, the hidden block, the Reveal panel, the
-  flyout filter panel, the page picker and the date bar. Hidden is violet with the crossed eye and the word Hidden;
+- Shared pieces live in `codex/shared/`: the hidden block, the Reveal panel, the page picker and the date bar. The Who
+  sees it control and its chip and the flyout filter panel started there and moved to `packages/ui/src/records/` once
+  the Compendium, Scenes and Settings used them too. Hidden is violet with the crossed eye and the word Hidden;
   a revealed thing says who it is revealed to.
 - Search is a table over `GET /codex/search` with its filters in the address. The reveal audit is now Search filtered
   to Hidden plus Home's reveal check. Relationships centre on a page with three views: Web, Factions grid (with the

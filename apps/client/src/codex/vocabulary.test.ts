@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { readSource, scanCopy } from "../copy-scan";
+import { recordPieceSources } from "../convention-sources";
 import { CAMPAIGN_PARTS, CODEX_BAR, CODEX_PHONE_TABS, SECTION_TITLE, codexDestinations } from "./routes";
 import { CHRONICLE_KIND_META } from "./chronicle";
 
@@ -60,12 +61,21 @@ function codexSources(): readonly string[] {
 }
 
 describe("The canonical glossary", () => {
-  const strings = scanCopy(codexSources().map((file) => ({ file, read: readSource(`${CODEX_DIR}${file}`) })));
+  const strings = scanCopy([
+    ...codexSources().map((file) => ({ file, read: readSource(`${CODEX_DIR}${file}`) })),
+    ...recordPieceSources()
+  ]);
 
   it("reads enough of the Codex to be worth trusting", () => {
     // Guard against a scan that silently matches nothing. The floor keeps headroom on purpose.
     expect(codexSources().length).toBeGreaterThan(25);
     expect(strings.length).toBeGreaterThan(400);
+  });
+
+  it("reads the record pieces in @vtt/ui with the Codex", () => {
+    const at = (file: string, text: string) => strings.some((entry) => entry.file === file && entry.text === text);
+    expect(at("packages/ui/src/records/WhoSeesIt.tsx", "Characters")).toBe(true);
+    expect(at("packages/ui/src/records/SortDialog.tsx", "Add a level")).toBe(true);
   });
 
   it("sees the object-literal copy the old scanner was blind to", () => {

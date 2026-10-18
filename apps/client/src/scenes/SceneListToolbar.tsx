@@ -1,5 +1,4 @@
-import { Button, Eyebrow } from "@vtt/ui";
-import { FilterChips, FilterFlyout, FiltersButton } from "../codex/shared/FilterFlyout";
+import { Button, Eyebrow, FilterChips, FilterFlyout, FiltersButton } from "@vtt/ui";
 import type { MapAsset } from "../maps/map-catalog";
 import { ModifiedDropdown, OneChoice, SortButton, TickDropdown } from "./listTools";
 import { STATE_LABEL } from "./sceneFacts";
@@ -18,7 +17,7 @@ export const SCENE_FILTERS_ID = "sc-scene-filters";
 
 /**
  * The Scenes table's toolbar: Filters, the State dropdown, the Modified range, how many rows show and Sort. The
- * dropdowns, the flyout and the Sort dialog are the Codex's shared pieces.
+ * dropdowns, the flyout and the Sort dialog come from `@vtt/ui`.
  */
 export function SceneListToolbar({
   filters,

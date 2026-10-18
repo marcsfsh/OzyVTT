@@ -1,10 +1,11 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { readSource, scanCopy } from "../copy-scan";
+import { recordPieceSources } from "../convention-sources";
 
 /**
  * The Compendium's words as a test. It is a record surface, so it says who sees a record the way the Codex does:
- * Hidden, Everyone, or the characters' names ("Revealed to Lyra Emberwise"), through the Codex's WhoSeesIt. The play
+ * Hidden, Everyone, or the characters' names ("Revealed to Lyra Emberwise"), through WhoSeesIt in `@vtt/ui`. The play
  * surfaces' "Shown to players" and "Hidden from players" stay out of it, and so do the words those two retired.
  */
 
@@ -26,7 +27,11 @@ const files = () =>
     .sort();
 
 describe("The Compendium's words", () => {
-  const strings = scanCopy(files().map((file) => ({ file, read: readSource(`${DIR}${file}`) })));
+  // The record pieces in @vtt/ui are the Compendium's too.
+  const strings = scanCopy([
+    ...files().map((file) => ({ file, read: readSource(`${DIR}${file}`) })),
+    ...recordPieceSources()
+  ]);
 
   it("reads enough of the Compendium to be worth trusting", () => {
     expect(files().length).toBeGreaterThan(15);

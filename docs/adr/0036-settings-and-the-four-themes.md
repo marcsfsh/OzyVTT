@@ -84,8 +84,8 @@ it), and its words are plain.
 
 ## Consequences and tradeoffs
 
-- Settings reuses the Codex shell's bar and tab bar styles and the Codex's `Dropdown`, `FilterFlyout` and Sort dialog
-  in place; they move to `packages/ui` when the Codex work that builds on them has landed.
+- Settings reuses the Codex shell's bar and tab bar styles. The `Dropdown`, `FilterFlyout` and Sort dialog it shares
+  with the Codex, the Compendium and Scenes moved to `packages/ui/src/records/` with Who sees it once that work landed.
 - Six sections share a phone's tab bar, so the labels are small.
 - The API reference keeps its filters and sort in the page. The address holds the open operation alone.
 - A theme switch in every app bar takes 44px of the phone bar, paid for by tighter steps and, at 320px, a tab moved

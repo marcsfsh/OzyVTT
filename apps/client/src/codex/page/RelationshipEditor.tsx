@@ -1,11 +1,10 @@
 import { useCallback, useState } from "react";
-import { Alert, Button, Eyebrow, Field, Input, Select, cx } from "@vtt/ui";
+import { Alert, Button, Eyebrow, Field, Input, Select, cx, FieldAudienceToggle } from "@vtt/ui";
 import type { CodexInWorldDate, CodexPageConnection, CodexRelationshipBegan } from "@vtt/domain";
 import { calendarApi, codexApi, CONNECTION_LABEL_MAX } from "../api";
 import { CONNECTION_LABEL_SUGGESTIONS, type EntityType } from "../entities";
 import { dateDraftOf, dateOfDraft, InWorldDateFields, type DateDraft } from "../InWorldDateFields";
 import { useCodexShell } from "../shell/context";
-import { FieldAudienceToggle } from "../shared/WhoSeesIt";
 import { PagePicker } from "../shared/PagePicker";
 import { useCodexQuery } from "../useCodexQuery";
 import { relationshipGroups, type AnyPageConnection } from "./MetaPanel";
@@ -216,12 +215,12 @@ export function RelationshipEditor({
       ))}
       <div className="cx-writerel-add">
         <Eyebrow>Add a relationship</Eyebrow>
-        <div className="cx-filterchips" role="group" aria-label="Label">
+        <div className="nh-filterchips" role="group" aria-label="Label">
           {LABEL_CHIPS.map((chip) => (
             <button
               key={chip}
               type="button"
-              className={cx("cx-filterchip", "interactive", label === chip && "is-on")}
+              className={cx("nh-filterchip", "interactive", label === chip && "is-on")}
               aria-pressed={label === chip}
               onClick={() => setLabel(label === chip ? "" : chip)}
             >

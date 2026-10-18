@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Button, IconChevron, cx } from "@vtt/ui";
-import "./shared.css";
+import { Button } from "../primitives/Button";
+import { IconChevron } from "../primitives/icons";
+import { cx } from "../primitives/util";
+import "./Dropdown.css";
 
 /**
  * A button that opens a panel of controls under it and keeps it open while they are used (several checkboxes, two
@@ -36,12 +38,12 @@ export function Dropdown({
   }, [open]);
   const close = () => {
     setOpen(false);
-    box.current?.querySelector<HTMLElement>(".cx-dropdown-button")?.focus();
+    box.current?.querySelector<HTMLElement>(".nh-dropdown-button")?.focus();
   };
   return (
     <div
       ref={box}
-      className={cx("cx-dropdown", className)}
+      className={cx("nh-dropdown", className)}
       onKeyDown={(event) => {
         if (event.key === "Escape" && open) {
           event.stopPropagation();
@@ -51,7 +53,7 @@ export function Dropdown({
     >
       <Button
         size="sm"
-        className={cx("cx-dropdown-button", open && "is-on")}
+        className={cx("nh-dropdown-button", open && "is-on")}
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((value) => !value)}
@@ -61,7 +63,7 @@ export function Dropdown({
         <IconChevron />
       </Button>
       {open && (
-        <div id={id} className={cx("cx-dropdown-panel", `is-${align}`, "anim-popover", panelClassName)}>
+        <div id={id} className={cx("nh-dropdown-panel", `is-${align}`, "anim-popover", panelClassName)}>
           {children(close)}
         </div>
       )}

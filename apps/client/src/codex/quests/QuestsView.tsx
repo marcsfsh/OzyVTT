@@ -15,7 +15,14 @@ import {
   Menu,
   MenuItem,
   Skeleton,
-  cx
+  cx,
+  FilterChips,
+  FilterFlyout,
+  FiltersButton,
+  WhoSeesItMenu,
+  HIDDEN,
+  sinceLabel,
+  type Audience
 } from "@vtt/ui";
 import { pageLinkKey, type CodexQuestStatus } from "@vtt/domain";
 import { playerCodexApi, questApi } from "../api";
@@ -28,11 +35,8 @@ import { QUEST_STATUS_LABEL, questProgress } from "../quests";
 import { pagePath, pathForSection, questPath } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "../shell/context";
-import { FilterChips, FilterFlyout, FiltersButton } from "../shared/FilterFlyout";
 import { HiddenBlock } from "../shared/HiddenBlock";
 import { RevealPanel } from "../shared/RevealPanel";
-import { WhoSeesItMenu } from "../shared/WhoSeesIt";
-import { HIDDEN, sinceLabel, type Audience } from "../shared/audience";
 import { createQuest } from "../creates";
 import { useCodexQuery } from "../useCodexQuery";
 import { useConfirm } from "../../components/feedback";
@@ -379,10 +383,10 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
   const reveal = (
     <Menu
       label={`Who can open this quest: ${quest.revealedToPlayers ? "Everyone" : "Hidden"}`}
-      triggerClassName={cx("cx-aud", quest.revealedToPlayers ? "is-everyone" : "is-hidden")}
+      triggerClassName={cx("nh-aud", quest.revealedToPlayers ? "is-everyone" : "is-hidden")}
       trigger={
         <>
-          {quest.revealedToPlayers ? <IconEye className="cx-aud-icon" /> : <IconEyeOff className="cx-aud-icon" />}
+          {quest.revealedToPlayers ? <IconEye className="nh-aud-icon" /> : <IconEyeOff className="nh-aud-icon" />}
           {quest.revealedToPlayers ? "Revealed to everyone" : "Hidden"}
         </>
       }

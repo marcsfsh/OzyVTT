@@ -545,7 +545,9 @@ and render the section the address names from `shell/sections.tsx`, each entry a
 the shell through context (`shell/context.ts`): the role and token, the address, and for the GM the shared feeds,
 the party and quick create. A player's views read only `playerCodexApi` and the player shapes of `api-records.ts`,
 which holds the record reads and writes (pages and quests with their blocks and audiences, search, home). The views
-live in their own folders (`home/`, `search/`, `page/`, `quests/`, `relationships/`) over the pieces in `shared/`.
+live in their own folders (`home/`, `search/`, `page/`, `quests/`, `relationships/`) over the pieces in `shared/`. Who
+sees it, the filter flyout, the dropdown and the Sort dialog are shared with the Compendium, Scenes, Maps and Settings,
+so they live in `@vtt/ui` (`packages/ui/src/records/`).
 A page's editor (`page/DocEditor.tsx`) writes the player text and the hidden blocks in one document;
 `page/document.ts` places blocks by `codexParagraphs` from `@vtt/domain`, the rule the server assembles bodies by.
 The table's Codex tab is `table/CodexTab.tsx`, over the same reads.

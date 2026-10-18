@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Button, IconEye, IconHome, IconList, IconPlus, Kbd, cx } from "@vtt/ui";
-import type { PartyCharacter } from "../codex/shared/audience";
-import { FilterFlyout } from "../codex/shared/FilterFlyout";
+import { Button, IconEye, IconHome, IconList, IconPlus, Kbd, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
 import { CodexIcon } from "../codex/icons";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";

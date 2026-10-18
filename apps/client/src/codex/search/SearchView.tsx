@@ -1,5 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Eyebrow, IconEye, IconEyeOff, Input, Skeleton, cx } from "@vtt/ui";
+import {
+  Alert,
+  Button,
+  Eyebrow,
+  IconEye,
+  IconEyeOff,
+  Input,
+  Skeleton,
+  cx,
+  AudienceChip,
+  Dropdown,
+  SortDialog,
+  EVERYONE,
+  HIDDEN
+} from "@vtt/ui";
 import type { CodexEntityType, CodexRecordKind } from "@vtt/domain";
 import { findApi } from "../api-records";
 import type { CodexSearchHit, CodexSearchType, PlayerCodexSearchHit } from "@vtt/domain";
@@ -8,10 +22,6 @@ import { CodexIcon, EntityIcon } from "../icons";
 import { pathForHit } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell } from "../shell/context";
-import { AudienceChip } from "../shared/WhoSeesIt";
-import { Dropdown } from "../shared/Dropdown";
-import { SortDialog } from "../shared/SortDialog";
-import { EVERYONE, HIDDEN } from "../shared/audience";
 import { KIND_GROUPS } from "../page/document";
 import { useCodexQuery } from "../useCodexQuery";
 import {
@@ -182,7 +192,7 @@ export function SearchView() {
     <Dropdown label={typeLabel} panelClassName="cx-typemenu scroll-y">
       {() => (
         <>
-          <div className="cx-dropdown-row">
+          <div className="nh-dropdown-row">
             <Button size="sm" variant="ghost" onClick={() => update({ types: null })}>
               Select all
             </Button>
@@ -191,7 +201,7 @@ export function SearchView() {
             </Button>
           </div>
           {SEARCH_TYPE_ORDER.map((type) => (
-            <label key={type} className="cx-check">
+            <label key={type} className="nh-check">
               <input
                 type="checkbox"
                 checked={typesOn.includes(type)}
@@ -227,7 +237,7 @@ export function SearchView() {
           >
             {(close) =>
               (["all", "revealed", "hidden"] as const).map((choice) => (
-                <label key={choice} className="cx-check">
+                <label key={choice} className="nh-check">
                   <input
                     type="radio"
                     name="cx-search-visibility"
@@ -243,10 +253,10 @@ export function SearchView() {
             }
           </Dropdown>
         )}
-        <Dropdown label={modifiedText} panelClassName="cx-datemenu">
+        <Dropdown label={modifiedText} panelClassName="nh-datemenu">
           {() => (
             <>
-              <label className="cx-datefield">
+              <label className="nh-datefield">
                 <span>From</span>
                 <Input
                   type="date"
@@ -254,7 +264,7 @@ export function SearchView() {
                   onChange={(event) => update({ from: event.target.value || null })}
                 />
               </label>
-              <label className="cx-datefield">
+              <label className="nh-datefield">
                 <span>To</span>
                 <Input
                   type="date"
@@ -432,12 +442,12 @@ function PhoneSearch({
     <div className="cx-search is-phone scroll-y">
       <CodexPhoneBar content={box} actions={false} />
       <div className="cx-search-phonebody">
-        <div className="cx-filterchips" role="group" aria-label="Kinds">
+        <div className="nh-filterchips" role="group" aria-label="Kinds">
           {chips.map((chip) => (
             <button
               key={chip.id}
               type="button"
-              className={cx("cx-filterchip", "interactive", onChip === chip.id && "is-on")}
+              className={cx("nh-filterchip", "interactive", onChip === chip.id && "is-on")}
               aria-pressed={onChip === chip.id}
               onClick={() => onTypes(chip.types)}
             >

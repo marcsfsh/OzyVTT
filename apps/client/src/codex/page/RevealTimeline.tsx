@@ -1,8 +1,7 @@
-import { Eyebrow } from "@vtt/ui";
+import { Eyebrow, characterNames, type PartyCharacter } from "@vtt/ui";
 import { entityDef } from "../entities";
 import type { CodexEntityType } from "@vtt/domain";
 import type { CodexBlock, PlayerCodexBlock } from "@vtt/domain";
-import { characterNames, type PartyCharacter } from "../shared/audience";
 
 type Row = Readonly<{
   at: string;

@@ -1,4 +1,6 @@
-import { IconCheck, IconEye, IconEyeOff, IconUser, Menu, MenuItem, cx } from "@vtt/ui";
+import { Menu, MenuItem } from "../primitives/Menu";
+import { IconCheck, IconEye, IconEyeOff, IconUser } from "../primitives/icons";
+import { cx } from "../primitives/util";
 import {
   EVERYONE,
   HIDDEN,
@@ -8,12 +10,12 @@ import {
   type Audience,
   type PartyCharacter
 } from "./audience";
-import "./shared.css";
+import "./WhoSeesIt.css";
 
 function AudienceIcon({ value }: Readonly<{ value: Audience }>) {
-  if (value.audience === "everyone") return <IconEye className="cx-aud-icon" />;
-  if (value.audience === "hidden") return <IconEyeOff className="cx-aud-icon" />;
-  return <IconUser className="cx-aud-icon" />;
+  if (value.audience === "everyone") return <IconEye className="nh-aud-icon" />;
+  if (value.audience === "hidden") return <IconEyeOff className="nh-aud-icon" />;
+  return <IconUser className="nh-aud-icon" />;
 }
 
 /**
@@ -26,7 +28,7 @@ export function AudienceChip({
   className
 }: Readonly<{ value: Audience; party: readonly PartyCharacter[]; className?: string }>) {
   return (
-    <span className={cx("cx-aud", `is-${value.audience}`, className)}>
+    <span className={cx("nh-aud", `is-${value.audience}`, className)}>
       <AudienceIcon value={value} />
       {audienceLabel(value, party)}
     </span>
@@ -63,8 +65,8 @@ export function WhoSeesItMenu({
     <Menu
       align="end"
       label={`Who sees ${what}: ${audienceLabel(value, party)}`}
-      className={cx("cx-aud-menu", className)}
-      triggerClassName={cx("cx-aud", `is-${value.audience}`)}
+      className={cx("nh-aud-menu", className)}
+      triggerClassName={cx("nh-aud", `is-${value.audience}`)}
       trigger={
         <>
           <AudienceIcon value={value} />
@@ -84,7 +86,7 @@ export function WhoSeesItMenu({
         role="menuitemradio"
         aria-checked={value.audience === "hidden"}
         icon={<IconEyeOff />}
-        className="cx-aud-item-hidden"
+        className="nh-aud-item-hidden"
         onClick={() => pick(HIDDEN)}
       >
         Hidden
@@ -115,7 +117,7 @@ export function FieldAudienceToggle({
   disabled = false
 }: Readonly<{ hidden: boolean; onChange: (hidden: boolean) => void; field: string; disabled?: boolean }>) {
   return (
-    <span className={cx("cx-fieldaud", hidden && "is-hidden")}>
+    <span className={cx("nh-fieldaud", hidden && "is-hidden")}>
       <button
         type="button"
         role="switch"
@@ -129,7 +131,7 @@ export function FieldAudienceToggle({
           <span className="nh-switch-thumb" />
         </span>
       </button>
-      <span className="cx-fieldaud-word" aria-hidden="true">
+      <span className="nh-fieldaud-word" aria-hidden="true">
         {hidden ? "Hidden" : "Everyone"}
       </span>
     </span>
@@ -164,10 +166,10 @@ export function WhoSeesItSwitch({
   const disabled = disabledReason !== null;
   const chosen = value.audience === "characters" ? value.characterIds : [];
   const segment = (audience: Audience["audience"]) =>
-    cx("cx-whoswitch-option", "interactive", value.audience === audience && "is-on", `is-${audience}`);
+    cx("nh-whoswitch-option", "interactive", value.audience === audience && "is-on", `is-${audience}`);
   return (
-    <div className={cx("cx-whoswitch", className)}>
-      <div className="cx-whoswitch-track" role="group" aria-label={`Who sees ${what}`}>
+    <div className={cx("nh-whoswitch", className)}>
+      <div className="nh-whoswitch-track" role="group" aria-label={`Who sees ${what}`}>
         <button
           type="button"
           className={segment("hidden")}
@@ -175,7 +177,7 @@ export function WhoSeesItSwitch({
           disabled={disabled}
           onClick={() => value.audience !== "hidden" && onChange(HIDDEN)}
         >
-          <IconEyeOff className="cx-aud-icon" />
+          <IconEyeOff className="nh-aud-icon" />
           Hidden
         </button>
         <button
@@ -185,24 +187,24 @@ export function WhoSeesItSwitch({
           disabled={disabled}
           onClick={() => value.audience !== "everyone" && onChange(EVERYONE)}
         >
-          <IconEye className="cx-aud-icon" />
+          <IconEye className="nh-aud-icon" />
           Everyone
         </button>
         {disabled || party.length === 0 ? (
           <button type="button" className={segment("characters")} disabled aria-pressed={false}>
-            <IconUser className="cx-aud-icon" />
+            <IconUser className="nh-aud-icon" />
             Characters
           </button>
         ) : (
           <Menu
             align="end"
             label={`Who sees ${what}: choose characters`}
-            className="cx-whoswitch-menu"
+            className="nh-whoswitch-menu"
             triggerClassName={segment("characters")}
             hideCaret
             trigger={
               <>
-                <IconUser className="cx-aud-icon" />
+                <IconUser className="nh-aud-icon" />
                 Characters
               </>
             }
@@ -221,7 +223,7 @@ export function WhoSeesItSwitch({
           </Menu>
         )}
       </div>
-      <span className={cx("cx-whoswitch-word", disabled && "is-reason")} role="status">
+      <span className={cx("nh-whoswitch-word", disabled && "is-reason")} role="status">
         {disabledReason ?? word ?? revealedLabel(value, party)}
       </span>
     </div>

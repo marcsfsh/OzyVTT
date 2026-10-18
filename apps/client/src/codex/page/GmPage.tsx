@@ -11,7 +11,9 @@ import {
   MenuItem,
   SegmentedControl,
   Skeleton,
-  cx
+  cx,
+  sinceLabel,
+  type Audience
 } from "@vtt/ui";
 import { pageLinkKey } from "@vtt/domain";
 import { useConfirm } from "../../components/feedback";
@@ -37,7 +39,6 @@ import { useCodexShell, useGmCodex } from "../shell/context";
 import { HiddenBlock } from "../shared/HiddenBlock";
 import { RevealPanel } from "../shared/RevealPanel";
 import { linksSentence, stampOf } from "../shared/reveals";
-import { sinceLabel, type Audience } from "../shared/audience";
 import { useCodexQuery } from "../useCodexQuery";
 import { gmDocument } from "./document";
 import {
@@ -294,10 +295,10 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   const pageAudience = (
     <Menu
       label={`Who can open this page: ${page.revealedToPlayers ? "Everyone" : "Hidden"}`}
-      triggerClassName={cx("cx-aud", page.revealedToPlayers ? "is-everyone" : "is-hidden")}
+      triggerClassName={cx("nh-aud", page.revealedToPlayers ? "is-everyone" : "is-hidden")}
       trigger={
         <>
-          {page.revealedToPlayers ? <IconEye className="cx-aud-icon" /> : <IconEyeOff className="cx-aud-icon" />}
+          {page.revealedToPlayers ? <IconEye className="nh-aud-icon" /> : <IconEyeOff className="nh-aud-icon" />}
           {page.revealedToPlayers ? "Revealed to everyone" : "Hidden"}
         </>
       }
@@ -314,7 +315,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
         role="menuitemradio"
         aria-checked={!page.revealedToPlayers}
         icon={<IconEyeOff />}
-        className="cx-aud-item-hidden"
+        className="nh-aud-item-hidden"
         onClick={() => page.revealedToPlayers && void setPageRevealed(false)}
       >
         Hide the page from players

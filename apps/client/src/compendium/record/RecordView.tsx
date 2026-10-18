@@ -13,9 +13,9 @@ import {
   SaveState,
   SegmentedControl,
   Tabs,
-  cx
+  cx,
+  WhoSeesItSwitch
 } from "@vtt/ui";
-import { WhoSeesItSwitch } from "../../codex/shared/WhoSeesIt";
 import { homebrewApi, type HomebrewRecordDocument, type HomebrewSrdRecord } from "../../homebrew/api";
 import { closingSave } from "../../homebrew/closingSaves";
 import { WIZARDS } from "../../homebrew/wizard";

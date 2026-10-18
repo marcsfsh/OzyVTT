@@ -1,5 +1,16 @@
 import { useMemo, useState } from "react";
-import { Alert, Button, Combobox, Field, Input, Modal, SegmentedControl, Select, TagInput } from "@vtt/ui";
+import {
+  Alert,
+  Button,
+  Combobox,
+  Field,
+  Input,
+  Modal,
+  SegmentedControl,
+  Select,
+  TagInput,
+  FieldAudienceToggle
+} from "@vtt/ui";
 import {
   formatWorldDate,
   type CodexChronicleRecord,
@@ -15,7 +26,6 @@ import { EntityIcon } from "../icons";
 import { InWorldDateFields, dateDraftOf, dateOfDraft, type DateDraft } from "../InWorldDateFields";
 import { sessionTitle } from "../sessions";
 import { newId } from "../../lib/ids";
-import { FieldAudienceToggle } from "../shared/WhoSeesIt";
 
 /** What the chronicle's composer writes. Standing is written with the standing value, so it isn't offered here. */
 export const COMPOSER_KINDS = ["entry", "deadline", "downtime", "milestone"] as const;

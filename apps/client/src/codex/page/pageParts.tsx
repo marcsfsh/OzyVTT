@@ -1,5 +1,14 @@
 import { useCallback } from "react";
-import { Eyebrow, IconChevronRight, IconEyeOff, IconUser, cx } from "@vtt/ui";
+import {
+  Eyebrow,
+  IconChevronRight,
+  IconEyeOff,
+  IconUser,
+  cx,
+  characterNames,
+  namesLabel,
+  type PartyCharacter
+} from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
 import { atlasApi, codexApi, playerCodexApi } from "../api";
 import { entityDef } from "../entities";
@@ -11,7 +20,6 @@ import { pathForSection } from "../routes";
 import { withQuery } from "../../router";
 import { kindGroupOf } from "./document";
 import type { CodexBlock } from "@vtt/domain";
-import { characterNames, namesLabel, type PartyCharacter } from "../shared/audience";
 
 /** Where the page's kind group lists it: People, Places, Factions, Things or Lore. */
 export const groupPath = (type: CodexEntityType) => withQuery(pathForSection("pages"), { group: kindGroupOf(type).id });
@@ -136,14 +144,14 @@ export function VisibilityCounts({
   return (
     <>
       {[...byCharacters.entries()].map(([names, count]) => (
-        <span key={names} className="cx-aud is-characters">
-          <IconUser className="cx-aud-icon" />
+        <span key={names} className="nh-aud is-characters">
+          <IconUser className="nh-aud-icon" />
           {count} {count === 1 ? "block" : "blocks"} revealed to {names}
         </span>
       ))}
       {hiddenParts.length > 0 && (
-        <span className="cx-aud is-hidden">
-          <IconEyeOff className="cx-aud-icon" />
+        <span className="nh-aud is-hidden">
+          <IconEyeOff className="nh-aud-icon" />
           {hiddenParts.join(" and ")} hidden
         </span>
       )}

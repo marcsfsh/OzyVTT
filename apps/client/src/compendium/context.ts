@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { PartyCharacter } from "../codex/shared/audience";
+import type { PartyCharacter } from "@vtt/ui";
 import type { Kind } from "./kinds";
 import type { CompendiumView } from "./routes";
 

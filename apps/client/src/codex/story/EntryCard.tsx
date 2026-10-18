@@ -1,4 +1,4 @@
-import { Badge, Button, IconEyeOff } from "@vtt/ui";
+import { Badge, Button, IconEyeOff, FieldAudienceToggle } from "@vtt/ui";
 import { formatWorldDate, type CodexChronicleRecord, type CodexPageSummary, type GmCodexCalendar } from "@vtt/domain";
 import {
   CHRONICLE_KIND_META,
@@ -18,7 +18,6 @@ import {
 } from "../chronicle";
 import { CodexIcon } from "../icons";
 import { CodexMarkdown } from "../CodexMarkdown";
-import { FieldAudienceToggle } from "../shared/WhoSeesIt";
 
 /**
  * One chronicle record in full, for the GM: its kind and date, the text players read, the hidden note, its payload,

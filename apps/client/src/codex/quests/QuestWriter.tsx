@@ -10,7 +10,10 @@ import {
   Input,
   SaveState,
   Select,
-  TagInput
+  TagInput,
+  WhoSeesItMenu,
+  EVERYONE,
+  type Audience
 } from "@vtt/ui";
 import type { CodexQuestStatus } from "@vtt/domain";
 import { questRecordApi } from "../api-records";
@@ -22,8 +25,6 @@ import { pagePath, pathForSection } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex } from "../shell/context";
 import { PagePicker } from "../shared/PagePicker";
-import { WhoSeesItMenu } from "../shared/WhoSeesIt";
-import { EVERYONE, type Audience } from "../shared/audience";
 import { DocEditor } from "../page/DocEditor";
 import { draftDocument, nextDraftKey, saveShape, type DraftItem } from "../page/document";
 

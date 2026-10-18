@@ -1,9 +1,17 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Button, Eyebrow, IconList, Input, cx } from "@vtt/ui";
-import type { PartyCharacter } from "../codex/shared/audience";
-import { Dropdown } from "../codex/shared/Dropdown";
-import { FilterChips, FilterFlyout, FiltersButton } from "../codex/shared/FilterFlyout";
-import { AudienceChip } from "../codex/shared/WhoSeesIt";
+import {
+  Button,
+  Eyebrow,
+  IconList,
+  Input,
+  cx,
+  type PartyCharacter,
+  Dropdown,
+  FilterChips,
+  FilterFlyout,
+  FiltersButton,
+  AudienceChip
+} from "@vtt/ui";
 import { ModifiedDropdown, OneChoice, SortButton, TickDropdown } from "../scenes/listTools";
 import {
   KIND_COLUMNS,

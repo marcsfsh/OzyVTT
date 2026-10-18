@@ -13,14 +13,14 @@ import {
   SaveState,
   Select,
   Switch,
-  TagInput
+  TagInput,
+  FieldAudienceToggle
 } from "@vtt/ui";
 import type { CodexAutosaveSettings, CodexMap, CodexMarker, CodexPageSummary } from "@vtt/domain";
 import { atlasApi, type CodexMarkerInput } from "../api";
 import { useCodexAutosave } from "../autosave";
 import { CodexIcon, EntityIcon, IconPicker, pinSwatchVar } from "../icons";
 import { useConfirm } from "../../components/feedback";
-import { FieldAudienceToggle } from "../shared/WhoSeesIt";
 
 type EditorScene = Readonly<{ id: string; name: string }>;
 type EditorActor = Readonly<{ id: string; name: string }>;

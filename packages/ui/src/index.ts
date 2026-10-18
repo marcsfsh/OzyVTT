@@ -129,3 +129,23 @@ export { DiceInputRow, type DiceEntryMode } from "./primitives/DiceInputRow";
 export { NameField } from "./primitives/NameField";
 export { FeatureList, type FeatureItem } from "./primitives/FeatureList";
 export { ReviewSummary, type ReviewSection } from "./primitives/ReviewSummary";
+
+/* The record surfaces' pieces (the Codex, the Compendium and the Scenes, Maps and Settings lists): who sees a record,
+   and a list's filters, dropdowns and sort. They say Hidden, Everyone or the characters' names. */
+export {
+  EVERYONE,
+  HIDDEN,
+  audienceLabel,
+  characterNames,
+  namesLabel,
+  revealedLabel,
+  sinceLabel,
+  toggleCharacter,
+  type Audience,
+  type AudienceKind,
+  type PartyCharacter
+} from "./records/audience";
+export { AudienceChip, FieldAudienceToggle, WhoSeesItMenu, WhoSeesItSwitch } from "./records/WhoSeesIt";
+export { FilterChips, FilterFlyout, FiltersButton } from "./records/FilterFlyout";
+export { Dropdown } from "./records/Dropdown";
+export { SortDialog, type SortDirection, type SortLevelOf } from "./records/SortDialog";

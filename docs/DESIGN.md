@@ -207,9 +207,9 @@ ADR-0031 records the layout and which views come from which mockup. A change to 
   block is violet with the crossed eye, the word Hidden and Reveal in its corner. A revealed one says who it reached
   ("Revealed to everyone", "Revealed to Lyra Emberwise") with its stamp and Hide again. On a phone each block is a
   card with its Who sees it menu at the top.
-- Who sees it is Everyone, Hidden or chosen characters, through the pieces in `codex/shared/`: `WhoSeesItMenu`,
-  `AudienceChip`, `FieldAudienceToggle`, `HiddenBlock` and `RevealPanel`. A field has two audiences, Everyone or
-  Hidden.
+- Who sees it is Everyone, Hidden or chosen characters, through `WhoSeesItMenu`, `AudienceChip` and
+  `FieldAudienceToggle` from `@vtt/ui` and the Codex's own `HiddenBlock` and `RevealPanel` (`codex/shared/`). A field
+  has two audiences, Everyone or Hidden.
 - Filters fly out from a Filters button (`FilterFlyout`) and live in the address, so a filtered list is a link.
 - The words are Hidden, Revealed, Reveal, Hide again, See as players and Who sees it.
 

@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
-import { Button, IconEye, IconEyeOff, IconUser, cx } from "@vtt/ui";
-import { revealedLabel, type Audience, type PartyCharacter } from "./audience";
-import { WhoSeesItMenu } from "./WhoSeesIt";
+import {
+  Button,
+  IconEye,
+  IconEyeOff,
+  IconUser,
+  cx,
+  revealedLabel,
+  type Audience,
+  type PartyCharacter,
+  WhoSeesItMenu
+} from "@vtt/ui";
 import "./shared.css";
 
 /**

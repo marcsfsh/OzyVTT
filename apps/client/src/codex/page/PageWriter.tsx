@@ -13,7 +13,12 @@ import {
   Select,
   TagInput,
   Textarea,
-  cx
+  cx,
+  AudienceChip,
+  FieldAudienceToggle,
+  EVERYONE,
+  HIDDEN,
+  type Audience
 } from "@vtt/ui";
 import { useConfirm } from "../../components/feedback";
 import { calendarApi, codexApi, uploadCodexAsset } from "../api";
@@ -28,8 +33,6 @@ import { useCodexAutosave } from "../autosave";
 import { atlasPath, journalEntryPath, relationshipsPath } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex } from "../shell/context";
-import { AudienceChip, FieldAudienceToggle } from "../shared/WhoSeesIt";
-import { EVERYONE, HIDDEN, type Audience } from "../shared/audience";
 import { useCodexQuery } from "../useCodexQuery";
 import { DocEditor } from "./DocEditor";
 import { draftDocument, saveShape, type DraftItem } from "./document";

@@ -1,6 +1,6 @@
 /* The API reference: a toolbar over a table of operations, with the filter flyout over the table's left side; and an
    operation as one document beside its metadata panel. The table, the toolbar row and the flyout take the Codex's
-   own styles (`cx-table`, `cx-sub`, `cx-flyout`). */
+   own styles (`cx-table`, `cx-sub`, `nh-flyout`). */
 
 .api-reference {
   position: relative;

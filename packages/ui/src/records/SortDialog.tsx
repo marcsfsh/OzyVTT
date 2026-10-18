@@ -1,6 +1,11 @@
 import { useState } from "react";
-import { Button, Eyebrow, IconButton, IconX, Modal, Select, cx } from "@vtt/ui";
-import "./shared.css";
+import { Button, IconButton } from "../primitives/Button";
+import { Select } from "../primitives/forms";
+import { Modal } from "../primitives/Modal";
+import { Eyebrow } from "../primitives/Wordmark";
+import { IconX } from "../primitives/icons";
+import { cx } from "../primitives/util";
+import "./SortDialog.css";
 
 export type SortDirection = "asc" | "desc";
 export type SortLevelOf<Key extends string> = Readonly<{ key: Key; direction: SortDirection }>;
@@ -55,7 +60,7 @@ export function SortDialog<Key extends string>({
       size="sm"
       align={align}
       title="Sort"
-      className="cx-sortdialog"
+      className="nh-sortdialog"
       footer={
         <>
           <Button variant="ghost" onClick={onCancel}>
@@ -67,13 +72,15 @@ export function SortDialog<Key extends string>({
         </>
       }
     >
-      <p className="cx-hint">Rows sort by the first level, then by each level under it, as in a spreadsheet.</p>
-      <div className="cx-sortlevels" role="list">
+      <p className="nh-sortdialog-hint">
+        Rows sort by the first level, then by each level under it, as in a spreadsheet.
+      </p>
+      <div className="nh-sortlevels" role="list">
         {draft.map((level, index) => (
           <div
             key={index}
             role="listitem"
-            className={cx("cx-sortrow", selected === index && "is-on")}
+            className={cx("nh-sortrow", selected === index && "is-on")}
             onFocus={() => setSelected(index)}
             onClick={() => setSelected(index)}
           >
@@ -115,7 +122,7 @@ export function SortDialog<Key extends string>({
           </div>
         ))}
       </div>
-      <div className="cx-dropdown-row">
+      <div className="nh-dropdown-row">
         <Button
           size="sm"
           disabled={!unused || draft.length >= maxLevels}

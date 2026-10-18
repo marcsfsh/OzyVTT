@@ -33,7 +33,7 @@ const VOCABULARY_EXCLUDED: ReadonlyArray<readonly [prefix: string, why: string]>
   ...PLAY_EXCLUDED,
   [
     "compendium/",
-    "a record surface: it says Hidden, Everyone or the characters' names through the Codex's WhoSeesIt, " +
+    "a record surface: it says Hidden, Everyone or the characters' names through WhoSeesIt in @vtt/ui, " +
       "and has its own lock (compendium/vocabulary.test.ts)"
   ]
 ];
@@ -76,6 +76,15 @@ export const playCopySources = (): { file: string; read: () => string }[] =>
     ),
     ...uiFiles((name) => isSource(name)).filter((s) => s.path.includes("/primitives/"))
   ].map((source) => ({ file: source.path, read: () => stripComments(source.read()) }));
+/**
+ * The record pieces in `packages/ui/src/records/` (Who sees it, the filters, the Sort dialog). They say the Codex's
+ * words, so the Codex's and the Compendium's vocabulary locks read them as their own.
+ */
+export const recordPieceSources = (): { file: string; read: () => string }[] =>
+  sources(`${UI_SRC}/records`, "packages/ui/src/records", walk(`${UI_SRC}/records`, isSource)).map((source) => ({
+    file: source.path,
+    read: source.read
+  }));
 /** Every stylesheet, client and `packages/ui`. */
 export const stylesheets = (): Source[] => [...clientFiles(isCss, true), ...uiFiles(isCss)];
 /** Client stylesheets only. */

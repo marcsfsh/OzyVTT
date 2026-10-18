@@ -79,7 +79,7 @@ Option 3, with C's studio for making and editing. The GM's tab is the Compendium
 - **Sharing** (`SharingView.tsx`) is a grid of published records against Hidden, Everyone and each party character,
   with Who sees it for ticked rows in one write; a record's Sharing tab holds its row, where each audience meets it
   and since when. The Compendium is a record surface, so it says who sees a record in the Codex's words through the
-  Codex's `WhoSeesItSwitch`.
+  `WhoSeesItSwitch` in `@vtt/ui`.
 - **Sources** lists the SRD, this table and each imported pack with their counts and credit, and each pack has its
   switch. Import is a review
   table from the server's dry run with a decision per record; export is a selection under a pack name.

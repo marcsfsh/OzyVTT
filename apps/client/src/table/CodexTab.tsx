@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Input, Skeleton, cx } from "@vtt/ui";
+import {
+  Alert,
+  Button,
+  Input,
+  Skeleton,
+  cx,
+  AudienceChip,
+  EVERYONE,
+  HIDDEN,
+  sinceLabel,
+  type Audience,
+  type PartyCharacter
+} from "@vtt/ui";
 import { pageLinkKey, type CodexEntityType } from "@vtt/domain";
 import { codexApi, playerCodexApi } from "../codex/api";
 import { findApi, pageRecordApi } from "../codex/api-records";
@@ -10,8 +22,6 @@ import { EntityIcon } from "../codex/icons";
 import { pagePath, pathForHit } from "../codex/routes";
 import { HiddenBlock } from "../codex/shared/HiddenBlock";
 import { RevealPanel } from "../codex/shared/RevealPanel";
-import { AudienceChip } from "../codex/shared/WhoSeesIt";
-import { EVERYONE, HIDDEN, sinceLabel, type Audience, type PartyCharacter } from "../codex/shared/audience";
 import { playerDocument } from "../codex/page/document";
 import { stampOf } from "../codex/shared/reveals";
 import { useCodexQuery } from "../codex/useCodexQuery";

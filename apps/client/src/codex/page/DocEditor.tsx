@@ -13,14 +13,17 @@ import {
   MenuItem,
   Textarea,
   applyMarkdownFormat,
-  cx
+  cx,
+  HIDDEN,
+  sinceLabel,
+  type Audience,
+  type PartyCharacter
 } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
 import type { CodexBlock } from "@vtt/domain";
 import { entityDef } from "../entities";
 import { EntityIcon } from "../icons";
 import { HiddenBlock } from "../shared/HiddenBlock";
-import { HIDDEN, sinceLabel, type Audience, type PartyCharacter } from "../shared/audience";
 import { nextDraftKey, splitForBlock, type DraftItem } from "./document";
 import { stampOf } from "../shared/reveals";
 

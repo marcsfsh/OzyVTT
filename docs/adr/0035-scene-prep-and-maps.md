@@ -46,8 +46,8 @@ phone, with New): Overview, Scenes and Maps, a find box (Ctrl K) and the view's 
   go, Filters as a flyout, a Modified range and Sort over several columns, all held in the address so a filtered
   list is a link. The scenes table keeps the GM's own order as its default sort, with drag and the menu's Move
   earlier and later to change it. A phone gets rows with two facts each. The dropdowns, flyout, chips and Sort
-  dialog are the Codex's shared pieces (`codex/shared/`); the Sort dialog, which was Search's own, now takes its
-  columns as props.
+  dialog are shared with the Codex (since moved to `packages/ui/src/records/`); the Sort dialog, which was Search's
+  own, now takes its columns as props.
 - **A scene is one document** at `/scenes/<id>` (`SceneDocument.tsx`), built as the table's docked workbench: the
   header bar, the map drawn by `EncounterMap` with its tool rail, editing that parked scene through the same
   commands with their `sceneId`, the tray, and a panel of what the GM asks about the scene (state and what it
@@ -114,6 +114,6 @@ same data.
 - Client tests: `scenes/scenes-tab.test.tsx` (overview, the scenes table with its filters and sort, the scene page
   with See as, every step of making a scene, phones), `maps/maps-tab.test.tsx` (the maps table, a map's page, each
   step of adding a map), `scenes/scene-lists.test.ts`, `table/table-header-scenes.test.tsx`,
-  `scene/map-placement.test.tsx`, `codex/shared/sort-dialog.test.tsx`.
+  `scene/map-placement.test.tsx`, `packages/ui/src/records/sort-dialog.test.tsx`.
 - The smoke journeys make scenes through the steps, set a grid from a scene's Map step and make it live, on a
   phone and a laptop.

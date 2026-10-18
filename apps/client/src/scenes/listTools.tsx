@@ -1,12 +1,18 @@
 import { useState } from "react";
-import { Button, Eyebrow, Input } from "@vtt/ui";
-import { Dropdown } from "../codex/shared/Dropdown";
-import { FilterChips } from "../codex/shared/FilterFlyout";
-import { SortDialog, type SortDirection, type SortLevelOf } from "../codex/shared/SortDialog";
+import {
+  Button,
+  Eyebrow,
+  Input,
+  Dropdown,
+  FilterChips,
+  SortDialog,
+  type SortDirection,
+  type SortLevelOf
+} from "@vtt/ui";
 import { firstSortDirection, modifiedRangeLabel, sortDirectionLabel, sortSummary } from "./scene-lists";
 
 /**
- * The pieces both tables' toolbars are built from, over the Codex's shared Dropdown, chips and Sort dialog: a
+ * The pieces both tables' toolbars are built from, over the Dropdown, chips and Sort dialog in `@vtt/ui`: a
  * dropdown of ticks with All and Clear, the Modified range, one-choice chips and the Sort button.
  */
 
@@ -33,7 +39,7 @@ export function TickDropdown<Value extends string>({
     <Dropdown label={label}>
       {() => (
         <>
-          <div className="cx-dropdown-row">
+          <div className="nh-dropdown-row">
             <Button size="sm" variant="ghost" onClick={() => onChange(options.map((option) => option.value))}>
               All
             </Button>
@@ -42,7 +48,7 @@ export function TickDropdown<Value extends string>({
             </Button>
           </div>
           {options.map((option) => (
-            <label key={option.value} className="cx-check">
+            <label key={option.value} className="nh-check">
               <input
                 type="checkbox"
                 checked={selected.includes(option.value)}
@@ -70,14 +76,14 @@ export function ModifiedDropdown({
   onChange
 }: Readonly<{ from: string | null; to: string | null; onChange: (from: string | null, to: string | null) => void }>) {
   return (
-    <Dropdown label={modifiedRangeLabel(from, to)} panelClassName="cx-datemenu" align="end">
+    <Dropdown label={modifiedRangeLabel(from, to)} panelClassName="nh-datemenu" align="end">
       {() => (
         <>
-          <label className="cx-datefield">
+          <label className="nh-datefield">
             <span>From</span>
             <Input type="date" value={from ?? ""} onChange={(event) => onChange(event.target.value || null, to)} />
           </label>
-          <label className="cx-datefield">
+          <label className="nh-datefield">
             <span>To</span>
             <Input type="date" value={to ?? ""} onChange={(event) => onChange(from, event.target.value || null)} />
           </label>

@@ -1,6 +1,14 @@
 import { useState, type ReactNode } from "react";
-import { Button, Eyebrow, Modal } from "@vtt/ui";
-import { EVERYONE, namesLabel, characterNames, type Audience, type PartyCharacter } from "./audience";
+import {
+  Button,
+  Eyebrow,
+  Modal,
+  EVERYONE,
+  namesLabel,
+  characterNames,
+  type Audience,
+  type PartyCharacter
+} from "@vtt/ui";
 import "./shared.css";
 
 /**

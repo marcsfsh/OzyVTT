@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { Badge } from "@vtt/ui";
-import { AudienceChip } from "../codex/shared/WhoSeesIt";
-import { HIDDEN } from "../codex/shared/audience";
+import { Badge, AudienceChip, HIDDEN } from "@vtt/ui";
 import { storedGmToken } from "../lib/gm-token";
 import { socket } from "../socket";
 import { listAllHomebrew, type HomebrewRecordSummary } from "./api";

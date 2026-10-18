@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Select } from "@vtt/ui";
-import type { PartyCharacter } from "../../codex/shared/audience";
+import { Select, type PartyCharacter } from "@vtt/ui";
 import { homebrewApi, type HomebrewRecordDocument, type SeeAs } from "../../homebrew/api";
 import { CompendiumCard, cardOfEntry, type Card } from "../CompendiumCard";
 import { kindLabel, type Kind, type Names } from "../kinds";

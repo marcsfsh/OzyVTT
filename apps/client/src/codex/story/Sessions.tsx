@@ -1,11 +1,10 @@
 import { useMemo, type ReactNode } from "react";
-import { Input } from "@vtt/ui";
+import { Input, FilterChips, FilterFlyout } from "@vtt/ui";
 import type { CodexCalendar, PlayerCodexChronicleRecord, PlayerCodexSession } from "@vtt/domain";
 import { CHRONICLE_KIND_META } from "../chronicle";
 import { CodexIcon } from "../icons";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { sessionTitle } from "../sessions";
-import { FilterChips, FilterFlyout } from "../shared/FilterFlyout";
 import { useCodexShell } from "../shell/context";
 import { realDateLabel, recordDay, type StoryRecord } from "./model";
 

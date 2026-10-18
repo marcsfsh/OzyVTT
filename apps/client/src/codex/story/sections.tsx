@@ -1,5 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
-import { Alert, Badge, Button, IconPlus, Modal, SegmentedControl, Skeleton, Input } from "@vtt/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  IconPlus,
+  Modal,
+  SegmentedControl,
+  Skeleton,
+  Input,
+  FilterChips,
+  FilterFlyout,
+  FiltersButton
+} from "@vtt/ui";
 import type { CodexChronicleRecord, CodexSession } from "@vtt/domain";
 import { calendarApi, journalApi } from "../api";
 import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META } from "../chronicle";
@@ -8,7 +20,6 @@ import { usePageLinks } from "../pageLinks";
 import { prepSessionApi } from "../prep/api";
 import { atlasPath, pagePath, pathForSection, sessionPath, templatePath } from "../routes";
 import { sessionTitle } from "../sessions";
-import { FilterChips, FilterFlyout, FiltersButton } from "../shared/FilterFlyout";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "../shell/context";
 import { useCodexQuery } from "../useCodexQuery";
