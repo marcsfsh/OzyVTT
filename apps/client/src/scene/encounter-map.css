@@ -159,9 +159,9 @@
   color: #fff;
   font-weight: 900;
 }
-/* `--void` is light in daybreak, so white initials on the disc fail contrast there; daybreak alone
-   switches to `--text`. */
-:root[data-theme="light"] .tray-token > span {
+/* `--void` is light in Day and Dawn, so white initials on the disc fail contrast there; those two alone
+   switch to `--text`. */
+:root:is([data-theme="light"], [data-theme="dawn"]) .tray-token > span {
   color: var(--text);
 }
 .tray-token > strong {

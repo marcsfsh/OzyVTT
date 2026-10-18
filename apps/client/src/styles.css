@@ -587,7 +587,7 @@ textarea:focus {
   opacity: 0.035;
   mix-blend-mode: screen;
 }
-[data-theme="light"] .app-texture {
+:is([data-theme="light"], [data-theme="dawn"]) .app-texture {
   display: none;
 }
 @media (prefers-reduced-transparency: reduce) {

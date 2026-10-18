@@ -4,8 +4,9 @@
 */
 
 /* Theme */
-export { type Theme } from "./theme/theme";
-export { ThemeToggle } from "./theme/ThemeToggle";
+export { type Theme, THEMES, THEME_NAMES } from "./theme/theme";
+export { ThemeSwitch, ThemeToggle } from "./theme/ThemeToggle";
+export { colourDistance, contrastRatio, parseColour, type Rgb } from "./theme/colour";
 
 /* Primitives */
 export { cx } from "./primitives/util";

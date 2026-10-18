@@ -8,7 +8,7 @@
     <script>
       try {
         var t = localStorage.getItem("vtt.theme");
-        document.documentElement.setAttribute("data-theme", t === "dusk" || t === "light" ? t : "dark");
+        document.documentElement.setAttribute("data-theme", t === "dusk" || t === "dawn" || t === "light" ? t : "dark");
       } catch (e) {
         document.documentElement.setAttribute("data-theme", "dark");
       }

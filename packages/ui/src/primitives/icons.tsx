@@ -482,15 +482,12 @@ export function IconSparkle({ className }: Readonly<{ className?: string }>) {
   );
 }
 
-/* The theme marks: how much of the disc is dark. */
-const THEME_RING =
-  "M12 2.6a9.4 9.4 0 1 0 0 18.8 9.4 9.4 0 0 0 0-18.8zm0 2.8a6.6 6.6 0 1 1 0 13.2 6.6 6.6 0 0 1 0-13.2z";
-
-export function IconThemeDark({ className }: Readonly<{ className?: string }>) {
+/* The theme marks, one hour each: the moon for Night, the slatted sun going down for Dusk, the sun rising with
+   its rays for Dawn and the full sun for Day. Dusk and Dawn share the horizon line and differ by slat and rays. */
+export function IconThemeNight({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d={THEME_RING} />
-      <path d="M12 2.6a9.4 9.4 0 0 1 0 18.8z" />
+      <path d="M11.12 2.84A9.2 9.2 0 1 0 20.98 13.99A7.6 7.6 0 0 1 11.12 2.84z" />
     </Glyph>
   );
 }
@@ -498,16 +495,27 @@ export function IconThemeDark({ className }: Readonly<{ className?: string }>) {
 export function IconThemeDusk({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d={THEME_RING} />
-      <path d="M12 2.6a9.4 9.4 0 0 0 0 18.8z" />
+      <path d="M4.78 11.9A8.4 8.4 0 0 1 19.22 11.9z" />
+      <path d="M4.05 13.5H19.95A8.4 8.4 0 0 1 20.4 16.2H3.6A8.4 8.4 0 0 1 4.05 13.5z" />
+      <Stroke d="M2.5 20h19" />
     </Glyph>
   );
 }
 
-export function IconThemeLight({ className }: Readonly<{ className?: string }>) {
+export function IconThemeDawn({ className }: Readonly<{ className?: string }>) {
   return (
     <Glyph className={className}>
-      <path fillRule="evenodd" d={THEME_RING} />
+      <path d="M6.4 17a5.6 5.6 0 0 1 11.2 0z" />
+      <Stroke d="M12 9.2V7.1M17.52 11.48 19 10M6.48 11.48 5 10M19.68 15.65l2.07-.37M4.32 15.65l-2.07-.37M2.5 20.4h19" />
+    </Glyph>
+  );
+}
+
+export function IconThemeDay({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <circle cx="12" cy="12" r="4.6" />
+      <Stroke d="M19.4 12h2.5M17.23 6.77 19 5M12 4.6V2.1M6.77 6.77 5 5M4.6 12H2.1M6.77 17.23 5 19M12 19.4v2.5M17.23 17.23 19 19" />
     </Glyph>
   );
 }

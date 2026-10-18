@@ -154,8 +154,8 @@
   transform-origin: center top;
 }
 
-/* Analog grain with a per-theme opacity token (`.static-noise` is hidden in light, but daybreak still
-   wants a little). */
+/* Analog grain with a per-theme opacity token (`.static-noise` is hidden in light, but Day and Dawn
+   still want a little). */
 .landing-noise {
   position: absolute;
   inset: 0;

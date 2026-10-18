@@ -29,7 +29,7 @@ grid and neon linework, used with restraint.
 - Chrome lettering belongs to the title screen alone. Every other heading is solid Bungee with the
   hard heading shadow.
 - Nothing pulses or loops. One-shot cues (a crit flash, a bar filling) are fine.
-- Legibility wins every conflict with mood. In the light theme, without exception.
+- Legibility wins every conflict with mood. In Day and Dawn, without exception.
 
 ## Colour
 
@@ -51,8 +51,19 @@ itself is for edges and fills.
 Every state carries an icon or a text label as well as a colour. The palette sits in the band
 that is hardest for red-green colour blindness, and green is absent on purpose.
 
-There are three themes, set with `data-theme="dark|dusk|light"` on the root: night (default),
-sunset and daybreak. They share one token set; only values change.
+There are four themes, named Night, Dusk, Dawn and Day wherever a person reads them. The root
+carries `data-theme="dark|dusk|dawn|light"`: the ids `dark` (Night, the default) and `light` (Day)
+predate the names and stay, so a choice saved on a device survives. They share one token set; only
+values change.
+
+- Night and Dusk are dark grounds. Dawn and Day are light ones: Day is cool, and Dawn is the warm
+  first light, apricot and cream under plum ink. A rule that changes for a pale ground names both.
+- In every theme each text ink clears 4.5:1 on every surface and on the sky, and the primary,
+  selection, GM-only, caution and danger hues stay far apart. `packages/ui/src/theme/themes.test.ts`
+  checks every pair.
+- Every page offers the theme. The app bar of the GM's and the player's shell, and the standalone
+  sheet's header, carry `ThemeSwitch`: one square with the current theme's mark that opens the four.
+  Settings and the title screen show them side by side with `ThemeToggle`.
 
 ## Type
 
@@ -110,7 +121,9 @@ Build from `@vtt/ui`. A new primitive goes into `packages/ui` with `nh-` prefixe
 next to it.
 
 - One primary button per view: the sun frame, its label in Bungee. Labels are sentence case and
-  name their result ("Roll initiative", "End turn").
+  name their result ("Roll initiative", "End turn"). The primitive owns the primary's plate, so it
+  owns the label's ink too: a page that needs another ink sets the `--nh-ink` hook, and a rule on
+  the button's `color` never reaches the words.
 - A tab bar or segmented control is a sunken track; the chosen option is raised with a cyan
   underline, because cyan is selection.
 - Chips and badges are a tinted strip with a 3px bar in their tone on the leading edge.

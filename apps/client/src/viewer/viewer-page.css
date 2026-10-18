@@ -1,6 +1,6 @@
 /* Page reset for viewer.html only (also what the GM's preview iframe loads). */
+/* `color-scheme` comes from the theme (design-tokens.css), so a screen in Day or Dawn gets light native controls. */
 :root {
-  color-scheme: dark;
   background: var(--void);
   color: var(--text);
 }
