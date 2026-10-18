@@ -315,18 +315,22 @@ function seedCampaign(store: CodexStore) {
     y: 0.5,
     iconId: "pin",
     iconColor: "#ff8800",
-    label: "Lantern hall",
+    label: "Lantern hall of [[The Cult]]",
     pageIds: [order.id, cult.id],
     revealedToPlayers: true
   });
   store.setPartyMarker(pin.id);
   const hiddenPin = store.createMarker(map.id, { x: 0.2, y: 0.2, iconId: "pin", iconColor: "#ff8800", label: "Lair" });
 
-  const shownSession = store.createSession({ sessionNumber: 1, recapBody: "We met the Lantern Order." });
+  // Player text links the hidden cult page throughout, so players read those links as plain text.
+  const shownSession = store.createSession({
+    sessionNumber: 1,
+    recapBody: "We met the Lantern Order. [[The Cult]] watched."
+  });
   store.setSessionRevealed(shownSession.id, true);
   const hiddenSession = store.createSession({ sessionNumber: 2, prepBody: "The ambush." });
   const note = store.createEntry({
-    playerText: "The lamps of the Lantern Order burn blue.",
+    playerText: "The lamps of the Lantern Order burn blue near [[The Cult]].",
     gmText: "Blue means the cult is near.",
     attachMarkerId: pin.id,
     attachPageId: order.id,
@@ -342,13 +346,13 @@ function seedCampaign(store: CodexStore) {
   const downtime = store.createDowntime({
     playerText: "A tenday at the lamp works.",
     sessionId: null,
-    downtime: { who: "Ireena", activity: "Crafting", days: 10, characterPageId: town.id },
+    downtime: { who: "Ireena", activity: "Crafting for [[The Cult]]", days: 10, characterPageId: town.id },
     revealedToPlayers: true
   });
   store.createMilestone({
     playerText: "Level 3.",
     sessionId: null,
-    milestone: { level: 3, reason: "The hall" },
+    milestone: { level: 3, reason: "The hall of [[The Cult]]" },
     revealedToPlayers: true
   });
   const quest = store.createQuest({
@@ -357,6 +361,7 @@ function seedCampaign(store: CodexStore) {
     blocks: [{ text: "The oil is poisoned." }],
     objectives: [
       { text: "Find oil", done: false },
+      { text: "Ask [[The Cult]] for oil", done: false },
       { text: "Taste the oil", done: false, audience: "hidden" },
       { text: "Ask Lyra's aunt", done: false, audience: "characters", characterIds: [LYRA] }
     ],
@@ -463,6 +468,9 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
       ["folder delete", () => store.deleteFolder("Foes")],
       ["page revision restore", () => store.restoreRevision(order.id, store.listRevisions(order.id)[0]!.id, "gm")],
       ["hidden page text", () => store.updatePage(cult.id, { playerBody: "Lantern bearers, all." }, undefined, "gm")],
+      ["hidden linked page renamed", () => store.updatePage(cult.id, { title: "The Lantern Cult" }, undefined, "gm")],
+      ["hidden linked page named back", () => store.updatePage(cult.id, { title: "The Cult" }, undefined, "gm")],
+      ["a second hidden page with the linked title", () => store.createPage({ title: "the cult" })],
       ["hidden page, same title", () => store.createPage({ title: "Vallaki", playerBody: "lantern lantern" })],
       ["GM-layer connection", () => store.createConnection(order.id, { toPageId: town.id, layer: "gm" })],
       ["hidden map", () => store.updateMap(secretMap.id, { name: "Under Vallaki, lantern vault", tags: ["lantern"] })],
@@ -527,7 +535,13 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
       ],
       [
         "quest objective shown to a character no reader holds",
-        () => store.setObjectiveAudience(quest.id, store.getQuest(quest.id)!.objectives[1]!.id, "characters", [CASS])
+        () =>
+          store.setObjectiveAudience(
+            quest.id,
+            store.getQuest(quest.id)!.objectives.find((objective) => objective.audience === "hidden")!.id,
+            "characters",
+            [CASS]
+          )
       ],
       [
         "hidden quest",
@@ -559,6 +573,40 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
     expect(await readAll(base, seeded.paths)).not.toEqual(before);
     // Some five thousand reads: every path, as each reader, after every edit.
   }, 90_000);
+
+  // A link to a hidden page reads as plain text, so revealing the page is a change players can read wherever
+  // their text links it, and every audience hears of it.
+  it("makes a link to a page a link again in every kind of player text when the page is revealed", async () => {
+    const { base, store } = await fixture();
+    const seeded = seedCampaign(store);
+    const changes = new PlayerCodexChanges(store);
+    changes.next(READERS);
+    const linked = async () => {
+      const get = async (path: string) => JSON.parse((await read(base, path, LYRA_TOKEN)).body).data;
+      const timeline = (await get("/timeline")).records as Array<{ kind: string; text: string; payload: any }>;
+      return [
+        (await get(`/sessions/${seeded.shownSession.id}`)).session.recap,
+        (await get("/journal")).entries.find((entry: { id: string }) => entry.id === seeded.note.id).text,
+        (await get(`/markers/${seeded.pin.id}`)).marker.label,
+        timeline.find((record) => record.kind === "milestone")!.payload.reason,
+        timeline.find((record) => record.kind === "downtime")!.payload.activity,
+        (await get(`/quests/${seeded.quest.id}`)).quest.objectives[1].text
+      ];
+    };
+    const written = [
+      "We met the Lantern Order. [[The Cult]] watched.",
+      "The lamps of the Lantern Order burn blue near [[The Cult]].",
+      "Lantern hall of [[The Cult]]",
+      "The hall of [[The Cult]]",
+      "Crafting for [[The Cult]]",
+      "Ask [[The Cult]] for oil"
+    ];
+    expect(await linked()).toEqual(written.map((text) => text.replace("[[The Cult]]", "The Cult")));
+
+    store.setPageRevealed(seeded.cult.id, true);
+    expect(await linked()).toEqual(written);
+    expect([...changes.next(READERS).values()]).toEqual([1, 1, 1]);
+  });
 
   it("counts a change for each kind of record a player can read", async () => {
     const { store } = await fixture();

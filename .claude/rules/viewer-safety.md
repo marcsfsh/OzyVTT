@@ -30,7 +30,8 @@ quantity and no identity, position or existence of a hidden thing. When in doubt
   characters the session claimed, or the ones a GM preview names) and nothing else. A hidden block,
   a Hidden field or an objective for another character leaves no trace: no text, no gap, no
   mention, no search hit, no moved date or ETag. A revealed child must not leak an unrevealed
-  parent or target, and a `[[link]]` to a page the reader cannot open reads as plain text. A
+  parent or target, and a `[[link]]` to a page the reader cannot open reads as plain text in any
+  record text a player receives (`plainUnopenableLinks` in `codex-projections.ts`). A
   hidden record is a 404, never a 403. Every read a player can make of the Codex is built in
   `codex/player-reads.ts`, per reader; the router serves it and the players' `codex:changed` ping
   hashes it per audience, so a GM-only edit must leave its output unchanged, and a reveal to one

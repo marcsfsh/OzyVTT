@@ -10,6 +10,7 @@ import {
   type CodexSearchRecord,
   type PlayerChronicleContext,
   type PlayerConnectionContext,
+  type PlayerLinkContext,
   type PlayerReaderContext,
   type PlayerSessionNumberContext
 } from "../codex-projections.js";
@@ -103,18 +104,39 @@ export function isMapVisible(store: CodexStore, mapId: string | null): boolean {
   return mapId !== null && (store.getMap(mapId)?.revealedToPlayers ?? false);
 }
 
-/** A map keeps its parent link only when the parent is visible, or it would name a secret ancestor. */
-export function mapContext(store: CodexStore, map: CodexMap): Readonly<{ parentRevealed: boolean }> {
-  return { parentRevealed: isMapVisible(store, map.parentMapId) };
+/**
+ * The link keys of the pages players can open. A `[[link]]` to any other page reads as plain text in every player
+ * read, so it never says that a hidden page exists. Every context below carries it.
+ */
+export function openableLinkKeys(store: CodexStore): ReadonlySet<string> {
+  return new Set(
+    store
+      .listPages()
+      .filter((page) => page.revealedToPlayers)
+      .map((page) => pageLinkKey(page.title))
+  );
 }
 
-/** A pin with its map's gate and which of its links lead somewhere visible. */
-export function markerRecord(store: CodexStore, marker: CodexMarker): CodexPageMarkerRecord {
+/** A map keeps its parent link only when the parent is visible, or it would name a secret ancestor. */
+export function mapContext(
+  store: CodexStore,
+  map: CodexMap
+): Readonly<{ parentRevealed: boolean }> & PlayerLinkContext {
+  return { parentRevealed: isMapVisible(store, map.parentMapId), openableLinkKeys: openableLinkKeys(store) };
+}
+
+/** A pin with its map's gate and which of its links lead somewhere visible. `openable` saves a list's repeat work. */
+export function markerRecord(
+  store: CodexStore,
+  marker: CodexMarker,
+  openable: ReadonlySet<string> = openableLinkKeys(store)
+): CodexPageMarkerRecord {
   return {
     marker,
     mapRevealed: isMapVisible(store, marker.mapId),
     revealedPageIds: revealedPageIdsIn(store, marker.pageIds),
-    subMapRevealed: isMapVisible(store, marker.subMapId)
+    subMapRevealed: isMapVisible(store, marker.subMapId),
+    openableLinkKeys: openable
   };
 }
 
@@ -159,7 +181,8 @@ export function journalContext(store: CodexStore): PlayerSessionNumberContext {
     revealedPageIds: revealedPageIdsIn(store, [
       ...store.listStanding().map((row) => row.factionPageId),
       ...store.downtimeCharacterPageIds()
-    ])
+    ]),
+    openableLinkKeys: openableLinkKeys(store)
   };
 }
 
@@ -170,12 +193,7 @@ export function journalContext(store: CodexStore): PlayerSessionNumberContext {
 export function readerContext(store: CodexStore, reader: CodexReader): PlayerReaderContext {
   return {
     reader,
-    openableLinkKeys: new Set(
-      store
-        .listPages()
-        .filter((page) => page.revealedToPlayers)
-        .map((page) => pageLinkKey(page.title))
-    ),
+    openableLinkKeys: openableLinkKeys(store),
     revealedSessionIds: new Set(
       store
         .listSessions()
@@ -222,7 +240,7 @@ export function connectionContext(store: CodexStore, reader: CodexReader = EVERY
   const context = journalContext(store);
   for (const entry of store.listTimeline())
     if (projectPlayerJournalEntry(entry, context) !== null) revealedSourceIds.add(entry.id);
-  return { revealedPageIds, revealedSourceIds, reader, revealedSessionIds };
+  return { revealedPageIds, revealedSourceIds, reader, revealedSessionIds, openableLinkKeys: openableLinkKeys(store) };
 }
 
 /** A search hit's live record plus what its player predicate needs. Null when the record is gone. */
@@ -259,12 +277,13 @@ export function searchRecord(store: CodexStore, ref: CodexSearchRef): CodexSearc
 export function revealAuditRecords(store: CodexStore): CodexRevealAuditRecord[] {
   const maps = store.listMaps();
   const sessionContext = journalContext(store);
+  const openable = openableLinkKeys(store);
   return [
     { kind: "date", calendar: store.getCalendar(), publishedDate: store.getPublishedDate() } as const,
     ...store.listPages().map((page) => ({ kind: "page", page }) as const),
     ...maps.map((map) => ({ kind: "map", map, ...mapContext(store, map) }) as const),
     ...maps.flatMap((map) =>
-      store.listMarkers(map.id).map((marker) => ({ kind: "marker", ...markerRecord(store, marker) }) as const)
+      store.listMarkers(map.id).map((marker) => ({ kind: "marker", ...markerRecord(store, marker, openable) }) as const)
     ),
     ...store.listTimeline().map((entry) => ({ kind: "journal", entry, sessionContext }) as const),
     ...store.listSessions().map((session) => ({ kind: "session", session }) as const),

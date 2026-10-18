@@ -284,6 +284,228 @@ describe("Codex readers: hidden blocks in a page a player reads", () => {
   });
 });
 
+describe("Codex readers: a link to a page the reader cannot open, in every kind of record text", () => {
+  const LINK = "[[The Cult]]";
+  type Ids = Readonly<Record<string, string>>;
+  type Case = Readonly<{
+    kind: string;
+    /** Writes revealed records with `LINK` in their text, beside a revealed town and faction; answers their ids. */
+    seed: (store: CodexStore, around: Ids) => Ids;
+    /** Every piece of those records' text a player reads, in a fixed order. */
+    texts: (base: string, token: string, ids: Ids) => Promise<unknown[]>;
+    /** The same pieces as the GM wrote them. */
+    written: readonly string[];
+  }>;
+  const get = async (base: string, path: string, token: string) => data(await read(base, path, token));
+  const pin = (store: CodexStore, mapId: string, label: string, pageIds: string[] = []) =>
+    store.createMarker(mapId, {
+      x: 0.5,
+      y: 0.5,
+      iconId: "pin",
+      iconColor: "#ff8800",
+      label,
+      pageIds,
+      revealedToPlayers: true
+    });
+
+  const CASES: readonly Case[] = [
+    {
+      kind: "a session's recap and date",
+      seed: (store) => {
+        const session = store.createSession({
+          sessionNumber: 1,
+          realDate: `${LINK} night`,
+          recapBody: `We fled ${LINK}.`
+        });
+        store.setSessionRevealed(session.id, true);
+        return { session: session.id };
+      },
+      texts: async (base, token, ids) => {
+        const listed = (await get(base, "/sessions", token)).sessions[0];
+        const one = (await get(base, `/sessions/${ids.session}`, token)).session;
+        return [listed.recap, listed.realDate, one.recap];
+      },
+      written: [`We fled ${LINK}.`, `${LINK} night`, `We fled ${LINK}.`]
+    },
+    {
+      kind: "a journal entry, in the journal, a page's journal and the chronicle",
+      seed: (store, around) => {
+        store.createEntry({
+          playerText: `The lamps of ${LINK} burn blue.`,
+          realDate: `${LINK} eve`,
+          attachPageId: around.town!,
+          sessionId: null,
+          revealedToPlayers: true
+        });
+        return {};
+      },
+      texts: async (base, token, around) => {
+        const entry = (await get(base, "/journal", token)).entries[0];
+        const attached = (await get(base, `/journal?pageId=${around.town}`, token)).entries[0];
+        const record = (await get(base, "/timeline", token)).records[0];
+        return [entry.text, entry.realDate, attached.text, record.text, record.realDate];
+      },
+      written: [
+        `The lamps of ${LINK} burn blue.`,
+        `${LINK} eve`,
+        `The lamps of ${LINK} burn blue.`,
+        `The lamps of ${LINK} burn blue.`,
+        `${LINK} eve`
+      ]
+    },
+    {
+      kind: "a milestone's, a downtime's and a standing change's details",
+      seed: (store, around) => {
+        store.createMilestone({
+          playerText: "Level 3.",
+          sessionId: null,
+          milestone: { level: 3, reason: `Beat ${LINK}` },
+          revealedToPlayers: true
+        });
+        store.createDowntime({
+          playerText: "A tenday.",
+          sessionId: null,
+          downtime: { who: `${LINK} spy`, activity: `Watching ${LINK}`, days: 3 },
+          revealedToPlayers: true
+        });
+        store.setStanding(around.faction!, 10, `Burned a ${LINK} shrine`);
+        store.setStandingRevealed(around.faction!, true);
+        store.setEntryRevealed(store.listTimeline().find((entry) => entry.kind === "standing")!.id, true);
+        return {};
+      },
+      texts: async (base, token) => {
+        const records = (await get(base, "/timeline", token)).records as Array<{ kind: string; payload: any }>;
+        const payload = (kind: string) => records.find((record) => record.kind === kind)!.payload;
+        return [
+          payload("milestone").reason,
+          payload("downtime").who,
+          payload("downtime").activity,
+          payload("standing").reason
+        ];
+      },
+      written: [`Beat ${LINK}`, `${LINK} spy`, `Watching ${LINK}`, `Burned a ${LINK} shrine`]
+    },
+    {
+      kind: "a quest's title and objectives",
+      seed: (store) => ({
+        quest: store.createQuest({
+          title: `Unmask ${LINK}`,
+          objectives: [{ text: `Find ${LINK}`, done: false }],
+          revealedToPlayers: true
+        }).id
+      }),
+      texts: async (base, token, ids) => {
+        const listed = (await get(base, "/quests", token)).quests[0];
+        const one = (await get(base, `/quests/${ids.quest}`, token)).quest;
+        return [listed.title, listed.objectives[0].text, one.title, one.objectives[0].text];
+      },
+      written: [`Unmask ${LINK}`, `Find ${LINK}`, `Unmask ${LINK}`, `Find ${LINK}`]
+    },
+    {
+      kind: "a map's name, a pin's label and the party's place",
+      seed: (store, around) => {
+        const map = store.createMap({
+          assetId: crypto.randomUUID(),
+          name: `${LINK} lands`,
+          kind: "regional",
+          revealedToPlayers: true
+        });
+        const hall = pin(store, map.id, `${LINK} hall`, [around.town!]);
+        store.setPartyMarker(hall.id);
+        return { map: map.id, pin: hall.id };
+      },
+      texts: async (base, token, ids) => {
+        const party = (await get(base, "/party", token)).party;
+        return [
+          (await get(base, "/maps", token)).maps[0].name,
+          (await get(base, `/maps/${ids.map}/markers`, token)).markers[0].label,
+          (await get(base, `/markers/${ids.pin}`, token)).marker.label,
+          (await get(base, `/pages/${ids.town}/markers`, token)).markers[0].label,
+          party.marker.label,
+          party.mapName
+        ];
+      },
+      written: [`${LINK} lands`, `${LINK} hall`, `${LINK} hall`, `${LINK} hall`, `${LINK} hall`, `${LINK} lands`]
+    },
+    {
+      kind: "a page's title and fields",
+      seed: (store) => ({
+        page: store.createPage({
+          title: `Shrine of ${LINK}`,
+          entityType: "location",
+          fields: { ruler: `${LINK} elders` },
+          revealedToPlayers: true
+        }).id
+      }),
+      texts: async (base, token, ids) => {
+        const listed = (await get(base, "/pages", token)).pages.find((page: { id: string }) => page.id === ids.page);
+        const one = (await get(base, `/pages/${ids.page}`, token)).page;
+        return [listed.title, one.title, one.fields.ruler];
+      },
+      written: [`Shrine of ${LINK}`, `Shrine of ${LINK}`, `${LINK} elders`]
+    },
+    {
+      kind: "a connection's label and a page panel's rows",
+      seed: (store, around) => {
+        store.createEntry({ playerText: `[[Vallaki]] fears ${LINK}.`, sessionId: null, revealedToPlayers: true });
+        store.createConnection(around.town!, { toPageId: around.faction!, label: `fears ${LINK}` });
+        return {};
+      },
+      texts: async (base, token, ids) => {
+        const edge = (await get(base, "/connections", token)).connections.find(
+          (row: { origin: string }) => row.origin === "declared"
+        );
+        const panel = (await get(base, `/pages/${ids.town}`, token)).connections as Array<Record<string, string>>;
+        return [
+          edge.label,
+          panel.find((row) => row.origin === "declared")!.label,
+          panel.find((row) => row.otherKind === "journal")!.otherTitle
+        ];
+      },
+      written: [`fears ${LINK}`, `fears ${LINK}`, `[[Vallaki]] fears ${LINK}.`]
+    },
+    {
+      kind: "search hits",
+      seed: (store) => {
+        const map = store.createMap({
+          assetId: crypto.randomUUID(),
+          name: `${LINK} lanterns`,
+          kind: "regional",
+          revealedToPlayers: true
+        });
+        pin(store, map.id, `${LINK} lanterns`);
+        store.createEntry({ playerText: `${LINK} lanterns`, sessionId: null, revealedToPlayers: true });
+        store.createPage({ title: `${LINK} lanterns`, revealedToPlayers: true });
+        store.createQuest({ title: `${LINK} lanterns`, revealedToPlayers: true });
+        store.setSessionRevealed(store.createSession({ recapBody: `${LINK} lanterns` }).id, true);
+        return {};
+      },
+      texts: async (base, token) =>
+        ((await get(base, "/search?q=lanterns", token)).hits as Array<{ kind: string; title: string }>)
+          .map((hit) => `${hit.kind}: ${hit.title}`)
+          .sort(),
+      written: ["journal", "map", "marker", "page", "quest", "session"].map((kind) => `${kind}: ${LINK} lanterns`)
+    }
+  ];
+
+  it.each(CASES)("prints it as plain text in $kind, per reader, until the page is revealed", async (each) => {
+    const { base, store } = await fixture();
+    const cult = store.createPage({ title: "The Cult", entityType: "faction", playerBody: "Lantern bearers." });
+    const town = store.createPage({ title: "Vallaki", entityType: "location", revealedToPlayers: true });
+    const faction = store.createPage({ title: "Lantern Order", entityType: "faction", revealedToPlayers: true });
+    const around = { town: town.id, faction: faction.id };
+    const ids = { ...around, ...each.seed(store, around) };
+    const plain = each.written.map((text) => text.replaceAll(LINK, "The Cult"));
+
+    for (const token of [PLAYER, LYRA_TOKEN, PREVIEW_LYRA])
+      expect(await each.texts(base, token, ids), token).toEqual(plain);
+
+    // Once players can open the page, the link is a link again.
+    store.setPageRevealed(cult.id, true);
+    for (const token of [PLAYER, LYRA_TOKEN]) expect(await each.texts(base, token, ids), token).toEqual(each.written);
+  });
+});
+
 describe("Codex readers: quest objectives", () => {
   it("lists only the objectives a reader may see, so a count of them counts only those", async () => {
     const { base, store } = await fixture();

@@ -160,10 +160,13 @@ audience. There are four:
   party characters). The server assembles the body a reader gets from the player text and the
   blocks that reach them, so a block they may not see leaves no trace, and its `[[links]]` stay on
   the GM layer until it reaches them. A `[[link]]` to a page the reader cannot open reads as plain
-  text. A block reaches a reader only once a write has stamped it for their audience, so an
-  unstamped block fails closed. Reveal is a graph: a child never leaks an unrevealed parent or
-  target, and `codex/visibility.ts` resolves a record's neighbours for the projection. Some
-  fields are GM-only even when revealed: staged scene ids on markers and sessions, and a page's
+  text in every piece of record text a player receives (bodies, recaps, entries and their details,
+  titles, labels, fields, objectives, search hits), since the link alone would say the page exists;
+  every player context carries the openable pages for it. A block reaches a reader only once a
+  write has stamped it for their audience, so an unstamped block fails closed. Reveal is a graph:
+  a child never leaks an unrevealed parent or target, and `codex/visibility.ts` resolves a
+  record's neighbours for the projection. Some fields are GM-only even when revealed: staged scene
+  ids on markers and sessions, and a page's
   folder path, which is the GM's private filing (a player's `folder` filter on the page list is
   ignored). A page's `updatedAt` moves on every save, so it stays with the GM too; players get
   `playerUpdatedAt`, which moves only when something that reader can read changes. A record's

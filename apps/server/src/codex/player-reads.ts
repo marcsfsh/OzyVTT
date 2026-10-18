@@ -20,6 +20,7 @@ import {
   orderPlayerAttached,
   orderPlayerChronicle,
   orderPlayerTimeline,
+  plainUnopenableLinks,
   projectPlayerCalendar,
   projectPlayerChronicleRecord,
   projectPlayerConnections,
@@ -157,7 +158,9 @@ export class PlayerCodexReads {
   pages(tag?: string): { pages: PlayerCodexPageSummary[] } {
     const rows = this.#store.listPages(tag === undefined ? undefined : { tag });
     return {
-      pages: rows.map((row) => projectPlayerPageSummary(row, this.#reader)).filter((page) => page !== null)
+      pages: rows
+        .map((row) => projectPlayerPageSummary(row, this.#reader, this.#pageContext))
+        .filter((page) => page !== null)
     };
   }
 
@@ -206,7 +209,12 @@ export class PlayerCodexReads {
     const marker = this.#store.partyMarker();
     const map = marker ? this.#store.getMap(marker.mapId) : null;
     const projected = marker && map ? projectPlayerPageMarker(markerRecord(this.#store, marker)) : null;
-    return { party: projected && map ? { marker: projected, mapName: map.name } : null };
+    return {
+      party:
+        projected && map
+          ? { marker: projected, mapName: plainUnopenableLinks(map.name, this.#pageContext.openableLinkKeys) }
+          : null
+    };
   }
 
   /** The timeline, or one pin's or page's entries. A hidden pin or page is refused, so its id cannot be probed. */
@@ -241,14 +249,16 @@ export class PlayerCodexReads {
       ...byFirstShown(rows.filter((session) => session.sessionNumber === null))
     ];
     return {
-      sessions: ordered.map(projectPlayerSession).filter((session) => session !== null),
+      sessions: ordered
+        .map((row) => projectPlayerSession(row, this.#pageContext))
+        .filter((session) => session !== null),
       activeSessionId: null
     };
   }
 
   session(sessionId: string): { session: PlayerCodexSession } | null {
     const session = this.#store.getSession(sessionId);
-    const projected = session && projectPlayerSession(session);
+    const projected = session && projectPlayerSession(session, this.#pageContext);
     return projected ? { session: projected } : null;
   }
 
@@ -297,8 +307,9 @@ export class PlayerCodexReads {
   }
 
   #projectMarkers(rows: ReturnType<CodexStore["listMarkers"]>): PlayerCodexMarker[] {
+    const openable = this.#pageContext.openableLinkKeys;
     return byFirstShown(rows)
-      .map((row) => projectPlayerPageMarker(markerRecord(this.#store, row)))
+      .map((row) => projectPlayerPageMarker(markerRecord(this.#store, row, openable)))
       .filter((marker) => marker !== null);
   }
 }
