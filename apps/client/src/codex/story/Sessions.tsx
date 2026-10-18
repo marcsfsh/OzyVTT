@@ -174,7 +174,8 @@ export function PlayerSessionPage({
   days,
   knownTitles,
   lineOf,
-  onFollow
+  onFollow,
+  phone = false
 }: Readonly<{
   token: string;
   session: PlayerCodexSession;
@@ -185,12 +186,14 @@ export function PlayerSessionPage({
   lineOf: (record: StoryRecord) => string;
   knownTitles: ReadonlySet<string>;
   onFollow: (target: string) => void;
+  /** A phone titles the page in its top bar, so the page leaves its own title out. */
+  phone?: boolean;
 }>) {
   const filed = records.filter((record) => record.sessionId === session.id);
   return (
     <article className="session-reader" aria-label={sessionTitle(session)}>
       <header className="session-titlerow">
-        <h2 className="session-title">{sessionTitle(session)}</h2>
+        {!phone && <h2 className="session-title">{sessionTitle(session)}</h2>}
         <span className="story-grow" />
         <span className="session-meta">{[realDateLabel(session.realDate), days].filter(Boolean).join(" · ")}</span>
       </header>

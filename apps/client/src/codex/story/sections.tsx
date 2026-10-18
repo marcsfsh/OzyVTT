@@ -918,6 +918,7 @@ export function PlayerSessionsSection() {
       knownTitles={knownTitles}
       lineOf={lineOf}
       onFollow={follow}
+      phone={shell.phone}
     />
   );
   if (shell.phone)
