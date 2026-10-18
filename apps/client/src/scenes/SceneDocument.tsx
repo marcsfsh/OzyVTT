@@ -224,7 +224,7 @@ export function SceneDocument({ sceneId }: Readonly<{ sceneId: string }>) {
         )}
       </Section>
       <Section title="Map" step="map" sceneId={scene.id}>
-        <SceneMapFacts facts={facts} />
+        <SceneMapFacts facts={facts} back={pathForScene(facts.scene.id)} />
       </Section>
       <Section title="Walls and light" step="light" sceneId={scene.id}>
         <SceneLight

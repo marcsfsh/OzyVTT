@@ -175,9 +175,9 @@ function Review({ facts }: Readonly<{ facts: SceneFacts }>) {
 }
 
 /**
- * Making or editing a scene as steps: Map, Tokens and monsters, Walls and light, Sound, and Review. The steps run down the left,
- * each marked done or unfinished; the step's questions fill the middle; the map is pinned on the right, drawn and
- * edited as the table draws it. Choosing the map makes the scene, privately, so every later step edits the real one.
+ * Making or editing a scene as steps: Map, Tokens and monsters, Walls and light, Sound, and Review. The steps run
+ * down the left, each marked done or unfinished; the step's questions fill the middle; the map is pinned on the
+ * right, drawn and edited as the table draws it. Choosing the map makes the scene, privately, so every later step edits the real one.
  * On a phone the steps are a strip across the top and the map is a bar over the bottom tabs that opens full screen.
  */
 export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null; step: SceneStep }>) {
@@ -272,7 +272,7 @@ export function SceneEditor({ sceneId, step }: Readonly<{ sceneId: string | null
         return (
           <div className="sc-q">
             <SceneName facts={facts} />
-            <SceneMapFacts facts={facts} />
+            <SceneMapFacts facts={facts} back={pathForScene(facts.scene.id, "map")} />
             <p className="sc-hint">
               A scene keeps its map for life, since its tokens, walls and fog sit on that map. Prepare another scene to
               use another map.

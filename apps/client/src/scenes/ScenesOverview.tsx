@@ -66,7 +66,7 @@ export function ScenesOverview() {
         ),
         actions:
           need.id === "grid" && entry.map ? (
-            <Button size="sm" onClick={() => go(pathForMap(entry.map!.id, "grid"))}>
+            <Button size="sm" onClick={() => go(pathForMap(entry.map!.id, "grid", pathForScene(entry.scene.id)))}>
               Set the grid
             </Button>
           ) : (

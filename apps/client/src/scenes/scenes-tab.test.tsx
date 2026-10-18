@@ -75,7 +75,8 @@ describe("the Scenes tab's front page", () => {
       expect.stringContaining("Saltmere has no grid yet.")
     ]);
     await user.click(within(rows[1]!).getByRole("button", { name: "Set the grid" }));
-    expect(here()).toBe(`/scenes/maps/${IDS.tunnels}?step=grid`);
+    // The grid's steps come back to the scene that needed it.
+    expect(here()).toBe(`/scenes/maps/${IDS.tunnels}?step=grid&back=${encodeURIComponent(`/scenes/${IDS.chase}`)}`);
   });
 
   it("goes from a waiting token to the step that places it", async () => {

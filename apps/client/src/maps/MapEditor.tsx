@@ -244,6 +244,7 @@ function NewMapEditor() {
 /** A map in the library, from its Grid step on: the calibration placed beside its steps, then Name and use. */
 function MapStepsEditor({ map, step }: Readonly<{ map: MapAsset; step: MapStep }>) {
   const { token, reloadMaps, go, narrow } = useScenes();
+  const { toast } = useToast();
   const back = backPathOf(useRoute().query);
   const image = useAuthorizedMapImage(map.id, token);
   const current: MapStep = step === "upload" ? "grid" : step;
@@ -257,7 +258,11 @@ function MapStepsEditor({ map, step }: Readonly<{ map: MapAsset; step: MapStep }
     onStep: (next) => {
       if (next === 3 && current !== "check") go(stepPath("check"));
     },
-    onFinished: () => go(stepPath("use"))
+    // The calibration's own note goes with its step, so the saved grid is said in a toast on the way to Use.
+    onFinished: (message) => {
+      toast(message, { tone: "success" });
+      go(stepPath("use"));
+    }
   });
   // A link or the step list can open Check before anything is marked; it then says to mark the grid first.
   const { goToStep, step: calibrationStep, maxStep } = calibration;

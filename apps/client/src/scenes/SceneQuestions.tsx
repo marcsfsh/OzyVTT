@@ -187,8 +187,11 @@ export function SceneSound({ facts }: Readonly<{ facts: SceneFacts }>) {
   );
 }
 
-/** The scene's map: its art, its grid and the way to its own page. A scene keeps its map for life. */
-export function SceneMapFacts({ facts }: Readonly<{ facts: SceneFacts }>) {
+/**
+ * The scene's map: its art, its grid and the way to its own page. A scene keeps its map for life. Setting the grid
+ * from here comes back to `back`, the page that asked.
+ */
+export function SceneMapFacts({ facts, back }: Readonly<{ facts: SceneFacts; back: string }>) {
   const { go } = useScenes();
   return (
     <div className="sc-q sc-mapfacts">
@@ -199,7 +202,7 @@ export function SceneMapFacts({ facts }: Readonly<{ facts: SceneFacts }>) {
       </div>
       <div className="sc-q-actions">
         {facts.grid === "none" && facts.map && (
-          <Button size="sm" onClick={() => go(pathForMap(facts.map!.id, "grid"))}>
+          <Button size="sm" onClick={() => go(pathForMap(facts.map!.id, "grid", back))}>
             Set the grid
           </Button>
         )}
