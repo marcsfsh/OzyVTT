@@ -13,7 +13,7 @@ import { build, catalog, fight, FOE, HERO, view, wizardInput, type Fight } from 
  * leave behind and how long it lasts need no caster of the spell's own level.
  */
 
-export const wizard = build(wizardInput(["hold-person", "mage-armor", "haste"]));
+const built = build(wizardInput(["hold-person", "mage-armor", "haste"]));
 
 let commands = 0;
 export const nextCommand = () => `60000000-0000-4000-8000-${String((commands += 1)).padStart(12, "0")}`;
@@ -26,6 +26,9 @@ export function caster(options: Parameters<typeof fight>[1] = {}): Fight {
 }
 
 const NUMBERS = { attackBonus: 7, saveDc: 15, bearersDc: false, modifier: 3 } as const;
+
+/** The Wizard's sheet, with Faithful Hound's cast on it so its bite is the sheet's to take while the hound is up. */
+export const wizard = { ...built, actions: [...built.actions, castAction("faithful-hound")] };
 
 /** A spell's cast action, as a sheet mints it. */
 export function castAction(spellId: string): ActorAction {
