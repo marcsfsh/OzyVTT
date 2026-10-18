@@ -258,7 +258,7 @@ export function MapStage({ presentation }: Readonly<{ presentation: Presentation
   if (!presentation.activeMap)
     return (
       <section className="viewer-waiting">
-        <span className="viewer-eyebrow">VIEWER CONNECTED</span>
+        <span className="viewer-eyebrow">Connected</span>
         <h1>Waiting for a map</h1>
         <p>The GM controls what appears here.</p>
       </section>
@@ -480,7 +480,7 @@ export function ViewerApp() {
   if (!presentation)
     return (
       <main className="viewer-waiting">
-        <span className="viewer-eyebrow">SHARED TABLE VIEWER</span>
+        <span className="viewer-eyebrow">Table screen</span>
         <h1>{connection === "reconnecting" ? "Reconnecting…" : "Connecting…"}</h1>
         <p role="alert">{message}</p>
       </main>
@@ -490,7 +490,7 @@ export function ViewerApp() {
   if (!presentation.enabled)
     return (
       <main className="viewer-waiting">
-        <span className="viewer-eyebrow">VIEWER CONNECTED</span>
+        <span className="viewer-eyebrow">Connected</span>
         <h1>Presentation paused</h1>
         <p>The GM will begin when the table is ready.</p>
         {sound}

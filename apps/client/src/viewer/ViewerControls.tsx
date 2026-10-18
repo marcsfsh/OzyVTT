@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Eyebrow, SegmentedControl, Select, useToast } from "@vtt/ui";
+import { Button, SegmentedControl, Select, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { HOST_PATHS } from "@vtt/api-contract";
 import { apiRequest } from "../lib/api";
@@ -48,7 +48,12 @@ type ViewerMap = Readonly<{
   scale?: Readonly<{ distancePerPixel: number; unit: string }> | null;
 }>;
 
-type ViewerControlsProps = Readonly<{ gmToken: string; map?: ViewerMap }>;
+type ViewerControlsProps = Readonly<{
+  gmToken: string;
+  map?: ViewerMap;
+  /** Opens the GM's preview of the table screen, drawn at the screen's own proportions. */
+  onPreview?: () => void;
+}>;
 type PresentationTool = "focus" | "ping" | "measure";
 
 type AccessList = Readonly<{ viewers: readonly ViewerMetadata[]; connections: readonly ViewerConnection[] }>;
@@ -64,7 +69,7 @@ function measurementLabel(map: ViewerMap | undefined, points: readonly Point[]) 
   return `${rounded(pixels)} px`;
 }
 
-export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
+export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps) {
   const [presentation, setPresentation] = useState<PresentationSummary | null>(null);
   const [viewers, setViewers] = useState<readonly ViewerMetadata[]>([]);
   const [connections, setConnections] = useState<readonly ViewerConnection[]>([]);
@@ -126,7 +131,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     }
   };
   const command = async (payload: Record<string, unknown>) => {
-    if (!presentation) throw new Error("Viewer presentation state is still loading.");
+    if (!presentation) throw new Error("The table screen is still loading. Try again in a moment.");
     await apiRequest("/api/v1/viewer/presentation/commands", {
       token: gmToken,
       body: { id: newId(), expectedRevision: presentation.revision, payload }
@@ -136,6 +141,10 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
   const mapIsPresented = Boolean(map && presentation?.enabled && presentation.activeMap?.assetId === map.assetId);
   const presentationHasMap = Boolean(presentation?.enabled && presentation.activeMap);
   const requiredPointCount = tool === "measure" ? 2 : 1;
+  /* One primary at a time, the next step: pair a screen, then present a map, then point at things on it. */
+  const step: "pair" | "present" | "point" =
+    connections.length === 0 ? "pair" : mapIsPresented ? "point" : map ? "present" : "pair";
+  const screens = connections.length === 1 ? "1 screen connected" : `${connections.length || "No"} screens connected`;
 
   const choosePoint = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!map || !previewUrl || busy || !svgRef.current) return;
@@ -155,7 +164,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
     });
   const sendTool = () =>
     void run(async () => {
-      if (!mapIsPresented) throw new Error("Present this map before using viewer tools.");
+      if (!mapIsPresented) throw new Error("Present this map first. These tools work on the map the screen shows.");
       if (draftPoints.length < requiredPointCount)
         throw new Error(`Choose ${requiredPointCount === 1 ? "a point" : "two points"} on the map first.`);
       if (tool === "focus") await command({ type: "viewer.camera.set", camera: { center: draftPoints[0], zoom } });
@@ -170,7 +179,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
             distanceLabel: labelOverride.trim() || suggestedLabel
           }
         });
-      toast(tool === "focus" ? "Viewer focused." : tool === "ping" ? "Ping sent." : "Measurement shown.", {
+      toast(tool === "focus" ? "The screen is focused there." : tool === "ping" ? "Ping sent." : "Measurement shown.", {
         tone: "success"
       });
     });
@@ -179,7 +188,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
       await navigator.clipboard.writeText(value);
       toast(confirmation, { tone: "success" });
     } catch {
-      toast("Copy was blocked by the browser. Select and copy the value manually.", { tone: "error" });
+      toast("The browser blocked the copy. Select the address and copy it yourself.", { tone: "error" });
     }
   };
 
@@ -193,13 +202,14 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
       <div className="pane-sky" aria-hidden="true" />
       <header className="viewer-controls-heading neon-beam">
         <div className="viewer-controls-title">
-          <Eyebrow>Shared display</Eyebrow>
-          <h2 id="viewer-controls-title">Table viewer</h2>
-          <p>Only explicitly presented, player-safe information appears on paired televisions and projectors.</p>
+          <h2 id="viewer-controls-title">Shared screen</h2>
+          <p>Paired screens show the map you present, with only what players can see on it.</p>
         </div>
         <div className="viewer-controls-status">
           <SharedScreenSwitch current="display" />
-          <strong className={connections.length ? "online" : ""}>{connections.length} connected</strong>
+          <strong className={connections.length ? "online" : ""} role="status">
+            {screens}
+          </strong>
         </div>
       </header>
 
@@ -211,19 +221,18 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
         >
           {!map && (
             <p className="viewer-no-map-notice" role="status">
-              Choose a map on the <strong>Maps</strong> tab first to present it here and unlock the focus/ping/measure
-              tools.
+              Upload or pick a map in <strong>Scenes</strong> to present it here. Focus, ping and measure work on the
+              map the screen shows.
             </p>
           )}
           {map && (
             <>
               <div className="viewer-tools-head">
-                <Eyebrow>Live presentation tools</Eyebrow>
-                <h3 id="viewer-tools-title">Focus, ping, and measure</h3>
+                <h3 id="viewer-tools-title">Focus, ping and measure</h3>
                 <p>
                   {mapIsPresented
-                    ? "Click the map, then send the selected action to every paired display."
-                    : "Present the current map to enable these tools."}
+                    ? "Choose a point on the map, then send it to every paired screen."
+                    : "Present this map to use these tools."}
                 </p>
               </div>
               <SegmentedControl
@@ -243,7 +252,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                 <div
                   className="viewer-tool-preview"
                   onClick={choosePoint}
-                  aria-label="Viewer presentation map. Click to choose a point; coordinate fields below are the keyboard alternative."
+                  aria-label="The presented map. Click a point, or type its coordinates in the fields below."
                 >
                   <svg
                     ref={svgRef}
@@ -322,7 +331,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
               </div>
               <div className="viewer-tool-actions">
                 <Button
-                  variant="primary"
+                  variant={step === "point" ? "primary" : "secondary"}
                   disabled={busy || !mapIsPresented || draftPoints.length < requiredPointCount}
                   onClick={sendTool}
                 >
@@ -365,13 +374,10 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
               Copy address
             </Button>
           </div>
-          <PairScreenForm gmToken={gmToken} onPaired={() => void refresh().catch(() => {})} />
+          <PairScreenForm gmToken={gmToken} primary={step === "pair"} onPaired={() => void refresh().catch(() => {})} />
           <div className="viewer-control-actions">
-            <Button variant="secondary" disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>
-              Open viewer here
-            </Button>
             <Button
-              variant="secondary"
+              variant={step === "present" && !presentationHasMap ? "primary" : "secondary"}
               disabled={busy || !presentation || (!presentationHasMap && !map)}
               onClick={() =>
                 void run(() =>
@@ -386,7 +392,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                 )
               }
             >
-              {presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Select a map to present"}
+              {presentationHasMap ? "Pause presentation" : map ? `Present ${map.altText}` : "Present a map"}
             </Button>
             <Button
               variant="secondary"
@@ -402,12 +408,24 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                 )
               }
             >
-              {mapIsPresented ? "Current map is live" : "Switch viewer to current map"}
+              {mapIsPresented
+                ? "This map is on the screen"
+                : map
+                  ? `Show ${map.altText} instead`
+                  : "Show this map instead"}
+            </Button>
+            {onPreview && (
+              <Button variant="secondary" disabled={busy} onClick={onPreview}>
+                Preview the screen
+              </Button>
+            )}
+            <Button variant="secondary" disabled={busy} onClick={() => window.open("/viewer.html", "vtt-table-viewer")}>
+              Open a screen here
             </Button>
           </div>
           {viewers.length > 0 && (
             <div className="viewer-access-list">
-              <h3>Paired displays</h3>
+              <h3>Paired screens</h3>
               <ul>
                 {viewers.map((viewer) => (
                   <li key={viewer.id}>
@@ -418,7 +436,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                           ? "Revoked"
                           : connectedIds.has(viewer.id)
                             ? `Connected · ${SOUND_WORDS[connections.find((connection) => connection.viewerId === viewer.id)!.sound]}`
-                            : "Offline"}
+                            : "Not connected"}
                       </span>
                     </div>
                     {!viewer.revokedAt && (
@@ -430,7 +448,7 @@ export function ViewerControls({ gmToken, map }: ViewerControlsProps) {
                           if (
                             await confirm({
                               title: `Revoke ${viewer.name}?`,
-                              body: "This display immediately loses access and stops receiving updates.",
+                              body: "The screen loses access now and shows nothing more until it is paired again.",
                               confirmLabel: "Revoke",
                               danger: true
                             })

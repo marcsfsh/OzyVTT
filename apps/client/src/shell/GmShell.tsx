@@ -293,6 +293,7 @@ export function GmShell({
       {tab("viewer") && route.segments[1] !== "sound" && (
         <ViewerControls
           gmToken={token}
+          onPreview={() => setShowViewerPreview(true)}
           {...(selectedMap
             ? {
                 map: {

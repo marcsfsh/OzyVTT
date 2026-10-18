@@ -4,7 +4,8 @@
    - Keep the looser spacing scale in viewer-page.css's `#viewer-root` block.
    - Paint only: nothing here may make a field render that did not before; a new field on the shared
      screen is a leak.
-   - Always night: viewer-main.tsx sets no `data-theme`. */
+   - Themed like every page: viewer.html's no-flash script reads the browser's stored theme, so a screen that
+     never chose one shows Night and the GM's own preview shows the GM's theme. */
 .viewer-eyebrow {
   color: var(--text-dim);
   font-size: clamp(0.8rem, 1.35vw, 1.15rem);
@@ -20,6 +21,9 @@
   height: 100%;
   display: grid;
   place-items: center;
+  /* The lines sit together in the middle, clear of the horizon; spread over the rows they drifted apart. */
+  align-content: center;
+  gap: var(--space-2);
   padding: var(--space-8);
   text-align: center;
   overflow: hidden;
@@ -58,13 +62,13 @@
     auto;
 }
 /* The crest: the sun masked to the top of a --sky-sun-d circle on the horizon, as `.pane-sky::after`
-   in styles.css. */
+   in styles.css. It stands on the line, so the sun rises from the horizon and never hangs under it. */
 .viewer-pairing::after,
 .viewer-waiting::after {
   content: "";
   position: absolute;
   left: calc(50% - var(--sky-sun-d) / 2);
-  bottom: calc(var(--sky-horizon-inset) - var(--sky-sun-crown));
+  bottom: var(--sky-horizon-inset);
   width: var(--sky-sun-d);
   height: var(--sky-sun-crown);
   background-image: var(--sky-sun);
@@ -72,6 +76,12 @@
   -webkit-mask-image: var(--sky-sun-mask);
   mask-image: var(--sky-sun-mask);
   pointer-events: none;
+}
+/* The words stay over the sun on a short screen, where the crest reaches up behind them. */
+.viewer-pairing-card,
+.viewer-waiting > :is(h1, p, .viewer-eyebrow) {
+  position: relative;
+  z-index: 1;
 }
 .viewer-pairing-card {
   container-type: inline-size;

@@ -300,6 +300,11 @@
   .viewer-address {
     grid-template-columns: 1fr;
   }
+  /* The whole address fits a phone's width: a smaller size, and wrapping where a code block allows it. */
+  .viewer-address select,
+  .viewer-address code {
+    font-size: var(--fs-sm);
+  }
   .viewer-address .nh-btn {
     justify-self: start;
   }

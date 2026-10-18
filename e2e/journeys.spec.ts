@@ -116,7 +116,7 @@ test("the first evening: the GM password, the join address, a player, the table 
   await press(gm.getByRole("button", { name: "Pair screen" }));
   await expect(gm.getByText("Living room TV is paired. It shows the table in a moment.")).toBeVisible();
   await expect(screen.getByRole("heading", { name: "Pair this screen" })).toBeHidden();
-  await expect(gm.getByText("1 connected")).toBeVisible();
+  await expect(gm.getByText("1 screen connected")).toBeVisible();
   await expectPageFits(gm);
 
   // A scene on a new map. The map has no grid, which the picker and the staging header say, with the way to set it.
@@ -525,7 +525,7 @@ test("the GM presents a map on a paired table screen", async ({ open, request })
   const gm = await open("/");
   await signInAsGm(gm);
   await openGmSection(gm, "Shared screen");
-  await expect(gm.getByRole("heading", { name: "Table viewer" })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: "Shared screen", level: 2 })).toBeVisible();
   await expect(gm.getByText("Den TV", { exact: false }).first()).toBeVisible();
 
   // The Shared screen offers the GM's current map: the live scene's, when an earlier journey left one.

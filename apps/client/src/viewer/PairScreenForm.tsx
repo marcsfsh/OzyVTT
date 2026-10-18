@@ -10,7 +10,16 @@ export const codeDigits = (typed: string) => typed.replace(/\D/g, "");
  * Pairing a table screen from the GM's side (ADR-0028): the screen shows a code, the GM types it here. A TV remote
  * never has to type anything.
  */
-export function PairScreenForm({ gmToken, onPaired }: Readonly<{ gmToken: string; onPaired: () => void }>) {
+export function PairScreenForm({
+  gmToken,
+  primary = true,
+  onPaired
+}: Readonly<{
+  gmToken: string;
+  /** Whether pairing is the page's next step, and so its one primary. */
+  primary?: boolean;
+  onPaired: () => void;
+}>) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("Table screen");
   const [busy, setBusy] = useState(false);
@@ -43,7 +52,7 @@ export function PairScreenForm({ gmToken, onPaired }: Readonly<{ gmToken: string
       }}
     >
       <h3 id="viewer-pair-title">Pair a table screen</h3>
-      <p>Open the address above on the TV. It shows a six-digit code: type that code here.</p>
+      <p>Open the address above on the TV. It shows a six-digit code. Type that code here.</p>
       <label>
         Code on the screen
         <Input
@@ -58,7 +67,7 @@ export function PairScreenForm({ gmToken, onPaired }: Readonly<{ gmToken: string
         Screen name
         <Input value={name} maxLength={100} onChange={(event) => setName(event.target.value)} />
       </label>
-      <Button variant="primary" type="submit" disabled={busy || !ready}>
+      <Button variant={primary ? "primary" : "secondary"} type="submit" disabled={busy || !ready}>
         {busy ? "Pairing…" : "Pair screen"}
       </Button>
     </form>
