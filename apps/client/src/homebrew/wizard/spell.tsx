@@ -466,6 +466,7 @@ export function spellSummaryOf(draft: Draft, id: string): ContentSpellSummary {
   return {
     id,
     name: typeof draft.name === "string" && draft.name.trim() ? draft.name : "Untitled spell",
+    source: "homebrew",
     level: typeof draft.level === "number" ? draft.level : 1,
     school: typeof draft.school === "string" ? draft.school : "",
     castingTime: typeof draft.castingTime === "string" ? draft.castingTime : "",

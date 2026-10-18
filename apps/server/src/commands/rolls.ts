@@ -168,7 +168,7 @@ export const rollCommands = [
         );
       });
       if (!committed.duplicate) {
-        const skills = kit.contentLibrary.forAudience("gm").skillSummaries();
+        const skills = kit.playCatalog().skillSummaries();
         const label = checkLabel(subject, {
           skill: (id) => skills.find((entry) => entry.id === id)?.name,
           tool: (id) => kit.equipmentCatalog().equipmentRecord(id)?.name

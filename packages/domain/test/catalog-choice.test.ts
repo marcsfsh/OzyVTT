@@ -116,6 +116,7 @@ const featSummary = (id: string, category: string): ContentFeatSummary => ({
 const spellSummary = (id: string, level: number, classes: readonly string[]): ContentSpellSummary => ({
   id,
   name: id,
+  source: "srd",
   level,
   school: "evocation",
   castingTime: "1 action",
@@ -137,6 +138,7 @@ const spellSummary = (id: string, level: number, classes: readonly string[]): Co
 const equipmentSummary = (id: string, category: ContentEquipmentSummary["category"]): ContentEquipmentSummary => ({
   id,
   name: id,
+  source: "srd",
   category,
   costGp: null,
   weightLb: null,

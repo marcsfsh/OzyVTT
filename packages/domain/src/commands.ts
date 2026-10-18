@@ -1372,6 +1372,10 @@ export const BuilderOffersSchema = z
     "A character-builder draft: the identity chosen so far, and the answers by offer key or as a stored ledger, one of the two."
   );
 
+/** The GM's See as: the builder's offers for this draft, as one player would get them. */
+export const HomebrewSeeAsBuilderOffersSchema = z
+  .object({ as: z.union([z.literal("everyone"), z.uuid()]), draft: BuilderOffersSchema })
+  .strict();
 /** Level up/down or respec: `CharacterCreateSchema` minus the name, plus the actor. Fully re-validated. */
 export const CharacterRebuildSchema = CharacterCreateSchema.omit({ name: true }).extend({ actorId: z.uuid() }).strict();
 

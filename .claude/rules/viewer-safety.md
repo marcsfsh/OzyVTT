@@ -12,6 +12,10 @@ paths:
   - "apps/server/src/codex-http.ts"
   - "apps/client/src/viewer/**"
   - "apps/server/src/vision/audience.ts"
+  - "apps/server/src/content-library.ts"
+  - "apps/server/src/homebrew-store.ts"
+  - "apps/server/src/homebrew-player.ts"
+  - "apps/server/src/commands/reads.ts"
 ---
 
 # Projection safety
@@ -38,5 +42,13 @@ quantity and no identity, position or existence of a hidden thing. When in doubt
   hashes it per audience, so a GM-only edit must leave its output unchanged, and a reveal to one
   character must leave every other reader's unchanged. Players see a record's first-shown date
   (`codex/first-shown.ts`), never when the GM made or edited it. The GM's preview only reads.
+- Homebrew reaches a player only through a catalog built for that reader (`ContentLibrary.forAudience`
+  with the session's claimed characters, or a preview's): published, not archived, in a pack that is
+  on, and shared with everyone or one of the reader's characters (`audienceReceives`). Every player
+  read of content (catalogs, builder offers, next level, spell choices, the Compendium) takes that
+  catalog, never the GM's or `play`, which is for resolving what a sheet or a monster already has. A
+  record shown to Lyra must leave every other reader's answer and ping unchanged, and no pack name,
+  audience or reveal date reaches a player. A player command that adds a record (an item, a spell)
+  checks it against the player's own catalog.
 
 See the "Projections" section of `docs/ARCHITECTURE.md`.

@@ -27,6 +27,9 @@ const LEVEL_TABLE = Array.from({ length: 20 }, (_, index) => ({
   proficiencyBonus: 2 + Math.floor(index / 4)
 }));
 
+/** A full caster's table: two level 1 slots at level 1, as the SRD's Wizard has. */
+const CASTER_TABLE = LEVEL_TABLE.map((row) => ({ ...row, spellSlots: [2, 0, 0, 0, 0, 0, 0, 0, 0] }));
+
 const classBody = (overrides: Record<string, unknown> = {}) => ({
   id: "hb-blood-hunter-a1b2c3",
   name: "Blood Hunter",
@@ -164,7 +167,7 @@ describe("tier 1: the record's own schema", () => {
     const refused = validateForPublish("equipment", arrows(["longsword"]), contextWith());
     expect(refused.valid).toBe(false);
     expect(messages(refused)).toContain(
-      '"longsword" is not a kind of ammunition (Arrows, Crossbow Bolts...), so "Seeking Arrow" could never be bound to it.'
+      "Longsword is not a kind of ammunition, such as Arrows or Crossbow Bolts, so Seeking Arrow could never be made from it."
     );
   });
 });
@@ -175,7 +178,10 @@ describe("tier 2: identity", () => {
     // written into a persisted ActorDefinition.
     const validity = validateForPublish("class", classBody({ id: `hb-${"a".repeat(70)}` }), contextWith());
     expect(validity.valid).toBe(false);
-    expect(messages(validity)).toMatch(/60/);
+    expect(validity.issues.map((issue) => issue.path)).toEqual([["id"]]);
+    expect(messages(validity)).toBe(
+      "This record's id can't be used here. Make a copy of the record, which gets a new id."
+    );
   });
 
   it("refuses an id outside the reserved homebrew namespace", () => {
@@ -190,7 +196,7 @@ describe("tier 3: cross-record references", () => {
       { id: "hb-mutant-a1b2c3", name: "Mutant", source: "homebrew", classId: "hb-nothing-000000" },
       contextWith()
     );
-    expect(messages(validity)).toContain(`No class "hb-nothing-000000" exists`);
+    expect(messages(validity)).toContain("The class Mutant belongs to is not in this table.");
     expect(
       validateForPublish(
         "subclass",
@@ -260,7 +266,7 @@ describe("a class and its subclass publish in either order", () => {
       }),
       both
     );
-    expect(messages(twoPicks)).toContain("asks for 2 distinct pick(s) but offers only 1");
+    expect(messages(twoPicks)).toContain("asks for 2 different picks but offers only 1");
   });
 
   it("still wants the class published first for a CASTER subclass, which is an order and not a deadlock", () => {
@@ -301,7 +307,7 @@ describe("tier 3: cross-record references, continued", () => {
       }),
       contextWith()
     );
-    expect(messages(validity)).toContain("resolves to nothing");
+    expect(messages(validity)).toContain("whose list of options is empty in this table");
   });
 
   it("refuses a starting-equipment id that resolves to nothing: it grants no attack and no AC, silently", () => {
@@ -312,7 +318,7 @@ describe("tier 3: cross-record references, continued", () => {
       }),
       contextWith()
     );
-    expect(messages(validity)).toContain("would grant nothing");
+    expect(messages(validity)).toContain("is not in this table, so it would give nothing");
     // The same option pointing at a real catalog id is fine.
     expect(
       validateForPublish(
@@ -342,7 +348,7 @@ describe("tier 3: cross-record references, continued", () => {
       }),
       contextWith()
     );
-    expect(messages(validity)).toContain("asks for 3 distinct pick(s) but offers only 2");
+    expect(messages(validity)).toContain("asks for 3 different picks but offers only 2");
   });
 
   it("refuses a choice-bearing feature that no level row grants: the wizard offers a pick the build cannot match", () => {
@@ -363,7 +369,7 @@ describe("tier 3: cross-record references, continued", () => {
       contextWith()
     );
     expect(validity.valid).toBe(false);
-    expect(messages(validity)).toContain("no level in the table grants it");
+    expect(messages(validity)).toContain("no level in the level table grants it");
     // Putting the feature in the table fixes it.
     expect(
       validateForPublish(
@@ -413,7 +419,7 @@ describe("tier 3: cross-record references, continued", () => {
         }),
         contextWith()
       );
-    expect(messages(repeatedAtThreeLevels(false))).toContain("asks for 3 distinct pick(s) but offers only 2");
+    expect(messages(repeatedAtThreeLevels(false))).toContain("asks for 3 different picks but offers only 2");
     expect(repeatedAtThreeLevels(true).valid).toBe(true);
   });
 
@@ -438,7 +444,7 @@ describe("tier 3: cross-record references, continued", () => {
       ]
     });
     expect(messages(validateForPublish("species", species("subrace"), contextWith()))).toContain(
-      "silently never granted"
+      "so mark its choice as a lineage choice"
     );
     expect(validateForPublish("species", species("lineage"), contextWith()).valid).toBe(true);
   });
@@ -541,7 +547,7 @@ describe("tier 3: cross-record references, continued", () => {
       },
       contextWith()
     );
-    expect(messages(validity)).toContain("disagrees with its record id");
+    expect(messages(validity)).toContain("names a different record than its own");
   });
 });
 
@@ -558,7 +564,7 @@ describe("spell lists: the empty list is the failure that matters", () => {
     // rejection, so the GM must hear about it at publish time.
     const validity = validateForPublish("spell-list", listBody(), contextWith());
     expect(validity.valid).toBe(false);
-    expect(messages(validity)).toContain("cannot be created at all");
+    expect(messages(validity)).toContain("a caster on an empty list can't be made at all");
   });
 
   it("accepts a list that draws real spells, by id or by basing on an existing list", () => {
@@ -581,7 +587,7 @@ describe("spell lists: the empty list is the failure that matters", () => {
       listBody({ basedOn: ["hb-peer-a1b2c3"] }),
       contextWith({ spellLists: [peer] })
     );
-    expect(messages(validity)).toContain("loops back to itself");
+    expect(messages(validity)).toContain("lead back to Necromancer List itself");
   });
 
   it("refuses a caster that names no list at all: the builder would look for one named after the class", () => {
@@ -590,14 +596,14 @@ describe("spell lists: the empty list is the failure that matters", () => {
       classBody({ spellcasting: { ability: "int", prepares: "prepared" } }),
       contextWith()
     );
-    expect(messages(validity)).toContain("names no spell list");
+    expect(messages(validity)).toContain("casts spells but has no spell list");
   });
 
   it("refuses a caster pointed at a list with no spells, and accepts one pointed at a real list", () => {
     const casting = (spellListId: string) =>
-      classBody({ spellcasting: { ability: "int", prepares: "prepared", spellListId } });
+      classBody({ spellcasting: { ability: "int", prepares: "prepared", spellListId }, levelTable: CASTER_TABLE });
     expect(messages(validateForPublish("class", casting("hb-empty-a1b2c3"), contextWith()))).toContain(
-      "could not be created at all"
+      "couldn't be made at all"
     );
     // The SRD wizard list resolves, so a homebrew class drawing from it publishes cleanly.
     expect(validateForPublish("class", casting("wizard"), contextWith()).valid).toBe(true);
@@ -614,7 +620,10 @@ describe("spell lists: the empty list is the failure that matters", () => {
     expect(
       validateForPublish(
         "class",
-        classBody({ spellcasting: { ability: "int", prepares: "prepared", spellListId: "hb-blood-a1b2c3" } }),
+        classBody({
+          spellcasting: { ability: "int", prepares: "prepared", spellListId: "hb-blood-a1b2c3" },
+          levelTable: CASTER_TABLE
+        }),
         context
       ).valid
     ).toBe(true);
@@ -633,7 +642,7 @@ describe("tier 4: shapes that parse and are then read by nothing", () => {
       spellcasting: { ability: "int", prepares: "prepared", spellListId: "wizard" }
     };
     expect(messages(validateForPublish("subclass", eldritchKnight, contextWith()))).toContain(
-      "Third-caster subclasses are not supported yet"
+      "Subclasses that add spellcasting to a class without it are not supported yet"
     );
     // The same subclass on a class that has slots is fine; nothing is being overlaid.
     expect(validateForPublish("subclass", { ...eldritchKnight, classId: "wizard" }, contextWith()).valid).toBe(true);
@@ -653,7 +662,7 @@ describe("tier 4: shapes that parse and are then read by nothing", () => {
     });
     const empty = validateForPublish("feat", withRider({ type: "extra-damage", damageType: "force" }), contextWith());
     expect(empty.valid).toBe(false);
-    expect(messages(empty)).toContain("neither a dice `formula` nor an `abilityModifier`");
+    expect(messages(empty)).toContain("has no dice and no ability modifier, so it would add nothing");
     // The offending field is addressable, like every other issue in this file.
     expect(empty.issues[0].path).toEqual(["feature", "modifiers", 0]);
 
@@ -702,9 +711,7 @@ describe("riders that parse and could never take effect", () => {
       const rider = { ...base, when: [{ type: "on-attack-roll" }] };
       const refused = validateForPublish("feat", feat(rider), contextWith());
       expect(refused.valid, base.type).toBe(false);
-      expect(messages(refused)).toContain(
-        `gates ${named} on "on-attack-roll", a moment the damage roll never collects`
-      );
+      expect(messages(refused), named).toContain("waits for a moment the damage roll never reaches");
       expect(refused.issues[0].path).toEqual(["feature", "modifiers", 0]);
     }
     for (const moment of ["on-hit", "on-critical-hit", "on-damage-roll"])
@@ -740,7 +747,7 @@ describe("riders that parse and could never take effect", () => {
       feat({ type: "armor-class", amount: 2 }, { tags: ["warded"], duration: { type: "encounter" } }),
       contextWith()
     );
-    expect(messages(armorOnEffect)).toContain('An effect cannot carry "armor-class"');
+    expect(messages(armorOnEffect)).toContain("An effect can't carry that modifier");
   });
 });
 
@@ -773,7 +780,7 @@ describe("open slugs the SRD does not know", () => {
       ["feature", "grants", "damageResistances", 0],
       ["feature", "grants", "conditionImmunities", 0]
     ]);
-    expect(validity.warnings[1].message).toContain('"fier" is not an SRD damage type');
+    expect(validity.warnings[1].message).toContain("Fier is not an SRD damage type");
   });
 
   it("says nothing about the SRD's own slugs", () => {
@@ -801,7 +808,7 @@ describe("an item that grants spells", () => {
     const refused = validateForPublish("equipment", amulet, contextWith());
     expect(refused.valid).toBe(false);
     expect(refused.issues[0].path).toEqual(["grants", "spells"]);
-    expect(messages(refused)).toContain('Give it a "casts" entry instead');
+    expect(messages(refused)).toContain("List them under Spells it casts");
   });
 });
 
@@ -815,7 +822,7 @@ describe("a duplicated SRD record still passes its own gate", () => {
       const newId = `hb-${entry.id}-a1b2c3`;
       const validity = validateForPublish("class", rewriteForNewId("class", source.body, entry.id, newId), context);
       // The one thing a copy legitimately lacks is a subclass naming it, and a draft subclass satisfies that.
-      const unexpected = validity.issues.filter((issue) => !String(issue.message).includes("no subclass names"));
+      const unexpected = validity.issues.filter((issue) => !String(issue.message).includes("no subclass belongs to"));
       expect(unexpected, `${entry.id}: ${messages({ issues: unexpected })}`).toEqual([]);
     }
   });

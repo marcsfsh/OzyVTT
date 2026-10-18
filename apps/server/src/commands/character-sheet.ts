@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import type { GameState } from "@vtt/domain";
+import { catalogIdOf, type InventoryItem } from "@vtt/schemas";
 import { requireActorAccess } from "../authorization.js";
 import { claimCharacter, forceReleaseCharacter, releaseCharactersForSession } from "../character-claims.js";
 import { setCharacterIdentity, setCharacterProficiencies } from "../character-edit.js";
@@ -26,8 +28,32 @@ import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
 import { setFavourites } from "../option-uses.js";
 import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
 import { addToSpellbook, swapClassSpell } from "../spell-choices.js";
-import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
+import { initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
+
+/** A player adds only an item their catalog has, when the row names a catalog record at all: a record the GM hid or
+ *  shared with another character is refused as one that does not exist. A row already carried keeps what it is. */
+function requireReceivedItem(
+  kit: Kit,
+  principal: GamePrincipal,
+  state: GameState,
+  actorId: string,
+  item: InventoryItem
+) {
+  if (isGmGrade(principal) || item.quantity <= 0) return;
+  const carried = state.actors.find((actor) => actor.id === actorId)?.inventory.some((entry) => entry.id === item.id);
+  if (carried) return;
+  const recordId = catalogIdOf(item);
+  if (kit.playCatalog().equipmentRecord(recordId) && !kit.catalogFor(principal).equipmentRecord(recordId))
+    throw new CommandRejectedError("That item is not in the content catalog.");
+}
+
+/** A player takes only a spell their catalog has: one shown to everyone or to one of their characters. The refusal
+ *  reads as for a spell that does not exist, so it says nothing about a hidden one. */
+function requireReceivedSpell(kit: Kit, principal: GamePrincipal, spellId: string) {
+  if (!isGmGrade(principal) && !kit.catalogFor(principal).spellRecord(spellId))
+    throw new CommandRejectedError("That spell is not in the content catalog.");
+}
 
 // Claims, and the edits a player may make to their own character's sheet.
 
@@ -159,8 +185,9 @@ export const characterSheetCommands = [
       let line = "";
       const { duplicate } = await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        requireReceivedSpell(kit, principal, spellId);
         const swapped = swapClassSpell(state, actorId, spellId, replaces, initiatorOf(principal).role, {
-          library: kit.contentLibrary.forAudience("gm"),
+          library: kit.playCatalog(),
           policy: state.builderPolicy,
           catalog: kit.equipmentCatalog()
         });
@@ -184,13 +211,14 @@ export const characterSheetCommands = [
       let line = "";
       const { duplicate } = await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "resource");
+        requireReceivedSpell(kit, principal, spellId);
         line = addToSpellbook(
           state,
           actorId,
           { spellId, from, ...(itemId !== undefined ? { itemId } : {}) },
           initiatorOf(principal),
           {
-            library: kit.contentLibrary.forAudience("gm"),
+            library: kit.playCatalog(),
             policy: state.builderPolicy,
             catalog: kit.equipmentCatalog(),
             random: (sides) => kit.context.random(sides),
@@ -224,6 +252,7 @@ export const characterSheetCommands = [
       let ended: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, actorId, "inventory");
+        requireReceivedItem(kit, principal, state, actorId, item);
         // Donning armor ends Mage Armor, which the table is told.
         ended = setInventoryItem(state, actorId, item, (definitionId) => kit.resolveDefinitionIn(state, definitionId), {
           catalog: kit.equipmentCatalog(),

@@ -75,7 +75,7 @@ export function createGameApiRouter(options: GameApiRouterOptions) {
     if (caller.kind === "gm") return { kind: "gm", sessionId: caller.sessionId };
     if (caller.kind === "player")
       return caller.preview
-        ? { kind: "player", sessionId: caller.sessionId, preview: true }
+        ? { kind: "player", sessionId: caller.sessionId, preview: { characterIds: caller.preview.characterIds } }
         : { kind: "player", sessionId: caller.sessionId };
     if (caller.kind === "integration" && caller.inScope)
       return { kind: "integration", credentialId: caller.id, name: caller.name };

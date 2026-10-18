@@ -1,6 +1,7 @@
 import { z } from "zod";
 import * as content from "@vtt/content-srd-5.2.1/schemas";
 import * as wire from "@vtt/domain";
+import * as commands from "@vtt/domain/commands";
 import {
   ActionSchema,
   ActionUsesSchema,
@@ -153,7 +154,7 @@ export const HomebrewRecordBodySchema = named(
     .discriminatedUnion("type", recordBranches as unknown as [z.ZodObject, ...z.ZodObject[]])
     .meta({ discriminator: { propertyName: "type", mapping: recordMapping } })
     .describe(
-      "The authored content only. `state`, `visibleToPlayers`, and `deletedAt` are row state and live on HomebrewRecordDocument, which is what stops an imported pack from inheriting the exporting table's visibility policy. One branch per `HomebrewContentType`, discriminated by the body's own `type`. A field with a server-side default is optional on the wire, and an unset optional field is left out entirely."
+      "The authored content only. `state`, `audience`, the pack and `deletedAt` are row state and live on HomebrewRecordDocument, which is what stops an imported pack from inheriting the exporting table's sharing. One branch per `HomebrewContentType`, discriminated by the body's own `type`. A field with a server-side default is optional on the wire, and an unset optional field is left out entirely."
     )
 );
 /**
@@ -332,4 +333,11 @@ nameAll([
   ["BuilderOffersData", wire.BuilderOffersReplySchema],
   ["BuilderAbilityIncreases", wire.BuilderAbilityIncreasesSchema],
   ["BuilderChoiceRow", CharacterChoiceSchema]
+]);
+
+// The Compendium a reader gets, and the GM's See as reads of one player's Compendium and builder.
+nameAll([
+  ["ContentCompendiumData", wire.ContentCompendiumSchema],
+  ["HomebrewSeeAsRecordData", wire.HomebrewSeeAsRecordSchema],
+  ["HomebrewSeeAsBuilderOffersRequest", commands.HomebrewSeeAsBuilderOffersSchema]
 ]);

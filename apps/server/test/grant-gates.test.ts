@@ -450,7 +450,11 @@ describe("the eleventh list: `spells` beside a `when` is refused, never silently
     const validity = validateForPublish("species", species(GATED_FIREBALL), publishContext());
     expect(validity.valid).toBe(false);
     expect(validity.issues).toHaveLength(1);
-    expect(validity.issues[0].message).toBe(grantedSpellGateMessage(["fireball"]));
+    // The schema's own explanation stays with the schema; the GM reads it in plain words.
+    expect(grantedSpellGateMessage(["fireball"])).toContain("cannot carry");
+    expect(validity.issues[0].message).toBe(
+      "A grant with a condition can't give spells. Put the spells in a grant with no condition."
+    );
     // Machine-addressable down the record, so the editor opens the right trait and box.
     expect(validity.issues[0].path.join(".")).toBe("traits.0.grants.spells");
   });

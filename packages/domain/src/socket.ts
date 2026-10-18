@@ -7,6 +7,8 @@ import type {
   ContentGlossaryResult,
   ContentEquipmentResult,
   ContentFeatsResult,
+  ContentCompendiumKind,
+  ContentCompendiumResult,
   ContentLanguagesResult,
   ContentMonsterBenchmarksResult,
   ContentMonstersResult,
@@ -487,6 +489,11 @@ export interface ClientToServerEvents {
   ) => void;
   "content:feats": (payload: Record<string, never>, acknowledgement: (result: ContentFeatsResult) => void) => void;
   "content:names": (payload: Record<string, never>, acknowledgement: (result: ContentNamesResult) => void) => void;
+  /** One kind of the Compendium: the SRD and the homebrew this reader receives. */
+  "content:compendium": (
+    payload: { kind: ContentCompendiumKind },
+    acknowledgement: (result: ContentCompendiumResult) => void
+  ) => void;
   "content:monster-actions": (
     payload: { definitionId: string },
     acknowledgement: (result: ContentActionsResult) => void

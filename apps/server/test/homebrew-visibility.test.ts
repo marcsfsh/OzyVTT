@@ -196,7 +196,7 @@ function fakeHomebrew(revision = 1): HomebrewContentSource {
   return {
     revision,
     publishedFor: (audience: ContentAudience) =>
-      audience === "gm" ? concatSlices(SLICES.gmonly, SLICES.playersafe) : SLICES.playersafe,
+      audience === "gm" || audience === "play" ? concatSlices(SLICES.gmonly, SLICES.playersafe) : SLICES.playersafe,
     // Status-blind, including drafts: the live-instance lookup.
     monsterForInstance: (id: string) => byExternalId.get(id)
   };
@@ -255,7 +255,8 @@ const PLAYER_READABLE_CONTENT_READS = [
   "content:species",
   "content:backgrounds",
   "content:feats",
-  "content:names"
+  "content:names",
+  "content:compendium"
 ] as const;
 /** The bestiary, stat blocks and the monster wizard's benchmarks (SRD only, so no homebrew can ride them): GM-grade
  *  only, and that gate is asserted below. */
@@ -266,11 +267,11 @@ const GM_ONLY_CONTENT_READS = [
   "content:monster-benchmarks"
 ] as const;
 
-const readAs = (game: GameCommands, event: string, principal: GamePrincipal) =>
+const readAs = (game: GameCommands, event: string, principal: GamePrincipal, input?: unknown) =>
   game.read(
     game.reads.find((read) => read.event === event)!,
     principal,
-    { definitionId: "hb-m-playersafe" }
+    input ?? (event === "content:compendium" ? { kind: "class" } : { definitionId: "hb-m-playersafe" })
   );
 
 // Markers are matched over the serialized payload, so it works for any catalog shape. Reduced to a
@@ -351,7 +352,7 @@ describe("homebrew never reaches an audience it was not published to", () => {
       asiLevels: [4, 8, 12, 16, 19]
     });
 
-    const player = new ContentLibrary(fakeHomebrew()).forAudience("player");
+    const player = new ContentLibrary(fakeHomebrew()).forAudience({ characterIds: [] });
     expect(player.classRecord("hb-gmonly-class")).toBeUndefined();
     expect(player.classProgressionTable()["hb-gmonly-class"]).toBeUndefined();
     expect(player.classProgressionTable()["hb-playersafe-class"]).toBeDefined();
@@ -364,9 +365,9 @@ describe("homebrew never reaches an audience it was not published to", () => {
     const library = new ContentLibrary(fakeHomebrew());
     expect(library.monsterForInstance("hb-m-draftonly")?.actions).toHaveLength(1);
     expect(library.forAudience("gm").monster("hb-m-draftonly")).toBeUndefined();
-    expect(library.forAudience("player").monster("hb-m-gmonly")).toBeUndefined();
+    expect(library.forAudience({ characterIds: [] }).monster("hb-m-gmonly")).toBeUndefined();
     expect(library.monsterForInstance("goblin-warrior")?.name).toBe("Goblin Warrior");
-    expect(library.forAudience("player").monster("goblin-warrior")?.name).toBe("Goblin Warrior");
+    expect(library.forAudience({ characterIds: [] }).monster("goblin-warrior")?.name).toBe("Goblin Warrior");
   });
 
   it("rebuilds its cached views when the homebrew revision moves, and not otherwise", () => {
@@ -378,26 +379,28 @@ describe("homebrew never reaches an audience it was not published to", () => {
       },
       publishedFor: (audience) => {
         builds += 1;
-        return audience === "gm" ? concatSlices(SLICES.gmonly, SLICES.playersafe) : SLICES.playersafe;
+        return audience === "gm" || audience === "play"
+          ? concatSlices(SLICES.gmonly, SLICES.playersafe)
+          : SLICES.playersafe;
       },
       monsterForInstance: () => undefined
     };
     const library = new ContentLibrary(source);
-    library.forAudience("player");
-    library.forAudience("player");
+    library.forAudience({ characterIds: [] });
+    library.forAudience({ characterIds: [] });
     expect(builds, "a repeat read at the same revision is served from cache").toBe(1);
     revision = 1;
-    expect(carries(library.forAudience("player").classSummaries(), "playersafe class")).toBe(true);
+    expect(carries(library.forAudience({ characterIds: [] }).classSummaries(), "playersafe class")).toBe(true);
     expect(builds).toBe(2);
   });
 
   it("costs nothing and shares one catalog when no homebrew source is wired in", () => {
     // The path every existing table takes: both audiences resolve to the same SRD-only catalog.
     const library = new ContentLibrary();
-    expect(library.forAudience("gm").classSummaries()).toBe(library.forAudience("player").classSummaries());
+    expect(library.forAudience("gm").classSummaries()).toBe(library.forAudience({ characterIds: [] }).classSummaries());
     expect(
       library
-        .forAudience("player")
+        .forAudience({ characterIds: [] })
         .classSummaries()
         .every((entry) => entry.source === "srd")
     ).toBe(true);
@@ -475,7 +478,7 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
 
     store.softDelete(ids.playersafe.monsterId);
     expect(library.forAudience("gm").monster(ids.playersafe.monsterId)).toBeUndefined();
-    expect(library.forAudience("player").monster(ids.playersafe.monsterId)).toBeUndefined();
+    expect(library.forAudience({ characterIds: [] }).monster(ids.playersafe.monsterId)).toBeUndefined();
     // Play-time lookup is status-blind: actions, typed defences and recharge are re-read per use, so
     // filtering here would disarm tokens already on the table.
     expect(library.monsterForInstance(ids.playersafe.monsterId)?.actions).toHaveLength(1);
@@ -501,7 +504,7 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
       .spellSummaries()
       .find((entry) => entry.id === spell.id);
     const playerSpell = library
-      .forAudience("player")
+      .forAudience({ characterIds: [] })
       .spellSummaries()
       .find((entry) => entry.id === spell.id);
     expect(gmSpell?.classes).toContain(list.id);
@@ -515,7 +518,7 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
     ).toContain(list.id);
     expect(
       library
-        .forAudience("player")
+        .forAudience({ characterIds: [] })
         .spellSummaries()
         .find((entry) => entry.id === "fireball")?.classes
     ).not.toContain(list.id);
@@ -538,7 +541,7 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
     const library = new ContentLibrary(store);
     expect(
       library
-        .forAudience("player")
+        .forAudience({ characterIds: [] })
         .spellSummaries()
         .find((entry) => entry.id === "fireball")?.classes
     ).toContain(list.id);
@@ -558,7 +561,7 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
     store.setState(rotten.id, "published", undefined);
     store.setVisibility(rotten.id, true, undefined);
 
-    const summaries = new ContentLibrary(store).forAudience("player").classSummaries();
+    const summaries = new ContentLibrary(store).forAudience({ characterIds: [] }).classSummaries();
     expect(summaries.some((entry) => entry.id === rotten.id)).toBe(false);
     expect(summaries.some((entry) => entry.id === good.id)).toBe(true);
     expect(summaries.some((entry) => entry.id === "wizard")).toBe(true);

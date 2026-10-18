@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
   ContentBackgroundSummarySchema,
   ContentClassSummarySchema,
+  ContentCompendiumRequestSchema,
+  ContentCompendiumSchema,
   ContentConditionSummarySchema,
   ContentEquipmentSummarySchema,
   ContentFeatSummarySchema,
@@ -266,6 +268,23 @@ export const listContentNames = publicCatalog({
     "Name pools by species for the builder's random generator. A pool's `kind` is an open slug and the order comes from the data, so a new pool adds no code."
 });
 
+export const getContentCompendium = defineRoute({
+  method: "get",
+  path: CONTENT_PATHS.compendium,
+  operationId: "getContentCompendium",
+  tag: "Reference content",
+  summary: "Read one kind of the Compendium",
+  description: `The SRD 5.2.1 records of one kind and the homebrew this reader receives: published, in a pack that is on, and shared with everyone or with one of the characters the caller's session holds. Each row is the catalog summary the builder and the gear picker get, with its \`source\`. No monsters: the bestiary is the GM's. A GM-grade caller reads the GM's catalog. ${ATTRIBUTION_NOTE}`,
+  access: anySession("game:read"),
+  query: ContentCompendiumRequestSchema,
+  responses: {
+    200: ok(ContentCompendiumSchema, "One kind of the Compendium, as this reader gets it."),
+    400: refused("`kind` is missing, or names no kind the Compendium lists."),
+    401: refused(),
+    403: refused()
+  }
+});
+
 export const CONTENT_ROUTES: readonly ApiRoute[] = [
   listContentMonsters,
   listContentMonsterBenchmarks,
@@ -282,5 +301,6 @@ export const CONTENT_ROUTES: readonly ApiRoute[] = [
   listContentSpecies,
   listContentBackgrounds,
   listContentFeats,
-  listContentNames
+  listContentNames,
+  getContentCompendium
 ];

@@ -97,7 +97,7 @@ export const actorCommands = [
     async run({ request, execute }, kit) {
       const definition = withDerivedSlots(
         importedDefinition(request.definition, "actor definition"),
-        kit.contentLibrary.forAudience("gm").classProgressionTable()
+        kit.playCatalog().classProgressionTable()
       );
       const actorId = request.commandId;
       await execute(

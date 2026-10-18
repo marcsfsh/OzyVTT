@@ -17,10 +17,16 @@ const slug = (max = 80) =>
     .regex(/^[a-z0-9-]+$/);
 const level = () => z.number().int().min(1).max(20);
 
+/** Where a catalog record came from. SRD and GM homebrew are merged server-side into one catalog, and a reader gets
+ *  only the homebrew it receives, so a row's source never names one it does not. */
+const ContentSourceKindSchema = z.enum(["srd", "homebrew"]);
+export type ContentSourceKind = z.infer<typeof ContentSourceKindSchema>;
+
 /** Compact browse row for bundled monster content; the server maps content definitions into this wire shape. */
 export const ContentMonsterSummarySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
+  source: ContentSourceKindSchema,
   challengeRating: z.number(),
   /** XP for defeating it, for the encounter budget; null for a homebrew CR the SRD table doesn't list. */
   experiencePoints: z.number().int().nullable(),
@@ -99,6 +105,7 @@ const scalingRow = { damageRoll: z.string().nullable(), targetCount: z.number().
 export const ContentSpellSummarySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
+  source: ContentSourceKindSchema.describe("Where the record came from: the SRD, or the GM's homebrew"),
   level: z.number().int().min(0).max(9).describe("0 is a cantrip"),
   school: z.string(),
   castingTime: z.string(),
@@ -158,6 +165,7 @@ export type ContentSpellsResult = {
 export const ContentEquipmentSummarySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
+  source: ContentSourceKindSchema.describe("Where the record came from: the SRD, or the GM's homebrew"),
   category: z
     .string()
     .describe(
@@ -241,9 +249,6 @@ export type ContentEquipmentResult = {
 // Public SRD rules reference, readable by any joined session. Every response carries the CC BY 4.0
 // `attribution` line the displaying surface must show (ADR-0015).
 
-/** Where a catalog record came from. SRD and GM homebrew are merged server-side into one catalog. */
-const ContentSourceKindSchema = z.enum(["srd", "homebrew"]);
-export type ContentSourceKind = z.infer<typeof ContentSourceKindSchema>;
 /** One budget a feature or option raises: "one extra Cleric cantrip" is `{offer: "class-cantrips", amount: 1}`.
  * `offer` is an offer key shared with the server, which rejects keys naming no real offer. */
 export const ContentExtraPickSummarySchema = z
@@ -747,6 +752,47 @@ export type ContentNamesResult = {
   names?: readonly ContentNameBundle[];
   attribution?: string;
 };
+/** The kinds of record a player's Compendium lists. No monsters: the bestiary is the GM's. */
+export const ContentCompendiumKindSchema = z.enum([
+  "class",
+  "subclass",
+  "species",
+  "background",
+  "feat",
+  "spell",
+  "equipment"
+]);
+export type ContentCompendiumKind = z.infer<typeof ContentCompendiumKindSchema>;
+const compendiumOf = <Kind extends ContentCompendiumKind, Row extends z.ZodType>(kind: Kind, row: Row) =>
+  z.strictObject({ kind: z.literal(kind), rows: z.array(row), attribution: z.string() });
+/**
+ * One kind of the Compendium as its reader gets it: the SRD and the homebrew that reader receives, as the catalog
+ * summaries the builder and the gear picker already get, each with its `source`. Sorted by name.
+ */
+export const ContentCompendiumSchema = z.discriminatedUnion("kind", [
+  compendiumOf("class", ContentClassSummarySchema),
+  compendiumOf("subclass", ContentSubclassSummarySchema),
+  compendiumOf("species", ContentSpeciesSummarySchema),
+  compendiumOf("background", ContentBackgroundSummarySchema),
+  compendiumOf("feat", ContentFeatSummarySchema),
+  compendiumOf("spell", ContentSpellSummarySchema),
+  compendiumOf("equipment", ContentEquipmentSummarySchema)
+]);
+export type ContentCompendium = Wire<z.infer<typeof ContentCompendiumSchema>>;
+/** The `content:compendium` read's input. */
+export const ContentCompendiumRequestSchema = z.strictObject({ kind: ContentCompendiumKindSchema });
+export type ContentCompendiumResult = { ok: boolean; message?: string } & Partial<ContentCompendium>;
+/** Who the GM's See as reads as: everyone, or one party character by actor id. */
+export const HomebrewSeeAsSchema = z.union([z.literal("everyone"), z.uuid()]);
+/** What one player receives of one record: whether it reaches them, and the Compendium row they get. */
+export const HomebrewSeeAsRecordSchema = z.strictObject({
+  as: HomebrewSeeAsSchema,
+  kind: z.enum(["class", "subclass", "species", "background", "feat", "spell", "equipment", "monster", "spell-list"]),
+  received: z.boolean(),
+  /** The one row that player's Compendium holds for the record; null when it holds none. */
+  entry: ContentCompendiumSchema.nullable()
+});
+export type HomebrewSeeAsRecord = Wire<z.infer<typeof HomebrewSeeAsRecordSchema>>;
 /** An area of effect parsed from a definition action's prose ("60-foot Cone", etc.); the GM places a matching template on the map. */
 export type ContentActionArea = Readonly<{
   shape: "cone" | "line" | "sphere" | "cube" | "emanation" | "cylinder";

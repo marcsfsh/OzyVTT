@@ -177,10 +177,10 @@ describe("homebrew HTTP authorization gate", () => {
     expect((await get(base, CONTENT, GM)).status).toBe(200);
   });
 
-  it("declares the same eleven paths the router mounts", async () => {
+  it("declares the same paths the router mounts", async () => {
     // A path added to the contract without a route (or the reverse) is a documented endpoint that 404s.
     const declared = Object.values(HOMEBREW_PATHS);
-    expect(declared).toHaveLength(11);
+    expect(declared).toHaveLength(25);
     expect(
       Object.keys(openApiDocument.paths)
         .filter((path) => path.startsWith("/api/v1/homebrew"))
@@ -397,7 +397,7 @@ describe("homebrew HTTP CRUD", () => {
     it("holds an autosave that makes the record unpublishable as pending, and keeps the live list shared", async () => {
       const { base, store } = await fixture({ realValidation: true });
       const id = await publishAndShare(base);
-      expect(store.publishedFor("player").spellLists).toHaveLength(1);
+      expect(store.publishedFor({ characterIds: [] }).spellLists).toHaveLength(1);
 
       // The autosave that empties the list: still a legal PATCH, and it still lands.
       const patched = await body(
@@ -408,14 +408,14 @@ describe("homebrew HTTP CRUD", () => {
       expect(patched.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: true });
       expect(patched.data.record.validity.valid).toBe(false);
       // ...while the players keep the published list.
-      expect(store.publishedFor("player").spellLists).toHaveLength(1);
-      expect(store.publishedFor("player").spellLists[0].add).toEqual(["fireball"]);
+      expect(store.publishedFor({ characterIds: [] }).spellLists).toHaveLength(1);
+      expect(store.publishedFor({ characterIds: [] }).spellLists[0].add).toEqual(["fireball"]);
 
       // Putting it live is refused, and the live version is untouched.
       const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, id), GM, {});
       expect(refused.status).toBe(409);
-      expect((await body(refused)).error.message).toContain("the published version is unchanged");
-      expect(store.publishedFor("player").spellLists).toHaveLength(1);
+      expect((await body(refused)).error.message).toContain("The published version is unchanged");
+      expect(store.publishedFor({ characterIds: [] }).spellLists).toHaveLength(1);
     });
 
     it("keeps a schema-breaking patch out of the catalogs, which still serve the published body", async () => {
@@ -440,11 +440,11 @@ describe("homebrew HTTP CRUD", () => {
         })
       );
       expect(fine.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: true });
-      expect(store.publishedFor("player").spellLists[0].name).toBe("Blood Magic");
+      expect(store.publishedFor({ characterIds: [] }).spellLists[0].name).toBe("Blood Magic");
 
       const live = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, id), GM, {}));
       expect(live.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: false });
-      expect(store.publishedFor("player").spellLists[0].name).toBe("Blood Magic II");
+      expect(store.publishedFor({ characterIds: [] }).spellLists[0].name).toBe("Blood Magic II");
 
       await patch(base, byId(id), GM, {
         record: { id, name: "Blood Magic III", source: "homebrew", add: ["fireball"] }
@@ -516,7 +516,7 @@ describe("homebrew HTTP CRUD", () => {
     // The one thing a fresh copy cannot do yet, and the publish button says so.
     const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, copy.id), GM, {});
     expect(refused.status).toBe(409);
-    expect((await body(refused)).error.details.invalid.issues[0].message).toContain("no subclass names");
+    expect((await body(refused)).error.details.invalid.issues[0].message).toContain("no subclass belongs to");
   });
 
   // End to end in the order a GM would work: duplicate a class and a subclass, re-point the subclass,
@@ -815,7 +815,7 @@ describe("homebrew HTTP packs", () => {
 
     expect(applied.data.rejected.map((entry: Json) => entry.originalId).sort()).toEqual([live.id, deleted.id].sort());
     expect(applied.data.rejected.find((entry: Json) => entry.originalId === live.id).issues[0].message).toContain(
-      "shown to players"
+      "published and shared"
     );
     expect(applied.data.rejected.find((entry: Json) => entry.originalId === deleted.id).issues[0].message).toContain(
       "Restore it"
@@ -825,7 +825,7 @@ describe("homebrew HTTP packs", () => {
     const untouched = (await body(await get(base, byId(live.id), GM))).data.record;
     expect(untouched).toMatchObject({ state: "published", visibleToPlayers: true });
     expect(untouched.record.name).toBe("Shared List");
-    expect(store.publishedFor("player").spellLists).toHaveLength(1);
+    expect(store.publishedFor({ characterIds: [] }).spellLists).toHaveLength(1);
     // The deleted record stays deleted.
     expect(store.get(deleted.id)!.deletedAt).not.toBeNull();
     // And the row overwriting is meant for goes through.

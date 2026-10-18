@@ -315,9 +315,9 @@ export const actorHealthCommands = [
         const actor = state.actors.find((candidate) => candidate.id === actorId);
         if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
         const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
-        // GM audience: legality is a content question and must match what the GM would get. Nothing GM-only
-        // is projected.
-        const choices = replaceableOffers(definition, kit.contentLibrary.forAudience("gm"));
+        // Play content: legality is a question about what the sheet already has, whatever a pack's switch says.
+        // Nothing GM-only is projected.
+        const choices = replaceableOffers(definition, kit.playCatalog());
         const match = choices.find((candidate) => candidate.offer === offer);
         if (!match) {
           throw new CommandRejectedError(
@@ -345,7 +345,7 @@ export const actorHealthCommands = [
         if (initiator.role !== "gm" && match.per === "long-rest" && actor.preparation === null)
           throw new CommandRejectedError(`${actor.name} chooses ${match.label} again after finishing a Long Rest.`);
         rechooseInLedger(state, actorId, offer, id, {
-          library: kit.contentLibrary.forAudience("gm"),
+          library: kit.playCatalog(),
           policy: state.builderPolicy,
           catalog: kit.equipmentCatalog()
         });
