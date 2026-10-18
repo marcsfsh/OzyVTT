@@ -4,7 +4,8 @@ import { Button, IconLevelUp } from "@vtt/ui";
 import { RichText } from "../encounter/RichText";
 import type { SrdExtension } from "../encounter/sheet-extension";
 import type { SheetActor } from "./sheet-model";
-import { UseList, type Pool } from "./Uses";
+import { plainActionName } from "../encounter/format";
+import { UseList, type Pool, type Spender } from "./Uses";
 
 /** What a use costs on a turn, in the SRD's words. */
 const ACTIVATION_WORDS: Readonly<Record<string, string>> = {
@@ -147,22 +148,32 @@ export function FeaturesTab({
 }>) {
   const masteries = derived?.weaponMasteries ?? [];
   const groups = featureGroups(definition, extension);
-  const acting = new Map<string, string>();
+  // A pool whose actions do something on their own (a heal, an attack, a spell, an effect) is used through them, each
+  // by name where several spend it (Channel Divinity's Divine Spark and Turn Undead).
+  const acting = new Map<string, Spender[]>();
   for (const pool of pools) {
-    const own = definition.actions.find((action) => (action.uses?.pool ?? action.id) === pool.id);
-    const row = serverActions.find((action) => (action.usesPool ?? action.id) === pool.id);
-    // A pool whose action does something on its own (a heal, an attack, a spell, an effect) is used through it.
-    const does = own
-      ? own.healing !== undefined ||
-        own.attack !== undefined ||
-        own.save !== undefined ||
-        own.damage.length > 0 ||
-        own.grants !== undefined ||
-        own.spellId !== undefined
-      : row !== undefined &&
-        (row.healing != null || row.attackBonus !== null || row.saveAbility !== null || row.damage.length > 0);
-    const id = own?.id ?? row?.id;
-    if (does && id) acting.set(pool.id, id);
+    const own = definition.actions.filter((action) => (action.uses?.pool ?? action.id) === pool.id);
+    const spenders: Spender[] =
+      own.length > 0
+        ? own
+            .filter(
+              (action) =>
+                action.healing !== undefined ||
+                action.attack !== undefined ||
+                action.save !== undefined ||
+                action.damage.length > 0 ||
+                action.grants !== undefined ||
+                action.spellId !== undefined
+            )
+            .map((action) => ({ id: action.id, name: plainActionName(action.name) }))
+        : serverActions
+            .filter(
+              (row) =>
+                (row.usesPool ?? row.id) === pool.id &&
+                (row.healing != null || row.attackBonus !== null || row.saveAbility !== null || row.damage.length > 0)
+            )
+            .map((row) => ({ id: row.id, name: plainActionName(row.name) }));
+    if (spenders.length > 0) acting.set(pool.id, spenders);
   }
   // What each use costs on a turn, said beside its name.
   const costs = new Map<string, string>();
