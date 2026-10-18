@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Menu, MenuItem, Tabs } from "@vtt/ui";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { RulesButton, RulesReference } from "../reference/RulesReference";
@@ -22,7 +22,9 @@ export function useTabFit(fits: TabFit) {
 
 /**
  * The app bar's tabs, the More menu and the Rules door. A tab in the menu that is the current one names the menu's
- * trigger, which is underlined like a chosen tab, so the bar always shows where you are.
+ * trigger, which is underlined like a chosen tab, so the bar always shows where you are. When the bar is still too
+ * narrow for its share (a 320px phone, a long section name on the trigger), the last tab moves into the menu too,
+ * one at a time, until the rest fit.
  */
 export function AppTabs({
   tabs,
@@ -39,14 +41,38 @@ export function AppTabs({
   className?: string;
   fits: TabFit;
 }>) {
-  const { visible, phone } = useTabFit(fits);
+  const fit = useTabFit(fits);
+  const { phone } = fit;
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [squeezed, setSqueezed] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const visible = Math.max(1, fit.visible - squeezed);
   const shown = tabs.slice(0, visible);
   const rest = tabs.slice(visible);
   const currentInMenu = rest.find((tab) => tab.id === activeId);
   const menu = rest.length > 0 || phone;
+
+  // A new current section, or any change of width, starts from the ladder's count again.
+  useLayoutEffect(() => setSqueezed(0), [fit.visible, activeId]);
+  useEffect(() => {
+    const reset = () => setSqueezed(0);
+    window.addEventListener("resize", reset);
+    return () => window.removeEventListener("resize", reset);
+  }, []);
+  useLayoutEffect(() => {
+    const track = box.current?.querySelector<HTMLElement>(".nh-tabs");
+    if (!track) return;
+    const check = () => {
+      if (track.scrollWidth - track.clientWidth > 1 && visible > 1) setSqueezed((count) => count + 1);
+    };
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, [visible]);
+
   return (
-    <>
+    <div ref={box} className="app-tabs">
       <Tabs
         className={className}
         ariaLabel={ariaLabel}
@@ -74,6 +100,6 @@ export function AppTabs({
         </Menu>
       )}
       {phone ? <RulesReference open={rulesOpen} onClose={() => setRulesOpen(false)} /> : <RulesButton />}
-    </>
+    </div>
   );
 }

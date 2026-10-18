@@ -100,6 +100,7 @@ export function CharacterSheet({
   end,
   doors,
   token,
+  headerEnd,
   onLevel,
   onClose
 }: Readonly<{
@@ -124,6 +125,8 @@ export function CharacterSheet({
   doors?: SheetDoors;
   /** The caller's bearer, which the token image picker needs. */
   token?: string;
+  /** Controls at the end of the header, after the menu: the standalone page's theme switch. */
+  headerEnd?: ReactNode;
   /** Opens the level page for this character. */
   onLevel?: () => void;
   onClose: () => void;
@@ -539,6 +542,7 @@ export function CharacterSheet({
           )}
           {menu}
           {close}
+          {headerEnd}
         </header>
         {status}
         {toastRow}
@@ -620,6 +624,7 @@ export function CharacterSheet({
             {levelBox}
             {menu}
             {close}
+            {headerEnd}
           </div>
           {!vitalsShow && (
             <div className="cs-tiles">

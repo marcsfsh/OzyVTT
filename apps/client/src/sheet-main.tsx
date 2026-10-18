@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { GmActor, GmView, PlayerActor, PlayerView } from "@vtt/domain";
-import { ToastProvider } from "@vtt/ui";
+import { ThemeSwitch, ToastProvider } from "@vtt/ui";
 // The global styles load before any component's own stylesheet, as in main.tsx: CSS lands in import order.
 import "@vtt/ui/styles.css";
 import "./styles.css";
@@ -52,7 +52,14 @@ function StandaloneSheet() {
     return <Message>That character isn't available to you. Claim it at the table, then reopen this tab.</Message>;
   return (
     <div className="cs-standalone">
-      <CharacterSheet actor={actor} role="player" state={state} presentation="page" onClose={() => window.close()} />
+      <CharacterSheet
+        actor={actor}
+        role="player"
+        state={state}
+        presentation="page"
+        headerEnd={<ThemeSwitch />}
+        onClose={() => window.close()}
+      />
     </div>
   );
 }

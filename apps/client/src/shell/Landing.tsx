@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, IconArrow, Input, Modal, Switch, ThemeToggle, Wordmark } from "@vtt/ui";
 import { Notice, type NoticeMessage } from "../components/feedback";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import "./landing.css";
 
 /**
@@ -84,6 +85,8 @@ export function Landing({
   const [shown, setShown] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [resetSteps, setResetSteps] = useState(false);
+  // A phone shows the four themes as their marks alone, so the switch fits beside the thumb.
+  const phone = useMediaQuery("(max-width: 560px)");
   const submit = () => {
     if (busy || !password) return;
     // The last attempt's error goes as this one starts, so it never sits beside the next answer.
@@ -216,7 +219,7 @@ export function Landing({
       {/* Auth errors are the one inline exception to toast-only feedback. */}
       <Notice notice={notice} />
       <div className="home-theme-switch">
-        <ThemeToggle />
+        <ThemeToggle compact={phone} />
       </div>
     </div>
   );

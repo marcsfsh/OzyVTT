@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GmView } from "@vtt/domain";
-import { Modal, useToast, Wordmark } from "@vtt/ui";
+import { Modal, ThemeSwitch, useToast, Wordmark } from "@vtt/ui";
 import { PartyRosterTab } from "../actors/PartyRosterTab";
 import { useConfirm } from "../components/feedback";
 import { lazySurface } from "../components/lazySurface";
@@ -62,7 +62,8 @@ const GM_TAB_FIT: TabFit = [GM_TABS.length, 5, 4, 3];
 /**
  * The GM's tab bar. The tab is read from the address, which names one; addresses that name none
  * (`/`, `/codex/pages/x`) resolve to "table". A tab returns you to where you were in it, and re-tapping
- * the current tab goes to its front door. It stays up while a full-page layer is open.
+ * the current tab goes to its front door. It stays up while a full-page layer is open, with the theme switch at its
+ * end.
  */
 export function GmTabBar() {
   const route = useRoute();
@@ -85,6 +86,7 @@ export function GmTabBar() {
           );
         }}
       />
+      <ThemeSwitch className="app-theme-switch" />
     </div>
   );
 }

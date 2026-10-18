@@ -1,5 +1,5 @@
 import type { PlayerView } from "@vtt/domain";
-import { Badge, Wordmark } from "@vtt/ui";
+import { Badge, ThemeSwitch, Wordmark } from "@vtt/ui";
 import { MyCharacter } from "../actors/MyCharacter";
 import { useRecapBadge } from "../codex/useRecapBadge";
 import { lazySurface } from "../components/lazySurface";
@@ -85,6 +85,7 @@ export function PlayerTabBar({ token }: Readonly<{ token: string }>) {
           navigate(id === "codex" ? (lastLocationForTab("player", "codex") ?? "/codex") : home);
         }}
       />
+      <ThemeSwitch className="app-theme-switch" />
     </div>
   );
 }

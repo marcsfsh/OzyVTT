@@ -534,16 +534,30 @@ textarea:focus {
 .app-logo {
   flex: none;
 }
+/* The tabs, More and Rules sit in the bar's own row; their wrapper only measures them. */
+.app-tabs {
+  display: contents;
+}
+/* The theme switch closes the bar at its far end, on every page and for both roles. */
+.frame-tabbar .app-theme-switch {
+  margin-left: auto;
+}
 /* A phone spends the bar's width on the tabs: no logo, and the tabs share the track. */
 @media (max-width: 760px) {
   .app-logo {
     display: none;
   }
+  /* Tighter steps, so three tabs, More and the theme switch share a 390px bar with nothing clipped. */
   .frame-tabbar {
-    padding-inline: var(--space-3);
+    gap: var(--space-2);
+    padding-inline: var(--space-2);
   }
   .frame-tabbar .nh-tabs {
     flex: 1;
+  }
+  .frame-tabbar .nh-tab,
+  .frame-tabbar .app-more .nh-menu-trigger {
+    padding-inline: var(--space-3);
   }
   .frame-tabbar .nh-tab {
     flex: 1 0 auto;
