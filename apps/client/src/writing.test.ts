@@ -198,7 +198,8 @@ const QUOTED: ReadonlyArray<readonly [prefix: string, why: string]> = [
   ["packages/dndbeyond-pdf/test/fixtures/", "form fields read out of real D&D Beyond PDFs"]
 ];
 
-const SKIPPED_DIRS = /\/(node_modules|dist|data|test-results|playwright-report)$/;
+// Claude Code's worktrees and local memory are machine-local and git-ignored.
+const SKIPPED_DIRS = /\/(node_modules|dist|data|test-results|playwright-report|worktrees|agent-memory-local)$/;
 const TEXT_FILE = /\.(ts|tsx|mts|mjs|js|json|md|css|html|yml)$/;
 /** The em dash, the en dash and curly quotes. Code that must match one writes the escape (`\u2014`). */
 const BANNED = /[\u2013\u2014\u2018\u2019\u201c\u201d]/;
@@ -206,10 +207,10 @@ const BANNED = /[\u2013\u2014\u2018\u2019\u201c\u201d]/;
 describe("The banned characters, anywhere in the repository", () => {
   const files = [
     ...["README.md", "CLAUDE.md"],
-    ...["apps", "packages", "docs", "e2e"].flatMap((root) =>
+    ...["apps", "packages", "docs", "e2e", ".claude", ".github"].flatMap((root) =>
       walk(
         root,
-        (path) => TEXT_FILE.test(path),
+        (path) => TEXT_FILE.test(path) && !path.endsWith("settings.local.json"),
         (path) => SKIPPED_DIRS.test(path) || QUOTED.some(([prefix]) => `${path}/`.startsWith(prefix))
       )
     )
@@ -220,7 +221,9 @@ describe("The banned characters, anywhere in the repository", () => {
       "docs/DESIGN.md",
       "apps/server/src/server.ts",
       "packages/ui/src/index.ts",
-      "e2e/journeys.spec.ts"
+      "e2e/journeys.spec.ts",
+      ".claude/settings.json",
+      ".github/workflows/ci.yml"
     ])
       expect(files).toContain(anchor);
   });

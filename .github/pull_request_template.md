@@ -1,16 +1,12 @@
 ## Summary
 
-<!-- What this changes and why, in a sentence or two. -->
+<!-- What changed and why, area by area for a larger change. -->
 
 ## Verification
 
-- [ ] `npm run check`
-- [ ] `npm test`
-- [ ] `npm run build`
-- [ ] UI change: looked at it running at desktop width and at phone width with touch
+<!-- The commands you ran and what they returned. For a UI change, the widths and devices you looked at. -->
 
-## Invariants touched
+## Security boundary
 
-- [ ] Server authority (no game decision moved to the client)
-- [ ] Projections (a new field reaching a player, the table viewer, or the Codex player view)
-- [ ] Role boundaries (a player acts only on their own character)
+<!-- What now reaches players, the table screen or the Codex player view, or what a player can now do, and why it is
+safe. Otherwise "None". -->
