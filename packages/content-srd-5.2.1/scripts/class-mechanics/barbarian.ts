@@ -56,11 +56,13 @@ export const barbarian: ClassMechanicsModule = {
     "unarmored-defense": {
       modifiers: [{ type: "unarmored-defense", ability: "con", allowShield: true }]
     },
-    // Weapon Mastery grows with the printed column: 2 -> 3 at level 4 -> 4 at level 10.
+    // Weapon Mastery grows with the printed column: 2 -> 3 at level 4 -> 4 at level 10. "Whenever you finish a Long
+    // Rest, you can ... change one of those weapon choices": the change is made in the Level flow until a rest offers it.
     "weapon-mastery": {
       extraPicks: [
         { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
-      ]
+      ],
+      replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 1 }]
     },
     // Advantage on Dexterity saves "unless you have the Incapacitated condition" (or one that includes it).
     "danger-sense": {

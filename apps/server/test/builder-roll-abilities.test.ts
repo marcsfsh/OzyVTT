@@ -182,9 +182,10 @@ describe("a player's rolled dice are the table's", () => {
       payload: { baseScores: assigned(roll.scores) }
     });
 
-    // Levelling up re-sends the values the sheet recorded, in any order, with no new roll; other values need one.
-    const levelFour = (baseScores: Record<string, number>) =>
-      post(base, GAME_PATHS.characterRebuild.replace("{actorId}", actorId), playerToken, {
+    // Levelling up re-sends the values the sheet recorded with no new roll; other values need one. Putting the same
+    // six in another order is a respec, which only the GM makes.
+    const levelFour = (baseScores: Record<string, number>, token = playerToken) =>
+      post(base, GAME_PATHS.characterRebuild.replace("{actorId}", actorId), token, {
         ...fighterCreate({ level: 4, baseScores }),
         name: undefined,
         actorId,
@@ -209,7 +210,10 @@ describe("a player's rolled dice are the table's", () => {
       commandId: randomUUID(),
       allowedAbilityMethods: ["standard-array"]
     });
-    expect((await levelFour(swapped)).status).toBe(200);
+    const reordered = await levelFour(swapped);
+    expect(reordered.status).toBe(409);
+    expect((await reordered.json()).error.details.reason).toBe("level_up_limit");
+    expect((await levelFour(swapped, gmToken)).status).toBe(200);
   });
 
   it("lets a sheet that recorded no scores re-send the ones its totals imply, and nothing else", async () => {

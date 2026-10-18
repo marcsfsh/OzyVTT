@@ -3,6 +3,9 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 export const rogue: ClassMechanicsModule = {
   features: {
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
+    // rest offers it.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
     /**
      * Once per turn (`per: "turn"`, counted in `turnUses`). It rides a hit: the server offers it on an attack's
      * preview when the hit qualifies (Finesse or Ranged weapon; Advantage, or an ally beside the target and no

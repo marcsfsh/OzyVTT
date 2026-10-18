@@ -378,8 +378,8 @@ export const featureRiders = {
 export const PickBudgetKeySchema = z
   .string()
   .regex(
-    /^[a-z0-9-]+(:[a-z0-9-]+)?$/,
-    'A pick budget names an offer key ("class-cantrips") or a feature\'s own pick ("feature:expertise").'
+    /^[a-z0-9-]+(:[a-z0-9-]+(\/[2-9])?)?$/,
+    'A pick budget names an offer key ("class-cantrips") or a feature\'s own pick ("feature:expertise", and "feature:magic-initiate-cleric/2" for its second).'
   )
   .max(80);
 

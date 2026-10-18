@@ -7,6 +7,9 @@ export const ranger: ClassMechanicsModule = {
      * Hunter's Mark always prepared (not counted against the prepared budget), with free casts read off
      * the printed Favored Enemy column (2 rising to 6).
      */
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
+    // rest offers it.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
     "favored-enemy": {
       uses: { scaling: { type: "class-resource", id: "favored-enemy" }, per: "long-rest" },
       grants: { spells: [{ id: "hunters-mark", level: 1, alwaysPrepared: true, withoutSlot: "free" }] }
@@ -101,7 +104,8 @@ export const ranger: ClassMechanicsModule = {
             name: "Druidic Warrior",
             description:
               "You learn two Druid cantrips of your choice. Wisdom is your spellcasting ability for them. Whenever you gain a Ranger level, you can replace one of these cantrips with another Druid cantrip.",
-            choice: { kind: "cantrip", choose: 2, fromCatalog: "druid-spells", maxSpellLevel: 0 }
+            choice: { kind: "cantrip", choose: 2, fromCatalog: "druid-spells", maxSpellLevel: 0 },
+            replaces: [{ offer: "feature:druidic-warrior", when: "level-up", amount: 1 }]
           }
         ]
       }

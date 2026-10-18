@@ -3,6 +3,14 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 export const bard: ClassMechanicsModule = {
   features: {
+    // "Whenever you gain a Bard level, you can replace one of your cantrips" and "one spell on your list".
+    spellcasting: {
+      replaces: [
+        { offer: "class-cantrips", when: "level-up", amount: 1 },
+        { offer: "class-spells", when: "level-up", amount: 1 }
+      ]
+    },
+
     /**
      * Uses scale off the Charisma modifier. The printed Bardic Die column is the die size, so
      * it stays display-only and is not in `liveResources`. Cutting Words and Peerless Skill spend the
@@ -104,10 +112,12 @@ export const bard: ClassMechanicsModule = {
 
       /**
        * "Choose two spells from any combination of the Cleric, Druid, and Wizard spell lists", via the
-       * `-or-` union slug. Picks outside the class budget do not count against the prepared total.
+       * `-or-` union slug. Picks outside the class budget do not count against the prepared total. "Whenever you gain
+       * a Bard level, you can replace one of the spells with another spell that meets these requirements."
        */
       "magical-discoveries": {
-        choice: { kind: "spell", choose: 2, fromCatalog: "cleric-spells-or-druid-spells-or-wizard-spells" }
+        choice: { kind: "spell", choose: 2, fromCatalog: "cleric-spells-or-druid-spells-or-wizard-spells" },
+        replaces: [{ offer: "feature:magical-discoveries", when: "level-up", amount: 1 }]
       }
     }
   }
