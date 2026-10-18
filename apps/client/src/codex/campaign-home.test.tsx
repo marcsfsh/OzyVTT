@@ -358,7 +358,7 @@ describe("The Campaign dashboard shows what exists today", () => {
     expect(screen.getByRole("button", { name: "Story" })).toHaveAttribute("aria-current", "page");
     // The entry is marked as well as the Journal opened.
     await waitFor(() => expect(document.getElementById("codex-entry-j1")).toHaveAttribute("aria-current", "true"));
-    expect(document.getElementById("codex-entry-j2")).not.toHaveAttribute("aria-current");
+    expect(document.getElementById("story-row-j2")).not.toHaveAttribute("aria-current");
   });
 
   it("an atlas row opens the Atlas ON that map", async () => {
@@ -533,9 +533,7 @@ describe("The player's Campaign dashboard is the server's projection (viewer saf
     );
 
     expect(screen.getByRole("button", { name: "Story" })).toHaveAttribute("aria-current", "page");
-    await waitFor(() =>
-      expect(document.getElementById("codex-player-entry-j1")).toHaveAttribute("aria-current", "true")
-    );
+    await waitFor(() => expect(document.getElementById("story-row-j1")).toHaveAttribute("aria-current", "true"));
   });
 });
 

@@ -1,16 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Alert,
-  Button,
-  Combobox,
-  Field,
-  Input,
-  Modal,
-  RevealSwitch,
-  SegmentedControl,
-  Select,
-  TagInput
-} from "@vtt/ui";
+import { Alert, Button, Combobox, Field, Input, Modal, SegmentedControl, Select, TagInput } from "@vtt/ui";
 import {
   formatWorldDate,
   type CodexChronicleRecord,
@@ -26,6 +15,7 @@ import { EntityIcon } from "../icons";
 import { InWorldDateFields, dateDraftOf, dateOfDraft, type DateDraft } from "../InWorldDateFields";
 import { sessionTitle } from "../sessions";
 import { newId } from "../../lib/ids";
+import { FieldAudienceToggle } from "../shared/WhoSeesIt";
 
 /** What the chronicle's composer writes. Standing is written with the standing value, so it isn't offered here. */
 export const COMPOSER_KINDS = ["entry", "deadline", "downtime", "milestone"] as const;
@@ -83,7 +73,8 @@ export function EntryComposer({
   tagSuggestions,
   initialKind = "entry",
   onClose,
-  onSaved
+  onSaved,
+  onFollow
 }: Readonly<{
   gmToken: string;
   open: boolean;
@@ -98,6 +89,8 @@ export function EntryComposer({
   initialKind?: ComposerKind;
   onClose: () => void;
   onSaved: () => void | Promise<void>;
+  /** Follows a `[[link]]` in the text: to the page of that title, or to create it. */
+  onFollow: (target: string) => void;
 }>) {
   const fresh = (): Draft => ({
     kind: initialKind,
@@ -222,7 +215,6 @@ export function EntryComposer({
     }
   };
 
-  const follow = () => undefined;
   return (
     <Modal
       open={open}
@@ -269,7 +261,8 @@ export function EntryComposer({
             ariaLabel="What players read"
             placeholder={PLACEHOLDER[kind]}
             pages={pages}
-            onNavigate={follow}
+            onNavigate={onFollow}
+            onCreatePage={onFollow}
             rows={5}
           />
         </Field>
@@ -282,7 +275,8 @@ export function EntryComposer({
             ariaLabel="Hidden note"
             placeholder="What only you see"
             pages={pages}
-            onNavigate={follow}
+            onNavigate={onFollow}
+            onCreatePage={onFollow}
             gmLayer
             rows={3}
           />
@@ -415,13 +409,13 @@ export function EntryComposer({
             suggestions={tagSuggestions}
           />
         </Field>
-        <div className="story-whosees is-row">
-          <RevealSwitch
-            revealed={draft.revealed}
-            onChange={(revealed) => set({ revealed })}
-            ariaLabel="Show this to players"
+        <div className="story-composer-who">
+          <span className="story-eyebrow">Who sees it</span>
+          <FieldAudienceToggle
+            field="this record"
+            hidden={!draft.revealed}
+            onChange={(hidden) => set({ revealed: !hidden })}
           />
-          <span className="story-whosees-label">{draft.revealed ? "Everyone" : "Hidden"}</span>
         </div>
       </div>
     </Modal>

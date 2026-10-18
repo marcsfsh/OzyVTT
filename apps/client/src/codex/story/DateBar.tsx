@@ -1,10 +1,19 @@
 import { useState } from "react";
 import { Alert, Button, IconEyeOff, useToast } from "@vtt/ui";
-import { formatWorldDate, type CodexCalendar, type GmCodexCalendar } from "@vtt/domain";
+import { formatWorldDate, type CodexCalendar, type CodexInWorldDate, type GmCodexCalendar } from "@vtt/domain";
 import { calendarApi } from "../api";
 import { CalendarEditor, CampaignDateEditor } from "../CalendarEditor";
 import { sameInWorldDate } from "../chronicle";
 import { hourLabel } from "../../rest/game-date";
+
+/**
+ * A date as the bar shows it: "Emberfall 15" while both dates share a year, since the month below names the year.
+ * Across a year the full date shows, so the two never read as the same day.
+ */
+function barDate(calendar: CodexCalendar, date: CodexInWorldDate, other: CodexInWorldDate | null): string {
+  if (other && other.year !== date.year) return formatWorldDate(calendar, date);
+  return `${calendar.months[date.month]?.name ?? ""} ${date.day}`;
+}
 
 /**
  * Both dates in one bar. Your date is the GM's, violet because only the GM sees it, and it opens a date editor;
@@ -81,17 +90,20 @@ export function GmDateBar({
           type="button"
           className="story-datebar-date is-gm"
           aria-label={now ? `Your date is ${formatWorldDate(calendar, now)}. Change it.` : "Set your date"}
+          title={now ? formatWorldDate(calendar, now) : undefined}
           onClick={() => setDateOpen(true)}
         >
-          {now ? formatWorldDate(calendar, now) : "Set your date"}
+          {now ? barDate(calendar, now, published) : "Set your date"}
         </button>
         {now && gameHours !== null && <span className="story-datebar-hour">{hourLabel(gameHours)}</span>}
-        <IconEyeOff className="story-datebar-gmicon" />
+        <span className="story-hiddenword">
+          <IconEyeOff /> Hidden
+        </span>
       </span>
       <span className="story-datebar-part">
         <span className="story-datebar-key">Players</span>
-        <strong className="story-datebar-date">
-          {published ? formatWorldDate(calendar, published) : "Not shared yet"}
+        <strong className="story-datebar-date" title={published ? formatWorldDate(calendar, published) : undefined}>
+          {published ? barDate(calendar, published, now) : "Not shared yet"}
         </strong>
       </span>
       <span className="story-datebar-actions">

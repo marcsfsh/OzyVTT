@@ -2,19 +2,13 @@ import { useCallback, useMemo, useState } from "react";
 import { Input, useToast } from "@vtt/ui";
 import { formatWorldDate, type PlayerCodexPageSummary, type PlayerCodexStanding } from "@vtt/domain";
 import { codexApi, playerCodexApi } from "../api";
-import { CalendarView, PlayerCalendarView } from "../CalendarView";
 import { CampaignHome } from "../CampaignHome";
-import { DowntimeView } from "../DowntimeView";
-import { JournalView } from "../JournalView";
 import { PagesView } from "../PagesView";
-import { PlayerJournal } from "../PlayerJournal";
 import { PlayerPages } from "../PlayerPages";
 import { PlayerQuests } from "../PlayerQuests";
-import { PlayerSessions } from "../PlayerSessions";
 import { QuestsView } from "../QuestsView";
 import { ConnectionGraph } from "../RelationshipGraph";
 import { SearchResultList, useCodexSearch } from "../SearchResults";
-import { SessionsView } from "../SessionsView";
 import { StandingAdjuster } from "../StandingAdjuster";
 import { campaignFeedProps, playerCampaignFeedProps } from "../dashboard";
 import { usePageLinks } from "../pageLinks";
@@ -262,177 +256,6 @@ export function PlayerPagesLegacy() {
         onOpen={go}
         onFollowLink={followLink}
         knownTitles={knownTitles}
-      />
-    </Legacy>
-  );
-}
-
-export function GmStoryLegacy() {
-  const { token, query, go, setQuery, setFilter } = useCodexShell();
-  const gm = useGmCodex();
-  const { feeds } = gm;
-  if (query.get("kind") === "downtime")
-    return (
-      <Legacy>
-        <DowntimeView
-          gmToken={token}
-          records={feeds.campaign.records}
-          calendar={feeds.campaign.calendar}
-          pages={feeds.pages}
-          actors={gm.actors}
-          loading={feeds.campaignFeed.loading}
-          error={feeds.campaignFeed.error}
-          onChanged={feeds.campaignFeed.reload}
-          onOpenEntry={(entryId) => go(journalEntryPath(entryId))}
-          onOpenPage={(pageId) => go(pagePath(pageId))}
-        />
-      </Legacy>
-    );
-  return (
-    <Legacy>
-      <JournalView
-        gmToken={token}
-        autosave={gm.autosave}
-        pages={feeds.pages}
-        onOpenPage={(pageId) => go(pagePath(pageId))}
-        onOpenMarker={(markerId) => go(atlasPath(null, markerId))}
-        onOpenReplay={gm.onOpenReplay}
-        openEntryId={query.get("entry")}
-        onOpenedEntry={() => setQuery((params) => params.delete("entry"))}
-        kindFilter={query.get("kind")}
-        tagFilter={query.get("tag")}
-        textFilter={query.get("q") ?? ""}
-        onFilterChange={setFilter}
-        sessions={feeds.sessions}
-        activeSessionId={feeds.activeSessionId}
-        onOpenSession={(sessionId) => go(sessionPath(sessionId))}
-        onOpenCalendar={() => go(pathForSection("timeline"))}
-      />
-    </Legacy>
-  );
-}
-
-export function PlayerStoryLegacy() {
-  const { token, query, setFilter } = useCodexShell();
-  const { feeds } = usePlayerCodex();
-  const { knownTitles, followLink } = usePlayerFollowLink();
-  return (
-    <Legacy>
-      <PlayerJournal
-        records={feeds.timeline}
-        calendar={feeds.calendar}
-        pages={feeds.pages}
-        token={token}
-        focusedId={query.get("entry")}
-        onNavigate={followLink}
-        knownTitles={knownTitles}
-        kindFilter={query.get("kind")}
-        tagFilter={query.get("tag")}
-        textFilter={query.get("q") ?? ""}
-        onFilterChange={setFilter}
-        quests={feeds.quests}
-      />
-    </Legacy>
-  );
-}
-
-export function GmTimelineLegacy() {
-  const { token, query, go, setQuery } = useCodexShell();
-  const gm = useGmCodex();
-  const { feeds } = gm;
-  return (
-    <Legacy>
-      <CalendarView
-        gmToken={token}
-        calendar={feeds.campaign.calendar}
-        gameHours={gm.gameHours}
-        records={feeds.campaign.records}
-        loading={feeds.campaignFeed.loading}
-        error={feeds.campaignFeed.error}
-        onChanged={feeds.campaignFeed.reload}
-        year={query.get("y")}
-        month={query.get("m")}
-        onMonthChange={(year, month) =>
-          setQuery((params) => {
-            params.set("y", String(year));
-            params.set("m", String(month));
-          })
-        }
-        onOpenEntry={(entryId) => go(journalEntryPath(entryId))}
-        onOpenPage={(pageId) => go(pagePath(pageId))}
-      />
-    </Legacy>
-  );
-}
-
-export function PlayerTimelineLegacy() {
-  const { query, go, setQuery } = useCodexShell();
-  const { feeds } = usePlayerCodex();
-  return (
-    <Legacy>
-      <PlayerCalendarView
-        calendar={feeds.calendar}
-        records={feeds.timeline}
-        year={query.get("y")}
-        month={query.get("m")}
-        onMonthChange={(year, month) =>
-          setQuery((params) => {
-            params.set("y", String(year));
-            params.set("m", String(month));
-          })
-        }
-        onOpenEntry={(entryId) => go(journalEntryPath(entryId))}
-      />
-    </Legacy>
-  );
-}
-
-export function GmSessionsLegacy() {
-  const { token, recordId, query, go, setFilter } = useCodexShell();
-  const gm = useGmCodex();
-  const { feeds } = gm;
-  const followLink = usePageLinks(feeds.pages, gm.quickCreate);
-  return (
-    <Legacy>
-      <SessionsView
-        gmToken={token}
-        sessions={feeds.sessions}
-        activeSessionId={feeds.activeSessionId}
-        loading={feeds.sessionFeed.loading}
-        error={feeds.sessionFeed.error}
-        onChanged={feeds.sessionFeed.reload}
-        autosave={gm.autosave}
-        pages={feeds.pages}
-        actors={gm.actors}
-        openSessionId={recordId}
-        onOpenSession={(id) => go(id ? sessionPath(id) : pathForSection("sessions"))}
-        filter={query.get("q") ?? ""}
-        statusFilter={query.get("status")}
-        onFilterChange={setFilter}
-        onPickTag={(tag) => go(tagPath(tag))}
-        onFollowLink={followLink}
-      />
-    </Legacy>
-  );
-}
-
-export function PlayerSessionsLegacy() {
-  const { token, recordId, query, go, setFilter } = useCodexShell();
-  const { feeds } = usePlayerCodex();
-  const { knownTitles, followLink } = usePlayerFollowLink();
-  return (
-    <Legacy>
-      <PlayerSessions
-        sessions={feeds.sessions}
-        loading={feeds.loading}
-        openId={recordId}
-        token={token}
-        onOpen={(id) => go(id ? sessionPath(id) : pathForSection("sessions"))}
-        onNavigate={followLink}
-        knownTitles={knownTitles}
-        filter={query.get("q") ?? ""}
-        onFilterChange={setFilter}
-        onPickTag={(tag) => go(tagPath(tag))}
       />
     </Legacy>
   );

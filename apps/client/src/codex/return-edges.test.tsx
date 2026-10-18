@@ -51,6 +51,8 @@ vi.mock("./api", async (importOriginal) => {
       forMarker: (...a: unknown[]) => forMarker(...a)
     },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
+    // Story reads the shell's campaign feed, which reads standing alongside the chronicle.
+    standingApi: { ...actual.standingApi, list: async () => [] },
     atlasApi: {
       ...actual.atlasApi,
       listMaps: (...a: unknown[]) => listMaps(...a),
@@ -138,14 +140,15 @@ const renderWorkspace = (onOpenReplay?: (archiveId: number) => void) =>
     </ToastProvider>
   );
 
-/** Open the Journal from the nav and wait for the chronicle. */
+/** Open Story from the nav, wait for the chronicle, and open the entry's row on the spine. */
 const openJournal = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
   await user.click(screen.getByRole("button", { name: "Story" }));
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
+  await user.click(await screen.findByRole("button", { name: /A battle was fought here/ }));
 };
 
-describe("Journal entry → its marker", () => {
+describe("Chronicle entry → its marker", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -204,12 +207,12 @@ describe("Journal entry → its marker", () => {
     renderWorkspace();
     await openJournal(user);
 
-    expect(await screen.findByText("A battle was fought here.")).toBeInTheDocument();
+    expect(await screen.findByRole("article", { name: /^Entry/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open pin" })).not.toBeInTheDocument();
   });
 });
 
-describe("Journal entry → its combat replay", () => {
+describe("Chronicle entry → its combat replay", () => {
   beforeEach(() => {
     listPages.mockResolvedValue([]);
     listRelationships.mockResolvedValue([]);
@@ -245,7 +248,7 @@ describe("Journal entry → its combat replay", () => {
     renderWorkspace(vi.fn());
     await openJournal(user);
 
-    expect(await screen.findByText("A battle was fought here.")).toBeInTheDocument();
+    expect(await screen.findByRole("article", { name: /^Battle/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open replay" })).not.toBeInTheDocument();
   });
 });

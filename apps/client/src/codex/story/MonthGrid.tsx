@@ -9,12 +9,16 @@ import {
   type CodexChronicleKind,
   type CodexInWorldDate
 } from "@vtt/domain";
-import { CHRONICLE_KIND_META } from "./chronicle";
-import { CodexIcon } from "./icons";
+import { laneOf } from "./model";
 
-/** Both Calendars' month: the visible month, its grid of days, and the records on each day. */
+/** The chronicle's month: the visible month, its grid of days, and the records on each day. */
 
-type DatedRecord = Readonly<{ kind: CodexChronicleKind; calendarInstant: number | null }>;
+type DatedRecord = Readonly<{
+  kind: CodexChronicleKind;
+  calendarInstant: number | null;
+  /** The GM's records say who sees them; a hidden one marks its day violet. */
+  revealedToPlayers?: boolean;
+}>;
 
 /**
  * The month on show: the address's `?y=`/`?m=`, else the month holding `fallback` (the reader's own date).
@@ -82,22 +86,28 @@ export function MonthBar({
   children
 }: Readonly<{ title: string; onStep: (delta: number) => void; children?: ReactNode }>) {
   return (
-    <div className="codex-calendar-monthbar">
+    <div className="story-cal-monthbar">
       <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => onStep(-1)}>
-        <IconChevron className="codex-chevron-left" />
+        <IconChevron className="story-chevron-left" />
       </Button>
-      <h3 className="codex-calendar-monthname">{title}</h3>
+      <h3 className="story-cal-monthname">{title}</h3>
       <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => onStep(1)}>
-        <IconChevron className="codex-chevron-right" />
+        <IconChevron className="story-chevron-right" />
       </Button>
       {children}
     </div>
   );
 }
 
+/** A day's dots: one per record up to three, violet when hidden, amber for the world's own, else blue. */
+const MAX_DOTS = 3;
+const dotTone = (record: DatedRecord) =>
+  record.revealedToPlayers === false ? "is-hidden" : laneOf(record.kind) === "world" ? "is-world" : "is-party";
+
 /**
- * The days as a grid under their weekday names. Each day is one button showing up to three kinds of record
- * on it; `marks` adds the reader's clock markers to a day's class and spoken name.
+ * The days as a grid under their weekday names, two letters each so a narrow side column still fits them; the
+ * full name is the header's spoken name. Each day is one button with a dot per record on it, and `marks` adds the
+ * reader's dates to a day's class and spoken name.
  */
 export function MonthGrid({
   grid,
@@ -114,44 +124,40 @@ export function MonthGrid({
 }>) {
   return (
     <div
-      className="codex-calendar-grid"
+      className="story-cal-grid"
       role="grid"
       aria-label={grid.title}
-      style={{ "--codex-week": String(grid.weekdays.length) } as React.CSSProperties}
+      style={{ "--story-week": String(grid.weekdays.length) } as React.CSSProperties}
     >
       {grid.weekdays.map((weekday) => (
-        <div key={weekday} className="codex-calendar-weekday" role="columnheader">
-          <span className="codex-calendar-weekdayfull">{weekday}</span>
-          <span className="codex-calendar-weekdayshort" aria-hidden="true">
-            {weekday.slice(0, 2)}
-          </span>
+        <div key={weekday} className="story-cal-weekday" role="columnheader" aria-label={weekday} title={weekday}>
+          <span aria-hidden="true">{weekday.slice(0, 2)}</span>
         </div>
       ))}
       {Array.from({ length: grid.lead }, (_, index) => (
-        <div key={`lead-${index}`} className="codex-calendar-cell is-blank" aria-hidden="true" />
+        <div key={`lead-${index}`} className="story-cal-cell is-blank" aria-hidden="true" />
       ))}
       {grid.days.map(({ day, instant }) => {
         const dayRecords = byInstant.get(instant) ?? [];
-        const kinds = [...new Set(dayRecords.map((record) => record.kind))].slice(0, 3);
         const mark = marks(instant);
         return (
           /* The cell is the tap target; ::after boxes would overlap across the grid. */
           <button
             key={instant}
             type="button"
-            className={`codex-calendar-cell${mark.className}${selectedInstant === instant ? " is-selected" : ""}`}
+            className={`story-cal-cell${mark.className}${selectedInstant === instant ? " is-selected" : ""}`}
             aria-pressed={selectedInstant === instant}
             aria-label={`${grid.monthDef.name} ${day}${dayRecords.length ? `, ${dayRecords.length} record${dayRecords.length === 1 ? "" : "s"}` : ""}${mark.label}`}
             onClick={() => onSelect(selectedInstant === instant ? null : instant)}
           >
-            <span className="codex-calendar-daynum">{day}</span>
-            {kinds.length > 0 && (
-              <span className="codex-calendar-marks" aria-hidden="true">
-                {kinds.map((kind) => (
-                  <CodexIcon key={kind} iconId={CHRONICLE_KIND_META[kind].iconId} className="codex-calendar-mark" />
+            <span className="story-cal-daynum">{day}</span>
+            {dayRecords.length > 0 && (
+              <span className="story-cal-dots" aria-hidden="true">
+                {dayRecords.slice(0, MAX_DOTS).map((record, index) => (
+                  <span key={index} className={`story-cal-dot ${dotTone(record)}`} />
                 ))}
-                {dayRecords.length > kinds.length && (
-                  <span className="codex-calendar-more">+{dayRecords.length - kinds.length}</span>
+                {dayRecords.length > MAX_DOTS && (
+                  <span className="story-cal-more">+{dayRecords.length - MAX_DOTS}</span>
                 )}
               </span>
             )}

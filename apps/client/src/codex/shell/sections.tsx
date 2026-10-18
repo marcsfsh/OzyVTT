@@ -7,20 +7,22 @@ import { useCodexShell, useGmCodex, usePlayerCodex } from "./context";
 import { GmAtlasSection, PlayerAtlasSection } from "../atlas/sections";
 import { GmTemplatesSection } from "../templates/sections";
 import {
+  GmSessionsSection,
+  GmStorySection,
+  GmTimelineSection,
+  PlayerSessionsSection,
+  PlayerStorySection,
+  PlayerTimelineSection
+} from "../story/sections";
+import {
   GmHomeLegacy,
   GmPagesLegacy,
   GmQuestsLegacy,
   GmRelationshipsLegacy,
-  GmSessionsLegacy,
-  GmStoryLegacy,
-  GmTimelineLegacy,
   PlayerHomeLegacy,
   PlayerPagesLegacy,
   PlayerQuestsLegacy,
   PlayerRelationshipsLegacy,
-  PlayerSessionsLegacy,
-  PlayerStoryLegacy,
-  PlayerTimelineLegacy,
   SearchLegacy
 } from "./legacy";
 
@@ -117,8 +119,8 @@ export const CODEX_SECTIONS: Readonly<Record<CodexSection, CodexSectionEntry>> =
 
   // ----- The atlas, the story, sessions and templates -----
   atlas: { gm: GmAtlasSection, player: PlayerAtlasSection },
-  story: { gm: GmStoryLegacy, player: PlayerStoryLegacy },
-  timeline: { gm: GmTimelineLegacy, player: PlayerTimelineLegacy },
-  sessions: { gm: GmSessionsLegacy, player: PlayerSessionsLegacy },
+  story: { gm: GmStorySection, player: PlayerStorySection },
+  timeline: { gm: GmTimelineSection, player: PlayerTimelineSection },
+  sessions: { gm: GmSessionsSection, player: PlayerSessionsSection },
   templates: { gm: GmTemplatesSection, player: null }
 };

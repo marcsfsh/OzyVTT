@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Badge, IconEyeOff, IconPlus } from "@vtt/ui";
 import {
   dateToInstant,
+  formatWorldDate,
+  instantToDate,
   type CodexCalendar,
   type CodexChronicleRecord,
   type CodexPageSummary,
@@ -18,19 +20,45 @@ import {
   deadlineStateLabel,
   deadlineStateTone,
   questEventLabel,
-  questEventOf
+  questEventOf,
+  standingChangeLabel,
+  standingOf
 } from "../chronicle";
 import { CodexIcon } from "../icons";
 import { CodexMarkdown } from "../CodexMarkdown";
-import { MonthBar, MonthGrid, useMonthView } from "../MonthGrid";
 import { sessionTitle } from "../sessions";
-import { sessionDays, spineGroups, type StoryRecord } from "./model";
+import { daySpanLabel, sessionDays, spineGroups, type StoryRecord } from "./model";
+import { MonthBar, MonthGrid, useMonthView } from "./MonthGrid";
 
 /**
  * The chronicle: the session spine on the left, newest first, each session with its in-world days, its recap and
  * what was filed under it; the calendar on the right with the dates, the month, the clocks and downtime. The GM's
  * and the players' chronicle share the layout and differ only in what they are given.
  */
+
+type Named = Readonly<{ id: string; title: string }>;
+
+/**
+ * A record's one line: its title, or what its payload says, naming the quest or faction when the reader has its
+ * page. The names come from the reader's own lists, so a player's line never names what the player can't see.
+ */
+export function recordLine(record: StoryRecord, quests: readonly Named[], pages: readonly Named[]): string {
+  const meta = CHRONICLE_KIND_META[record.kind];
+  if (record.title?.trim()) return record.title;
+  const questEvent = questEventOf(record as never);
+  if (questEvent)
+    return questEventLabel(questEvent, quests.find((quest) => quest.id === questEvent.questId)?.title ?? null);
+  const standing = standingOf(record as never);
+  if (standing)
+    return standingChangeLabel(standing, pages.find((page) => page.id === standing.factionPageId)?.title ?? null);
+  return chronicleRowSummary(record as never) || meta.label;
+}
+
+/** A record's day, short: "Emberfall 13". The month view above it carries the year. */
+function shortDay(record: StoryRecord, calendar: CodexCalendar | null): string | null {
+  if (record.calendarInstant === null) return record.inWorldLabel;
+  return daySpanLabel(calendar, record.calendarInstant, record.calendarInstant) || record.inWorldLabel;
+}
 
 type SpineSession = Readonly<{
   id: string;
@@ -43,24 +71,25 @@ type SpineSession = Readonly<{
 /** One record's row on the spine: its date and kind, then its line. A GM row opens to the full record. */
 function SpineRow({
   record,
-  questTitle,
+  line,
+  day,
   open,
+  current,
   gm,
   onToggle,
   children
 }: Readonly<{
-  record: StoryRecord & Readonly<{ tags?: readonly string[] }>;
-  questTitle?: string | null;
+  record: StoryRecord;
+  line: string;
+  day: string | null;
   open: boolean;
+  /** The record the address names, which a jump from elsewhere landed on. */
+  current: boolean;
   gm: boolean;
   onToggle: () => void;
   children?: ReactNode;
 }>) {
   const meta = CHRONICLE_KIND_META[record.kind];
-  const questEvent = questEventOf(record as never);
-  const line = questEvent
-    ? questEventLabel(questEvent, questTitle ?? null)
-    : (record.title ?? chronicleRowSummary(record as never) ?? meta.label);
   return (
     <li
       className={`story-spinerow${open ? " is-open" : ""}${gm && record.revealedToPlayers === false ? " is-hidden" : ""}`}
@@ -69,20 +98,21 @@ function SpineRow({
         type="button"
         className="story-spinerow-open"
         aria-expanded={open}
+        aria-current={current ? "true" : undefined}
         id={`story-row-${record.id}`}
         onClick={onToggle}
       >
         <CodexIcon iconId={meta.iconId} className="story-spinerow-icon" />
         <span className="story-spinerow-text">
           <span className="story-spinerow-meta">
-            {[record.inWorldLabel, meta.label].filter(Boolean).join(" · ")}
+            {[day, meta.label].filter(Boolean).join(" · ")}
             {gm && record.revealedToPlayers === false && (
               <span className="story-hiddenword">
                 <IconEyeOff /> Hidden
               </span>
             )}
           </span>
-          <span className="story-spinerow-line">{line || meta.label}</span>
+          <span className="story-spinerow-line">{line}</span>
         </span>
       </button>
       {open && children}
@@ -100,11 +130,13 @@ function Spine<R extends StoryRecord>({
   focusedId,
   onFollow,
   knownTitles,
+  lineOf,
   onOpenSession,
   renderOpen
 }: Readonly<{
   sessions: readonly SpineSession[];
   records: readonly R[];
+  lineOf: (record: R) => string;
   calendar: CodexCalendar | null;
   token: string;
   audience: "gm" | "player";
@@ -172,8 +204,11 @@ function Spine<R extends StoryRecord>({
                   <SpineRow
                     key={`${record.kind}-${record.id}`}
                     record={record}
+                    line={lineOf(record)}
+                    day={shortDay(record, calendar)}
                     gm={audience === "gm"}
                     open={openId === record.id}
+                    current={focusedId === record.id}
                     onToggle={() => setOpenId((now) => (now === record.id ? null : record.id))}
                   >
                     {renderOpen ? (
@@ -208,11 +243,13 @@ function CalendarMonth<R extends StoryRecord & Readonly<{ kind: CodexChronicleRe
   fallback,
   year,
   month,
+  lineOf,
   onMonthChange,
   onOpenRecord
 }: Readonly<{
   calendar: CodexCalendar | null;
   records: readonly R[];
+  lineOf: (record: R) => string;
   marks: ReadonlyArray<Readonly<{ date: CodexCalendar["currentDate"]; className: string; label: string }>>;
   fallback: CodexCalendar["currentDate"];
   year: string | null;
@@ -250,6 +287,7 @@ function CalendarMonth<R extends StoryRecord & Readonly<{ kind: CodexChronicleRe
       />
       {selectedInstant !== null && (
         <section className="story-day" aria-label="Records on this day">
+          <h4 className="story-eyebrow">{formatWorldDate(calendar, instantToDate(calendar, selectedInstant))}</h4>
           {selectedRecords.length === 0 ? (
             <p className="story-hint">Nothing happened on this day.</p>
           ) : (
@@ -260,9 +298,7 @@ function CalendarMonth<R extends StoryRecord & Readonly<{ kind: CodexChronicleRe
                   <li key={`${record.kind}-${record.id}`}>
                     <button type="button" className="story-dayrow" onClick={() => onOpenRecord(record)}>
                       <CodexIcon iconId={meta.iconId} className="story-spinerow-icon" />
-                      <span className="story-ellipsis">
-                        {record.title ?? chronicleRowSummary(record as never) ?? meta.label}
-                      </span>
+                      <span className="story-ellipsis">{lineOf(record)}</span>
                       <Badge tone={meta.tone}>{meta.label}</Badge>
                     </button>
                   </li>
@@ -281,8 +317,15 @@ function Clocks<R extends StoryRecord>({
   records,
   calendar,
   gm,
+  lineOf,
   onOpen
-}: Readonly<{ records: readonly R[]; calendar: CodexCalendar | null; gm: boolean; onOpen?: (record: R) => void }>) {
+}: Readonly<{
+  records: readonly R[];
+  calendar: CodexCalendar | null;
+  gm: boolean;
+  lineOf: (record: R) => string;
+  onOpen?: (record: R) => void;
+}>) {
   const clocks = campaignDeadlines(records);
   if (clocks.length === 0) return null;
   return (
@@ -296,8 +339,8 @@ function Clocks<R extends StoryRecord>({
             <>
               <CodexIcon iconId="hourglass" className="story-spinerow-icon" />
               <span className="story-spinerow-text">
-                <span className="story-spinerow-line">{record.title ?? chronicleRowSummary(record as never)}</span>
-                <span className="story-spinerow-meta">{record.inWorldLabel ?? (calendar ? "" : "Undated")}</span>
+                <span className="story-spinerow-line">{lineOf(record)}</span>
+                <span className="story-spinerow-meta">{shortDay(record, calendar) ?? "Undated"}</span>
               </span>
               <Badge tone={deadlineStateTone(fired)}>{deadlineStateLabel(fired)}</Badge>
               {hidden && (
@@ -336,6 +379,7 @@ export function GmChronicle({
   calendar,
   sessions,
   pages,
+  quests,
   focusedId,
   year,
   month,
@@ -353,6 +397,7 @@ export function GmChronicle({
   calendar: GmCodexCalendar | null;
   sessions: readonly CodexSession[];
   pages: readonly CodexPageSummary[];
+  quests: readonly Named[];
   focusedId: string | null;
   year: string | null;
   month: string | null;
@@ -379,6 +424,7 @@ export function GmChronicle({
     [sessions]
   );
   const known = useMemo(() => new Set(pages.map((page) => page.title.trim().toLowerCase())), [pages]);
+  const lineOf = (record: StoryRecord) => recordLine(record, quests, pages);
   return (
     <div className="story-chronicle">
       <div className="story-spinecol scroll-y">
@@ -388,6 +434,7 @@ export function GmChronicle({
           calendar={calendar}
           token={gmToken}
           audience="gm"
+          lineOf={lineOf}
           focusedId={focusedId}
           onFollow={onFollow}
           knownTitles={known}
@@ -407,10 +454,11 @@ export function GmChronicle({
           ]}
           year={year}
           month={month}
+          lineOf={lineOf}
           onMonthChange={onMonthChange}
           onOpenRecord={onOpenRecord}
         />
-        <Clocks records={records} calendar={calendar} gm onOpen={onOpenRecord} />
+        <Clocks records={records} calendar={calendar} gm lineOf={lineOf} onOpen={onOpenRecord} />
         {downtime}
         <button type="button" className="story-addbox" onClick={onAdd}>
           <IconPlus /> Add to the chronicle
@@ -427,6 +475,8 @@ export function PlayerChronicle({
   records,
   calendar,
   sessions,
+  pages,
+  quests,
   focusedId,
   year,
   month,
@@ -442,6 +492,8 @@ export function PlayerChronicle({
   records: readonly PlayerCodexChronicleRecord[];
   calendar: CodexCalendar | null;
   sessions: readonly PlayerCodexSession[];
+  pages: readonly Named[];
+  quests: readonly Named[];
   focusedId: string | null;
   year: string | null;
   month: string | null;
@@ -466,6 +518,7 @@ export function PlayerChronicle({
     [sessions]
   );
   const [opened, setOpened] = useState<string | null>(focusedId);
+  const lineOf = (record: StoryRecord) => recordLine(record, quests, pages);
   return (
     <div className="story-chronicle">
       <div className="story-spinecol scroll-y">
@@ -475,6 +528,7 @@ export function PlayerChronicle({
           calendar={calendar}
           token={token}
           audience="player"
+          lineOf={lineOf}
           focusedId={opened}
           onFollow={onFollow}
           knownTitles={knownTitles}
@@ -490,10 +544,11 @@ export function PlayerChronicle({
           marks={[{ date: calendar?.currentDate ?? null, className: "is-published", label: "today" }]}
           year={year}
           month={month}
+          lineOf={lineOf}
           onMonthChange={onMonthChange}
           onOpenRecord={(record) => (record.kind === "event" ? onOpenEvent(record.id) : setOpened(record.id))}
         />
-        <Clocks records={records} calendar={calendar} gm={false} />
+        <Clocks records={records} calendar={calendar} gm={false} lineOf={lineOf} />
         {downtime}
       </aside>
     </div>

@@ -895,28 +895,6 @@
   margin-top: var(--space-3);
 }
 
-/* Calendar + chronicle */
-.codex-composer-head-actions {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-/* The lens toggle sits above the timeline and governs every group. */
-.codex-timeline-lens {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--space-2);
-}
-.codex-timeline-lens .nh-segmented {
-  max-width: 100%;
-}
-.codex-timeline-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
 .codex-timeline-year {
   font-family: var(--font-display);
   font-size: var(--fs-h2);
@@ -945,10 +923,7 @@
   color: var(--text);
   border-bottom-color: var(--cyan);
 }
-.codex-timeline-year-open {
-  font-size: var(--fs-body);
-  color: var(--text-muted);
-}
+
 .codex-now-chip {
   font-family: var(--font-numeric);
   font-size: var(--fs-2xs);
@@ -962,16 +937,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.codex-timeline-now {
-  font-family: var(--font-label);
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.06em;
-  color: var(--cyan);
-  border-left: 2px solid var(--cyan);
-  padding: var(--space-1) var(--space-2);
-  border-radius: 0;
-  margin: var(--space-2) 0;
-}
+
 .codex-calendar-editor {
   display: flex;
   flex-direction: column;
@@ -1263,42 +1229,6 @@
   }
 }
 
-/* ----- Sessions: the log destination and the console drawer ----- */
-
-/* 44px min-height in a stacked list, where an ::after hit area would overhang. */
-.codex-session-row {
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-2);
-  width: 100%;
-  text-align: left;
-  padding: var(--space-1) var(--space-3);
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  transition:
-    color var(--dur-hover) var(--ease-settle),
-    border-color var(--dur-hover) var(--ease-settle);
-}
-.codex-session-row:hover {
-  border-bottom-color: var(--line-hover);
-}
-/* Selection owns the edge, hover owns the surface. */
-.codex-session-row.is-active {
-  background: var(--surface-2);
-  border-color: var(--magenta);
-}
-.codex-session-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
 /* ----- Quests: the quest log destination ----- */
 
 /* Reuses the notebook chassis and the session log's exit row. */
@@ -1325,13 +1255,11 @@
 }
 /* Wraps so the nowrap status and visibility badges drop below the title and the rail never scrolls
    sideways. Shared with `.codex-session-row`. */
-.codex-quest-row,
-.codex-session-row {
+.codex-quest-row {
   flex-wrap: wrap;
   row-gap: var(--space-1);
 }
-.codex-quest-row > .codex-list-title,
-.codex-session-row > .codex-list-title {
+.codex-quest-row > .codex-list-title {
   flex: 1 1 auto;
   min-width: 8rem;
 }
@@ -1831,15 +1759,6 @@
   }
 }
 
-/* ----- Journal ----- */
-.codex-journal {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  max-width: 820px;
-  margin: 0 auto;
-  width: 100%;
-}
 /* Holds the summoned "Entry details" panel to the composer's box. */
 .codex-composer {
   display: flex;
@@ -1847,31 +1766,7 @@
   gap: var(--space-3);
   position: relative;
 }
-.codex-composer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.codex-composer-gm-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.codex-composer-meta {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.codex-composer-meta > * {
-  flex: 1 1 130px;
-}
-/* Stop a row of fields stretching each field: `.nh-field` is a grid with no `align-content`, so a field
-   with a help line would grow its siblings' inputs. Scoped to these rows; elsewhere the stretch is wanted. */
-.codex-composer-meta > .nh-field,
-.codex-downtime-form > .nh-field,
-.codex-downtime-edit > .nh-field {
-  align-content: start;
-}
+
 .codex-composer-foot {
   display: flex;
   align-items: center;
@@ -1879,74 +1774,14 @@
   gap: var(--space-3);
   flex-wrap: wrap;
 }
-/* Layout only; the 12px row gap covers the overhangs of this and the small buttons below. */
-.codex-composer-kind {
-  display: flex;
-}
+
 /* Prose and no warning box: neither message is an error. */
 .codex-composer-hint {
   margin: 0;
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
-/* Only rendered while the two clocks differ. */
-/* Severity is a 2px leading rule on a neutral ground. */
-.codex-prepclock {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-left: 2px solid var(--caution);
-  border-radius: 0;
-  background: var(--surface-2);
-}
-.codex-prepclock-label {
-  font-size: var(--fs-sm);
-  color: var(--text-dim);
-}
 
-.codex-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-/* The kind hue is a leading border, a real border so the backing layer doesn't bury it. */
-.codex-entry {
-  border: 1px solid transparent;
-  border-left: 2px solid var(--cyan);
-  border-radius: 0;
-  background: var(--surface-1);
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.codex-entry.is-combat {
-  border-left-color: var(--caution);
-}
-/* Event rows use the event entity colour; glyph and word carry the meaning. */
-.codex-entry.is-event {
-  border-left-color: var(--codex-type-event);
-}
-/* Deadline shares the battle accent; the glyph and word tell them apart. */
-.codex-entry.is-deadline {
-  border-left-color: var(--caution);
-}
-.codex-entry.is-downtime {
-  border-left-color: var(--info);
-}
-/* The entry a search hit landed on, marked by its border. */
-.codex-entry.is-focused {
-  border-color: var(--magenta);
-}
-.codex-entry-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
 /* Wraps so a busy meta row can't push the RevealSwitch off the card. */
 .codex-entry-meta {
   display: flex;
@@ -1958,60 +1793,6 @@
 .codex-entry-kindglyph {
   color: var(--text-dim);
 }
-.codex-entry.is-combat .codex-entry-kindglyph {
-  color: var(--caution);
-}
-.codex-entry.is-event .codex-entry-kindglyph {
-  color: var(--codex-type-event);
-}
-.codex-entry.is-deadline .codex-entry-kindglyph {
-  color: var(--caution);
-}
-.codex-entry.is-downtime .codex-entry-kindglyph {
-  color: var(--info);
-}
-.codex-entry-when {
-  color: var(--text-muted);
-  font-family: var(--font-numeric);
-  font-size: var(--fs-xs);
-}
-.codex-entry-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-h3);
-  color: var(--text);
-  margin: 0;
-}
-.codex-entry-body {
-  color: var(--text);
-}
-.codex-entry-gm {
-  border-top: 1px dashed var(--line);
-  padding-top: var(--space-2);
-  color: var(--text-dim);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  align-items: flex-start;
-}
-/* Read-only badges; no tap floor needed. */
-.codex-entry-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.codex-entry-tags .nh-badge {
-  font-family: var(--font-numeric);
-}
-/* The footer wraps on a phone; 12px gaps keep stacked small-button ::after hit areas from overlapping. */
-.codex-entry-foot {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
 
 /* Downtime payload and confirmation. Confirm is a default-size `Button` (no ::after) because it sits right
    above the footer's small buttons. */
@@ -2022,26 +1803,7 @@
   border-top: 1px dashed var(--line);
   padding-top: var(--space-2);
 }
-.codex-downtime-what {
-  margin: 0;
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-.codex-downtime-state {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-.codex-downtime-apply {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.codex-downtime-proposal {
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
+
 /* ----- Player Codex ----- */
 /* The player reader is bare prose on the sky scene, so it reserves the horizon band at the bottom. The GM's
    panes end in opaque cards and don't need it. */
@@ -2701,203 +2463,6 @@
   list-style: none;
 }
 
-/* ----- The Calendar view: a lens over the chronicle ----- */
-.codex-calendar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.codex-calendar-clocks {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  border: 1px solid transparent;
-  padding: var(--space-3);
-}
-.codex-calendar-clock {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-.codex-calendar-clocklabel {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-/* The GM's clock is a button. 44px min-height: an ::after would overhang the players' clock and month bar. */
-.codex-calendar-clockset {
-  min-height: var(--tap-min);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  margin: calc(var(--space-1) * -1) calc(var(--space-2) * -1);
-  background: none;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: inherit;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  text-align: left;
-}
-.codex-calendar-clockset:hover {
-  border-color: var(--line-hover);
-  background: var(--surface-2);
-}
-.codex-calendar-clockset:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
-}
-/* The game clock's hour beside the GM's date; the two are the table's one clock. */
-.codex-calendar-hour {
-  color: var(--text);
-  font: 700 var(--fs-sm) var(--font-numeric);
-}
-.codex-calendar-clockhint {
-  margin: 0;
-  padding: 0 var(--space-3);
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-.codex-calendar-monthbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.codex-calendar-monthname {
-  margin: 0;
-  flex: 1 1 auto;
-  font: 700 var(--fs-h3) / 1.2 var(--font-display);
-}
-.codex-calendar-yearjump {
-  max-width: 8rem;
-}
-.codex-calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--codex-week, 7), minmax(0, 1fr));
-  gap: 2px;
-}
-.codex-calendar-weekday {
-  padding: var(--space-1);
-  text-align: center;
-  color: var(--text-muted);
-  font: 700 var(--fs-2xs) / 1.2 var(--font-label);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-}
-.codex-calendar-weekdayshort {
-  display: none;
-}
-/* The cell is the tap target; ::after boxes would overlap across the grid. */
-.codex-calendar-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-height: var(--tap-min);
-  padding: var(--space-1);
-  border: 1px solid var(--line);
-  border-radius: 0;
-  background: var(--surface-1);
-  color: var(--text-dim);
-  cursor: pointer;
-  font: inherit;
-}
-.codex-calendar-cell:hover {
-  background: var(--surface-2);
-}
-.codex-calendar-cell.is-blank {
-  border-color: transparent;
-  background: none;
-}
-/* Violet is the GM's own clock (GM-only); cyan is what the table sees. */
-.codex-calendar-cell.is-now {
-  border-color: var(--violet);
-  box-shadow: inset 0 0 0 1px var(--violet);
-}
-.codex-calendar-cell.is-published {
-  border-color: var(--cyan);
-}
-.codex-calendar-cell.is-selected {
-  background: var(--surface-3);
-  border-color: var(--magenta);
-}
-.codex-calendar-daynum {
-  font: 600 var(--fs-sm) / 1 var(--font-numeric);
-  color: var(--text);
-}
-.codex-calendar-marks {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-wrap: wrap;
-}
-.codex-calendar-mark {
-  width: 0.8em;
-  height: 0.8em;
-  color: var(--text-muted);
-}
-.codex-calendar-more {
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-}
-.codex-calendar-day {
-  border: 1px solid transparent;
-  padding: var(--space-3);
-}
-
-/* ----- The Downtime tracker: a lens over the Journal ----- */
-.codex-downtime-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  border: 1px solid transparent;
-  padding: var(--space-3);
-  margin-block-end: var(--space-4);
-}
-.codex-downtime-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-3);
-}
-.codex-downtime-pending,
-.codex-downtime-history {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.codex-downtime-pendingrow,
-.codex-downtime-historyrow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  min-height: var(--tap-min);
-}
-.codex-downtime-pendingrow > .codex-list-title,
-.codex-downtime-historyrow > .codex-campaign-recentitem {
-  flex: 1 1 14rem;
-  min-width: 0;
-}
-/* A Confirm failure renders inside its own row, on a full-width line of the wrap. */
-.codex-downtime-pendingrow > .nh-alert {
-  flex: 1 0 100%;
-}
-.codex-downtime-edit {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-3);
-  width: 100%;
-}
-.codex-downtime-totals {
-  width: 100%;
-}
-
 /* Backup */
 .codex-backup {
   display: flex;
@@ -2944,41 +2509,15 @@
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
-.codex-dot {
-  display: inline-block;
-  width: 0.5em;
-  height: 0.5em;
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-/* `IconChevron` points down; left and right are rotations of it. */
-.codex-chevron-left,
-.codex-chevron-right {
+
+/* `IconChevron` points down; a quarter turn points it left, for Back. */
+.codex-chevron-left {
   width: 1em;
   height: 1em;
   flex: none;
-}
-.codex-chevron-left {
   transform: rotate(90deg);
 }
-.codex-chevron-right {
-  transform: rotate(-90deg);
-}
-/* Inline in a wrapping meta row, so the paint grows to the floor with no ::after. */
-.codex-entry-sessionlink {
-  min-height: var(--tap-min);
-  display: inline-flex;
-  align-items: center;
-  border: none;
-  background: none;
-  color: var(--cyan);
-  cursor: pointer;
-  font: inherit;
-  padding: 0 var(--space-1);
-}
-.codex-entry-sessionlink:hover {
-  text-decoration: underline;
-}
+
 /* A row just hidden from the audit stays (dimmed) until the refetch settles, so the switch can be flipped back. */
 .codex-audit-row.is-hidden {
   opacity: 0.55;
@@ -2992,24 +2531,7 @@
   min-width: 0;
 }
 
-@media (max-width: 650px) {
-  .codex-calendar-weekdayfull {
-    display: none;
-  }
-  .codex-calendar-weekdayshort {
-    display: inline;
-  }
-}
 @media (max-width: 560px) {
-  /* The month grid becomes a week list. */
-  .codex-calendar-grid {
-    grid-template-columns: repeat(min(var(--codex-week, 7), 4), minmax(0, 1fr));
-  }
-  .codex-downtime-pendingrow,
-  .codex-downtime-historyrow {
-    align-items: stretch;
-    flex-direction: column;
-  }
   .codex-dashgrid {
     gap: var(--space-3);
   }
@@ -3039,9 +2561,6 @@
 .codex-editor-center,
 .codex-editor-context,
 .codex-dashcard,
-.codex-calendar-clocks,
-.codex-calendar-day,
-.codex-downtime-section,
 .codex-campaign-typecard,
 .codex-quest-link-open,
 .codex-icon-btn,
@@ -3060,9 +2579,6 @@
 .codex-editor-center::before,
 .codex-editor-context::before,
 .codex-dashcard::before,
-.codex-calendar-clocks::before,
-.codex-calendar-day::before,
-.codex-downtime-section::before,
 .codex-campaign-typecard::before,
 .codex-quest-link-open::before,
 .codex-icon-btn::before,
@@ -3092,10 +2608,7 @@
 .codex-main-empty,
 .codex-editor-center,
 .codex-editor-context,
-.codex-dashcard,
-.codex-calendar-clocks,
-.codex-calendar-day,
-.codex-downtime-section {
+.codex-dashcard {
   --material-fill: var(--material-lip), var(--material-plate);
 }
 /* Nested: rim and bezel over a flat plate, no texture. */

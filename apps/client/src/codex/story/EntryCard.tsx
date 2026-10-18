@@ -1,4 +1,4 @@
-import { Badge, Button, IconEyeOff, RevealSwitch } from "@vtt/ui";
+import { Badge, Button, IconEyeOff } from "@vtt/ui";
 import { formatWorldDate, type CodexChronicleRecord, type CodexPageSummary, type GmCodexCalendar } from "@vtt/domain";
 import {
   CHRONICLE_KIND_META,
@@ -18,6 +18,7 @@ import {
 } from "../chronicle";
 import { CodexIcon } from "../icons";
 import { CodexMarkdown } from "../CodexMarkdown";
+import { FieldAudienceToggle } from "../shared/WhoSeesIt";
 
 /**
  * One chronicle record in full, for the GM: its kind and date, the text players read, the hidden note, its payload,
@@ -30,6 +31,7 @@ export function EntryCard({
   records,
   calendar,
   pages,
+  quests = [],
   focused = false,
   onOpenPage,
   onOpenMarker,
@@ -46,6 +48,8 @@ export function EntryCard({
   records: readonly CodexChronicleRecord[];
   calendar: GmCodexCalendar | null;
   pages: readonly CodexPageSummary[];
+  /** Names a quest event's quest. */
+  quests?: ReadonlyArray<Readonly<{ id: string; title: string }>>;
   focused?: boolean;
   onOpenPage: (pageId: string) => void;
   onOpenMarker?: (markerId: string) => void;
@@ -92,14 +96,11 @@ export function EntryCard({
           record.sessionNumber !== null && <span className="story-entry-when">Session {record.sessionNumber}</span>
         )}
         <span className="story-grow" />
-        <div className="story-whosees">
-          <RevealSwitch
-            revealed={record.revealedToPlayers}
-            onChange={onReveal}
-            ariaLabel={isEvent ? "Show this event to players" : "Show this entry to players"}
-          />
-          <span className="story-whosees-label">{record.revealedToPlayers ? "Everyone" : "Hidden"}</span>
-        </div>
+        <FieldAudienceToggle
+          field={isEvent ? "this event" : "this entry"}
+          hidden={!record.revealedToPlayers}
+          onChange={(hidden) => onReveal(!hidden)}
+        />
       </header>
       {record.title && <h4 className="story-entry-title">{record.title}</h4>}
       {record.text.trim() && (
@@ -145,7 +146,11 @@ export function EntryCard({
         </div>
       )}
       {milestone && <p className="story-payload">{milestoneSummaryLabel(milestone)}</p>}
-      {questEvent && <p className="story-payload">{questEventLabel(questEvent, null)}</p>}
+      {questEvent && (
+        <p className="story-payload">
+          {questEventLabel(questEvent, quests.find((quest) => quest.id === questEvent.questId)?.title ?? null)}
+        </p>
+      )}
       {standing && (
         <p className="story-payload">
           {standingChangeLabel(standing, pages.find((page) => page.id === standing.factionPageId)?.title ?? null)}

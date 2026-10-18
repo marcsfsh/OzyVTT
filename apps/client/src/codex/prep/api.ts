@@ -66,17 +66,29 @@ export type NewSessionInput = Readonly<{
   templateId?: string | null;
 }>;
 
+/** Everything the session page saves at once; `prep` is the whole list of sections. */
+export type SessionPageInput = Readonly<{
+  sessionNumber?: number | null;
+  realDate?: string | null;
+  attendees?: readonly string[];
+  recapBody?: string;
+  status?: "planned" | "played";
+  tags?: readonly string[];
+  prep?: readonly CodexPrepSectionInput[];
+  expectedRev?: number;
+}>;
+
 export const prepSessionApi = {
+  get: (token: string, id: string) =>
+    call<{ session: PrepSession }>(token, `/sessions/${id}`).then((data) => data.session),
+  update: (token: string, id: string, input: SessionPageInput) =>
+    call<{ session: PrepSession }>(token, `/sessions/${id}`, { method: "PATCH", body: input }).then(
+      (data) => data.session
+    ),
   create: (token: string, input: NewSessionInput) =>
     call<{ session: PrepSession }>(token, "/sessions", {
       method: "POST",
       body: { status: "planned", ...input }
-    }).then((data) => data.session),
-  /** Replaces the whole prep. A stale `expectedRev` is a 409, so a tick from the live board is never overwritten. */
-  savePrep: (token: string, id: string, prep: readonly CodexPrepSectionInput[], expectedRev: number) =>
-    call<{ session: PrepSession }>(token, `/sessions/${id}`, {
-      method: "PATCH",
-      body: { prep, expectedRev }
     }).then((data) => data.session),
   /** Copies the template's sections in its order and keeps what each matching section holds. */
   applyTemplate: (token: string, id: string, templateId: string, expectedRev?: number) =>

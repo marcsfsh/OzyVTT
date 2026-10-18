@@ -52,6 +52,8 @@ vi.mock("./api", async (importOriginal) => {
       forMarker: (...a: unknown[]) => forMarker(...a)
     },
     calendarApi: { ...actual.calendarApi, get: (...a: unknown[]) => getCalendar(...a) },
+    // Story reads the shell's campaign feed, which reads standing alongside the chronicle.
+    standingApi: { ...actual.standingApi, list: async () => [] },
     atlasApi: {
       ...actual.atlasApi,
       listMaps: (...a: unknown[]) => listMaps(...a),
@@ -269,7 +271,7 @@ describe("Page → its connections, in one place", () => {
 
     expect(screen.getByRole("button", { name: "Story" })).toHaveAttribute("aria-current", "page");
     await waitFor(() => expect(document.getElementById("codex-entry-j9")).toHaveAttribute("aria-current", "true"));
-    expect(document.getElementById("codex-entry-j0")).not.toHaveAttribute("aria-current");
+    expect(document.getElementById("story-row-j0")).not.toHaveAttribute("aria-current");
   });
 
   it("a pin row lands on the Atlas WITH the pin's own map open and the pin selected", async () => {

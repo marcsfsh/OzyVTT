@@ -160,11 +160,13 @@ describe("the GM's Sessions and Quests filters live in the address", () => {
     const user = userEvent.setup();
     renderGm("/codex/sessions?status=planned");
 
-    // Cold open on a filtered address.
-    const sessions = await rail("Sessions");
+    // Cold open on a filtered address: the flyout opens on the filtered list.
+    const sessions = within(await screen.findByRole("list", { name: "Sessions" }));
     await waitFor(() => expect(sessions.queryByText("Session 1")).not.toBeInTheDocument());
     expect(sessions.getByText("Session 2")).toBeInTheDocument();
-    expect(screen.getByLabelText("Filter by status")).toHaveValue("planned");
+    expect(
+      within(screen.getByRole("group", { name: "Status" })).getByRole("button", { name: "Planned" })
+    ).toHaveAttribute("aria-pressed", "true");
 
     await user.type(screen.getByLabelText("Filter sessions"), "crypt");
     await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("crypt"));
@@ -190,7 +192,9 @@ describe("the GM's Sessions and Quests filters live in the address", () => {
     const user = userEvent.setup();
     renderGm("/codex/sessions?status=planned");
 
-    await user.click((await rail("Sessions")).getByRole("button", { name: /Session 2/ }));
+    await user.click(
+      within(await screen.findByRole("list", { name: "Sessions" })).getByRole("button", { name: /Session 2/ })
+    );
 
     await waitFor(() => expect(window.location.pathname).toBe("/codex/sessions/s2"));
     expect(window.location.search).toBe("");
@@ -206,12 +210,13 @@ describe("the player's lists filter in place too", () => {
     ]);
     renderPlayer("/codex/sessions");
 
-    const sessions = await rail("Sessions");
-    await waitFor(() => expect(sessions.getByText("Session 1")).toBeInTheDocument());
+    await user.click(await screen.findByRole("button", { name: "Filters" }));
+    const list = () => within(screen.getByRole("list", { name: "Sessions" }));
+    await waitFor(() => expect(list().getByText("Session 1")).toBeInTheDocument());
 
     await user.type(screen.getByLabelText("Filter sessions"), "tavern");
-    await waitFor(async () => expect((await rail("Sessions")).queryByText("Session 1")).not.toBeInTheDocument());
-    expect((await rail("Sessions")).getByText("Session 2")).toBeInTheDocument();
+    await waitFor(() => expect(list().queryByText("Session 1")).not.toBeInTheDocument());
+    expect(list().getByText("Session 2")).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("q")).toBe("tavern");
   });
 
@@ -228,7 +233,7 @@ describe("the player's lists filter in place too", () => {
     expect(screen.getByLabelText("Filter by status")).toHaveValue("completed");
   });
 
-  it("Journal: the GM's three filters, over the player's own records", async () => {
+  it("Story: the GM's three filters, over the player's own records", async () => {
     const user = userEvent.setup();
     playerChronicle.mockResolvedValue([
       {
@@ -260,13 +265,15 @@ describe("the player's lists filter in place too", () => {
         firstShownAt: "2026-07-31T00:00:00.000Z"
       }
     ]);
+    // The old Journal address still lands on Story.
     renderPlayer("/codex/journal");
     await waitFor(() => expect(screen.getByText("We reached Vallaki")).toBeInTheDocument());
 
-    await user.selectOptions(screen.getByLabelText("Filter by kind"), "deadline");
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    await user.click(within(screen.getByRole("group", { name: "Kind" })).getByRole("button", { name: "Deadline" }));
 
     await waitFor(() => expect(screen.queryByText("We reached Vallaki")).not.toBeInTheDocument());
-    expect(screen.getByText("Before the feast")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Clocks" })).getByText("The feast")).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("kind")).toBe("deadline");
   });
 
