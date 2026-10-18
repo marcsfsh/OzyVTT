@@ -33,9 +33,11 @@ Node.js 24 or newer.
 
 ```bash
 npm install
-cp .env.example .env
 npm run dev
 ```
+
+The server reads `PORT` and `DATA_DIR` from the environment or from a `.env` file in the repo root;
+`.env.example` lists them.
 
 Open `http://localhost:5173`. Vite also prints a network address such as
 `http://192.168.1.50:5173` for other devices on the LAN.
@@ -62,15 +64,16 @@ GM browser.
 If you forget it, reset it on the computer that runs OzyVTT:
 
 1. Stop OzyVTT.
-2. Delete `data/auth.json` (or `auth.json` in your `DATA_DIR`).
+2. Delete `apps/server/data/auth.json` (or `auth.json` in your `DATA_DIR`).
 3. Start OzyVTT again, open it on that computer, and set a new password.
 
 The campaign stays as it was. Every sign-in ends, so players join again and claim their
 characters.
 
-`data/` holds the GM password hash and all campaign data. It is git-ignored, so back it up
-separately. A `data/` directory from a build before the October 2026 cleanup is refused at startup;
-move it aside to start fresh.
+`apps/server/data/` holds the GM password hash and all campaign data. Set `DATA_DIR` to keep it
+elsewhere; a relative path is read from `apps/server`. It is git-ignored, so back it up separately. A
+data directory from a build before the October 2026 cleanup is refused at startup; move it aside to
+start fresh.
 
 ## Commands
 

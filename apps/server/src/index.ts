@@ -1,12 +1,19 @@
 import { existsSync } from "node:fs";
 import { networkInterfaces } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "./server.js";
 
+// The repo's .env is found from this file, since npm runs workspace scripts from apps/server. A variable already set
+// in the environment wins over the file.
+const envFile = fileURLToPath(new URL("../../../.env", import.meta.url));
+if (existsSync(envFile)) process.loadEnvFile(envFile);
+
 const port = Number(process.env.PORT ?? 3001);
 const developmentClientPort = 5173;
-const dataDir = process.env.DATA_DIR ?? join(process.cwd(), "data");
+// A relative DATA_DIR is read from apps/server, where npm runs the server's scripts, so the default and an existing
+// .env both find the campaign `npm run start` keeps in apps/server/data, wherever node was started.
+const dataDir = resolve(fileURLToPath(new URL("..", import.meta.url)), process.env.DATA_DIR ?? "data");
 const clientOrigin = process.env.CLIENT_ORIGIN;
 const webDist = join(fileURLToPath(new URL("../../client/dist", import.meta.url)));
 const hasBuiltClient = existsSync(join(webDist, "index.html"));

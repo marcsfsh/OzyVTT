@@ -98,7 +98,7 @@ drops the dead token and takes a fresh seat.
 **The GM password.** `POST /host/gm/password` changes it after checking the current one, counted with sign-in attempts
 against the rate limit. It ends every GM session issued before the change and returns a new token for the caller, who
 moves its socket to it; the other GM devices are told after a 5-second grace. Resetting a forgotten password is still
-done on the host: stop OzyVTT, delete `data/auth.json`, start it and set a new one. A new password brings a new token
+done on the host: stop OzyVTT, delete `auth.json` from the data directory, start it and set a new one. A new password brings a new token
 secret, so every older session is dead; setting it therefore lets go of every claim, and players claim again.
 
 ## Consequences and tradeoffs

@@ -491,9 +491,11 @@ it with `mount(router, routes.name, ...)`, parsing the body with `routes.name.bo
 
 ## Persistence
 
-All stores share `data/vtt.sqlite` (WAL). Integration credentials have their own SQLite file;
-GM auth is `data/auth.json`; map, token and Codex images and the sound library's files are files under `data/`. Paths are
-chosen in `apps/server/src/index.ts`. `data/` is git-ignored.
+Everything is kept in one data directory: `DATA_DIR`, by default `apps/server/data` (a relative `DATA_DIR` is read from
+`apps/server`, and `apps/server/src/index.ts` also reads a `.env` file at the repo root). All stores share `vtt.sqlite`
+(WAL) there. Integration credentials have their own SQLite file; GM auth is `auth.json`; map, token and Codex images
+and the sound library's files are files under it. The directory is git-ignored. Elsewhere in this document, `data/`
+means it.
 
 Every store opens its database and runs its migrations through `apps/server/src/database.ts`. Each
 store's history starts from one baseline migration recorded in the shared `migrations` table; a file
