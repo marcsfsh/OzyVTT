@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
-import { ScreenSoundSchema, type ScreenSound, type SoundScreen, type ViewerSoundProjection } from "@vtt/domain";
+import type { z } from "zod";
+import type { ViewerConnectionMetadataSchema } from "@vtt/api-contract/schemas";
+import type { ScreenSound, SoundScreen, ViewerSoundProjection } from "@vtt/domain";
 import { ViewerAccessDeniedError, type ViewerAccessMetadata, type ViewerAccessStore } from "./viewer-access.js";
 import type {
   ViewerCamera,
@@ -43,13 +44,6 @@ type GmSubscriber = {
 };
 
 /** A table screen connected right now, under the viewer credential it paired with, and whether it can play sound. */
-export const ViewerConnectionMetadataSchema = z.strictObject({
-  connectionId: z.string(),
-  viewerId: z.uuid(),
-  name: z.string(),
-  connectedAt: z.iso.datetime(),
-  sound: ScreenSoundSchema
-});
 export type ViewerConnectionMetadata = Readonly<z.infer<typeof ViewerConnectionMetadataSchema>>;
 
 export class ViewerCoordinator {

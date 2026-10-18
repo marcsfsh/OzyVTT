@@ -1,6 +1,6 @@
 import { GameStateSchema } from "@vtt/domain";
 import { API_VERSION, GAME_COMMANDS, REALTIME_PROTOCOL_VERSION } from "@vtt/api-contract";
-import { openApiDocument } from "./openapi/document.js";
+import { openApiDocument } from "./api-routes.js";
 
 /**
  * Renders the generated app map (`docs/app-map.md`). Pure: reads the `GameState` schema, the api-contract
@@ -58,10 +58,10 @@ export function renderAppMap(): string {
   lines.push("The mutation surface shared by both transports (Socket.IO + HTTP `/api/v1`); each requires the");
   lines.push("listed integration scope. Adding one: its typed socket event in domain `ClientToServerEvents`, its");
   lines.push(
-    "schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMANDS` (`packages/api-contract`) with an"
+    "schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMANDS` (`packages/api-contract`), and"
   );
-  lines.push("OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports");
-  lines.push("register from. Then the projection decision.");
+  lines.push("one table entry under `apps/server/src/commands/`. Both transports register from that table, and");
+  lines.push("the OpenAPI document generates the command's operation from it. Then the projection decision.");
   lines.push("");
   lines.push(`Namespaces: ${namespaces.map((namespace) => `\`${namespace}\``).join(", ")}.`);
   lines.push("");
@@ -72,8 +72,8 @@ export function renderAppMap(): string {
 
   lines.push("## HTTP surface");
   lines.push("");
-  lines.push("Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-identical to");
-  lines.push("`@vtt/api-contract`).");
+  lines.push("Every path in the served OpenAPI document (`GET /api/v1/openapi.json`), which is generated");
+  lines.push("from the route registry in `packages/api-contract/src/routes/`.");
   lines.push("");
   for (const entry of httpPaths) lines.push(`- \`${entry.methods.join(" ")} ${entry.path}\``);
   lines.push("");
@@ -88,7 +88,10 @@ export function renderAppMap(): string {
   lines.push("- **Persisted/importable schemas:** `packages/schemas/src/index.ts`: `Actor`, `ActorDefinition`.");
   lines.push("- **Command Zod schemas:** `packages/domain/src/commands.ts`.");
   lines.push("- **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).");
-  lines.push("- **Scopes + OpenAPI:** `packages/api-contract/src/index.ts`.");
+  lines.push("- **Scopes and paths:** `packages/api-contract/src/index.ts`.");
+  lines.push(
+    "- **Route registry and OpenAPI generator:** `packages/api-contract/src/routes/`, `packages/api-contract/src/openapi/`."
+  );
   lines.push("- **Projections (GM/player security boundary):** `apps/server/src/projections.ts`.");
   lines.push("- **Public viewer projection:** `apps/server/src/viewer-encounter.ts`, `viewer-presentation.ts`.");
   lines.push("- **Persistence (SQLite):** `apps/server/src/game-store.ts`.");

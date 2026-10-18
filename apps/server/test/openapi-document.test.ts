@@ -20,9 +20,11 @@ import {
   SESSION_PATHS,
   SOUND_ASSET_PATHS,
   SYSTEM_PATHS,
+  TOKEN_ASSET_PATHS,
   VIEWER_PATHS
 } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
+import { gameCommands } from "../src/commands/index.js";
 
 const requestId = "f84d13cb-a7da-4ef2-9f2f-53d38e49d862";
 
@@ -30,13 +32,15 @@ describe("the OpenAPI document", () => {
   it("keeps OpenAPI system, document, and credential paths, versions, scopes, and component references aligned", () => {
     expect(openApiDocument.openapi).toBe("3.1.0");
     expect(openApiDocument.info.version).toBe(API_VERSION);
-    expect(openApiDocument.servers[0].url).toBe(API_NAMESPACE);
+    // Every path already starts with the namespace, so the server URL is the host's root.
+    expect(openApiDocument.servers[0]?.url).toBe("/");
 
     const declaredPaths = [
       ...Object.values(SYSTEM_PATHS),
       OPENAPI_DOCUMENT_PATH,
       ...Object.values(INTEGRATION_CREDENTIAL_PATHS),
       ...Object.values(MAP_ASSET_PATHS),
+      ...Object.values(TOKEN_ASSET_PATHS),
       ...Object.values(SOUND_ASSET_PATHS),
       ...Object.values(VIEWER_PATHS),
       ...Object.values(GAME_PATHS),
@@ -50,7 +54,7 @@ describe("the OpenAPI document", () => {
     ];
     expect(Object.keys(openApiDocument.paths).sort()).toEqual([...new Set(declaredPaths)].sort());
     for (const path of Object.values(SYSTEM_PATHS))
-      expect(openApiDocument.paths[path].get.responses["200"].content["application/json"].schema.$ref).toMatch(
+      expect(openApiDocument.paths[path]?.get?.responses["200"]?.content?.["application/json"]?.schema.$ref).toMatch(
         /^#\/components\/schemas\//
       );
   });
@@ -75,6 +79,7 @@ describe("the OpenAPI document", () => {
     // Content is the one map-asset read open to a GM, an authorized player or a paired viewer session.
     expect(openApiDocument.paths[MAP_ASSET_PATHS.content].get.security).toEqual([
       { gmAuth: [] },
+      { playerAuth: [] },
       { viewerCookieAuth: [] }
     ]);
     expect(openApiDocument.paths[MAP_ASSET_PATHS.calibrationWizards].post.security).toEqual([{ gmAuth: [] }]);
@@ -363,12 +368,23 @@ describe("the OpenAPI document", () => {
     expect(scopeOf(GAME_PATHS.actionResolve, "post")).toEqual(["combat:write"]);
     expect(scopeOf(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toEqual(["combat:read"]);
     expect(scopeOf(ENCOUNTER_ARCHIVE_PATHS.byId, "delete")).toEqual(["admin"]);
-    // Every game/content/archive operation also accepts a GM session.
+    // Every game/content/archive operation also accepts a GM session, except a command only a player may send.
+    const playerOnly = new Set(
+      gameCommands
+        .filter((command) => command.playerOnly !== undefined)
+        .map((command) => GAME_COMMANDS[command.type].path as string)
+    );
+    expect(playerOnly.size).toBeGreaterThan(0);
     for (const path of [
       ...Object.values(GAME_PATHS),
       ...Object.values(CONTENT_PATHS),
       ...Object.values(ENCOUNTER_ARCHIVE_PATHS)
     ]) {
+      if (playerOnly.has(path)) {
+        for (const operation of Object.values(paths[path]))
+          expect(operation.security, `${path} is a player's own`).toEqual([{ playerAuth: [] }]);
+        continue;
+      }
       for (const operation of Object.values(paths[path])) {
         expect(
           operation.security?.some((entry) => "gmAuth" in entry),
@@ -404,7 +420,9 @@ describe("the OpenAPI document", () => {
       expect(acceptsPlayer(path, "get"), `${path} must accept a player session`).toBe(true);
       expect(scopeOf(path, "get"), `${path} scope`).toEqual(["game:read"]);
     }
-    expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toBe(false);
+    // A player lists and reads only the replays the GM shared; managing them stays with the GM.
+    expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.collection, "get")).toBe(true);
+    expect(acceptsPlayer(ENCOUNTER_ARCHIVE_PATHS.byId, "delete")).toBe(false);
     expect(openApiDocument.components.securitySchemes.playerAuth).toMatchObject({ type: "http", scheme: "bearer" });
   });
 
@@ -434,12 +452,21 @@ describe("the OpenAPI document", () => {
       "IntegrationCredentialIssued.token",
       "PlayerSessionIssued.token",
       "CodexPreviewSessionData.token",
-      // The host's own sign-in: the GM password goes in and a GM session token comes out.
-      "HostPasswordRequest.password",
+      // The host's own setup and sign-in: the GM password goes in and a GM session token comes out.
+      "HostSetupRequest.password",
+      "GmSignInRequest.password",
       "GmSignIn.token",
       // Changing the GM password: both passwords go in, and the GmSignIn token above comes out.
       "GmPasswordChangeRequest.currentPassword",
       "GmPasswordChangeRequest.newPassword"
+    ]);
+    // Battlemap pieces: an actor's token, a name fixed by ActorDefinitionSchema, and the token image library.
+    const gamePieces = new Set([
+      "ActorDefinition.token",
+      "HomebrewMonsterRecord.token",
+      "TokenAssetUploadData.token",
+      "TokenAssetData.token",
+      "TokenAssetListData.tokens"
     ]);
     for (const [name, schema] of Object.entries(openApiDocument.components.schemas)) {
       const properties =
@@ -447,8 +474,7 @@ describe("the OpenAPI document", () => {
       for (const property of properties) {
         if (issuance.has(`${name}.${property}`)) continue;
         if (/^tokenAsset/.test(property)) continue; // battlemap tokens are game pieces
-        // An ActorDefinition's `token` is its battlemap piece, a name fixed by ActorDefinitionSchema.
-        if (`${name}.${property}` === "HomebrewMonsterRecord.token") continue;
+        if (gamePieces.has(`${name}.${property}`)) continue;
         expect(property, `${name}.${property} looks secret-shaped`).not.toMatch(forbiddenNames);
       }
     }

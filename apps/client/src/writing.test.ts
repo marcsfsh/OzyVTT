@@ -93,7 +93,9 @@ describe("The writing rules, on every string a person reads", () => {
     expect(at("apps/client/src/encounter/ActionTargetPicker.tsx", /^Choose what|caught when you roll/)).toBe(true);
     expect(at("packages/ui/src/primitives/Checklist.tsx", /^, done$/)).toBe(true);
     expect(at("apps/server/src/rests.ts", /^A Short Rest is already under way/)).toBe(true);
-    expect(at("apps/server/src/openapi/descriptions.ts", /^The ordered checklist/)).toBe(true);
+    // OpenAPI prose lives on the Zod schemas and in the route registry.
+    expect(at("packages/domain/src/codex-wire.ts", /^The ordered checklist/)).toBe(true);
+    expect(at("packages/api-contract/src/routes/system.ts", /^Answers as soon as the server is serving/)).toBe(true);
     expect(at("packages/rules-5e/src/dice.ts", /^Enter a dice formula/)).toBe(true);
     expect(strings.length).toBeGreaterThan(10_000);
   });

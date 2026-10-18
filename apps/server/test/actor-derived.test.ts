@@ -6,7 +6,7 @@ import { deriveActorSheet } from "../src/actor-derived.js";
 import { deriveEquipment, type EquipmentCatalog } from "../src/equipment-derivation.js";
 import { testCatalog } from "./catalog-records.js";
 import { projectGmView, projectPlayerView } from "../src/projections.js";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { saveModifierFor, saveTotalFor } from "../src/saving-throws.js";
 
 // The derived sheet block: item-granted skill proficiency/expertise, save bonuses, and `check-bonus`.

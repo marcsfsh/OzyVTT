@@ -1,3 +1,4 @@
+import { EncounterArchiveLaunchSchema } from "@vtt/api-contract";
 import type { EncounterArchiveDocument } from "../encounter-archive.js";
 import { paintFog, resetFog, setFogEnabled } from "../fog.js";
 import {
@@ -188,6 +189,7 @@ export const sceneCommands = [
     gmOnly: "Only the GM can launch a replay.",
     // The typed route lives on the archive it replays, so its `{id}` is the archive's number.
     pathParams: (params) => ({ archiveId: Number(params.id) }),
+    reply: { schema: EncounterArchiveLaunchSchema, description: "The launched scene and the cloned combatants." },
     // Parks the live table like `scene.activate` and goes live on a recorded moment.
     async run({ request, executeTimeline }, kit) {
       const { commandId, archiveId, turnIndex } = request;

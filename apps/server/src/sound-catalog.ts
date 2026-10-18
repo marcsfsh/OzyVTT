@@ -1,21 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
-import { z } from "zod";
+import type { z } from "zod";
+import type { PublicSoundAssetSchema } from "@vtt/api-contract/schemas";
 import { migrate, openDatabase, type Migration } from "./database.js";
 import { InvalidRequestError } from "./invalid-request.js";
 
 /** A sound in the GM's library as the sound routes report it: the stored file's facts and the GM's name for it. */
-export const PublicSoundAssetSchema = z.strictObject({
-  id: z.uuid(),
-  name: z.string(),
-  originalName: z.string(),
-  format: z.enum(["mp3", "aac", "m4a", "ogg", "wav", "webm", "flac"]),
-  codec: z.enum(["mp3", "aac", "vorbis", "opus", "pcm", "flac"]),
-  mediaType: z.string(),
-  durationMs: z.number().int().min(1),
-  byteLength: z.number().int().min(1),
-  importedAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime()
-});
 export type PublicSoundAsset = Readonly<z.infer<typeof PublicSoundAssetSchema>>;
 
 export type SoundCatalogEntry = Readonly<{ assetId: string; name: string; createdAt: string; updatedAt: string }>;
