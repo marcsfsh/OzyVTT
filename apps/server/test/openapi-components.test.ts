@@ -76,7 +76,6 @@ const document = {
     { to: "everyone", at: timestamp },
     { to: lyra, at: timestamp }
   ],
-  visibleToPlayers: true,
   packId: "table",
   packName: null,
   inCatalogs: false,
@@ -98,7 +97,6 @@ const summary = {
   state: "draft",
   audience: "hidden",
   characterIds: [],
-  visibleToPlayers: false,
   packId: "table",
   packName: null,
   inCatalogs: false,
@@ -295,7 +293,6 @@ const FIXTURES: Record<string, unknown> = {
   HomebrewUpdateRequest: { record, expectedRev: 3 },
   HomebrewDuplicateRequest: { name: "Shield Master (Copy)" },
   HomebrewStateChangeRequest: { expectedRev: 3 },
-  HomebrewVisibilityRequest: { visibleToPlayers: true },
   // Omits both defaulted fields: Zod fills them in, and the component must accept the result.
   HomebrewPackImportRequest: { pack },
   HomebrewContentResponse: { ok: true, apiVersion: "1", data: { record: document } },

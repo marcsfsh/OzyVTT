@@ -498,7 +498,6 @@ describe("the migration of visible_to_players, and an old pack", () => {
     expect(store.get("hb-shown-a1b2c3")).toMatchObject({
       audience: "everyone",
       characterIds: [],
-      visibleToPlayers: true,
       packId: "table",
       basedOn: null,
       reveals: [{ to: "everyone", at: "2026-02-02T00:00:00.000Z" }]

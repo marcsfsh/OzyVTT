@@ -182,8 +182,7 @@ describe("who sees it", () => {
     expect(HomebrewContentResponseSchema.safeParse(shown.json).success).toBe(true);
     expect(shown.json.data.record).toMatchObject({
       audience: "characters",
-      characterIds: [LYRA],
-      visibleToPlayers: true
+      characterIds: [LYRA]
     });
     expect(shown.json.data.record.reveals.map((reveal: Json) => reveal.to)).toEqual([LYRA]);
     // Everyone after Lyra adds a stamp for everyone; hiding keeps both.

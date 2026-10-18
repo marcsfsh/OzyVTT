@@ -97,6 +97,7 @@ const get = (base: string, path: string, headers: Record<string, string>) => fet
 const send = (method: string) => (base: string, path: string, headers: Record<string, string>, payload?: unknown) =>
   fetch(`${base}${path}`, { method, headers, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
 const post = send("POST");
+const put = send("PUT");
 const patch = send("PATCH");
 const remove = send("DELETE");
 
@@ -130,10 +131,7 @@ describe("homebrew HTTP authorization gate", () => {
       ["POST publish", () => post(base, sub(HOMEBREW_PATHS.contentPublish, draft.id), ANON, {})],
       ["POST unpublish", () => post(base, sub(HOMEBREW_PATHS.contentUnpublish, draft.id), ANON, {})],
       ["POST discard", () => post(base, sub(HOMEBREW_PATHS.contentDiscard, draft.id), ANON, {})],
-      [
-        "POST visibility",
-        () => post(base, sub(HOMEBREW_PATHS.contentVisibility, draft.id), ANON, { visibleToPlayers: true })
-      ],
+      ["PUT audience", () => put(base, sub(HOMEBREW_PATHS.contentAudience, draft.id), ANON, { audience: "everyone" })],
       ["GET usages", () => get(base, sub(HOMEBREW_PATHS.contentUsages, draft.id), ANON)],
       ["GET packsExport", () => get(base, HOMEBREW_PATHS.packsExport, ANON)],
       [
@@ -180,7 +178,7 @@ describe("homebrew HTTP authorization gate", () => {
   it("declares the same paths the router mounts", async () => {
     // A path added to the contract without a route (or the reverse) is a documented endpoint that 404s.
     const declared = Object.values(HOMEBREW_PATHS);
-    expect(declared).toHaveLength(25);
+    expect(declared).toHaveLength(24);
     expect(
       Object.keys(openApiDocument.paths)
         .filter((path) => path.startsWith("/api/v1/homebrew"))
@@ -228,7 +226,7 @@ describe("homebrew HTTP CRUD", () => {
     const created = await body(response);
     expect(HomebrewContentResponseSchema.safeParse(created).success).toBe(true);
     const record = created.data.record;
-    expect(record).toMatchObject({ type: "class", state: "draft", visibleToPlayers: false, deletedAt: null, rev: 1 });
+    expect(record).toMatchObject({ type: "class", state: "draft", audience: "hidden", deletedAt: null, rev: 1 });
     // `record` is self-describing on the wire (the pack format is a bare array of records) even
     // though `type` is stored on the row and outside the authored body.
     expect(record.record).toMatchObject({ id: record.id, type: "class", name: "Blood Hunter", hitDie: "d10" });
@@ -292,23 +290,23 @@ describe("homebrew HTTP CRUD", () => {
     expect((await post(base, sub(HOMEBREW_PATHS.contentRestore, "hb-never-000000"), GM, {})).status).toBe(404);
   });
 
-  it("keeps publish and visibility separate, and refuses to make a draft player-visible", async () => {
+  it("keeps publish and sharing separate, and refuses to share a draft", async () => {
     const { base } = await fixture();
     const record = await createRecord(base);
-    // draft + visible is meaningless: a 409.
-    const early = await post(base, sub(HOMEBREW_PATHS.contentVisibility, record.id), GM, { visibleToPlayers: true });
+    // A draft is always Hidden: sharing one is a 409.
+    const early = await put(base, sub(HOMEBREW_PATHS.contentAudience, record.id), GM, { audience: "everyone" });
     expect(early.status).toBe(409);
 
     const published = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, record.id), GM, {}));
-    // Publishing does not show it to players; that is the separate endpoint's job.
-    expect(published.data.record).toMatchObject({ state: "published", visibleToPlayers: false });
+    // Publishing does not share it with players; that is the separate endpoint's job.
+    expect(published.data.record).toMatchObject({ state: "published", audience: "hidden" });
     const visible = await body(
-      await post(base, sub(HOMEBREW_PATHS.contentVisibility, record.id), GM, {
-        visibleToPlayers: true,
+      await put(base, sub(HOMEBREW_PATHS.contentAudience, record.id), GM, {
+        audience: "everyone",
         expectedRev: published.data.record.rev
       })
     );
-    expect(visible.data.record.visibleToPlayers).toBe(true);
+    expect(visible.data.record.audience).toBe("everyone");
     const unpublished = await body(await post(base, sub(HOMEBREW_PATHS.contentUnpublish, record.id), GM, {}));
     expect(unpublished.data.record.state).toBe("draft");
   });
@@ -388,9 +386,9 @@ describe("homebrew HTTP CRUD", () => {
       const published = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, created.id), GM, {}));
       expect(published.data.record.state).toBe("published");
       const shared = await body(
-        await post(base, sub(HOMEBREW_PATHS.contentVisibility, created.id), GM, { visibleToPlayers: true })
+        await put(base, sub(HOMEBREW_PATHS.contentAudience, created.id), GM, { audience: "everyone" })
       );
-      expect(shared.data.record.visibleToPlayers).toBe(true);
+      expect(shared.data.record.audience).toBe("everyone");
       return created.id as string;
     };
 
@@ -405,7 +403,7 @@ describe("homebrew HTTP CRUD", () => {
       );
       // The editor sees its edit and what blocks it...
       expect(patched.data.record.record.add).toEqual([]);
-      expect(patched.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: true });
+      expect(patched.data.record).toMatchObject({ state: "published", audience: "everyone", pendingChanges: true });
       expect(patched.data.record.validity.valid).toBe(false);
       // ...while the players keep the published list.
       expect(store.publishedFor({ characterIds: [] }).spellLists).toHaveLength(1);
@@ -439,11 +437,11 @@ describe("homebrew HTTP CRUD", () => {
           record: { id, name: "Blood Magic II", source: "homebrew", add: ["fireball", "fire-bolt"] }
         })
       );
-      expect(fine.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: true });
+      expect(fine.data.record).toMatchObject({ state: "published", audience: "everyone", pendingChanges: true });
       expect(store.publishedFor({ characterIds: [] }).spellLists[0].name).toBe("Blood Magic");
 
       const live = await body(await post(base, sub(HOMEBREW_PATHS.contentPublish, id), GM, {}));
-      expect(live.data.record).toMatchObject({ state: "published", visibleToPlayers: true, pendingChanges: false });
+      expect(live.data.record).toMatchObject({ state: "published", audience: "everyone", pendingChanges: false });
       expect(store.publishedFor({ characterIds: [] }).spellLists[0].name).toBe("Blood Magic II");
 
       await patch(base, byId(id), GM, {
@@ -460,7 +458,7 @@ describe("homebrew HTTP CRUD", () => {
           record: { id: draft.id, name: "Scratch", source: "homebrew", add: [] }
         })
       );
-      expect(edited.data.record).toMatchObject({ state: "draft", visibleToPlayers: false });
+      expect(edited.data.record).toMatchObject({ state: "draft", audience: "hidden" });
       expect(edited.status).toBeUndefined();
     });
   });
@@ -491,7 +489,7 @@ describe("homebrew HTTP CRUD", () => {
     expect(copy.status).toBe(201);
     const copied = (await body(copy)).data.record;
     expect(copied.id).not.toBe(record.id);
-    expect(copied).toMatchObject({ state: "draft", visibleToPlayers: false });
+    expect(copied).toMatchObject({ state: "draft", audience: "hidden" });
     expect(copied.record).toMatchObject({ type: "class", name: "Blood Hunter (copy)", hitDie: "d10" });
   });
 
@@ -503,7 +501,7 @@ describe("homebrew HTTP CRUD", () => {
     expect(response.status).toBe(201);
     const copy = (await body(response)).data.record;
     expect(HomebrewContentResponseSchema.safeParse(await body(await get(base, byId(copy.id), GM))).success).toBe(true);
-    expect(copy).toMatchObject({ type: "class", state: "draft", visibleToPlayers: false });
+    expect(copy).toMatchObject({ type: "class", state: "draft", audience: "hidden" });
     expect(copy.id.startsWith("hb-")).toBe(true);
     expect(copy.record.name).toBe("Wizard (copy)");
     expect(copy.record.source).toBe("homebrew");
@@ -669,7 +667,7 @@ describe("homebrew HTTP packs", () => {
     const record = exported.data.pack.records[0];
     expect(record).toMatchObject({ id: published.id, type: "class", name: "Blood Hunter" });
     // An importer must not inherit this table's visibility policy, so none of it travels.
-    for (const key of ["state", "visibleToPlayers", "deletedAt", "rev"]) expect(record).not.toHaveProperty(key);
+    for (const key of ["state", "audience", "deletedAt", "rev"]) expect(record).not.toHaveProperty(key);
   });
 
   it("imports everything as an invisible draft, re-mints a colliding id, and dry-runs without writing", async () => {
@@ -708,7 +706,7 @@ describe("homebrew HTTP packs", () => {
     });
     for (const entry of applied.data.imported) expect(entry.id).toMatch(/^hb-[a-z0-9-]+-[0-9a-f]{6}$/);
     // Everything lands as an invisible draft, which is what makes importing an invalid pack harmless.
-    for (const row of store.list().rows) expect(row).toMatchObject({ state: "draft", visibleToPlayers: false });
+    for (const row of store.list().rows) expect(row).toMatchObject({ state: "draft", audience: "hidden" });
     expect(store.list().total).toBe(4);
   });
 
@@ -788,7 +786,7 @@ describe("homebrew HTTP packs", () => {
     const { base, store } = await fixture({ realValidation: true });
     const live = await createRecord(base, { type: "spell-list", name: "Shared List", add: ["fireball"] });
     await post(base, sub(HOMEBREW_PATHS.contentPublish, live.id), GM, {});
-    await post(base, sub(HOMEBREW_PATHS.contentVisibility, live.id), GM, { visibleToPlayers: true });
+    await put(base, sub(HOMEBREW_PATHS.contentAudience, live.id), GM, { audience: "everyone" });
     const deleted = await createRecord(base, { type: "feat", name: "Deleted Feat" });
     await remove(base, byId(deleted.id), GM);
     const draft = await createRecord(base, { type: "feat", name: "Plain Draft" });
@@ -823,7 +821,7 @@ describe("homebrew HTTP packs", () => {
 
     // The live record is exactly as it was: same name, same body, still published, still shared.
     const untouched = (await body(await get(base, byId(live.id), GM))).data.record;
-    expect(untouched).toMatchObject({ state: "published", visibleToPlayers: true });
+    expect(untouched).toMatchObject({ state: "published", audience: "everyone" });
     expect(untouched.record.name).toBe("Shared List");
     expect(store.publishedFor({ characterIds: [] }).spellLists).toHaveLength(1);
     // The deleted record stays deleted.

@@ -201,7 +201,6 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       audience: row.audience,
       characterIds: [...row.characterIds],
       reveals: [...row.reveals],
-      visibleToPlayers: row.visibleToPlayers,
       packId: row.packId,
       packName: packs.get(row.packId)?.name ?? null,
       inCatalogs: inCatalogs(row, packs),
@@ -228,7 +227,6 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       state: row.state,
       audience: row.audience,
       characterIds: [...row.characterIds],
-      visibleToPlayers: row.visibleToPlayers,
       packId: row.packId,
       packName: packs.get(row.packId)?.name ?? null,
       inCatalogs: inCatalogs(row, packs),
@@ -429,19 +427,6 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     try {
       const { expectedRev } = routes.discardHomebrewChanges.body.schema.parse(request.body ?? {});
       return sent(response, store.discardPending(pathParam(request, "id"), expectedRev, authorOf(response)));
-    } catch (error) {
-      return storeError(response, error);
-    }
-  });
-
-  // The older on-or-off switch: on is Everyone, off is Hidden.
-  mount(router, routes.setHomebrewContentVisibility, requireGm, (request, response) => {
-    try {
-      const { visibleToPlayers, expectedRev } = routes.setHomebrewContentVisibility.body.schema.parse(request.body);
-      return sent(
-        response,
-        store.setVisibility(pathParam(request, "id"), visibleToPlayers, expectedRev, authorOf(response))
-      );
     } catch (error) {
       return storeError(response, error);
     }
