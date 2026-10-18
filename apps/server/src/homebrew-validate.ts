@@ -647,9 +647,10 @@ export type HomebrewValidationScenario = Readonly<{
   archived?: boolean;
 }>;
 
-/** The catalog and published spell lists of a scenario. */
+/** The catalog and published spell lists of a scenario, for one audience. */
 export type ScenarioCatalogs = (
-  scenario: HomebrewValidationScenario
+  scenario: HomebrewValidationScenario,
+  audience?: "gm" | "play"
 ) => Readonly<{ catalog: ContentView; spellLists: readonly SpellListReference[] }>;
 
 /** Builds a scenario's catalogs over the live library and store. */
@@ -657,12 +658,12 @@ export function scenarioCatalogs(
   library: Pick<ContentLibrary, "forAudienceAdjusted">,
   store: Pick<HomebrewStore, "publishedFor">
 ): ScenarioCatalogs {
-  return (scenario) => {
+  return (scenario, audience = "play") => {
     const adjust = (slice: Parameters<typeof sliceReplacing>[0]) =>
       sliceReplacing(slice, scenario.without, scenario.replacement);
     return {
-      catalog: library.forAudienceAdjusted("gm", adjust),
-      spellLists: adjust(store.publishedFor("gm")).spellLists
+      catalog: library.forAudienceAdjusted(audience, adjust),
+      spellLists: adjust(store.publishedFor(audience)).spellLists
     };
   };
 }
@@ -675,21 +676,59 @@ function authoredWithout(index: HomebrewAuthoredIndex, id: string): HomebrewAuth
   };
 }
 
+/** A published record in a pack that is switched off, as the gate's warning names it. */
+export type OffPackRecord = Readonly<{ name: string; packName: string }>;
+
+/**
+ * The gate reads the table with every pack on (`play`), so a record that needs one from a pack that is off still
+ * publishes. What fails only once the switched-off packs leave the catalog (`gm`) comes back as a warning at the same
+ * path, naming the record and its pack where the path holds that record's id.
+ */
 export function createHomebrewValidator(source: {
-  forAudience: (audience: "gm" | "player") => ContentView;
+  forAudience: (audience: "gm" | "play") => ContentView;
   /** Catalogs for a scenario; without it, every validation reads the live table. */
   forScenario?: ScenarioCatalogs;
-  publishedSpellLists: () => readonly SpellListReference[];
+  publishedSpellLists: (audience?: "gm" | "play") => readonly SpellListReference[];
   /** Drafts included: the gate asks about authorship alone. */
   authoredIndex: () => HomebrewAuthoredIndex;
+  /** Published records in packs that are off, by id. Without it, no pack is ever off. */
+  offPackRecords?: () => ReadonlyMap<string, OffPackRecord>;
 }) {
-  return (type: HomebrewContentType, body: unknown, scenario?: HomebrewValidationScenario): HomebrewValidity => {
-    const adjusted = scenario && source.forScenario ? source.forScenario(scenario) : null;
+  const contextFor = (audience: "gm" | "play", scenario: HomebrewValidationScenario | undefined) => {
+    const adjusted = scenario && source.forScenario ? source.forScenario(scenario, audience) : null;
     const authored = source.authoredIndex();
-    return validateForPublish(type, body, {
-      catalog: adjusted?.catalog ?? source.forAudience("gm"),
-      spellLists: adjusted?.spellLists ?? source.publishedSpellLists(),
+    return {
+      catalog: adjusted?.catalog ?? source.forAudience(audience),
+      spellLists: adjusted?.spellLists ?? source.publishedSpellLists(audience),
       authored: scenario?.archived ? authoredWithout(authored, scenario.without) : authored
-    });
+    };
   };
+  return (type: HomebrewContentType, body: unknown, scenario?: HomebrewValidationScenario): HomebrewValidity => {
+    const validity = validateForPublish(type, body, contextFor("play", scenario));
+    const offPack = source.offPackRecords?.() ?? new Map<string, OffPackRecord>();
+    if (!validity.valid || offPack.size === 0) return validity;
+    const onOnly = validateForPublish(type, body, contextFor("gm", scenario));
+    if (onOnly.valid) return validity;
+    const warnings = onOnly.issues.map((issue) => {
+      const named = offPack.get(String(valueAt(body, issue.path) ?? ""));
+      return {
+        path: issue.path,
+        recordId: issue.recordId,
+        message: named
+          ? `Needs ${named.name} from ${named.packName}, which is switched off. Turn that pack on in Sources to use it.`
+          : "Needs a record from a pack that is switched off. Turn that pack on in Sources to use it."
+      };
+    });
+    return { ...validity, warnings: [...validity.warnings, ...warnings] };
+  };
+}
+
+/** The value a path names in a body, or undefined. */
+function valueAt(body: unknown, path: readonly (string | number)[]): unknown {
+  let node = body;
+  for (const key of path) {
+    if (node === null || typeof node !== "object") return undefined;
+    node = (node as Record<string | number, unknown>)[key];
+  }
+  return node;
 }

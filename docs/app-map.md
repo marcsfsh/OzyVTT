@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 290 HTTP paths
+- 14 GameState fields · 137 commands · 305 HTTP paths
 
 ## GameState shape
 
@@ -259,6 +259,7 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/codex/timeline`
 - `GET /api/v1/content/backgrounds`
 - `GET /api/v1/content/classes`
+- `GET /api/v1/content/compendium`
 - `GET /api/v1/content/conditions`
 - `GET /api/v1/content/equipment`
 - `GET /api/v1/content/feats`
@@ -430,15 +431,29 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/gm/integration-credentials/{id}/rotate`
 - `GET POST /api/v1/homebrew/content`
 - `DELETE GET PATCH /api/v1/homebrew/content/{id}`
+- `PUT /api/v1/homebrew/content/{id}/audience`
 - `POST /api/v1/homebrew/content/{id}/discard`
 - `POST /api/v1/homebrew/content/{id}/duplicate`
 - `POST /api/v1/homebrew/content/{id}/publish`
 - `POST /api/v1/homebrew/content/{id}/restore`
+- `GET /api/v1/homebrew/content/{id}/revisions`
+- `GET /api/v1/homebrew/content/{id}/revisions/{revisionId}`
+- `POST /api/v1/homebrew/content/{id}/revisions/{revisionId}/restore`
 - `POST /api/v1/homebrew/content/{id}/unpublish`
 - `GET /api/v1/homebrew/content/{id}/usages`
 - `POST /api/v1/homebrew/content/{id}/visibility`
+- `GET /api/v1/homebrew/overview`
+- `GET /api/v1/homebrew/packs`
+- `PATCH /api/v1/homebrew/packs/{packId}`
 - `GET /api/v1/homebrew/packs/export`
 - `POST /api/v1/homebrew/packs/import`
+- `GET /api/v1/homebrew/search`
+- `POST /api/v1/homebrew/see-as/builder-offers`
+- `GET /api/v1/homebrew/see-as/compendium`
+- `GET /api/v1/homebrew/see-as/content/{id}`
+- `POST /api/v1/homebrew/sharing`
+- `GET /api/v1/homebrew/srd/{id}`
+- `GET /api/v1/homebrew/table`
 - `GET /api/v1/host/gm/join-urls`
 - `POST /api/v1/host/gm/password`
 - `POST /api/v1/host/gm/revoke-all`

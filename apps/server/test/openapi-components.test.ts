@@ -63,11 +63,25 @@ const record = {
     modifiers: []
   }
 };
+const lyra = "0b6f6a3e-8f3c-4b1e-9d2a-1c2b3a4d5e6f";
+const columns = { category: "general", prerequisiteLevel: null };
+const basedOn = { source: "srd", id: "shield-master", name: "Shield Master", copiedAt: timestamp };
 const document = {
   id: "hb-shield-master-a1b2c3",
   type: "feat",
   state: "draft",
-  visibleToPlayers: false,
+  audience: "characters",
+  characterIds: [lyra],
+  reveals: [
+    { to: "everyone", at: timestamp },
+    { to: lyra, at: timestamp }
+  ],
+  visibleToPlayers: true,
+  packId: "table",
+  packName: null,
+  inCatalogs: false,
+  basedOn,
+  references: { "hb-brine-burst-a1b2c3": { type: "spell", name: "Brine Burst", source: "homebrew" } },
   deletedAt: null,
   rev: 3,
   createdAt: timestamp,
@@ -82,12 +96,121 @@ const summary = {
   name: "Shield Master",
   source: "homebrew",
   state: "draft",
+  audience: "hidden",
+  characterIds: [],
   visibleToPlayers: false,
+  packId: "table",
+  packName: null,
+  inCatalogs: false,
   deletedAt: null,
   rev: 3,
+  createdAt: timestamp,
   updatedAt: timestamp,
   valid: false,
-  usageCount: 0
+  pendingChanges: false,
+  issueCount: 1,
+  basedOn: null,
+  usageCount: 0,
+  columns
+};
+const packInfo = {
+  id: "6c1d2a8e-5b7f-4c3d-9e1a-2b3c4d5e6f70",
+  kind: "imported",
+  name: "Sundered Coast extras",
+  credit: "Ren's table",
+  importedAt: timestamp,
+  enabled: true,
+  counts: { records: 3, published: 0, drafts: 3, shared: 0, archived: 0 }
+};
+const importRecord = {
+  index: 1,
+  type: "species",
+  name: "Saltborn",
+  clash: {
+    source: "homebrew",
+    id: "hb-saltborn-77aa01",
+    name: "Saltborn",
+    state: "published",
+    audience: "everyone",
+    archived: false
+  },
+  problems: [],
+  allowed: ["new", "skip", "rename"],
+  decision: "rename",
+  id: "hb-saltborn-ren-c1d2e3"
+};
+const tableRow = {
+  id: "fireball",
+  kind: "spell",
+  name: "Fireball",
+  source: "srd",
+  packId: null,
+  state: "published",
+  archived: false,
+  inCatalogs: true,
+  pendingChanges: false,
+  issueCount: 0,
+  audience: "everyone",
+  characterIds: [],
+  basedOn: null,
+  createdAt: null,
+  updatedAt: null,
+  usageCount: null,
+  columns: { level: 3, school: "evocation", castingTime: "Action", range: "150 feet", lists: ["sorcerer", "wizard"] }
+};
+const overview = {
+  srd: { records: 1195 },
+  packs: [packInfo],
+  byKind: [{ kind: "spell", srd: 339, homebrew: 3, drafts: 2, shared: 1 }],
+  needsYou: [
+    {
+      id: "hb-tidecaller-a1b2c3",
+      kind: "class",
+      name: "Tidecaller",
+      packId: "table",
+      reason: "changes-not-live",
+      issueCount: 0,
+      since: timestamp
+    }
+  ]
+};
+const search = {
+  hits: [
+    {
+      id: "hb-tidecaller-a1b2c3",
+      kind: "class",
+      name: "Tidecaller",
+      packId: "table",
+      state: "published",
+      archived: false,
+      matches: [{ path: ["features", 1, "name"], line: "Brine Ward" }]
+    }
+  ],
+  total: 1
+};
+const revision = {
+  id: 12,
+  rev: 7,
+  at: timestamp,
+  event: "publish",
+  device: "this-device",
+  deviceKey: "3f9a1c0b2d4e",
+  name: "Shield Master",
+  state: "published",
+  pending: false,
+  audience: "hidden",
+  characterIds: [],
+  changedFields: ["description"]
+};
+const conflict = {
+  baseRev: 7,
+  currentRev: 8,
+  baseKnown: true,
+  changes: [
+    { field: "description", base: "Old.", current: "New." },
+    { field: "summary", current: "Added." }
+  ],
+  rowChanges: ["audience"]
 };
 const pack = {
   schemaId: "vtt.homebrew-pack",
@@ -134,8 +257,41 @@ const FIXTURES: Record<string, unknown> = {
     reminted: [{ originalId: "wizard", id: "hb-wizard-d4e5f6", reason: "srd-collision" }],
     overwritten: [],
     rejected: [{ originalId: "hb-broken-000000", issues: [issue] }],
-    dryRun: true
+    dryRun: true,
+    records: [importRecord],
+    pack: null
   },
+  HomebrewReveal: { to: lyra, at: timestamp },
+  HomebrewBasedOn: basedOn,
+  HomebrewReference: { type: "spell", name: "Brine Burst", source: "homebrew" },
+  HomebrewTableColumns: columns,
+  HomebrewPackInfo: packInfo,
+  HomebrewPackList: { srd: { records: 1195 }, packs: [packInfo] },
+  HomebrewPackResult: { pack: packInfo },
+  HomebrewPackUpdateRequest: { enabled: false },
+  HomebrewImportDecision: { index: 1, decision: "rename", name: "Saltborn (Ren)" },
+  HomebrewImportRecord: importRecord,
+  HomebrewAudienceRequest: { audience: "characters", characterIds: [lyra], expectedRev: 9 },
+  HomebrewSharingRequest: { records: [{ id: "hb-shield-master-a1b2c3", expectedRev: 3 }], audience: "everyone" },
+  HomebrewSharing: { records: [summary] },
+  HomebrewSrdRecord: { type: "feat", record },
+  HomebrewTableRow: tableRow,
+  HomebrewTable: { kind: "spell", rows: [tableRow] },
+  HomebrewOverview: overview,
+  HomebrewSearch: search,
+  HomebrewRevisionSummary: revision,
+  HomebrewRevisionList: { revisions: [revision] },
+  HomebrewRevisionRead: { revision: { ...revision, record } },
+  HomebrewConflict: conflict,
+  HomebrewSharingResponse: { ok: true, apiVersion: "1", data: { records: [summary] } },
+  HomebrewPackListResponse: { ok: true, apiVersion: "1", data: { srd: { records: 1195 }, packs: [packInfo] } },
+  HomebrewPackResponse: { ok: true, apiVersion: "1", data: { pack: packInfo } },
+  HomebrewSrdRecordResponse: { ok: true, apiVersion: "1", data: { type: "feat", record } },
+  HomebrewTableResponse: { ok: true, apiVersion: "1", data: { kind: "spell", rows: [tableRow] } },
+  HomebrewOverviewResponse: { ok: true, apiVersion: "1", data: overview },
+  HomebrewSearchResponse: { ok: true, apiVersion: "1", data: search },
+  HomebrewRevisionListResponse: { ok: true, apiVersion: "1", data: { revisions: [revision] } },
+  HomebrewRevisionReadResponse: { ok: true, apiVersion: "1", data: { revision: { ...revision, record } } },
   HomebrewCreateRequest: { record },
   HomebrewUpdateRequest: { record, expectedRev: 3 },
   HomebrewDuplicateRequest: { name: "Shield Master (Copy)" },
@@ -164,7 +320,7 @@ const FIXTURES: Record<string, unknown> = {
   HomebrewPackImportResponse: {
     ok: true,
     apiVersion: "1",
-    data: { imported: [], reminted: [], overwritten: [], rejected: [], dryRun: false }
+    data: { imported: [], reminted: [], overwritten: [], rejected: [], dryRun: false, records: [], pack: packInfo }
   },
   SystemHealth: { status: "ok", serverTime: timestamp },
   GameCommandDescriptor: { type: "actor.apply-damage", scope: "actor:write", summary: "Applies damage" },

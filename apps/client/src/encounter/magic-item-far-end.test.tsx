@@ -26,13 +26,14 @@ import { CharacterSheet } from "../sheet/CharacterSheet";
 /**
  * A GM adds `Wand of the War Mage, +1` and its rarity and attunement requirement appear on screen,
  * using the real folded catalog (`loadEquipment()`). Only the actor holding it is a fixture.
- * The description is the channel: neither `ContentEquipmentSummary` nor `ItemMagicMarkerSchema`
- * carries a `rarity`, and adding one to a projection would be a viewer-safety change.
+ * The description is the channel: `ItemMagicMarkerSchema` carries no `rarity`, and adding one to a
+ * projection would be a viewer-safety change.
  */
 
 const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) => ({
   id: item.id,
   name: item.name,
+  source: item.source,
   category: item.category,
   costGp: item.costGp,
   weightLb: item.weightLb,

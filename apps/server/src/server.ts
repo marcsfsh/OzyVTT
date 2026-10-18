@@ -18,7 +18,7 @@ import { nextAnnotationExpiry } from "./annotations.js";
 import { fillMissingSpeeds, fillStoredProseFacts, reconcileArmorClasses, storedDefinition } from "./actor-roster.js";
 import { createApiV1Router } from "./api-v1.js";
 import { AudioAssetStore } from "./audio-assets.js";
-import { ContentLibrary } from "./content-library.js";
+import { ContentLibrary, type ContentReader } from "./content-library.js";
 import { equipmentCatalogOf } from "./equipment-derivation.js";
 import { reconcileMagicMarkers } from "./inventory.js";
 import { AuthService } from "./auth.js";
@@ -150,12 +150,12 @@ export function createServer(options: CreateServerOptions) {
     maxPixels: 4096 * 4096
   });
   const homebrewStore = new HomebrewStore(options.databasePath);
-  // `publishedFor(audience)` gives `ContentLibrary` only published (and, for players, player-visible)
-  // records; drafts are in neither slice.
+  // `publishedFor(audience)` gives `ContentLibrary` only published records, and for a reader only those shown to
+  // everyone or to one of its characters in packs that are on; drafts are in no slice.
   const contentLibrary = new ContentLibrary(homebrewStore);
   sightContent = () => ({
     definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
-    catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+    catalog: equipmentCatalogOf(contentLibrary.forAudience("play"))
   });
   const authorizeGm = (token: string | undefined) => auth.verify(token) !== null;
   /** Every credential the server accepts, checked one way for every HTTP route and the socket (ADR-0027). */
@@ -251,7 +251,15 @@ export function createServer(options: CreateServerOptions) {
         "state:updated",
         gm ? gmView(current) : projectPlayerView(current, player?.sessionId, presenceFor, Date.now(), sightContent())
       );
-      if (!gm) followCodexReader(socket);
+      if (!gm) {
+        followCodexReader(socket);
+        // A claim or a release changes which homebrew the socket receives.
+        try {
+          followHomebrewReader(socket);
+        } catch (error) {
+          console.error("checking a player's homebrew failed:", error instanceof Error ? error.message : error);
+        }
+      }
     }
   }
   /** The player characters a session has claimed: what it reads in the Codex beyond what everyone reads. */
@@ -343,10 +351,58 @@ export function createServer(options: CreateServerOptions) {
       }
     });
   }
-  /** Tells every client the homebrew library changed so it refetches its own merged catalog. Content-free
-   *  (only a revision), so players learn nothing about what the GM is working on. */
+  /** The characters whose homebrew a player socket receives: its session's claims, or the ones a preview names. */
+  function homebrewReaderOf(socket: Socket<ClientToServerEvents, ServerToClientEvents>): ContentReader {
+    const player = auth.verifyPlayer(socket.handshake.auth?.token);
+    if (!player) return { characterIds: [] };
+    return { characterIds: player.preview ? player.preview.characterIds : claimedCharacters(player.sessionId) };
+  }
+  /** What each player socket's last homebrew ping covered: the hash of the homebrew its reader receives, and the
+   *  number it was last sent. */
+  const homebrewSeen = new WeakMap<
+    Socket<ClientToServerEvents, ServerToClientEvents>,
+    { fingerprint: string; sent: number }
+  >();
+  /**
+   * Pings a player socket when the homebrew its reader receives changed since the last check, and starts counting for
+   * a socket seen for the first time. The number grows for that socket alone, so it says nothing about any other
+   * reader's changes, and a reconnect never reuses one.
+   */
+  function followHomebrewReader(socket: Socket<ClientToServerEvents, ServerToClientEvents>) {
+    const fingerprint = homebrewStore.fingerprintFor(homebrewReaderOf(socket));
+    const seen = homebrewSeen.get(socket);
+    if (!seen) {
+      homebrewSeen.set(socket, { fingerprint, sent: Date.now() });
+      return;
+    }
+    if (seen.fingerprint === fingerprint) return;
+    const sent = Math.max(seen.sent + 1, Date.now());
+    homebrewSeen.set(socket, { fingerprint, sent });
+    socket.emit("homebrew:changed", { revision: sent });
+  }
+  /** The players' homebrew check waiting to run, so writes in one tick share it. */
+  let playerHomebrewCheck: NodeJS.Immediate | undefined;
+  /**
+   * Tells clients the homebrew library changed so each refetches its own catalog. Content-free (only a revision).
+   * The GM's devices hear of every write. A player's device hears only of a change to what its reader receives, so a
+   * hidden record, a reveal to another character or a pack nobody receives anything from pings no player.
+   */
   function notifyHomebrewChanged() {
-    io.emit("homebrew:changed", { revision: homebrewStore.revision });
+    for (const socket of io.sockets.sockets.values())
+      if (auth.verify(socket.handshake.auth?.token))
+        socket.emit("homebrew:changed", { revision: homebrewStore.revision });
+    playerHomebrewCheck ??= setImmediate(() => {
+      playerHomebrewCheck = undefined;
+      for (const socket of io.sockets.sockets.values()) {
+        if (auth.verify(socket.handshake.auth?.token)) continue;
+        try {
+          followHomebrewReader(socket);
+        } catch (error) {
+          // Best-effort (the write already committed), but logged. With no answer, the player is not pinged.
+          console.error("checking a player's homebrew failed:", error instanceof Error ? error.message : error);
+        }
+      }
+    });
     // Best-effort (the homebrew write already committed), but logged.
     void reconcileContentDerived().catch((error: unknown) =>
       console.error("re-deriving armor classes failed:", error instanceof Error ? error.message : error)
@@ -358,7 +414,7 @@ export function createServer(options: CreateServerOptions) {
   async function reconcileContentDerived() {
     const current = committedState.read();
     if (current.combat.historyCursor !== null) return;
-    const catalog = equipmentCatalogOf(contentLibrary.forAudience("gm"));
+    const catalog = equipmentCatalogOf(contentLibrary.forAudience("play"));
     const definitionsIn = (state: GameState) => (definitionId: string) =>
       storedDefinition(state, definitionId) ?? contentLibrary.monsterForInstance(definitionId);
     const reconcile = (state: GameState) => {
@@ -759,16 +815,20 @@ export function createServer(options: CreateServerOptions) {
       verifiers,
       notifyChanged: notifyHomebrewChanged,
       // The GM catalog: a dependency that is published but not player-visible is valid here.
+      // The table with every pack on: a dependency in a pack that is off publishes, with a warning.
       validate: createHomebrewValidator({
         forAudience: (audience) => contentLibrary.forAudience(audience),
         forScenario: scenarioCatalogs(contentLibrary, homebrewStore),
-        publishedSpellLists: () => homebrewStore.publishedFor("gm").spellLists,
+        publishedSpellLists: (audience = "play") => homebrewStore.publishedFor(audience).spellLists,
         // Drafts included, only here: the gate asks whether a record exists, so a class and its subclass can
         // publish in either order.
-        authoredIndex: () => homebrewStore.authoredIndex()
+        authoredIndex: () => homebrewStore.authoredIndex(),
+        offPackRecords: () => homebrewStore.offPackRecords()
       }),
       usagesOf: homebrewUsagesFor,
-      catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("gm"), id)
+      catalogRecord: (id) => findCatalogRecord(contentLibrary.forAudience("play"), id),
+      contentLibrary,
+      partyCharacters
     })
   );
   const gameApiRouter = createGameApiRouter({
@@ -880,7 +940,7 @@ export function createServer(options: CreateServerOptions) {
       const player = auth.verifyPlayer(token);
       if (!player) return null;
       return player.preview
-        ? { kind: "player", sessionId: player.sessionId, preview: true }
+        ? { kind: "player", sessionId: player.sessionId, preview: { characterIds: player.preview.characterIds } }
         : { kind: "player", sessionId: player.sessionId };
     };
     /** Whether this socket joined with a token that has since been revoked or run out. */
@@ -973,6 +1033,7 @@ export function createServer(options: CreateServerOptions) {
   function close() {
     clearInterval(sessionSweep);
     if (playerCodexCheck) clearImmediate(playerCodexCheck);
+    if (playerHomebrewCheck) clearImmediate(playerHomebrewCheck);
     presence.dispose();
     viewerCoordinator.dispose();
     sound.dispose();

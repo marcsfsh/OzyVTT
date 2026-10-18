@@ -61,9 +61,39 @@ import type { CharacterFeatureRef } from "./equipment-derivation.js";
 import { statblockFacts } from "./statblock-facts.js";
 import { withMonsterSpells } from "./monster-spells.js";
 
-/** Who reads a catalog. GM-grade principals also see published homebrew that isn't player-visible.
- *  The public viewer never reads content, so there is no viewer audience. */
-export type ContentAudience = "gm" | "player";
+/** The characters a player session reads as: the party characters it has claimed, or the ones a GM preview names. A
+ *  reader with no character reads what everyone reads. */
+export type ContentReader = Readonly<{ characterIds: readonly string[] }>;
+
+/**
+ * Who reads a catalog. `gm` is the GM's browsing (pickers, the bestiary, the GM's builder): every published record in
+ * a pack that is on. `play` is play-time resolution of what is already on a sheet or the map: every published record,
+ * whatever its pack's switch, so a character keeps what it has. A reader is one player session: the published records
+ * in packs that are on and shown to everyone or to one of its characters. The public viewer never reads content.
+ */
+export type ContentAudience = "gm" | "play" | ContentReader;
+
+/** The cache key of an audience: one per distinct set of characters, whatever order they come in. */
+export function audienceKey(audience: ContentAudience): string {
+  return typeof audience === "string" ? audience : `reader:${[...new Set(audience.characterIds)].sort().join(",")}`;
+}
+
+/** What a published homebrew record a reader may receive looks like: who it is shown to and whether its pack is on. */
+export type HomebrewReach = Readonly<{
+  audience: "hidden" | "everyone" | "characters";
+  characterIds: readonly string[];
+  packEnabled: boolean;
+}>;
+
+/** Whether `audience` receives a published, live record with this reach. The one rule every catalog follows. */
+export function audienceReceives(audience: ContentAudience, reach: HomebrewReach): boolean {
+  if (audience === "play") return true;
+  if (!reach.packEnabled) return false;
+  if (audience === "gm") return true;
+  if (reach.audience === "everyone") return true;
+  if (reach.audience !== "characters") return false;
+  return reach.characterIds.some((id) => audience.characterIds.includes(id));
+}
 
 /** Published, non-deleted homebrew for one audience, in the SRD's own bundle shapes (ADR-0016). Drafts are
  *  never in a merged catalog; only the homebrew router's GM-only reads reach them. */
@@ -97,7 +127,8 @@ export const EMPTY_HOMEBREW_SLICE: HomebrewCatalogSlice = Object.freeze({
 export interface HomebrewContentSource {
   /** Bumped inside every write transaction; -1 until the store's initialize() completes. */
   readonly revision: number;
-  /** Published, non-deleted records this audience may browse. Never drafts (see HomebrewCatalogSlice). */
+  /** Published, non-deleted records this audience receives (`audienceReceives`). Never drafts. Two audiences that
+   *  receive the same records may get the same slice object, so their catalogs are built once. */
   publishedFor(audience: ContentAudience): HomebrewCatalogSlice;
   /** Any monster row regardless of status/deletion; see ContentLibrary.monsterForInstance. */
   monsterForInstance(id: string): ActorDefinition | undefined;
@@ -149,7 +180,9 @@ export interface ContentView {
  *  required argument, so no call site can skip the audience decision. */
 export class ContentLibrary {
   readonly attribution: string;
-  private readonly views = new Map<ContentAudience, ContentView>();
+  private readonly views = new Map<string, ContentView>();
+  /** Built catalogs by the slice they were built from: audiences that receive the same records share one. */
+  private data = new WeakMap<HomebrewCatalogSlice, CatalogData>();
   /** Sentinel below every real revision (a store reports -1 while uninitialised). */
   private builtAt = -2;
 
@@ -163,15 +196,16 @@ export class ContentLibrary {
     const revision = this.homebrew?.revision ?? 0;
     if (revision !== this.builtAt) {
       this.views.clear();
+      this.data = new WeakMap();
       this.builtAt = revision;
     }
-    const cached = this.views.get(audience);
+    const key = audienceKey(audience);
+    const cached = this.views.get(key);
     if (cached) return cached;
-    const slice = this.homebrew?.publishedFor(audience);
-    // No homebrew: both audiences share the module-level SRD catalog.
-    const data = slice && !sliceIsEmpty(slice) ? buildCatalogData(slice) : SRD_ONLY_CATALOG;
-    const view = viewOf(audience, data, this.attribution);
-    this.views.set(audience, view);
+    // Readers come and go with claims; a long session can't grow the cache without bound.
+    if (this.views.size >= MAX_CACHED_VIEWS) this.views.clear();
+    const view = viewOf(audience, this.catalogData(this.homebrew?.publishedFor(audience)), this.attribution);
+    this.views.set(key, view);
     return view;
   }
 
@@ -192,9 +226,24 @@ export class ContentLibrary {
     if (bundled) return bundled;
     const homebrew = this.homebrew?.monsterForInstance(definitionId);
     // Its spells as cast actions, as the catalog gives a bundled stat block's.
-    return homebrew ? withMonsterSpells(homebrew, (spellId) => this.forAudience("gm").spellRecord(spellId)) : undefined;
+    return homebrew
+      ? withMonsterSpells(homebrew, (spellId) => this.forAudience("play").spellRecord(spellId))
+      : undefined;
+  }
+
+  private catalogData(slice: HomebrewCatalogSlice | undefined): CatalogData {
+    // No homebrew: every audience shares the module-level SRD catalog.
+    if (!slice || sliceIsEmpty(slice)) return SRD_ONLY_CATALOG;
+    const known = this.data.get(slice);
+    if (known) return known;
+    const built = buildCatalogData(slice);
+    this.data.set(slice, built);
+    return built;
   }
 }
+
+/** Distinct audiences kept at once; a table has the GM, play and a handful of players. */
+const MAX_CACHED_VIEWS = 64;
 
 /** One flattening for bundled and imported definitions, so the runner's wire shape can't fork. */
 export function actionSummaryOf(action: ActorDefinition["actions"][number]): ContentActionSummary {
@@ -592,6 +641,7 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     .map((spell) => ({
       id: spell.id,
       name: spell.name,
+      source: spell.source,
       level: spell.level,
       school: spell.school,
       castingTime: spell.castingTime,
@@ -618,6 +668,7 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
   const equipmentSummaries: readonly ContentEquipmentSummary[] = equipment.map((item) => ({
     id: item.id,
     name: item.name,
+    source: item.source,
     category: item.category,
     costGp: item.costGp,
     weightLb: item.weightLb,
@@ -629,25 +680,40 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
     ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
     // The levels a Spell Scroll can bear, as its name says, for the picker's spell step.
-    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
+    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
+    // Printed facts, as the item's own line says them ("Wand, Rare (Requires Attunement by a Spellcaster)").
+    ...(item.rarity !== undefined ? { rarity: item.rarity } : {}),
+    ...(item.attunement !== undefined
+      ? { attunement: { required: item.attunement.required, restrictedTo: [...item.attunement.restrictedTo] } }
+      : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();
+  // A monster's `source` is bundle provenance, so where it came from is recorded as it is merged.
+  const homebrewMonsterIds = new Set<string>();
   // A stat block's spells become cast actions here, from this audience's spells, so every reader sees them.
   const spellsById = new Map(spells.map((spell) => [spell.id, spell]));
-  for (const definition of merged(loadMonsterDefinitions(), homebrew.monsters)) {
+  for (const definition of loadMonsterDefinitions())
     if (definition.source.externalId)
       monstersById.set(
         definition.source.externalId,
         withMonsterSpells(definition, (spellId) => spellsById.get(spellId))
       );
-  }
+  for (const definition of homebrew.monsters)
+    if (definition.source.externalId) {
+      homebrewMonsterIds.add(definition.source.externalId);
+      monstersById.set(
+        definition.source.externalId,
+        withMonsterSpells(definition, (spellId) => spellsById.get(spellId))
+      );
+    }
   const monsterSummaries: readonly ContentMonsterSummary[] = [...monstersById.entries()]
     .map(([id, definition]) => {
       const facts = statblockFacts(definition);
       return {
         id,
         name: definition.name,
+        source: homebrewMonsterIds.has(id) ? ("homebrew" as const) : ("srd" as const),
         challengeRating: facts.challengeRating ?? 0,
         experiencePoints: facts.experiencePoints,
         type: facts.creatureType ?? "unknown",

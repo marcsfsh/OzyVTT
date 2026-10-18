@@ -407,7 +407,7 @@ export const characterCommands = [
     async run({ principal, request, execute }, kit) {
       const definition = withDerivedSlots(
         importedDefinition(request.definition, "character"),
-        kit.contentLibrary.forAudience("gm").classProgressionTable()
+        kit.playCatalog().classProgressionTable()
       );
       await execute((state) => submitPendingImport(state, definition, request.commandId, sessionIdOf(principal)));
     }

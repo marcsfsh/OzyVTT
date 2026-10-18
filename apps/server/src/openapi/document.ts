@@ -8,6 +8,7 @@ import {
   GAME_PATHS,
   HOMEBREW_PATHS,
   HOST_PATHS,
+  HomebrewAudienceSchema,
   HomebrewContentStateSchema,
   HomebrewContentTypeSchema,
   INTEGRATION_CREDENTIAL_PATHS,
@@ -162,6 +163,33 @@ const homebrewId = { ...contentSlug, maxLength: 60 } as const;
 const homebrewIdParam = { name: "id", in: "path", required: true, schema: homebrewId } as const;
 const homebrewContentType = { type: "string", enum: HomebrewContentTypeSchema.options } as const;
 const homebrewState = { type: "string", enum: HomebrewContentStateSchema.options } as const;
+const homebrewAudience = { type: "string", enum: HomebrewAudienceSchema.options } as const;
+/** `table` for this table's own records, or an imported pack's uuid. */
+const homebrewPackId = { type: "string", maxLength: 60 } as const;
+const homebrewPackIdParam = { name: "packId", in: "path", required: true, schema: homebrewPackId } as const;
+const homebrewRevisionIdParam = {
+  name: "revisionId",
+  in: "path",
+  required: true,
+  schema: { type: "integer", minimum: 1 }
+} as const;
+/** See as: everyone, or one party character's actor id. */
+const homebrewSeeAsParam = {
+  name: "as",
+  in: "query",
+  required: true,
+  schema: {
+    anyOf: [
+      { type: "string", const: "everyone" },
+      { type: "string", format: "uuid" }
+    ]
+  },
+  description: "Read as everyone, or as the player of this party character (whether or not anyone holds it)."
+} as const;
+const compendiumKind = {
+  type: "string",
+  enum: ["class", "subclass", "species", "background", "feat", "spell", "equipment"]
+} as const;
 /** One homebrew operation; security is always `homebrewGmOnly`. */
 const homebrewOp = (
   operationId: string,
@@ -1407,6 +1435,25 @@ export const openApiDocument = {
         "ContentNamesResponse"
       )
     },
+    [CONTENT_PATHS.compendium]: {
+      get: {
+        ...contentCatalogOperation(
+          "getContentCompendium",
+          "One kind of the Compendium: the SRD 5.2.1 records and the homebrew this reader receives (published, in a pack that is on, and shared with everyone or one of the caller's characters), as the catalog summaries the builder and the gear picker get, each with its source. No monsters: the bestiary is the GM's. A GM-grade caller reads the GM's catalog. Includes the CC BY 4.0 attribution line.",
+          "ContentCompendiumResponse"
+        ),
+        parameters: [{ name: "kind", in: "query", required: true, schema: compendiumKind }],
+        responses: {
+          "200": {
+            description: "Compendium rows",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ContentCompendiumResponse" } } }
+          },
+          "400": apiError,
+          "401": apiError,
+          "403": apiError
+        }
+      }
+    },
     [ENCOUNTER_ARCHIVE_PATHS.collection]: {
       get: {
         operationId: "listEncounterArchives",
@@ -2393,7 +2440,27 @@ export const openApiDocument = {
             description: "Single-valued; omit for every type."
           },
           { name: "state", in: "query", required: false, schema: homebrewState },
-          { name: "visibleToPlayers", in: "query", required: false, schema: { type: "boolean" } },
+          {
+            name: "audience",
+            in: "query",
+            required: false,
+            schema: homebrewAudience,
+            description: "Who sees it: hidden, everyone or characters."
+          },
+          {
+            name: "packId",
+            in: "query",
+            required: false,
+            schema: homebrewPackId,
+            description: "Only the records of one pack: `table` for this table's own, or an imported pack's id."
+          },
+          {
+            name: "visibleToPlayers",
+            in: "query",
+            required: false,
+            schema: { type: "boolean" },
+            description: "Deprecated: true lists the records any player sees, false the Hidden ones. Use `audience`."
+          },
           {
             name: "q",
             in: "query",
@@ -2416,7 +2483,7 @@ export const openApiDocument = {
         body: "HomebrewCreateRequest",
         conflict: "The record's id collides with an existing one (`error.details.collidesWith`)",
         description:
-          'Creates a homebrew record. It always lands as `state: "draft"`, `visibleToPlayers: false`: a draft is allowed to be invalid, and nothing reaches a player until it is BOTH published and made visible.'
+          'Creates a homebrew record from its name: the id is minted from `record.name` and never changes, so send the name the GM chose. It always lands as `state: "draft"` and `audience: "hidden"` in this table\'s own pack: a draft is allowed to be invalid, and nothing reaches a player until it is both published and shared.'
       })
     },
     [HOMEBREW_PATHS.contentById]: {
@@ -2433,7 +2500,7 @@ export const openApiDocument = {
         notFound: true,
         conflict: "A stale `expectedRev`; `error.currentRevision` carries the row's revision",
         description:
-          "Replaces the authored `record` and leaves `state`, `visibleToPlayers`, and `deletedAt` alone: correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record. On a published record the edit is held as pending (`pendingChanges: true`): the live body stays in the catalogs, so an edit mid-session never pulls content from the players, until `/publish` validates the pending body and puts it live or `/discard` drops it."
+          "Replaces the authored `record` and leaves `state`, `audience` and `deletedAt` alone: correct PATCH semantics on the ROW, even though the `record` value it carries is complete. A stale `expectedRev` is a 409 whose `error.details.conflict` (HomebrewConflict) lists the fields the stored copy changed since that revision, with both values. A partial merge into a polymorphic body under `additionalProperties: false` is unspecifiable, so the body is always the whole record. On a published record the edit is held as pending (`pendingChanges: true`): the live body stays in the catalogs, so an edit mid-session never pulls content from the players, until `/publish` validates the pending body and puts it live or `/discard` drops it."
       }),
       delete: homebrewOp("deleteHomebrewContent", "HomebrewDeletedResponse", {
         bad: false,
@@ -2459,7 +2526,7 @@ export const openApiDocument = {
         params: [homebrewIdParam],
         notFound: true,
         description:
-          "Deep-copies a record under a freshly minted homebrew id. `{id}` may be an SRD id (`wizard`), which is what makes a 20-row class table tractable to author: the server reads the full bundled record and mints a namespaced homebrew copy. The copy lands as a draft, invisible to players."
+          "Deep-copies a record under a homebrew id minted from `name`, the name the GM typed (absent, the copy is named after its source with (copy)). `{id}` may be an SRD id (`wizard`), which is what makes a 20-row class table tractable to author: the server reads the full bundled record and mints a namespaced homebrew copy. The copy lands as a Hidden draft in this table's own pack, and keeps `basedOn` (the source, its id and name, and when it was copied) for Compare."
       })
     },
     [HOMEBREW_PATHS.contentPublish]: {
@@ -2471,7 +2538,7 @@ export const openApiDocument = {
         conflict:
           "The draft is not valid: `error.details.invalid.issues` lists every blocking issue with its machine-addressable `path`",
         description:
-          'Moves a record to `state: "published"`, which requires it to be valid. On a published record with `pendingChanges`, validates the pending body and puts it live; refused, the live body is unchanged. Publishing does NOT show it to players; that is `/visibility`, deliberately a separate endpoint. A publish REQUEST that is itself malformed is a 400; a well-formed request against a body the stored state refuses is a 409.'
+          'Moves a record to `state: "published"`, which requires it to be valid. On a published record with `pendingChanges`, validates the pending body and puts it live; refused, the live body is unchanged. Publishing does NOT show it to players; that is `/audience`, deliberately a separate endpoint, and a new publish starts Hidden. The gate reads the table with every pack on, so a record that needs one from a pack that is off publishes with a warning. A publish REQUEST that is itself malformed is a 400; a well-formed request against a body the stored state refuses is a 409.'
       })
     },
     [HOMEBREW_PATHS.contentDiscard]: {
@@ -2491,7 +2558,7 @@ export const openApiDocument = {
         params: [homebrewIdParam],
         notFound: true,
         description:
-          'Returns a record to `state: "draft"`. It leaves the merged catalogs at once and may be invalid again while the GM reworks it. Pending edits become the draft\'s body, since a draft is edited in place.'
+          'Returns a record to `state: "draft"` and `audience: "hidden"`, since a draft is always Hidden: it leaves every catalog at once and may be invalid again while the GM reworks it. Pending edits become the draft\'s body, since a draft is edited in place. Publishing it again starts Hidden.'
       })
     },
     [HOMEBREW_PATHS.contentVisibility]: {
@@ -2499,9 +2566,9 @@ export const openApiDocument = {
         body: "HomebrewVisibilityRequest",
         params: [homebrewIdParam],
         notFound: true,
-        conflict: "The record is still a draft; publish it first",
+        conflict: "The record is still a draft or archived; publish or restore it first",
         description:
-          "Sets whether players may see a published record. `state` and `visibleToPlayers` are orthogonal, but the COMBINATION draft + visible is meaningless: asking for it on a draft is a loud 409, never a silent no-op, which is what keeps `visibleToPlayers` from becoming a lie."
+          "Deprecated: the older on-or-off switch. `visibleToPlayers: true` shares the record with everyone and false hides it, as `/audience` does. A draft is always Hidden: asking to show one is a 409."
       })
     },
     [HOMEBREW_PATHS.contentUsages]: {
@@ -2513,10 +2580,138 @@ export const openApiDocument = {
           "Which characters took this record, computed on demand from the character choice ledger (no persisted reverse index at this data volume), and which published records depend on it. A built character carries a flattened, self-contained ActorDefinition, so removing a homebrew record never breaks one. A published record can break: `dependents.ifRemoved` names those that publish now and would not once this one is removed or unpublished (`safeToDelete` is false when any do), and `dependents.ifUpdated` those its pending edits would break once live."
       })
     },
+    [HOMEBREW_PATHS.contentAudience]: {
+      put: homebrewOp("setHomebrewContentAudience", "HomebrewContentResponse", {
+        body: "HomebrewAudienceRequest",
+        params: [homebrewIdParam],
+        notFound: true,
+        conflict: "The record is a draft or archived and can only be Hidden, or a stale `expectedRev`",
+        description:
+          "Sets who sees a published record: `hidden` (the GM only), `everyone`, or `characters` (the players of the party characters in `characterIds`, each an actor id of a player character in the party, or a 400). A draft or an archived record can only be Hidden. Each write bumps `rev`, leaves one history row, and stamps `reveals` for every audience the record newly reaches. A player receives the record only while it is published, not archived, in a pack that is on, and shared with everyone or one of that player's characters."
+      })
+    },
+    [HOMEBREW_PATHS.sharing]: {
+      post: homebrewOp("setHomebrewSharing", "HomebrewSharingResponse", {
+        body: "HomebrewSharingRequest",
+        notFound: true,
+        conflict: "A record is a draft or archived, or a stale `expectedRev`; nothing changed",
+        description:
+          "Sets who sees several records in one write, for the Sharing grid's selected rows. All of them change or none does, and each leaves one history row."
+      })
+    },
+    [HOMEBREW_PATHS.contentRevisions]: {
+      get: homebrewOp("listHomebrewRevisions", "HomebrewRevisionListResponse", {
+        bad: false,
+        params: [homebrewIdParam],
+        notFound: true,
+        description:
+          "A record's history, newest first: every write (an edit, publish, unpublish, discard, share, archive, restore, import, duplicate or restored version), when, from which device (`this-device` is the caller's GM session), and which top-level fields of the body it changed. A `publish` row is a version players got."
+      })
+    },
+    [HOMEBREW_PATHS.contentRevision]: {
+      get: homebrewOp("getHomebrewRevision", "HomebrewRevisionReadResponse", {
+        params: [homebrewIdParam, homebrewRevisionIdParam],
+        notFound: true,
+        description: "One history row with the body it recorded, for comparing two versions field by field."
+      })
+    },
+    [HOMEBREW_PATHS.contentRevisionRestore]: {
+      post: homebrewOp("restoreHomebrewRevision", "HomebrewContentResponse", {
+        body: "HomebrewStateChangeRequest",
+        bodyRequired: false,
+        params: [homebrewIdParam, homebrewRevisionIdParam],
+        notFound: true,
+        conflict: "A stale `expectedRev`",
+        description:
+          "Puts an old version back as the editor's copy: a published record's pending changes (nothing goes live until `/publish`), or a draft's body. Who sees it is not part of a version and does not change."
+      })
+    },
+    [HOMEBREW_PATHS.table]: {
+      get: homebrewOp("getHomebrewTable", "HomebrewTableResponse", {
+        params: [
+          { name: "kind", in: "query", required: true, schema: homebrewContentType },
+          { name: "includeArchived", in: "query", required: false, schema: { type: "boolean", default: false } }
+        ],
+        description:
+          "One kind's table: the SRD 5.2.1 records of that kind and this table's homebrew in one row shape, with the kind's own columns (spell level and school, a monster's CR, size, type, AC and HP, an item's kind, rarity and attunement, a class's hit die, primary abilities and caster type), the source, pack, state, changes not live, issue count, who sees it, Based on, and created and modified times."
+      })
+    },
+    [HOMEBREW_PATHS.overview]: {
+      get: homebrewOp("getHomebrewOverview", "HomebrewOverviewResponse", {
+        bad: false,
+        description:
+          "The Compendium's front page: the SRD's record count, each pack with its counts and switch, counts by kind, and what needs the GM (changes not live, drafts, imported drafts not looked at yet, and published records that no longer publish), newest first."
+      })
+    },
+    [HOMEBREW_PATHS.search]: {
+      get: homebrewOp("searchHomebrew", "HomebrewSearchResponse", {
+        params: [
+          { name: "q", in: "query", required: true, schema: { type: "string", minLength: 1, maxLength: 120 } },
+          { name: "kind", in: "query", required: false, schema: homebrewContentType },
+          { name: "includeArchived", in: "query", required: false, schema: { type: "boolean", default: false } },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 100, default: 50 }
+          }
+        ],
+        description:
+          "Searches the names and text of this table's homebrew, in the body the editor shows. Each hit carries up to three matches, each the path of the text and the line holding the words. Names that match come first. The SRD's text is in the content catalogs."
+      })
+    },
+    [HOMEBREW_PATHS.srdRecord]: {
+      get: homebrewOp("getHomebrewSrdRecord", "HomebrewSrdRecordResponse", {
+        bad: false,
+        params: [{ name: "id", in: "path", required: true, schema: contentSlug }],
+        notFound: true,
+        description:
+          "An SRD 5.2.1 record as an authorable body: the body a duplicate starts from, with its SRD id. For an SRD row's card and for comparing a copy with its source."
+      })
+    },
+    [HOMEBREW_PATHS.packs]: {
+      get: homebrewOp("listHomebrewPacks", "HomebrewPackListResponse", {
+        bad: false,
+        description:
+          "The Sources: the SRD's record count, this table's own pack, and each imported pack with its credit, when it was imported, its switch and its counts."
+      })
+    },
+    [HOMEBREW_PATHS.packById]: {
+      patch: homebrewOp("updateHomebrewPack", "HomebrewPackResponse", {
+        body: "HomebrewPackUpdateRequest",
+        params: [homebrewPackIdParam],
+        notFound: true,
+        conflict: "This table's own pack has no name or credit to change",
+        description:
+          "Renames, re-credits or switches a pack. Off takes the pack's published records out of every catalog for every audience (the GM's pickers, the bestiary, the builder and every player read) without unpublishing them; a character keeps what it already has. On puts them back as they were."
+      })
+    },
+    [HOMEBREW_PATHS.seeAsCompendium]: {
+      get: homebrewOp("seeHomebrewCompendiumAs", "ContentCompendiumResponse", {
+        params: [homebrewSeeAsParam, { name: "kind", in: "query", required: true, schema: compendiumKind }],
+        description:
+          "See as: one kind of the Compendium exactly as that player receives it, from the same catalog the player's own reads use. `equipment` is that player's gear picker, `spell` the spell catalog. GM only; never sent to a player."
+      })
+    },
+    [HOMEBREW_PATHS.seeAsContent]: {
+      get: homebrewOp("seeHomebrewContentAs", "HomebrewSeeAsRecordResponse", {
+        params: [{ name: "id", in: "path", required: true, schema: contentSlug }, homebrewSeeAsParam],
+        notFound: true,
+        description:
+          "See as for one record (homebrew or SRD): whether that player receives it, and the Compendium row they get. A monster or a spell list has no player card."
+      })
+    },
+    [HOMEBREW_PATHS.seeAsBuilderOffers]: {
+      post: homebrewOp("seeHomebrewBuilderOffersAs", "HomebrewSeeAsBuilderOffersResponse", {
+        body: "HomebrewSeeAsBuilderOffersRequest",
+        conflict: "The builder refused the draft",
+        description: "See as for the character builder: the offers this draft gets from that player's catalog."
+      })
+    },
     [HOMEBREW_PATHS.packsExport]: {
       get: homebrewOp("exportHomebrewPack", "HomebrewPackExportResponse", {
         description:
-          "Exports published, non-deleted records as a shareable pack. Optional `type` and repeatable `id` narrow it to one class. The pack carries authored bodies ONLY (no `state`, `visibleToPlayers`, `deletedAt`, or `rev`), so an importing table can never inherit this one's visibility policy.",
+          "Exports published, non-deleted records as a shareable pack under a name and credit of the GM's choosing. Optional `type`, `packId` and repeatable `id` narrow it to a chosen set. The pack carries authored bodies ONLY (no `state`, `audience`, `deletedAt`, or `rev`), so an importing table can never inherit this one's sharing.",
         params: [
           { name: "type", in: "query", required: false, schema: homebrewContentType },
           {
@@ -2527,6 +2722,21 @@ export const openApiDocument = {
             explode: true,
             schema: { type: "array", maxItems: 500, items: homebrewId },
             description: "Repeatable: `?id=a&id=b`. Omit for every published record."
+          },
+          { name: "packId", in: "query", required: false, schema: homebrewPackId },
+          {
+            name: "name",
+            in: "query",
+            required: false,
+            schema: { type: "string", minLength: 1, maxLength: 120 },
+            description: 'The pack\'s name. Absent, it is "Homebrew".'
+          },
+          {
+            name: "credit",
+            in: "query",
+            required: false,
+            schema: { type: "string", maxLength: 400 },
+            description: "Who made it, as the importing table's Sources list will credit it."
           }
         ]
       })
@@ -2534,11 +2744,10 @@ export const openApiDocument = {
     [HOMEBREW_PATHS.packsImport]: {
       post: homebrewOp("importHomebrewPack", "HomebrewPackImportResponse", {
         body: "HomebrewPackImportRequest",
-        conflict:
-          "One or more records failed validation after id rewriting; `error.details.invalid.issues` carries each issue with its `recordId`, and nothing was written",
+        conflict: "A record can't be replaced, or a stale revision",
         tooLarge: true,
         description:
-          'Imports a pack. Everything lands as `state: "draft"`, `visibleToPlayers: false`, which makes importing an invalid pack harmless. Ids that collide with an SRD id are ALWAYS re-minted; ids colliding with existing homebrew follow `onIdCollision`. `dryRun` runs the whole collision + cross-reference-rewrite + re-validate pass and returns the identical report without writing; use it to see the plan before the only destructive path in the feature runs. This route mounts its own body parser above the server\'s 512kb default (about 4mb); a larger pack is a 413.'
+          'Imports a pack into a new pack of this table\'s Sources (named and credited from the file, switched on). Everything lands as `state: "draft"` and `audience: "hidden"`, which makes importing an invalid pack harmless. `records` reports every record in names: its kind, what it clashes with here (the same id, or a record of its kind with its name), what the publish gate would say, the decisions it allows and the one applied. With `decisions`, each record is imported as new, replaces the GM\'s own draft it clashes with, is skipped, or lands as a renamed copy; without them, `onIdCollision` decides every clash as before. A published record is never replaced. Ids that collide with an SRD id are always re-minted. `dryRun` returns the identical report without writing, so the review table can be shown first. This route mounts its own body parser above the server\'s 512kb default (about 4mb); a larger pack is a 413.'
       })
     }
   },
@@ -2920,6 +3129,9 @@ export const openApiDocument = {
       ContentBackgroundsResponse: envelopeSchema("#/components/schemas/ContentBackgroundsData"),
       ContentFeatsResponse: envelopeSchema("#/components/schemas/ContentFeatsData"),
       ContentNamesResponse: envelopeSchema("#/components/schemas/ContentNamesData"),
+      ContentCompendiumResponse: envelopeSchema("#/components/schemas/ContentCompendiumData"),
+      HomebrewSeeAsRecordResponse: envelopeSchema("#/components/schemas/HomebrewSeeAsRecordData"),
+      HomebrewSeeAsBuilderOffersResponse: envelopeSchema("#/components/schemas/BuilderOffersData"),
       EncounterArchiveVisibilityRequest: {
         type: "object",
         additionalProperties: false,

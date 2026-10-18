@@ -27,6 +27,7 @@ import { CharacterSheet } from "./CharacterSheet";
 const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) => ({
   id: item.id,
   name: item.name,
+  source: item.source,
   category: item.category,
   costGp: item.costGp,
   weightLb: item.weightLb,

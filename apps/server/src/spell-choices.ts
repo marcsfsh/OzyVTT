@@ -109,6 +109,17 @@ export function spellChoicesOf(
   return { swaps, spellbook };
 }
 
+/** The spell choices narrowed to the spells `catalog` holds (the caller's own catalog), so a swap or a copy never
+ *  offers a spell that reader does not receive. The spellbook already holds lists only the character's own spells. */
+export function receivedSpellChoices(choices: SpellChoices | null, catalog: ContentView): SpellChoices | null {
+  if (!choices) return null;
+  const received = (id: string) => catalog.spellRecord(id) !== undefined;
+  return {
+    swaps: choices.swaps.map((swap) => ({ ...swap, spellIds: swap.spellIds.filter(received) })),
+    spellbook: choices.spellbook ? { ...choices.spellbook, addable: choices.spellbook.addable.filter(received) } : null
+  };
+}
+
 function characterOf(state: GameState, actorId: string): { actor: Actor; definition: ActorDefinition } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That character no longer exists.");

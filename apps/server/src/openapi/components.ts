@@ -11,6 +11,7 @@ import {
 } from "@vtt/schemas";
 import * as content from "@vtt/content-srd-5.2.1";
 import * as wire from "@vtt/domain";
+import * as commands from "@vtt/domain/commands";
 import { MapCatalogEntrySchema, PublicMapAssetSchema } from "../map-catalog.js";
 import { ViewerAccessMetadataSchema, ViewerPairingSchema } from "../viewer-access.js";
 import { ViewerConnectionMetadataSchema } from "../viewer-coordinator.js";
@@ -258,6 +259,9 @@ const TABLE_RESPONSES: ReadonlyArray<readonly [string, z.ZodType]> = [
   ["CharacterDraftData", wire.CharacterDraftReplySchema],
   ["BuilderOffersData", wire.BuilderOffersReplySchema],
   ["BuilderAbilityIncreases", wire.BuilderAbilityIncreasesSchema],
+  ["ContentCompendiumData", wire.ContentCompendiumSchema],
+  ["HomebrewSeeAsRecordData", wire.HomebrewSeeAsRecordSchema],
+  ["HomebrewSeeAsBuilderOffersRequest", commands.HomebrewSeeAsBuilderOffersSchema],
   ["BuilderChoiceRow", CharacterChoiceSchema]
 ];
 

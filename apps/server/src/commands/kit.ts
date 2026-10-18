@@ -17,7 +17,7 @@ import type { CharacterDraftStore } from "../character-drafts.js";
 import type { Initiator } from "../authorization.js";
 import type { CombatLogStore } from "../combat-log.js";
 import type { TimelineOutcome } from "../combat-history.js";
-import type { ContentLibrary } from "../content-library.js";
+import type { ContentAudience, ContentLibrary } from "../content-library.js";
 import type { EffectNarration } from "../effects.js";
 import type { InitiativeRollDeps, InitiativeRollSink, TurnAdvanceDeps } from "../encounter.js";
 import { equipmentCatalogOf } from "../equipment-derivation.js";
@@ -33,16 +33,34 @@ import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
  *  (ADR-0016); players keep player limits. The public viewer never reaches a command. */
-/** `preview` marks the GM's See as players session, which reads and never acts. */
+/** `preview` marks the GM's See as players session, which reads as the characters it names and never acts. */
 export type GamePrincipal =
   | Readonly<{ kind: "gm"; sessionId: string }>
-  | Readonly<{ kind: "player"; sessionId: string; preview?: true }>
+  | PlayerPrincipal
   | Readonly<{ kind: "integration"; credentialId: string; name: string }>;
+export type PlayerPrincipal = Readonly<{
+  kind: "player";
+  sessionId: string;
+  preview?: Readonly<{ characterIds: readonly string[] }>;
+}>;
 
-export function isGmGrade(
-  principal: GamePrincipal
-): principal is Exclude<GamePrincipal, Readonly<{ kind: "player"; sessionId: string; preview?: true }>> {
+export function isGmGrade(principal: GamePrincipal): principal is Exclude<GamePrincipal, PlayerPrincipal> {
   return principal.kind !== "player";
+}
+
+/** The party characters a player session has claimed: whose homebrew it receives beyond everyone's. */
+export function claimedCharacterIds(state: Pick<GameState, "actors">, sessionId: string): string[] {
+  return state.actors
+    .filter((actor) => actor.kind === "player-character" && actor.ownerSessionId === sessionId)
+    .map((actor) => actor.id);
+}
+
+/** Whose catalog a principal reads: the GM's, or one reader's (a preview reads as the characters it names). */
+export function contentAudienceOf(principal: GamePrincipal, state: Pick<GameState, "actors">): ContentAudience {
+  if (isGmGrade(principal)) return "gm";
+  return {
+    characterIds: principal.preview ? principal.preview.characterIds : claimedCharacterIds(state, principal.sessionId)
+  };
 }
 
 /** The principal as authorization reads it: GM-grade acts on anyone, a player on their own claimed actor. */
@@ -156,10 +174,12 @@ export function createKit(context: CommandContext) {
   const { store, contentLibrary } = context;
   const read = context.readState;
   const actorName = (actorId: string) => read().actors.find((actor) => actor.id === actorId)?.name ?? "A combatant";
+  /** Play-time content: what is already on a sheet or the map resolves whatever its pack's switch says. */
+  const playCatalog = () => contentLibrary.forAudience("play");
   /** What dynamic vision reads from the content: stat blocks, and the catalog with species senses and lit items. */
   const sightContent = (): SightContent => ({
     definition: (definitionId) => contentLibrary.monsterForInstance(definitionId),
-    catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+    catalog: equipmentCatalogOf(playCatalog())
   });
   /** The creatures hidden from this initiator by sight or the fog, which it may not target; none for the GM. */
   const unseenBy = (initiator: Initiator, state: GameState): ReadonlySet<string> =>
@@ -214,11 +234,14 @@ export function createKit(context: CommandContext) {
     sightContent,
     /** The same lookup against the committed state, for reads outside a command transaction. */
     resolveDefinition: (definitionId: string) => resolveDefinitionIn(read(), definitionId),
-    /** The catalog a principal may read: GM-grade sees everything, a player only player-visible records. */
-    catalogFor: (principal: GamePrincipal) => contentLibrary.forAudience(isGmGrade(principal) ? "gm" : "player"),
-    /** Play-time item catalog (riders live here, never on the inventory row). GM audience so a player can
-     *  still roll their own GM-authored item; browsing is gated on the catalog reads. */
-    equipmentCatalog: () => equipmentCatalogOf(contentLibrary.forAudience("gm")),
+    /** The catalog a principal may browse: the GM's, or the homebrew this player receives (shown to everyone or to
+     *  one of the characters the session claimed). */
+    catalogFor: (principal: GamePrincipal) => contentLibrary.forAudience(contentAudienceOf(principal, read())),
+    /** Play-time content, for rebuilding and resolving what a character or a monster already has. Never browsed. */
+    playCatalog,
+    /** Play-time item catalog (riders live here, never on the inventory row). The play audience, so a player can
+     *  still roll an item the GM hid or whose pack is off; browsing is gated on the catalog reads. */
+    equipmentCatalog: () => equipmentCatalogOf(playCatalog()),
 
     /** False once a player session has created its daily share of characters. */
     withinCreateCap(sessionId: string): boolean {
@@ -237,7 +260,7 @@ export function createKit(context: CommandContext) {
     zoneDeps: (state: GameState, geometry: TokenMapGeometry | null): ZoneDeps => ({
       geometry,
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
-      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
+      catalog: equipmentCatalogOf(playCatalog()),
       rollDie: (sides) => context.random(sides),
       newId: context.newId,
       now: () => new Date().toISOString()
@@ -251,7 +274,7 @@ export function createKit(context: CommandContext) {
       distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null
     ): TurnAdvanceDeps => ({
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
-      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm")),
+      catalog: equipmentCatalogOf(playCatalog()),
       rollDie: (sides) => context.random(sides),
       newId: context.newId,
       now: () => new Date().toISOString(),
@@ -269,7 +292,7 @@ export function createKit(context: CommandContext) {
     /** What an initiative roll reads about its roller in `state`: stat blocks and items for its riders. */
     initiativeRollDeps: (state: GameState): InitiativeRollDeps => ({
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
-      catalog: equipmentCatalogOf(contentLibrary.forAudience("gm"))
+      catalog: equipmentCatalogOf(playCatalog())
     }),
 
     /** Server-thrown initiative dice land in `state.rolls` attributed to the combatant; hidden ones are GM-only. */

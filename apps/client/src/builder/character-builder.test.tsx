@@ -73,6 +73,7 @@ const CANTRIPS = [
 const spell = (name: string, level: number): ContentSpellSummary => ({
   id: name.toLowerCase().replace(/ /g, "-"),
   name,
+  source: "srd",
   level,
   school: "evocation",
   castingTime: "action",

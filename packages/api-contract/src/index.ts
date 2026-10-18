@@ -177,9 +177,9 @@ export const CODEX_ASSET_PATHS = {
 
 /**
  * The GM homebrew authoring surface (`homebrew-http.ts`). Every operation is GM-only; players see homebrew
- * only through the merged `CONTENT_PATHS` catalogs, and only records that are published, `visibleToPlayers`
- * and not deleted. One polymorphic collection serves all content types via `type`. `{id}` is OpenAPI-style;
- * ids are content slugs (`hb-<slug>-<6 hex>`, <=60 chars).
+ * only through the merged `CONTENT_PATHS` catalogs, and only records that are published, not deleted, in a pack
+ * that is on, and shown to everyone or to one of their characters. One polymorphic collection serves all content
+ * types via `type`. `{id}` is OpenAPI-style; ids are content slugs (`hb-<slug>-<6 hex>`, <=60 chars).
  */
 export const HOMEBREW_PATHS = {
   content: `${API_NAMESPACE}/homebrew/content`,
@@ -191,8 +191,22 @@ export const HOMEBREW_PATHS = {
   contentDiscard: `${API_NAMESPACE}/homebrew/content/{id}/discard`,
   contentVisibility: `${API_NAMESPACE}/homebrew/content/{id}/visibility`,
   contentUsages: `${API_NAMESPACE}/homebrew/content/{id}/usages`,
+  contentAudience: `${API_NAMESPACE}/homebrew/content/{id}/audience`,
+  contentRevisions: `${API_NAMESPACE}/homebrew/content/{id}/revisions`,
+  contentRevision: `${API_NAMESPACE}/homebrew/content/{id}/revisions/{revisionId}`,
+  contentRevisionRestore: `${API_NAMESPACE}/homebrew/content/{id}/revisions/{revisionId}/restore`,
+  sharing: `${API_NAMESPACE}/homebrew/sharing`,
+  table: `${API_NAMESPACE}/homebrew/table`,
+  overview: `${API_NAMESPACE}/homebrew/overview`,
+  search: `${API_NAMESPACE}/homebrew/search`,
+  srdRecord: `${API_NAMESPACE}/homebrew/srd/{id}`,
+  packs: `${API_NAMESPACE}/homebrew/packs`,
+  packById: `${API_NAMESPACE}/homebrew/packs/{packId}`,
   packsExport: `${API_NAMESPACE}/homebrew/packs/export`,
-  packsImport: `${API_NAMESPACE}/homebrew/packs/import`
+  packsImport: `${API_NAMESPACE}/homebrew/packs/import`,
+  seeAsCompendium: `${API_NAMESPACE}/homebrew/see-as/compendium`,
+  seeAsContent: `${API_NAMESPACE}/homebrew/see-as/content/{id}`,
+  seeAsBuilderOffers: `${API_NAMESPACE}/homebrew/see-as/builder-offers`
 } as const;
 
 /** The live-game integration surface (`game-http.ts`): reads project per principal; writes dispatch through the
@@ -372,7 +386,9 @@ export const CONTENT_PATHS = {
   species: `${API_NAMESPACE}/content/species`,
   backgrounds: `${API_NAMESPACE}/content/backgrounds`,
   feats: `${API_NAMESPACE}/content/feats`,
-  names: `${API_NAMESPACE}/content/names`
+  names: `${API_NAMESPACE}/content/names`,
+  /** The Compendium: one kind of the SRD and the homebrew this reader receives. No monsters. */
+  compendium: `${API_NAMESPACE}/content/compendium`
 } as const;
 
 /** The archive document's schema version; the generated reference interpolates it. */
@@ -871,8 +887,14 @@ export const HomebrewContentTypeSchema = z.enum([
   "monster",
   "spell-list"
 ]);
-/** Set only by `/publish` and `/unpublish`; orthogonal to `visibleToPlayers`, which only `/visibility` sets. */
+/** Set only by `/publish` and `/unpublish`. A draft is always Hidden; `/unpublish` hides the record. */
 export const HomebrewContentStateSchema = z.enum(["draft", "published"]);
+/** Who sees a record: the GM only, every player, or the players of the party characters in `characterIds`. */
+export const HomebrewAudienceSchema = z.enum(["hidden", "everyone", "characters"]);
+/** Party characters by actor id. */
+const HomebrewCharacterIdsSchema = z.array(z.uuid()).max(12);
+/** Where a record or a catalog row came from. */
+const HomebrewSourceKindSchema = z.enum(["srd", "homebrew"]);
 /** A persisted homebrew id (`hb-<slug>-<6 hex>`). Capped at 60, below the content id's 80: persisted ActorDefinition ids cap at 60,
  * and a longer one would fail `GameStateSchema.parse` on the next boot. */
 const HomebrewIdSchema = z
@@ -897,12 +919,77 @@ export const HomebrewValiditySchema = z
   .strict();
 /** The authored content body only, never row state. Opaque until each type's authored shape lands; see the HomebrewRecord component. */
 export const HomebrewRecordSchema = z.record(z.string(), z.unknown());
+/** When a published record reached one audience: `everyone`, or a character's actor id. */
+export const HomebrewRevealSchema = z
+  .object({ to: z.union([z.literal("everyone"), z.uuid()]), at: TimestampSchema })
+  .strict();
+/** What a duplicate was copied from, for Compare. */
+export const HomebrewBasedOnSchema = z
+  .object({
+    source: HomebrewSourceKindSchema,
+    id: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    name: z.string().min(1).max(120),
+    copiedAt: TimestampSchema
+  })
+  .strict();
+/** The record an id in a body names, so an editor shows its name. */
+export const HomebrewReferenceSchema = z
+  .object({ type: HomebrewContentTypeSchema, name: z.string().min(1).max(120), source: HomebrewSourceKindSchema })
+  .strict();
+const CasterTypeSchema = z.enum(["full", "half", "third", "pact", "none"]);
+/** A kind's own table columns, read from the body. Every key is optional, and null when the body does not say. */
+export const HomebrewTableColumnsSchema = z
+  .object({
+    level: z.number().int().nullable().optional(),
+    school: z.string().max(40).nullable().optional(),
+    castingTime: z.string().max(200).nullable().optional(),
+    range: z.string().max(200).nullable().optional(),
+    lists: z.array(z.string().max(80)).nullable().optional(),
+    challengeRating: z.number().nullable().optional(),
+    size: z.string().max(40).nullable().optional(),
+    creatureType: z.string().max(80).nullable().optional(),
+    armorClass: z.number().int().nullable().optional(),
+    hitPoints: z.number().int().nullable().optional(),
+    itemKind: z.string().max(40).nullable().optional(),
+    rarity: z.string().max(40).nullable().optional(),
+    attunement: z
+      .object({ required: z.boolean(), restrictedTo: z.array(z.string().max(80)) })
+      .strict()
+      .nullable()
+      .optional(),
+    hitDie: z.string().max(8).nullable().optional(),
+    primaryAbilities: z.array(z.string().max(8)).nullable().optional(),
+    casterType: CasterTypeSchema.nullable().optional(),
+    classId: z.string().max(80).nullable().optional(),
+    speedFeet: z.number().int().nullable().optional(),
+    originFeatId: z.string().max(80).nullable().optional(),
+    category: z.string().max(40).nullable().optional(),
+    prerequisiteLevel: z.number().int().nullable().optional(),
+    spellCount: z.number().int().nonnegative().nullable().optional()
+  })
+  .strict();
 export const HomebrewRecordDocumentSchema = z
   .object({
     id: HomebrewIdSchema,
     type: HomebrewContentTypeSchema,
     state: HomebrewContentStateSchema,
+    audience: HomebrewAudienceSchema,
+    /** Non-empty exactly when `audience` is `characters`. */
+    characterIds: HomebrewCharacterIdsSchema,
+    reveals: z.array(HomebrewRevealSchema),
+    /** Deprecated: `audience` is not `hidden`. */
     visibleToPlayers: z.boolean(),
+    packId: z.string().max(60),
+    /** Null for this table's own pack. */
+    packName: z.string().max(120).nullable(),
+    /** Published, not archived, and its pack is on: what every catalog holds. */
+    inCatalogs: z.boolean(),
+    basedOn: HomebrewBasedOnSchema.nullable(),
+    /** Every other record the body names by id, with its name. */
+    references: z.record(z.string().max(80), HomebrewReferenceSchema),
     deletedAt: TimestampSchema.nullable(),
     rev: z.number().int().nonnegative(),
     createdAt: TimestampSchema,
@@ -913,7 +1000,8 @@ export const HomebrewRecordDocumentSchema = z
     record: HomebrewRecordSchema
   })
   .strict();
-/** The flat, NON-polymorphic list row: a name and a badge, so the union stays out of the library's hot path. */
+/** The flat, NON-polymorphic list row: the row state and the kind's own columns, so the union stays out of the
+ *  library's hot path. */
 export const HomebrewRecordSummarySchema = z
   .object({
     id: HomebrewIdSchema,
@@ -921,12 +1009,25 @@ export const HomebrewRecordSummarySchema = z
     name: z.string().min(1).max(120),
     source: z.literal("homebrew"),
     state: HomebrewContentStateSchema,
+    audience: HomebrewAudienceSchema,
+    characterIds: HomebrewCharacterIdsSchema,
+    /** Deprecated: `audience` is not `hidden`. */
     visibleToPlayers: z.boolean(),
+    packId: z.string().max(60),
+    packName: z.string().max(120).nullable(),
+    inCatalogs: z.boolean(),
     deletedAt: TimestampSchema.nullable(),
     rev: z.number().int().nonnegative(),
+    createdAt: TimestampSchema,
     updatedAt: TimestampSchema,
+    /** The live body publishes. */
     valid: z.boolean(),
-    usageCount: z.number().int().nonnegative()
+    pendingChanges: z.boolean(),
+    /** Publish issues in the body the editor shows (pending edits included). */
+    issueCount: z.number().int().nonnegative(),
+    basedOn: HomebrewBasedOnSchema.nullable(),
+    usageCount: z.number().int().nonnegative(),
+    columns: HomebrewTableColumnsSchema
   })
   .strict();
 export const HomebrewContentListSchema = z
@@ -983,6 +1084,78 @@ export const HomebrewPackSchema = z
   })
   .strict();
 export const HomebrewPackExportSchema = z.object({ pack: HomebrewPackSchema }).strict();
+/** A pack: this table's own records, or one imported pack. Off takes its published records out of every catalog. */
+export const HomebrewPackInfoSchema = z
+  .object({
+    id: z.string().max(60),
+    kind: z.enum(["table", "imported"]),
+    /** Null for this table's own pack. */
+    name: z.string().min(1).max(120).nullable(),
+    credit: z.string().max(400).nullable(),
+    importedAt: TimestampSchema.nullable(),
+    enabled: z.boolean(),
+    counts: z
+      .object({
+        records: z.number().int().nonnegative(),
+        published: z.number().int().nonnegative(),
+        drafts: z.number().int().nonnegative(),
+        shared: z.number().int().nonnegative(),
+        archived: z.number().int().nonnegative()
+      })
+      .strict()
+  })
+  .strict();
+export const HomebrewPackListSchema = z
+  .object({
+    srd: z.object({ records: z.number().int().nonnegative() }).strict(),
+    packs: z.array(HomebrewPackInfoSchema)
+  })
+  .strict();
+export const HomebrewPackResultSchema = z.object({ pack: HomebrewPackInfoSchema }).strict();
+export const HomebrewPackUpdateRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    credit: z.string().max(400).nullable().optional(),
+    enabled: z.boolean().optional()
+  })
+  .strict();
+const HomebrewImportDecisionKindSchema = z.enum(["new", "replace", "skip", "rename"]);
+/** What to do with one record of a pack, by its position in `pack.records`. */
+export const HomebrewImportDecisionSchema = z
+  .object({
+    index: z.number().int().nonnegative(),
+    decision: HomebrewImportDecisionKindSchema,
+    /** For `rename`: the copy's name. Absent, it is "<name> (<pack name>)". */
+    name: z.string().trim().min(1).max(120).optional()
+  })
+  .strict();
+/** One record of a pack as the import reads it: its kind, what it clashes with here, and what the gate would say. */
+export const HomebrewImportRecordSchema = z
+  .object({
+    index: z.number().int().nonnegative(),
+    type: HomebrewContentTypeSchema.nullable(),
+    name: z.string().min(1).max(120).nullable(),
+    clash: z
+      .object({
+        source: HomebrewSourceKindSchema,
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        name: z.string().min(1).max(120),
+        state: HomebrewContentStateSchema.nullable(),
+        audience: HomebrewAudienceSchema.nullable(),
+        archived: z.boolean()
+      })
+      .strict()
+      .nullable(),
+    problems: z.array(HomebrewValidationIssueSchema),
+    allowed: z.array(HomebrewImportDecisionKindSchema),
+    decision: HomebrewImportDecisionKindSchema,
+    /** Where it landed, or would land; null when skipped or unreadable. */
+    id: HomebrewIdSchema.nullable()
+  })
+  .strict();
 export const HomebrewPackImportSchema = z
   .object({
     imported: z.array(
@@ -1012,25 +1185,188 @@ export const HomebrewPackImportSchema = z
     rejected: z.array(
       z.object({ originalId: HomebrewIdSchema, issues: z.array(HomebrewValidationIssueSchema) }).strict()
     ),
-    dryRun: z.boolean()
+    dryRun: z.boolean(),
+    /** Every record of the pack, in order, with the decision applied (or the default, in a dry run). */
+    records: z.array(HomebrewImportRecordSchema),
+    /** The pack the records landed in; null for a dry run or when nothing landed. */
+    pack: HomebrewPackInfoSchema.nullable()
   })
   .strict();
 export const HomebrewCreateRequestSchema = z.object({ record: HomebrewRecordSchema }).strict();
 export const HomebrewUpdateRequestSchema = z
   .object({ record: HomebrewRecordSchema, expectedRev: z.number().int().nonnegative().optional() })
   .strict();
+/** Send the name the GM typed: the copy's id is minted from it. Absent, the copy is "<source> (copy)". */
 export const HomebrewDuplicateRequestSchema = z.object({ name: z.string().min(1).max(120).optional() }).strict();
 export const HomebrewStateChangeRequestSchema = z
   .object({ expectedRev: z.number().int().nonnegative().optional() })
   .strict();
+/** Deprecated: `true` is Everyone and `false` is Hidden. Use `HomebrewAudienceRequest`. */
 export const HomebrewVisibilityRequestSchema = z
   .object({ visibleToPlayers: z.boolean(), expectedRev: z.number().int().nonnegative().optional() })
   .strict();
+/** Who sees one record. `characterIds` only, and then at least one, with `characters`. */
+export const HomebrewAudienceRequestSchema = z
+  .object({
+    audience: HomebrewAudienceSchema,
+    characterIds: HomebrewCharacterIdsSchema.optional(),
+    expectedRev: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Who sees several records, in one write: all of them change or none does. */
+export const HomebrewSharingRequestSchema = z
+  .object({
+    records: z
+      .array(z.object({ id: HomebrewIdSchema, expectedRev: z.number().int().nonnegative().optional() }).strict())
+      .min(1)
+      .max(500),
+    audience: HomebrewAudienceSchema,
+    characterIds: HomebrewCharacterIdsSchema.optional()
+  })
+  .strict();
+export const HomebrewSharingSchema = z.object({ records: z.array(HomebrewRecordSummarySchema) }).strict();
 export const HomebrewPackImportRequestSchema = z
   .object({
     pack: HomebrewPackSchema,
+    /** Used only without `decisions`. */
     onIdCollision: z.enum(["remint", "overwrite"]).default("remint"),
-    dryRun: z.boolean().default(false)
+    dryRun: z.boolean().default(false),
+    decisions: z.array(HomebrewImportDecisionSchema).max(500).optional()
+  })
+  .strict();
+/** An SRD record as an authorable body: the body a duplicate starts from, with its SRD id. */
+export const HomebrewSrdRecordSchema = z
+  .object({ type: HomebrewContentTypeSchema, record: HomebrewRecordSchema })
+  .strict();
+/** One row of a kind's table: an SRD record or a homebrew one, in one shape. */
+export const HomebrewTableRowSchema = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    kind: HomebrewContentTypeSchema,
+    name: z.string().min(1).max(120),
+    source: HomebrewSourceKindSchema,
+    /** Null for SRD rows. */
+    packId: z.string().max(60).nullable(),
+    /** SRD rows are published. */
+    state: HomebrewContentStateSchema,
+    archived: z.boolean(),
+    inCatalogs: z.boolean(),
+    pendingChanges: z.boolean(),
+    issueCount: z.number().int().nonnegative(),
+    audience: HomebrewAudienceSchema,
+    characterIds: HomebrewCharacterIdsSchema,
+    basedOn: HomebrewBasedOnSchema.nullable(),
+    createdAt: TimestampSchema.nullable(),
+    updatedAt: TimestampSchema.nullable(),
+    usageCount: z.number().int().nonnegative().nullable(),
+    columns: HomebrewTableColumnsSchema
+  })
+  .strict();
+export const HomebrewTableSchema = z
+  .object({ kind: HomebrewContentTypeSchema, rows: z.array(HomebrewTableRowSchema) })
+  .strict();
+export const HomebrewOverviewSchema = z
+  .object({
+    srd: z.object({ records: z.number().int().nonnegative() }).strict(),
+    packs: z.array(HomebrewPackInfoSchema),
+    byKind: z.array(
+      z
+        .object({
+          kind: HomebrewContentTypeSchema,
+          srd: z.number().int().nonnegative(),
+          homebrew: z.number().int().nonnegative(),
+          drafts: z.number().int().nonnegative(),
+          shared: z.number().int().nonnegative()
+        })
+        .strict()
+    ),
+    needsYou: z.array(
+      z
+        .object({
+          id: HomebrewIdSchema,
+          kind: HomebrewContentTypeSchema,
+          name: z.string().min(1).max(120),
+          packId: z.string().max(60),
+          reason: z.enum(["changes-not-live", "draft", "imported", "broken"]),
+          issueCount: z.number().int().nonnegative(),
+          since: TimestampSchema
+        })
+        .strict()
+    )
+  })
+  .strict();
+export const HomebrewSearchSchema = z
+  .object({
+    hits: z.array(
+      z
+        .object({
+          id: HomebrewIdSchema,
+          kind: HomebrewContentTypeSchema,
+          name: z.string().min(1).max(120),
+          packId: z.string().max(60),
+          state: HomebrewContentStateSchema,
+          archived: z.boolean(),
+          matches: z.array(
+            z.object({ path: z.array(z.union([z.string(), z.number().int()])), line: z.string().max(400) }).strict()
+          )
+        })
+        .strict()
+    ),
+    total: z.number().int().nonnegative()
+  })
+  .strict();
+const HomebrewRevisionEventSchema = z.enum([
+  "create",
+  "edit",
+  "publish",
+  "unpublish",
+  "discard",
+  "share",
+  "archive",
+  "restore",
+  "import",
+  "duplicate",
+  "revert",
+  "pack"
+]);
+/** One write in a record's history. */
+export const HomebrewRevisionSummarySchema = z
+  .object({
+    id: z.number().int().positive(),
+    rev: z.number().int().nonnegative(),
+    at: TimestampSchema,
+    event: HomebrewRevisionEventSchema,
+    /** Read against the caller's GM session. */
+    device: z.enum(["this-device", "other-device", "server"]),
+    /** The same key for the same GM device; null for the server. */
+    deviceKey: z.string().max(40).nullable(),
+    name: z.string().min(1).max(120),
+    state: HomebrewContentStateSchema,
+    /** The body is a published record's changes that were not live. */
+    pending: z.boolean(),
+    audience: HomebrewAudienceSchema,
+    characterIds: HomebrewCharacterIdsSchema,
+    changedFields: z.array(z.string().max(80))
+  })
+  .strict();
+export const HomebrewRevisionListSchema = z.object({ revisions: z.array(HomebrewRevisionSummarySchema) }).strict();
+export const HomebrewRevisionReadSchema = z
+  .object({ revision: HomebrewRevisionSummarySchema.extend({ record: HomebrewRecordSchema }).strict() })
+  .strict();
+/** `error.details.conflict` on a 409 for a stale `expectedRev`: what the server's copy changed since `baseRev`. */
+export const HomebrewConflictSchema = z
+  .object({
+    baseRev: z.number().int().nonnegative(),
+    currentRev: z.number().int().nonnegative(),
+    /** False when no history row holds `baseRev` (very old data): the nearest earlier one stood in. */
+    baseKnown: z.boolean(),
+    changes: z.array(
+      z.object({ field: z.string().max(80), base: z.unknown().optional(), current: z.unknown().optional() }).strict()
+    ),
+    rowChanges: z.array(z.enum(["state", "audience", "archived"]))
   })
   .strict();
 
@@ -1040,6 +1376,15 @@ export const HomebrewDeletedResponseSchema = successEnvelopeSchema(HomebrewDelet
 export const HomebrewUsagesResponseSchema = successEnvelopeSchema(HomebrewUsagesSchema);
 export const HomebrewPackExportResponseSchema = successEnvelopeSchema(HomebrewPackExportSchema);
 export const HomebrewPackImportResponseSchema = successEnvelopeSchema(HomebrewPackImportSchema);
+export const HomebrewSharingResponseSchema = successEnvelopeSchema(HomebrewSharingSchema);
+export const HomebrewPackListResponseSchema = successEnvelopeSchema(HomebrewPackListSchema);
+export const HomebrewPackResponseSchema = successEnvelopeSchema(HomebrewPackResultSchema);
+export const HomebrewSrdRecordResponseSchema = successEnvelopeSchema(HomebrewSrdRecordSchema);
+export const HomebrewTableResponseSchema = successEnvelopeSchema(HomebrewTableSchema);
+export const HomebrewOverviewResponseSchema = successEnvelopeSchema(HomebrewOverviewSchema);
+export const HomebrewSearchResponseSchema = successEnvelopeSchema(HomebrewSearchSchema);
+export const HomebrewRevisionListResponseSchema = successEnvelopeSchema(HomebrewRevisionListSchema);
+export const HomebrewRevisionReadResponseSchema = successEnvelopeSchema(HomebrewRevisionReadSchema);
 
 export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>;
 export type IntegrationScope = z.infer<typeof IntegrationScopeSchema>;
@@ -1072,3 +1417,21 @@ export type HomebrewContentList = z.infer<typeof HomebrewContentListSchema>;
 export type HomebrewUsages = z.infer<typeof HomebrewUsagesSchema>;
 export type HomebrewPack = z.infer<typeof HomebrewPackSchema>;
 export type HomebrewPackImport = z.infer<typeof HomebrewPackImportSchema>;
+export type HomebrewAudience = z.infer<typeof HomebrewAudienceSchema>;
+export type HomebrewReveal = z.infer<typeof HomebrewRevealSchema>;
+export type HomebrewBasedOn = z.infer<typeof HomebrewBasedOnSchema>;
+export type HomebrewReference = z.infer<typeof HomebrewReferenceSchema>;
+export type HomebrewTableColumns = z.infer<typeof HomebrewTableColumnsSchema>;
+export type HomebrewPackInfo = z.infer<typeof HomebrewPackInfoSchema>;
+export type HomebrewPackList = z.infer<typeof HomebrewPackListSchema>;
+export type HomebrewImportDecision = z.infer<typeof HomebrewImportDecisionSchema>;
+export type HomebrewImportRecord = z.infer<typeof HomebrewImportRecordSchema>;
+export type HomebrewSrdRecord = z.infer<typeof HomebrewSrdRecordSchema>;
+export type HomebrewTableRow = z.infer<typeof HomebrewTableRowSchema>;
+export type HomebrewTable = z.infer<typeof HomebrewTableSchema>;
+export type HomebrewOverview = z.infer<typeof HomebrewOverviewSchema>;
+export type HomebrewSearch = z.infer<typeof HomebrewSearchSchema>;
+export type HomebrewRevisionSummary = z.infer<typeof HomebrewRevisionSummarySchema>;
+export type HomebrewRevisionList = z.infer<typeof HomebrewRevisionListSchema>;
+export type HomebrewRevisionRead = z.infer<typeof HomebrewRevisionReadSchema>;
+export type HomebrewConflict = z.infer<typeof HomebrewConflictSchema>;

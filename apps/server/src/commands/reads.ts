@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CONTENT_PATHS, GAME_PATHS } from "@vtt/api-contract";
-import type { GmView, PlayerView } from "@vtt/domain";
+import { ContentCompendiumRequestSchema, type GmView, type PlayerView } from "@vtt/domain";
 import { actionAvailability } from "../action-resolution.js";
 import { deriveActorSheet } from "../actor-derived.js";
 import { storedDefinition } from "../actor-roster.js";
@@ -13,7 +13,7 @@ import { actionSummariesOf, actionSummaryOf, type ContentView } from "../content
 import { effectiveActions } from "../effective-actions.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { rechoicesOf } from "../ledger-rechoice.js";
-import { spellChoicesOf } from "../spell-choices.js";
+import { receivedSpellChoices, spellChoicesOf } from "../spell-choices.js";
 import { withMasteries } from "../weapon-masteries.js";
 import {
   ActorAvailableActionsSchema,
@@ -24,6 +24,7 @@ import {
   VisionPreviewSchema
 } from "@vtt/domain/commands";
 import { srdMonsterBenchmarks } from "../monster-benchmarks.js";
+import { compendiumOf } from "../homebrew-player.js";
 import { partyViewerIds } from "../vision/audience.js";
 import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
@@ -67,6 +68,18 @@ export const gameReads = [
       return { [key]: rows(catalog), attribution: catalog.attribution };
     }
   })),
+
+  {
+    event: "content:compendium",
+    path: CONTENT_PATHS.compendium,
+    scope: "game:read",
+    schema: ContentCompendiumRequestSchema,
+    malformed: "Pick a kind of record for the Compendium: class, subclass, species, background, feat, spell or item.",
+    httpInput: ({ query }) => ({ kind: query.kind }),
+    // The reader's own catalog: the SRD and the homebrew shown to everyone or to one of the caller's characters.
+    run: (principal, input, kit) =>
+      compendiumOf(kit.catalogFor(principal), (input as z.output<typeof ContentCompendiumRequestSchema>).kind)
+  },
 
   {
     event: "content:monsters",
@@ -183,10 +196,14 @@ export const gameReads = [
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
         // request and is never on the broadcast projection (see `actor-derived.ts`).
         derived: deriveActorSheet(actor, definition, derivation, kit.catalogFor(principal).skillSummaries(), catalog),
-        // Read against the GM's content, as `actor.rechoose` checks them.
-        rechoices: rechoicesOf(actor, definition, kit.contentLibrary.forAudience("gm")),
-        // Read against the GM's content and the table's builder policy, as the swap and the spellbook check them.
-        spellChoices: spellChoicesOf(actor, definition, kit.contentLibrary.forAudience("gm"), state.builderPolicy)
+        // Read against what the sheet already has, as `actor.rechoose` checks them.
+        rechoices: rechoicesOf(actor, definition, kit.playCatalog()),
+        // Read against the sheet's content and the table's builder policy, as the swap and the spellbook check them,
+        // and offered only where the caller receives the spell, so another character's homebrew is never named.
+        spellChoices: receivedSpellChoices(
+          spellChoicesOf(actor, definition, kit.playCatalog(), state.builderPolicy),
+          kit.catalogFor(principal)
+        )
       };
     }
   },
