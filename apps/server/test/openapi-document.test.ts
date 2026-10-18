@@ -147,6 +147,7 @@ describe("the OpenAPI document", () => {
       [CODEX_PATHS.pages, "get"],
       [CODEX_PATHS.pageById, "get"],
       [CODEX_PATHS.search, "get"],
+      [CODEX_PATHS.home, "get"],
       [CODEX_PATHS.connections, "get"],
       [CODEX_PATHS.maps, "get"],
       [CODEX_PATHS.mapMarkers, "get"],
@@ -271,7 +272,7 @@ describe("the OpenAPI document", () => {
     const schemas = openApiDocument.components.schemas as unknown as Record<string, Schema>;
     const wrappers = Object.keys(schemas).filter((name) => name.startsWith("Codex") && name.endsWith("Projected"));
     // Pinned so deleting a wrapper cannot silently empty this test.
-    expect(wrappers).toHaveLength(12);
+    expect(wrappers).toHaveLength(14);
     for (const wrapper of wrappers) {
       const branches = schemas[wrapper].oneOf ?? [];
       expect(

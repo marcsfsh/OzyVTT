@@ -5,13 +5,11 @@ import {
   projectPlayerPageMarker,
   type CodexPageMarkerRecord,
   type CodexRevealAuditRecord,
-  type CodexSearchRecord,
   type PlayerChronicleContext,
   type PlayerConnectionContext,
   type PlayerSessionNumberContext
 } from "../codex-projections.js";
 import type { CodexDb } from "./db.js";
-import type { CodexSearchRef } from "./search.js";
 import { isId } from "./validate.js";
 
 /**
@@ -169,36 +167,6 @@ export function connectionContext(store: CodexStore): PlayerConnectionContext {
   for (const entry of store.listTimeline())
     if (projectPlayerJournalEntry(entry, context) !== null) revealedSourceIds.add(entry.id);
   return { revealedPageIds, revealedSourceIds };
-}
-
-/** A search hit's live record plus what its player predicate needs. Null when the record is gone. */
-export function searchRecord(store: CodexStore, ref: CodexSearchRef): CodexSearchRecord | null {
-  switch (ref.kind) {
-    case "page": {
-      const page = store.getPage(ref.id);
-      return page ? { kind: "page", page } : null;
-    }
-    case "journal": {
-      const entry = store.getEntry(ref.id);
-      return entry ? { kind: "journal", entry } : null;
-    }
-    case "map": {
-      const map = store.getMap(ref.id);
-      return map ? { kind: "map", map } : null;
-    }
-    case "marker": {
-      const marker = store.getMarker(ref.id);
-      return marker ? { kind: "marker", marker, mapRevealed: isMapVisible(store, marker.mapId) } : null;
-    }
-    case "quest": {
-      const quest = store.getQuest(ref.id);
-      return quest ? { kind: "quest", quest } : null;
-    }
-    case "session": {
-      const session = store.getSession(ref.id);
-      return session ? { kind: "session", session } : null;
-    }
-  }
 }
 
 /** Every record the reveal audit considers, each with the context its player projection takes. */

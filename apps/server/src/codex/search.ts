@@ -8,9 +8,9 @@ import { PLAYER_SEARCH_VISIBLE_SQL } from "./visibility.js";
  * same transaction and every delete unindexes it; a reveal needs no reindex because visibility is checked
  * against the live row when the player table is read.
  *
- * Adding a kind is a viewer-safety change with three gates: its `index*` writer puts only player-layer text in
- * `codex_search_player` (nothing downstream catches GM text there), `PLAYER_SEARCH_VISIBLE_SQL`, and
- * `projectPlayerSearchHit`.
+ * The GM's search ranks from `codex_search_gm`. A player's search route reads no index: `codex/find.ts` matches
+ * over that player's own reads. `codex_search_player` backs the store's `searchAll("player")`, so its `index*`
+ * writers still put only player-layer text there, and `PLAYER_SEARCH_VISIBLE_SQL` still gates it.
  */
 export const CODEX_RECORD_KINDS: readonly CodexRecordKind[] = ["page", "journal", "map", "marker", "quest", "session"];
 /** One search hit as the store returns it: what kind of record matched, and which one. */
@@ -150,27 +150,29 @@ export function indexEntry(
 }
 
 /**
- * The GM's search: the first `SEARCH_LIMIT` matches. Ranking: an exact title match first, then bm25 with the title
- * weighted 10x (`bm25()` takes a weight for every declared column, the UNINDEXED ones included). bm25 weighs a
- * word by how many rows hold it, which tells the GM nothing, since the GM reads every row.
+ * Every GM match, ranked, with no cap. Ranking: an exact title match first, then bm25 with the title weighted 10x
+ * (`bm25()` takes a weight for every declared column, the UNINDEXED ones included). bm25 weighs a word by how many
+ * rows hold it, which tells the GM nothing, since the GM reads every row.
  */
-function searchGm(db: CodexDb, query: string, kinds: readonly CodexRecordKind[]): CodexSearchRefs {
+export function searchGmMatches(
+  db: CodexDb,
+  query: string,
+  kinds: readonly CodexRecordKind[] = CODEX_RECORD_KINDS
+): CodexSearchRef[] {
   const match = ftsQuery(query);
-  if (!match) return { hits: [], truncated: false };
+  if (!match) return [];
   // Never "" here (`ftsQuery` requires a letter or digit), so empty-titled rows cannot match the first tier.
   const exactTitle = query.trim().toLowerCase();
-  // One row past the cap: its presence is what says the results were cut off.
   const sql = `SELECT kind, record_id FROM codex_search_gm WHERE codex_search_gm MATCH ? AND codex_search_gm.kind IN (${kinds.map(() => "?").join(", ")})
-    ORDER BY (CASE WHEN LOWER(codex_search_gm.title) = ? THEN 0 ELSE 1 END), bm25(codex_search_gm, 0.0, 0.0, 10.0, 1.0)
-    LIMIT ${SEARCH_LIMIT + 1}`;
+    ORDER BY (CASE WHEN LOWER(codex_search_gm.title) = ? THEN 0 ELSE 1 END), bm25(codex_search_gm, 0.0, 0.0, 10.0, 1.0)`;
   try {
     const rows = db.database.prepare(sql).all(match, ...kinds, exactTitle) as Array<{
       kind: CodexRecordKind;
       record_id: string;
     }>;
-    return capSearch(rows.map((row) => ({ kind: row.kind, id: row.record_id })));
+    return rows.map((row) => ({ kind: row.kind, id: row.record_id }));
   } catch {
-    return { hits: [], truncated: false };
+    return [];
   }
 }
 
@@ -223,7 +225,7 @@ export function searchAll(
   kinds: readonly CodexRecordKind[] = CODEX_RECORD_KINDS
 ): CodexSearchRefs {
   const wanted = kinds.length > 0 ? kinds : CODEX_RECORD_KINDS;
-  return audience === "gm" ? searchGm(db, query, wanted) : capSearch(searchPlayerMatches(db, query, wanted));
+  return capSearch(audience === "gm" ? searchGmMatches(db, query, wanted) : searchPlayerMatches(db, query, wanted));
 }
 
 /** The words of a free-text query, at most twelve. */

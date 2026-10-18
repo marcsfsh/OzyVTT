@@ -16,11 +16,12 @@ import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetStore } from "./map-assets.js";
 import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
 import type { CodexRelationshipRow } from "./codex/connections.js";
+import { findGm, gmHome } from "./codex/find.js";
 import { liveBoard, liveClue, sessionHappened } from "./codex/live.js";
 import { PlayerCodexReads } from "./codex/player-reads.js";
 import { prepItems } from "./codex/prep.js";
 import { CodexNotFoundError, CodexRevisionConflictError, CodexValidationError } from "./codex/validate.js";
-import { revealAuditRecords, searchRecord } from "./codex/visibility.js";
+import { revealAuditRecords } from "./codex/visibility.js";
 import type { CodexStore } from "./codex-store.js";
 import { callerOf, refuse, sendUnauthenticated, type CredentialVerifiers } from "./request-auth.js";
 import {
@@ -59,7 +60,9 @@ import {
   SessionLogSchema,
   SessionTickSchema,
   SessionUpdateSchema,
-  StandingSetSchema
+  StandingSetSchema,
+  parseHomeSince,
+  parseSearchQuery
 } from "./codex-requests.js";
 import {
   projectGmCalendar,
@@ -72,7 +75,6 @@ import {
   projectGmPageConnections,
   projectGmPageSummary,
   projectGmQuest,
-  projectGmSearchHit,
   projectGmSession,
   projectGmStanding,
   projectRevealAudit
@@ -335,19 +337,33 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return readEnvelope(request, response, role, { pages });
   });
 
-  /** One result list (`hits`) across all record kinds, discriminated by `kind`. */
+  /** One result list (`hits`) across all record kinds, filtered and sorted (`codex/find.ts`). */
   router.get(expressPath(CODEX_PATHS.search), (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const query = typeof request.query.q === "string" ? request.query.q : "";
+    let query;
+    try {
+      query = parseSearchQuery(request.query);
+    } catch (error) {
+      return malformed(response, error);
+    }
+    // A player's search reads only what that player reads, and has no visibility filter.
     if (role === "player") return readEnvelope(request, response, role, playerReads().search(query));
-    const found = store.searchAll("gm", query);
-    const hits = found.hits
-      .map((ref) => searchRecord(store, ref))
-      .filter((record) => record !== null)
-      .map(projectGmSearchHit);
-    // `truncated` is measured before projection, so it means the search itself was cut off.
-    return readEnvelope(request, response, role, { hits, truncated: found.truncated });
+    return readEnvelope(request, response, role, findGm(store, query));
+  });
+
+  // Home: the GM's counts, latest changes and reveal check; a player's new since their last visit.
+  router.get(expressPath(CODEX_PATHS.home), (request, response) => {
+    const role = readGrade(request, response);
+    if (!role) return;
+    if (role === "gm") return readEnvelope(request, response, role, { home: gmHome(store) });
+    let since;
+    try {
+      since = parseHomeSince(request.query);
+    } catch (error) {
+      return malformed(response, error);
+    }
+    return readEnvelope(request, response, role, playerReads().home(since));
   });
 
   router.get(expressPath(CODEX_PATHS.pageById), (request, response) => {

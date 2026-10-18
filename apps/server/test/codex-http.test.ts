@@ -1077,11 +1077,23 @@ describe("codex suite-wide search viewer safety", () => {
     expect((await search(base, "Ireena", GM)).map((hit) => hit.kind)).toEqual(["page"]);
   });
 
-  it("a player hit carries only navigation fields: no bodies, reveal flags, or secret-map linkage", async () => {
+  it("a player hit carries no bodies, reveal flags, or secret-map linkage", async () => {
     const { base, openMap, shownMarker } = await world();
     // Assert the exact key set, so any new field in the player search projection fails here.
     const marker = (await search(base, "Blinsky", PLAYER))[0];
-    expect(Object.keys(marker).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    expect(Object.keys(marker).sort()).toEqual([
+      "columns",
+      "entityType",
+      "id",
+      "kind",
+      "mapId",
+      "match",
+      "modifiedAt",
+      "tags",
+      "title",
+      "type"
+    ]);
+    expect(marker).not.toHaveProperty("revealedToPlayers");
     expect(marker.mapId).toBe(openMap); // a player only ever gets a pin whose map is revealed
     expect(marker.id).toBe(shownMarker);
   });
@@ -1684,7 +1696,18 @@ describe("codex quests HTTP boundary", () => {
     const hits = await search("Wyrmwood", PLAYER);
     expect(hits).toEqual([expect.objectContaining({ kind: "quest", id: questId })]);
     // The same uniform row shape every other kind emits. Quests carry no tags, hence `[]`.
-    expect(Object.keys(hits[0]).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
+    expect(Object.keys(hits[0]).sort()).toEqual([
+      "columns",
+      "entityType",
+      "id",
+      "kind",
+      "mapId",
+      "match",
+      "modifiedAt",
+      "tags",
+      "title",
+      "type"
+    ]);
     expect(hits[0].tags).toEqual([]);
     expect(await search("forgery", PLAYER)).toEqual([]);
     expect(await search("forgery", GM)).toEqual([expect.objectContaining({ kind: "quest", id: questId })]);

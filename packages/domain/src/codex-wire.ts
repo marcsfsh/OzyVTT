@@ -536,8 +536,20 @@ export type PlayerCodexCalendar = Wire<z.infer<typeof PlayerCodexCalendarSchema>
 
 // ----- Suite-wide search -----
 
-/** Every key is present on every kind, and each is already in that kind's player projection. */
-export const CodexSearchHitSchema = z.strictObject({
+/** What the search's type filter, the home's collections and a hit's `type` name: a page's entity type, else its
+ *  record kind. In this order, which is also the `type` sort's. */
+export const CODEX_SEARCH_TYPES = [...CODEX_ENTITY_TYPES, "journal", "map", "marker", "quest", "session"] as const;
+const CodexSearchTypeSchema = z.enum(CODEX_SEARCH_TYPES);
+export type CodexSearchType = z.infer<typeof CodexSearchTypeSchema>;
+/** The search's `visibility` filter, the GM's only. */
+export const CODEX_SEARCH_VISIBILITIES = ["all", "revealed", "hidden"] as const;
+export type CodexSearchVisibility = (typeof CODEX_SEARCH_VISIBILITIES)[number];
+/** The sort keys that are not column keys. Any other key names a column. */
+export const CODEX_SEARCH_SORT_KEYS = ["relevance", "name", "type", "modified", "visibility"] as const;
+
+/** A hit's table columns by key: a page's field values, a quest's status, and so on. A key with no value is absent. */
+const columns = () => z.record(z.string(), z.string());
+const hitBase = {
   kind: CodexRecordKindSchema,
   id: z.uuid(),
   title: z.string(),
@@ -545,12 +557,42 @@ export const CodexSearchHitSchema = z.strictObject({
   /** Pages only. */
   entityType: CodexEntityTypeSchema.nullable(),
   /** Markers only, so a pin hit can open its map. */
-  mapId: z.uuid().nullable()
+  mapId: z.uuid().nullable(),
+  type: CodexSearchTypeSchema
+};
+
+/** The GM's hit. `match.hidden` says the line is GM-only text: a GM body or note, a hidden field, prep, attendees. */
+export const CodexSearchHitSchema = z.strictObject({
+  ...hitBase,
+  /** Whether players can read the record, by its kind's player read (a pin needs its map too). */
+  revealedToPlayers: z.boolean(),
+  modifiedAt: timestamp(),
+  columns: columns(),
+  match: z.strictObject({ line: z.string(), hidden: z.boolean() }).nullable()
 });
 export type CodexSearchHit = Wire<z.infer<typeof CodexSearchHitSchema>>;
-/** The Codex is unpaginated; `truncated` means the search itself was cut off. */
-export const CodexSearchResultSchema = z.strictObject({ hits: z.array(CodexSearchHitSchema), truncated: z.boolean() });
+/** A player's hit, built from what that player reads, so its line never quotes hidden text. `modifiedAt` is a
+ *  page's `playerUpdatedAt` or an entry's `firstShownAt`, and null for kinds that have neither. */
+export const PlayerCodexSearchHitSchema = z.strictObject({
+  ...hitBase,
+  modifiedAt: timestamp().nullable(),
+  columns: columns(),
+  match: z.strictObject({ line: z.string() }).nullable()
+});
+export type PlayerCodexSearchHit = Wire<z.infer<typeof PlayerCodexSearchHitSchema>>;
+/** The Codex is unpaginated; `truncated` means the list was cut at the limit, and `total` counts every match. */
+export const CodexSearchResultSchema = z.strictObject({
+  hits: z.array(CodexSearchHitSchema),
+  truncated: z.boolean(),
+  total: z.number().int().min(0)
+});
 export type CodexSearchResult = Wire<z.infer<typeof CodexSearchResultSchema>>;
+export const PlayerCodexSearchResultSchema = z.strictObject({
+  hits: z.array(PlayerCodexSearchHitSchema),
+  truncated: z.boolean(),
+  total: z.number().int().min(0)
+});
+export type PlayerCodexSearchResult = Wire<z.infer<typeof PlayerCodexSearchResultSchema>>;
 
 // ----- The live board and the recap's sources (GM-only) -----
 
@@ -644,6 +686,69 @@ export const CodexSessionHappenedSchema = z.strictObject({
   )
 });
 export type CodexSessionHappened = Wire<z.infer<typeof CodexSessionHappenedSchema>>;
+
+// ----- Home -----
+
+/** One revealed record that points at something players can't read. */
+export const CodexRevealCheckRowSchema = z.strictObject({
+  reason: z.enum(["link", "placeholder", "hidden-pin"]),
+  kind: CodexRecordKindSchema,
+  id: z.uuid(),
+  title: z.string(),
+  /** The pin's map, when `kind` is marker. */
+  mapId: z.uuid().nullable(),
+  targetKind: z.enum(["page", "map", "marker"]).nullable(),
+  targetId: z.uuid().nullable(),
+  targetTitle: z.string().nullable(),
+  fieldKey: z.string().nullable()
+});
+export type CodexRevealCheckRow = Wire<z.infer<typeof CodexRevealCheckRowSchema>>;
+
+/** Who sees a change: players can read it, only the GM can, or chosen characters can. */
+const CodexChangeAudienceSchema = z.enum(["everyone", "hidden", "characters"]);
+export type CodexChangeAudience = z.infer<typeof CodexChangeAudienceSchema>;
+/** What a change was. Only a page tells a reveal or a hide apart from an edit. */
+const CodexChangeKindSchema = z.enum(["created", "edited", "revealed", "hidden"]);
+export type CodexChangeKind = z.infer<typeof CodexChangeKindSchema>;
+
+/** The GM's home. */
+export const CodexHomeSchema = z.strictObject({
+  collections: z.array(
+    z.strictObject({ type: CodexSearchTypeSchema, revealed: z.number().int().min(0), hidden: z.number().int().min(0) })
+  ),
+  recent: z.array(
+    z.strictObject({
+      kind: CodexRecordKindSchema,
+      id: z.uuid(),
+      title: z.string(),
+      type: CodexSearchTypeSchema,
+      mapId: z.uuid().nullable(),
+      changedAt: timestamp(),
+      change: CodexChangeKindSchema,
+      audience: CodexChangeAudienceSchema,
+      characterIds: z.array(z.uuid())
+    })
+  ),
+  revealCheck: z.strictObject({ rows: z.array(CodexRevealCheckRowSchema), total: z.number().int().min(0) })
+});
+export type CodexHome = Wire<z.infer<typeof CodexHomeSchema>>;
+
+/** A player's home: what they can read that is new or changed since their last visit. */
+export const PlayerCodexHomeSchema = z.strictObject({
+  newSince: z.array(
+    z.strictObject({
+      kind: CodexRecordKindSchema,
+      id: z.uuid(),
+      title: z.string(),
+      type: CodexSearchTypeSchema,
+      mapId: z.uuid().nullable(),
+      at: timestamp(),
+      change: z.enum(["new", "updated"])
+    })
+  ),
+  truncated: z.boolean()
+});
+export type PlayerCodexHome = Wire<z.infer<typeof PlayerCodexHomeSchema>>;
 
 // ----- Settings (GM-only) -----
 

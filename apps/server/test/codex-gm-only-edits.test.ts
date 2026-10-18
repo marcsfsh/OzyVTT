@@ -375,7 +375,14 @@ function seedCampaign(store: CodexStore) {
     "/calendar",
     "/search?q=lantern",
     "/search?q=vallaki",
-    "/search?q=session"
+    "/search?q=session",
+    // The filtered and sorted search, and the home, read only the player's own dates and text.
+    "/search?q=lantern&sort=modified:desc,name&limit=500",
+    "/search?types=faction,location,quest,session&sort=type,leader:desc",
+    "/search?modifiedFrom=2026-01-01&sort=modified",
+    "/search?visibility=hidden",
+    "/home",
+    "/home?since=2026-01-01T00:00:00.000Z"
   ];
   return {
     order,

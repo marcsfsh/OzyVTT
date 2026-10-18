@@ -1537,10 +1537,60 @@ export const openApiDocument = {
     [CODEX_PATHS.search]: {
       get: codexOp("searchCodex", codexRead, "CodexSearchResponse", {
         notModified: true,
-        bad: false,
         description:
-          "Suite-wide full-text search across pages, journal entries, maps and markers, role-scoped. `q` is the query. Deliberately ONE search route for every record type: `hits` is a single ranked list discriminated by `kind`.",
-        params: [{ name: "q", in: "query", schema: { type: "string" } }]
+          "Search across every record kind, role-scoped, with filters and a sort of up to 4 levels. Every parameter is optional; a blank `q` lists everything the filters allow. A GM hit says whether players can read the record and whether its matching line is GM-only text. A player's search reads only what that player reads: its hits never match, quote or rank on hidden text, it has no visibility filter, and its modified date is a page's `playerUpdatedAt` or an entry's `firstShownAt`.",
+        params: [
+          { name: "q", in: "query", schema: { type: "string", maxLength: 200 } },
+          {
+            name: "types",
+            in: "query",
+            description:
+              "Comma list of search types: a page entity type, `page` for every page type, `journal`, `map`, `marker`, `quest` or `session`. Default: all.",
+            schema: { type: "string" }
+          },
+          {
+            name: "visibility",
+            in: "query",
+            description: "The GM's only: `all`, `revealed` or `hidden`. A player's is ignored.",
+            schema: { type: "string", enum: ["all", "revealed", "hidden"] }
+          },
+          {
+            name: "modifiedFrom",
+            in: "query",
+            description: "Inclusive: an ISO date and time, or `YYYY-MM-DD` for the start of that UTC day.",
+            schema: { type: "string" }
+          },
+          {
+            name: "modifiedTo",
+            in: "query",
+            description: "Inclusive: an ISO date and time, or `YYYY-MM-DD` for the end of that UTC day.",
+            schema: { type: "string" }
+          },
+          {
+            name: "sort",
+            in: "query",
+            description:
+              "Comma list of `key` or `key:asc`/`key:desc`, first key first, at most 4. Keys: `relevance`, `name`, `type`, `modified`, `visibility` (GM only) or a column key. A missing value sorts last either way.",
+            schema: { type: "string" }
+          },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 500, default: 50 } }
+        ]
+      })
+    },
+    [CODEX_PATHS.home]: {
+      get: codexOp("getCodexHome", codexRead, "CodexHomeResponse", {
+        notModified: true,
+        description:
+          "The front page's aggregates, role-projected. A GM gets the revealed and hidden count of every search type, the latest changes with who sees each, and the reveal check: revealed records that point at something players can't read. A player gets what they can read that is new or changed after `since`, built from pages' `playerUpdatedAt` and the first-shown dates.",
+        params: [
+          {
+            name: "since",
+            in: "query",
+            description:
+              "A player's last visit, as an ISO date and time. Without it everything is new. The GM's is ignored.",
+            schema: { type: "string", format: "date-time" }
+          }
+        ]
       })
     },
     [CODEX_PATHS.pageById]: {
@@ -2791,7 +2841,25 @@ export const openApiDocument = {
       // writes keep the direct GM ref. Edge lists are role-uniform (players just get fewer rows), so need no wrapper.
       CodexPageListData: codexDataObject("pages", codexArrayRef("CodexPageSummaryProjected")),
       CodexPageListResponse: envelopeSchema("#/components/schemas/CodexPageListData"),
+      // Hits are role-projected one by one; the list around them is the same for both.
+      CodexSearchHitProjected: codexProjected("CodexSearchHit"),
+      CodexSearchData: {
+        type: "object",
+        additionalProperties: false,
+        required: ["hits", "truncated", "total"],
+        properties: {
+          hits: codexArrayRef("CodexSearchHitProjected"),
+          truncated: {
+            type: "boolean",
+            description: "The list was cut at `limit`. A player's list is counted after every player gate."
+          },
+          total: { type: "integer", minimum: 0, description: "Every match before the cut." }
+        }
+      },
       CodexSearchResponse: envelopeSchema("#/components/schemas/CodexSearchData"),
+      CodexHomeProjected: codexProjected("CodexHome"),
+      CodexHomeData: codexDataObject("home", { $ref: "#/components/schemas/CodexHomeProjected" }),
+      CodexHomeResponse: envelopeSchema("#/components/schemas/CodexHomeData"),
       CodexPrepTemplateListResponse: envelopeSchema("#/components/schemas/CodexPrepTemplateListData"),
       CodexPrepTemplateData: codexDataObject("template", { $ref: "#/components/schemas/CodexPrepTemplate" }),
       CodexPrepTemplateResponse: envelopeSchema("#/components/schemas/CodexPrepTemplateData"),

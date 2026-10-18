@@ -578,6 +578,8 @@ describe("codex responses validate against the schemas the document publishes", 
       [CODEX_PATHS.standing, "/api/v1/codex/standing", "standing"],
       [CODEX_PATHS.calendar, "/api/v1/codex/calendar"],
       [CODEX_PATHS.search, "/api/v1/codex/search?q=barovia", "hits"],
+      [CODEX_PATHS.search, "/api/v1/codex/search?sort=type,modified:desc&types=location,quest,session", "hits"],
+      [CODEX_PATHS.home, "/api/v1/codex/home?since=2000-01-01T00:00:00.000Z"],
       // Seeded in `populated()`: the marker is revealed on a revealed map and carries the party flag, so
       // both roles get a non-null body.
       [CODEX_PATHS.markerById, `/api/v1/codex/markers/${markerId}`],

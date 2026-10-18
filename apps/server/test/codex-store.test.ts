@@ -20,7 +20,6 @@ import {
   projectGmJournalEntry,
   projectGmMarker,
   projectGmQuest,
-  projectGmSearchHit,
   projectGmSession,
   projectPlayerChronicleRecord,
   projectPlayerJournalEntry,
@@ -30,11 +29,26 @@ import {
   projectPlayerPageMarker,
   projectPlayerPageSummary,
   projectPlayerQuest,
-  projectPlayerSearchHit,
   projectPlayerSession
 } from "../src/codex-projections.js";
+import { findGm, type CodexFindQuery } from "../src/codex/find.js";
 import { BUILT_IN_TEMPLATE_ID } from "../src/codex/prep.js";
+import { PlayerCodexReads } from "../src/codex/player-reads.js";
 import { prepNotes, prepNotesOf } from "./codex-prep-notes.js";
+
+/** A plain search for `q`: every type, no filters, the default sort. */
+const findQuery = (q: string): CodexFindQuery => ({
+  q,
+  types: new Set(),
+  visibility: "all",
+  modifiedFrom: null,
+  modifiedTo: null,
+  sort: [],
+  limit: 50
+});
+/** A player's search as the route builds it, from that player's own reads; and the GM's. */
+const playerSearch = (q: string, from: CodexStore = store) => new PlayerCodexReads(from).search(findQuery(q)).hits;
+const gmSearch = (q: string, from: CodexStore = store) => findGm(from, findQuery(q)).hits;
 
 /** The default autosave setting, spelled once. */
 const AUTOSAVE_DEFAULT = { enabled: true, intervalSeconds: 1 } as const;
@@ -2511,29 +2525,38 @@ describe("Codex quest: the projection layer, on its own", () => {
     expect(JSON.stringify(projected)).not.toContain(secret.id);
   });
 
-  it("refuses an UNREVEALED quest at the SEARCH projection too: gate 3, on its own", () => {
+  it("keeps an UNREVEALED quest out of a player's search, and gives the GM its hit", () => {
     const quest = seed();
-    // Called directly with no SQL in front; over HTTP `PLAYER_SEARCH_VISIBLE_SQL` would already have dropped this row.
-    expect(projectPlayerSearchHit({ kind: "quest", quest }, playerSessionNumbers())).toBeNull();
-    expect(projectGmSearchHit({ kind: "quest", quest })).toMatchObject({
-      kind: "quest",
-      id: quest.id,
-      title: "The Wyrmwood Contract"
-    });
+    expect(playerSearch("Wyrmwood")).toEqual([]);
+    expect(gmSearch("Wyrmwood")).toEqual([
+      expect.objectContaining({ kind: "quest", id: quest.id, title: "The Wyrmwood Contract", revealedToPlayers: false })
+    ]);
   });
 
   it("emits a REVEALED quest as a uniform hit row: no body, no reveal flag, and `tags: []`", () => {
-    const revealed = store.setQuestRevealed(seed().id, true);
-    const hit = projectPlayerSearchHit({ kind: "quest", quest: revealed }, playerSessionNumbers())!;
+    store.setQuestRevealed(seed().id, true);
+    const [hit] = playerSearch("Wyrmwood");
     // The same key set every other kind emits, so a row renderer never branches on kind.
-    expect(Object.keys(hit).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
-    // Quests carry no tags, so this is `[]`. `status`/`objectives` live on
-    // the record; a result row exists to navigate.
-    expect(hit.tags).toEqual([]);
-    expect(hit.entityType).toBeNull();
-    expect(hit.mapId).toBeNull();
+    expect(Object.keys(hit!).sort()).toEqual([
+      "columns",
+      "entityType",
+      "id",
+      "kind",
+      "mapId",
+      "match",
+      "modifiedAt",
+      "tags",
+      "title",
+      "type"
+    ]);
+    // Quests carry no tags, so this is `[]`. The title matched, so no line is quoted.
+    expect(hit).toMatchObject({ tags: [], entityType: null, mapId: null, type: "quest", match: null });
+    expect(hit!.columns).toEqual({ status: "active" });
     expect(JSON.stringify(hit)).not.toContain("forgery");
     expect(JSON.stringify(hit)).not.toContain("counting house");
+    // A word only the GM body holds finds nothing for a player, and the GM's line says it is hidden.
+    expect(playerSearch("forgery")).toEqual([]);
+    expect(gmSearch("forgery")[0]!.match).toEqual({ line: expect.stringContaining("forgery"), hidden: true });
   });
 });
 
@@ -4633,19 +4656,20 @@ describe("CodexStore search: sessions join the one index (three gates)", () => {
     expect(store.searchAll("player", "crossed").hits.some((hit) => hit.id === session.id)).toBe(true);
   });
 
-  it("GATE 3: the projection arm refuses an unrevealed session even when the SQL layer passes it", () => {
+  it("GATE 3: a player's search reads the session's player read, so an unrevealed one never appears", () => {
     const session = seed();
-    // Constructed by hand, as the SQL layer would hand it over if its gate were weakened.
-    expect(projectPlayerSearchHit({ kind: "session", session }, playerSessionNumbers())).toBeNull();
-    expect(projectGmSearchHit({ kind: "session", session })).toMatchObject({
+    expect(playerSearch("crossed")).toEqual([]);
+    expect(gmSearch("crossed")[0]).toMatchObject({ kind: "session", id: session.id, title: "Session 4" });
+    store.setSessionRevealed(session.id, true);
+    const [hit] = playerSearch("crossed");
+    expect(hit).toMatchObject({
       kind: "session",
-      id: session.id,
-      title: "Session 4"
+      tags: ["ravenloft"],
+      match: { line: "The party crossed the bridge." }
     });
-    const revealed = store.setSessionRevealed(session.id, true);
-    const hit = projectPlayerSearchHit({ kind: "session", session: revealed }, playerSessionNumbers())!;
-    expect(Object.keys(hit).sort()).toEqual(["entityType", "id", "kind", "mapId", "tags", "title"]);
-    expect(hit.tags).toEqual(["ravenloft"]);
+    // Prep and attendees are no part of the player read, so they neither match nor show.
+    expect(playerSearch("ambush")).toEqual([]);
+    expect(playerSearch("Mara")).toEqual([]);
     expect(JSON.stringify(hit)).not.toContain("Ireena");
     expect(JSON.stringify(hit)).not.toContain("Mara");
   });
@@ -4658,7 +4682,7 @@ describe("CodexStore search: sessions join the one index (three gates)", () => {
     );
     const empty = store.setSessionRevealed(store.createSession({}).id, true);
     const title = (session: typeof numbered) =>
-      projectPlayerSearchHit({ kind: "session", session }, playerSessionNumbers())!.title;
+      playerSearch("").find((hit) => hit.kind === "session" && hit.id === session.id)!.title;
     expect(title(numbered)).toBe("Session 4");
     expect(title(recapOnly)).toBe("The party crossed the bridge.");
     // An empty title would render as an unclickable blank row on the reveal audit.
@@ -5033,12 +5057,11 @@ describe("CodexStore quest history", () => {
       projectRevealAudit([{ kind: "journal", entry: store.getEntry(record.id)!, sessionContext }]).sections.find(
         (section) => section.kind === "journal"
       )!.rows;
-    expect(projectPlayerSearchHit({ kind: "journal", entry: record }, context([]))).toBeNull();
+    const searched = () => playerSearch("").some((hit) => hit.id === record.id);
+    expect(searched()).toBe(false);
     expect(auditRows(context([]))).toEqual([]);
     store.setQuestRevealed(quest.id, true);
-    expect(
-      projectPlayerSearchHit({ kind: "journal", entry: store.getEntry(record.id)! }, context([quest.id]))
-    ).not.toBeNull();
+    expect(searched()).toBe(true);
     // A quest record has no prose, so `excerpt(text)` is "" and `AUDIT_JOURNAL_FALLBACK` names the kind instead.
     expect(auditRows(context([quest.id]))[0]).toMatchObject({ journalKind: "quest", title: "Quest updated" });
   });
@@ -5550,7 +5573,7 @@ describe("every codex write bumps the coarse revision (the ETag's one premise)",
     "listRevisions",
     "listAllRevisions",
     "searchAll",
-    "searchPlayerMatches",
+    "searchGmMatches",
     "searchPages",
     "listPrepTemplates",
     "getPrepTemplate",

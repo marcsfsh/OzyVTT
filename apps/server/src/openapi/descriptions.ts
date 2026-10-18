@@ -1305,7 +1305,36 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     tags: "Always present, so no consumer branches on key presence.",
     entityType: "The page's entity type; null for every other kind.",
     mapId:
-      "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed."
+      "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed.",
+    type: "A page's entity type, else the record kind: what the `types` filter and the `type` sort read.",
+    revealedToPlayers:
+      "Whether players can read the record, by its kind's player read: a pin also needs its map. What the `visibility` filter reads.",
+    modifiedAt: "When the GM last saved the record.",
+    columns:
+      "The values the record's kind shows as table columns, by column key: a page's fields (hidden ones included), a quest's `status`, a session's `number`, `date` and `status`, an entry's `kind` and `date`, a pin's `map`, a map's `kind` and `parent`. A column with no value is absent.",
+    match:
+      "The line that matched, cut to about 160 characters; null without `q` or when only the title or tags matched. `hidden` is true when the line is GM-only text: a GM body or note, a hidden field, prep or attendees."
+  },
+  CodexSearchHitPlayer: {
+    "": "One search hit as a PLAYER receives it, built from what that player reads. No `revealedToPlayers`, and its line never comes from hidden text.",
+    modifiedAt:
+      "A page's `playerUpdatedAt` or an entry's `firstShownAt`; null for other kinds. Never when the GM saved the record.",
+    columns: "As the GM's, from the player's own read: a page's fields are the ones the player can read.",
+    match: "The line of the player's own text that matched; null without `q` or when only the title or tags matched."
+  },
+  CodexHome: {
+    "": "The GM's front page aggregates.",
+    collections:
+      "Every search type in a fixed order, zeros included. `revealed` counts what players can read by each kind's player read; `hidden` is the rest. The same split as the search's `visibility` filter.",
+    recent:
+      "The 12 latest changed records, newest first. `change` says what it was; only a page tells a reveal or a hide from an edit. `audience` is who sees the change: `everyone` when players can read the record and, for a page, the change moved what they read; `hidden` otherwise.",
+    revealCheck:
+      "Revealed records that point at something players can't read: a link to a hidden page or map, a field players read that holds a placeholder, a hidden pin on a revealed map. Players get plain text there, so each is safe. At most 100 rows; `total` counts them all."
+  },
+  CodexHomePlayer: {
+    "": "A player's front page: what they can read that is new or changed since `since`.",
+    newSince:
+      "Newest first, at most 50. `change` is `new` when the record was first shown after `since`, else `updated`. Built only from dates players already receive."
   },
   CodexPrepTemplate: {
     "": "A reusable plan for session prep: an ordered list of sections, each with a title, a prompt and a type. GM-only.",
@@ -1321,11 +1350,6 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     pageGroups: "One group per Linked pages section. A page that no longer exists is left out.",
     clocks: "The deadlines of every Clocks section, deduped. `fired` is measured against the GM's date.",
     logged: "The 50 latest journal entries filed under the session, oldest first."
-  },
-  CodexSearchData: {
-    hits: "The one ranked result list, all record kinds. A title equal to the query comes first for both roles. After it, a GM's hits are ranked by relevance (bm25, the title weighted 10x). A player's come by tier: a title holding every query word, then the rest, each tier ordered by kind, title and id. A player hit's place depends on its own title alone, so records a player cannot see never move it.",
-    truncated:
-      'The result list was CUT at the cap. Narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference, and it tells "exactly 50 matches" from "50 and more". A player\'s list is counted after every player gate, so a record they cannot see never takes a place under the cap or sets this flag.'
   },
   CodexRevisionHistorySettings: {
     "": "How much page version history the codex keeps, and what keeping it costs. The two knobs are exactly `CodexRevisionHistoryInput`'s; the two usage figures are server-computed and READ-ONLY, and they ride along here in one object because a settings screen wants the cost beside the control that changes it.",

@@ -92,6 +92,8 @@ export const CODEX_PATHS = {
   pageRevisions: `${API_NAMESPACE}/codex/pages/{id}/revisions`,
   pageRevisionRestore: `${API_NAMESPACE}/codex/pages/{id}/revisions/{revisionId}/restore`,
   search: `${API_NAMESPACE}/codex/search`,
+  // Role-projected: the GM's counts, latest changes and reveal check; a player's new since their last visit.
+  home: `${API_NAMESPACE}/codex/home`,
   previewSession: `${API_NAMESPACE}/codex/preview-session`,
   folders: `${API_NAMESPACE}/codex/folders`,
   foldersMove: `${API_NAMESPACE}/codex/folders/move`,

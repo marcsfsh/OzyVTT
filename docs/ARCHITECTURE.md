@@ -163,11 +163,14 @@ audience. There are four:
   `firstShownAt`: the moment players could first read the record, set by that write
   (`codex/first-shown.ts` runs in every Codex write) and never moved after, through a hide or a
   re-reveal. The order and length of a player's lists come from what the player can read too: a
-  player's search ranks each hit on its own title and is capped after the player gates (the GM's
-  keeps relevance ranking, since the GM reads every row anyway), a player's journal places an
-  entry by the session number the player receives and then by `firstShownAt`, a page's mentions
-  keep a fixed order, a hidden page never takes a revealed page's title for `[[links]]`, and a
-  GM-layer connection never folds away a player-layer mention. A hidden record is a 404, never a
+  player's search is built from that player's own reads, so a hit matches, quotes and ranks only on
+  text the player reads, its modified date is `playerUpdatedAt` or `firstShownAt`, and it is
+  capped after the gates (the GM's keeps relevance ranking from the index, since the GM reads every
+  row anyway). A player's home lists what is new since their last visit from the same dates. Prep
+  templates, session prep, the live board and the GM's home aggregates have no player read at all.
+  A player's journal places an entry by the session number the player receives and then by
+  `firstShownAt`, a page's mentions keep a fixed order, a hidden page never takes a revealed
+  page's title for `[[links]]`, and a GM-layer connection never folds away a player-layer mention. A hidden record is a 404, never a
   403, and ETags are computed after every gate. A GM's ETag carries the store revision; a player's
   hashes the body they receive, so a GM-only write leaves it as it was.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
@@ -369,8 +372,10 @@ template, and owns the copy: editing a template never changes a session, and re-
 what was written in the sections that still match. The live board (`codex/live.ts`) reads the active
 session's prep; its commands tick a clue, set the current scene and log a line as a note filed under
 the session. A tick and the current scene change the prep, so they move the session's `rev`, and an
-editor holding the old one gets a conflict instead of overwriting the tick. Party position is one write that
-moves the party pin to a point on any map, or makes one.
+editor holding the old one gets a conflict instead of overwriting the tick. Party position is one
+write that moves the party pin to a point on any map, or makes one. Search filters and sorts, and the
+GM's home counts, recent changes and reveal check, are built in `codex/find.ts`; a player's search
+and home are built in `player-reads.ts` from that player's own reads.
 
 The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
 (`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that
