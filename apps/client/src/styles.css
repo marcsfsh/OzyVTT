@@ -295,16 +295,6 @@ p {
   color: var(--text-dim);
   line-height: var(--lh-body);
 }
-.eyebrow {
-  display: inline-block;
-  color: var(--text-muted);
-  font-family: var(--font-label);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-}
-
 /* Base styles for the raw <button>/<input>/<select> that remain; prefer @vtt/ui <Button>. */
 button,
 input,

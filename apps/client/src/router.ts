@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from "react";
 // The Codex owns its address space (`codex/routes.ts`) and this module asks it. The import cycle via
 // `withQuery` is safe: neither module calls across it during evaluation.
-import { codexSectionOf } from "./codex/routes";
+import { codexSectionOf, GM_ONLY_SECTIONS, type CodexAddress } from "./codex/routes";
 import { redirectForOldMapAddress, scenesViewOf, type ScenesView } from "./scenes/routes";
 
 export type Route = Readonly<{
@@ -59,57 +59,7 @@ async function mayLeave(): Promise<boolean> {
   return true;
 }
 
-// Transient history entries (the phone nav drawer only)
-
-/**
- * Pushes a same-path entry whose only job is to be popped, so Android back closes the phone nav
- * drawer and the page stays in the section. Dialogs stay out of history.
- */
-const transients = new Map<string, () => void>();
-
-export function pushTransient(key: string, onPop: () => void): void {
-  transients.set(key, onPop);
-  window.history.pushState({ transient: key }, "", window.location.href);
-}
-
-/** Withdraw a transient entry that was closed by its own affordance, where the back gesture didn't close it. */
-export function popTransient(key: string): void {
-  if (!transients.has(key)) return;
-  transients.delete(key);
-  // `back()` pops our entry; the popstate handler sees no registered key and re-routes to the same
-  // path, a no-op render.
-  window.history.back();
-}
-
-/**
- * Forgets a transient entry without going back, for a caller about to navigate (`back()` is a task and
- * `navigate` a microtask, so the destination would be popped). Returns whether an entry is stranded,
- * so the caller can navigate with `replace: true`.
- */
-export function discardTransient(key: string): boolean {
-  if (!transients.has(key)) return false;
-  transients.delete(key);
-  return true;
-}
-
-/**
- * Pops an entry `discardTransient` released when the navigation was then vetoed, so the next Back is
- * not spent on a closed drawer. Same address, so no guard prompt.
- */
-export function releaseStrandedEntry(): void {
-  window.history.back();
-}
-
-window.addEventListener("popstate", (event) => {
-  const key = (event.state as { transient?: string } | null)?.transient;
-  // Popping forward onto a transient entry is never honoured; only its disappearance matters. With a
-  // transient registered, the pop closes it and the route stands.
-  if (transients.size > 0) {
-    const [openKey, onPop] = [...transients.entries()][transients.size - 1];
-    transients.delete(openKey);
-    onPop();
-    if (key === undefined) return;
-  }
+window.addEventListener("popstate", () => {
   /**
    * Back is a navigation too, so guards apply; the browser has already moved, so a veto pushes the
    * previous address back. With no guards, or a pop that keeps the address, it just publishes.
@@ -128,10 +78,7 @@ window.addEventListener("popstate", (event) => {
   });
 });
 
-/**
- * Goes to an address after the guards; a veto leaves the URL alone. Resolves to whether it navigated
- * (the nav drawer uses that to take back its released entry).
- */
+/** Goes to an address after the guards; a veto leaves the URL alone. Resolves to whether it navigated. */
 export function navigate(path: string, opts: Readonly<{ replace?: boolean }> = {}): Promise<boolean> {
   if (path === currentHref()) return Promise.resolve(false);
   return mayLeave().then((allowed) => {
@@ -245,7 +192,7 @@ export function litPlayerTab(path: string): PlayerTab {
  */
 export function isGmOnlyPath(path: string): boolean {
   const segments = path.split("/").filter(Boolean);
-  if (segments[0] === "codex") return ["audit", "backup", "settings"].includes(segments[1] ?? "");
+  if (segments[0] === "codex") return GM_ONLY_SECTIONS.includes((segments[1] ?? "") as CodexAddress);
   // `/settings` is shared but `/settings/api` is GM-only.
   if (segments[0] === "settings") return segments[1] === "api";
   const tab = gmTabForPath(path);

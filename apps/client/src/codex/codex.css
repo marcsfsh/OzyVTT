@@ -53,12 +53,6 @@
   flex: 0 0 auto;
   min-height: var(--tap-min);
 }
-/* Move-to-folder picker (the touch alternative to drag-and-drop). The modal body scrolls, so no cap here. */
-.codex-move-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 
 /* The rail's scroll region. `position: relative` makes it the containing block for absolute descendants
    (including the folder menu popover), so they scroll inside it and the shell never grows. */
@@ -91,46 +85,7 @@
   font-size: var(--fs-sm);
   padding: var(--space-3) var(--space-2);
 }
-/* 44px min-height: an ::after hit area would overhang neighbouring rows in a vertical list. */
-.codex-list-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--tap-min);
-  text-align: left;
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  position: relative;
-  transition:
-    color var(--dur-hover) var(--ease-settle),
-    border-color var(--dur-hover) var(--ease-settle);
-}
-.codex-list-item:hover {
-  border-bottom-color: var(--line-hover);
-}
-.codex-list-item.is-active {
-  border-bottom-color: var(--magenta);
-  font-weight: 700;
-}
-.codex-list-item.is-active::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 2px;
-  top: 50%;
-  width: var(--cue-w);
-  height: var(--cue-h);
-  transform: translateY(-50%);
-  color: var(--magenta);
-  background: var(--cue-mark);
-  pointer-events: none;
-}
+
 .codex-list-title {
   flex: 1;
   min-width: 0;
@@ -243,161 +198,6 @@
   flex: none;
   vertical-align: -0.16em;
 }
-.codex-reader-titleicon {
-  width: 0.82em;
-  height: 0.82em;
-  margin-right: 0.28em;
-  vertical-align: -0.02em;
-}
-.codex-campaign-typeglyph {
-  width: 20px;
-  height: 20px;
-}
-
-/* Notebook tree. */
-.codex-tree {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.codex-tree-branch {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-/* 44px min-height: a vertical stack can't use an ::after hit area. Also gives the ⋯ menu a 44px row to sit in. */
-.codex-tree-folder {
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  width: 100%;
-  text-align: left;
-  padding: var(--space-1) var(--space-2);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-family: var(--font-label);
-  font-weight: 700;
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  border-radius: var(--radius-sm);
-}
-.codex-tree-folder:hover {
-  background: var(--surface-2);
-  color: var(--text);
-}
-.codex-tree-caret {
-  display: inline-block;
-  width: 0.9em;
-  height: 0.9em;
-  flex: none;
-  color: var(--text-muted);
-  transform: rotate(-90deg);
-  transition: transform var(--dur-base, 200ms) var(--ease-settle, ease);
-}
-.codex-tree-caret.is-open {
-  transform: rotate(0deg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .codex-tree-caret {
-    transition: none;
-  }
-}
-.codex-tree-folder-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.codex-tree-count {
-  font-family: var(--font-numeric);
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-}
-/* 44px min-height for the vertical stack; also contains the ⋯ move button's hit area. */
-.codex-tree-page {
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  width: 100%;
-  text-align: left;
-  padding: var(--space-1) var(--space-2);
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  position: relative;
-}
-.codex-tree-page:hover {
-  border-bottom-color: var(--line-hover);
-}
-.codex-tree-page.is-active {
-  border-bottom-color: var(--magenta);
-  font-weight: 700;
-}
-.codex-tree-page.is-active::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 0;
-  top: 50%;
-  width: var(--cue-w);
-  height: var(--cue-h);
-  transform: translateY(-50%);
-  color: var(--magenta);
-  background: var(--cue-mark);
-  pointer-events: none;
-}
-.codex-tree-page-row {
-  display: flex;
-  align-items: center;
-}
-.codex-tree-page-row .codex-tree-page {
-  flex: 1;
-  min-width: 0;
-}
-/* The row wraps so the visibility badge drops below the title and never squeezes it to nothing.
-   `min-width: 6rem` (not 0) is what makes flex-wrap trigger. */
-.codex-tree-page {
-  flex-wrap: wrap;
-  row-gap: var(--space-1);
-}
-.codex-tree-page > .codex-list-title {
-  flex: 1 1 6rem;
-  min-width: 6rem;
-}
-.codex-tree-page[draggable="true"],
-.codex-tree-folder[draggable="true"] {
-  cursor: grab;
-}
-/* The 44px ::after overhangs 14.5px per side; --space-4 keeps it off the title button. */
-.codex-tree-page-move {
-  margin-inline-start: var(--space-4);
-  opacity: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0 var(--space-1);
-  font-size: var(--fs-body);
-  border-radius: var(--radius-sm);
-  line-height: 1;
-}
-.codex-tree-page-row:hover .codex-tree-page-move,
-.codex-tree-page-move:focus-visible {
-  opacity: 1;
-}
-.codex-tree-page-move:hover {
-  color: var(--cyan);
-  background: var(--surface-2);
-}
 
 /* The detail column's scroll region; the editor scrolls here while the rail stays put. */
 .codex-main {
@@ -433,73 +233,10 @@
   margin-bottom: var(--space-2);
 }
 
-.codex-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-height: 0;
-}
-.codex-editor-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.codex-title-input {
-  width: 100%;
-  min-width: 0;
-}
-.codex-editor-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.codex-editor-titlewrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.codex-crumbs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-  font-family: var(--font-numeric);
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-}
 .codex-crumb-sep {
   opacity: 0.6;
 }
-.codex-editor-head {
-  padding-inline: var(--space-4);
-}
-/* The editor fills the definite-height `.codex-main` and never pushes it into a scroll. */
-.codex-editor {
-  flex: 1 1 auto;
-}
-.codex-editor-cols {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  align-items: stretch;
-  flex: 1 1 auto;
-  min-height: 0;
-  position: relative;
-}
-.codex-editor-center {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  border: 1px solid transparent;
-  padding: var(--space-4);
-}
+
 /* Page details overlay the detail column. `absolute` (not `fixed`) clips it to this column so it cannot
    collide with the shell's Session prep drawer. */
 .codex-editor-context {
@@ -552,57 +289,6 @@
 .codex-editor-surface.is-fill .nh-mdeditor-input {
   flex: 1 1 auto;
   min-height: 8rem;
-}
-/* Read mode is not pinned to the frame: a reader takes its content height and scrolls in `.codex-main`. */
-.codex-tree-folder-row {
-  display: flex;
-  align-items: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-}
-.codex-tree-folder-row .codex-tree-folder {
-  flex: 1;
-  min-width: 0;
-}
-.codex-tree-folder-row.is-drop {
-  background: color-mix(in srgb, var(--cyan) 16%, transparent);
-  border-color: var(--cyan);
-  border-style: dashed;
-}
-/* The menu trigger's ::after overhangs 8px per side; --space-2 keeps it off the folder-name button. */
-.codex-tree-folder-actions {
-  display: flex;
-  align-items: center;
-  margin-inline-start: var(--space-2);
-}
-.codex-tree-folder-menu {
-  opacity: 0;
-}
-.codex-tree-folder-row:hover .codex-tree-folder-menu,
-.codex-tree-folder-menu:focus-within,
-.codex-tree-folder-menu[open] {
-  opacity: 1;
-}
-.codex-tree-folder-ic {
-  width: 1em;
-  height: 1em;
-  display: block;
-}
-/* Touch has no hover, so row actions stay visible on narrow screens. */
-@media (max-width: 849px) {
-  .codex-tree-folder-menu,
-  .codex-tree-page-move {
-    opacity: 1;
-  }
-}
-
-/* Entity meta and typed fields share one grid so their columns line up. */
-.codex-meta-row,
-.codex-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-  gap: var(--space-2) var(--space-3);
-  align-items: start;
 }
 
 .codex-body-bar {
@@ -736,24 +422,6 @@
   margin: 0 0 var(--space-2);
 }
 
-/* A page's return edges as one bordered section with a sub-heading per kind. */
-.codex-connections {
-  border-top: 1px solid var(--line);
-  padding-top: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.codex-connections-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.codex-connections-head .codex-backlinks-title {
-  margin: 0;
-}
 .codex-connections-block {
   display: flex;
   flex-direction: column;
@@ -855,10 +523,6 @@
   flex: 1;
 }
 
-/* Typed entity fields. The grid is shared with `.codex-meta-row` above. */
-.codex-field-area {
-  min-height: 3.5em;
-}
 .codex-field-wide {
   grid-column: 1 / -1;
 } /* textareas (goals, properties, traits) span the full row */
@@ -867,40 +531,6 @@
   border-left: 2px solid var(--violet);
   background: color-mix(in srgb, var(--violet) 7%, var(--surface-2));
   border-radius: 0;
-}
-.codex-fields-secret {
-  margin-top: var(--space-3);
-  padding: var(--space-3);
-}
-.codex-fields-secret-tag {
-  grid-column: 1 / -1;
-  justify-self: start;
-  margin-bottom: var(--space-1);
-}
-.codex-tree-icon {
-  flex-shrink: 0;
-}
-.codex-reader-fields {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 3px var(--space-3);
-  margin: 0 0 var(--space-3);
-}
-.codex-reader-field {
-  display: contents;
-}
-.codex-reader-field dt {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-.codex-reader-field dd {
-  margin: 0;
-  color: var(--text);
-}
-.codex-reader-rels {
-  border-top: 1px solid var(--line);
-  padding-top: var(--space-3);
-  margin-top: var(--space-3);
 }
 
 /* Calendar + chronicle */
@@ -1026,29 +656,6 @@
   padding-left: 1.1rem;
 }
 
-/* Campaign home dashboard */
-/* No scroller of its own; it scrolls in `.codex-shell-content`. */
-.codex-campaign {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-.codex-campaign-stats {
-  display: flex;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-.codex-campaign-stat {
-  display: flex;
-  flex-direction: column;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-.codex-campaign-statnum {
-  font-family: var(--font-display);
-  font-size: var(--fs-h1);
-  color: var(--magenta);
-}
 .codex-campaign-section {
   display: flex;
   flex-direction: column;
@@ -1063,73 +670,7 @@
   color: var(--text-muted);
   margin: 0;
 }
-.codex-campaign-types {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--space-3);
-}
-.codex-campaign-typecard {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid transparent;
-  border-left-width: 3px;
-  cursor: pointer;
-  transition: transform var(--dur-press) var(--ease-settle);
-}
-.codex-campaign-typecard:hover {
-  transform: translateY(-1px);
-}
-.codex-campaign-typecard:hover::before,
-.codex-campaign-typecard:focus-visible::before {
-  border-color: var(--rim-color-hi);
-}
-.codex-campaign-typeicon {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.codex-campaign-typelabel {
-  flex: 1;
-  color: var(--text);
-}
-.codex-campaign-typecount {
-  font-family: var(--font-display);
-  font-size: var(--fs-h2);
-  color: var(--cyan);
-}
-.codex-campaign-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-/* 32px paint plus an ::after hit area; the 12px row gap covers the 6px overhang. */
-.codex-tag-chip {
-  min-height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 3px var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: 0;
-  background: var(--surface-2);
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-}
-.codex-tag-chip:hover {
-  border-color: var(--cyan);
-  color: var(--text);
-}
-.codex-tag-count {
-  font-family: var(--font-numeric);
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-}
+
 .codex-campaign-recent {
   display: flex;
   flex-direction: column;
@@ -1162,45 +703,7 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
-/* The in-world "now" sits in the stat row, baseline-aligned with the numbers. */
-.codex-campaign-today {
-  display: flex;
-  align-items: flex-end;
-}
-/* The player's non-interactive session row: no tap floor, since nothing here is tappable. */
-.codex-campaign-sessionrow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  color: var(--text);
-}
-/* Clamped: the full recap lives in the Journal. */
-.codex-campaign-sessionrecap {
-  margin: 0;
-  padding: 0 var(--space-3);
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  overflow: hidden;
-}
-/* "Open quests" card: a row plus its objective list, wrapped because the GM's row is a <button>. */
-.codex-campaign-quest {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-/* The player's static twin of `.codex-campaign-recentitem`; no tap floor since nothing is tappable. */
-.codex-campaign-questrow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  color: var(--text);
-}
+
 /* The title keeps a readable floor and the row wraps, so nowrap annotations drop to a second line instead
    of crushing the name. Quest progress and deadline dates are the row's payload, so they never hide. */
 .codex-campaign-recentitem {
@@ -1211,41 +714,7 @@
   flex: 1 1 auto;
   min-width: 8rem;
 }
-.codex-campaign-questprogress,
-.codex-campaign-deadlinewhen {
-  flex: none;
-  font-family: var(--font-numeric);
-  font-size: var(--fs-2xs);
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-/* Indented so the read-only checklist belongs to the quest row above. */
-.codex-campaign-questlist {
-  padding: 0 var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-5));
-}
-/* Faction standing card: a row plus its bar. */
-.codex-campaign-standings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.codex-campaign-standing {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-/* Wraps at narrow widths so the tier word is never ellipsised. Adjust is a default-size `Button` (44px
-   paint, no ::after) because it can end up directly above the next faction's row. */
-.codex-campaign-standingrow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.codex-campaign-standingname {
-  flex: 1 1 180px;
-  min-width: 0;
-}
+
 .codex-campaign-standingvalue {
   flex: none;
   font-family: var(--font-numeric);
@@ -1253,21 +722,10 @@
   color: var(--text-dim);
   white-space: nowrap;
 }
-.codex-campaign-standingmeter {
-  padding: 0 var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-5));
-}
 
 @media (max-width: 650px) {
-  /* Tighter gap keeps the stats to two rows on a phone. */
-  .codex-campaign-stats {
-    gap: var(--space-3);
-  }
   .codex-campaign-recentwhen {
     display: none;
-  } /* the when-label goes first, never the title */
-  /* The bar drops its indent before it loses width. */
-  .codex-campaign-standingmeter {
-    padding: 0 0 var(--space-1);
   }
 }
 
@@ -1307,290 +765,17 @@
   gap: var(--space-3);
 }
 
-/* Codex blocks inside the `Drawer` body; the drawer itself is not restyled. */
-.codex-console {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: flex-start;
-}
-.codex-console-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-.codex-console-attendees {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
-/* This panel is likely open while screen-sharing, so the secret block must read as GM-only at a glance. */
-.codex-console-prep {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
-  padding: var(--space-3);
-  width: 100%;
-}
-.codex-console-empty {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: flex-start;
-  color: var(--text-muted);
-}
-
-/* ----- Quests: the quest log destination ----- */
-
-/* Reuses the notebook chassis and the session log's exit row. */
-
-/* 44px min-height in a stacked list, where an ::after hit area would overhang. */
-.codex-quest-row {
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-2);
-  width: 100%;
-  text-align: left;
-  padding: var(--space-1) var(--space-3);
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  transition:
-    color var(--dur-hover) var(--ease-settle),
-    border-color var(--dur-hover) var(--ease-settle);
-}
 /* Wraps so the nowrap status and visibility badges drop below the title and the rail never scrolls
    sideways. Shared with `.codex-session-row`. */
-.codex-quest-row,
+
 .codex-session-row {
   flex-wrap: wrap;
   row-gap: var(--space-1);
 }
-.codex-quest-row > .codex-list-title,
+
 .codex-session-row > .codex-list-title {
   flex: 1 1 auto;
   min-width: 8rem;
-}
-.codex-quest-row:hover {
-  background: var(--surface-2);
-  border-color: var(--line);
-}
-/* Selection owns the edge, hover owns the surface. */
-.codex-quest-row.is-active {
-  background: var(--surface-2);
-  border-color: var(--magenta);
-}
-.codex-quest-rowglyph {
-  flex: none;
-  color: var(--caution);
-} /* the quest hue from the search row */
-
-.codex-quest-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.codex-quest-objectives {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.codex-quest-objectives-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.codex-quest-subhead {
-  margin: 0;
-  font-family: var(--font-label);
-  font-weight: 700;
-  font-size: var(--fs-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-/* A readout in words, never a bare "2/5". */
-.codex-quest-progress {
-  font-family: var(--font-numeric);
-  font-size: var(--fs-2xs);
-  color: var(--text-dim);
-}
-
-/* Linked-entity rows: both controls grow to 44px, since rows 4px apart can't absorb an ::after overhang. */
-.codex-quest-links {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.codex-quest-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.codex-quest-link-open {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  text-align: left;
-  border: 1px solid transparent;
-  color: var(--text);
-  padding: var(--space-1) var(--space-3);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-}
-.codex-quest-link-open:hover::before,
-.codex-quest-link-open:focus-visible::before {
-  border-color: var(--cyan);
-}
-
-/* ----- The player's quest reader (reuses the GM log's chassis and rows) ----- */
-
-/* Relationship graph: fills its region, bar on top, canvas takes the rest. */
-.codex-graph {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  gap: var(--space-2);
-}
-.codex-graph-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.codex-graph-hint {
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-.codex-graph-legend {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-/* Wrapping chips grow to 44px and never overhang. */
-.codex-graph-legenditem {
-  min-height: var(--tap-min);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--fs-2xs);
-  color: var(--text-dim);
-  border: 1px solid transparent;
-  background: none;
-  border-radius: 0;
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-  transition:
-    opacity var(--dur-hover) var(--ease-settle),
-    border-color var(--dur-hover) var(--ease-settle);
-}
-.codex-graph-legenditem:hover {
-  border-color: var(--line);
-  color: var(--text);
-}
-.codex-graph-legenditem.is-off {
-  opacity: 0.4;
-  text-decoration: line-through;
-}
-.codex-graph-legenditem i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.codex-graph-zoom {
-  display: flex;
-  gap: var(--space-1);
-  align-items: center;
-}
-.codex-graph-svg {
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
-  background: radial-gradient(circle at 50% 40%, var(--surface-1), var(--void));
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  cursor: grab;
-}
-.codex-graph-svg:active {
-  cursor: grabbing;
-}
-.codex-graph-arrowhead {
-  fill: var(--line-strong);
-}
-.codex-graph-edge line {
-  stroke: var(--line-strong);
-  stroke-width: 1.2;
-  opacity: 0.5;
-  transition:
-    opacity var(--dur-hover) var(--ease-settle),
-    stroke var(--dur-hover) var(--ease-settle);
-}
-.codex-graph-edge.is-lit line {
-  stroke: var(--cyan);
-  opacity: 0.95;
-  stroke-width: 1.8;
-}
-.codex-graph-edge.is-dim {
-  opacity: 0.15;
-}
-.codex-graph-edgelabel {
-  fill: var(--text-dim);
-  font-size: 9px;
-  font-family: var(--font-numeric);
-  pointer-events: none;
-}
-.codex-graph-node {
-  cursor: pointer;
-  transition: opacity var(--dur-hover) var(--ease-settle);
-}
-.codex-graph-node:focus {
-  outline: none;
-}
-/* Rings go on the painted node only: the invisible hit circle is tap-sized, so a ring there would float
-   away from the node. */
-.codex-graph-node circle:not(.codex-graph-nodehit) {
-  stroke: var(--void);
-  stroke-width: 2;
-  transition: stroke var(--dur-hover) var(--ease-settle);
-}
-.codex-graph-node.is-hover circle:not(.codex-graph-nodehit) {
-  stroke: var(--text);
-  stroke-width: 2.5;
-}
-.codex-graph-node:focus-visible circle:not(.codex-graph-nodehit),
-.codex-graph-node.is-focus circle:not(.codex-graph-nodehit) {
-  stroke: var(--cyan);
-  stroke-width: 3;
-}
-.codex-graph-node.is-dim {
-  opacity: 0.28;
-}
-.codex-graph-nodeicon {
-  fill: rgba(8, 6, 20, 0.85);
-  pointer-events: none;
-}
-.codex-graph-nodelabel {
-  fill: var(--text);
-  font-size: 11px;
-  pointer-events: none;
-  paint-order: stroke;
-  stroke: var(--void);
-  stroke-width: 3px;
 }
 
 /* Settings: a column, so every control grows its own 44px paint and none squeezes below the floor at 320px. */
@@ -2204,13 +1389,6 @@
   }
 }
 
-/* Once the bar wraps, the legend's `margin-left: auto` would strand it mid-row. */
-@media (max-width: 760px) {
-  .codex-graph-legend {
-    margin-left: 0;
-  }
-}
-
 /* ----- Journal ----- */
 .codex-journal {
   display: flex;
@@ -2443,49 +1621,6 @@
   line-height: var(--lh-body);
 }
 
-/* Media */
-.codex-banner {
-  position: relative;
-  border-radius: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-.codex-banner-img {
-  display: block;
-  width: 100%;
-  max-height: 240px;
-  object-fit: cover;
-}
-.codex-banner-actions {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  display: flex;
-  gap: var(--space-1);
-  background: var(--overlay);
-  border-radius: var(--radius-pill);
-  padding: 2px;
-}
-/* The add-a-banner control is a solid button. */
-.codex-banner-add {
-  align-self: flex-start;
-  border: 1px solid transparent;
-  color: var(--text-dim);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-}
-.codex-banner-add:hover {
-  color: var(--text);
-}
-.codex-banner-add:hover::before,
-.codex-banner-add:focus-visible::before {
-  border-color: var(--magenta);
-}
-
-/* New-page template menu */
-.codex-newpage {
-  position: relative;
-}
 .codex-md-img {
   display: block;
   max-width: 100%;
@@ -2497,12 +1632,6 @@
 .codex-img-failed {
   color: var(--text-muted);
   font-style: italic;
-}
-
-/* The graph node's invisible touch circle: `fill: transparent` (not `none`) so it receives pointer events.
-   Its radius is set in RelationshipGraph.tsx from the live zoom. */
-.codex-graph-nodehit {
-  fill: transparent;
 }
 
 /* ----- Adjusting a faction's standing ----- */
@@ -2525,14 +1654,6 @@
   color: var(--text-muted);
 }
 
-/* ----- The reveal audit ----- */
-
-/* No scroller of its own; it scrolls in `.codex-shell-content`. */
-.codex-audit {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
 .codex-audit-head {
   display: flex;
   flex-direction: column;
@@ -2544,20 +1665,13 @@
   color: var(--text);
   margin: 0;
 }
-.codex-audit-count {
-  margin: 0;
-  color: var(--text);
-}
+
 .codex-audit-scope {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-.codex-audit-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
+
 .codex-audit-h {
   display: flex;
   align-items: center;
@@ -2570,337 +1684,12 @@
   color: var(--text-muted);
   margin: 0;
 }
-.codex-audit-glyph {
-  color: var(--text-muted);
-}
-/* Says "not read" when a category didn't arrive, so it never looks empty. */
-.codex-audit-sectioncount {
-  font-family: var(--font-label);
-  font-size: var(--fs-2xs);
-  color: var(--text-dim);
-  text-transform: none;
-  letter-spacing: 0;
-}
-.codex-audit-rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-/* 44px min-height and a default-size `Button`, so this stack of action rows has no ::after hit areas. */
-.codex-audit-row {
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-}
-.codex-audit-row {
-  flex-wrap: wrap;
-  row-gap: var(--space-1);
-}
-.codex-audit-row .codex-list-title {
-  flex: 1 1 auto;
-  min-width: 8rem;
-}
-
-/* ----- Sidebar shell. Breakpoints: >=850 expanded sidebar (collapsible to a 56px rail), 761-849 icon
-   rail, <=760 off-canvas drawer. ----- */
-
-/* The shell never scrolls; `stretch` makes the sidebar a full-height column. */
-.codex-shell {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr);
-  gap: 0;
-  align-items: stretch;
-  min-height: 0;
-}
-.codex-shell-side {
-  display: none;
-}
-.codex-shell-main {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-/* The one scroll region. Bottom padding reserves the sky's horizon band; `overscroll-behavior` because the
-   page behind is locked. */
-.codex-shell-content {
-  min-width: 0;
-  position: relative;
-  padding-bottom: calc(var(--sky-horizon-inset) + var(--sky-sun-crown) + env(safe-area-inset-bottom));
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--space-6);
-}
-/* Filling sections cover the horizon with opaque panels, so they skip the reserve. */
-.codex-shell-content:has(> .codex-workspace),
-.codex-shell-content:has(> .codex-atlas),
-.codex-shell-content:has(> .codex-graph) {
-  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
-}
 
 /* The GM's player preview: the sheet is the frame, so the embedded shell gets a definite height. */
 .codex-preview-modal .nh-modal-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-.codex-shell.is-embedded {
-  flex: 1 1 auto;
-  min-height: 0;
-}
-.codex-shell.is-embedded .codex-shell-content {
-  padding-bottom: 0;
-}
-
-.codex-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  height: 100%;
-  min-height: 0;
-  padding: var(--space-3) var(--space-2);
-  border: 1px solid transparent;
-}
-/* The rail scrolls so Tools (Settings, Backup) stays reachable on a 720p screen. */
-.codex-sidebar-groups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  flex: 1 1 auto;
-  min-height: 0;
-  position: relative;
-}
-/* Tools is bottom-anchored by layout; array order doesn't place it. */
-.codex-sidebar-group.is-tools {
-  margin-block-start: auto;
-  padding-block-start: var(--space-3);
-  border-block-start: 1px solid var(--line);
-}
-.codex-sidebar-grouplabel {
-  display: block;
-  padding-inline: var(--space-2);
-  margin-block-end: var(--space-1);
-  color: var(--text-muted);
-}
-.codex-sidebar-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* 44px min-height in a stacked list. */
-.codex-navitem {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--tap-min);
-  padding: var(--space-2);
-  border: 0;
-  border-bottom: 1px solid transparent;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-dim);
-  font: 600 var(--fs-sm) / 1.2 var(--font-body);
-  text-align: start;
-  cursor: pointer;
-}
-.codex-navitem:hover {
-  color: var(--text);
-}
-/* Selection owns the edge, hover owns the fill, so the two never look the same. */
-.codex-navitem.is-active {
-  color: var(--text);
-  border-bottom-color: var(--magenta);
-  padding-inline-start: calc(var(--space-2) + 0.55rem);
-}
-.codex-navitem.is-active::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 2px;
-  top: 50%;
-  width: var(--cue-w);
-  height: var(--cue-h);
-  transform: translateY(-50%);
-  color: var(--magenta);
-  background: var(--cue-mark);
-  pointer-events: none;
-}
-.codex-navitem-icon {
-  width: 1.15em;
-  height: 1.15em;
-  flex: none;
-}
-.codex-navitem-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.codex-sidebar-search {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--tap-min);
-  padding: var(--space-2);
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  font: 500 var(--fs-sm) / 1.2 var(--font-body);
-  text-align: start;
-  cursor: pointer;
-}
-.codex-sidebar-search:hover {
-  color: var(--text);
-}
-.codex-sidebar-search:hover::before,
-.codex-sidebar-search:focus-visible::before {
-  border-color: var(--rim-color-hi);
-}
-.codex-sidebar-search .nh-kbd {
-  margin-inline-start: auto;
-}
-.codex-sidebar-searchglyph {
-  opacity: 0.8;
-}
-.codex-sidebar-foot {
-  display: flex;
-  justify-content: flex-end;
-  padding-block-start: var(--space-2);
-}
-
-.codex-sidebar.is-rail {
-  padding-inline: var(--space-1);
-}
-.codex-sidebar.is-rail .codex-navitem,
-.codex-sidebar.is-rail .codex-sidebar-search {
-  justify-content: center;
-  padding-inline: 0;
-}
-/* Rail mode: drop the stable scrollbar gutter so the nav icons, search glyph and collapse chevron share one
-   centre line. The rail then has no visible scrollbar; the fade below marks overflow instead. */
-.codex-sidebar.is-rail .codex-sidebar-groups {
-  scrollbar-width: none;
-  scrollbar-gutter: auto;
-}
-.codex-sidebar.is-rail .codex-sidebar-groups::-webkit-scrollbar {
-  display: none;
-}
-.codex-sidebar.is-rail .codex-sidebar-foot {
-  justify-content: center;
-}
-/* Fade an edge only while `SidebarNav.tsx` reports real overflow past it. `black` is a mask stencil here. */
-.codex-sidebar.is-rail .codex-sidebar-groups.has-fade-bottom {
-  mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent 100%);
-}
-.codex-sidebar.is-rail .codex-sidebar-groups.has-fade-top {
-  mask-image: linear-gradient(to bottom, transparent 0, black 1.5rem, black 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 1.5rem, black 100%);
-}
-.codex-sidebar.is-rail .codex-sidebar-groups.has-fade-top.has-fade-bottom {
-  mask-image: linear-gradient(to bottom, transparent 0, black 1.5rem, black calc(100% - 1.5rem), transparent 100%);
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    black 1.5rem,
-    black calc(100% - 1.5rem),
-    transparent 100%
-  );
-}
-
-.codex-navdrawer .nh-drawer-body {
-  padding: var(--space-2);
-}
-/* The prep drawer never covers the whole screen, so closing it stays obvious on a phone. */
-.codex-prepdrawer {
-  width: min(420px, 85vw);
-}
-
-.codex-topbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--tap-min);
-  padding-inline: var(--space-1);
-}
-.codex-topbar-title {
-  margin: 0;
-  font: 700 var(--fs-h3) / 1.2 var(--font-display);
-  letter-spacing: var(--tracking-display);
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.codex-topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.codex-topbar-search {
-  display: none;
-}
-
-/* No sticky: the rail is a column of a frame that never scrolls. */
-@media (min-width: 761px) {
-  .codex-shell {
-    grid-template-columns: 56px minmax(0, 1fr);
-    gap: var(--space-4);
-  }
-  .codex-shell-side {
-    display: block;
-    min-height: 0;
-  }
-  .codex-topbar-menu {
-    display: none;
-  }
-  .codex-navdrawer {
-    display: none;
-  }
-}
-/* 761-849: the icon rail is forced (the track is 56px). `useSidebarRail.ts` collapses the markup to match;
-   this hides labels in case it doesn't, since no other navigation shows in this band. */
-@media (min-width: 761px) and (max-width: 849px) {
-  .codex-sidebar {
-    padding-inline: var(--space-1);
-  }
-  .codex-sidebar .codex-navitem,
-  .codex-sidebar .codex-sidebar-search {
-    justify-content: center;
-    padding-inline: 0;
-  }
-  .codex-sidebar .codex-navitem-label,
-  .codex-sidebar .codex-sidebar-grouplabel,
-  .codex-sidebar .codex-sidebar-search .nh-kbd,
-  .codex-sidebar .codex-sidebar-foot {
-    display: none;
-  }
-}
-@media (min-width: 850px) {
-  .codex-shell {
-    grid-template-columns: 220px minmax(0, 1fr);
-  }
-  .codex-shell.is-rail {
-    grid-template-columns: 56px minmax(0, 1fr);
-  }
-}
-@media (max-width: 760px) {
-  .codex-topbar-search {
-    display: inline-flex;
-  }
 }
 
 /* The not-found view's actions. */
@@ -2920,159 +1709,12 @@
   font-size: var(--fs-sm);
 }
 
-/* ----- The dashboard's card chassis ----- */
-.codex-dashgrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-4);
-}
-@media (min-width: 850px) {
-  .codex-dashgrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 980px) {
-  .codex-dashgrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.codex-dashcard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  border: 1px solid transparent;
-  padding: var(--space-3);
-  min-width: 0;
-}
-.codex-dashcard-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.codex-dashcard-glyph {
-  width: 1.1em;
-  height: 1.1em;
-  flex: none;
-  color: var(--text-dim);
-}
-.codex-dashcard-title {
-  margin: 0;
-  font: 700 var(--fs-h3) / 1.2 var(--font-display);
-  letter-spacing: var(--tracking-display);
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.codex-dashcard-body {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.codex-dashcard-empty {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-.codex-dashcard-foot {
-  display: flex;
-  justify-content: flex-start;
-  margin-block-start: auto;
-}
-.codex-campaign-partyline {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-}
-
-/* ----- The connections panel: one list, one row shape, both origins ----- */
-.codex-connections-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.codex-conn-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-/* 44px min-height in a stacked list. */
-.codex-conn-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  min-height: var(--tap-min);
-}
-.codex-conn-target {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: var(--tap-min);
-  border: none;
-  background: none;
-  color: var(--cyan);
-  cursor: pointer;
-  font: inherit;
-  text-align: start;
-  padding: 0;
-}
-.codex-conn-target:hover {
-  text-decoration: underline;
-}
-/* The direction arrow, drawn as a shape: "out" points away from this page, "in" points at it. */
-.codex-conn-arrow {
-  flex: none;
-  width: 14px;
-  height: 2px;
-  background: var(--line-strong);
-  position: relative;
-}
-.codex-conn-arrow::after {
-  content: "";
-  position: absolute;
-  inset-inline-end: 0;
-  top: -2px;
-  border: 3px solid transparent;
-  border-inline-start-color: var(--line-strong);
-}
-.codex-conn-arrow.is-in {
-  transform: rotate(180deg);
-}
-.codex-conn-kind,
-.codex-conn-origin {
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-}
-.codex-conn-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-inline-start: auto;
-}
-/* An inline form is a solid panel. */
-.codex-conn-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid transparent;
-}
 .codex-conn-formactions {
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
 }
-.codex-conn-gmswitch {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
+
 .codex-editor-tagjumps {
   display: flex;
   flex-wrap: wrap;
@@ -3371,15 +2013,6 @@
   padding: var(--space-3);
 }
 
-/* A drawn dot: the `●` character may be missing from the body font. */
-.codex-campaign-partyreveal {
-  margin: 0;
-}
-.codex-conn-why {
-  flex: 1 1 100%;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
 .codex-dot {
   display: inline-block;
   width: 0.5em;
@@ -3415,18 +2048,6 @@
 .codex-entry-sessionlink:hover {
   text-decoration: underline;
 }
-/* A row just hidden from the audit stays (dimmed) until the refetch settles, so the switch can be flipped back. */
-.codex-audit-row.is-hidden {
-  opacity: 0.55;
-}
-.codex-filter-chips {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.codex-rail-tagfilter {
-  min-width: 0;
-}
 
 @media (max-width: 650px) {
   .codex-calendar-weekdayfull {
@@ -3446,9 +2067,7 @@
     align-items: stretch;
     flex-direction: column;
   }
-  .codex-dashgrid {
-    gap: var(--space-3);
-  }
+
   /* Let the long in-world date wrap between tokens so the row doesn't widen the page. */
   .codex-campaign-recentwhen {
     white-space: normal;
@@ -3457,65 +2076,47 @@
 
 /* Typed-entity rows get a leading rule in the shared `--codex-type` hue; the glyph says which kind.
    `:has()` limits it to rows that carry an entity glyph. */
-.codex-tree-page:has(.codex-tree-icon),
+
 .codex-hit:has(.codex-hit-ic) {
   border-inline-start: 2px solid var(--codex-type);
   padding-inline-start: var(--space-2);
 }
-/* The glyph takes the hue; the row's ink stays on the text. */
-.codex-tree-icon {
-  color: var(--codex-type);
-}
 
 /* Panel material: edge and fill on a `::before` backing layer behind the content. Outermost panels take the
    chrome lip; nested ones a flat plate. Never put it on a scroller: the layer would scroll with the content. */
-.codex-sidebar,
+
 .codex-rail,
 .codex-main-empty,
-.codex-editor-center,
 .codex-editor-context,
 .codex-inspector,
-.codex-dashcard,
 .codex-calendar-clocks,
 .codex-calendar-day,
 .codex-downtime-section,
 .codex-pindetails,
-.codex-campaign-typecard,
 .codex-asset-card,
-.codex-quest-link-open,
 .codex-marker-link-open,
 .codex-marker-appearance,
 .codex-icon-btn,
-.codex-sidebar-search,
-.codex-settings-danger,
-.codex-conn-form,
-.codex-banner-add {
+.codex-settings-danger {
   position: relative;
   isolation: isolate;
   border-radius: 0;
   background: none;
 }
-.codex-sidebar::before,
+
 .codex-rail::before,
 .codex-main-empty::before,
-.codex-editor-center::before,
 .codex-editor-context::before,
 .codex-inspector::before,
-.codex-dashcard::before,
 .codex-calendar-clocks::before,
 .codex-calendar-day::before,
 .codex-downtime-section::before,
 .codex-pindetails::before,
-.codex-campaign-typecard::before,
 .codex-asset-card::before,
-.codex-quest-link-open::before,
 .codex-marker-link-open::before,
 .codex-marker-appearance::before,
 .codex-icon-btn::before,
-.codex-sidebar-search::before,
-.codex-settings-danger::before,
-.codex-conn-form::before,
-.codex-banner-add::before {
+.codex-settings-danger::before {
   content: "";
   position: absolute;
   inset: -1px;
@@ -3533,13 +2134,11 @@
     background var(--dur-hover);
 }
 /* Outermost: the texture. */
-.codex-sidebar,
+
 .codex-rail,
 .codex-main-empty,
-.codex-editor-center,
 .codex-editor-context,
 .codex-inspector,
-.codex-dashcard,
 .codex-calendar-clocks,
 .codex-calendar-day,
 .codex-downtime-section,
@@ -3547,16 +2146,12 @@
   --material-fill: var(--material-lip), var(--material-plate);
 }
 /* Nested: rim and bezel over a flat plate, no texture. */
-.codex-campaign-typecard,
+
 .codex-asset-card,
-.codex-quest-link-open,
 .codex-marker-link-open,
 .codex-marker-appearance,
 .codex-icon-btn,
-.codex-sidebar-search,
-.codex-settings-danger,
-.codex-conn-form,
-.codex-banner-add {
+.codex-settings-danger {
   --material-fill: var(--material-plate);
 }
 /* Restore `absolute`: the shared rule above sets `relative`. */
@@ -3570,8 +2165,4 @@
 /* The danger fence keeps its own severity edge. */
 .codex-settings-danger::before {
   border-color: color-mix(in srgb, var(--danger) 55%, var(--rim-color));
-}
-/* The type card's 3px leading bar is set per kind inline, so only the rim moves to the backing layer. */
-.codex-campaign-typecard {
-  border-left-width: 3px;
 }

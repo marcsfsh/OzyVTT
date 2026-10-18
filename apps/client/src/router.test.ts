@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import {
   currentHref,
-  discardTransient,
   gmTabForPath,
   isGmOnlyPath,
   isKnownPath,
@@ -16,8 +15,6 @@ import {
   pathForGmTab,
   redirectForRetiredPath,
   SOUND_BOARD_PATH,
-  popTransient,
-  pushTransient,
   registerNavigationGuard,
   rememberLocation,
   replaceQuery,
@@ -132,22 +129,27 @@ describe("Which addresses exist", () => {
   it("knows the codex sections, and rejects a section that does not exist", () => {
     expect(isKnownPath("/codex")).toBe(true);
     for (const section of [
+      "search",
       "pages",
       "atlas",
-      "graph",
+      "story",
+      "timeline",
       "sessions",
       "quests",
-      "journal",
-      "calendar",
-      "downtime",
-      "audit",
+      "relationships",
+      "templates",
       "backup",
       "settings"
     ]) {
       expect(isKnownPath(`/codex/${section}`)).toBe(true);
     }
-    expect(isKnownPath("/codex/relationships")).toBe(false); // the retired name
     expect(isKnownPath("/codex/notebook")).toBe(false); // the retired word
+  });
+
+  it("still answers the addresses from before the remaster, which the shells redirect", () => {
+    for (const section of ["graph", "journal", "calendar", "downtime", "audit"]) {
+      expect(isKnownPath(`/codex/${section}`)).toBe(true);
+    }
   });
 
   it("allows a record id only on the sections that HAVE records", () => {
@@ -155,8 +157,10 @@ describe("Which addresses exist", () => {
     expect(isKnownPath("/codex/sessions/s1")).toBe(true);
     expect(isKnownPath("/codex/quests/q1")).toBe(true);
     expect(isKnownPath("/codex/atlas/m1")).toBe(true);
-    // The journal focuses an entry with `?entry=` and no path segment; the other shape must not work.
-    expect(isKnownPath("/codex/journal/j1")).toBe(false);
+    expect(isKnownPath("/codex/templates/t1")).toBe(true);
+    // The chronicle focuses an entry with `?entry=` and no path segment; the other shape must not work.
+    expect(isKnownPath("/codex/story/j1")).toBe(false);
+    expect(isKnownPath("/codex/search/x")).toBe(false);
     expect(isKnownPath("/codex/settings/anything")).toBe(false);
   });
 
@@ -191,6 +195,13 @@ describe("Which addresses exist", () => {
       "/codex/graph",
       "/codex/graph/g1",
       "/codex/audit",
+      "/codex/search",
+      "/codex/search/x",
+      "/codex/story",
+      "/codex/story/x",
+      "/codex/timeline",
+      "/codex/templates",
+      "/codex/templates/t1",
       "/codex/backup",
       "/codex/settings",
       "/codex/settings/anything",
@@ -215,11 +226,26 @@ describe("Which addresses a player may reach (viewer safety)", () => {
    * The client half of the GM-only rule. The server refuses a player token anyway, but a player who
    * reaches the address has already learned the surface exists; the not-found view prevents that.
    */
-  it("marks the three GM-only codex addresses, and only those three", () => {
+  it("marks the GM menu's codex addresses and the retired audit GM-only, and only those", () => {
     expect(isGmOnlyPath("/codex/audit")).toBe(true);
+    expect(isGmOnlyPath("/codex/templates")).toBe(true);
+    expect(isGmOnlyPath("/codex/templates/t1")).toBe(true);
     expect(isGmOnlyPath("/codex/backup")).toBe(true);
     expect(isGmOnlyPath("/codex/settings")).toBe(true);
-    for (const section of ["pages", "atlas", "graph", "sessions", "quests", "journal", "calendar", "downtime"]) {
+    for (const section of [
+      "search",
+      "pages",
+      "atlas",
+      "story",
+      "timeline",
+      "relationships",
+      "sessions",
+      "quests",
+      "graph",
+      "journal",
+      "calendar",
+      "downtime"
+    ]) {
       expect(isGmOnlyPath(`/codex/${section}`)).toBe(false);
     }
     expect(isGmOnlyPath("/codex")).toBe(false);
@@ -453,58 +479,6 @@ describe("Back and forward are guarded too (mobile parity)", () => {
     await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/journal"));
     window.history.back();
     await vi.waitFor(() => expect(window.location.pathname).toBe("/codex/pages/p1"));
-  });
-});
-
-describe("Transient history (the phone nav drawer)", () => {
-  it("closes the drawer on back instead of leaving the section", () => {
-    goTo("/codex/pages");
-    const onPop = vi.fn();
-    pushTransient("nav-drawer", onPop);
-    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
-    expect(onPop).toHaveBeenCalledTimes(1);
-    // The address is untouched.
-    expect(window.location.pathname).toBe("/codex/pages");
-  });
-
-  it("withdraws its entry when the drawer is closed by its own X, so back still means back", () => {
-    goTo("/codex/pages");
-    const onPop = vi.fn();
-    pushTransient("nav-drawer", onPop);
-    popTransient("nav-drawer");
-    // Withdrawn, so the next pop is a real navigation and the handler is not called again.
-    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
-    expect(onPop).not.toHaveBeenCalled();
-  });
-
-  it("ignores popTransient for a key that was never pushed", () => {
-    goTo("/codex/pages");
-    expect(() => popTransient("never-opened")).not.toThrow();
-  });
-
-  /**
-   * `discardTransient` exists because `popTransient` cannot serve a caller about to navigate: in a
-   * browser `history.back()` is a task and `navigate`'s push is a microtask, so closing then
-   * navigating would push the destination and immediately go back off it.
-   */
-  it("discardTransient forgets the entry WITHOUT going back, and says one was stranded", () => {
-    goTo("/codex/pages");
-    const onPop = vi.fn();
-    pushTransient("nav-drawer", onPop);
-    const at = window.location.pathname;
-
-    expect(discardTransient("nav-drawer")).toBe(true);
-    // No history movement: the caller overwrites the entry itself.
-    expect(window.location.pathname).toBe(at);
-    // The handler is gone, so a later pop is a real navigation.
-    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
-    expect(onPop).not.toHaveBeenCalled();
-  });
-
-  it("discardTransient reports false when nothing was open, so the caller does not replace by mistake", () => {
-    // No drawer, so the navigation must push; replacing would eat the entry the GM came from.
-    goTo("/codex/pages");
-    expect(discardTransient("nav-drawer")).toBe(false);
   });
 });
 

@@ -23,7 +23,6 @@ vi.mock("./lib/api", async (original) => ({
 
 import { touchMoveCancelled } from "../test/drag-surface";
 import { MapSurface } from "./codex/MapSurface";
-import { ConnectionGraph } from "./codex/RelationshipGraph";
 import { useCalibration } from "./maps/useCalibration";
 import { MapTokenTray } from "./scene/MapTokenTray";
 import { ScenesContext, type ScenesContextValue } from "./scenes/context";
@@ -132,19 +131,6 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
       />
     )
   },
-  {
-    selector: ".codex-graph-svg",
-    ui: () => (
-      <ConnectionGraph
-        nodes={[
-          { id: "p1", title: "Vallaki", entityType: "note" },
-          { id: "p2", title: "Ireena", entityType: "character" }
-        ]}
-        connections={[]}
-        onOpen={() => {}}
-      />
-    )
-  },
   { selector: ".viewer-stage", ui: () => <MapStage presentation={presentation} /> },
   {
     selector: ".viewer-initiative-resize",
@@ -195,8 +181,8 @@ describe("drag surfaces", () => {
       .filter((name) => /touchAction:\s*"none"/.test(readFileSync(join(source, name), "utf8")))
       .map((name) => relative(source, join(source, name)));
     const covered = [...SURFACES.map((surface) => surface.selector), ".encounter-map-stage"];
-    expect([...ruled].sort()).toEqual(covered.filter((selector) => selector !== ".codex-graph-svg").sort());
-    // The relationship graph sets it inline on its svg, which is `.codex-graph-svg`.
-    expect(inline).toEqual(["codex/RelationshipGraph.tsx"]);
+    expect([...ruled].sort()).toEqual(covered.sort());
+    // No component sets it inline: every drag surface is named in a stylesheet.
+    expect(inline).toEqual([]);
   });
 });

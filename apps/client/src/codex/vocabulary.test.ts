@@ -1,13 +1,14 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { readSource, scanCopy } from "../copy-scan";
-import { SECTION_TITLE, GM_SIDEBAR, PLAYER_SIDEBAR } from "./routes";
+import { CAMPAIGN_PARTS, CODEX_BAR, CODEX_PHONE_TABS, SECTION_TITLE, codexDestinations } from "./routes";
 import { CHRONICLE_KIND_META } from "./chronicle";
 
 /**
- * The Codex glossary as a test: fails on retired words in user-facing strings under `src/codex/` (JSX
+ * The Codex glossary as a test: fails on retired words in user-facing strings anywhere under `src/codex/` (JSX
  * text, label-like props or object keys, and `setError`/`toast`/`setNotice` arguments). Identifiers,
- * comments, CSS classes and wire field names are out of scope.
+ * comments, CSS classes and wire field names are out of scope. The visibility words are Hidden, Revealed (to
+ * everyone or to a character by name), Reveal and Hide again, and Who sees it.
  */
 
 /** Vite rewrites `import.meta.url`, so use the cwd (the client workspace root, asserted below). */
@@ -20,19 +21,16 @@ const REVEAL_PRIMITIVE = `${process.cwd()}/../../packages/ui/src/primitives/Reve
 const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
   { pattern: /\bnote ?books?\b/i, use: "Pages (the section) / page (the record)" },
   { pattern: /\bback ?links?\b/i, use: "connection: D8 made it one list" },
-  { pattern: /\brelationships?\b/i, use: "connection: D8 made it one list" },
   { pattern: /\bwiki[- ]?links?\b/i, use: 'connection, or "[[link]]" when you mean the syntax' },
   { pattern: /\bmarkers?\b/i, use: "pin" },
   { pattern: /\bquest log\b/i, use: "Quests" },
   { pattern: /\bsession log\b/i, use: "Sessions" },
   { pattern: /\bcampaign clock\b/i, use: "your date / today" },
-  { pattern: /\breveal(s|ed|ing)?\b/i, use: '"Shown to players" / "Hidden from players" / "Show … to players"' },
-  { pattern: /\bpublic\b/i, use: '"Shown to players"' },
+  { pattern: /\bpublic\b/i, use: '"Revealed to everyone"' },
   // No lookahead: "secret" mid-sentence must match too.
-  { pattern: /\bsecret\b/i, use: '"Hidden from players" or "GM only"' },
-  // The feature is the Journal in copy; `chronicle` identifiers are fine.
-  { pattern: /\bchronicles?\b/i, use: "Journal" },
-  { pattern: /\btimelines?\b/i, use: "Journal" },
+  { pattern: /\bsecret\b/i, use: '"Hidden"' },
+  { pattern: /\bgraph\b/i, use: "Relationships (its views are Web, Factions grid and Over time)" },
+  { pattern: /\breveal audit\b/i, use: "Search filtered to Hidden, or Home's reveal check" },
   /**
    * The old names of the two-layer notes control. Anchored to the whole string, because the same words
    * appear legitimately in prose and "GM only" is the content-axis pill.
@@ -50,15 +48,13 @@ const RETIRED: ReadonlyArray<Readonly<{ pattern: RegExp; use: string }>> = [
 
 /** Exemptions, matched as whole strings so a new violation can't hide behind one. */
 const ALLOWED = new Set<string>([
-  // A section name.
-  "Reveal audit",
   // In-fiction content (what a faction is up to), with nothing to do with visibility.
   "Secret agenda"
 ]);
 
-/** The scanner is shared with `play-vocabulary.test.ts` via `copy-scan.ts`. */
+/** Every source file under the Codex, its views' folders included. The scanner is shared via `copy-scan.ts`. */
 function codexSources(): readonly string[] {
-  return readdirSync(CODEX_DIR)
+  return (readdirSync(CODEX_DIR, { recursive: true }) as string[])
     .filter((file) => /\.tsx?$/.test(file) && !file.includes(".test."))
     .sort();
 }
@@ -128,33 +124,31 @@ describe("The canonical glossary", () => {
 });
 
 describe("The words the navigation itself uses", () => {
-  it("names every sidebar destination in the glossary's words, in both roles", () => {
-    const labels = (groups: typeof GM_SIDEBAR) => groups.flatMap((group) => group.items.map((item) => item.label));
-    expect(labels(GM_SIDEBAR)).toEqual([
+  it("names the laptop's sections, the phone's tabs and Campaign's parts in the decided words", () => {
+    expect(CODEX_BAR.map((item) => item.label)).toEqual([
       "Home",
-      "Pages",
+      "Search",
       "Atlas",
-      "Graph",
-      "Sessions",
+      "Story",
       "Quests",
-      "Journal",
-      "Calendar",
-      "Downtime",
-      "Reveal audit",
-      "Preview as player",
-      "Backup",
-      "Autosave and history"
+      "Relationships"
     ]);
-    // The player's Codex is the GM's navigation minus the tools.
-    expect(labels(PLAYER_SIDEBAR)).toEqual(labels(GM_SIDEBAR).slice(0, 9));
+    expect(CODEX_PHONE_TABS.map((tab) => tab.label)).toEqual(["Home", "Pages", "Atlas", "Campaign", "Search"]);
+    expect(CAMPAIGN_PARTS.map((part) => part.label)).toEqual(["Story", "Quests", "Relationships", "Sessions"]);
   });
 
-  it("titles each section with the sidebar's own word, so the top bar cannot drift from the nav", () => {
-    for (const item of GM_SIDEBAR.flatMap((group) => group.items)) {
-      if (!item.path) continue;
+  it("titles each section with the bar's own word, so a phone's top bar cannot drift from the nav", () => {
+    for (const item of CODEX_BAR) {
       const section = item.path === "/codex" ? "home" : item.path.replace("/codex/", "");
       expect(SECTION_TITLE[section as keyof typeof SECTION_TITLE]).toBe(item.label);
     }
+  });
+
+  it("offers the player every destination the GM has, minus the GM menu's", () => {
+    const gm = codexDestinations("gm").map((item) => item.label);
+    const player = codexDestinations("player").map((item) => item.label);
+    expect(gm.slice(0, player.length)).toEqual(player);
+    expect(gm.slice(player.length)).toEqual(["Prep templates", "Backup", "Autosave and history"]);
   });
 });
 
