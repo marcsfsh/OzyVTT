@@ -1,4 +1,5 @@
-/* The Codex's shared pieces: who sees it, the hidden block, the Reveal panel, the filter flyout and the page picker.
+/* The Codex's shared pieces: who sees it, the hidden block, the Reveal panel, the filter flyout, the page picker, the
+   dropdown and the Sort dialog.
    Hidden is violet with the crossed eye, everyone is indigo with the eye, chosen characters are cyan with a person. */
 
 .cx-hint {
@@ -469,6 +470,47 @@
   height: 1.1rem;
   margin: 0;
   accent-color: var(--cyan);
+}
+.cx-dropdown-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+/* A From and To pair of days in a dropdown. */
+.cx-datemenu {
+  min-width: 16rem;
+}
+.cx-datefield {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+/* ----- The Sort dialog: one row per level, the chosen row edged in cyan ----- */
+.cx-sortdialog .nh-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cx-sortlevels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cx-sortrow {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border: 1px solid transparent;
+}
+.cx-sortrow.is-on {
+  border-color: var(--cyan);
 }
 
 /* ----- Both dates in one bar ----- */
