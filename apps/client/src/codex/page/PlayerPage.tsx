@@ -88,6 +88,7 @@ export function PlayerPageBody({
     if (page) onLoaded?.(page);
   }, [page, onLoaded]);
   const followLink = useFollowPlayerLink(token);
+  const { go } = useCodexShell();
 
   if (tokenError) return <Alert tone="danger">{tokenError}</Alert>;
   if (!token || (read.loading && !page)) return <Skeleton variant="block" height="10rem" />;
@@ -140,6 +141,7 @@ export function PlayerPageBody({
       </MetaSection>
       <OnTheAtlas token={token} pins={pins} onOpenPin={onOpenPin} />
       <MentionedOn connections={connections} onOpen={onOpenConnection} />
+      <TagChips tags={page.tags} onPick={(tag) => go(tagPath(tag))} />
     </>
   );
   if (phone)
@@ -154,6 +156,7 @@ export function PlayerPageBody({
             <RelationshipList connections={connections} pageTitle={page.title} onOpen={onOpenConnection} />
           </MetaSection>
           <MentionedOn connections={connections} onOpen={onOpenConnection} />
+          <TagChips tags={page.tags} onPick={(tag) => go(tagPath(tag))} />
         </div>
       </>
     );
@@ -261,11 +264,6 @@ export function PlayerPage({ id }: Readonly<{ id: string }>) {
         </header>
       )}
       {body}
-      {summary && summary.tags.length > 0 && (
-        <div className="cx-page-tags">
-          <TagChips tags={summary.tags} onPick={(tag) => go(tagPath(tag))} />
-        </div>
-      )}
     </div>
   );
 }

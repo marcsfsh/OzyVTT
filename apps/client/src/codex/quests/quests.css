@@ -15,6 +15,12 @@
 .cx-quests-main > .cx-page {
   flex: 1 1 auto;
 }
+/* On a wide screen the open flyout sits beside the quest and the quest moves over for it. */
+@media (min-width: 980px) {
+  .cx-quests-main:has(> .cx-flyout) > :not(.cx-flyout) {
+    margin-left: min(330px, 100%);
+  }
+}
 .cx-questlist {
   margin: 0;
   padding: 0;

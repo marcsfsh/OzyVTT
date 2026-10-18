@@ -107,7 +107,9 @@ export function RevealPanel({
       </fieldset>
       <Eyebrow>What they will read</Eyebrow>
       <div className="cx-reveal-preview scroll-y">{preview}</div>
-      {links && <p className="cx-hint">{links}</p>}
+      <p className="cx-hint">
+        {`${links ? `${links} ` : ""}The block keeps its place on the page, and its stamp shows the session and the players' date.`}
+      </p>
       {error && (
         <p className="cx-reveal-error" role="alert">
           {error}

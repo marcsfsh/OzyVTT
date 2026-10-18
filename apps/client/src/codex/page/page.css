@@ -164,9 +164,6 @@
   background: var(--surface-1);
   overscroll-behavior: contain;
 }
-.cx-page-tags {
-  padding: 0 var(--space-6) var(--space-4);
-}
 .cx-page-loading,
 .cx-page-missing {
   display: flex;
@@ -215,6 +212,16 @@
   font: 700 var(--fs-2xs) / 1.5 var(--font-label);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
+}
+/* A field's Hidden word sits under its label, so the label keeps its line. */
+dt.cx-meta-key {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+dt.cx-meta-key .cx-meta-hidden {
+  margin-inline-start: 0;
+  font-size: var(--fs-2xs);
 }
 .cx-meta-hidden {
   display: inline-flex;
@@ -429,7 +436,14 @@
 
 /* ----- Writing ----- */
 .cx-write-title {
-  flex: 1 1 20rem;
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 12rem;
+  max-width: 100%;
+  field-sizing: content;
+}
+.cx-page-phonebody .cx-write-title {
+  width: 100%;
   min-width: 0;
 }
 .cx-write {
@@ -550,8 +564,8 @@
   justify-content: space-between;
 }
 .cx-writefields-who {
-  width: 4.5rem;
-  text-align: center;
+  white-space: nowrap;
+  text-align: right;
 }
 .cx-writefield {
   display: grid;
@@ -733,6 +747,12 @@
 }
 .cx-count b {
   color: var(--text);
+}
+/* Inside a row button the app's legacy rule would stack these spans. */
+.cx-count > span {
+  display: inline;
+  margin: 0;
+  font-size: inherit;
 }
 .cx-count-hidden {
   padding: 0;

@@ -5,6 +5,7 @@ import {
   Eyebrow,
   IconButton,
   IconCheck,
+  IconChevronRight,
   IconEye,
   IconEyeOff,
   IconMore,
@@ -586,6 +587,7 @@ function GmQuest({ id }: Readonly<{ id: string }>) {
             <button type="button" className="cx-crumb" onClick={() => go(pathForSection("quests"))}>
               Quests
             </button>
+            <IconChevronRight className="cx-crumb-sep" />
             <b className="cx-crumb-here">{quest.title}</b>
           </nav>
           <h1 className="cx-page-title">{quest.title}</h1>
@@ -800,6 +802,7 @@ export function PlayerQuests() {
                   <button type="button" className="cx-crumb" onClick={() => go(pathForSection("quests"))}>
                     Quests
                   </button>
+                  <IconChevronRight className="cx-crumb-sep" />
                   <b className="cx-crumb-here">{quest.title}</b>
                 </nav>
                 <h1 className="cx-page-title">{quest.title}</h1>

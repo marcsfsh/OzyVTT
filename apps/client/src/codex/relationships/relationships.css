@@ -166,11 +166,16 @@
   background: color-mix(in srgb, var(--surface-2) 70%, transparent);
   text-align: center;
 }
-.cx-time-today {
+.cx-time-today,
+.cx-time-tick {
   position: absolute;
   top: 0;
   transform: translateX(-50%);
   color: var(--cyan-hi);
+  white-space: nowrap;
+}
+.cx-time-tick {
+  color: var(--text-dim);
 }
 .cx-time-row {
   display: grid;

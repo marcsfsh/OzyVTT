@@ -5,7 +5,7 @@ import { sessionApi } from "../api";
 import { findApi } from "../api-records";
 import type { CodexHome, CodexRevealCheckRow, CodexSearchType } from "@vtt/domain";
 import { CodexMarkdown } from "../CodexMarkdown";
-import { clocksOf, nextSessionCard } from "./rules";
+import { clocksOf, nextSessionCard, realDateLabel } from "./rules";
 import { deadlineStateLabel } from "../chronicle";
 import { entityDef } from "../entities";
 import { CodexIcon, EntityIcon } from "../icons";
@@ -267,8 +267,9 @@ export function GmHome() {
   );
   const sessionLine = next && (
     <span className="cx-hint">
-      {next.realDate ? `${next.realDate} · ` : ""}
-      {next.heading === "Next session" ? "Planned" : next.heading}
+      {[realDateLabel(next.realDate), next.heading === "Next session" ? "Planned" : next.heading]
+        .filter(Boolean)
+        .join(" · ")}
     </span>
   );
 

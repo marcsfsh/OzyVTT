@@ -123,6 +123,24 @@ describe("The table's Codex tab for the GM", () => {
     expect(window.location.pathname).toBe("/codex/pages/p1");
   });
 
+  it("opens a page a block links to in the tab itself", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("vtt.table-codex-recent.gm", JSON.stringify([{ id: "p1", title: "Ysolde Varn" }]));
+    records.pageRecordApi.get.mockImplementation(async (_t: string, id: string) =>
+      id === "p1"
+        ? {
+            page: { ...YSOLDE, blocks: [block({ id: "b1", title: "The debt", text: "She owes [[The Tidebound]]." })] },
+            connections: []
+          }
+        : { page: page({ id: "p2", title: "The Tidebound", entityType: "faction", blocks: [] }), connections: [] }
+    );
+    api.codexApi.listPages.mockResolvedValue([{ id: "p2", title: "The Tidebound", entityType: "faction" }]);
+    renderTab("gm");
+    await user.click(await screen.findByRole("button", { name: "The Tidebound" }));
+    expect(await screen.findByRole("heading", { name: "The Tidebound" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/table");
+  });
+
   it("says when the search failed, and when nothing matched", async () => {
     const user = userEvent.setup();
     records.findApi.search.mockRejectedValueOnce(new Error("The codex request failed (500)."));
