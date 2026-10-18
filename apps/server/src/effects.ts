@@ -71,6 +71,8 @@ export const RECKLESS_TAG = "reckless-attack";
 export const STEADY_AIM_TAG = "steady-aim";
 /** A curse (Hex, Bestow Curse, Geas): Remove Curse ends it (SRD Rules Glossary, Curses). */
 export const CURSE_TAG = "curse";
+/** A Stable creature's hours until it regains 1 Hit Point (SRD Damage and Healing: "after 1d4 hours"). */
+export const STABLE_RECOVERY_TAG = "stable-recovery";
 
 /** What an effect must name; every other field takes `EffectInstanceSchema`'s default. */
 export type EffectSpec = Pick<EffectInstance, "id" | "name" | "duration"> & Partial<EffectInstance>;
@@ -721,8 +723,10 @@ export function ageEffects(state: GameState, actorIds: ReadonlySet<string>, minu
       if (!current) continue;
       const left = remainingAfter(current.duration, minutes);
       if (left === null) continue;
-      if (left <= 0) endEffectInternal(state, actor, current.id, events, true);
-      else
+      if (left <= 0) {
+        if (current.tags.includes(STABLE_RECOVERY_TAG)) events.push(...stableRecovers(actor));
+        endEffectInternal(state, actor, current.id, events, true);
+      } else
         actor.effects = actor.effects.map((candidate) =>
           candidate.id === current.id
             ? { ...candidate, duration: { ...(candidate.duration as { type: "rounds" | "minutes" }), remaining: left } }
@@ -731,6 +735,48 @@ export function ageEffects(state: GameState, actorIds: ReadonlySet<string>, minu
     }
   }
   return events;
+}
+
+/** A creature just made Stable starts its 1d4 hours on the game clock, rolled now (SRD Damage and Healing: "A Stable
+ *  creature that isn't healed regains 1 Hit Point after 1d4 hours"). Taking damage starts its dying again, so it ends
+ *  the count. */
+export function startStableRecovery(
+  state: GameState,
+  actor: Actor,
+  random: (sides: number) => number,
+  id: string
+): EffectNarration[] {
+  if (actor.deathSaves?.stable !== true || actor.hp.current !== 0) return [];
+  const hours = Math.max(1, Math.min(4, random(4)));
+  addEffect(
+    state,
+    actor.id,
+    makeEffect({
+      id,
+      name: "Stable",
+      tags: [STABLE_RECOVERY_TAG],
+      startedRound: state.combat.round,
+      duration: { type: "minutes", remaining: hours * 60 },
+      endsOnDamage: true
+    })
+  );
+  return [
+    {
+      kind: "condition",
+      text: `${actor.name} regains 1 Hit Point in ${hours} ${hours === 1 ? "hour" : "hours"} of game time unless healed first.`,
+      actorId: actor.id
+    }
+  ];
+}
+
+/** SRD: "A Stable creature that isn't healed regains 1 Hit Point after 1d4 hours." One healed meanwhile, or dying again,
+ *  gets nothing from it. */
+function stableRecovers(actor: Actor): EffectNarration[] {
+  if (actor.hp.current !== 0 || actor.deathSaves?.stable !== true) return [];
+  actor.hp = { ...actor.hp, current: 1 };
+  actor.deathSaves = null;
+  removeConditionDirect(actor, "unconscious");
+  return [{ kind: "condition", text: `${actor.name} regains 1 Hit Point and wakes.`, actorId: actor.id }];
 }
 
 /** What a duration has left once `minutes` of game time pass: 0 for one that runs out, null for one that time doesn't

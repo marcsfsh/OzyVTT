@@ -6,7 +6,7 @@ import { refreshBaseArmorClass, spellSlotMaxima, storedArmorClass } from "./acto
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { castAction, itemAction } from "./item-actions.js";
 import { keepAmmunitionCount } from "./ammunition.js";
-import { endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
+import { endConditionsImmuneTo, endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 import { scrollSpellProblem } from "./scrolls.js";
 
@@ -400,7 +400,19 @@ export function setInventoryItem(
     }
   }
   reconcileEquipment(actor, definition, deps);
-  return donningEndsMageArmor(state, actor);
+  return [...immuneConditionsEnd(actor, definition, deps), ...donningEndsMageArmor(state, actor)];
+}
+
+/** SRD Immunity: an item that now makes its bearer immune to a condition (a Periapt of Proof against Poison put on)
+ *  ends the one it has. */
+function immuneConditionsEnd(
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  deps: InventoryDeps
+): EffectNarration[] {
+  if (!definition || !deps.catalog) return [];
+  const immunities = deriveEquipment(actor, definition, deps.catalog).conditionImmunities;
+  return immunities.flatMap((entry) => endConditionsImmuneTo(actor, [entry.id], entry.source));
 }
 
 /** SRD Remove Curse: "If the object is a cursed magic item, its curse remains, but the spell breaks its owner's

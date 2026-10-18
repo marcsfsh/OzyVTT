@@ -185,6 +185,11 @@ export function openSpellZone(ctx: ResolveContext): void {
     annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
     area: aroundCaster ? null : (spell.area ?? null),
     damageDealt: 0,
+    // The damage type the caster chose for it (Conjure Elemental's element).
+    ...(input.damageType && (spell.effect?.damageTypes ?? []).includes(input.damageType as never)
+      ? { damageType: input.damageType }
+      : {}),
+    ...(row.zone.on.includes("spell-end") ? { burstsOnEnd: true as const } : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };

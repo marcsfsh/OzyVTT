@@ -77,16 +77,17 @@ const SpellDamageSchema = z
 /**
  * Where and when what a spell leaves behind acts on a creature, so the server raises the save or deals the damage:
  * a creature entering it (or the area moving onto the creature), starting or ending its turn there, or travelling in
- * it (Spike Growth's damage for every 5 feet). The area is the one the cast places on the map, or within `feet` of
- * the caster (an Emanation) or of the point the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A
- * creature makes this save only once per turn" (entering counts once a turn anyway); `affects` "enemies" spares the
- * caster's allies (Guardian of Faith; spirits that harm the creatures the caster chooses); `damageCap` ends it once
- * it has dealt that much (Guardian of Faith's 60).
+ * it (Spike Growth's damage for every 5 feet); the start of each of its caster's turns, on the one creature in it
+ * nearest its point (Faithful Hound's bite); or the spell's end, on every creature in it (Delayed Blast Fireball's
+ * bead). The area is the one the cast places on the map, or within `feet` of the caster (an Emanation) or of the point
+ * the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A creature makes this save only once per turn"
+ * (entering counts once a turn anyway); `affects` "enemies" spares the caster's allies (Guardian of Faith; spirits that
+ * harm the creatures the caster chooses); `damageCap` ends it once it has dealt that much (Guardian of Faith's 60).
  */
 export const SpellZoneSchema = z
   .object({
     on: z
-      .array(z.enum(["enter", "start-turn", "end-turn", "travel"]))
+      .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "spell-end"]))
       .min(1)
       .max(3),
     oncePerTurn: z.literal(true).optional(),
@@ -95,7 +96,12 @@ export const SpellZoneSchema = z
     affects: z.literal("enemies").optional(),
     damageCap: z.number().int().min(1).max(1000).optional(),
     /** The creatures it affects move at half Speed inside it (Spirit Guardians). */
-    halvesSpeed: z.literal(true).optional()
+    halvesSpeed: z.literal(true).optional(),
+    /** It acts on no one while a creature it restrained is still held (Conjure Elemental: "if the spirit has no creature
+     *  Restrained"). */
+    holdsOne: z.literal(true).optional(),
+    /** Its damage grows by one die each time its caster's turn ends while it lasts (Delayed Blast Fireball). */
+    grows: z.literal(true).optional()
   })
   .strict();
 export type SpellZone = z.infer<typeof SpellZoneSchema>;

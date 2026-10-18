@@ -273,7 +273,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
-      damage: [{ formula: "8d8", type: "lightning" }]
+      damage: [{ formula: "8d8", type: "lightning" }],
+      // A Large spirit: its space and 5 feet around it reach 10 feet from its point. The caster's chosen element is
+      // its damage type.
+      zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", holdsOne: true }
     }
   ],
   "conjure-fey": [
@@ -304,7 +307,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "The bead explodes when the spell ends: 12d6, plus 1d6 for each of your turns that ended while it lasted.",
       save: save("dex"),
       damage: [{ formula: "12d6", type: "fire" }],
-      area: { shape: "sphere", sizeFeet: 20, widthFeet: null }
+      area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
+      zone: { on: ["spell-end"], grows: true }
     }
   ],
   "dragons-breath": [
@@ -323,7 +327,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
-      damage: [{ formula: "4d8", type: "force" }]
+      damage: [{ formula: "4d8", type: "force" }],
+      zone: { on: ["caster-turn-start"], around: "point", feet: 5, affects: "enemies" }
     }
   ],
   "flame-blade": [
@@ -1003,6 +1008,10 @@ const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set(["earthquake", "en
 const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "blade-barrier": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // The Large spirit and the 5 feet it reaches around it.
+  "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // The hound and the 5 feet it bites in.
+  "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "guardian-of-faith": { shape: "sphere", sizeFeet: 10, widthFeet: null },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },

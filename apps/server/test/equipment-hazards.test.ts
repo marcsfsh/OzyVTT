@@ -192,7 +192,7 @@ describe("Antitoxin", () => {
     write(table, IDS.fighter, catalogRow("antitoxin", { equipped: false }));
     fight(table, IDS.fighter);
     resolveAt(table, IDS.fighter, "item-antitoxin-drink", [], { targetIds: [] });
-    expect(fighter(table).effects).toMatchObject([{ name: "Antitoxin (1 hour)", tags: ["antitoxin"] }]);
+    expect(fighter(table).effects).toMatchObject([{ name: "Antitoxin", tags: ["antitoxin"] }]);
     expect(table.state.combat.turn.bonusActionUsed).toBe(true);
     expect(fighter(table).inventory.some((row) => row.id === "antitoxin")).toBe(false);
     const rolled = (conditionIds: string[]) => {
@@ -220,7 +220,7 @@ describe("Antitoxin", () => {
         catalog
       }).outcome.rollMode;
     };
-    expect(rolled(["poisoned"])).toMatchObject({ mode: "advantage", advantage: ["Antitoxin (1 hour)"] });
+    expect(rolled(["poisoned"])).toMatchObject({ mode: "advantage", advantage: ["Antitoxin"] });
     expect(rolled(["frightened"])).toBeUndefined();
   });
 });
@@ -286,7 +286,7 @@ describe("outside a fight", () => {
     expect((await use("item-antitoxin-drink")).status).toBe(200);
     expect((await use("extinguish-fire")).status).toBe(200);
     const after = server.store.snapshot.actors.find((actor) => actor.id === IDS.fighter)!;
-    expect(after.effects.map((effect) => effect.name)).toEqual(["Antitoxin (1 hour)"]);
+    expect(after.effects.map((effect) => effect.name)).toEqual(["Antitoxin"]);
     expect(after.conditions.map((condition) => condition.id)).toEqual(["prone"]);
     // Not burning any more, there is nothing to put out.
     expect((await use("extinguish-fire")).status).toBe(409);

@@ -10,13 +10,23 @@ export function zoneContentOf(zone: SpellZone, catalog: EquipmentCatalog | undef
   return spell && row?.zone ? { spell, row, trigger: row.zone } : undefined;
 }
 
-/** Removes a spell's zone (`combat.spellZones`) and the area it placed on the map. */
+/** Removes a spell's zone (`combat.spellZones`) and the area it placed on the map. A zone that acts as its spell ends
+ *  (Delayed Blast Fireball's bead) is left `bursting` instead, for `burstEndedZones` to raise its saves and remove. */
 export function endZone(state: GameState, zoneId: string): void {
   const zone = state.combat.spellZones.find((candidate) => candidate.id === zoneId);
   if (!zone) return;
+  if (zone.burstsOnEnd && !zone.bursting && state.combat.active) {
+    zone.bursting = true;
+    return;
+  }
+  removeZone(state, zone);
+}
+
+/** Takes a zone and its area off the table, whatever it does as it ends. */
+export function removeZone(state: GameState, zone: SpellZone): void {
   state.combat = {
     ...state.combat,
-    spellZones: state.combat.spellZones.filter((candidate) => candidate.id !== zoneId),
+    spellZones: state.combat.spellZones.filter((candidate) => candidate.id !== zone.id),
     annotations:
       zone.annotationId === null
         ? state.combat.annotations

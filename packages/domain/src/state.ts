@@ -760,6 +760,14 @@ export const SpellZoneSchema = z
     area: ActionAreaSchema.nullable().default(null),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
+    /** The damage type the caster chose at the cast (Conjure Elemental's element); absent, the spell's own. */
+    damageType: z.string().min(1).max(40).optional(),
+    /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
+    grown: z.number().int().nonnegative().max(100).optional(),
+    /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
+     *  has raised the saves. */
+    burstsOnEnd: z.literal(true).optional(),
+    bursting: z.literal(true).optional(),
     /** This turn's marks: who has entered it, and who has made its save or taken its damage. Cleared as each turn
      *  begins. */
     entered: z.array(z.uuid()).max(200).default([]),

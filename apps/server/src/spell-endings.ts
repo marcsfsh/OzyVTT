@@ -59,6 +59,13 @@ export function endSpellZone(state: GameState, zone: SpellZone): EffectNarration
     (effect) => effect.castId === zone.castId && effect.tags.includes(CONCENTRATING_TAG)
   );
   const events = holder && marker ? endEffectIfPresent(state, holder.id, marker.id) : [];
+  // A spell with no Concentration (Faithful Hound) is up on its caster by an effect of its own, which goes with it.
+  const caster = state.actors.find((actor) => actor.id === zone.casterId);
+  const up =
+    zone.castId === null
+      ? caster?.effects.find((effect) => effect.spell?.id === zone.spellId && effect.castId === undefined)
+      : undefined;
+  if (caster && up) events.push(...endEffectIfPresent(state, caster.id, up.id));
   endZone(state, zone.id);
   return [...events, { kind: "effect", text: `${zone.name} ends.`, actorId: zone.casterId }];
 }

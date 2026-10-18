@@ -36,10 +36,11 @@ export function spellUpLevel(
  *  the next one (Spiritual Weapon's attack, Heat Metal's heat). */
 export const castThisTurnKey = (actorId: string, spellId: string) => `${actorId}:cast:${spellId}`;
 
-/** A later action the caster takes itself (an action or a Bonus Action), which the spell must be up for. Moving a mark
- *  has its own check, and an area's trigger is no action. */
+/** A later action that is there only while the spell is up: the caster's own (an action or a Bonus Action), and what
+ *  the spell does by itself (Faithful Hound's bite, a zone's save), which the GM may also run by hand. Moving a mark has
+ *  its own check. */
 export function takenWhileUp(row: LaterRow): boolean {
-  return row.movesGrant !== true && (row.activation === "action" || row.activation === "bonus-action");
+  return row.movesGrant !== true;
 }
 
 /** A later action rolled at the level its spell was cast at (Spiritual Weapon from a level 3 spell slot hits for 2d8). */

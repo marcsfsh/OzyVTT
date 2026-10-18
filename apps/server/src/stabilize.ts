@@ -6,7 +6,7 @@ import { canPlayerTarget, requireActorAccess, requireGm, type Initiator } from "
 import { rollSettledCheck } from "./check-rolls.js";
 import { conditionLabel, incapacitatingCondition } from "./condition-rules.js";
 import { withOneUsedUp } from "./consumables.js";
-import { endKnockOut, KNOCKED_OUT_TAG, type EffectNarration } from "./effects.js";
+import { endKnockOut, KNOCKED_OUT_TAG, startStableRecovery, type EffectNarration } from "./effects.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
@@ -162,7 +162,7 @@ export function stabilizeCreature(
     requireGm(scope, "Only the GM can rule a creature stable.");
     const condition = targetState(target);
     const line = condition === "dying" ? `${target.name} is stable.` : `${target.name} comes round.`;
-    const events = settle(state, target, condition, line);
+    const events = settle(state, target, condition, line, deps, input.commandId);
     return {
       stabilized: condition === "dying",
       woke: condition === "knocked-out",
@@ -256,7 +256,7 @@ export function stabilizeCreature(
       condition === "dying"
         ? `${helper.name} stabilized ${target.name} (${readout}).`
         : `${helper.name}'s first aid wakes ${target.name} (${readout}).`;
-    events.push(...settle(state, target, condition, line));
+    events.push(...settle(state, target, condition, line, deps, input.commandId));
     return { stabilized: condition === "dying", woke: condition === "knocked-out", check, events, overridden };
   }
   // One use of the kit, counted on the carried row's quantity as a potion is; the last one takes the row.
@@ -265,19 +265,25 @@ export function stabilizeCreature(
     input.method === "healers-kit"
       ? `${helper.name} stabilized ${target.name} with a Healer's Kit.`
       : `${helper.name} cast Spare the Dying, and ${target.name} is stable.`;
-  events.push(...settle(state, target, condition, line));
+  events.push(...settle(state, target, condition, line, deps, input.commandId));
   return { stabilized: true, woke: false, check: null, events, overridden };
 }
 
-/** Makes a dying creature Stable (its counters reset, its Unconscious kept), or ends a knock-out. */
+/** Makes a dying creature Stable (its counters reset, its Unconscious kept, and its 1d4 hours to 1 Hit Point counting
+ *  on the game clock), or ends a knock-out. */
 function settle(
   state: GameState,
   target: LiveActor,
   condition: "dying" | "knocked-out",
-  line: string
+  line: string,
+  deps: Pick<StabilizeDeps, "random">,
+  commandId: string
 ): EffectNarration[] {
   if (condition === "knocked-out")
     return [{ kind: "condition", text: line, actorId: target.id }, ...endKnockOut(state, target)];
   target.deathSaves = { ...STABLE };
-  return [{ kind: "condition", text: line, actorId: target.id }];
+  return [
+    { kind: "condition", text: line, actorId: target.id },
+    ...startStableRecovery(state, target, deps.random, `${commandId}:stable`)
+  ];
 }
