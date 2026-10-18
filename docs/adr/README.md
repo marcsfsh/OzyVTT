@@ -32,6 +32,7 @@
 | [028](0028-table-screen-pairing.md)             | Accepted                                       | A table screen shows a short code and the GM types it; the code only names the request, and the screen's own secret collects the same viewer credential                                                       |
 | [029](0029-one-game-clock.md)                   | Accepted                                       | One game clock: the Codex calendar keeps the day and the game keeps the hour, and time that passes at the table moves the Codex date by the midnights it crossed                                              |
 | [030](0030-character-sheet-remaster.md)         | Accepted                                       | The character sheet remaster: A's tabbed sheet everywhere, with C's turn and cast cards and B's Vitals, spell list and Level box on a player's phone                                                          |
+| [034](0034-openapi-from-the-route-registry.md)  | Accepted                                       | One route registry in the contract declares every HTTP operation; the routers mount and parse from it and the OpenAPI document is generated from it alone                                                     |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 
