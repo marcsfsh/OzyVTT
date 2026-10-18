@@ -680,12 +680,7 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
     ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
     // The levels a Spell Scroll can bear, as its name says, for the picker's spell step.
-    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
-    // Printed facts, as the item's own line says them ("Wand, Rare (Requires Attunement by a Spellcaster)").
-    ...(item.rarity !== undefined ? { rarity: item.rarity } : {}),
-    ...(item.attunement !== undefined
-      ? { attunement: { required: item.attunement.required, restrictedTo: [...item.attunement.restrictedTo] } }
-      : {})
+    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();

@@ -177,11 +177,7 @@ export const ContentEquipmentSummarySchema = z.strictObject({
   /** The damage types the GM may pick for the item's resistance ("The GM chooses the type"). */
   damageTypeChoice: z.array(slug(20)).max(13).optional(),
   /** A Spell Scroll: the spell levels one copy can bear, as its name prints them; the pick is the row's `spellId`. */
-  spellScroll: z.strictObject({ minLevel: z.number().int(), maxLevel: z.number().int() }).optional(),
-  /** The printed rarity ("rare"), when the item has one. */
-  rarity: z.string().optional(),
-  /** Whether it needs attunement, and by whom ("spellcaster", a class id), as printed. */
-  attunement: z.strictObject({ required: z.boolean(), restrictedTo: z.array(z.string()) }).optional()
+  spellScroll: z.strictObject({ minLevel: z.number().int(), maxLevel: z.number().int() }).optional()
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
 export type ContentEquipmentResult = {

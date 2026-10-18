@@ -819,8 +819,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "One stored row: the authored body plus its row state. `state` is set only by /publish and /unpublish, `audience` only by /audience and /sharing (and /unpublish, which hides), `deletedAt` only by DELETE and /restore. A player receives a record only when it is published, not deleted, in a pack that is on, and shared with everyone or one of that player's characters, and even then only through the merged CONTENT_PATHS catalogs, never through this component.",
     audience:
       "Who sees it: hidden (the GM only), everyone, or characters (the players of the party characters in `characterIds`). Publishing does not reveal: sharing is the separate, deliberate second step, and a draft is always hidden",
-    reveals:
-      "Each time the published record reached an audience it did not reach just before, oldest first. Hiding keeps them",
+    reveals: "A stamp for each time the published record reached a new audience, oldest first. Hiding keeps them",
     visibleToPlayers: "Deprecated: `audience` is not hidden",
     inCatalogs:
       "Published, not deleted, and its pack is on: what every catalog, the GM's pickers and the bestiary hold",

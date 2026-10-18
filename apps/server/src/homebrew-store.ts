@@ -1547,7 +1547,7 @@ function reachOf(state: HomebrewContentState, audience: HomebrewAudience): Reado
   return new Set(audience.audience === "characters" ? audience.characterIds : []);
 }
 
-/** A stamp for each audience the record reaches now and did not just before. Hiding keeps the old stamps. */
+/** A stamp for each audience the record reaches after this write and did not before it. Hiding keeps the old stamps. */
 function withReveals(
   reveals: readonly HomebrewReveal[],
   before: ReadonlySet<string>,
