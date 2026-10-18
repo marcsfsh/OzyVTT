@@ -1,25 +1,8 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import {
-  API_VERSION,
-  CreateIntegrationCredentialRequestSchema,
-  INTEGRATION_CREDENTIAL_PATHS,
-  IntegrationScopeSchema,
-  OPENAPI_DOCUMENT_PATH,
-  REALTIME_PROTOCOL_VERSION,
-  RotateIntegrationCredentialRequestSchema,
-  SYSTEM_PATHS
-} from "@vtt/api-contract";
-import { openApiDocument } from "./openapi/document.js";
-import {
-  apiErrorHandler,
-  expressPath,
-  isUuidV4,
-  issuesOf,
-  pathParam,
-  sendData,
-  sendFailure,
-  sendInternalError
-} from "./http-kit.js";
+import { API_VERSION, IntegrationScopeSchema, REALTIME_PROTOCOL_VERSION } from "@vtt/api-contract";
+import { systemRoutes as routes } from "@vtt/api-contract/routes";
+import { openApiDocument } from "./api-routes.js";
+import { apiErrorHandler, issuesOf, mount, sendData, sendFailure, sendInternalError } from "./http-kit.js";
 import type { IntegrationCredentialStore } from "./integration-credentials.js";
 import { InvalidRequestError } from "./invalid-request.js";
 import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
@@ -37,8 +20,8 @@ type ApiV1RouterOptions = {
 
 /** The credential id from the path, or null (after answering 400) when it is not a UUID v4. */
 function credentialIdParam(request: Request, response: Response): string | null {
-  const id = pathParam(request, "id");
-  if (isUuidV4(id)) return id;
+  const params = routes.revokeIntegrationCredential.params.safeParse(request.params);
+  if (params.success) return params.data.id;
   sendFailure(response, 400, "validation_failed", "The credential ID is malformed.");
   return null;
 }
@@ -52,11 +35,11 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
     return refuse(res, caller, "Only a GM session manages integration credentials.");
   }
 
-  router.get(SYSTEM_PATHS.health, (_req, res) =>
+  mount(router, routes.getSystemHealth, (_req, res) =>
     sendData(res, 200, { status: "ok", serverTime: new Date().toISOString() })
   );
 
-  router.get(SYSTEM_PATHS.version, (_req, res) =>
+  mount(router, routes.getSystemVersion, (_req, res) =>
     sendData(res, 200, {
       applicationVersion: options.applicationVersion,
       apiVersion: API_VERSION,
@@ -65,7 +48,7 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
     })
   );
 
-  router.get(SYSTEM_PATHS.capabilities, (req, res) => {
+  mount(router, routes.getSystemCapabilities, (req, res) => {
     const caller = callerOf(req, res, options.verifiers, { scope: "system:read" });
     if (caller.kind !== "integration" || !caller.inScope)
       return refuse(res, caller, "The capabilities read takes an integration credential with the system:read scope.");
@@ -88,11 +71,11 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
     });
   });
 
-  // Served from the imported, versioned document so the response matches what ships in @vtt/api-contract.
-  router.get(OPENAPI_DOCUMENT_PATH, (_req, res) => res.json(openApiDocument));
+  // Built from the route registry when the server starts, so it describes exactly what is mounted.
+  mount(router, routes.getOpenApiDocument, (_req, res) => res.json(openApiDocument));
 
-  router.post(expressPath(INTEGRATION_CREDENTIAL_PATHS.collection), requireGm, (req, res) => {
-    const parsed = CreateIntegrationCredentialRequestSchema.safeParse(req.body);
+  mount(router, routes.createIntegrationCredential, requireGm, (req, res) => {
+    const parsed = routes.createIntegrationCredential.body.schema.safeParse(req.body);
     if (!parsed.success)
       return sendFailure(res, 400, "validation_failed", "The credential request is malformed.", {
         issues: issuesOf(parsed.error)
@@ -106,14 +89,14 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
     }
   });
 
-  router.get(expressPath(INTEGRATION_CREDENTIAL_PATHS.collection), requireGm, (_req, res) =>
+  mount(router, routes.listIntegrationCredentials, requireGm, (_req, res) =>
     sendData(res, 200, { credentials: options.credentialStore.list() })
   );
 
-  router.post(expressPath(INTEGRATION_CREDENTIAL_PATHS.rotate), requireGm, (req, res) => {
+  mount(router, routes.rotateIntegrationCredential, requireGm, (req, res) => {
     const id = credentialIdParam(req, res);
     if (!id) return;
-    const parsed = RotateIntegrationCredentialRequestSchema.safeParse(req.body ?? {});
+    const parsed = routes.rotateIntegrationCredential.body.schema.safeParse(req.body ?? {});
     if (!parsed.success) return sendFailure(res, 400, "validation_failed", "The rotation request is malformed.");
     try {
       const issued = options.credentialStore.rotate(id, parsed.data.expiresAt);
@@ -125,7 +108,7 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
     }
   });
 
-  router.post(expressPath(INTEGRATION_CREDENTIAL_PATHS.revoke), requireGm, (req, res) => {
+  mount(router, routes.revokeIntegrationCredential, requireGm, (req, res) => {
     const id = credentialIdParam(req, res);
     if (!id) return;
     const revoked = options.credentialStore.revoke(id);
@@ -134,7 +117,7 @@ export function createApiV1Router(options: ApiV1RouterOptions) {
     return sendData(res, 200, credential);
   });
 
-  router.get(expressPath(INTEGRATION_CREDENTIAL_PATHS.audit), requireGm, (req, res) => {
+  mount(router, routes.getIntegrationCredentialAudit, requireGm, (req, res) => {
     const id = credentialIdParam(req, res);
     if (!id) return;
     if (!options.credentialStore.get(id)) return sendFailure(res, 404, "not_found", "That credential does not exist.");

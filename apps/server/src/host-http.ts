@@ -1,8 +1,7 @@
 import express from "express";
-import { z } from "zod";
-import { HOST_PATHS } from "@vtt/api-contract";
+import { hostRoutes as routes } from "@vtt/api-contract/routes";
 import type { AuthService } from "./auth.js";
-import { sendData, sendFailure } from "./http-kit.js";
+import { mount, sendData, sendFailure } from "./http-kit.js";
 import type { LoginRateLimiter } from "./login-rate-limit.js";
 import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 
@@ -23,13 +22,6 @@ export type HostRouterOptions = Readonly<{
   passwordChangeGraceMs?: number;
 }>;
 
-const MIN_PASSWORD = 12;
-const SetupSchema = z.object({ password: z.string().min(MIN_PASSWORD).max(256) }).strict();
-const SignInSchema = z.object({ password: z.string() }).strict();
-const ChangePasswordSchema = z
-  .object({ currentPassword: z.string().max(256), newPassword: z.string().min(MIN_PASSWORD).max(256) })
-  .strict();
-
 const isLocalhost = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(url);
 
 /** The host's own GM account: first-run password setup, sign-in and sign-out, the password, and the addresses the
@@ -48,9 +40,11 @@ export function createHostRouter(options: HostRouterOptions) {
     return false;
   };
 
-  router.get(HOST_PATHS.setup, (_request, response) => sendData(response, 200, { bootstrapped: auth.isBootstrapped }));
+  mount(router, routes.getHostSetup, (_request, response) =>
+    sendData(response, 200, { bootstrapped: auth.isBootstrapped })
+  );
 
-  router.post(HOST_PATHS.setup, async (request, response) => {
+  mount(router, routes.setGmPassword, async (request, response) => {
     if (!options.isLoopback(request.ip))
       return sendFailure(
         response,
@@ -58,7 +52,7 @@ export function createHostRouter(options: HostRouterOptions) {
         "forbidden",
         `Set the GM password on the computer that runs OzyVTT. Open ${hostUrl} there.`
       );
-    const body = SetupSchema.safeParse(request.body);
+    const body = routes.setGmPassword.body.schema.safeParse(request.body);
     if (!body.success)
       return sendFailure(response, 400, "validation_failed", "Use a GM password of at least 12 characters.");
     try {
@@ -70,10 +64,10 @@ export function createHostRouter(options: HostRouterOptions) {
     }
   });
 
-  router.post(HOST_PATHS.gmSignIn, async (request, response) => {
+  mount(router, routes.signInGm, async (request, response) => {
     const key = request.ip ?? "unknown";
     if (!withinAttempts(key, response)) return;
-    const body = SignInSchema.safeParse(request.body);
+    const body = routes.signInGm.body.schema.safeParse(request.body);
     const token = body.success ? await auth.login(body.data.password) : null;
     if (!token) {
       loginLimiter.recordFailure(key);
@@ -85,7 +79,7 @@ export function createHostRouter(options: HostRouterOptions) {
     return sendData(response, 200, { token });
   });
 
-  router.post(HOST_PATHS.gmSignOut, async (request, response) => {
+  mount(router, routes.signOutGm, async (request, response) => {
     const caller = callerOf(request, response, options.verifiers);
     if (caller.kind !== "gm") return refuse(response, caller, "Only a GM session signs out here.");
     await auth.logout(caller.token);
@@ -93,7 +87,7 @@ export function createHostRouter(options: HostRouterOptions) {
     return sendData(response, 200, { signedOut: true });
   });
 
-  router.post(HOST_PATHS.gmRevokeAll, async (request, response) => {
+  mount(router, routes.revokeAllGmSessions, async (request, response) => {
     const caller = callerOf(request, response, options.verifiers);
     if (caller.kind !== "gm") return refuse(response, caller, "Only a GM session ends the GM sessions.");
     await auth.revokeAllGmSessions();
@@ -102,12 +96,12 @@ export function createHostRouter(options: HostRouterOptions) {
   });
 
   // Counted with sign-in attempts, so a stolen GM session can't become a way to guess the password.
-  router.post(HOST_PATHS.gmPassword, async (request, response) => {
+  mount(router, routes.changeGmPassword, async (request, response) => {
     const caller = callerOf(request, response, options.verifiers);
     if (caller.kind !== "gm") return refuse(response, caller, "Only a GM session changes the GM password.");
     const key = request.ip ?? "unknown";
     if (!withinAttempts(key, response)) return;
-    const body = ChangePasswordSchema.safeParse(request.body);
+    const body = routes.changeGmPassword.body.schema.safeParse(request.body);
     if (!body.success)
       return sendFailure(response, 400, "validation_failed", "Use a new GM password of at least 12 characters.");
     const token = await auth.changePassword(body.data.currentPassword, body.data.newPassword);
@@ -126,7 +120,7 @@ export function createHostRouter(options: HostRouterOptions) {
     return sendData(response, 200, { token });
   });
 
-  router.get(HOST_PATHS.viewerUrls, (request, response) => {
+  mount(router, routes.listViewerUrls, (request, response) => {
     const caller = callerOf(request, response, options.verifiers);
     if (caller.kind !== "gm") return refuse(response, caller, "The table screen addresses are for the GM.");
     return sendData(response, 200, { viewerUrls: baseUrls.map((url) => `${url}/viewer.html`) });
@@ -134,7 +128,7 @@ export function createHostRouter(options: HostRouterOptions) {
 
   // The addresses players open on the home network. A localhost address works only on this computer, so it is left
   // out; `hostUrl` is there for the case with no network address at all.
-  router.get(HOST_PATHS.joinUrls, (request, response) => {
+  mount(router, routes.listJoinUrls, (request, response) => {
     const caller = callerOf(request, response, options.verifiers);
     if (caller.kind !== "gm") return refuse(response, caller, "The join addresses are for the GM.");
     return sendData(response, 200, { joinUrls: baseUrls.filter((url) => !isLocalhost(url)), hostUrl });

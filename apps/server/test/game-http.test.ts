@@ -17,10 +17,10 @@ import {
   PlayerSessionIssuedResponseSchema,
   SESSION_PATHS
 } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { io as connect } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
-import { gameCommands, gameReads, socketEventOf } from "../src/commands/index.js";
+import { gameCommands, gameReads, readScope, socketEventOf } from "../src/commands/index.js";
 import { createServer } from "../src/server.js";
 import { png } from "./image-fixtures.js";
 
@@ -1437,6 +1437,11 @@ describe("the command and read tables", () => {
       expect(socketEventOf(command.type), command.type).toMatch(/^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/);
       const operation = documented[route.path]?.[route.method];
       expect(operation, `${route.method.toUpperCase()} ${route.path} (${command.type}) is undocumented`).toBeDefined();
+      // A player-only command refuses every GM-grade caller, a scoped credential included.
+      if (command.playerOnly !== undefined) {
+        expect(operation?.security, command.type).toEqual([{ playerAuth: [] }]);
+        continue;
+      }
       expect(bearerScope(operation), command.type).toEqual([route.scope]);
       // A GM-only command must not be documented as open to player sessions.
       if (command.gmOnly !== undefined) expect(offeredToPlayers(operation), command.type).toBe(false);
@@ -1445,9 +1450,9 @@ describe("the command and read tables", () => {
 
   it("gives every read a documented GET with its scope, open to players exactly when the read is", () => {
     for (const read of gameReads) {
-      const operation = documented[read.path]?.get;
-      expect(operation, `GET ${read.path} (${read.event}) is undocumented`).toBeDefined();
-      expect(bearerScope(operation), read.event).toEqual([read.scope]);
+      const operation = documented[read.route.path]?.get;
+      expect(operation, `GET ${read.route.path} (${read.event}) is undocumented`).toBeDefined();
+      expect(bearerScope(operation), read.event).toEqual([readScope(read)]);
       expect(offeredToPlayers(operation), read.event).toBe(!("gmOnly" in read));
     }
   });
@@ -1460,7 +1465,7 @@ describe("the command and read tables", () => {
       expect(response.status, `${route.method.toUpperCase()} ${route.path}`).toBe(401);
     }
     for (const read of gameReads)
-      expect((await fetch(base + concrete(read.path))).status, `GET ${read.path}`).toBe(401);
+      expect((await fetch(base + concrete(read.route.path))).status, `GET ${read.route.path}`).toBe(401);
 
     // A socket that never joined reaches every handler and is turned away by the same gate.
     const socket = connect(base, { transports: ["websocket"], reconnection: false, forceNew: true });
@@ -1497,7 +1502,7 @@ describe("the command and read tables", () => {
       expect((await response.json()).error.message, command.type).toBe(command.gmOnly);
     }
     for (const read of gameReads.filter((candidate) => "gmOnly" in candidate)) {
-      const response = await fetch(base + concrete(read.path), { headers: bearer(playerToken) });
+      const response = await fetch(base + concrete(read.route.path), { headers: bearer(playerToken) });
       expect(response.status, read.event).toBe(403);
     }
   });

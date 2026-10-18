@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
-import { z } from "zod";
+import { assetRoutes as routes } from "@vtt/api-contract/routes";
 import { sendAssetContent } from "./asset-content.js";
 import {
   adjustWizardGrid,
@@ -14,70 +14,24 @@ import {
   type GridCalibrationWizardState
 } from "./grid-calibration-wizard.js";
 import { gridOverlayLines } from "./grid-overlay.js";
-import { apiErrorHandler, bearerToken, isUuidV4, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
+import {
+  apiErrorHandler,
+  bearerToken,
+  isUuidV4,
+  mount,
+  pathParam,
+  sendData,
+  sendFailure,
+  sendRefusal
+} from "./http-kit.js";
 import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetMetadata, MapAssetStore } from "./map-assets.js";
 import { deriveMapDistanceScale } from "./map-measurement.js";
-import type { MapCatalogEntry, MapCatalogStore, MapKind, PublicMapAsset } from "./map-catalog.js";
+import type { MapCatalogEntry, MapCatalogStore, PublicMapAsset } from "./map-catalog.js";
 import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 
-const MAP_COLLECTION = "/api/v1/map-assets";
-const MAP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const FAULT = "Map request failed.";
 const WIZARD_TTL_MS = 30 * 60 * 1_000;
-
-const PointSchema = z.object({ x: z.number(), y: z.number() }).strict();
-const StartWizardSchema = z.union([
-  z
-    .object({
-      start: PointSchema,
-      end: PointSchema,
-      cellsAcross: z.literal(3),
-      cellsDown: z.literal(3),
-      distancePerCell: z.number().positive().optional()
-    })
-    .strict(),
-  z
-    .object({
-      start: PointSchema,
-      end: PointSchema,
-      cellsBetween: z.number().int(),
-      axis: z.enum(["horizontal", "vertical"]),
-      distancePerCell: z.number().positive().optional()
-    })
-    .strict()
-]);
-const WizardActionSchema = z.discriminatedUnion("action", [
-  z
-    .object({
-      action: z.literal("adjust"),
-      adjustment: z
-        .object({
-          originDelta: PointSchema.optional(),
-          cellSizeDeltaPx: z.number().optional(),
-          rotationDeltaRadians: z.number().optional(),
-          distancePerCell: z.number().positive().optional()
-        })
-        .strict()
-    })
-    .strict(),
-  z.object({ action: z.literal("undo") }).strict(),
-  z.object({ action: z.literal("redo") }).strict(),
-  z
-    .object({ action: z.literal("verify"), imagePoint: PointSchema, tolerancePx: z.number().positive().optional() })
-    .strict()
-]);
-const ScaleSchema = z
-  .object({ start: PointSchema, end: PointSchema, knownDistance: z.number().positive(), unit: z.string() })
-  .strict();
-const DetailsSchema = z
-  .object({
-    name: z.string().optional(),
-    kind: z.enum(["battlemap", "regional", "world"]).optional(),
-    folder: z.string().nullable().optional()
-  })
-  .strict();
-const FolderRenameSchema = z.object({ from: z.string(), to: z.string().nullable() }).strict();
 
 type WizardSession = { ownerHash: string; assetId: string; state: GridCalibrationWizardState; touchedAt: number };
 
@@ -93,8 +47,8 @@ type MapRouterOptions = Readonly<{
 }>;
 
 function mapId(request: Request) {
-  const id = pathParam(request, "id");
-  return MAP_ID.test(id) ? id : null;
+  const params = routes.getMapAsset.params.safeParse({ id: pathParam(request, "id") });
+  return params.success ? params.data.id : null;
 }
 
 function publicAsset(metadata: MapAssetMetadata, entry: MapCatalogEntry): PublicMapAsset {
@@ -172,17 +126,19 @@ export function createMapRouter(options: MapRouterOptions) {
     return { wizardId, state, overlay, overlayWarning };
   };
 
-  router.post(
-    MAP_COLLECTION,
+  mount(
+    router,
+    routes.uploadMapAsset,
     requireGm,
     express.raw({ type: () => true, limit: "51mb" }),
     async (request, response) => {
       try {
         if (!Buffer.isBuffer(request.body))
           return sendFailure(response, 400, "validation_failed", "Upload the image as the request body.");
-        const filename = typeof request.query.filename === "string" ? request.query.filename : "map";
-        const name = typeof request.query.name === "string" ? request.query.name : filename.replace(/\.[^.]+$/, "");
-        const kind = (typeof request.query.kind === "string" ? request.query.kind : "battlemap") as MapKind;
+        const query = routes.uploadMapAsset.query.parse(request.query);
+        const filename = query.filename ?? "map";
+        const name = query.name ?? filename.replace(/\.[^.]+$/, "");
+        const kind = query.kind ?? "battlemap";
         const imported = await options.assets.import(request.body, filename);
         const entry = options.catalog.register(imported.metadata.id, name, kind);
         return sendData(response, imported.duplicate ? 200 : 201, {
@@ -195,7 +151,7 @@ export function createMapRouter(options: MapRouterOptions) {
     }
   );
 
-  router.get(MAP_COLLECTION, requireGm, async (_request, response) => {
+  mount(router, routes.listMapAssets, requireGm, async (_request, response) => {
     const entries = options.catalog.list();
     const assets = (
       await Promise.all(
@@ -208,7 +164,7 @@ export function createMapRouter(options: MapRouterOptions) {
     return sendData(response, 200, { assets });
   });
 
-  router.get(`${MAP_COLLECTION}/:id`, requireGm, async (request, response) => {
+  mount(router, routes.getMapAsset, requireGm, async (request, response) => {
     const id = mapId(request);
     if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
     const [metadata, entry] = await Promise.all([options.assets.get(id), Promise.resolve(options.catalog.get(id))]);
@@ -216,20 +172,20 @@ export function createMapRouter(options: MapRouterOptions) {
     return sendData(response, 200, { asset: publicAsset(metadata, entry) });
   });
 
-  router.patch(`${MAP_COLLECTION}/:id`, requireGm, (request, response) => {
+  mount(router, routes.updateMapAssetDetails, requireGm, (request, response) => {
     try {
       const id = mapId(request);
       if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
-      const input = DetailsSchema.parse(request.body);
+      const input = routes.updateMapAssetDetails.body.schema.parse(request.body);
       return sendData(response, 200, { map: options.catalog.updateDetails(id, input) });
     } catch (error) {
       return sendRefusal(response, error, "Map details are malformed.", FAULT);
     }
   });
 
-  router.post(`${MAP_COLLECTION}/folders/rename`, requireGm, (request, response) => {
+  mount(router, routes.renameMapFolder, requireGm, (request, response) => {
     try {
-      const input = FolderRenameSchema.parse(request.body);
+      const input = routes.renameMapFolder.body.schema.parse(request.body);
       options.catalog.renameFolder(input.from, input.to);
       return sendData(response, 200, { renamed: true });
     } catch (error) {
@@ -237,7 +193,7 @@ export function createMapRouter(options: MapRouterOptions) {
     }
   });
 
-  router.get(`${MAP_COLLECTION}/:id/content`, async (request, response) => {
+  mount(router, routes.getMapAssetContent, async (request, response) => {
     const id = mapId(request);
     if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
     if (!mayReadContent(request, response, id)) return;
@@ -250,7 +206,7 @@ export function createMapRouter(options: MapRouterOptions) {
   // Calibration numbers aren't secret (clients already get grid-derived token sizing); exposing them
   // read-only lets the map preview measurements. The server still computes authoritative geometry on
   // every annotation command.
-  router.get(`${MAP_COLLECTION}/:id/grid`, (request, response) => {
+  mount(router, routes.getMapAssetGrid, (request, response) => {
     const id = mapId(request);
     if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
     if (!mayReadContent(request, response, id)) return;
@@ -259,7 +215,7 @@ export function createMapRouter(options: MapRouterOptions) {
     return sendData(response, 200, { calibration: entry.calibration?.calibration ?? null });
   });
 
-  router.post(`${MAP_COLLECTION}/:id/calibration/wizards`, requireGm, async (request, response) => {
+  mount(router, routes.startMapCalibrationWizard, requireGm, async (request, response) => {
     try {
       const id = mapId(request);
       const token = bearerToken(request);
@@ -267,7 +223,7 @@ export function createMapRouter(options: MapRouterOptions) {
       const metadata = await options.assets.get(id);
       if (!metadata || !options.catalog.get(id))
         return sendFailure(response, 404, "not_found", "Map asset was not found.");
-      const input = StartWizardSchema.parse(request.body);
+      const input = routes.startMapCalibrationWizard.body.schema.parse(request.body);
       const initial = createGridCalibrationWizard({
         assetId: id,
         mapWidthPx: metadata.width,
@@ -288,13 +244,13 @@ export function createMapRouter(options: MapRouterOptions) {
     }
   });
 
-  router.post(`${MAP_COLLECTION}/:id/calibration/wizards/:wizardId/actions`, requireGm, (request, response) => {
+  mount(router, routes.actOnMapCalibrationWizard, requireGm, (request, response) => {
     try {
       const id = mapId(request);
       if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
       const found = wizardFor(request, id);
       if (!found) return sendFailure(response, 404, "not_found", "Calibration wizard was not found or expired.");
-      const action = WizardActionSchema.parse(request.body);
+      const action = routes.actOnMapCalibrationWizard.body.schema.parse(request.body);
       if (action.action === "adjust") found.session.state = adjustWizardGrid(found.session.state, action.adjustment);
       else if (action.action === "undo") found.session.state = undoWizardGrid(found.session.state);
       else if (action.action === "redo") found.session.state = redoWizardGrid(found.session.state);
@@ -305,7 +261,7 @@ export function createMapRouter(options: MapRouterOptions) {
     }
   });
 
-  router.post(`${MAP_COLLECTION}/:id/calibration/wizards/:wizardId/complete`, requireGm, (request, response) => {
+  mount(router, routes.completeMapCalibrationWizard, requireGm, (request, response) => {
     try {
       const id = mapId(request);
       if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
@@ -326,11 +282,11 @@ export function createMapRouter(options: MapRouterOptions) {
     }
   });
 
-  router.put(`${MAP_COLLECTION}/:id/scale`, requireGm, (request, response) => {
+  mount(router, routes.setMapAssetScale, requireGm, (request, response) => {
     try {
       const id = mapId(request);
       if (!id) return sendFailure(response, 400, "validation_failed", "Map asset ID is malformed.");
-      const input = ScaleSchema.parse(request.body);
+      const input = routes.setMapAssetScale.body.schema.parse(request.body);
       return sendData(response, 200, { map: options.catalog.saveScale(id, deriveMapDistanceScale(input)) });
     } catch (error) {
       return sendRefusal(response, error, "Map scale request is malformed.", FAULT);

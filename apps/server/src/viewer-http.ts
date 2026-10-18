@@ -1,91 +1,13 @@
 import { Router, type Request, type Response } from "express";
-import { z } from "zod";
 import { VIEWER_PAIRING_COOKIE, VIEWER_PATHS, VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
-import { cookie, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
+import { viewerRoutes as routes } from "@vtt/api-contract/routes";
+import { cookie, mount, pathParam, sendData, sendFailure, sendRefusal } from "./http-kit.js";
 import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
 import { ViewerAccessDeniedError, ViewerPairingRateLimitError, type ViewerAccessStore } from "./viewer-access.js";
 import type { ViewerCoordinator } from "./viewer-coordinator.js";
 import { ViewerRevisionConflictError, type ViewerCommand } from "./viewer-presentation.js";
 import type { ViewerPresentationStore } from "./viewer-presentation-store.js";
 
-const PointSchema = z.object({ x: z.number(), y: z.number() }).strict();
-const CameraSchema = z.object({ center: PointSchema, zoom: z.number() }).strict();
-const InitiativeSchema = z
-  .object({
-    visible: z.boolean(),
-    round: z.number().int().nonnegative(),
-    hiddenTurn: z.boolean().default(false),
-    entries: z
-      .array(z.object({ actorId: z.string(), name: z.string(), initiative: z.number(), active: z.boolean() }).strict())
-      .max(200)
-  })
-  .strict();
-const EncounterSceneSchema = z
-  .object({
-    mapAssetId: z.string().nullable(),
-    tokens: z
-      .array(
-        z
-          .object({
-            actorId: z.string(),
-            name: z.string(),
-            kind: z.enum(["player-character", "monster", "npc"]),
-            position: PointSchema,
-            sizePx: z.number().positive(),
-            active: z.boolean()
-          })
-          .strict()
-      )
-      .max(200)
-  })
-  .strict();
-const PayloadSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("viewer.enabled.set"), enabled: z.boolean() }).strict(),
-  z
-    .object({
-      type: z.literal("viewer.presentation.begin"),
-      assetId: z.string(),
-      altText: z.string(),
-      camera: CameraSchema
-    })
-    .strict(),
-  z
-    .object({ type: z.literal("viewer.map.set"), assetId: z.string(), altText: z.string(), camera: CameraSchema })
-    .strict(),
-  z.object({ type: z.literal("viewer.camera.set"), camera: CameraSchema }).strict(),
-  z
-    .object({
-      type: z.literal("viewer.measurement.set"),
-      measurement: z.object({ id: z.string(), points: z.array(PointSchema), distanceLabel: z.string() }).strict()
-    })
-    .strict(),
-  z.object({ type: z.literal("viewer.measurement.clear") }).strict(),
-  z
-    .object({
-      type: z.literal("viewer.ping"),
-      id: z.string(),
-      point: PointSchema,
-      label: z.string().optional(),
-      durationMs: z.number().int().optional()
-    })
-    .strict(),
-  z.object({ type: z.literal("viewer.initiative.set"), initiative: InitiativeSchema }).strict(),
-  z
-    .object({ type: z.literal("viewer.encounter.set"), initiative: InitiativeSchema, encounter: EncounterSceneSchema })
-    .strict()
-]);
-const CommandSchema = z
-  .object({ id: z.string(), expectedRevision: z.number().int().nonnegative().optional(), payload: PayloadSchema })
-  .strict();
-const PairingSchema = z.object({ ttlMs: z.number().int().optional() }).strict();
-/** A screen's word on its own sound: `blocked` until someone taps it, `muted` for the GM's silent preview. */
-const SoundStatusSchema = z
-  .object({ sound: z.enum(["on", "blocked", "muted"]), unplayable: z.array(z.uuid()).max(20).default([]) })
-  .strict();
-const ExchangeSchema = z
-  .object({ code: z.string(), name: z.string(), expiresInMs: z.number().int().positive().nullable().optional() })
-  .strict();
-const ApproveSchema = z.object({ code: z.string().max(32), name: z.string().optional() }).strict();
 const SCREEN_NAME = "Table screen";
 
 type ViewerRouterOptions = Readonly<{
@@ -145,10 +67,10 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     return null;
   };
 
-  router.post("/api/v1/viewer/pairings", (request, response) => {
+  mount(router, routes.createViewerPairing, (request, response) => {
     try {
       if (requireGm(request, response) === null) return;
-      const input = PairingSchema.parse(request.body);
+      const input = routes.createViewerPairing.body.schema.parse(request.body ?? {});
       const pairing = options.access.createPairingCode(input.ttlMs);
       return sendData(response, 201, { pairing });
     } catch (error) {
@@ -156,9 +78,9 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     }
   });
 
-  router.post("/api/v1/viewer/pairings/exchange", (request, response) => {
+  mount(router, routes.exchangeViewerPairing, (request, response) => {
     try {
-      const input = ExchangeSchema.parse(request.body);
+      const input = routes.exchangeViewerPairing.body.schema.parse(request.body);
       const expiresAt = input.expiresInMs == null ? input.expiresInMs : now() + input.expiresInMs;
       const result = options.access.exchangePairingCode(input.code, input.name, { expiresAt });
       const maxAge =
@@ -173,7 +95,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
   });
 
   // A table screen asks to pair. It shows the code; the GM types it on their own device (ADR-0028).
-  router.post(VIEWER_PATHS.screenPairings, (_request, response) => {
+  mount(router, routes.openScreenPairing, (_request, response) => {
     try {
       const { requestToken, code, expiresAt } = options.access.openScreenPairing();
       const seconds = Math.max(1, Math.ceil((Date.parse(expiresAt) - now()) / 1_000));
@@ -185,7 +107,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
   });
 
   // The screen's poll: still waiting with its code, or paired, which hands over the viewer cookie once.
-  router.get(VIEWER_PATHS.screenPairingsCurrent, (request, response) => {
+  mount(router, routes.getScreenPairing, (request, response) => {
     try {
       const held = cookie(request, VIEWER_PAIRING_COOKIE);
       const current = held ? options.access.collectScreenPairing(held) : null;
@@ -204,10 +126,10 @@ export function createViewerRouter(options: ViewerRouterOptions) {
 
   // The GM types the code a screen shows. A code that names no open request is a 404, never a 401: the GM's own
   // session is fine, and a 401 would sign them out.
-  router.post(VIEWER_PATHS.screenPairingsApprove, (request, response) => {
+  mount(router, routes.approveScreenPairing, (request, response) => {
     try {
       if (requireGm(request, response) === null) return;
-      const input = ApproveSchema.parse(request.body);
+      const input = routes.approveScreenPairing.body.schema.parse(request.body);
       const approved = options.access.approveScreenPairing(input.code, input.name?.trim() || SCREEN_NAME);
       return sendData(response, 200, { approved });
     } catch (error) {
@@ -216,7 +138,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     }
   });
 
-  router.get("/api/v1/viewer/access", (request, response) => {
+  mount(router, routes.listViewerAccess, (request, response) => {
     try {
       if (requireGm(request, response) === null) return;
       return sendData(response, 200, {
@@ -228,7 +150,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     }
   });
 
-  router.delete("/api/v1/viewer/access/:id", (request, response) => {
+  mount(router, routes.revokeViewerAccess, (request, response) => {
     try {
       if (requireGm(request, response) === null) return;
       const viewer = options.access.revoke(pathParam(request, "id"));
@@ -240,7 +162,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
   });
 
   // Read-only viewer cookie for the GM's own preview of the shared screen (iframe and pop-out).
-  router.post("/api/v1/viewer/preview-session", (request, response) => {
+  mount(router, routes.createViewerPreviewSession, (request, response) => {
     try {
       if (requireGm(request, response) === null) return;
       const result = options.access.mintPreviewSession("GM preview", 12 * 60 * 60 * 1_000);
@@ -252,7 +174,7 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     }
   });
 
-  router.get("/api/v1/viewer/presentation", (request, response) => {
+  mount(router, routes.getViewerPresentation, (request, response) => {
     try {
       if (requireGmOrViewer(request, response) === null) return;
       return sendData(response, 200, { presentation: options.coordinator.project(now()) });
@@ -261,11 +183,14 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     }
   });
 
-  router.post("/api/v1/viewer/presentation/commands", async (request, response) => {
+  mount(router, routes.sendViewerPresentationCommand, async (request, response) => {
     try {
       const token = requireGm(request, response);
       if (token === null) return;
-      const command = CommandSchema.parse(request.body) as Omit<ViewerCommand, "role">;
+      const command = routes.sendViewerPresentationCommand.body.schema.parse(request.body) as Omit<
+        ViewerCommand,
+        "role"
+      >;
       const result = await options.coordinator.executeGm(token, command);
       return sendData(response, 200, { revision: result.state.revision, duplicate: result.duplicate });
     } catch (error) {
@@ -273,18 +198,18 @@ export function createViewerRouter(options: ViewerRouterOptions) {
     }
   });
 
-  router.post("/api/v1/viewer/sound-status", (request, response) => {
+  mount(router, routes.reportViewerSoundStatus, (request, response) => {
     try {
       const token = requireViewer(request, response);
       if (token === null) return;
-      options.coordinator.reportSound(token, SoundStatusSchema.parse(request.body));
+      options.coordinator.reportSound(token, routes.reportViewerSoundStatus.body.schema.parse(request.body));
       return sendData(response, 200, { received: true });
     } catch (error) {
       return errorResponse(error, response);
     }
   });
 
-  router.get("/api/v1/viewer/events", (request, response) => {
+  mount(router, routes.streamViewerPresentation, (request, response) => {
     let disconnect = () => {};
     try {
       const caller = requireGmOrViewer(request, response);

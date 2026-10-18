@@ -9,7 +9,7 @@ import { VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
 import { MapAssetStore } from "../src/map-assets.js";
 import { MapCatalogStore } from "../src/map-catalog.js";
 import { createMapRouter } from "../src/map-http.js";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { png } from "./image-fixtures.js";
 import { fixedVerifiers } from "./fixed-verifiers.js";
 
@@ -118,7 +118,7 @@ describe("map asset HTTP workflow", () => {
       })
     );
     expect(filed.data.map.folder).toBe("Dungeons");
-    expectShape("MapAssetData", filed.data);
+    expectShape("MapCatalogEntryData", filed.data);
     expectShape(
       "MapAssetData",
       (await body(await fetch(`${test.base}/api/v1/map-assets/${id}`, { headers: gm() }))).data

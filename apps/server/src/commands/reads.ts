@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { CONTENT_PATHS, GAME_PATHS } from "@vtt/api-contract";
+import type { z } from "zod";
+import { contentRoutes, gameRoutes, type ApiRoute } from "@vtt/api-contract/routes";
 import type { GmView, PlayerView } from "@vtt/domain";
 import { actionAvailability } from "../action-resolution.js";
 import { deriveActorSheet } from "../actor-derived.js";
@@ -39,29 +39,33 @@ import type { ReadSpec } from "./pipeline.js";
 /** The rules catalogs any joined session may read, each with the CC-BY attribution its display must carry
  *  (ADR-0015): reference text, and the character builder's choices. */
 const PUBLIC_CATALOGS = [
-  ["content:conditions", CONTENT_PATHS.conditions, "conditions", (catalog) => catalog.conditionSummaries()],
-  ["content:glossary", CONTENT_PATHS.glossary, "glossary", (catalog) => catalog.glossaryEntries()],
-  ["content:skills", CONTENT_PATHS.skills, "skills", (catalog) => catalog.skillSummaries()],
-  ["content:languages", CONTENT_PATHS.languages, "languages", (catalog) => catalog.languageSummaries()],
-  ["content:spells", CONTENT_PATHS.spells, "spells", (catalog) => catalog.spellSummaries()],
-  ["content:equipment", CONTENT_PATHS.equipment, "equipment", (catalog) => catalog.equipmentSummaries()],
-  ["content:classes", CONTENT_PATHS.classes, "classes", (catalog) => catalog.classSummaries()],
-  ["content:subclasses", CONTENT_PATHS.subclasses, "subclasses", (catalog) => catalog.subclassSummaries()],
-  ["content:species", CONTENT_PATHS.species, "species", (catalog) => catalog.speciesSummaries()],
-  ["content:backgrounds", CONTENT_PATHS.backgrounds, "backgrounds", (catalog) => catalog.backgroundSummaries()],
-  ["content:feats", CONTENT_PATHS.feats, "feats", (catalog) => catalog.featSummaries()],
-  ["content:names", CONTENT_PATHS.names, "names", (catalog) => catalog.nameBundles()]
+  ["content:conditions", contentRoutes.listContentConditions, "conditions", (catalog) => catalog.conditionSummaries()],
+  ["content:glossary", contentRoutes.listContentGlossary, "glossary", (catalog) => catalog.glossaryEntries()],
+  ["content:skills", contentRoutes.listContentSkills, "skills", (catalog) => catalog.skillSummaries()],
+  ["content:languages", contentRoutes.listContentLanguages, "languages", (catalog) => catalog.languageSummaries()],
+  ["content:spells", contentRoutes.listContentSpells, "spells", (catalog) => catalog.spellSummaries()],
+  ["content:equipment", contentRoutes.listContentEquipment, "equipment", (catalog) => catalog.equipmentSummaries()],
+  ["content:classes", contentRoutes.listContentClasses, "classes", (catalog) => catalog.classSummaries()],
+  ["content:subclasses", contentRoutes.listContentSubclasses, "subclasses", (catalog) => catalog.subclassSummaries()],
+  ["content:species", contentRoutes.listContentSpecies, "species", (catalog) => catalog.speciesSummaries()],
+  [
+    "content:backgrounds",
+    contentRoutes.listContentBackgrounds,
+    "backgrounds",
+    (catalog) => catalog.backgroundSummaries()
+  ],
+  ["content:feats", contentRoutes.listContentFeats, "feats", (catalog) => catalog.featSummaries()],
+  ["content:names", contentRoutes.listContentNames, "names", (catalog) => catalog.nameBundles()]
 ] as const satisfies ReadonlyArray<
-  readonly [ReadSpec["event"], string, string, (catalog: ContentView) => readonly unknown[]]
+  readonly [ReadSpec["event"], ApiRoute, string, (catalog: ContentView) => readonly unknown[]]
 >;
 
-const LogReadSchema = z.object({ limit: z.number().int().min(1).max(1000).optional() }).strict();
+const LogReadSchema = gameRoutes.getCombatLog.query;
 
 export const gameReads = [
-  ...PUBLIC_CATALOGS.map(([event, path, key, rows]) => ({
+  ...PUBLIC_CATALOGS.map(([event, route, key, rows]) => ({
     event,
-    path,
-    scope: "game:read" as const,
+    route,
     run: (principal: GamePrincipal, _input: unknown, kit: Kit) => {
       const catalog = kit.catalogFor(principal);
       return { [key]: rows(catalog), attribution: catalog.attribution };
@@ -70,8 +74,7 @@ export const gameReads = [
 
   {
     event: "content:monsters",
-    path: CONTENT_PATHS.monsters,
-    scope: "game:read",
+    route: contentRoutes.listContentMonsters,
     gmOnly: "Only the GM can browse bundled content.",
     run: (principal, _input, kit) => {
       const catalog = kit.catalogFor(principal);
@@ -81,8 +84,7 @@ export const gameReads = [
 
   {
     event: "content:monster-benchmarks",
-    path: CONTENT_PATHS.monsterBenchmarks,
-    scope: "game:read",
+    route: contentRoutes.listContentMonsterBenchmarks,
     gmOnly: "Only the GM writes monsters.",
     run: (principal, _input, kit) => ({
       benchmarks: srdMonsterBenchmarks(),
@@ -92,8 +94,7 @@ export const gameReads = [
 
   {
     event: "content:monster-actions",
-    path: CONTENT_PATHS.monsterActions,
-    scope: "game:read",
+    route: contentRoutes.getContentMonsterActions,
     gmOnly: "Only the GM can browse stat blocks.",
     schema: ContentActionsSchema,
     malformed: "The action lookup is malformed.",
@@ -127,8 +128,7 @@ export const gameReads = [
 
   {
     event: "content:monster-sheet",
-    path: CONTENT_PATHS.monsterById,
-    scope: "game:read",
+    route: contentRoutes.getContentMonster,
     gmOnly: "Only the GM can read stat blocks.",
     schema: ContentActionsSchema,
     malformed: "The stat-block lookup is malformed.",
@@ -143,8 +143,7 @@ export const gameReads = [
 
   {
     event: "actor:available-actions",
-    path: GAME_PATHS.actorAvailableActions,
-    scope: "combat:read",
+    route: gameRoutes.getActorAvailableActions,
     schema: ActorAvailableActionsSchema,
     malformed: "The availability lookup is malformed.",
     // The same evaluation as resolution, read-only. GM-grade any combatant; a player their own.
@@ -193,16 +192,14 @@ export const gameReads = [
 
   {
     event: "character:draft",
-    path: GAME_PATHS.characterDraft,
-    scope: "game:read",
+    route: gameRoutes.getCharacterDraft,
     // Only ever the caller's own: the owner comes from the signed principal, never from the request.
     run: (principal, _input, kit) => ({ draft: kit.context.characterDrafts.get(draftOwnerOf(principal)) })
   },
 
   {
     event: "actor:movement",
-    path: GAME_PATHS.actorMovement,
-    scope: "combat:read",
+    route: gameRoutes.getActorMovement,
     schema: ActorMovementSchema,
     malformed: "The movement lookup is malformed.",
     // The budget a move is charged against, for the map's drag preview. GM-grade any combatant; a player their own.
@@ -228,8 +225,7 @@ export const gameReads = [
 
   {
     event: "character:next-level",
-    path: GAME_PATHS.characterNextLevel,
-    scope: "game:read",
+    route: gameRoutes.getCharacterNextLevel,
     schema: CharacterNextLevelSchema,
     malformed: "The next-level lookup is malformed.",
     // Answered only to someone who may level the character: the GM always, a player their own while the table's
@@ -256,8 +252,7 @@ export const gameReads = [
 
   {
     event: "builder:offers",
-    path: GAME_PATHS.builderOffers,
-    scope: "game:read",
+    route: gameRoutes.getBuilderOffers,
     schema: BuilderOffersSchema,
     malformed: "The builder draft is malformed.",
     // Over HTTP the draft is one JSON-encoded `draft` query parameter.
@@ -279,8 +274,7 @@ export const gameReads = [
 
   {
     event: "vision:preview",
-    path: GAME_PATHS.visionPreview,
-    scope: "scene:read",
+    route: gameRoutes.previewVision,
     gmOnly: "Only the GM can look through a creature's eyes.",
     schema: VisionPreviewSchema,
     malformed: "The vision preview is malformed.",
@@ -306,8 +300,7 @@ export const gameReads = [
 
   {
     event: "log:read",
-    path: GAME_PATHS.log,
-    scope: "combat:read",
+    route: gameRoutes.getCombatLog,
     schema: LogReadSchema,
     malformed: "limit must be an integer between 1 and 1000.",
     httpInput: ({ query }) => (query.limit === undefined ? {} : { limit: Number(query.limit) }),
@@ -323,8 +316,7 @@ export const gameReads = [
 
   {
     event: "sound:board",
-    path: GAME_PATHS.sound,
-    scope: "scene:read",
+    route: gameRoutes.getSoundBoard,
     gmOnly: "Only the GM controls the table's sound.",
     run: (_principal, _input, kit) => {
       if (!kit.context.sound) throw new GameNotFoundError("Sound is not available on this server.");

@@ -5,7 +5,8 @@ import { io as connect, type Socket } from "socket.io-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GameStateSchema } from "@vtt/domain";
 import { createServer } from "../src/server.js";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
+import { mountedRoutes } from "./route-table.js";
 
 /**
  * The session lifecycle's one rule, walked over every HTTP route the server mounts and the socket handshake
@@ -13,22 +14,6 @@ import { openApiDocument } from "../src/openapi/document.js";
  * credential without the role. The answers for every route are pinned in `__snapshots__/credential-answers.txt`, so
  * a new route, or a changed answer, shows up in review.
  */
-
-type Layer = Readonly<{
-  route?: Readonly<{ path: string; methods: Record<string, boolean> }>;
-  handle?: Readonly<{ stack?: readonly Layer[] }>;
-}>;
-
-/** Every `method path` under `/api/v1`, read from Express's own route table so nothing mounted can be missed. */
-function mountedRoutes(stack: readonly Layer[]): Array<Readonly<{ method: string; path: string }>> {
-  return stack.flatMap((layer) => {
-    if (layer.route)
-      return Object.keys(layer.route.methods)
-        .filter((method) => method !== "_all")
-        .map((method) => ({ method: method.toUpperCase(), path: layer.route!.path }));
-    return layer.handle?.stack ? mountedRoutes(layer.handle.stack) : [];
-  });
-}
 
 /** Routes anyone may call: they take no session, or check something other than a credential. */
 const PUBLIC = new Set([
@@ -118,9 +103,7 @@ async function answer(method: string, path: string, token: string | undefined) {
 
 describe("every route answers a credential the same way", () => {
   it("answers 401 to a missing or dead credential and 403 only to a valid one without the role", async () => {
-    const routes = mountedRoutes((server.app as unknown as { router: { stack: Layer[] } }).router.stack).filter(
-      (route) => route.path.startsWith("/api/v1/")
-    );
+    const routes = mountedRoutes(server);
     // The walk must see the whole surface, or it proves nothing.
     expect(routes.length).toBeGreaterThan(200);
     const lines: string[] = [];

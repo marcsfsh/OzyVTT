@@ -1,15 +1,16 @@
 import { createHash } from "node:crypto";
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
-import { CODEX_ASSET_PATHS, CODEX_PATHS } from "@vtt/api-contract";
+import { codexRoutes as routes, type ApiRoute, type BodyOf } from "@vtt/api-contract/routes";
 import {
   apiErrorHandler,
-  expressPath,
   issuesOf,
+  mount,
   pathParam,
   sendData,
   sendFailure,
-  sendInternalError
+  sendInternalError,
+  successStatus
 } from "./http-kit.js";
 import { InvalidRequestError } from "./invalid-request.js";
 import type { MapAssetStore } from "./map-assets.js";
@@ -22,52 +23,7 @@ import { CodexNotFoundError, CodexRevisionConflictError, CodexValidationError } 
 import { revealAuditRecords } from "./codex/visibility.js";
 import type { CodexStore } from "./codex-store.js";
 import { callerOf, refuse, sendUnauthenticated, type CredentialVerifiers } from "./request-auth.js";
-import {
-  AudienceSetSchema,
-  BlockAddSchema,
-  BlockEditSchema,
-  BlockMoveSchema,
-  CalendarSchema,
-  CodexImportSchema,
-  CodexSettingsSchema,
-  ConnectionCreateSchema,
-  ConnectionUpdateSchema,
-  DeadlineCreateSchema,
-  DowntimeCreateSchema,
-  FieldAudienceSchema,
-  FolderMoveSchema,
-  FolderPathSchema,
-  JournalUpdateSchema,
-  JournalWriteSchema,
-  MapCreateSchema,
-  MapParentSchema,
-  MapUpdateSchema,
-  MarkerCreateSchema,
-  MarkerMoveSchema,
-  MarkerPartySchema,
-  MarkerUpdateSchema,
-  MilestoneCreateSchema,
-  PageCreateSchema,
-  PageUpdateSchema,
-  PartyPlaceSchema,
-  PrepTemplateCreateSchema,
-  PrepTemplateDuplicateSchema,
-  PrepTemplateUpdateSchema,
-  PreviewSessionSchema,
-  QuestCreateSchema,
-  QuestUpdateSchema,
-  RevealSchema,
-  RevisionsDeleteSchema,
-  SessionApplyTemplateSchema,
-  SessionCreateSchema,
-  SessionCurrentSceneSchema,
-  SessionLogSchema,
-  SessionTickSchema,
-  SessionUpdateSchema,
-  StandingSetSchema,
-  parseHomeSince,
-  parseSearchQuery
-} from "./codex-requests.js";
+import { parseHomeSince, parseSearchQuery } from "./codex-requests.js";
 import {
   EVERYONE,
   projectGmCalendar,
@@ -308,53 +264,55 @@ export function createCodexRouter(options: CodexRouterOptions) {
   };
 
   /**
-   * One GM write: `run` parses the body, calls the store and returns the response data; then every client is
-   * pinged and the data is sent. A store error becomes its status. `currentRevision` re-reads the row only on a
-   * 409, so the caller learns which revision it lost the race to. `quiet` skips the ping for GM-only state.
+   * One GM write: its body is parsed with the route's own schema, `run` calls the store and returns the response
+   * data, then every client is pinged and the data is sent with the route's documented success status. A store
+   * error becomes its status. `currentRevision`
+   * re-reads the row only on a 409, so the caller learns which revision it lost the race to. `quiet` skips the ping
+   * for GM-only state.
    */
-  const write = (
-    method: "post" | "patch" | "put" | "delete",
-    path: string,
-    run: (request: Request) => unknown,
+  const write = <R extends ApiRoute>(
+    route: R,
+    run: (request: Request, body: BodyOf<R>) => unknown,
     how: Readonly<{
-      status?: number;
       quiet?: boolean;
       currentRevision?: (request: Request) => number | undefined;
     }> = {}
-  ) =>
-    router[method](expressPath(path), requireWrite, (request: Request, response: Response) => {
+  ) => {
+    const status = successStatus(route);
+    mount(router, route, requireWrite, (request: Request, response: Response) => {
       try {
-        const data = run(request);
+        const body =
+          route.body?.kind === "json"
+            ? route.body.schema.parse(request.body ?? (route.body.required ? undefined : {}))
+            : undefined;
+        const data = run(request, body as BodyOf<R>);
         if (!how.quiet) options.notifyChanged();
-        return sendData(response, how.status ?? 200, data);
+        return sendData(response, status, data);
       } catch (error) {
         const { currentRevision } = how;
         return codexError(response, error, currentRevision && (() => currentRevision(request)));
       }
     });
-  const CREATED = { status: 201 } as const;
+  };
 
   // Pages
 
-  router.get(expressPath(CODEX_PATHS.pages), (request, response) => {
+  mount(router, routes.listCodexPages, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const tag = request.query.tag === undefined ? undefined : String(request.query.tag);
+    const query = routes.listCodexPages.query.safeParse(request.query);
+    if (!query.success) return malformed(response, query.error);
+    const { tag } = query.data;
     // Folders are the GM's private filing. A player's folder filter is ignored, since an answer that changed
     // with it would show which pages the GM filed where.
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).pages(tag));
-    const folder =
-      request.query.folder === undefined
-        ? undefined
-        : request.query.folder === ""
-          ? null
-          : String(request.query.folder);
+    const folder = query.data.folder === "" ? null : query.data.folder;
     const pages = store.listPages({ folder, tag }).map(projectGmPageSummary);
     return readEnvelope(request, response, role, { pages });
   });
 
   /** One result list (`hits`) across all record kinds, filtered and sorted (`codex/find.ts`). */
-  router.get(expressPath(CODEX_PATHS.search), (request, response) => {
+  mount(router, routes.searchCodex, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     let query;
@@ -369,7 +327,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   // Home: the GM's counts, latest changes and reveal check; a player's new since their last visit.
-  router.get(expressPath(CODEX_PATHS.home), (request, response) => {
+  mount(router, routes.getCodexHome, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "gm") return readEnvelope(request, response, role, { home: gmHome(store) });
@@ -382,7 +340,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return readEnvelope(request, response, role, playerReads(request, response).home(since));
   });
 
-  router.get(expressPath(CODEX_PATHS.pageById), (request, response) => {
+  mount(router, routes.getCodexPage, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     const data =
@@ -393,41 +351,35 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return readEnvelope(request, response, role, data);
   });
 
+  write(routes.createCodexPage, (_request, body) => ({
+    page: projectGmPage(store.createPage(withoutCommandId(body)))
+  }));
   write(
-    "post",
-    CODEX_PATHS.pages,
-    (request) => ({ page: projectGmPage(store.createPage(withoutCommandId(PageCreateSchema.parse(request.body)))) }),
-    CREATED
-  );
-  write(
-    "patch",
-    CODEX_PATHS.pageById,
-    (request) => {
-      const { expectedRev, ...fields } = withoutCommandId(PageUpdateSchema.parse(request.body));
+    routes.updateCodexPage,
+    (request, body) => {
+      const { expectedRev, ...fields } = withoutCommandId(body);
       return { page: projectGmPage(store.updatePage(pathParam(request, "id"), fields, expectedRev, "gm")) };
     },
     { currentRevision: (request) => store.getPage(pathParam(request, "id"))?.rev }
   );
-  write("post", CODEX_PATHS.pageReveal, (request) => ({
-    page: projectGmPage(store.setPageRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed))
+  write(routes.revealCodexPage, (request, body) => ({
+    page: projectGmPage(store.setPageRevealed(pathParam(request, "id"), body.revealed))
   }));
 
   // Hidden blocks: content and place are edits (`rev` moves, `expectedRev` guards); who sees one is not.
   write(
-    "post",
-    CODEX_PATHS.pageBlocks,
-    (request) => {
-      const { expectedRev, ...input } = withoutCommandId(BlockAddSchema.parse(request.body));
+    routes.addCodexPageBlock,
+    (request, body) => {
+      const { expectedRev, ...input } = withoutCommandId(body);
       const { page, blockId } = store.addPageBlock(pathParam(request, "id"), input, expectedRev);
       return { page: projectGmPage(page), block: page.blocks.find((block) => block.id === blockId) };
     },
-    { status: 201, currentRevision: (request) => store.getPage(pathParam(request, "id"))?.rev }
+    { currentRevision: (request) => store.getPage(pathParam(request, "id"))?.rev }
   );
   write(
-    "patch",
-    CODEX_PATHS.pageBlockById,
-    (request) => {
-      const { expectedRev, ...input } = withoutCommandId(BlockEditSchema.parse(request.body));
+    routes.editCodexPageBlock,
+    (request, body) => {
+      const { expectedRev, ...input } = withoutCommandId(body);
       return {
         page: projectGmPage(
           store.editPageBlock(pathParam(request, "id"), pathParam(request, "blockId"), input, expectedRev)
@@ -437,10 +389,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
     { currentRevision: (request) => store.getPage(pathParam(request, "id"))?.rev }
   );
   write(
-    "post",
-    CODEX_PATHS.pageBlockMove,
-    (request) => {
-      const { expectedRev, ...place } = withoutCommandId(BlockMoveSchema.parse(request.body));
+    routes.moveCodexPageBlock,
+    (request, body) => {
+      const { expectedRev, ...place } = withoutCommandId(body);
       return {
         page: projectGmPage(
           store.movePageBlock(pathParam(request, "id"), pathParam(request, "blockId"), place, expectedRev)
@@ -450,11 +401,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
     { currentRevision: (request) => store.getPage(pathParam(request, "id"))?.rev }
   );
   // Idempotent: a block already gone answers the page as it is.
-  write("delete", CODEX_PATHS.pageBlockById, (request) => ({
+  write(routes.deleteCodexPageBlock, (request) => ({
     page: projectGmPage(store.deletePageBlock(pathParam(request, "id"), pathParam(request, "blockId")))
   }));
-  write("put", CODEX_PATHS.pageBlockAudience, (request) => {
-    const { audience, characterIds } = AudienceSetSchema.parse(request.body);
+  write(routes.setCodexPageBlockAudience, (request, body) => {
+    const { audience, characterIds } = body;
     partyOnly(characterIds);
     return {
       page: projectGmPage(
@@ -462,44 +413,30 @@ export function createCodexRouter(options: CodexRouterOptions) {
       )
     };
   });
-  write("put", CODEX_PATHS.pageFieldAudience, (request) => ({
-    page: projectGmPage(
-      store.setPageFieldAudience(
-        pathParam(request, "id"),
-        pathParam(request, "key"),
-        FieldAudienceSchema.parse(request.body).audience
-      )
-    )
+  write(routes.setCodexPageFieldAudience, (request, body) => ({
+    page: projectGmPage(store.setPageFieldAudience(pathParam(request, "id"), pathParam(request, "key"), body.audience))
   }));
-  write("delete", CODEX_PATHS.pageById, (request) => {
+  write(routes.deleteCodexPage, (request) => {
     store.deletePage(pathParam(request, "id"));
     return { deleted: true };
   });
 
   // Folder records make empty folders persist; otherwise a folder is only implied by its pages.
-  write("post", CODEX_PATHS.foldersMove, (request) => {
-    const { from, to } = FolderMoveSchema.parse(request.body);
-    return { moved: store.moveFolder(from, to) };
-  });
-  router.get(expressPath(CODEX_PATHS.folders), requireGmRead, (request, response) =>
+  write(routes.moveCodexFolder, (_request, body) => ({ moved: store.moveFolder(body.from, body.to) }));
+  mount(router, routes.listCodexFolders, requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", { folders: store.listFolders() })
   );
-  write(
-    "post",
-    CODEX_PATHS.folders,
-    (request) => ({ path: store.createFolder(FolderPathSchema.parse(request.body).path) }),
-    CREATED
-  );
-  write("post", CODEX_PATHS.foldersDelete, (request) => {
-    store.deleteFolder(FolderPathSchema.parse(request.body).path);
+  write(routes.createCodexFolder, (_request, body) => ({ path: store.createFolder(body.path) }));
+  write(routes.deleteCodexFolder, (_request, body) => {
+    store.deleteFolder(body.path);
     return { deleted: true };
   });
 
   // GM preview: mints a real, short-lived player principal, never a role flag on the GM's token. It reads as
   // everyone, or as one party character, and only reads.
-  router.post(expressPath(CODEX_PATHS.previewSession), requireGmSession, (request, response) => {
+  mount(router, routes.createCodexPreviewSession, requireGmSession, (request, response) => {
     try {
-      const { characterId } = PreviewSessionSchema.parse(request.body ?? {});
+      const { characterId } = routes.createCodexPreviewSession.body.schema.parse(request.body ?? {});
       const characterIds = characterId ? [characterId] : [];
       partyOnly(characterIds);
       return sendData(response, 201, { token: options.issuePreviewSession(characterIds) });
@@ -508,41 +445,32 @@ export function createCodexRouter(options: CodexRouterOptions) {
     }
   });
 
-  router.get(expressPath(CODEX_PATHS.pageRevisions), requireGmRead, (request, response) => {
+  mount(router, routes.listCodexPageRevisions, requireGmRead, (request, response) => {
     const page = store.getPage(pathParam(request, "id"));
     if (!page) return sendFailure(response, 404, "not_found", "That page was not found.");
     return readEnvelope(request, response, "gm", { revisions: store.listRevisions(page.id) });
   });
-  write("post", CODEX_PATHS.pageRevisionRestore, (request) => {
-    const revisionId = Number(request.params.revisionId);
-    if (!Number.isInteger(revisionId)) throw new CodexValidationError("The revision id is malformed.");
-    return { page: projectGmPage(store.restoreRevision(pathParam(request, "id"), revisionId, "gm")) };
+  write(routes.restoreCodexPageRevision, (request) => {
+    const params = routes.restoreCodexPageRevision.params.safeParse(request.params);
+    if (!params.success) throw new CodexValidationError("The revision id is malformed.");
+    return { page: projectGmPage(store.restoreRevision(params.data.id, params.data.revisionId, "gm")) };
   });
 
   // Connections: declared edges and mentions are one concept, one panel, one graph.
 
   // Idempotent on `(from, to, label)`. Touches both pages' recency but not their `rev`.
-  write(
-    "post",
-    CODEX_PATHS.pageConnections,
-    (request) => ({
-      connection: store.connectionEdge(
-        store.createConnection(pathParam(request, "id"), withoutCommandId(ConnectionCreateSchema.parse(request.body)))
-      )
-    }),
-    CREATED
-  );
-  // Declared connections only; a mention is edited through its source text.
-  write("patch", CODEX_PATHS.connectionById, (request) => ({
-    connection: store.connectionEdge(
-      store.updateConnection(pathParam(request, "id"), withoutCommandId(ConnectionUpdateSchema.parse(request.body)))
-    )
+  write(routes.createCodexConnection, (request, body) => ({
+    connection: store.connectionEdge(store.createConnection(pathParam(request, "id"), withoutCommandId(body)))
   }));
-  write("delete", CODEX_PATHS.connectionById, (request) => {
+  // Declared connections only; a mention is edited through its source text.
+  write(routes.updateCodexConnection, (request, body) => ({
+    connection: store.connectionEdge(store.updateConnection(pathParam(request, "id"), withoutCommandId(body)))
+  }));
+  write(routes.deleteCodexConnection, (request) => {
     store.deleteConnection(pathParam(request, "id"));
     return { deleted: true };
   });
-  router.get(expressPath(CODEX_PATHS.connections), (request, response) => {
+  mount(router, routes.listCodexConnections, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).connections());
@@ -551,33 +479,28 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   // The atlas: maps and their pins
 
-  router.get(expressPath(CODEX_PATHS.maps), (request, response) => {
+  mount(router, routes.listCodexMaps, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).maps());
     return readEnvelope(request, response, role, { maps: store.listMaps().map(projectGmMap) });
   });
-  write(
-    "post",
-    CODEX_PATHS.maps,
-    (request) => ({ map: projectGmMap(store.createMap(withoutCommandId(MapCreateSchema.parse(request.body)))) }),
-    CREATED
-  );
-  write("patch", CODEX_PATHS.mapById, (request) => ({
-    map: projectGmMap(store.updateMap(pathParam(request, "id"), withoutCommandId(MapUpdateSchema.parse(request.body))))
+  write(routes.createCodexMap, (_request, body) => ({ map: projectGmMap(store.createMap(withoutCommandId(body))) }));
+  write(routes.updateCodexMap, (request, body) => ({
+    map: projectGmMap(store.updateMap(pathParam(request, "id"), withoutCommandId(body)))
   }));
-  write("post", CODEX_PATHS.mapParent, (request) => ({
-    map: projectGmMap(store.setMapParent(pathParam(request, "id"), MapParentSchema.parse(request.body).parentMapId))
+  write(routes.setCodexMapParent, (request, body) => ({
+    map: projectGmMap(store.setMapParent(pathParam(request, "id"), body.parentMapId))
   }));
-  write("post", CODEX_PATHS.mapReveal, (request) => ({
-    map: projectGmMap(store.setMapRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed))
+  write(routes.revealCodexMap, (request, body) => ({
+    map: projectGmMap(store.setMapRevealed(pathParam(request, "id"), body.revealed))
   }));
-  write("delete", CODEX_PATHS.mapById, (request) => {
+  write(routes.deleteCodexMap, (request) => {
     store.deleteMap(pathParam(request, "id"));
     return { deleted: true };
   });
 
-  router.get(expressPath(CODEX_PATHS.mapMarkers), (request, response) => {
+  mount(router, routes.listCodexMarkers, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     const mapId = pathParam(request, "id");
@@ -590,7 +513,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   // Pins pointing at a page. A player is refused a hidden page first, so ids cannot be probed.
-  router.get(expressPath(CODEX_PATHS.pageMarkers), (request, response) => {
+  mount(router, routes.listCodexPageMarkers, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     const pageId = pathParam(request, "id");
@@ -602,20 +525,13 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return readEnvelope(request, response, role, data);
   });
 
-  write(
-    "post",
-    CODEX_PATHS.mapMarkers,
-    (request) => ({
-      marker: projectGmMarker(
-        store.createMarker(pathParam(request, "id"), withoutCommandId(MarkerCreateSchema.parse(request.body)))
-      )
-    }),
-    CREATED
-  );
+  write(routes.createCodexMarker, (request, body) => ({
+    marker: projectGmMarker(store.createMarker(pathParam(request, "id"), withoutCommandId(body)))
+  }));
 
   // Where the party is. A player gets null (not 404) for a hidden pin, so a hidden party pin and none look
   // the same; `mapName` is sent only with a visible pin.
-  router.get(expressPath(CODEX_PATHS.party), (request, response) => {
+  mount(router, routes.getCodexPartyLocation, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).party());
@@ -627,14 +543,14 @@ export function createCodexRouter(options: CodexRouterOptions) {
   });
 
   // Puts the party at a point on any map: the party pin moves there, or one is made, in one write.
-  write("post", CODEX_PATHS.party, (request) => {
-    const { mapId, x, y, revealedToPlayers } = PartyPlaceSchema.parse(request.body);
+  write(routes.placeCodexParty, (_request, body) => {
+    const { mapId, x, y, revealedToPlayers } = body;
     const placed = store.placeParty({ mapId, x, y, revealedToPlayers });
     return { marker: projectGmMarker(placed.marker), created: placed.created };
   });
 
   // One pin by id. Any player gate failure is the same 404 as a bogus id.
-  router.get(expressPath(CODEX_PATHS.markerById), (request, response) => {
+  mount(router, routes.getCodexMarker, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     const markerId = pathParam(request, "id");
@@ -645,43 +561,38 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return readEnvelope(request, response, role, data);
   });
 
-  write("patch", CODEX_PATHS.markerById, (request) => ({
-    marker: projectGmMarker(
-      store.updateMarker(pathParam(request, "id"), withoutCommandId(MarkerUpdateSchema.parse(request.body)))
-    )
+  write(routes.updateCodexMarker, (request, body) => ({
+    marker: projectGmMarker(store.updateMarker(pathParam(request, "id"), withoutCommandId(body)))
   }));
-  write("post", CODEX_PATHS.markerMove, (request) => {
-    const { x, y } = MarkerMoveSchema.parse(request.body);
-    return { marker: projectGmMarker(store.moveMarker(pathParam(request, "id"), x, y)) };
-  });
-  write("post", CODEX_PATHS.markerReveal, (request) => ({
-    marker: projectGmMarker(
-      store.setMarkerRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed)
-    )
+  write(routes.moveCodexMarker, (request, body) => ({
+    marker: projectGmMarker(store.moveMarker(pathParam(request, "id"), body.x, body.y))
+  }));
+  write(routes.revealCodexMarker, (request, body) => ({
+    marker: projectGmMarker(store.setMarkerRevealed(pathParam(request, "id"), body.revealed))
   }));
   // `isParty: false` clears only this pin, whichever pin holds the flag.
-  write("put", CODEX_PATHS.markerParty, (request) => {
+  write(routes.setCodexPartyMarker, (request, body) => {
     const markerId = pathParam(request, "id");
-    const { isParty } = MarkerPartySchema.parse(request.body);
-    if (isParty) store.setPartyMarker(markerId);
+    if (body.isParty) store.setPartyMarker(markerId);
     else if (store.partyMarker()?.id === markerId) store.setPartyMarker(null);
     // `setPartyMarker` refuses an unknown id; clearing one that does not hold the flag is caught here.
     const marker = store.getMarker(markerId);
     if (!marker) throw new CodexNotFoundError("That marker was not found.");
     return { marker: projectGmMarker(marker) };
   });
-  write("delete", CODEX_PATHS.markerById, (request) => {
+  write(routes.deleteCodexMarker, (request) => {
     store.deleteMarker(pathParam(request, "id"));
     return { deleted: true };
   });
 
   // The journal
 
-  router.get(expressPath(CODEX_PATHS.journal), (request, response) => {
+  mount(router, routes.listCodexJournal, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
-    const markerId = typeof request.query.markerId === "string" ? request.query.markerId : undefined;
-    const pageId = typeof request.query.pageId === "string" ? request.query.pageId : undefined;
+    const query = routes.listCodexJournal.query.safeParse(request.query);
+    if (!query.success) return malformed(response, query.error);
+    const { markerId, pageId } = query.data;
     if (role === "player") {
       // A player reads a pin's or page's mini-timeline only when that pin or page is visible, so hidden ids
       // cannot be probed. Each entry's own gate still applies.
@@ -695,7 +606,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   // The chronicle: entries and dated event pages in one order. `listChronicle` is ungated;
   // `projectPlayerChronicleRecord` is the only player gate.
-  router.get(expressPath(CODEX_PATHS.timeline), (request, response) => {
+  mount(router, routes.listCodexTimeline, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).chronicle());
@@ -711,65 +622,41 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return readEnvelope(request, response, role, { records });
   });
 
-  write(
-    "post",
-    CODEX_PATHS.journal,
-    (request) => ({
-      entry: projectGmJournalEntry(store.createEntry(withoutCommandId(JournalWriteSchema.parse(request.body))))
-    }),
-    CREATED
-  );
+  write(routes.createCodexJournalEntry, (_request, body) => ({
+    entry: projectGmJournalEntry(store.createEntry(withoutCommandId(body)))
+  }));
   // Deadline, downtime and milestone have their own create routes, each needing a date or a payload, and are
   // registered before the `{id}` family. Reveal goes through the ordinary journal route.
-  write(
-    "post",
-    CODEX_PATHS.journalDeadline,
-    (request) => ({
-      entry: projectGmJournalEntry(store.createDeadline(withoutCommandId(DeadlineCreateSchema.parse(request.body))))
-    }),
-    CREATED
-  );
+  write(routes.createCodexDeadline, (_request, body) => ({
+    entry: projectGmJournalEntry(store.createDeadline(withoutCommandId(body)))
+  }));
   // Never moves the clock; answers with the date `apply-downtime` would move it to.
-  write(
-    "post",
-    CODEX_PATHS.journalDowntime,
-    (request) => {
-      const entry = store.createDowntime(withoutCommandId(DowntimeCreateSchema.parse(request.body)));
-      return { entry: projectGmJournalEntry(entry), proposedDate: store.proposedDateFor(entry) };
-    },
-    CREATED
-  );
-  write(
-    "post",
-    CODEX_PATHS.journalMilestone,
-    (request) => ({
-      entry: projectGmJournalEntry(store.createMilestone(withoutCommandId(MilestoneCreateSchema.parse(request.body))))
-    }),
-    CREATED
-  );
+  write(routes.createCodexDowntime, (_request, body) => {
+    const entry = store.createDowntime(withoutCommandId(body));
+    return { entry: projectGmJournalEntry(entry), proposedDate: store.proposedDateFor(entry) };
+  });
+  write(routes.createCodexMilestone, (_request, body) => ({
+    entry: projectGmJournalEntry(store.createMilestone(withoutCommandId(body)))
+  }));
   // Moves the GM's clock by the downtime's days. A second apply is refused.
-  write("post", CODEX_PATHS.journalApplyDowntime, (request) => {
+  write(routes.applyCodexDowntime, (request) => {
     const { entry, calendar } = store.applyDowntime(pathParam(request, "id"));
     return { entry: projectGmJournalEntry(entry), calendar: projectGmCalendar(calendar, store.getPublishedDate()) };
   });
-  write("patch", CODEX_PATHS.journalById, (request) => ({
-    entry: projectGmJournalEntry(
-      store.updateEntry(pathParam(request, "id"), withoutCommandId(JournalUpdateSchema.parse(request.body)))
-    )
+  write(routes.updateCodexJournalEntry, (request, body) => ({
+    entry: projectGmJournalEntry(store.updateEntry(pathParam(request, "id"), withoutCommandId(body)))
   }));
-  write("post", CODEX_PATHS.journalReveal, (request) => ({
-    entry: projectGmJournalEntry(
-      store.setEntryRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed)
-    )
+  write(routes.revealCodexJournalEntry, (request, body) => ({
+    entry: projectGmJournalEntry(store.setEntryRevealed(pathParam(request, "id"), body.revealed))
   }));
-  write("delete", CODEX_PATHS.journalById, (request) => {
+  write(routes.deleteCodexJournalEntry, (request) => {
     store.deleteEntry(pathParam(request, "id"));
     return { deleted: true };
   });
 
   // Sessions. A hidden session is a 404 for a player: secret must look like absent.
 
-  router.get(expressPath(CODEX_PATHS.sessions), (request, response) => {
+  mount(router, routes.listCodexSessions, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).sessions());
@@ -778,15 +665,10 @@ export function createCodexRouter(options: CodexRouterOptions) {
       activeSessionId: store.activeSessionId
     });
   });
-  write(
-    "post",
-    CODEX_PATHS.sessions,
-    (request) => ({
-      session: projectGmSession(store.createSession(withoutCommandId(SessionCreateSchema.parse(request.body))))
-    }),
-    CREATED
-  );
-  router.get(expressPath(CODEX_PATHS.sessionById), (request, response) => {
+  write(routes.createCodexSession, (_request, body) => ({
+    session: projectGmSession(store.createSession(withoutCommandId(body)))
+  }));
+  mount(router, routes.getCodexSession, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     const sessionId = pathParam(request, "id");
@@ -799,131 +681,98 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return readEnvelope(request, response, role, data);
   });
   write(
-    "patch",
-    CODEX_PATHS.sessionById,
-    (request) => {
-      const { expectedRev, ...fields } = withoutCommandId(SessionUpdateSchema.parse(request.body));
+    routes.updateCodexSession,
+    (request, body) => {
+      const { expectedRev, ...fields } = withoutCommandId(body);
       return { session: projectGmSession(store.updateSession(pathParam(request, "id"), fields, expectedRev)) };
     },
     { currentRevision: (request) => store.getSession(pathParam(request, "id"))?.rev }
   );
-  write("delete", CODEX_PATHS.sessionById, (request) => {
+  write(routes.deleteCodexSession, (request) => {
     store.deleteSession(pathParam(request, "id"));
     return { deleted: true };
   });
-  write("post", CODEX_PATHS.sessionReveal, (request) => ({
-    session: projectGmSession(
-      store.setSessionRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed)
-    )
+  write(routes.revealCodexSession, (request, body) => ({
+    session: projectGmSession(store.setSessionRevealed(pathParam(request, "id"), body.revealed))
   }));
   // Answers with the pointer alone: activating a session does not edit it.
-  write("post", CODEX_PATHS.sessionActivate, (request) => ({
+  write(routes.activateCodexSession, (request) => ({
     activeSessionId: store.setActiveSession(pathParam(request, "id"))
   }));
   // Re-applies a template to the prep and keeps what was written.
   write(
-    "post",
-    CODEX_PATHS.sessionApplyTemplate,
-    (request) => {
-      const { templateId, expectedRev } = SessionApplyTemplateSchema.parse(request.body);
-      return { session: projectGmSession(store.applyPrepTemplate(pathParam(request, "id"), templateId, expectedRev)) };
-    },
+    routes.applyCodexPrepTemplate,
+    (request, body) => ({
+      session: projectGmSession(store.applyPrepTemplate(pathParam(request, "id"), body.templateId, body.expectedRev))
+    }),
     { currentRevision: (request) => store.getSession(pathParam(request, "id"))?.rev }
   );
 
   // The live board and the recap step. GM-only: the prep never reaches a player.
-  router.get(expressPath(CODEX_PATHS.board), requireGmRead, (request, response) =>
+  mount(router, routes.getCodexLiveBoard, requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", { board: liveBoard(store) })
   );
-  router.get(expressPath(CODEX_PATHS.sessionHappened), requireGmRead, (request, response) => {
+  mount(router, routes.getCodexSessionHappened, requireGmRead, (request, response) => {
     const session = store.getSession(pathParam(request, "id"));
     if (!session) return sendFailure(response, 404, "not_found", "That session was not found.");
     return readEnvelope(request, response, "gm", { happened: sessionHappened(store, session) });
   });
-  write(
-    "post",
-    CODEX_PATHS.sessionLog,
-    (request) => {
-      const { text, revealedToPlayers } = SessionLogSchema.parse(request.body);
-      return {
-        entry: projectGmJournalEntry(store.logSessionLine(pathParam(request, "id"), { text, revealedToPlayers }))
-      };
-    },
-    CREATED
-  );
+  write(routes.logCodexSessionLine, (request, body) => ({
+    entry: projectGmJournalEntry(
+      store.logSessionLine(pathParam(request, "id"), { text: body.text, revealedToPlayers: body.revealedToPlayers })
+    )
+  }));
   // Answers with the clue as the board shows it, so the client can offer to reveal a block it links.
-  write("post", CODEX_PATHS.sessionTick, (request) => {
-    const { itemId, done } = SessionTickSchema.parse(request.body);
-    const session = store.tickPrepItem(pathParam(request, "id"), itemId, done);
-    const ticked = prepItems(session.prep).find(({ item }) => item.id === itemId)!;
+  write(routes.tickCodexPrepItem, (request, body) => {
+    const session = store.tickPrepItem(pathParam(request, "id"), body.itemId, body.done);
+    const ticked = prepItems(session.prep).find(({ item }) => item.id === body.itemId)!;
     return { session: projectGmSession(session), clue: liveClue(store, ticked.item) };
   });
-  write("post", CODEX_PATHS.sessionCurrentScene, (request) => ({
-    session: projectGmSession(
-      store.setCurrentScene(pathParam(request, "id"), SessionCurrentSceneSchema.parse(request.body).sceneId)
-    )
+  write(routes.setCodexCurrentScene, (request, body) => ({
+    session: projectGmSession(store.setCurrentScene(pathParam(request, "id"), body.sceneId))
   }));
 
   // Prep templates: the GM's library. The built-in starting template is read-only.
 
-  router.get(expressPath(CODEX_PATHS.prepTemplates), requireGmRead, (request, response) =>
+  mount(router, routes.listCodexPrepTemplates, requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", store.listPrepTemplates())
   );
+  write(routes.createCodexPrepTemplate, (_request, body) => ({
+    template: store.createPrepTemplate(withoutCommandId(body))
+  }));
   write(
-    "post",
-    CODEX_PATHS.prepTemplates,
-    (request) => ({
-      template: store.createPrepTemplate(withoutCommandId(PrepTemplateCreateSchema.parse(request.body)))
-    }),
-    CREATED
-  );
-  write(
-    "patch",
-    CODEX_PATHS.prepTemplateById,
-    (request) => {
-      const { expectedRev, ...fields } = withoutCommandId(PrepTemplateUpdateSchema.parse(request.body));
+    routes.updateCodexPrepTemplate,
+    (request, body) => {
+      const { expectedRev, ...fields } = withoutCommandId(body);
       return { template: store.updatePrepTemplate(pathParam(request, "id"), fields, expectedRev) };
     },
     { currentRevision: (request) => store.getPrepTemplate(pathParam(request, "id"))?.rev }
   );
-  write("delete", CODEX_PATHS.prepTemplateById, (request) => {
+  write(routes.deleteCodexPrepTemplate, (request) => {
     store.deletePrepTemplate(pathParam(request, "id"));
     return { deleted: true };
   });
-  write(
-    "post",
-    CODEX_PATHS.prepTemplateDuplicate,
-    (request) => ({
-      template: store.duplicatePrepTemplate(
-        pathParam(request, "id"),
-        PrepTemplateDuplicateSchema.parse(request.body ?? {}).name
-      )
-    }),
-    CREATED
-  );
-  write("post", CODEX_PATHS.prepTemplateDefault, (request) => ({
+  write(routes.duplicateCodexPrepTemplate, (request, body) => ({
+    template: store.duplicatePrepTemplate(pathParam(request, "id"), body.name)
+  }));
+  write(routes.setDefaultCodexPrepTemplate, (request) => ({
     defaultTemplateId: store.setDefaultPrepTemplate(pathParam(request, "id"))
   }));
 
   // Quests. A hidden quest is a 404 for a player, and its page links are filtered to revealed pages.
 
-  router.get(expressPath(CODEX_PATHS.quests), (request, response) => {
+  mount(router, routes.listCodexQuests, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).quests());
     return readEnvelope(request, response, role, { quests: store.listQuests().map(projectGmQuest) });
   });
-  write(
-    "post",
-    CODEX_PATHS.quests,
-    (request) => {
-      const input = withoutCommandId(QuestCreateSchema.parse(request.body));
-      partyOnly(input.objectives?.flatMap((objective) => objective.characterIds ?? []));
-      return { quest: projectGmQuest(store.createQuest(input)) };
-    },
-    CREATED
-  );
-  router.get(expressPath(CODEX_PATHS.questById), (request, response) => {
+  write(routes.createCodexQuest, (_request, body) => {
+    const input = withoutCommandId(body);
+    partyOnly(input.objectives?.flatMap((objective) => objective.characterIds ?? []));
+    return { quest: projectGmQuest(store.createQuest(input)) };
+  });
+  mount(router, routes.getCodexQuest, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     const questId = pathParam(request, "id");
@@ -934,37 +783,34 @@ export function createCodexRouter(options: CodexRouterOptions) {
     return readEnvelope(request, response, role, data);
   });
   write(
-    "patch",
-    CODEX_PATHS.questById,
-    (request) => {
-      const { expectedRev, ...fields } = withoutCommandId(QuestUpdateSchema.parse(request.body));
+    routes.updateCodexQuest,
+    (request, body) => {
+      const { expectedRev, ...fields } = withoutCommandId(body);
       partyOnly(fields.objectives?.flatMap((objective) => objective.characterIds ?? []));
       return { quest: projectGmQuest(store.updateQuest(pathParam(request, "id"), fields, expectedRev)) };
     },
     { currentRevision: (request) => store.getQuest(pathParam(request, "id"))?.rev }
   );
-  write("delete", CODEX_PATHS.questById, (request) => {
+  write(routes.deleteCodexQuest, (request) => {
     store.deleteQuest(pathParam(request, "id"));
     return { deleted: true };
   });
-  write("post", CODEX_PATHS.questReveal, (request) => ({
-    quest: projectGmQuest(store.setQuestRevealed(pathParam(request, "id"), RevealSchema.parse(request.body).revealed))
+  write(routes.revealCodexQuest, (request, body) => ({
+    quest: projectGmQuest(store.setQuestRevealed(pathParam(request, "id"), body.revealed))
   }));
   write(
-    "post",
-    CODEX_PATHS.questBlocks,
-    (request) => {
-      const { expectedRev, ...input } = withoutCommandId(BlockAddSchema.parse(request.body));
+    routes.addCodexQuestBlock,
+    (request, body) => {
+      const { expectedRev, ...input } = withoutCommandId(body);
       const { quest, blockId } = store.addQuestBlock(pathParam(request, "id"), input, expectedRev);
       return { quest: projectGmQuest(quest), block: quest.blocks.find((block) => block.id === blockId) };
     },
-    { status: 201, currentRevision: (request) => store.getQuest(pathParam(request, "id"))?.rev }
+    { currentRevision: (request) => store.getQuest(pathParam(request, "id"))?.rev }
   );
   write(
-    "patch",
-    CODEX_PATHS.questBlockById,
-    (request) => {
-      const { expectedRev, ...input } = withoutCommandId(BlockEditSchema.parse(request.body));
+    routes.editCodexQuestBlock,
+    (request, body) => {
+      const { expectedRev, ...input } = withoutCommandId(body);
       return {
         quest: projectGmQuest(
           store.editQuestBlock(pathParam(request, "id"), pathParam(request, "blockId"), input, expectedRev)
@@ -974,10 +820,9 @@ export function createCodexRouter(options: CodexRouterOptions) {
     { currentRevision: (request) => store.getQuest(pathParam(request, "id"))?.rev }
   );
   write(
-    "post",
-    CODEX_PATHS.questBlockMove,
-    (request) => {
-      const { expectedRev, ...place } = withoutCommandId(BlockMoveSchema.parse(request.body));
+    routes.moveCodexQuestBlock,
+    (request, body) => {
+      const { expectedRev, ...place } = withoutCommandId(body);
       return {
         quest: projectGmQuest(
           store.moveQuestBlock(pathParam(request, "id"), pathParam(request, "blockId"), place, expectedRev)
@@ -986,11 +831,11 @@ export function createCodexRouter(options: CodexRouterOptions) {
     },
     { currentRevision: (request) => store.getQuest(pathParam(request, "id"))?.rev }
   );
-  write("delete", CODEX_PATHS.questBlockById, (request) => ({
+  write(routes.deleteCodexQuestBlock, (request) => ({
     quest: projectGmQuest(store.deleteQuestBlock(pathParam(request, "id"), pathParam(request, "blockId")))
   }));
-  write("put", CODEX_PATHS.questBlockAudience, (request) => {
-    const { audience, characterIds } = AudienceSetSchema.parse(request.body);
+  write(routes.setCodexQuestBlockAudience, (request, body) => {
+    const { audience, characterIds } = body;
     partyOnly(characterIds);
     return {
       quest: projectGmQuest(
@@ -998,8 +843,8 @@ export function createCodexRouter(options: CodexRouterOptions) {
       )
     };
   });
-  write("put", CODEX_PATHS.questObjectiveAudience, (request) => {
-    const { audience, characterIds } = AudienceSetSchema.parse(request.body);
+  write(routes.setCodexQuestObjectiveAudience, (request, body) => {
+    const { audience, characterIds } = body;
     partyOnly(characterIds);
     return {
       quest: projectGmQuest(
@@ -1010,31 +855,28 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   // Standing, addressed by faction page id. A player needs both the standing and its faction revealed.
 
-  router.get(expressPath(CODEX_PATHS.standing), (request, response) => {
+  mount(router, routes.listCodexStanding, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).standing());
     return readEnvelope(request, response, role, { standing: store.listStanding().map(projectGmStanding) });
   });
   // The value and its history record are one write, hence `reason` here.
-  write("put", CODEX_PATHS.standingByFaction, (request) => {
-    const { value, reason } = StandingSetSchema.parse(request.body);
-    return { standing: projectGmStanding(store.setStanding(pathParam(request, "factionPageId"), value, reason)) };
-  });
-  write("post", CODEX_PATHS.standingReveal, (request) => ({
-    standing: projectGmStanding(
-      store.setStandingRevealed(pathParam(request, "factionPageId"), RevealSchema.parse(request.body).revealed)
-    )
+  write(routes.setCodexStanding, (request, body) => ({
+    standing: projectGmStanding(store.setStanding(pathParam(request, "factionPageId"), body.value, body.reason))
+  }));
+  write(routes.revealCodexStanding, (request, body) => ({
+    standing: projectGmStanding(store.setStandingRevealed(pathParam(request, "factionPageId"), body.revealed))
   }));
 
   // What the party can currently see, for the GM. `projectRevealAudit` decides every row.
-  router.get(expressPath(CODEX_PATHS.revealAudit), requireGmRead, (request, response) =>
+  mount(router, routes.getCodexRevealAudit, requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", { audit: projectRevealAudit(revealAuditRecords(store)) })
   );
 
   // The calendar: the GM gets their own clock plus the published one; a player gets only the published one.
 
-  router.get(expressPath(CODEX_PATHS.calendar), (request, response) => {
+  mount(router, routes.getCodexCalendar, (request, response) => {
     const role = readGrade(request, response);
     if (!role) return;
     if (role === "player") return readEnvelope(request, response, role, playerReads(request, response).calendar());
@@ -1043,57 +885,46 @@ export function createCodexRouter(options: CodexRouterOptions) {
     });
   });
   // Replacing the calendar moves only the GM's clock; it never publishes.
-  write("put", CODEX_PATHS.calendar, (request) => ({
-    calendar: projectGmCalendar(
-      store.setCalendar(withoutCommandId(CalendarSchema.parse(request.body))),
-      store.getPublishedDate()
-    )
+  write(routes.setCodexCalendar, (_request, body) => ({
+    calendar: projectGmCalendar(store.setCalendar(withoutCommandId(body)), store.getPublishedDate())
   }));
   // Before a calendar save: which revealed dated records it would move. Reads only, so no commandId and no ping.
-  router.post(expressPath(CODEX_PATHS.calendarCheck), requireGmRead, (request, response) => {
+  mount(router, routes.checkCodexCalendar, requireGmRead, (request, response) => {
     try {
-      return sendData(response, 200, {
-        moves: store.calendarMoves(withoutCommandId(CalendarSchema.parse(request.body)))
-      });
+      const body = routes.checkCodexCalendar.body.schema.parse(request.body);
+      return sendData(response, 200, { moves: store.calendarMoves(withoutCommandId(body)) });
     } catch (error) {
       return malformed(response, error);
     }
   });
   // The only thing that moves the players' clock forward; unpublishing takes it away.
-  write("post", CODEX_PATHS.calendarPublish, () => ({
+  write(routes.publishCodexCampaignDate, () => ({
     calendar: projectGmCalendar(store.publishCampaignDate(), store.getPublishedDate())
   }));
-  write("post", CODEX_PATHS.calendarUnpublish, () => ({
+  write(routes.unpublishCodexCampaignDate, () => ({
     calendar: projectGmCalendar(store.unpublishCampaignDate(), store.getPublishedDate())
   }));
 
   // Restore a backup: replace-only and all-or-nothing. The body must be an unedited export file.
-  write("post", CODEX_PATHS.import, (request) => ({
-    replaced: true,
-    counts: store.importBundle(CodexImportSchema.parse(request.body).codex)
-  }));
+  write(routes.importCodex, (_request, body) => ({ replaced: true, counts: store.importBundle(body.codex) }));
 
   // Settings are GM-only, reads included. Their writes ping nobody (no client shows them), though the store
   // still bumps the revision for the GM's ETags.
-  router.get(expressPath(CODEX_PATHS.settings), requireGmRead, (request, response) =>
+  mount(router, routes.getCodexSettings, requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", { settings: store.getSettings() })
   );
   // Answers with the stored read shape; `.strict()` rejects the read-only usage fields.
-  write(
-    "put",
-    CODEX_PATHS.settings,
-    (request) => ({ settings: store.setSettings(withoutCommandId(CodexSettingsSchema.parse(request.body))) }),
-    { quiet: true }
-  );
+  write(routes.setCodexSettings, (_request, body) => ({ settings: store.setSettings(withoutCommandId(body)) }), {
+    quiet: true
+  });
   // Prunes history Codex-wide. Works with history switched off and never touches a page.
   write(
-    "delete",
-    CODEX_PATHS.pageRevisionsCollection,
-    (request) => ({ deleted: store.deleteRevisionsOlderThan(RevisionsDeleteSchema.parse(request.body).olderThanDays) }),
+    routes.deleteCodexPageRevisions,
+    (_request, body) => ({ deleted: store.deleteRevisionsOlderThan(body.olderThanDays) }),
     { quiet: true }
   );
 
-  router.get(expressPath(CODEX_PATHS.export), requireGmRead, (request, response) =>
+  mount(router, routes.exportCodex, requireGmRead, (request, response) =>
     readEnvelope(request, response, "gm", {
       codex: store.exportBundle(),
       exportedAt: new Date().toISOString(),
@@ -1103,15 +934,17 @@ export function createCodexRouter(options: CodexRouterOptions) {
 
   // Media: page banners and inline images
 
-  router.post(
-    expressPath(CODEX_ASSET_PATHS.collection),
+  mount(
+    router,
+    routes.uploadCodexAsset,
     requireWrite,
     express.raw({ type: () => true, limit: "11mb" }),
     async (request, response) => {
       try {
         if (!Buffer.isBuffer(request.body) || request.body.length === 0)
           return sendFailure(response, 400, "validation_failed", "Upload the image as the request body.");
-        const filename = typeof request.query.filename === "string" ? request.query.filename : "image";
+        const query = routes.uploadCodexAsset.query.safeParse(request.query);
+        const filename = (query.success ? query.data.filename : undefined) ?? "image";
         const imported = await options.assets.import(request.body, filename);
         return sendData(response, imported.duplicate ? 200 : 201, {
           asset: {
@@ -1128,7 +961,7 @@ export function createCodexRouter(options: CodexRouterOptions) {
     }
   );
 
-  router.get(expressPath(CODEX_ASSET_PATHS.content), async (request, response) => {
+  mount(router, routes.getCodexAssetContent, async (request, response) => {
     const id = pathParam(request, "id");
     // A GM or credential always; a player only when revealed player-facing content uses the image. Everyone else is
     // refused before any lookup, so the answer never depends on whether the image exists.
