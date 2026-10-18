@@ -131,7 +131,7 @@ describe("map asset HTTP workflow", () => {
 
   it("files a new upload under the folder it names, and stores nothing for a folder it refuses", async () => {
     const test = await fixture();
-    const upload = (query: string, bytes: Buffer) =>
+    const upload = (query: string, bytes: Buffer<ArrayBuffer>) =>
       fetch(`${test.base}/api/v1/map-assets?filename=crypt.png&name=Crypt&kind=battlemap&${query}`, {
         method: "POST",
         headers: gm("image/png"),

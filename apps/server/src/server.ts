@@ -73,6 +73,7 @@ import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
 import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
+import { stampSceneChanges } from "./scenes.js";
 import type { SightContent } from "./vision/senses.js";
 
 export type CreateServerOptions = {
@@ -127,6 +128,7 @@ export function createServer(options: CreateServerOptions) {
       } catch (error) {
         console.error("hiding a hidden creature's rolls failed:", error instanceof Error ? error.message : error);
       }
+      stampSceneChanges(state, before);
     }
   });
   // Every read of the game state outside a command's own transaction goes through here.
