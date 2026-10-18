@@ -532,7 +532,7 @@ function PhoneSearch({
   const recent = recentSearches();
   return (
     <div className="cx-search is-phone scroll-y">
-      <CodexPhoneBar content={box} />
+      <CodexPhoneBar content={box} actions={false} />
       <div className="cx-search-phonebody">
         <div className="cx-filterchips" role="group" aria-label="Kinds">
           {chips.map((chip) => (
