@@ -63,6 +63,15 @@ export function ToastProvider({ children, duration = 3200 }: { children: ReactNo
   }, []);
 
   const dismiss = useCallback((id: number) => setToasts((list) => list.filter((t) => t.id !== id)), []);
+  // Pending dismiss timers, cleared on unmount so none fires into a provider that is gone.
+  const timers = useRef(new Set<number>());
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const handle of pending) window.clearTimeout(handle);
+      pending.clear();
+    };
+  }, []);
   const toast = useCallback(
     (message: ReactNode, options?: ToastOptions) => {
       if (mutedRef.current) return; // this viewer silenced notifications (client-local)
@@ -70,7 +79,13 @@ export function ToastProvider({ children, duration = 3200 }: { children: ReactNo
       const tone = options?.tone ?? "info";
       setToasts((list) => [...list, { id, message, tone }]);
       const ttl = options?.duration ?? duration;
-      if (ttl > 0) window.setTimeout(() => dismiss(id), ttl);
+      if (ttl > 0) {
+        const handle = window.setTimeout(() => {
+          timers.current.delete(handle);
+          dismiss(id);
+        }, ttl);
+        timers.current.add(handle);
+      }
     },
     [dismiss, duration]
   );

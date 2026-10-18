@@ -12,6 +12,7 @@ import { Drawer } from "./Drawer";
 import { MarkdownEditor, applyMarkdownFormat, wikiLinkContext } from "./MarkdownEditor";
 import { Modal } from "./Modal";
 import { TagInput } from "./TagInput";
+import { ToastProvider, useToast } from "./Toast";
 
 describe("Drawer", () => {
   it("renders titled, closeable, non-modal, and inert while closed", async () => {
@@ -569,5 +570,34 @@ describe("TagInput", () => {
     // No suggestions, no chooser: a caller can set `pick` for a whole control whose vocabulary varies.
     expect(screen.queryByRole("combobox", { name: "Which languages" })).toBeNull();
     expect(screen.getByLabelText("Which languages")).toBeInTheDocument();
+  });
+});
+
+describe("ToastProvider", () => {
+  it("clears a pending dismiss timer when it unmounts", () => {
+    vi.useFakeTimers();
+    try {
+      function Saver() {
+        const { toast } = useToast();
+        return (
+          <button type="button" onClick={() => toast("Encounter saved")}>
+            Save
+          </button>
+        );
+      }
+      const { unmount } = render(
+        <ToastProvider>
+          <Saver />
+        </ToastProvider>
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(screen.getByRole("status")).toHaveTextContent("Encounter saved");
+      expect(vi.getTimerCount()).toBe(1);
+      unmount();
+      // A timer left behind would set state in a provider that is gone, after a test's window is torn down.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
