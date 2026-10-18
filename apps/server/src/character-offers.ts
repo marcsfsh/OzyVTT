@@ -38,6 +38,7 @@ import type { CharacterCreateRequestInput } from "./character-build.js";
 import type { ContentView } from "./content-library.js";
 import type { CharacterFeatureRef } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
+import { SHEET_PROFICIENCIES_KIND } from "./sheet-proficiency-edits.js";
 
 /**
  * The offer survey: everything the content asks a build to pick, with its legal options, and the ledger
@@ -1350,7 +1351,14 @@ function placeChoices(
 
   // Pass B: everything else. Class spells/cantrips (step 9), equipment, size and the subclass row aren't
   // offers. `hp-roll`, `ability-scores` and `class-levels` rows are build output, so an echoed ledger is accepted.
-  const separateKinds = new Set(["equipment", "size", "hp-roll", "ability-scores", CLASS_LEVELS_KIND]);
+  const separateKinds = new Set([
+    "equipment",
+    "size",
+    "hp-roll",
+    "ability-scores",
+    CLASS_LEVELS_KIND,
+    SHEET_PROFICIENCIES_KIND
+  ]);
   const casterIds = casters.map(({ entry }) => entry.record.id);
   const classSpellRows = new Map<string, { cantrips: CharacterChoice[]; spells: CharacterChoice[] }>();
   const strayClassSpellRows: CharacterChoice[] = [];

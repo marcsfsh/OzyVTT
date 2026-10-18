@@ -401,7 +401,10 @@ export const characterSheetCommands = [
     async run({ principal, request, execute }, kit) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterProficiencies(state, request.actorId, request.proficiencies, kit.equipmentCatalog());
+        setCharacterProficiencies(state, request.actorId, request.proficiencies, kit.equipmentCatalog(), {
+          library: kit.playCatalog(),
+          policy: state.builderPolicy
+        });
       });
     }
   })

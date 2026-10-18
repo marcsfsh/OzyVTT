@@ -53,6 +53,8 @@ import {
 } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
+import { CONTENT_STAMP } from "./content-stamp.js";
+import { withProficiencyEdit } from "./sheet-proficiency-edits.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -1049,33 +1051,37 @@ export function buildCharacterDefinition(
   for (const skill of expertiseTaken) {
     if (!skillTaken.includes(skill)) reject(`Expertise in "${skill}" requires proficiency in it first.`);
   }
-  const proficiencies = {
-    saves: dedupe([...classRecord.savingThrows, ...interpreted.grantedSaves]),
-    skills: dedupe(skillTaken).map((id) => ({
-      id,
-      proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
-    })),
-    armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
-    weapons: dedupe([
-      ...classRecord.weaponProficiencies,
-      ...multiclassTraining("weapons"),
-      ...interpreted.grantedWeapons
-    ]),
-    tools: dedupe([
-      ...classRecord.toolProficiencies,
-      ...multiclassTraining("tools"),
-      ...takenOf("tool"),
-      ...skillOrTool.filter((id) => !skillIds.has(id)),
-      ...background.toolProficiencies,
-      ...interpreted.grantedTools
-    ]),
-    languages: dedupe([
-      ...species.languages,
-      ...takenOf("language"),
-      ...background.languages,
-      ...interpreted.grantedLanguages
-    ])
-  };
+  // A hand edit made on the sheet comes last, so it outlasts the rebuild (`sheet-proficiency-edits.ts`).
+  const proficiencies = withProficiencyEdit(
+    {
+      saves: dedupe([...classRecord.savingThrows, ...interpreted.grantedSaves]),
+      skills: dedupe(skillTaken).map((id) => ({
+        id,
+        proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
+      })),
+      armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
+      weapons: dedupe([
+        ...classRecord.weaponProficiencies,
+        ...multiclassTraining("weapons"),
+        ...interpreted.grantedWeapons
+      ]),
+      tools: dedupe([
+        ...classRecord.toolProficiencies,
+        ...multiclassTraining("tools"),
+        ...takenOf("tool"),
+        ...skillOrTool.filter((id) => !skillIds.has(id)),
+        ...background.toolProficiencies,
+        ...interpreted.grantedTools
+      ]),
+      languages: dedupe([
+        ...species.languages,
+        ...takenOf("language"),
+        ...background.languages,
+        ...interpreted.grantedLanguages
+      ])
+    },
+    input.choices
+  );
 
   // ---- 9. Spellcasting: each casting class's own row (cantrips, prepared cap, the highest level it prepares, its
   // list and ability) over one shared slot pool, plus chosen and granted spells. ----
@@ -1444,7 +1450,7 @@ export function buildCharacterDefinition(
   return ActorDefinitionSchema.parse({
     schemaId: "vtt.actor-character",
     schemaVersion: 1,
-    source: { name: BUILDER_SOURCE_NAME, version: "1" },
+    source: { name: BUILDER_SOURCE_NAME, version: CONTENT_STAMP },
     name: input.name,
     summary,
     size,
