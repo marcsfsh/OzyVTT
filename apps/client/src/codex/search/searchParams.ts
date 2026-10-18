@@ -1,4 +1,4 @@
-import { CODEX_SEARCH_TYPES, type CodexSearchType, type CodexSearchVisibility } from "../contract";
+import { CODEX_SEARCH_TYPES, type CodexSearchType, type CodexSearchVisibility } from "@vtt/domain";
 
 /**
  * Search's filters as its address holds them (`?q=&types=&visibility=&from=&to=&sort=`), so a filtered search is a

@@ -1,11 +1,11 @@
 import { useContext, useMemo, useState } from "react";
 import { Eyebrow, IconEyeOff, SegmentedControl, useToast, cx } from "@vtt/ui";
 import { dateToInstant, type CodexEntityType, type CodexCalendar, type CodexInWorldDate } from "@vtt/domain";
-import type { CodexConnection, PlayerCodexConnection } from "../contract";
+import type { CodexConnection, PlayerCodexConnection } from "@vtt/domain";
 import { entityColor, entityIconId } from "../entities";
 import { EntityIcon, iconChildren } from "../icons";
 import { StandingAdjuster } from "../StandingAdjuster";
-import { standingLabel } from "../chronicle";
+import { standingLabel, standingValueLabel } from "../chronicle";
 import { pagePath, relationshipsPath, type RelationshipsView as ViewId } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { GmCodexContext, PlayerCodexContext, useCodexShell, useGmCodex } from "../shell/context";
@@ -26,19 +26,23 @@ type Tie = Readonly<{
 const capitalized = (text: string) => (text ? text[0].toUpperCase() + text.slice(1) : text);
 const isHidden = (connection: AnyConnection) => "layer" in connection && connection.layer === "gm";
 
-/** The focus page's declared ties to other pages, each read from the focus page's side. */
+/** What a line says: its label, "mentions" for a link written in a page's text, or "related to". */
+const edgeWord = (connection: AnyConnection) =>
+  connection.origin === "mention" ? "mentions" : connection.label?.trim() || "related to";
+
+/** The focus page's ties to other pages, declared and mentioned alike, each read from the focus page's side. */
 function tiesOf(focus: Node, connections: readonly AnyConnection[], nodes: ReadonlyMap<string, Node>): Tie[] {
   const ties: Tie[] = [];
   for (const connection of connections) {
-    if (connection.origin !== "declared" || connection.fromKind !== "page") continue;
+    if (connection.fromKind !== "page") continue;
     const out = connection.fromId === focus.id;
     const inbound = connection.toPageId === focus.id;
     if (!out && !inbound) continue;
     const other = nodes.get(out ? connection.toPageId : connection.fromId);
     if (!other || other.id === focus.id) continue;
-    const label = capitalized(connection.label?.trim() || "related to");
+    const label = capitalized(edgeWord(connection));
     ties.push({
-      key: `${connection.fromId}:${connection.toPageId}:${connection.label ?? ""}`,
+      key: `${connection.origin}:${connection.fromId}:${connection.toPageId}:${connection.label ?? ""}`,
       other,
       label: out ? label : `${label} ${focus.title}`,
       hidden: isHidden(connection),
@@ -70,7 +74,7 @@ function TieList({ ties, go }: Readonly<{ ties: readonly Tie[]; go: (path: strin
               {tie.hidden && (
                 <span className="cx-meta-hidden">
                   <IconEyeOff />
-                  <span className="nh-sr-only">Hidden</span>
+                  Hidden
                 </span>
               )}
             </button>
@@ -123,10 +127,10 @@ function Web({
       aria-label={`${focus.title} and the pages tied to it`}
     >
       {placed.map(({ tie, x, y }) => (
-        <g key={tie.key} className={cx("cx-web-edge", tie.hidden && "is-hidden")}>
+        <g key={tie.key} className={cx("cx-web-edge", tie.hidden && "is-hidden")} data-origin={tie.connection.origin}>
           <line x1={0} y1={0} x2={x} y2={y} />
           <text x={x / 2} y={y / 2 - 6} textAnchor="middle" className="cx-web-edgelabel">
-            {tie.connection.label ?? "related to"}
+            {edgeWord(tie.connection)}
           </text>
         </g>
       ))}
@@ -147,6 +151,9 @@ function Web({
     </svg>
   );
 }
+
+/** A standing in words: its tier and its signed value, "Hunted -80". */
+const standingWords = (value: number) => `${standingLabel(value)} ${standingValueLabel(value)}`;
 
 type StandingRow = Readonly<{ factionPageId: string; value: number; revealedToPlayers?: boolean }>;
 
@@ -214,11 +221,11 @@ function FactionsGrid({
               <td className={cx("cx-grid-party", party?.revealedToPlayers === false && "is-hidden")}>
                 {onAdjust ? (
                   <button type="button" className="cx-grid-adjust" onClick={() => onAdjust(row.id)}>
-                    {party ? standingLabel(party.value) : "Not set"}
+                    {party ? standingWords(party.value) : "Not set"}
                     <span className="nh-sr-only"> · Adjust {row.title}'s standing</span>
                   </button>
                 ) : party ? (
-                  standingLabel(party.value)
+                  standingWords(party.value)
                 ) : (
                   <span className="cx-hint">None known</span>
                 )}
@@ -409,6 +416,14 @@ export function RelationshipsView() {
   );
   const tieTitle = focus ? `${focus.title}'s ties` : "Ties";
 
+  const loading = gm ? gm.feeds.list.loading : (player?.feeds.loading ?? false);
+  if (pages.length === 0 && loading)
+    return (
+      <div className="cx-rel">
+        <CodexPhoneBar title="Relationships" />
+        <p className="cx-empty">Loading the pages.</p>
+      </div>
+    );
   if (pages.length === 0)
     return (
       <div className="cx-rel">

@@ -218,7 +218,12 @@
 }
 .cx-meta-hidden {
   display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  margin-inline-start: auto;
   color: var(--violet-hi);
+  font-size: var(--fs-sm);
+  font-weight: 400;
 }
 .cx-meta-groups {
   display: flex;
@@ -263,6 +268,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .cx-meta-chips .cx-meta-link {
   width: auto;
@@ -590,6 +598,36 @@
 .cx-writerel-row {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+}
+.cx-writerel-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cx-began-chip {
+  align-self: flex-start;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.cx-began-chip:hover {
+  color: var(--text);
+}
+.cx-began,
+.cx-began-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cx-began-date {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
 }
 .cx-writerel-add {

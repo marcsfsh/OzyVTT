@@ -10,7 +10,7 @@ import { useCodexQuery } from "../useCodexQuery";
 import { pathForSection } from "../routes";
 import { withQuery } from "../../router";
 import { kindGroupOf } from "./document";
-import type { CodexBlock } from "../contract";
+import type { CodexBlock } from "@vtt/domain";
 import { characterNames, namesLabel, type PartyCharacter } from "../shared/audience";
 
 /** Where the page's kind group lists it: People, Places, Factions, Things or Lore. */
@@ -151,7 +151,7 @@ export function VisibilityCounts({
   );
 }
 
-/** A stretch of player text as the reader reads it. */
+/** A stretch of player text as the reader reads it. The GM's copy offers to make the page a missing link names. */
 export function DocText({
   text,
   token,
@@ -169,7 +169,14 @@ export function DocText({
 }>) {
   return (
     <div className={cx("cx-doc-text", className)}>
-      <CodexMarkdown text={text} token={token} audience={audience} onNavigate={onNavigate} knownTitles={knownTitles} />
+      <CodexMarkdown
+        text={text}
+        token={token}
+        audience={audience}
+        onNavigate={onNavigate}
+        knownTitles={knownTitles}
+        onCreate={audience === "gm" ? onNavigate : undefined}
+      />
     </div>
   );
 }

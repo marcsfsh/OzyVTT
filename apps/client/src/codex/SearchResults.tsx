@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import { Alert, Skeleton } from "@vtt/ui";
 import { CodexIcon, EntityIcon } from "./icons";
 import { entityDef } from "./entities";
-import type { CodexRecordKind, CodexSearchHit } from "@vtt/domain";
-import { SEARCH_HIT_CAP } from "./api";
+import type { CodexRecordKind, CodexSearchHit, PlayerCodexSearchHit } from "@vtt/domain";
 
-/**
- * The suite-wide search result surface (fetch state, row shape, kind marks), shared by the Pages rail,
- * the command palette and the player Codex so they render identical rows.
- */
+/** The command palette's search: its fetch state, its row and the kind marks, for the GM and for players. */
+
+/** A hit as either audience receives it. */
+export type AnySearchHit = CodexSearchHit | PlayerCodexSearchHit;
 
 /** Distinct loading and error states, so a failed search never renders as "no matches". */
 export type SearchState =
@@ -16,7 +14,7 @@ export type SearchState =
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "error"; message: string }>
   /** A clipped list must be able to say so. */
-  | Readonly<{ status: "ready"; hits: readonly CodexSearchHit[]; truncated: boolean }>;
+  | Readonly<{ status: "ready"; hits: readonly AnySearchHit[]; truncated: boolean }>;
 
 /** Collapses ordinary typing to one request while staying under the ~300ms that reads as instant. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -27,7 +25,7 @@ const SEARCH_DEBOUNCE_MS = 250;
  */
 export function useCodexSearch(
   query: string,
-  search: (query: string) => Promise<Readonly<{ hits: readonly CodexSearchHit[]; truncated: boolean }>>,
+  search: (query: string) => Promise<Readonly<{ hits: readonly AnySearchHit[]; truncated: boolean }>>,
   refreshKey?: unknown
 ): SearchState {
   const [state, setState] = useState<SearchState>({ status: "idle" });
@@ -80,13 +78,13 @@ const KIND_MARKS: Readonly<
 };
 
 /** A page reads as its entity type ("Character"). */
-export function searchHitKindLabel(hit: CodexSearchHit): string {
+export function searchHitKindLabel(hit: AnySearchHit): string {
   if (hit.kind !== "page") return KIND_MARKS[hit.kind].label;
   return hit.entityType ? entityDef(hit.entityType).label : "Page";
 }
 
 /** Fallback titles: a pin may be unlabelled and a journal entry may have no player-facing text. */
-export function searchHitTitle(hit: CodexSearchHit): string {
+export function searchHitTitle(hit: AnySearchHit): string {
   const title = hit.title.trim();
   if (title) return title;
   // Session titles are built server-side and never empty; the fallback is just for safety.
@@ -100,14 +98,14 @@ export function searchHitTitle(hit: CodexSearchHit): string {
 }
 
 /** Unique across kinds. */
-export function searchHitKey(hit: CodexSearchHit): string {
+export function searchHitKey(hit: AnySearchHit): string {
   return `${hit.kind}:${hit.id}`;
 }
 
 export type SearchResultRowProps = Readonly<{
-  hit: CodexSearchHit;
+  hit: AnySearchHit;
   active?: boolean;
-  onOpen: (hit: CodexSearchHit) => void;
+  onOpen: (hit: AnySearchHit) => void;
   onHover?: () => void;
 }>;
 
@@ -141,50 +139,5 @@ export function SearchResultRow({ hit, active = false, onOpen, onHover }: Search
         </span>
       </span>
     </button>
-  );
-}
-
-export type SearchResultListProps = Readonly<{
-  state: SearchState;
-  onOpen: (hit: CodexSearchHit) => void;
-  /** Highlights the page currently open behind the list. */
-  selectedId?: string | null;
-  /** Only rendered for a settled, successful search. */
-  emptyLabel: string;
-}>;
-
-/** The whole result list including loading and error states. Renders nothing while idle. */
-export function SearchResultList({ state, onOpen, selectedId = null, emptyLabel }: SearchResultListProps) {
-  if (state.status === "idle") return null;
-  if (state.status === "loading")
-    return (
-      <div className="codex-list-loading">
-        {[0, 1, 2].map((row) => (
-          <Skeleton key={row} variant="text" />
-        ))}
-      </div>
-    );
-  if (state.status === "error")
-    return (
-      <Alert tone="danger" title="Search failed">
-        {state.message}
-      </Alert>
-    );
-  if (state.hits.length === 0) return <p className="codex-list-empty">{emptyLabel}</p>;
-  return (
-    <>
-      {state.hits.map((hit) => (
-        <SearchResultRow
-          key={searchHitKey(hit)}
-          hit={hit}
-          active={hit.kind === "page" && hit.id === selectedId}
-          onOpen={onOpen}
-        />
-      ))}
-      {/* The Codex is unpaginated, so a clipped list says so; there is no page 2. */}
-      {state.truncated && (
-        <p className="codex-search-truncated">Showing the first {SEARCH_HIT_CAP} matches. Narrow the search.</p>
-      )}
-    </>
   );
 }

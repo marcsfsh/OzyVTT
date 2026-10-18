@@ -1,5 +1,5 @@
 import { pageLinkKey } from "@vtt/domain";
-import type { CodexBlock } from "../contract";
+import type { CodexBlock } from "@vtt/domain";
 
 /** When the block reached the audience it has now: the earliest stamp among the readers it is shown to. */
 export function stampOf(block: CodexBlock) {

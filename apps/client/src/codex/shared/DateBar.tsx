@@ -47,18 +47,21 @@ export function DateBar({
     );
   const published = calendar.publishedDate ?? null;
   const same = sameInWorldDate(calendar.currentDate, published);
-  const publish = async () => {
+  const change = async (write: () => Promise<unknown>, failure: string) => {
     setBusy(true);
     setError(null);
     try {
-      await calendarApi.publish(token);
+      await write();
       onPublished?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Couldn't publish the date.");
+      setError(cause instanceof Error ? cause.message : failure);
     } finally {
       setBusy(false);
     }
   };
+  const publish = () => change(() => calendarApi.publish(token), "Couldn't publish the date.");
+  // Players then see no date at all until the next Publish.
+  const unpublish = () => change(() => calendarApi.unpublish(token), "Couldn't hide the players' date.");
   return (
     <div className={cx("cx-datebar", tight && "is-tight", className)}>
       <span className="cx-datebar-key">{tight ? "Yours" : "Your date"}</span>
@@ -66,6 +69,11 @@ export function DateBar({
       <span className="cx-datebar-key">{tight ? "Players" : "Players' date"}</span>
       <span className="cx-datebar-value">{date(published)}</span>
       <span className="cx-grow" />
+      {!tight && published && (
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void unpublish()}>
+          Hide from players
+        </Button>
+      )}
       {!tight && (
         <Button size="sm" disabled={busy || same || !calendar.currentDate} onClick={() => void publish()}>
           Publish

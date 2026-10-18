@@ -21,7 +21,7 @@ import type {
   PlayerCodexPage,
   PlayerCodexPageConnection,
   PlayerCodexSearchResult
-} from "./contract";
+} from "@vtt/domain";
 
 const BASE = "/api/v1/codex";
 

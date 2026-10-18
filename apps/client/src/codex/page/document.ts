@@ -1,5 +1,5 @@
 import type { CodexEntityType } from "@vtt/domain";
-import { codexParagraphs, type CodexBlock, type PlayerCodexBlock } from "../contract";
+import { codexParagraphs, type CodexBlock, type PlayerCodexBlock } from "@vtt/domain";
 
 /**
  * A page as one document: the player text cut at its blocks, so the GM reads and writes each block where it sits.

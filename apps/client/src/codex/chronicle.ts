@@ -295,16 +295,6 @@ export function chronicleKindOfJournal(kind: CodexJournalKind): CodexChronicleKi
 }
 
 /**
- * Kinds the dashboard's "Recent journal activity" feed omits because a card already shows them: `event`
- * pages are listed as pages, deadlines have their own card, and the standing card lists every faction.
- */
-export const DASHBOARD_CARDED_KINDS: ReadonlySet<CodexChronicleKind> = new Set<CodexChronicleKind>([
-  "event",
-  "deadline",
-  "standing"
-]);
-
-/**
  * Would revealing this record show players a date past their published clock? Records are dated at the
  * GM's prep clock, so this warns at reveal time. Silent for undated records and when nothing has been
  * published yet. Strictly after: a record at the published date is the party's present.

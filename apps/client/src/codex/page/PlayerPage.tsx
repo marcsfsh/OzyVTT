@@ -3,7 +3,7 @@ import { Alert, IconSparkle, Skeleton, cx } from "@vtt/ui";
 import { pageLinkKey } from "@vtt/domain";
 import { playerCodexApi } from "../api";
 import { pageRecordApi } from "../api-records";
-import type { PlayerCodexBlock } from "../contract";
+import type { PlayerCodexBlock } from "@vtt/domain";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { atlasPath, journalEntryPath, pagePath, questPath, sessionPath, tagPath } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Modal, Skeleton } from "@vtt/ui";
-import type { CodexSearchHit } from "@vtt/domain";
-import { codexApi, playerCodexApi, SEARCH_HIT_CAP } from "./api";
-import { SearchResultRow, searchHitKey, useCodexSearch } from "./SearchResults";
+import { SEARCH_HIT_CAP } from "./api";
+import { findApi } from "./api-records";
+import { SearchResultRow, searchHitKey, useCodexSearch, type AnySearchHit } from "./SearchResults";
 import { codexDestinations, pathForSection } from "./routes";
 import { withQuery } from "../router";
 
@@ -13,14 +13,14 @@ import { withQuery } from "../router";
  */
 
 type Action =
-  | Readonly<{ kind: "hit"; hit: CodexSearchHit }>
+  | Readonly<{ kind: "hit"; hit: AnySearchHit }>
   | Readonly<{ kind: "create"; label: string; title: string }>
   | Readonly<{ kind: "verb"; label: string; run: () => void }>
   | Readonly<{ kind: "goto"; label: string; path: string }>;
 
 export type CommandPaletteProps = Readonly<{
   gmToken: string;
-  onOpenHit: (hit: CodexSearchHit) => void;
+  onOpenHit: (hit: AnySearchHit) => void;
   /** Opens quick-create prefilled with the typed name. Absent on the player palette. */
   onCreatePage?: (title: string) => void;
   /** Creates a session and opens it (`creates.ts`). Absent on the player palette. */
@@ -52,7 +52,7 @@ export function CommandPalette({
   }, []);
 
   const runSearch = useCallback(
-    (text: string) => (player ? playerCodexApi.search(gmToken, text) : codexApi.search(gmToken, text)),
+    (text: string) => (player ? findApi.searchAsPlayer(gmToken, { q: text }) : findApi.search(gmToken, { q: text })),
     [gmToken, player]
   );
   const state = useCodexSearch(query, runSearch);
