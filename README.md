@@ -16,10 +16,10 @@ It has two parts:
   player-safe view of the map and turn order, and plays the music, ambience and sound effects
   the GM uploads and runs from a sound board.
 - **The Codex.** A wiki of typed pages (characters, locations, factions, items and more), an
-  atlas of nested maps, a chronicle on a custom calendar, sessions made from prep templates,
-  quests, downtime and a relationship graph. A page or quest holds the text players read and hidden blocks the GM can
-  show to everyone or to one character later, and players only ever receive what the GM has
-  revealed to them.
+  atlas of nested maps, a chronicle on a custom calendar, sessions with prep templates, quests,
+  downtime and relationships. A page or quest holds the text players read and hidden blocks the
+  GM can show to everyone or to one character later, and players only ever receive what the GM
+  has revealed to them.
 
 Characters can be built in a guided builder, imported from a D&D Beyond PDF, or authored as
 homebrew. SRD 5.2.1 monsters, spells, equipment and magic items are included. The GM makes
@@ -110,14 +110,15 @@ screen, and playing music on it. It needs Chromium once: `npx playwright install
 
 ## Using the Codex
 
-1. Open the **Codex** tab, create a page, pick its type and fill in both halves. Link pages
-   with `[[wiki-links]]` and typed relationships.
-2. Upload maps to the **Atlas** and place markers that link pages, sub-maps or scenes.
-3. In **Story**, set the calendar and your date, add to the chronicle, and publish the date when
-   the party reaches it.
+1. Open the **Codex** tab and make a page with **New**. Write what players may read, and add a
+   **Hidden block** for anything only you should see; each field has its own Who sees it switch.
+   Link pages with `[[links]]` and add relationships beside the text.
+2. Upload maps to the **Atlas** and place pins that link pages, sub-maps or scenes.
+3. Set the calendar in **Story** and add dated entries to the chronicle.
 4. Make a session from a prep template, fill in its prep, and run it from the table's
    **Tonight** tab: tick clues, log what happens, and write the recap after play.
-5. Reveal what players should see. The GM can preview exactly what a player sees.
+5. Reveal a block to everyone or to chosen characters when the table reaches it. **See as
+   players** shows the page exactly as everyone, or one character's player, receives it.
 
 ## HTTP API
 

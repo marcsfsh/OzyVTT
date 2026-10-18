@@ -29,7 +29,10 @@ export function CodexPhoneBar({
   content?: ReactNode;
   /** Shows Back at the start of the bar. */
   onBack?: () => void;
-  /** Controls at the end of the bar. A section's bar without them keeps the shell's own; a record's has Back. */
+  /**
+   * Controls at the end of the bar. A section's bar without them keeps the shell's own, a record's bar has Back in
+   * their place, and `false` leaves the bar to its content.
+   */
   actions?: ReactNode;
 }>) {
   const slot = useContext(PhoneBarContext);

@@ -32,7 +32,7 @@
 | [028](0028-table-screen-pairing.md)             | Accepted                                       | A table screen shows a short code and the GM types it; the code only names the request, and the screen's own secret collects the same viewer credential                                                       |
 | [029](0029-one-game-clock.md)                   | Accepted                                       | One game clock: the Codex calendar keeps the day and the game keeps the hour, and time that passes at the table moves the Codex date by the midnights it crossed                                              |
 | [030](0030-character-sheet-remaster.md)         | Accepted                                       | The character sheet remaster: A's tabbed sheet everywhere, with C's turn and cast cards and B's Vitals, spell list and Level box on a player's phone                                                          |
-| [031](0031-session-prep-and-player-reads.md)    | Accepted                                       | Session prep is typed sections a session copies from a template, run live on the Tonight tab; a player's search and home are built from that player's own reads                                               |
+| [031](0031-codex-remaster.md)                   | Accepted                                       | The Codex remaster: one document per page with hidden blocks for chosen readers, a section bar and phone tabs, and search, home and relationships rebuilt                                                     |
 
 Use [template.md](template.md) for material decisions. A proposed ADR becomes accepted only after its spike has evidence.
 
