@@ -5,7 +5,8 @@
  * on this monster's scores, and the text follows the answers in the SRD's words until the GM edits it.
  */
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { useConfirm } from "../../components/feedback";
 import { SaveConditionSchema } from "@vtt/schemas";
 import { Chip, Field, FieldGrid, Input, NumberField, RowEditor, Select, Stepper, Switch, Textarea } from "@vtt/ui";
 import type { Draft } from "../schema";
@@ -83,25 +84,51 @@ function refreshMultiattacks(
   });
 }
 
-/** A new kind keeps the action's place, name, timing and uses, and starts that kind's mechanics fresh. */
-function toKind(action: MonsterAction, kind: ActionKind, draft: Draft): MonsterAction {
-  const {
-    attack: _attack,
-    save: _save,
-    damage: _damage,
-    onHit: _onHit,
-    multiattack: _multiattack,
-    area: _area,
-    ...kept
-  } = action as Record<string, unknown>;
+/** The answers that belong to one kind of action, with the text they wrote. */
+const MECHANICS = ["attack", "save", "damage", "onHit", "multiattack", "area", "description"] as const;
+type Mechanics = Readonly<Partial<Record<(typeof MECHANICS)[number], unknown>>>;
+
+const mechanicsOf = (action: MonsterAction): Mechanics =>
+  Object.fromEntries(MECHANICS.filter((key) => key in action).map((key) => [key, action[key]]));
+
+function withoutMechanics(action: MonsterAction): Record<string, unknown> {
+  const kept: Record<string, unknown> = { ...action };
+  for (const key of MECHANICS) delete kept[key];
+  return kept;
+}
+
+/** A new kind keeps the action's place, name, timing and uses. Its mechanics are the ones it had the last time it was
+ *  this kind, while the monster is open, or fresh ones. */
+function toKind(action: MonsterAction, kind: ActionKind, draft: Draft, earlier?: Mechanics): MonsterAction {
+  const kept = withoutMechanics(action);
+  if (earlier) return { ...kept, ...earlier };
   const fresh = seeded(kind, activationOf(action), draft);
   return {
     ...fresh,
     ...kept,
+    description: action.description,
     ...(kind === "multiattack" ? { name: kept.name || fresh.name } : {}),
     damage: kind === "attack" || kind === "save" ? fresh.damage : []
   };
 }
+
+/** Whether an action's answers say more than a new action of its kind would: a switch would put them aside. */
+function hasAnswers(action: MonsterAction, draft: Draft): boolean {
+  const kind = kindOf(action);
+  if (kind === "other") return typeof action.description === "string" && action.description.trim() !== "";
+  const fresh = mechanicsOf(seeded(kind, activationOf(action), draft));
+  const own = mechanicsOf(action);
+  return (["attack", "save", "damage", "onHit", "multiattack", "area"] as const).some(
+    (key) => JSON.stringify(own[key] ?? null) !== JSON.stringify(fresh[key] ?? null)
+  );
+}
+
+const KIND_PHRASE: Readonly<Record<ActionKind, string>> = {
+  attack: "an attack",
+  save: "a saving throw",
+  multiattack: "a Multiattack",
+  other: "another kind of action"
+};
 
 /** A new action, its numbers the SRD's arithmetic on this monster: attack bonus PB plus Strength or Dexterity
  *  (the better), save DC 8 plus PB plus Constitution. */
@@ -147,58 +174,81 @@ export function MonsterActions({
     commit(rows.map((row, i) => (i === index ? editAction(before, after, all, creature) : row)));
 
   const kinds = KINDS_FOR[activation];
+  const { confirm, dialog } = useConfirm();
+  // Each action's answers for the kinds it has been, while this monster is open, so a switch and back loses nothing.
+  const earlier = useRef(new Map<string, Partial<Record<ActionKind, Mechanics>>>());
+  const changeKind = async (index: number, action: MonsterAction, kind: ActionKind) => {
+    const from = kindOf(action);
+    const name = typeof action.name === "string" && action.name.trim() ? action.name.trim() : "This action";
+    if (
+      hasAnswers(action, draft) &&
+      !(await confirm({
+        title: `Make ${name} ${KIND_PHRASE[kind]}?`,
+        body: `Its ${KIND_WORDS[from].toLowerCase()} answers are kept while this monster is open. Change it back to ${KIND_WORDS[from]} to get them again.`,
+        confirmLabel: `Make it ${KIND_PHRASE[kind]}`
+      }))
+    )
+      return;
+    const key = String(action.id);
+    const held = earlier.current.get(key) ?? {};
+    earlier.current.set(key, { ...held, [from]: mechanicsOf(action) });
+    put(index, action, toKind(action, kind, draft, held[kind]));
+  };
   return (
-    <RowEditor
-      rows={rows}
-      onChange={commit}
-      rowKey={(action) => String(action.id)}
-      onAdd={() => {
-        const fresh = seeded(kinds[0], activation, draft);
-        return editAction(fresh, fresh, all, creature);
-      }}
-      addLabel={
-        activation === "bonus-action"
-          ? "Add a Bonus Action"
-          : activation === "reaction"
-            ? "Add a Reaction"
-            : activation === "legendary"
-              ? "Add a Legendary Action"
-              : "Add an action"
-      }
-      emptyText={
-        activation === "action"
-          ? "No actions yet. Most monsters have at least one attack."
-          : activation === "bonus-action"
-            ? "No Bonus Actions. Most monsters have none."
+    <>
+      <RowEditor
+        rows={rows}
+        onChange={commit}
+        rowKey={(action) => String(action.id)}
+        onAdd={() => {
+          const fresh = seeded(kinds[0], activation, draft);
+          return editAction(fresh, fresh, all, creature);
+        }}
+        addLabel={
+          activation === "bonus-action"
+            ? "Add a Bonus Action"
             : activation === "reaction"
-              ? "No Reactions. Most monsters have none."
-              : "No Legendary Actions yet."
-      }
-      collapsible
-      max={activation === "action" ? 12 : 6}
-      maxReachedReason={`This list holds up to ${activation === "action" ? 12 : 6} entries.`}
-      ariaLabel={
-        activation === "bonus-action"
-          ? "Bonus Actions"
-          : activation === "reaction"
-            ? "Reactions"
-            : activation === "legendary"
-              ? "Legendary Actions"
-              : "Actions"
-      }
-      rowLabel={(action) => (typeof action.name === "string" && action.name ? action.name : "Unnamed action")}
-      renderRow={(action, index) => (
-        <ActionBuilder
-          action={action}
-          all={all}
-          kinds={kinds}
-          draft={draft}
-          idPrefix={`${idPrefix}-${index}`}
-          onChange={(next) => put(index, action, next)}
-          onKind={(kind) => put(index, action, toKind(action, kind, draft))}
-        />
-      )}
-    />
+              ? "Add a Reaction"
+              : activation === "legendary"
+                ? "Add a Legendary Action"
+                : "Add an action"
+        }
+        emptyText={
+          activation === "action"
+            ? "No actions yet. Most monsters have at least one attack."
+            : activation === "bonus-action"
+              ? "No Bonus Actions. Most monsters have none."
+              : activation === "reaction"
+                ? "No Reactions. Most monsters have none."
+                : "No Legendary Actions yet."
+        }
+        collapsible
+        max={activation === "action" ? 12 : 6}
+        maxReachedReason={`This list holds up to ${activation === "action" ? 12 : 6} entries.`}
+        ariaLabel={
+          activation === "bonus-action"
+            ? "Bonus Actions"
+            : activation === "reaction"
+              ? "Reactions"
+              : activation === "legendary"
+                ? "Legendary Actions"
+                : "Actions"
+        }
+        rowLabel={(action) => (typeof action.name === "string" && action.name ? action.name : "Unnamed action")}
+        renderRow={(action, index) => (
+          <ActionBuilder
+            action={action}
+            all={all}
+            kinds={kinds}
+            draft={draft}
+            idPrefix={`${idPrefix}-${index}`}
+            onChange={(next) => put(index, action, next)}
+            onKind={(kind) => void changeKind(index, action, kind)}
+          />
+        )}
+      />
+      {dialog}
+    </>
   );
 }
 
