@@ -76,6 +76,16 @@ try {
     await signIn(page);
     for (const path of paths) {
       await page.goto(path);
+      // A player rejoins with the stored token after a load; the address they asked for wins.
+      const rejoin = page.getByRole("button", { name: "Join as Player" });
+      if (role === "player")
+        await rejoin.waitFor({ timeout: 3_000 }).then(
+          async () => {
+            await rejoin.click();
+            await rejoin.waitFor({ state: "hidden" });
+          },
+          () => {}
+        );
       await page.waitForLoadState("networkidle").catch(() => {});
       await page.waitForTimeout(500);
       const slug = path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "home";
