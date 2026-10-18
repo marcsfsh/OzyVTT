@@ -160,8 +160,11 @@ export const codexApi = {
       body: { olderThanDays }
     }),
   /** A short-lived player token so the GM can preview the player Codex through the real player projection. */
-  createPreviewSession: (token: string) =>
-    request<{ token: string }>(token, "/preview-session", { method: "POST" }).then((data) => data.token),
+  /** A short-lived, read-only player token that reads the Codex as Everyone (null) or as one character. */
+  createPreviewSession: (token: string, characterId: string | null = null) =>
+    request<{ token: string }>(token, "/preview-session", { method: "POST", body: { characterId } }).then(
+      (data) => data.token
+    ),
   /** Save the whole object; `importBundle` accepts it back verbatim. */
   exportBundle: (token: string) => request<CodexExportBundle>(token, "/export"),
   /**

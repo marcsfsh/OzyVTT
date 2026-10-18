@@ -455,7 +455,7 @@ describe("The player's chronicle and the player's clock", () => {
         payload: { who: "Aldric", activity: "Forging a blade", days: 7, characterPageId: null }
       })
     ]);
-    await user.click(screen.getByRole("button", { name: "Journal" }));
+    await user.click(screen.getByRole("button", { name: "Story" }));
 
     expect(playerRowOf("d1").textContent).toContain("Deadline");
     expect(playerRowOf("d1").querySelector(".codex-entry-kindglyph")).not.toBeNull();

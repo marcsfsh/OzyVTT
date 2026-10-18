@@ -75,6 +75,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
+import { navigate } from "../router";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import type {
@@ -316,7 +317,7 @@ describe("Suite-wide search: every jump prepares its destination", () => {
     await searchInRail(user, "mists");
     await user.click(await screen.findByText("The party crossed the mists."));
 
-    expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Story" })).toHaveAttribute("aria-current", "page");
     await waitFor(() => expect(document.getElementById("codex-entry-j1")).toHaveAttribute("aria-current", "true"));
     expect(document.getElementById("codex-entry-j0")).not.toHaveAttribute("aria-current");
   });
@@ -346,7 +347,7 @@ describe("Suite-wide search: every jump prepares its destination", () => {
     await searchInRail(user, "strahd");
     await user.click(await screen.findByText("Strahd von Zarovich"));
 
-    expect(screen.getByRole("button", { name: "Pages" })).toHaveAttribute("aria-current", "page");
+    expect(window.location.pathname).toBe("/codex/pages/p1");
     await waitFor(() => expect(getPage).toHaveBeenCalledWith("gm", "p1"));
   });
 });
@@ -369,7 +370,7 @@ describe("Suite-wide search: the command palette is the SAME search", () => {
 
   const openPalette = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+    await user.click(screen.getByRole("button", { name: /Search the Codex/ }));
     // Rail and palette boxes share a name; the palette's is inside the dialog.
     const palette = within(await screen.findByRole("dialog", { name: "Codex command palette" }));
     await user.type(palette.getByLabelText("Search the Codex"), query);
@@ -460,8 +461,8 @@ describe("Suite-wide search: the player surface (viewer safety)", () => {
   const searchAsPlayer = async (user: ReturnType<typeof userEvent.setup>, query: string) => {
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Pages" }));
-    await user.type(screen.getAllByLabelText("Search the Codex")[0], query);
+    await navigate("/codex/pages");
+    await user.type((await screen.findAllByLabelText("Search the Codex"))[0], query);
   };
 
   it("renders the non-page kinds the server hands it: the client must not assume page-only", async () => {
@@ -535,7 +536,7 @@ describe("Suite-wide search: one settled query, one request", () => {
     const user = userEvent.setup({ delay: null });
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+    await user.click(screen.getByRole("button", { name: /Search the Codex/ }));
     await user.type(
       within(await screen.findByRole("dialog", { name: "Codex command palette" })).getByLabelText("Search the Codex"),
       "strahd"
@@ -556,8 +557,8 @@ describe("Suite-wide search: one settled query, one request", () => {
     const user = userEvent.setup({ delay: null });
     (goTo("/codex"), render)(<PlayerCodex token="player" />);
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Pages" }));
-    await user.type(screen.getAllByLabelText("Search the Codex")[0], "barovia");
+    await navigate("/codex/pages");
+    await user.type((await screen.findAllByLabelText("Search the Codex"))[0], "barovia");
 
     await waitFor(() => expect(playerSearch).toHaveBeenCalledWith("player", "barovia"));
     expect(playerSearch).toHaveBeenCalledTimes(1);

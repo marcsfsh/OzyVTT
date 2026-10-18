@@ -267,7 +267,7 @@ describe("Page → its connections, in one place", () => {
 
     await user.click(await connections.findByRole("button", { name: /The mists closed behind them/ }));
 
-    expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Story" })).toHaveAttribute("aria-current", "page");
     await waitFor(() => expect(document.getElementById("codex-entry-j9")).toHaveAttribute("aria-current", "true"));
     expect(document.getElementById("codex-entry-j0")).not.toHaveAttribute("aria-current");
   });
@@ -309,7 +309,7 @@ describe("Page → its connections, in one place", () => {
 
     await user.click(connections.getByRole("button", { name: "Show in graph" }));
 
-    expect(screen.getByRole("button", { name: "Graph" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Relationships" })).toHaveAttribute("aria-current", "page");
     // This node carries the landing and the other does not.
     const focused = await screen.findByRole("button", { name: "Location: Barovia" });
     await waitFor(() => expect(focused).toHaveAttribute("aria-current", "true"));
@@ -341,7 +341,7 @@ const VIEWBOX = { halfW: 520, halfH: 390 };
 
 const openGraph = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
-  await user.click(screen.getByRole("button", { name: "Graph" }));
+  await user.click(screen.getByRole("button", { name: "Relationships" }));
 };
 
 describe("The Graph tells the truth", () => {
@@ -504,7 +504,7 @@ describe("The player Graph reads the PLAYER links feed (viewer safety)", () => {
       </ToastProvider>
     );
     await waitFor(() => expect(playerListPages).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Graph" }));
+    await user.click(screen.getByRole("button", { name: "Relationships" }));
 
     await waitFor(() => expect(screen.getByText(/1 connection/)).toBeInTheDocument());
     expect(document.querySelectorAll('[data-edgeorigin="mention"]')).toHaveLength(1);

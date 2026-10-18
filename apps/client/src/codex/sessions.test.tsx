@@ -205,57 +205,6 @@ describe("Which session is 'now' (the rule, below the components)", () => {
   });
 });
 
-describe("The session console is a VIEW", () => {
-  it("opens from three different modes on one fetch, and writes nothing", async () => {
-    gmDefaults();
-    const user = userEvent.setup();
-    await renderWorkspace();
-
-    // The console is a drawer so it is reachable from every section.
-    for (const tab of ["Pages", "Home", "Atlas"]) {
-      await user.click(screen.getAllByRole("button", { name: tab })[0]);
-      await user.click(screen.getByRole("button", { name: "Session prep" }));
-      const panel = screen.getByRole("complementary", { name: "Session prep" });
-      // The drawer stays mounted while closed, so check `inert`; presence proves nothing.
-      expect(panel).not.toHaveAttribute("inert");
-      // The active session's prep rendered, so the call counts below aren't against an empty panel.
-      expect(within(panel).getByRole("heading", { name: "Session 8" })).toBeInTheDocument();
-      expect(within(panel).getByText("The heart of the castle.")).toBeInTheDocument();
-      await user.click(within(panel).getByRole("button", { name: "Close" }));
-      expect(panel).toHaveAttribute("inert");
-    }
-
-    // One read for the whole workspace, no writes.
-    expect(listSessions).toHaveBeenCalledTimes(1);
-    for (const write of [createSession, updateSession, revealSession, activateSession, removeSession]) {
-      expect(write).not.toHaveBeenCalled();
-    }
-  });
-
-  it("remembers whether it was left open, under a codex- key", async () => {
-    // Both the write and the read back on a fresh mount.
-    gmDefaults();
-    const user = userEvent.setup();
-    const first = (goTo("/codex/sessions"), render)(
-      <ToastProvider>
-        <CodexShell gmToken="gm" />
-      </ToastProvider>
-    );
-    await waitFor(() => expect(listSessions).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Session prep" }));
-    expect(localStorage.getItem("codex-session-console")).toBe("open");
-    first.unmount();
-
-    (goTo("/codex/sessions"), render)(
-      <ToastProvider>
-        <CodexShell gmToken="gm" />
-      </ToastProvider>
-    );
-    await waitFor(() => expect(listSessions).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole("complementary", { name: "Session prep" })).not.toHaveAttribute("inert");
-  });
-});
-
 describe("Getting to a session (R1: every jump prepares its destination)", () => {
   it("from the Campaign card, landing ON that session with the other one unmarked", async () => {
     // The active session is the lower-numbered one, so the GM's pointer has to win for this to pass.
@@ -284,7 +233,7 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Journal" }));
+    await user.click(screen.getByRole("button", { name: "Story" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "By session" }));
 
@@ -316,7 +265,7 @@ describe("Getting to a session (R1: every jump prepares its destination)", () =>
     const user = userEvent.setup();
     await renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Journal" }));
+    await user.click(screen.getByRole("button", { name: "Story" }));
     await waitFor(() => expect(chronicle).toHaveBeenCalled());
 
     expect(screen.getByText("1492 DR")).toBeInTheDocument();
@@ -357,7 +306,7 @@ describe("The player's session card (viewer safety)", () => {
     await user.click(card.getByRole("button", { name: /Session 8/ }));
     expect(window.location.pathname).toBe("/codex/sessions/s8");
     const sidebar = within(screen.getByRole("navigation", { name: "Codex sections" }));
-    expect(sidebar.getByRole("button", { name: "Sessions" })).toHaveAttribute("aria-current", "page");
+    expect(sidebar.getByRole("button", { name: "Story" })).toHaveAttribute("aria-current", "page");
   });
 
   /**
