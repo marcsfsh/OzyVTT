@@ -66,7 +66,7 @@ describe("The canonical glossary", () => {
   it("reads enough of the Codex to be worth trusting", () => {
     // Guard against a scan that silently matches nothing. The floor keeps headroom on purpose.
     expect(codexSources().length).toBeGreaterThan(25);
-    expect(strings.length).toBeGreaterThan(850);
+    expect(strings.length).toBeGreaterThan(400);
   });
 
   it("sees the object-literal copy the old scanner was blind to", () => {

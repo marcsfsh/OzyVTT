@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from "react";
-import { Badge, Button, Field, IconPlus, Input, Modal, RevealSwitch, Select, Switch, TagInput } from "@vtt/ui";
+import { Badge, Button, Field, IconPlus, Input, Modal, Select, Switch, TagInput } from "@vtt/ui";
 import type { CodexMap, CodexMapKind } from "@vtt/domain";
 import type { MapAsset } from "../api";
+import { FieldAudienceToggle } from "../shared/WhoSeesIt";
 
 const MAP_KINDS: ReadonlyArray<{ value: CodexMapKind; label: string }> = [
   { value: "world", label: "World" },
@@ -76,10 +77,11 @@ export function MapDetails({
             }}
           />
         </Field>
-        <div className="atlas-whosees">
-          <RevealSwitch revealed={map.revealedToPlayers} onChange={onReveal} ariaLabel="Show this map to players" />
-          <span className="atlas-whosees-label">{map.revealedToPlayers ? "Everyone" : "Hidden"}</span>
-        </div>
+        <FieldAudienceToggle
+          field="this map"
+          hidden={!map.revealedToPlayers}
+          onChange={(hidden) => onReveal(!hidden)}
+        />
       </div>
       <Field label="Kind" htmlFor="map-kind">
         <Select id="map-kind" value={map.kind} onChange={(event) => onRetype(event.target.value as CodexMapKind)}>

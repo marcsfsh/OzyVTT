@@ -10,7 +10,6 @@ import {
   IconPlus,
   IconX,
   Input,
-  RevealSwitch,
   SaveState,
   Select,
   Switch,
@@ -21,6 +20,7 @@ import { atlasApi, type CodexMarkerInput } from "../api";
 import { useCodexAutosave } from "../autosave";
 import { CodexIcon, EntityIcon, IconPicker, pinSwatchVar } from "../icons";
 import { useConfirm } from "../../components/feedback";
+import { FieldAudienceToggle } from "../shared/WhoSeesIt";
 
 type EditorScene = Readonly<{ id: string; name: string }>;
 type EditorActor = Readonly<{ id: string; name: string }>;
@@ -177,10 +177,11 @@ export function PinEditor({
             onChange={(event) => setLabel(event.target.value)}
           />
         </Field>
-        <div className="atlas-whosees">
-          <RevealSwitch revealed={marker.revealedToPlayers} onChange={reveal} ariaLabel="Show this pin to players" />
-          <span className="atlas-whosees-label">{marker.revealedToPlayers ? "Everyone" : "Hidden"}</span>
-        </div>
+        <FieldAudienceToggle
+          field="this pin"
+          hidden={!marker.revealedToPlayers}
+          onChange={(hidden) => void reveal(!hidden)}
+        />
       </div>
       {!autosave.enabled && (
         <Button variant="secondary" size="sm" disabled={!details.dirty} onClick={() => void details.flush()}>

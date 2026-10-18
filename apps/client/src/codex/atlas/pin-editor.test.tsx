@@ -140,7 +140,7 @@ describe("A pin's tags and label", () => {
     revealMarker.mockResolvedValue(MARKER({ revealedToPlayers: false }));
     renderEditor(MARKER({ tags: [] }), { autosave: false });
     expect(screen.getByText("Everyone")).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("switch", { name: "Show this pin to players" }));
+    await userEvent.setup().click(screen.getByRole("switch", { name: "Who sees this pin: Everyone" }));
     await waitFor(() => expect(revealMarker).toHaveBeenCalledWith("gm", "k1", false));
   });
 });

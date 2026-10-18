@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { Combobox, IconChevronRight, IconEyeOff, Input, Menu, VisibilityBadge } from "@vtt/ui";
+import { Combobox, IconChevronRight, IconEye, IconEyeOff, Input, Menu } from "@vtt/ui";
 import { countOf } from "@vtt/domain";
 import { CodexIcon, pinSwatchVar } from "../icons";
 import { LAYER_META, type AtlasLayer, type AtlasLayers } from "./layers";
@@ -196,7 +196,15 @@ export function PinTable({
             >
               {gm && (
                 <td className="atlas-pintable-eye">
-                  <VisibilityBadge revealed={pin.revealedToPlayers !== false} />
+                  {pin.revealedToPlayers === false ? (
+                    <span className="atlas-hiddenmark" role="img" aria-label="Hidden" title="Hidden">
+                      <IconEyeOff />
+                    </span>
+                  ) : (
+                    <span className="atlas-shownmark" role="img" aria-label="Everyone" title="Everyone">
+                      <IconEye />
+                    </span>
+                  )}
                 </td>
               )}
               <th scope="row">

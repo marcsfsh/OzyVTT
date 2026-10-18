@@ -171,7 +171,9 @@ describe("The GM's atlas", () => {
     await waitFor(() => expect(within(table).getByText("Ysolde Varn")).toBeInTheDocument());
     expect(within(table).getByText("Tunnel mouth")).toBeInTheDocument();
     expect(screen.getByText("Regional map")).toBeInTheDocument();
-    expect(screen.getByText("Revealed to everyone")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("complementary", { name: "Saltmere" })).getAllByText("Everyone")[0]
+    ).toBeInTheDocument();
     // One hidden pin here and one hidden map inside.
     expect(screen.getByText(/1 pin and 1 map\s+hidden/)).toBeInTheDocument();
   });
@@ -287,7 +289,7 @@ describe("The GM's atlas", () => {
     expect(screen.getByRole("list", { name: /chosen/i })).toHaveTextContent("coast");
     await user.type(screen.getByLabelText("Tags"), "Old Town{Enter}");
     await waitFor(() => expect(updateMap).toHaveBeenCalledWith("gm", "m1", { tags: ["coast", "old-town"] }));
-    await user.click(screen.getByRole("switch", { name: "Show this map to players" }));
+    await user.click(screen.getByRole("switch", { name: "Who sees this map: Everyone" }));
     await waitFor(() => expect(revealMap).toHaveBeenCalledWith("gm", "m1", false));
   });
 

@@ -149,7 +149,7 @@ span.tpl-crumb {
 /* ----- One template ----- */
 .tpl-work {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(18rem, 32%, 24rem);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
@@ -355,9 +355,9 @@ span.tpl-crumb {
   border-bottom: 0;
 }
 
-@media (max-width: 980px) {
+@media (min-width: 980px) {
   .tpl-work {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) clamp(18rem, 32%, 24rem);
   }
 }
 @media (max-width: 760px) {

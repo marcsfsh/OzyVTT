@@ -1,20 +1,12 @@
 import { useCallback } from "react";
-import {
-  Badge,
-  Button,
-  HiddenFromPlayers,
-  IconButton,
-  IconChevronRight,
-  IconPencil,
-  IconPlay,
-  IconX,
-  VisibilityBadge
-} from "@vtt/ui";
+import { Badge, Button, HiddenFromPlayers, IconButton, IconChevronRight, IconPencil, IconPlay, IconX } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
 import { journalApi } from "../api";
 import { ENTITY_DEFS } from "../entities";
 import { CodexIcon, EntityIcon, pinSwatchVar } from "../icons";
 import { useCodexQuery } from "../useCodexQuery";
+import { EVERYONE, HIDDEN } from "../shared/audience";
+import { AudienceChip } from "../shared/WhoSeesIt";
 
 type ViewedPin = Readonly<{
   id: string;
@@ -91,7 +83,7 @@ export function PinView({
       <header className="atlas-pinview-head">
         <CodexIcon iconId={pin.iconId} className="atlas-pinview-icon" style={{ color: pinSwatchVar(pin.iconColor) }} />
         <h3 className="atlas-pinview-title">{label}</h3>
-        {gm && <VisibilityBadge revealed={pin.revealedToPlayers !== false} />}
+        {gm && <AudienceChip value={pin.revealedToPlayers === false ? HIDDEN : EVERYONE} party={[]} />}
         <IconButton label="Close" size="sm" onClick={onClose}>
           <IconX />
         </IconButton>
