@@ -136,7 +136,6 @@ export function TemplateEditor({
         <span className="tpl-grow" />
         {!readOnly && (
           <Menu
-            className="tpl-addmenu"
             align="end"
             trigger={
               <span className="tpl-addtrigger">
@@ -202,14 +201,12 @@ export function TemplateEditor({
                 <>
                   <Input
                     aria-label={`Section ${index + 1} title`}
-                    className="tpl-section-titleinput"
                     value={section.title}
                     maxLength={CODEX_PREP_LIMITS.sectionTitle}
                     onChange={(event) => patchSection(section.id, { title: event.target.value })}
                   />
                   <Input
                     aria-label={`Section ${index + 1} prompt`}
-                    className="tpl-section-promptinput"
                     placeholder="A prompt shown while you write"
                     value={section.prompt}
                     maxLength={CODEX_PREP_LIMITS.prompt}

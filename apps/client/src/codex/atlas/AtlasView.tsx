@@ -379,7 +379,6 @@ export function AtlasView({
     <Button
       variant="secondary"
       size="sm"
-      className="atlas-partybutton"
       aria-pressed={placing === "party"}
       onClick={() => setPlacing((now) => (now === "party" ? null : "party"))}
     >

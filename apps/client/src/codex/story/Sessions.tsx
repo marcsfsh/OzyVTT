@@ -302,7 +302,7 @@ export function StoryBar({
   ] as const;
   return (
     <div className="story-bar">
-      <nav className="nh-segmented story-views" aria-label="Story views">
+      <nav className="nh-segmented" aria-label="Story views">
         {views.map((each) => (
           <button
             key={each.id}
