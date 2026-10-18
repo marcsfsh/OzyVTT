@@ -148,7 +148,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                   size="sm"
                   onClick={() => {
                     setOpen(false);
-                    navigate(pathForSection("calendar"));
+                    navigate(pathForSection("story"));
                   }}
                 >
                   Set the date

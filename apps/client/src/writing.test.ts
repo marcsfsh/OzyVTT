@@ -70,12 +70,6 @@ const EXEMPT: ReadonlyArray<readonly [file: string, text: string, rule: string, 
     "The opening line of a confirm dialog's body, built in a variable before the confirm call."
   ],
   [
-    "apps/client/src/codex/RevealAudit.tsx",
-    "Hide $ from players?",
-    "question",
-    "A confirm dialog built on Modal, because it warns that the faction's standing hides too. This is its title."
-  ],
-  [
     "apps/client/src/codex/autosave.ts",
     "You have unsaved changes. Leave without saving?",
     "question",

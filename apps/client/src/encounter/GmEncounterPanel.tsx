@@ -38,6 +38,10 @@ export type GmPanelSlots = Readonly<{
   party?: ReactNode;
   /** The rest button, beside Start the fight. */
   rest?: ReactNode;
+  /** The active session's live board. */
+  tonight?: ReactNode;
+  /** The Codex at the table: search and a compact page with Reveal on its blocks. */
+  codex?: ReactNode;
 }>;
 
 export function GmEncounterPanel({
@@ -516,6 +520,11 @@ export function GmEncounterPanel({
 
   const fighting = state.combat.active;
   const needsCount = slots?.needsCount ?? 0;
+  // Tonight and the Codex sit beside the fight's own tabs, so a lookup or a logged line never leaves the map.
+  const campaignTabs: PanelTab[] = [
+    ...(slots?.tonight ? [{ id: "tonight", label: "Tonight", content: slots.tonight, scrolls: false }] : []),
+    ...(slots?.codex ? [{ id: "codex", label: "Codex", content: slots.codex, scrolls: false }] : [])
+  ];
   const tabs: PanelTab[] = phone
     ? fighting
       ? [
@@ -526,6 +535,7 @@ export function GmEncounterPanel({
             label: needsCount > 0 ? `Needs ${needsCount}` : "Needs",
             content: slots?.needs ?? <p className="table-panel-empty">Nothing waits on you.</p>
           },
+          ...campaignTabs,
           { id: "dice", label: "Dice", content: slots?.dice },
           { id: "log", label: "Log", content: slots?.log, scrolls: false }
         ]
@@ -540,6 +550,7 @@ export function GmEncounterPanel({
               </>
             )
           },
+          ...campaignTabs,
           { id: "party", label: "Party", content: slots?.party },
           { id: "dice", label: "Dice", content: slots?.dice },
           { id: "log", label: "Log", content: slots?.log, scrolls: false }
@@ -558,6 +569,7 @@ export function GmEncounterPanel({
           ),
           scrolls: !fighting
         },
+        ...campaignTabs,
         { id: "dice", label: "Dice", content: slots?.dice },
         { id: "log", label: "Log", content: slots?.log, scrolls: false },
         { id: "token", label: "Token", content: slots?.token }

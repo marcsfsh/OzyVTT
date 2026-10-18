@@ -136,9 +136,6 @@ describe("(b) no raw input where a primitive exists", () => {
 
 // (c) One eyebrow
 
-/** Uses of the client's `.eyebrow` class, which codex/ (not this suite's to change) still renders. */
-const EYEBROW_ALLOW: readonly string[] = ["apps/client/src/codex/SidebarNav.tsx"];
-
 /** Every `className=` value, braces balanced so `className={cx("a", `b ${c}`)}` comes out whole. */
 function classNameValues(src: string): { value: string; index: number }[] {
   const values: { value: string; index: number }[] = [];
@@ -162,7 +159,7 @@ function classNameValues(src: string): { value: string; index: number }[] {
 }
 
 describe("(c) one eyebrow, the Eyebrow primitive", () => {
-  it("renders the local eyebrow class only where listed", () => {
+  it("renders no local eyebrow class", () => {
     const hits: Hit[] = [];
     for (const source of allTsx()) {
       const src = stripComments(source.read());
@@ -171,17 +168,15 @@ describe("(c) one eyebrow, the Eyebrow primitive", () => {
         if (value.split(/[^A-Za-z0-9_-]+/).includes("eyebrow"))
           hits.push({ key: source.path, at: cite(source.path, src, index, value.trim().slice(0, 60)) });
     }
-    const { unexcused, dead } = settle(hits, EYEBROW_ALLOW);
-    expect(unexcused, "Render <Eyebrow> from @vtt/ui; it owns the tracking, size and colour.").toEqual([]);
     expect(
-      dead,
-      "These EYEBROW_ALLOW rows excuse nothing any more: delete them, and the `.eyebrow` rule in styles.css with the last."
+      hits.map((hit) => hit.at),
+      "Render <Eyebrow> from @vtt/ui; it owns the tracking, size and colour."
     ).toEqual([]);
   });
 
-  it("declares the local class only in styles.css", () => {
+  it("declares no local eyebrow class", () => {
     const hits = hitsOf(stylesheets(), /(?<![\w-])\.eyebrow(?![\w-])/g, stripBlockComments, (_match, path) => path);
-    expect(hits.filter((hit) => hit.key !== "apps/client/src/styles.css").map((hit) => hit.at)).toEqual([]);
+    expect(hits.map((hit) => hit.at)).toEqual([]);
   });
 });
 
@@ -196,7 +191,6 @@ const COLOR = /#[0-9a-fA-F]{3,8}\b|%23[0-9a-fA-F]{3,6}|rgba?\(|hsla?\(/g;
 /** Literal counts per file, each with the reason it cannot be a token. */
 const COLOR_ALLOW: ReadonlyArray<readonly [file: string, count: number, why: string]> = [
   ["apps/client/src/actors/pdf-import.css", 5, "import-status hues (amber/red/violet) that never became tokens"],
-  ["apps/client/src/codex/codex.css", 1, "graph node-icon fill over arbitrary map art"],
   ["apps/client/src/maps/map-manager.css", 11, "SVG paint: grid strokes and drop-shadows over image content"],
   ["apps/client/src/scene/annotation.css", 3, "SVG paint: annotation strokes over image content"],
   ["apps/client/src/scene/encounter-map.css", 8, "SVG paint, and the black/white pair a token ring needs on any map"],
