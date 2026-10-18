@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { BuilderOffer, ContentSpellSummary } from "@vtt/domain";
 import { ABILITIES, type Ability } from "@vtt/rules-5e";
-import { Alert, Badge, ChoiceGrid, SegmentedControl, Select, type ChoiceOption } from "@vtt/ui";
+import { Alert, ChoiceGrid, SegmentedControl, Select, type ChoiceOption } from "@vtt/ui";
 import type { BuilderCatalogs } from "../content/catalogs";
+import { HomebrewBadge } from "../homebrew/marks";
 // The fight's own spell card, so a spell reads the same while choosing it and while casting it.
 import { SpellCard } from "../encounter/spells";
 import {
@@ -29,8 +30,7 @@ const SPELL_KINDS: ReadonlySet<string> = new Set(["spell", "cantrip"]);
  * Badge only the exception: nearly every option is SRD, so only homebrew gets a badge. `ChoiceCard`
  * collapses the slot when the badge is `undefined`.
  */
-export const sourceBadge = (source: string | undefined) =>
-  source === "homebrew" ? <Badge tone="primary">Homebrew</Badge> : undefined;
+export const sourceBadge = (source: string | undefined) => (source === "homebrew" ? <HomebrewBadge /> : undefined);
 /** Sentence-cases a stored provenance phrase for a card's disabled reason. */
 const asReason = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
 
@@ -44,15 +44,13 @@ const spellLevelLine = (level: number | null | undefined) =>
 
 /**
  * Provenance for an offer option, by id. The server's offers carry options as `{ id, name, level? }`,
- * so `source` is looked back up in the catalog the id came from.
- *
- * Subclasses and feats only: spell, equipment and monster summaries carry no `source`, so a
- * homebrew spell is still unbadged. These catalogs are audience-merged server-side, so nothing a
- * player may not see can be badged.
+ * so `source` is looked back up in the catalog the id came from. These catalogs are built for the reader on the
+ * server, so nothing a player may not see can be badged.
  */
 const offerSource = (catalogs: BuilderCatalogs, id: string): string | undefined =>
   catalogs.choice.subclasses.find((entry) => entry.id === id)?.source ??
-  catalogs.choice.feats.find((entry) => entry.id === id)?.source;
+  catalogs.choice.feats.find((entry) => entry.id === id)?.source ??
+  catalogs.choice.spells.find((entry) => entry.id === id)?.source;
 
 /**
  * One pick offered by the content: heading, count, and the grid that answers it.

@@ -27,7 +27,19 @@ function walk(dir: string, keep: (name: string) => boolean, base = ""): string[]
   return out;
 }
 
+/** What the play vocabulary lock leaves out besides `PLAY_EXCLUDED`: record surfaces, which say who sees a record in
+    the Codex's words. Their design is still checked with the rest of the play tree. */
+const VOCABULARY_EXCLUDED: ReadonlyArray<readonly [prefix: string, why: string]> = [
+  ...PLAY_EXCLUDED,
+  [
+    "compendium/",
+    "a record surface: it says Hidden, Everyone or the characters' names through the Codex's WhoSeesIt, " +
+      "and has its own lock (compendium/vocabulary.test.ts)"
+  ]
+];
+
 const excluded = (rel: string): boolean => PLAY_EXCLUDED.some(([prefix]) => rel.startsWith(prefix));
+const vocabularyExcluded = (rel: string): boolean => VOCABULARY_EXCLUDED.some(([prefix]) => rel.startsWith(prefix));
 const isSource = (name: string) => /\.tsx?$/.test(name) && !name.includes(".test.") && !name.endsWith(".d.ts");
 const isCss = (name: string) => name.endsWith(".css");
 
@@ -56,9 +68,14 @@ export const scannedTsx = (): Source[] => [...playTsx(), ...uiFiles((name) => is
 export const allTsx = (): Source[] => [...clientFiles(isSource, true), ...uiFiles(isSource)];
 /** What the vocabulary lock reads: play `.ts`/`.tsx` plus the `packages/ui` primitives. */
 export const playCopySources = (): { file: string; read: () => string }[] =>
-  [...clientFiles(isSource), ...uiFiles((name) => isSource(name)).filter((s) => s.path.includes("/primitives/"))].map(
-    (source) => ({ file: source.path, read: () => stripComments(source.read()) })
-  );
+  [
+    ...sources(
+      CLIENT_SRC,
+      "apps/client/src",
+      walk(CLIENT_SRC, isSource).filter((rel) => !vocabularyExcluded(rel))
+    ),
+    ...uiFiles((name) => isSource(name)).filter((s) => s.path.includes("/primitives/"))
+  ].map((source) => ({ file: source.path, read: () => stripComments(source.read()) }));
 /** Every stylesheet, client and `packages/ui`. */
 export const stylesheets = (): Source[] => [...clientFiles(isCss, true), ...uiFiles(isCss)];
 /** Client stylesheets only. */

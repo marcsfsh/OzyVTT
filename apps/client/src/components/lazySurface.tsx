@@ -13,7 +13,7 @@ export function SurfaceFallback() {
 }
 
 /**
- * A surface whose code loads on first use (Codex, homebrew, settings, the builder, replays, the map
+ * A surface whose code loads on first use (Codex, the Compendium, settings, the builder, replays, the map
  * library), each in its own Suspense boundary so loading one never blanks the rest of the shell.
  */
 export function lazySurface<P extends object>(

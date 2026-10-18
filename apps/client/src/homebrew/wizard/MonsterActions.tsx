@@ -25,6 +25,7 @@ import {
   actionsOf,
   activationOf,
   attackBonusFor,
+  actionLine,
   editAction,
   generatedText,
   kindOf,
@@ -234,7 +235,8 @@ export function MonsterActions({
                 ? "Legendary Actions"
                 : "Actions"
         }
-        rowLabel={(action) => (typeof action.name === "string" && action.name ? action.name : "Unnamed action")}
+        // Each closed row reads as a line of the stat block's actions table.
+        rowLabel={actionLine}
         renderRow={(action, index) => (
           <ActionBuilder
             action={action}

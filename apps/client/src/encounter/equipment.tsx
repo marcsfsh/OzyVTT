@@ -1,3 +1,4 @@
+import { HomebrewMarks, useHomebrewMarks } from "../homebrew/marks";
 import { useEffect, useMemo, useState } from "react";
 import type { ContentEquipmentSummary, ContentSpellSummary } from "@vtt/domain";
 import { Input, Modal } from "@vtt/ui";
@@ -378,13 +379,17 @@ export function EquipmentPicker({
   ownedCounts,
   busy,
   onAdd,
-  onClose
+  onClose,
+  gm = false
 }: Readonly<{
   ownedCounts: ReadonlyMap<string, number>;
   busy: boolean;
   onAdd: (item: ContentEquipmentSummary, baseId?: string, spellId?: string) => void;
   onClose: () => void;
+  /** The GM's picker also marks a Hidden homebrew item, read from the GM's own homebrew list. */
+  gm?: boolean;
 }>) {
+  const marks = useHomebrewMarks(gm);
   const { catalog, attribution } = useEquipmentReference();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -498,7 +503,7 @@ export function EquipmentPicker({
       size="lg"
       accent="cyan"
       title="Add equipment"
-      ariaLabel="Browse the SRD equipment catalog"
+      ariaLabel="Browse the equipment catalog"
     >
       <div className="sheet-picker-controls">
         <Input
@@ -541,6 +546,7 @@ export function EquipmentPicker({
                 <div className="sheet-picker-item">
                   <span className="sheet-picker-name">
                     {item.name}
+                    <HomebrewMarks source={item.source} mark={marks.get(item.id)} />
                     {owned > 0 && (
                       <span className="sheet-picker-owned" aria-label={`${owned} in pack`}>
                         ×{owned}

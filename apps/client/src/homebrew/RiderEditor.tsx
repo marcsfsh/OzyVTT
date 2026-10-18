@@ -31,7 +31,7 @@ export const ALL_RIDERS: readonly RiderKind[] = ["modifiers", "grants", "uses", 
  * harness's exemption list and tests drive `grantRowsOf`/`grantsFromRows` instead.
  */
 export function riderFieldsForTest(scope: RiderScope): readonly FieldDef[] {
-  // What `RecordDetail` enables on a monster, in render order.
+  // What the record view's editor parts enable on a monster, in render order.
   if (scope === "statblock") return [tagsField("Tags"), actionsField(scope)];
   return [
     whenField(),

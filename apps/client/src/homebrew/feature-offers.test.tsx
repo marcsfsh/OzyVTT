@@ -13,7 +13,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { blankDraft, forStorage } from "./defaults";
 import { FeatureEditor } from "./FeatureEditor";
-import { SchemaForm } from "./SchemaForm";
+import { SchemaForm } from "./form-harness";
 import { SCHEMAS } from "./schemas";
 import { EMPTY_CONTEXT, type Draft } from "./schema";
 

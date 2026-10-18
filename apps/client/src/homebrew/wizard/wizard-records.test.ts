@@ -15,7 +15,7 @@ import { editorField } from "./questions";
 import { isCustomQuestion } from "./types";
 import { publishIssues } from "../validate";
 import { BORROWED, WIZARD_RECORDS, answers } from "./wizard-records";
-import { REVIEW_STEP, wizardSteps } from "./WizardView";
+import { REVIEW_STEP, wizardSteps } from "./steps";
 
 const TYPES = Object.keys(SCHEMAS) as HomebrewType[];
 
@@ -38,8 +38,9 @@ const COMPOSED: Readonly<Record<HomebrewType, readonly string[]>> = {
   // The level and the damage roll carry the upcast rows along; the attack-or-save answer is one control.
   spell: ["level", "attackRoll", "save.repeatSave", "save.endsOnDamage", "damage.roll"],
   // The name renames the generated texts, size moves the token and the Hit Points, and the type and alignment
-  // move the bestiary line. The rest are stat-block bag keys the editor has no field for.
-  monster: ["name", "size", "type", "alignment", "armorDetail", "languages"],
+  // move the bestiary line. The rest are stat-block bag keys the editor has no field for, and the tags, which the
+  // editor keeps inside its rider list.
+  monster: ["name", "size", "type", "alignment", "armorDetail", "languages", "tags"],
   equipment: [],
   class: [],
   subclass: [],

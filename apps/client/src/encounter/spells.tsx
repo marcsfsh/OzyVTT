@@ -152,14 +152,31 @@ export function SpellCard({ spell, onClose }: Readonly<{ spell: ContentSpellSumm
   );
 }
 
-/** The card's body, shared with the homebrew spell wizard's preview so a new spell is shown as the table shows it. */
-export function SpellCardContent({ spell }: Readonly<{ spell: ContentSpellSummary }>) {
-  const levelLine = spell.level === 0 ? `${capitalize(spell.school)} cantrip` : `Level ${spell.level} ${spell.school}`;
+/** The spell lists a card names: an SRD list by its class, and a homebrew one by the name the caller knows. */
+function listNames(spell: ContentSpellSummary, names?: (id: string) => string | null): string[] {
+  return spell.classes
+    .map((id) => names?.(id) ?? (id.startsWith("hb-") ? null : id.split("-").map(capitalize).join(" ")))
+    .filter((name): name is string => Boolean(name))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * The card's body, shared by the sheet, the builder and the Compendium, so a spell reads the same wherever it is
+ * met. The type line is the SRD's: "Level 3 Evocation (Sorcerer, Wizard)".
+ */
+export function SpellCardContent({
+  spell,
+  listName
+}: Readonly<{ spell: ContentSpellSummary; listName?: (id: string) => string | null }>) {
+  const school = capitalize(spell.school);
+  const lists = listNames(spell, listName);
+  const levelLine = spell.level === 0 ? `${school} Cantrip` : `Level ${spell.level} ${school}`;
   return (
     <>
       <p className="spell-card-type">
         {levelLine}
-        {spell.ritual ? " · ritual" : ""}
+        {lists.length > 0 ? ` (${lists.join(", ")})` : ""}
+        {spell.ritual ? " · Ritual" : ""}
       </p>
       <dl className="spell-card-meta">
         <div>

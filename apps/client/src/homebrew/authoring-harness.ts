@@ -22,9 +22,9 @@ import { bodyForPublish, publishIssues } from "./validate";
     never grow to hide a gap. */
 export const RIDER_EXEMPT: readonly string[] = ["grants"];
 
-/** The scope at which a record type mounts `RiderEditor` (directly or via `FeatureEditor`), derived
-    from the form data and matching `RecordDetail.tsx`: equipment is `item`, monster is `statblock`,
-    everything else is `feature`. */
+/** The scope at which a record type mounts `RiderEditor` (directly or via `FeatureEditor`), derived from the form
+    data and matching `compendium/record/editorParts.tsx`: equipment is `item`, monster is `statblock`, everything
+    else is `feature`. */
 export function riderScopeOf(type: HomebrewType): RiderScope | null {
   const customs = new Set<string>();
   const walk = (fields: readonly FieldDef[]) => {

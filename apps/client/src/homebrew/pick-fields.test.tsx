@@ -17,12 +17,12 @@ import userEvent from "@testing-library/user-event";
 import { DAMAGE_TYPE_IDS, RARITY_IDS, WEAPON_MASTERY_IDS, WEAPON_PROPERTY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { blankDraft, forStorage } from "./defaults";
 import { RiderEditor } from "./RiderEditor";
-import { SchemaForm } from "./SchemaForm";
+import { SchemaForm } from "./form-harness";
 import { SCHEMAS } from "./schemas";
 import { EMPTY_CONTEXT, pickValue, suggestionLabel, type Draft } from "./schema";
 import type { HomebrewType } from "./types";
 
-/** The real form, driven as `RecordDetail` drives it: one draft, one `onDraft`. */
+/** The real form, driven as the record view drives it: one draft, one `onDraft`. */
 function RecordForm({ type, seed, onBody }: { type: HomebrewType; seed: Draft; onBody: (body: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(seed);
   return (
@@ -458,7 +458,7 @@ describe("the eleventh grant kind is a spell PICKER, because a spell id cannot b
 
 /** `GrantsEditor` exposes no control for `grants.when` but rebuilds the bag on every edit, so it must
     carry the gate across. This drives the gesture (a real mount and tap, and the `onChange` payload
-    `RecordDetail` would autosave); the body half is `grant-gate-preservation.mirror.test.ts`. */
+    the record view would autosave); the body half is `grant-gate-preservation.mirror.test.ts`. */
 describe("a gate the editor cannot show is a gate the editor must not drop", () => {
   /** `mindless-rage` as `subclasses.v1.json` ships it, as the opened body. */
   const GATED = {

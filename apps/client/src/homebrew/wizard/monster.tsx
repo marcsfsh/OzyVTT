@@ -8,7 +8,7 @@ import { Chip, Field, FieldGrid, Input, NumberField, RowEditor, Select, Stepper,
 import { opt, type Draft, type FieldDef } from "../schema";
 import { MonsterActions } from "./MonsterActions";
 import { MonsterBenchmarks } from "./MonsterBenchmarks";
-import { StatBlockPreview } from "./StatBlockPreview";
+import { tagsField } from "../riders/actions";
 import { ask } from "./questions";
 import {
   ABILITY_IDS,
@@ -499,6 +499,7 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "These answers make the first lines of its stat block.",
       owns: ["name", "size", "extensions", "proficiencyBonus", "summary", "token"],
       sections: ["identity"],
+      covers: ["challengeRating"],
       questions: [
         ask("monster", "name", {
           label: "Name",
@@ -530,7 +531,8 @@ export const MONSTER_WIZARD: WizardDef = {
         ask("monster", "summary", {
           label: "Bestiary line",
           help: "It follows your answers above until you change it."
-        })
+        }),
+        tagsField("Tags")
       ]
     },
     {
@@ -614,6 +616,8 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "Its attacks and other actions go here. A Multiattack makes several of them as one action.",
       owns: ["actions"],
       sections: ["actions"],
+      // The actions table writes what the editor's action list did; its tags have their own question.
+      covers: ["riders"],
       claims: claimsActions("action"),
       questions: [
         {
@@ -680,6 +684,5 @@ export const MONSTER_WIZARD: WizardDef = {
       claims: claimsActions("legendary"),
       questions: [{ key: "legendary", render: (props) => <LegendaryQuestion {...props} /> }]
     }
-  ],
-  Preview: StatBlockPreview
+  ]
 };

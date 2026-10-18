@@ -7,7 +7,7 @@ import { MonsterActions } from "./MonsterActions";
 import { placeIssues } from "./issues";
 import { actionsOf, partsOf, saveText } from "./monster-actions";
 import { MONSTER_WIZARD } from "./monster";
-import { wizardSteps } from "./WizardView";
+import { wizardSteps } from "./steps";
 
 const undertow = {
   id: "action-undertow",

@@ -147,7 +147,7 @@ describe("the eleven item authoring paths (Appendix A5 repro)", () => {
       item(["weapon.damageDice", "1d8"], ["weapon.damageType", "slashing"]),
       "weapon.category"
     );
-    expect(issuesFor("equipment", draft)).toContain("Fill in weapon kind.");
+    expect(issuesFor("equipment", draft)).toContain("Pick the weapon kind from the list.");
     expect(parsesAsStored("equipment", draft)!.success).toBe(false);
   });
 });

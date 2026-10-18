@@ -131,6 +131,7 @@ describe("The play glossary", () => {
       expect(dirs.has(dir), `apps/client/src/${dir}/ is not in the scan`).toBe(true);
     }
     expect(dirs.has("codex"), "codex/ has its own lock and must stay out of this one").toBe(false);
+    expect(dirs.has("compendium"), "compendium/ is a record surface with its own lock").toBe(false);
   });
 
   it("sees the copy shapes a naive scanner is blind to", () => {
@@ -241,7 +242,7 @@ describe("The structured copy, pinned at its one definition", () => {
   it("calls the place the Table and never the Encounter", () => {
     // "Encounter" is a fight and never a place. The GM tab table is checked through the scan (its rows are
     // `label: "…"`); the order is not pinned here.
-    for (const label of ["Table", "Scenes", "Roster", "Codex", "Homebrew", "Settings"]) {
+    for (const label of ["Table", "Scenes", "Roster", "Codex", "Compendium", "Settings"]) {
       expect(at("apps/client/src/shell/GmShell.tsx", label), `the GM tab bar no longer has a "${label}" tab`).toBe(
         true
       );
@@ -266,16 +267,5 @@ describe("The verb triad, pinned per dialog", () => {
         `${citeCopy(entry)} promises permanence in an Archive dialog. Archive is REVERSIBLE: use Delete, or drop the sentence.`
       ).toBe(false);
     }
-  });
-
-  it("keeps Archive reversible in copy: it offers a way back", () => {
-    expect(at("apps/client/src/homebrew/RecordDetail.tsx", "Archive this?"), "the homebrew archive confirm").toBe(true);
-    const body = strings.find(
-      (entry) =>
-        entry.file === "apps/client/src/homebrew/RecordDetail.tsx" &&
-        /stops appearing in the character builder/.test(visible(entry))
-    );
-    expect(body, "the homebrew archive confirm has lost its body").toBeDefined();
-    expect(/restore it later/i.test(visible(body!)), "an Archive confirm must say the thing comes back").toBe(true);
   });
 });

@@ -1,14 +1,11 @@
 /** The spell wizard. Its steps follow the spell card from top to bottom, and the spell lists and the text come last. */
 
 import { useEffect, useState } from "react";
-import type { ContentSpellSummary } from "@vtt/domain";
 import { MAGIC_SCHOOL_IDS } from "@vtt/content-srd-5.2.1/schemas";
-import { spellComponentsText } from "@vtt/content-srd-5.2.1/spell-effect";
 import { Button, Chip, Field, Input, NumberField, Stepper, Switch } from "@vtt/ui";
-import { SpellCardContent } from "../../encounter/spells";
 import { getAt, setAt } from "../paths";
 import { opt, type Draft, type FieldDef } from "../schema";
-import type { PreviewProps, StepProps, WizardDef } from "./types";
+import type { StepProps, WizardDef } from "./types";
 import { ask } from "./questions";
 import {
   RANGE_KINDS,
@@ -445,59 +442,5 @@ export const SPELL_WIZARD: WizardDef = {
         ask("spell", "attribution", { label: "Source" })
       ]
     }
-  ],
-  Preview: SpellPreview
+  ]
 };
-
-/** The record as the catalog serves it to the card (`content-library.ts`'s spell summary). */
-export function spellSummaryOf(draft: Draft, id: string): ContentSpellSummary {
-  const range = (draft.range as { distance: number | null; unit: string | null; text: string | null } | undefined) ?? {
-    distance: null,
-    unit: null,
-    text: null
-  };
-  const components = (draft.components as Parameters<typeof spellComponentsText>[0] | undefined) ?? {
-    verbal: false,
-    somatic: false,
-    material: false,
-    materialText: null,
-    materialConsumed: false
-  };
-  return {
-    id,
-    name: typeof draft.name === "string" && draft.name.trim() ? draft.name : "Untitled spell",
-    source: "homebrew",
-    level: typeof draft.level === "number" ? draft.level : 1,
-    school: typeof draft.school === "string" ? draft.school : "",
-    castingTime: typeof draft.castingTime === "string" ? draft.castingTime : "",
-    rangeText: range.text,
-    attackRoll: draft.attackRoll === true,
-    rangeFeet: range.unit === "feet" ? range.distance : null,
-    componentsText: spellComponentsText(components),
-    duration: typeof draft.duration === "string" ? draft.duration : "",
-    concentration: draft.concentration === true,
-    ritual: draft.ritual === true,
-    description: typeof draft.description === "string" ? draft.description : "",
-    higherLevel: typeof draft.higherLevel === "string" && draft.higherLevel.trim() ? draft.higherLevel : null,
-    classes: Array.isArray(draft.classes) ? (draft.classes as string[]) : [],
-    damageRoll: rollOf(draft) || null,
-    damageTypes: (getAt(draft, "damage.types") as string[] | undefined) ?? [],
-    castingOptions: [],
-    cantripScaling: []
-  };
-}
-
-function SpellPreview({ draft, recordId }: PreviewProps) {
-  const spell = spellSummaryOf(draft, recordId);
-  return (
-    <article className="hb-wiz-card" aria-label={`${spell.name} spell card`}>
-      <h4 className="hb-wiz-card-name">{spell.name}</h4>
-      <SpellCardContent spell={spell} />
-      {spell.classes.length > 0 && (
-        <p className="hb-wiz-card-foot">
-          On the {spell.classes.map((id) => id.replace(/-/g, " ")).join(", ")} spell lists.
-        </p>
-      )}
-    </article>
-  );
-}

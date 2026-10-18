@@ -24,7 +24,7 @@ import { TableView } from "./TableView";
 import type { Connection } from "./useSession";
 
 const CodexShell = lazySurface(() => import("../codex/CodexShell").then((m) => m.CodexShell));
-const HomebrewPanel = lazySurface(() => import("../homebrew/HomebrewPanel").then((m) => m.HomebrewPanel));
+const CompendiumShell = lazySurface(() => import("../compendium/CompendiumShell").then((m) => m.CompendiumShell));
 const SettingsPage = lazySurface(() => import("../settings/SettingsPage").then((m) => m.SettingsPage));
 const ScenesShell = lazySurface(() => import("../scenes/ScenesShell").then((m) => m.ScenesShell));
 const ReplayList = lazySurface(() => import("../replay/ReplayList").then((m) => m.ReplayList));
@@ -42,8 +42,8 @@ const GM_TABS: ReadonlyArray<{ id: GmTab; label: string }> = [
   { id: "scenes", label: "Scenes" },
   { id: "roster", label: "Roster" },
   { id: "codex", label: "Codex" },
-  // Homebrew sits right after Codex: the two GM authoring surfaces are adjacent.
-  { id: "homebrew", label: "Homebrew" },
+  // The Compendium sits right after Codex: the two GM authoring surfaces are adjacent.
+  { id: "compendium", label: "Compendium" },
   // Controls for the shared screen.
   { id: "viewer", label: "Shared screen" },
   { id: "replay", label: "Replays" },
@@ -125,6 +125,14 @@ export function GmShell({
    */
   const scenesLoaded = Array.isArray(state.combat.scenes);
   const scenes = useMemo(() => state.combat.scenes ?? [], [state.combat.scenes]);
+  /** The party's player characters, for the Compendium's Who sees it. */
+  const party = useMemo(
+    () =>
+      (state.actors ?? [])
+        .filter((actor) => actor.kind === "player-character" && actor.archived !== true)
+        .map((actor) => ({ id: actor.id, name: actor.name })),
+    [state.actors]
+  );
   const sceneActions = useSceneActions(scenes, { combatActive: state.combat.active });
   // One way to make a scene live from anywhere: asked first while a fight is on, since that fight is parked.
   const makeSceneLive = async (sceneId: string): Promise<boolean> => {
@@ -274,8 +282,8 @@ export function GmShell({
         />
       )}
 
-      {/* Homebrew owns its frame: a modebar row over a master-detail workspace. */}
-      {tab("homebrew") && <HomebrewPanel gmToken={token} />}
+      {/* The Compendium owns its frame: a section bar over its tables, and a record at its own address. */}
+      {tab("compendium") && <CompendiumShell token={token} party={party} />}
 
       {showViewerPreview && <ViewerPreviewPanel gmToken={token} onClose={() => setShowViewerPreview(false)} />}
 

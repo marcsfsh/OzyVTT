@@ -1,0 +1,91 @@
+/* A monster's stat block in SRD order: the name, the type line under a magenta rule, the numbers, the six abilities as
+   boxes and the entries under their headings. */
+.sb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text);
+  font: 400 var(--fs-sm) / var(--lh-body) var(--font-body);
+}
+.sb-head {
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--magenta);
+}
+.sb-name {
+  margin: 0;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h2) / var(--lh-tight) var(--font-display);
+  text-shadow: var(--heading-shadow);
+}
+.sb-type {
+  margin: var(--space-1) 0 0;
+  color: var(--text-dim);
+  font-style: italic;
+}
+.sb-block {
+  display: grid;
+  gap: 2px;
+}
+.sb-line,
+.sb-entry {
+  margin: 0;
+}
+.sb-line strong,
+.sb-entry strong {
+  margin-right: var(--space-1);
+  color: var(--text);
+  font-weight: 700;
+}
+.sb-entry strong {
+  font-style: italic;
+}
+.sb-abilities {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+}
+.sb-ability {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--space-1) 2px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.sb-ability dt {
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1 var(--font-label);
+  letter-spacing: 0.06em;
+}
+.sb-ability dd {
+  display: grid;
+  justify-items: center;
+  margin: 0;
+}
+.sb-score {
+  font: 700 var(--fs-body) / 1.1 var(--font-numeric);
+}
+.sb-mods {
+  color: var(--text-dim);
+  font: 500 var(--fs-2xs) / 1.2 var(--font-numeric);
+  text-align: center;
+}
+.sb-section {
+  display: grid;
+  gap: var(--space-1);
+}
+.sb-heading {
+  margin: var(--space-2) 0 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid color-mix(in srgb, var(--magenta) 45%, transparent);
+  color: var(--magenta-text);
+  font: 400 var(--fs-sm) / var(--lh-tight) var(--font-display);
+}
+/* Three boxes a row on a phone, so each number keeps its width. */
+@media (max-width: 560px) {
+  .sb-abilities {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -13,6 +13,7 @@
  */
 
 import { featurePicks, HOMEBREW_BODY_SCHEMAS } from "@vtt/content-srd-5.2.1/schemas";
+import { plainSchemaIssue, type SchemaIssue } from "@vtt/content-srd-5.2.1/homebrew-issues";
 import { forStorage } from "./defaults";
 import { getAt } from "./paths";
 // The gating vocabulary comes from the form that offers it, so new conditions are checked here too.
@@ -404,30 +405,18 @@ function localIssues(type: HomebrewType, draft: Draft, ctx: SchemaContext): read
   }
 }
 
-/** One validity issue (server or shared schema) in the standard sentence shape. The label and
-    section come from the form schema via the issue's `path`. `missing` marks a value the body does
-    not have at all, which reads as "Fill in" in place of the schema's wording. */
+/** One validity issue as the checklist places it. The sentence is the gate's own (the server's verdict, or the same
+    words from `plainSchemaIssue` for the shared schemas), and the form schema says which section owns its path. */
 export function issueReason(
   type: HomebrewType,
-  issue: { path: ReadonlyArray<string | number>; message: string; missing?: boolean } | undefined,
-  lookup: (
-    path: ReadonlyArray<string | number>
-  ) => Readonly<{ label: string; sectionId: string; sectionTitle: string }> | null = (path) => fieldAt(type, path)
+  issue: Readonly<{ path: ReadonlyArray<string | number>; message: string }> | undefined
 ): BlockedReason | null {
   if (!issue) return null;
   const dotted = issue.path.filter((segment) => typeof segment === "string").join(".");
-  const found = lookup(issue.path);
-  if (!found) {
-    // No field owns this path (whole-record rule, extension bag); pass the message through.
-    return { text: issue.message, path: dotted || undefined, segments: issue.path };
-  }
-  // Zod messages lack terminal punctuation; the template adds it once.
-  const detail = issue.message.replace(/[.\s]+$/, "");
+  const found = fieldAt(type, issue.path);
   return {
-    text: issue.missing
-      ? `Fill in ${found.label}.`
-      : `Fix ${found.label}: ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`,
-    sectionId: found.sectionId,
+    text: issue.message,
+    ...(found ? { sectionId: found.sectionId } : {}),
     path: dotted || undefined,
     segments: issue.path
   };
@@ -460,24 +449,22 @@ export function bodyForPublish(type: HomebrewType, draft: Draft, recordId: strin
   return body;
 }
 
-/** Issues from the record's own schema, the same `HOMEBREW_BODY_SCHEMAS` entry the server's publish
-    gate and store read-back use. Unnamed records short-circuit before this runs. */
+/** Issues from the record's own schema, the same `HOMEBREW_BODY_SCHEMAS` entry the server's publish gate and store
+    read-back use, in the gate's own sentences. Unnamed records short-circuit before this runs. */
 function schemaIssues(type: HomebrewType, draft: Draft, recordId: string): readonly BlockedReason[] {
   const schema = HOMEBREW_BODY_SCHEMAS[type];
   if (!schema) return [];
   const body = bodyForPublish(type, draft, recordId);
   const parsed = schema.safeParse(body) as {
     success: boolean;
-    error?: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }> };
+    error?: { issues: ReadonlyArray<SchemaIssue> };
   };
   if (parsed.success) return [];
   const out: BlockedReason[] = [];
   for (const issue of parsed.error?.issues ?? []) {
-    const path = issue.path.map((key) => (typeof key === "number" ? key : String(key)));
     // `id` is forced by the store; the server's identity check reports id problems better.
-    if (path[0] === "id") continue;
-    const missing = path.length > 0 && getAt(body, path.join(".")) === undefined;
-    const reason = issueReason(type, { path, message: issue.message, missing });
+    if (issue.path[0] === "id") continue;
+    const reason = issueReason(type, plainSchemaIssue(issue, body, null));
     if (reason) out.push(reason);
   }
   return out;

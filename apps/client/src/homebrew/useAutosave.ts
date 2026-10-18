@@ -167,17 +167,3 @@ export function useAutosave<T>({
 
   return { status, flush, retry, markSaved, savedDraft };
 }
-
-/**
- * A conflict's way back without losing work: the server's copy, with each top-level field this editor changed since
- * its last save (`base`) kept as this editor has it. A field changed on both sides takes this editor's value.
- */
-export function keepLocalEdits<T extends Readonly<Record<string, unknown>>>(base: T, local: T, server: T): T {
-  const merged: Record<string, unknown> = { ...server };
-  for (const key of new Set([...Object.keys(base), ...Object.keys(local)])) {
-    if (JSON.stringify(local[key]) === JSON.stringify(base[key])) continue;
-    if (key in local) merged[key] = local[key];
-    else delete merged[key];
-  }
-  return merged as T;
-}

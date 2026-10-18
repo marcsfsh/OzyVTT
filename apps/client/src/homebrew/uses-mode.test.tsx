@@ -10,7 +10,7 @@ import { forStorage } from "./defaults";
 import { ITEM_RIDERS, RiderEditor } from "./RiderEditor";
 import { EMPTY_CONTEXT, type Draft } from "./schema";
 
-/** The rider form, driven the way `RecordDetail` drives it: one draft, one `onChange`. */
+/** The rider form, driven the way the record view drives it: one draft, one `onChange`. */
 function Riders({ body, scope, onBody }: { body: Draft; scope: "feature" | "item"; onBody: (next: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(body);
   return (

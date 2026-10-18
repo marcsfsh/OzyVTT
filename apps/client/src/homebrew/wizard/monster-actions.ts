@@ -58,6 +58,37 @@ export function kindOf(action: MonsterAction): ActionKind {
   return "other";
 }
 
+const KIND_WORD: Readonly<Record<ActionKind, string>> = {
+  attack: "Attack",
+  save: "Saving throw",
+  multiattack: "Multiattack",
+  other: "Other"
+};
+
+/** One action as the actions table reads it, a row a column at a time: its name, kind, hit or DC, and damage. */
+export function actionLine(action: MonsterAction): string {
+  const name = typeof action.name === "string" && action.name ? action.name : "Unnamed action";
+  const kind = kindOf(action);
+  const attack = action.attack as Attack | undefined;
+  const save = action.save as Save | undefined;
+  const hit =
+    kind === "attack" && attack
+      ? [
+          `${attack.bonus >= 0 ? "+" : ""}${attack.bonus}`,
+          typeof attack.reachFeet === "number" ? `reach ${attack.reachFeet} ft.` : null,
+          typeof attack.rangeFeet === "number" ? `range ${attack.rangeFeet} ft.` : null
+        ]
+          .filter(Boolean)
+          .join(", ")
+      : kind === "save" && save
+        ? `${ABILITY_NAMES[save.ability].slice(0, 3)} DC ${save.dc}`
+        : null;
+  const damage = partsOf(action)
+    .map((part) => `${part.formula} ${title(part.type)}`)
+    .join(", ");
+  return [name, KIND_WORD[kind], hit, damage || null].filter(Boolean).join(" · ");
+}
+
 export function activationOf(action: MonsterAction): Activation {
   if (action.legendary) return "legendary";
   if (action.activation === "bonus-action" || action.activation === "reaction") return action.activation;

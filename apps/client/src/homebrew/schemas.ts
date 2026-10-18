@@ -17,8 +17,7 @@ import {
   type Draft,
   type FieldDef,
   type HomebrewSchema,
-  type SchemaContext,
-  type SectionDef
+  type SchemaContext
 } from "./schema";
 import type { HomebrewType } from "./types";
 import { ABILITIES, DAMAGE_TYPES, SIZES } from "./vocabulary";
@@ -1445,11 +1444,6 @@ export const SCHEMAS: Readonly<Record<HomebrewType, HomebrewSchema>> = {
   equipment: EQUIPMENT_SCHEMA,
   monster: MONSTER_SCHEMA
 };
-
-/** Section title for the checklist's jump control. */
-export function sectionTitle(type: HomebrewType, sectionId: string): string | null {
-  return SCHEMAS[type]?.sections.find((section: SectionDef) => section.id === sectionId)?.title ?? null;
-}
 
 /** Which field owns a validity issue's `path`, so the message can use the field's label. Matches
     the longest dotted prefix (`["range","distance"]` falls back to `range` if needed). */

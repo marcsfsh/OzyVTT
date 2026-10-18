@@ -1,0 +1,1265 @@
+/* The Compendium: the Codex shell's bar over a view on a laptop, the phone bar and tab bar on a phone (both from
+   codex/shell/shell.css). Each view's regions scroll themselves; the page never scrolls sideways. */
+
+.cp-shell {
+  flex: 1 1 auto;
+  height: 100%;
+}
+.cp-content {
+  isolation: isolate;
+}
+.cp-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cp-pad {
+  padding: var(--space-3) var(--space-4);
+}
+.cp-kind-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  color: var(--text-dim);
+}
+
+/* Words: a hint is quiet, a caution is the caution ink, an eyebrow labels what follows. */
+.cp-hint,
+.cp-muted {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cp-caution {
+  color: var(--caution-hi);
+}
+.cp-strong {
+  font-weight: 700;
+}
+.cp-eyebrow {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cp-h {
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--heading-ink);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cp-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.cp-blocked {
+  margin: 0;
+  color: var(--caution-hi);
+  font-size: var(--fs-sm);
+}
+.cp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  color: var(--text-dim);
+  text-align: center;
+}
+.cp-empty p {
+  margin: 0;
+}
+.cp-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.cp-block {
+  width: 100%;
+}
+.cp-section-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cp-section-head .cp-h {
+  margin: 0;
+}
+
+/* ----- The laptop bar ----- */
+.cp-bar-title {
+  margin: 0 var(--space-2) 0 0;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h3) / 1.1 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  white-space: nowrap;
+}
+@media (min-width: 1280px) {
+  .cx-searchbox.cp-searchbox {
+    width: min(380px, 28vw);
+  }
+}
+
+/* ----- The phone bar's own controls ----- */
+.cp-phonehead .cx-phonebar-actions {
+  gap: var(--space-1);
+}
+.cp-phone-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-6);
+}
+
+/* ----- Rows: a table's on a laptop, a list's on a phone ----- */
+.cp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 500 var(--fs-sm) / 1.35 var(--font-body);
+}
+.cp-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-align: start;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.cp-table tbody td,
+.cp-table tbody th {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font-weight: 500;
+  text-align: start;
+  vertical-align: middle;
+}
+.cp-table tbody th[scope="row"] {
+  font-weight: 700;
+}
+.cp-table .is-num {
+  text-align: end;
+}
+.cp-table .is-c {
+  text-align: center;
+}
+.cp-table tbody tr {
+  cursor: default;
+}
+.cp-tables .cp-table tbody tr {
+  cursor: pointer;
+}
+.cp-table tbody tr:hover > * {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+/* The open row is raised, with the cyan selection edge on its left. */
+.cp-table tbody tr.is-selected > * {
+  background: var(--tab-on);
+}
+.cp-table tbody tr.is-selected > :first-child {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.cp-table tbody tr.is-archived {
+  opacity: 0.6;
+}
+.cp-when {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.cp-nowrap {
+  white-space: nowrap;
+}
+.cp-rowlink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  .cp-rowlink {
+    min-height: var(--tap-min);
+  }
+}
+/* The global `button span` rule dims and shrinks every span in a button; a row keeps its own words. */
+.cp-rowlink span,
+.cp-row span {
+  margin-top: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.cp-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cp-name-text {
+  font-weight: 700;
+}
+.cp-pack-mark {
+  white-space: nowrap;
+}
+.cp-state {
+  white-space: nowrap;
+}
+.cp-count {
+  min-width: 2.5rem;
+  min-height: 2.25rem;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--cyan-hi);
+  font: inherit;
+  font-weight: 700;
+  text-align: end;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.cp-count.cp-caution {
+  color: var(--caution-hi);
+}
+.cp-action-cell {
+  text-align: end;
+}
+.cp-pick,
+.cp-pick-cell input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--cyan);
+}
+.cp-table .cp-pick-cell {
+  width: 2.75rem;
+  text-align: center;
+}
+
+.cp-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: calc(var(--tap-min) + var(--space-2));
+  margin: 0;
+  padding: var(--space-2) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.cp-row:hover {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+.cp-row.is-selected,
+.cp-row.is-first {
+  background: var(--tab-on);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.cp-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cp-row-main > b {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-row-main > small {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.cp-row > svg {
+  flex: none;
+}
+.cp-card-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line-raised);
+  background: var(--material-lip), var(--surface-1);
+}
+.cp-card-row.is-top {
+  align-items: flex-start;
+}
+.cp-card-row .cp-row-main > b {
+  white-space: normal;
+}
+.cp-mrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+  font-size: var(--fs-sm);
+}
+.cp-mrow > svg {
+  flex: none;
+  color: var(--text-dim);
+}
+
+/* ----- Tables ----- */
+.cp-tables {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.cp-tool {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.cp-tool-count {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-tables-main {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.cp-tables-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 var(--space-3) var(--space-4);
+}
+.cp-menuitem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 600 var(--fs-sm) / 1.2 var(--font-body);
+  text-align: start;
+  cursor: pointer;
+}
+.cp-menuitem:hover,
+.cp-menuitem.is-on {
+  background: var(--tab-on);
+}
+.cp-menuitem svg {
+  width: 1.1em;
+  height: 1.1em;
+  color: var(--text-dim);
+}
+.cp-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cp-field input {
+  margin-top: 0;
+  font: 500 var(--fs-sm) / 1.3 var(--font-body);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.cp-flyout-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+/* On a phone the toolbar is a row of chips that scrolls inside itself. */
+.cp-shell.is-phone .cp-tool {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cp-shell.is-phone .cp-tool > * {
+  flex: none;
+}
+.cp-shell.is-phone .cp-tables-body {
+  padding: 0 var(--space-2) var(--space-4);
+}
+
+/* ----- Overview ----- */
+.cp-overview--laptop {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-6);
+}
+.cp-overview-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cp-overview-col .cp-h:first-child {
+  margin-top: 0;
+}
+@media (max-width: 979px) {
+  .cp-overview--laptop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ----- A record beside its table, or with the table folded into a flyout ----- */
+.cp-recordlayout {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.cp-recordlayout.is-docked {
+  grid-template-columns: minmax(300px, 1fr) minmax(0, 720px);
+}
+.cp-recordlayout.is-full {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cp-dock-table {
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line-raised);
+}
+.cx-flyout.cp-table-flyout {
+  width: min(440px, 100%);
+  padding-inline: 0;
+}
+.cp-table-flyout .cx-flyout-head {
+  padding-inline: var(--space-3);
+}
+.cp-table-flyout .cx-flyout-body {
+  padding-bottom: 0;
+}
+
+.cp-record {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--material-lip), var(--surface-1);
+}
+.cp-record.is-dock {
+  box-shadow: var(--shadow-drop-2);
+}
+.cp-record.is-phone {
+  background: var(--bg);
+}
+.cp-rec-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-strong);
+  flex: none;
+}
+.cp-rec-titlerow,
+.cp-rec-linerow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cp-rec-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h3) / 1.15 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-rec-title:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.cp-rec-line {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cp-rec-who {
+  flex: none;
+}
+.cp-savestate {
+  flex: none;
+}
+.cp-rec-tabs {
+  flex: none;
+  padding: var(--space-2) var(--space-3) 0;
+}
+.cp-rec-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) 0;
+}
+.cp-rec-notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) 0;
+}
+.cp-rec-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.cp-rec-body.scroll-y {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-6);
+}
+.cp-rec-body.is-studio {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The readiness ring: the share of the steps done, with the count inside. */
+.cp-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+}
+.cp-ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.cp-ring-track {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 3;
+}
+.cp-ring-fill {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-linecap: butt;
+  stroke-width: 3;
+  transition: stroke-dasharray var(--dur-base) var(--ease-settle);
+}
+.cp-ring.is-done .cp-ring-fill {
+  stroke: var(--success);
+}
+.cp-ring-text {
+  font: 700 var(--fs-2xs) / 1 var(--font-label);
+}
+
+/* ----- Card ----- */
+.cp-cardtab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cp-seeas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cp-seeas .cp-eyebrow {
+  margin: 0;
+}
+.cp-seeas select {
+  width: auto;
+  min-width: 12rem;
+  margin-top: 0;
+}
+.cp-seeas .cp-hint {
+  flex: 1 1 16rem;
+}
+.cp-notsent {
+  padding: var(--space-3);
+  border: 1px dashed var(--line-strong);
+  color: var(--text-dim);
+}
+.cp-notsent p {
+  margin: 0;
+}
+.cp-notsent strong {
+  color: var(--text);
+}
+.cp-cardframe {
+  max-width: 44rem;
+}
+.cp-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cp-card-name {
+  margin: 0;
+  color: var(--heading-ink);
+  font: 400 var(--fs-h3) / 1.15 var(--font-display);
+  letter-spacing: var(--tracking-display);
+}
+.cp-card-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-card-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+.cp-places {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-places li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+  font-size: var(--fs-sm);
+}
+.cp-places li svg {
+  flex: none;
+  color: var(--text-dim);
+}
+
+/* ----- Sharing, a record's row ----- */
+.cp-sharingtab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cp-checklist {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-check-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cp-check-text small {
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.2 var(--font-body);
+}
+
+/* ----- The studio: steps, questions and the pinned preview ----- */
+.cp-studio {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.cp-studio.is-wide {
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr) minmax(18rem, 26rem);
+}
+.cp-studio.is-phone {
+  display: flex;
+  flex-direction: column;
+}
+.cp-studio-steps {
+  min-height: 0;
+  padding: var(--space-3) var(--space-2);
+  border-right: 1px solid var(--line);
+}
+.cp-studio-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.cp-studio-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4) var(--space-6);
+}
+.cp-studio.is-phone .cp-studio-body {
+  padding: var(--space-3) var(--space-3) calc(var(--tap-min) + var(--space-6));
+}
+.cp-studio-preview {
+  min-height: 0;
+  padding: var(--space-3);
+  border-left: 1px solid var(--line);
+  background: var(--bg);
+}
+.cp-studio-preview .cp-eyebrow {
+  margin: 0 0 var(--space-2);
+}
+.cp-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.cp-studio.is-all .cp-step + .cp-step {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line-strong);
+}
+.cp-step-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cp-step-title {
+  margin: 0;
+  color: var(--heading-ink);
+  font: 700 var(--fs-sm) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cp-step-title:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.cp-step-intro {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cp-questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.cp-question {
+  min-width: 0;
+}
+.cp-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+.cp-more-summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  color: var(--text-dim);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.cp-more[open] > .cp-more-summary {
+  margin-bottom: var(--space-3);
+}
+.cp-todo {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--caution);
+  background: color-mix(in srgb, var(--caution) 8%, transparent);
+}
+.cp-todo-title {
+  margin: 0;
+  color: var(--caution-hi);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cp-todo-list,
+.cp-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.cp-step-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--line);
+  flex: none;
+}
+.cp-studio.is-phone .cp-step-foot {
+  padding: var(--space-2) var(--space-3);
+}
+.cp-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cp-review-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cp-problem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+}
+.cp-problem > svg {
+  flex: none;
+  color: var(--caution-hi);
+}
+.cp-problem p {
+  margin: 0;
+}
+
+/* The phone's steps: a strip across the top, scrolled inside itself. */
+.cp-stepstrip {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: none;
+}
+.cp-stepchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-raised);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: 600 var(--fs-xs) / 1.2 var(--font-body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cp-stepchip.is-now {
+  border-color: var(--cyan);
+  background: var(--tab-on);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+.cp-stepchip.is-done svg {
+  color: var(--cyan-hi);
+}
+.cp-stepchip.is-incomplete svg {
+  color: var(--caution-hi);
+}
+
+/* The phone's preview: a bar over the tab bar that opens the card full screen. */
+.cp-peek {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: calc(var(--tap-min) + var(--space-2));
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  border-top: 1px solid var(--rim-gm);
+  background: var(--material-lip), var(--surface-2);
+}
+.cp-peek > svg {
+  flex: none;
+  color: var(--text-dim);
+}
+.cp-peek-line {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-studio:not(.is-phone) .cp-studio-main {
+  padding-bottom: 0;
+}
+.cp-studio:not(.is-wide) .cp-studio-main {
+  padding-bottom: calc(var(--tap-min) + var(--space-2));
+}
+
+/* ----- History and Compare ----- */
+.cp-historytab,
+.cp-basedon {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cp-histlist {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-histrow {
+  border-bottom: 1px solid var(--line);
+}
+.cp-histrow.is-picked {
+  background: var(--tab-on);
+}
+.cp-histrow-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--tap-min) + var(--space-2));
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+}
+.cp-compare {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-collapse: collapse;
+  font: 500 var(--fs-sm) / 1.4 var(--font-body);
+}
+.cp-compare th,
+.cp-compare td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+  vertical-align: top;
+}
+.cp-compare thead th {
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cp-compare tbody th {
+  width: 9rem;
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cp-compare tr.is-changed td {
+  background: color-mix(in srgb, var(--cyan) 9%, transparent);
+}
+.cp-ins {
+  color: var(--cyan-hi);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cp-del {
+  color: var(--magenta-text);
+  text-decoration: line-through;
+}
+/* On a phone each field stacks its two values, each named. */
+@media (max-width: 760px) {
+  .cp-compare thead {
+    display: none;
+  }
+  .cp-compare tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .cp-compare tbody th {
+    width: auto;
+  }
+  .cp-compare td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--text-dim);
+    font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+  }
+}
+
+/* A conflict: each field either device changed, and which value stays. */
+.cp-merge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cp-merge-head {
+  border-color: var(--caution);
+}
+.cp-merge-table {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-collapse: collapse;
+  font: 500 var(--fs-sm) / 1.4 var(--font-body);
+}
+.cp-merge-table th,
+.cp-merge-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+  vertical-align: top;
+}
+.cp-merge-table thead th,
+.cp-merge-table tbody th {
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.cp-merge-table thead th {
+  background: var(--surface-2);
+}
+.cp-keep {
+  background: color-mix(in srgb, var(--cyan) 9%, transparent);
+}
+.cp-keep-mark {
+  color: var(--cyan-hi);
+  vertical-align: middle;
+}
+.cp-keep-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+.cp-keep-option input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  accent-color: var(--cyan);
+}
+.cp-keep-option.is-on {
+  color: var(--text);
+}
+@media (max-width: 760px) {
+  .cp-merge-table.is-phone thead {
+    display: none;
+  }
+  .cp-merge-table.is-phone tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ----- Sources ----- */
+.cp-sources {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.cp-sources > .cp-section-head {
+  padding: var(--space-3) var(--space-4) 0;
+}
+.cp-sources .cp-pad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cp-review-import {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.cp-decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 12rem;
+}
+.cp-decision select,
+.cp-decision input {
+  margin-top: 0;
+}
+.cp-upload {
+  transform: rotate(180deg);
+}
+.cp-export {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cp-export .cp-checklist {
+  max-height: 16rem;
+}
+
+/* ----- Sharing ----- */
+.cp-sharing--laptop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  gap: var(--space-4);
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4) 0;
+}
+.cp-sharing-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+}
+.cp-grid-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: var(--space-4);
+}
+.cp-sharing-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  padding-bottom: var(--space-4);
+}
+.cp-sharing-side .cp-h:first-child {
+  margin-top: 0;
+}
+.cp-gridbox {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line-raised);
+  border-radius: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  .cp-gridbox {
+    width: var(--tap-min);
+    height: var(--tap-min);
+  }
+}
+.cp-gridbox.is-on {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 22%, var(--surface-2));
+  color: var(--cyan-hi);
+}
+.cp-gridbox.is-on.is-hidden {
+  border-color: var(--rim-gm);
+  background: color-mix(in srgb, var(--violet-hi) 18%, var(--surface-2));
+  color: var(--violet-hi);
+}
+.cp-gridbox.is-covered {
+  opacity: 0.45;
+}
+.cp-gridbox:disabled {
+  cursor: default;
+}
+.cp-bulk-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+@media (max-width: 979px) {
+  .cp-sharing--laptop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ----- New homebrew and Search ----- */
+.cp-new-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cp-new-grid {
+  min-width: 0;
+}
+.cp-new-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cp-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+.cp-search-form input,
+.cp-search-form select {
+  margin-top: 0;
+}
+.cp-search-results {
+  max-height: 32rem;
+  margin-top: var(--space-2);
+}
+@media (max-width: 760px) {
+  .cp-search-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

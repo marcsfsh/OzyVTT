@@ -1,6 +1,6 @@
-/** The wizards as a GM uses them: steps one at a time, answers through the controls, the preview beside them, and a
-    review that reads the editor's own publish checklist back step by step. Driven the way `RecordDetail` drives it:
-    one draft, the checklist worked out from it, and the step held outside. */
+/** The studio as a GM uses it: the wizard's steps one at a time, answers through the controls, the record's real card
+    pinned beside them, and a review that reads the editor's own publish checklist back step by step. Driven the way
+    the record view drives it: one draft, the checklist worked out from it, and the step held outside. */
 
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -42,13 +42,14 @@ vi.mock("../../content/catalogs", async (importOriginal) => ({
   })
 }));
 
-import { blankDraft, forStorage } from "../defaults";
-import { EMPTY_CONTEXT, type Draft } from "../schema";
-import type { HomebrewType } from "../types";
-import { publishIssues } from "../validate";
-import { WIZARDS } from "./index";
-import { WizardView } from "./WizardView";
-import { wizardSpell } from "./wizard-records";
+import { blankDraft, forStorage } from "../../homebrew/defaults";
+import { EMPTY_CONTEXT, type Draft } from "../../homebrew/schema";
+import type { HomebrewType } from "../../homebrew/types";
+import { publishIssues } from "../../homebrew/validate";
+import { WIZARDS } from "../../homebrew/wizard";
+import { wizardSpell } from "../../homebrew/wizard/wizard-records";
+import { CompendiumCard, cardOfBody } from "../CompendiumCard";
+import { Studio } from "./Studio";
 
 const RECORD = "hb-wizard-probe";
 const CTX = { ...EMPTY_CONTEXT, recordId: RECORD };
@@ -57,20 +58,18 @@ function Harness({
   type,
   initial,
   onDraft,
-  onPublish,
-  onOpenEditor
+  onPublish
 }: Readonly<{
   type: HomebrewType;
   initial: Draft;
   onDraft: (next: Draft) => void;
   onPublish: () => void;
-  onOpenEditor: (section: string | null) => void;
 }>) {
   const [draft, setDraft] = useState(initial);
-  const [step, setStep] = useState(WIZARDS[type].steps[0].id);
+  const [step, setStep] = useState(WIZARDS[type].steps[0]!.id);
   const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
   return (
-    <WizardView
+    <Studio
       def={WIZARDS[type]}
       draft={draft}
       onDraft={(next) => {
@@ -86,12 +85,17 @@ function Harness({
       onStep={setStep}
       visited={visited}
       onVisited={(id) => setVisited((held) => new Set([...held, id]))}
+      seenAll={false}
+      mode="steps"
+      custom={{}}
       publishLabel="Publish"
       onPublish={onPublish}
       busy={false}
-      actionError={null}
       published={null}
-      onOpenEditor={onOpenEditor}
+      preview={<CompendiumCard card={cardOfBody(type, draft, RECORD)} />}
+      previewLine=""
+      wide
+      phone={false}
     />
   );
 }
@@ -99,7 +103,6 @@ function Harness({
 function mount(type: HomebrewType, initial: Draft = { ...blankDraft(type), name: "" }) {
   let latest = initial;
   const onPublish = vi.fn();
-  const onOpenEditor = vi.fn();
   render(
     <Harness
       type={type}
@@ -108,24 +111,22 @@ function mount(type: HomebrewType, initial: Draft = { ...blankDraft(type), name:
         latest = next;
       }}
       onPublish={onPublish}
-      onOpenEditor={onOpenEditor}
     />
   );
   const user = userEvent.setup();
-  const foot = () => within(document.querySelector<HTMLElement>(".hb-wiz-foot")!);
+  const foot = () => within(document.querySelector<HTMLElement>(".cp-step-foot")!);
   return {
     user,
     onPublish,
-    onOpenEditor,
     draft: () => latest,
-    body: () => within(document.querySelector<HTMLElement>(".hb-wiz-body")!),
-    preview: () => within(document.querySelector<HTMLElement>(".hb-wiz-preview")!),
-    heading: () => document.querySelector(".hb-wiz-heading")?.textContent,
+    body: () => within(document.querySelector<HTMLElement>(".cp-studio-body")!),
+    preview: () => within(document.querySelector<HTMLElement>(".cp-studio-preview")!),
+    heading: () => document.querySelector(".cp-step-title")?.textContent,
     stepNames: () =>
-      Array.from(document.querySelectorAll(".hb-wiz-steps .nh-step-label")).map(
+      Array.from(document.querySelectorAll(".cp-studio-steps .nh-step-label")).map(
         (label) => label.firstChild?.textContent ?? ""
       ),
-    next: () => user.click(foot().getByRole("button", { name: /^(Next|Review)$/ })),
+    next: () => user.click(foot().getByRole("button", { name: /^Next/ })),
     publish: () => foot().queryByRole("button", { name: "Publish" })
   };
 }
@@ -193,7 +194,7 @@ describe("the review step", () => {
     expect(wizard.body().getByText(/things? (is|are) left before this can be published/)).toBeInTheDocument();
     expect(wizard.publish()).toBeDisabled();
 
-    const nameGroup = wizard.body().getByText("Name and level").closest(".hb-wiz-review-group") as HTMLElement;
+    const nameGroup = wizard.body().getByText("Name and level").closest(".cp-review-group") as HTMLElement;
     await wizard.user.click(within(nameGroup).getAllByRole("button", { name: "Go to it" })[0]);
     expect(wizard.heading()).toBe("Name and level");
     expect(document.activeElement).toBe(wizard.body().getByLabelText("Name"));
@@ -290,7 +291,7 @@ describe("the class and subclass wizards", () => {
   it("offers a background only Origin feats", async () => {
     const wizard = mount("background", { ...blankDraft("background"), name: "Lamplighter" });
     await wizard.user.click(screen.getByRole("button", { name: /^Origin feat/ }));
-    const select = wizard.body().getByLabelText("Origin feat");
+    const select = wizard.body().getByRole("combobox", { name: "Origin feat" });
     expect(
       within(select)
         .getAllByRole("option")

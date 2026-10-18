@@ -8,6 +8,7 @@ import { useSyncExternalStore } from "react";
 // The Codex owns its address space (`codex/routes.ts`) and this module asks it. The import cycle via
 // `withQuery` is safe: neither module calls across it during evaluation.
 import { codexSectionOf, GM_ONLY_SECTIONS, type CodexAddress } from "./codex/routes";
+import { compendiumViewOf } from "./compendium/routes";
 import { isSettingsSection } from "./settings/sections";
 import { redirectForOldMapAddress, scenesViewOf, type ScenesView } from "./scenes/routes";
 
@@ -131,7 +132,7 @@ export function useRoute(): Route {
 
 // The app shell's address table
 
-export type GmTab = "scenes" | "table" | "roster" | "codex" | "homebrew" | "viewer" | "replay" | "settings";
+export type GmTab = "scenes" | "table" | "roster" | "codex" | "compendium" | "viewer" | "replay" | "settings";
 
 /** One address per GM tab; the server reserves `GET /viewer`, hence `/viewer-controls`. */
 const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
@@ -139,7 +140,7 @@ const GM_TAB_PATHS: Readonly<Record<GmTab, string>> = {
   scenes: "/scenes",
   roster: "/roster",
   codex: "/codex",
-  homebrew: "/homebrew",
+  compendium: "/compendium",
   viewer: "/viewer-controls",
   replay: "/replays",
   settings: "/settings"
@@ -153,7 +154,12 @@ export function pathForGmTab(tab: GmTab): string {
 export const SOUND_BOARD_PATH = `${GM_TAB_PATHS.viewer}/sound`;
 
 /** Retired addresses, redirected so old bookmarks land. */
-const RETIRED_PATHS: Readonly<Record<string, string>> = { "/encounter": "/table", "/setup": "/settings" };
+const RETIRED_PATHS: Readonly<Record<string, string>> = {
+  "/encounter": "/table",
+  "/setup": "/settings",
+  // The Homebrew tab became the Compendium.
+  "/homebrew": "/compendium"
+};
 
 /** Where a retired address goes, or null when the address is not retired. `?view=maps` moves too, and so does the
  *  map library's `?map=` for one map's grid. */
@@ -220,6 +226,8 @@ export function isKnownPath(path: string): boolean {
     return segments.length === 3 && segments[2] === "level";
   }
   if (segments[0] === "scenes") return scenesViewOf(segments, new URLSearchParams()) !== null;
+  // The Compendium's views and each record's own address.
+  if (segments[0] === "compendium") return compendiumViewOf(segments, new URLSearchParams()) !== null;
   // The player's own tab: one segment, nothing under it.
   if (segments[0] === "me") return segments.length === 1;
   // A section of Settings, or one operation of the API reference by its operation id.
