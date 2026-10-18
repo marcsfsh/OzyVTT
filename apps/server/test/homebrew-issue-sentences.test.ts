@@ -13,7 +13,7 @@ import {
 import { ContentLibrary } from "../src/content-library.js";
 import { EMPTY_AUTHORED_INDEX } from "../src/homebrew-store.js";
 import { validateForPublish } from "../src/homebrew-validate.js";
-import { fieldLabel } from "../src/homebrew-issues.js";
+import { fieldLabel } from "@vtt/content-srd-5.2.1/homebrew-issues";
 
 // Every issue the publish gate returns is a sentence a GM reads (the Writing rules): no schema text, slugs, ids or
 // backticks, and a path the client places on the step that owns it. The gate's rules are unchanged; only the words.

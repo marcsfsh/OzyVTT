@@ -25,14 +25,14 @@ import type { ContentLibrary, ContentView } from "./content-library.js";
 import { STATBLOCK_EXTENSION, statblockFacts } from "./statblock-facts.js";
 import { homebrewIdProblem } from "./homebrew-ids.js";
 import { sliceReplacing, type HomebrewAuthoredIndex, type HomebrewBody, type HomebrewStore } from "./homebrew-store.js";
-import { plainSchemaIssue } from "./homebrew-issues.js";
+import { plainSchemaIssue } from "@vtt/content-srd-5.2.1/homebrew-issues";
 
 /**
  * The publish gate: runs only on Publish (drafts may be invalid) and returns field paths plus messages. Most
  * homebrew mistakes otherwise fail silently in play. Tiers run in order, each only if the last passed:
  * 1. the record's own Zod schema; 2. identity (`hb-`, length, slug, opaque monsters); 3. referential (names
  * resolve; class/subclass rules ask only whether the partner is authored); 4. unsupported-but-parsing shapes.
- * Every message is a sentence a GM reads (`homebrew-issues.ts` turns the schema's findings into one): records are
+ * Every message is a sentence a GM reads (`homebrew-issues.ts` in the content package turns the schema's findings into one): records are
  * named, and no id, slug or schema word reaches the GM.
  */
 

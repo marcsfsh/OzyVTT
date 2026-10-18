@@ -287,6 +287,17 @@ export const SpellReferenceSchema = z
   );
 export type SpellReference = z.infer<typeof SpellReferenceSchema>;
 
+/** A spell's upcast rows by slot level (Fireball's 9d6 at 4th), from its `slot_level_N` casting options. A cantrip's
+ *  character-level scaling is no cast-at option, so it is left out. */
+export function slotCastingOptionsOf(
+  options: SpellReference["castingOptions"]
+): Array<{ level: number; damageRoll: string | null; targetCount: number | null }> {
+  return options.flatMap((option) => {
+    const match = /^slot_level_(\d+)$/.exec(option.type);
+    return match ? [{ level: Number(match[1]), damageRoll: option.damageRoll, targetCount: option.targetCount }] : [];
+  });
+}
+
 /** A cantrip's printed character-level rows (Fire Bolt's 2d10 at 5), from its `player_level_N` casting options. */
 export function cantripScalingOf(
   options: SpellReference["castingOptions"]

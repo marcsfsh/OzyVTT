@@ -40,6 +40,7 @@ import {
   loadSpecies,
   loadSpells,
   cantripScalingOf,
+  slotCastingOptionsOf,
   loadSubclasses,
   type BackgroundReference,
   type ClassLevelRow,
@@ -311,14 +312,6 @@ export function actionSummariesOf(actions: ActorDefinition["actions"]): ContentA
   return actions.map((action) => {
     const list = listOf.get(action.id);
     return { ...actionSummaryOf(action), ...(list !== undefined ? { castFrom: list } : {}) };
-  });
-}
-
-/** SRD upcast rows are typed "slot_level_N"; keep only those (cantrip scaling is not a cast-at option) with the slot level. */
-function slotCastingOptions(options: SpellReference["castingOptions"]): ContentSpellSummary["castingOptions"] {
-  return options.flatMap((option) => {
-    const match = /^slot_level_(\d+)$/.exec(option.type);
-    return match ? [{ level: Number(match[1]), damageRoll: option.damageRoll, targetCount: option.targetCount }] : [];
   });
 }
 
@@ -659,7 +652,7 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
       classes: spell.classes,
       damageRoll: spell.damage.roll,
       damageTypes: spell.damage.types,
-      castingOptions: slotCastingOptions(spell.castingOptions),
+      castingOptions: slotCastingOptionsOf(spell.castingOptions),
       cantripScaling: spell.level === 0 ? cantripScalingOf(spell.castingOptions) : []
     }))
     .sort(byName);
