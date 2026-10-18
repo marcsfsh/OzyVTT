@@ -8,6 +8,8 @@ import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
 import { PlayerCodexChanges } from "../src/codex/player-reads.js";
+import { BUILT_IN_TEMPLATE_ID } from "../src/codex/prep.js";
+import { prepNotes } from "./codex-prep-notes.js";
 import { fixedVerifiers } from "./fixed-verifiers.js";
 
 // A GM-only edit must leave every byte a player can read where it was: the bodies, the lists, the search hits
@@ -310,7 +312,7 @@ function seedCampaign(store: CodexStore) {
 
   const shownSession = store.createSession({ sessionNumber: 1, recapBody: "We met the Lantern Order." });
   store.setSessionRevealed(shownSession.id, true);
-  const hiddenSession = store.createSession({ sessionNumber: 2, prepBody: "The ambush." });
+  const hiddenSession = store.createSession({ sessionNumber: 2, prep: prepNotes("The ambush.") });
   const note = store.createEntry({
     playerText: "The lamps of the Lantern Order burn blue.",
     gmText: "Blue means the cult is near.",
@@ -373,7 +375,14 @@ function seedCampaign(store: CodexStore) {
     "/calendar",
     "/search?q=lantern",
     "/search?q=vallaki",
-    "/search?q=session"
+    "/search?q=session",
+    // The filtered and sorted search, and the home, read only the player's own dates and text.
+    "/search?q=lantern&sort=modified:desc,name&limit=500",
+    "/search?types=faction,location,quest,session&sort=type,leader:desc",
+    "/search?modifiedFrom=2026-01-01&sort=modified",
+    "/search?visibility=hidden",
+    "/home",
+    "/home?since=2026-01-01T00:00:00.000Z"
   ];
   return {
     order,
@@ -400,6 +409,19 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
     const { order, town, cult, map, secretMap, pin, hiddenPin, shownSession, hiddenSession, note, downtime } = seeded;
     const { quest, hiddenQuest } = seeded;
     const changes = new PlayerCodexChanges(store);
+    /** The template the run makes, and the first checklist item or scene of a session's prep, read at call time. */
+    const lanternTemplate = () =>
+      store.listPrepTemplates().templates.find((row) => row.name.startsWith("Lantern night"))!;
+    const firstOf = (sessionId: string, key: "items" | "scenes"): string =>
+      store
+        .getSession(sessionId)!
+        .prep.flatMap((section): readonly { id: string }[] =>
+          key === "items" && section.type === "checklist"
+            ? section.items
+            : key === "scenes" && section.type === "scenes"
+              ? section.scenes
+              : []
+        )[0]!.id;
 
     const edits: ReadonlyArray<readonly [string, () => unknown]> = [
       [
@@ -450,7 +472,12 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
         () =>
           store.updateSession(
             shownSession.id,
-            { prepBody: "Next: the ambush.", attendees: ["Sam"], status: "played", sceneIds: [crypto.randomUUID()] },
+            {
+              prep: prepNotes("Next: the ambush."),
+              attendees: ["Sam"],
+              status: "played",
+              sceneIds: [crypto.randomUUID()]
+            },
             undefined
           )
       ],
@@ -459,6 +486,44 @@ describe("Codex: a GM-only edit to any record kind leaves every player read as i
         () => store.updateSession(hiddenSession.id, { sessionNumber: 5, recapBody: "Lantern recap." }, undefined)
       ],
       ["active session", () => store.setActiveSession(hiddenSession.id)],
+      [
+        "prep template",
+        () =>
+          store.createPrepTemplate({
+            name: "Lantern night",
+            sections: [
+              { title: "Lantern clues", prompt: "Lantern lantern.", type: "checklist" },
+              { title: "Scenes", type: "scenes" }
+            ]
+          })
+      ],
+      ["template rename", () => store.updatePrepTemplate(lanternTemplate().id, { name: "Lantern nights" }, undefined)],
+      ["template default", () => store.setDefaultPrepTemplate(lanternTemplate().id)],
+      ["template copy", () => store.duplicatePrepTemplate(BUILT_IN_TEMPLATE_ID, "Lantern copy")],
+      ["template apply", () => store.applyPrepTemplate(shownSession.id, lanternTemplate().id, undefined)],
+      [
+        "prep clues and scenes",
+        () =>
+          store.updateSession(
+            shownSession.id,
+            {
+              prep: store
+                .getSession(shownSession.id)!
+                .prep.map((section) =>
+                  section.type === "checklist"
+                    ? { ...section, items: [{ text: "The lantern oil is poisoned." }] }
+                    : section.type === "scenes"
+                      ? { ...section, scenes: [{ title: "Lantern hall", placePageId: order.id }] }
+                      : section
+                )
+            },
+            undefined
+          )
+      ],
+      ["clue tick", () => store.tickPrepItem(shownSession.id, firstOf(shownSession.id, "items"), true)],
+      ["current scene", () => store.setCurrentScene(shownSession.id, firstOf(shownSession.id, "scenes"))],
+      ["logged line", () => store.logSessionLine(shownSession.id, { text: "Lantern oil spilled." })],
+      ["template delete", () => store.deletePrepTemplate(lanternTemplate().id)],
       ["quest GM notes", () => store.updateQuest(quest.id, { gmBody: "The oil is cursed." }, undefined)],
       [
         "hidden quest",

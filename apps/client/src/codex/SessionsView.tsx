@@ -24,6 +24,7 @@ import { CodexEditor } from "./CodexEditor";
 import { TagChip } from "./TagChip";
 import { archivedOptionLabel, charactersFor, type ArchivableActor } from "./characters";
 import { useCodexAutosave } from "./autosave";
+import { prepNotes, withPrepNotes } from "./prep-notes";
 import { useConfirm } from "../components/feedback";
 
 /**
@@ -260,12 +261,14 @@ function SessionEditor({
     realDate: session.realDate ?? "",
     attendees: session.attendees,
     status: session.status,
-    prepBody: session.prepBody,
+    prepBody: prepNotes(session.prep),
     recapBody: session.recapBody,
     tags: session.tags
   });
   const [error, setError] = useState<string | null>(null);
   const revRef = useRef(session.rev);
+  /** The prep as last saved: the box edits its first Text section and the other sections ride along. */
+  const prepRef = useRef(session.prep);
   const patch = (next: Partial<SessionDraft>) => setDraft((prev) => ({ ...prev, ...next }));
 
   /** The characters "Who played" offers; the field stores names. */
@@ -284,13 +287,14 @@ function SessionEditor({
         realDate: next.realDate.trim() || null,
         // Always sent: omitting `attendees` keeps the stored list, so removing the last name needs `[]`.
         attendees: next.attendees,
-        prepBody: next.prepBody,
+        prep: withPrepNotes(prepRef.current, next.prepBody),
         recapBody: next.recapBody,
         status: next.status,
         tags: next.tags,
         expectedRev: revRef.current
       });
       revRef.current = updated.rev;
+      prepRef.current = updated.prep;
       setError(null);
       await onChanged();
     },

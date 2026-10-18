@@ -17,7 +17,6 @@ import type {
   CodexRevealAudit,
   CodexRevealAuditKind,
   CodexRevealAuditRow,
-  CodexSearchHit,
   CodexSession,
   CodexStanding,
   GmCodexCalendar,
@@ -370,7 +369,7 @@ export function projectPlayerStanding(
 
 /** A bounded one-line rendering of a record's prose for list rows (search hits, chronicle rows). */
 const EXCERPT_LENGTH = 160;
-function excerpt(text: string): string {
+export function excerpt(text: string): string {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length <= EXCERPT_LENGTH ? flat : `${flat.slice(0, EXCERPT_LENGTH - 1)}…`;
 }
@@ -622,163 +621,12 @@ export function projectPlayerCalendar(
   };
 }
 
-// Suite-wide search: one index, one result list, every record kind
-
-/** A matched record plus the context its player predicate needs (a pin on a hidden map is invisible). */
-export type CodexSearchRecord =
-  | Readonly<{ kind: "page"; page: CodexPage }>
-  | Readonly<{ kind: "journal"; entry: CodexJournalEntry }>
-  | Readonly<{ kind: "map"; map: CodexMap }>
-  | Readonly<{ kind: "marker"; marker: CodexMarker; mapRevealed: boolean }>
-  // A quest's own reveal flag is its whole predicate.
-  | Readonly<{ kind: "quest"; quest: CodexQuest }>
-  // A session's own reveal flag is its whole predicate; prep and attendees never enter the player index.
-  | Readonly<{ kind: "session"; session: CodexSession }>;
+// Suite-wide search titles. The hits themselves are built in `codex/find.ts`: a player's from their own reads.
 
 /** "Session {n}", else a recap excerpt, else "Untitled session". Only for a session the reader may see. */
 export function sessionDisplayTitle(session: Readonly<{ sessionNumber: number | null; recap: string }>): string {
   if (session.sessionNumber !== null) return `Session ${session.sessionNumber}`;
   return excerpt(session.recap) || "Untitled session";
-}
-
-/** null when not player-visible, as each kind's player list endpoint decides (markers also need their map revealed). */
-export function projectPlayerSearchHit(
-  record: CodexSearchRecord,
-  context: PlayerSessionNumberContext
-): CodexSearchHit | null {
-  switch (record.kind) {
-    case "page":
-      return record.page.revealedToPlayers
-        ? {
-            kind: "page",
-            id: record.page.id,
-            title: record.page.title,
-            tags: record.page.tags,
-            entityType: record.page.entityType,
-            mapId: null
-          }
-        : null;
-    case "journal":
-      // Delegates so this arm also gets the standing and quest gates.
-      return projectPlayerJournalEntry(record.entry, context) === null
-        ? null
-        : {
-            kind: "journal",
-            id: record.entry.id,
-            title: excerpt(record.entry.playerText),
-            tags: record.entry.tags,
-            entityType: null,
-            mapId: null
-          };
-    case "map":
-      return record.map.revealedToPlayers
-        ? {
-            kind: "map",
-            id: record.map.id,
-            title: record.map.name,
-            tags: record.map.tags,
-            entityType: null,
-            mapId: null
-          }
-        : null;
-    case "marker":
-      return record.marker.revealedToPlayers && record.mapRevealed
-        ? {
-            kind: "marker",
-            id: record.marker.id,
-            title: record.marker.label ?? "",
-            tags: record.marker.tags,
-            entityType: null,
-            mapId: record.marker.mapId
-          }
-        : null;
-    case "session": {
-      // Delegates to `projectPlayerSession`; prep and attendees never enter the player index at all.
-      const projected = projectPlayerSession(record.session);
-      return projected === null
-        ? null
-        : {
-            kind: "session",
-            id: projected.id,
-            title: sessionDisplayTitle(projected),
-            tags: projected.tags,
-            entityType: null,
-            mapId: null
-          };
-    }
-    case "quest":
-      return record.quest.revealedToPlayers
-        ? {
-            kind: "quest",
-            id: record.quest.id,
-            title: record.quest.title,
-            tags: record.quest.tags,
-            entityType: null,
-            mapId: null
-          }
-        : null;
-  }
-}
-
-export function projectGmSearchHit(record: CodexSearchRecord): CodexSearchHit {
-  switch (record.kind) {
-    case "page":
-      return {
-        kind: "page",
-        id: record.page.id,
-        title: record.page.title,
-        tags: record.page.tags,
-        entityType: record.page.entityType,
-        mapId: null
-      };
-    // The GM may see either layer, so an entry with no player text still shows something useful.
-    case "journal":
-      return {
-        kind: "journal",
-        id: record.entry.id,
-        title: excerpt(record.entry.playerText || record.entry.gmText || ""),
-        tags: record.entry.tags,
-        entityType: null,
-        mapId: null
-      };
-    case "map":
-      return {
-        kind: "map",
-        id: record.map.id,
-        title: record.map.name,
-        tags: record.map.tags,
-        entityType: null,
-        mapId: null
-      };
-    case "marker":
-      return {
-        kind: "marker",
-        id: record.marker.id,
-        title: record.marker.label ?? "",
-        tags: record.marker.tags,
-        entityType: null,
-        mapId: record.marker.mapId
-      };
-    case "quest":
-      return {
-        kind: "quest",
-        id: record.quest.id,
-        title: record.quest.title,
-        tags: record.quest.tags,
-        entityType: null,
-        mapId: null
-      };
-    // The GM sees a session hit whatever its reveal state.
-    case "session":
-      return {
-        kind: "session",
-        id: record.session.id,
-        title: sessionDisplayTitle({ sessionNumber: record.session.sessionNumber, recap: record.session.recapBody }),
-        tags: record.session.tags,
-        entityType: null,
-        mapId: null
-      };
-  }
 }
 
 // The reveal audit: one GM view of everything the party can currently see
@@ -807,7 +655,7 @@ export type CodexRevealAuditRecord =
   | Readonly<{ kind: "standing"; standing: CodexStanding; factionRevealed: boolean; factionTitle: string | null }>;
 
 /** Fallback title for a journal record with no player prose; keyed by kind so a new kind fails to compile. */
-const AUDIT_JOURNAL_FALLBACK: Readonly<Record<CodexJournalKind, string>> = {
+export const AUDIT_JOURNAL_FALLBACK: Readonly<Record<CodexJournalKind, string>> = {
   note: "Journal entry",
   combat: "Battle",
   deadline: "Deadline",

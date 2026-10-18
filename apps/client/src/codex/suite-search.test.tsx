@@ -99,7 +99,12 @@ const HIT_PAGE: CodexSearchHit = {
   title: "Strahd von Zarovich",
   tags: ["villain"],
   entityType: "character",
-  mapId: null
+  mapId: null,
+  type: "character",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 const HIT_JOURNAL: CodexSearchHit = {
   kind: "journal",
@@ -107,7 +112,12 @@ const HIT_JOURNAL: CodexSearchHit = {
   title: "The party crossed the mists.",
   tags: [],
   entityType: null,
-  mapId: null
+  mapId: null,
+  type: "journal",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 const HIT_MAP: CodexSearchHit = {
   kind: "map",
@@ -115,7 +125,12 @@ const HIT_MAP: CodexSearchHit = {
   title: "Barovia",
   tags: ["gothic"],
   entityType: null,
-  mapId: null
+  mapId: null,
+  type: "map",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 const HIT_MARKER: CodexSearchHit = {
   kind: "marker",
@@ -123,7 +138,12 @@ const HIT_MARKER: CodexSearchHit = {
   title: "Old Svalich Road",
   tags: ["road"],
   entityType: null,
-  mapId: "m1"
+  mapId: "m1",
+  type: "marker",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 const HITS: readonly CodexSearchHit[] = [HIT_PAGE, HIT_JOURNAL, HIT_MAP, HIT_MARKER];
 

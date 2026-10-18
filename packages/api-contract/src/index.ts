@@ -92,6 +92,8 @@ export const CODEX_PATHS = {
   pageRevisions: `${API_NAMESPACE}/codex/pages/{id}/revisions`,
   pageRevisionRestore: `${API_NAMESPACE}/codex/pages/{id}/revisions/{revisionId}/restore`,
   search: `${API_NAMESPACE}/codex/search`,
+  // Role-projected: the GM's counts, latest changes and reveal check; a player's new since their last visit.
+  home: `${API_NAMESPACE}/codex/home`,
   previewSession: `${API_NAMESPACE}/codex/preview-session`,
   folders: `${API_NAMESPACE}/codex/folders`,
   foldersMove: `${API_NAMESPACE}/codex/folders/move`,
@@ -122,6 +124,18 @@ export const CODEX_PATHS = {
   sessionById: `${API_NAMESPACE}/codex/sessions/{id}`,
   sessionReveal: `${API_NAMESPACE}/codex/sessions/{id}/reveal`,
   sessionActivate: `${API_NAMESPACE}/codex/sessions/{id}/activate`,
+  sessionApplyTemplate: `${API_NAMESPACE}/codex/sessions/{id}/apply-template`,
+  sessionHappened: `${API_NAMESPACE}/codex/sessions/{id}/happened`,
+  sessionLog: `${API_NAMESPACE}/codex/sessions/{id}/log`,
+  sessionTick: `${API_NAMESPACE}/codex/sessions/{id}/tick`,
+  sessionCurrentScene: `${API_NAMESPACE}/codex/sessions/{id}/current-scene`,
+  // The active session's live board, GM-only.
+  board: `${API_NAMESPACE}/codex/board`,
+  // The GM's library of session prep templates. The built-in starting template is read-only.
+  prepTemplates: `${API_NAMESPACE}/codex/prep-templates`,
+  prepTemplateById: `${API_NAMESPACE}/codex/prep-templates/{id}`,
+  prepTemplateDuplicate: `${API_NAMESPACE}/codex/prep-templates/{id}/duplicate`,
+  prepTemplateDefault: `${API_NAMESPACE}/codex/prep-templates/{id}/default`,
   quests: `${API_NAMESPACE}/codex/quests`,
   questById: `${API_NAMESPACE}/codex/quests/{id}`,
   questReveal: `${API_NAMESPACE}/codex/quests/{id}/reveal`,

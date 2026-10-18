@@ -42,6 +42,8 @@ export type CodexMarkerCreateInput = Readonly<{
   tags?: readonly string[];
 }>;
 export type CodexMarkerUpdateInput = Partial<CodexMarkerCreateInput>;
+/** Where to put the party: a point on a map. `revealedToPlayers` is kept as it is unless sent. */
+export type CodexPartyPlaceInput = Readonly<{ mapId: string; x: number; y: number; revealedToPlayers?: boolean }>;
 
 type MapRowRaw = {
   id: string;
@@ -425,6 +427,48 @@ export function setPartyMarker(db: CodexDb, markerId: string | null): CodexMarke
     if (markerId !== null) db.database.prepare("UPDATE codex_markers SET is_party = 1 WHERE id = ?").run(markerId);
   });
   return markerId === null ? null : getMarker(db, markerId);
+}
+
+/** How a party pin looks when placing the party makes one. */
+const NEW_PARTY_PIN = { label: "The party", iconId: "pin", iconColor: "#FF2E9A" } as const;
+
+/**
+ * Puts the party at a point on any map in one write: the party pin moves there, across maps if it must, or a pin is
+ * made there and flagged. A new pin is revealed when the map is, unless `revealedToPlayers` says otherwise.
+ */
+export function placeParty(db: CodexDb, input: CodexPartyPlaceInput): { marker: CodexMarker; created: boolean } {
+  const map = mapRow(db, id(input.mapId));
+  if (!map) throw new CodexNotFoundError("That map no longer exists.");
+  const x = coord(input.x);
+  const y = coord(input.y);
+  const existing = partyMarker(db);
+  if (existing) {
+    write(db, () => {
+      db.database
+        .prepare("UPDATE codex_markers SET map_id = ?, x = ?, y = ?, revealed = ?, updated_at = ? WHERE id = ?")
+        .run(map.id, x, y, (input.revealedToPlayers ?? existing.revealedToPlayers) ? 1 : 0, stamp(db), existing.id);
+    });
+    return { marker: getMarker(db, existing.id)!, created: false };
+  }
+  const now = stamp(db);
+  const marker: CodexMarker = {
+    id: freshId(),
+    mapId: map.id,
+    x,
+    y,
+    ...NEW_PARTY_PIN,
+    revealedToPlayers: input.revealedToPlayers ?? map.revealed === 1,
+    pageIds: [],
+    subMapId: null,
+    sceneIds: [],
+    actorId: null,
+    tags: [],
+    isParty: true,
+    createdAt: now,
+    updatedAt: now
+  };
+  write(db, () => insertMarker(db, marker));
+  return { marker: getMarker(db, marker.id)!, created: true };
 }
 
 /** Ungated; `projectPlayerPageMarker` is the gate. */
