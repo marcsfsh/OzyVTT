@@ -8,17 +8,31 @@ import { downloadJson } from "../lib/download";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- an arbitrary JSON Schema node
 export type Schema = Record<string, any>;
 export type Components = Record<string, Schema>;
+/** A body or answer: its schema and, on some operations, a worked example the schema accepts. */
+export type Media = Readonly<{ schema?: Schema; example?: unknown }>;
 export type Operation = Readonly<{
   operationId?: string;
+  /** The operation's one tag, which names its group in `document.tags`. */
+  tags?: readonly string[];
+  /** A short line naming what the operation does. */
+  summary?: string;
   description?: string;
   security?: ReadonlyArray<Record<string, readonly string[]>>;
-  parameters?: ReadonlyArray<{ name: string; in: string; required?: boolean; schema?: Schema }>;
-  requestBody?: { required?: boolean; content: Record<string, { schema?: Schema }> };
+  /** A parameter carries a `schema`, or, for a JSON-encoded query value, `content` with one. */
+  parameters?: ReadonlyArray<{
+    name: string;
+    in: string;
+    required?: boolean;
+    description?: string;
+    schema?: Schema;
+    content?: Record<string, Media>;
+  }>;
+  requestBody?: { required?: boolean; description?: string; content: Record<string, Media> };
   responses: Record<
     string,
     {
       description?: string;
-      content?: Record<string, { schema?: Schema }>;
+      content?: Record<string, Media>;
       headers?: Record<string, unknown>;
       $ref?: string;
     }
@@ -26,6 +40,8 @@ export type Operation = Readonly<{
 }>;
 export type OpenApiDocument = Readonly<{
   info: { title: string; description?: string };
+  /** The groups, in the order the server lists them. */
+  tags?: ReadonlyArray<{ name: string; description?: string }>;
   paths: Record<string, Record<string, Operation>>;
   components: { schemas: Components };
 }>;
@@ -139,7 +155,10 @@ export const GROUPS: ReadonlyArray<{ title: string; match: (path: string) => boo
   { title: "Live game", match: (path) => path.startsWith("/api/v1/game") },
   { title: "Reference content", match: (path) => path.startsWith("/api/v1/content") },
   { title: "Fight replays (Time Machine)", match: (path) => path.startsWith("/api/v1/encounters") },
+  { title: "Host and GM sign-in", match: (path) => path.startsWith("/api/v1/host") },
   { title: "Map assets & calibration", match: (path) => path.startsWith("/api/v1/map-assets") },
+  { title: "Token images", match: (path) => path.startsWith("/api/v1/token-assets") },
+  { title: "Sound library", match: (path) => path.startsWith("/api/v1/sound-assets") },
   { title: "Table viewer", match: (path) => path.startsWith("/api/v1/viewer") },
   // Titles follow the Codex glossary ("pages", "atlas", "journal", "calendar"). New paths appear on
   // their own because the live document is rendered; `ungrouped` catches anything a matcher misses.
@@ -294,6 +313,14 @@ function exampleValue(
     return "string";
   }
   return null;
+}
+
+/** The JSON request body's documented example, when the operation has one. */
+export function documentedExample(operation: Operation): Record<string, unknown> | null {
+  const example = operation.requestBody?.content?.["application/json"]?.example;
+  return example !== null && typeof example === "object" && !Array.isArray(example)
+    ? (example as Record<string, unknown>)
+    : null;
 }
 
 /** The request body example includes all top-level properties (so optional commandId/expectedRevision show); nested objects use required-only. */

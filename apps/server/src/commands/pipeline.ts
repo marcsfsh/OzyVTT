@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { GameCommandType, IntegrationScope } from "@vtt/api-contract";
+import type { ApiRoute } from "@vtt/api-contract/routes";
 import type { ClientToServerEvents, GameState } from "@vtt/domain";
 import { GameAccessDeniedError } from "../authorization.js";
 import { isIncapacitated } from "../condition-rules.js";
@@ -50,6 +51,8 @@ export type CommandSpec<Schema extends z.ZodType> = Readonly<{
   playerOnly?: string;
   /** Maps typed-route path parameters into the payload; by default each joins under its own name. */
   pathParams?: (params: Readonly<Record<string, string>>) => Record<string, unknown>;
+  /** The HTTP reply's documented shape, for a command whose reply carries more than the acknowledgement. */
+  reply?: Readonly<{ schema: z.ZodType; description: string }>;
   /** The command itself. Whatever it returns is added to the reply after the revision and duplicate flag. */
   run(call: CommandCall<z.output<Schema>>, kit: Kit): Promise<GameReply | void>;
 }>;
@@ -59,11 +62,10 @@ export function defineCommand<Schema extends z.ZodType>(spec: CommandSpec<Schema
   return spec;
 }
 
-/** A read served to the socket under `event` and over HTTP as `GET path`. */
+/** A read served to the socket under `event` and over HTTP as its registry route, whose scope admits a credential. */
 export type ReadSpec = Readonly<{
   event: keyof ClientToServerEvents;
-  path: string;
-  scope: IntegrationScope;
+  route: ApiRoute;
   gmOnly?: string;
   /** Validates the input; absent, the read takes none. */
   schema?: z.ZodType;
@@ -72,6 +74,14 @@ export type ReadSpec = Readonly<{
   httpInput?: (request: Readonly<{ params: Record<string, string>; query: Record<string, unknown> }>) => unknown;
   run(principal: GamePrincipal, input: unknown, kit: Kit): GameReply;
 }>;
+
+/** The integration scope a read's route admits a credential with. */
+export function readScope(read: ReadSpec): IntegrationScope {
+  const access = read.route.access;
+  if ("public" in access || !access.scope || access.scope === "per-command")
+    throw new Error(`${read.event} needs a route that names one scope.`);
+  return access.scope;
+}
 
 /** Socket.IO event names are the command type with its first `.` as `:`. */
 export type SocketEventOf<Type extends string> = Type extends `${infer Area}.${infer Name}` ? `${Area}:${Name}` : never;

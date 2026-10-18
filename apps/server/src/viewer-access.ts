@@ -1,23 +1,14 @@
 import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { z } from "zod";
+import type { z } from "zod";
+import type { ScreenPairingSchema, ViewerAccessMetadataSchema, ViewerPairingSchema } from "@vtt/api-contract/schemas";
 import { migrate, openDatabase, type Migration } from "./database.js";
 import { InvalidRequestError } from "./invalid-request.js";
 
-export const ViewerAccessMetadataSchema = z.strictObject({
-  id: z.uuid(),
-  name: z.string(),
-  createdAt: z.iso.datetime(),
-  expiresAt: z.iso.datetime().nullable(),
-  lastUsedAt: z.iso.datetime().nullable(),
-  revokedAt: z.iso.datetime().nullable()
-});
 export type ViewerAccessMetadata = Readonly<z.infer<typeof ViewerAccessMetadataSchema>>;
 /** A one-time code a table screen exchanges for its viewer credential. */
-export const ViewerPairingSchema = z.strictObject({ code: z.string(), expiresAt: z.iso.datetime() });
 export type ViewerPairing = Readonly<z.infer<typeof ViewerPairingSchema>>;
 /** What a table screen shows while it waits for the GM: its short code and when the code runs out. */
-export const ScreenPairingSchema = z.strictObject({ code: z.string(), expiresAt: z.iso.datetime() });
 export type ScreenPairing = Readonly<z.infer<typeof ScreenPairingSchema>>;
 
 type ViewerAccessRow = Readonly<{

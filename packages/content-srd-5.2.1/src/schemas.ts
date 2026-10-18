@@ -195,58 +195,96 @@ export const SpellEffectSchema = z
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;
 
-export const SpellReferenceSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]+$/),
-  name: z.string().min(1).max(120),
-  source: ContentSourceSchema,
-  /** Credit line for a homebrew spell whose text came from elsewhere. SRD rows inherit the bundle-wide CC BY notice. */
-  attribution: z.string().max(400).optional(),
-  level: z.number().int().min(0).max(9),
-  school: z.string().min(1).max(40),
-  castingTime: z.string().min(1).max(80),
-  reactionCondition: z.string().max(400).nullable(),
-  range: z.object({ distance: z.number().nullable(), unit: z.string().nullable(), text: z.string().nullable() }),
-  components: z.object({
-    verbal: z.boolean(),
-    somatic: z.boolean(),
-    material: z.boolean(),
-    materialText: z.string().nullable(),
-    materialConsumed: z.boolean()
-  }),
-  duration: z.string().min(1).max(120),
-  concentration: z.boolean(),
-  ritual: z.boolean(),
-  /** The caster makes a spell attack roll, when it casts or on a later turn: read from the cast model for the SRD,
-   *  since the source marks every spell whose text mentions an attack roll (Bless, Shining Smite). */
-  attackRoll: z.boolean(),
-  damage: z.object({ roll: z.string().nullable(), types: z.array(z.string()) }),
-  /** The save the spell forces: the ability the target rolls and what the save does. The caster supplies the DC. */
-  save: z
-    .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
-    .strict()
-    .nullable(),
-  target: z.object({ type: z.string().nullable(), count: z.number().int().nullable() }),
-  shape: z.object({ type: z.string(), size: z.number().nullable(), unit: z.string().nullable() }).nullable(),
-  /** The area a cast covers, for the map template, read from the text at build time. `shape` above is the source's
-   *  own field, which records a line's width as its size and has no emanations. */
-  area: ActionAreaSchema.nullable().default(null),
-  /** What one cast does to its targets: the spell attacks it makes, the damage it deals, the hit points it restores.
-   *  Read from the text at build time with a reviewed table, because the source's `damage` and `attack_roll` columns
-   *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against") and no single cast. A zone, a summons or a
-   *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
-  effect: SpellEffectSchema.nullable().default(null),
-  classes: z.array(z.string()),
-  description: z.string().min(1).max(20000),
-  higherLevel: z.string().max(4000).nullable(),
-  castingOptions: z.array(
-    z.object({
-      type: z.string(),
-      damageRoll: z.string().nullable(),
-      targetCount: z.number().int().nullable(),
-      description: z.string().nullable()
-    })
-  )
-});
+export const SpellReferenceSchema = z
+  .object({
+    id: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .describe(
+        "The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write, because a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas"
+      ),
+    name: z.string().min(1).max(120),
+    source: ContentSourceSchema.describe(
+      'Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same'
+    ),
+    /** Credit line for a homebrew spell whose text came from elsewhere. SRD rows inherit the bundle-wide CC BY notice. */
+    attribution: z
+      .string()
+      .max(400)
+      .optional()
+      .describe(
+        "Credit line when the text came from somewhere else; SRD records inherit the bundle-wide CC BY notice instead"
+      ),
+    level: z.number().int().min(0).max(9).describe("0 is a cantrip"),
+    school: z.string().min(1).max(40),
+    castingTime: z.string().min(1).max(80),
+    reactionCondition: z
+      .string()
+      .max(400)
+      .nullable()
+      .describe("What triggers the reaction, for a spell cast as one; null otherwise"),
+    range: z.object({ distance: z.number().nullable(), unit: z.string().nullable(), text: z.string().nullable() }),
+    components: z.object({
+      verbal: z.boolean(),
+      somatic: z.boolean(),
+      material: z.boolean(),
+      materialText: z.string().nullable(),
+      materialConsumed: z.boolean()
+    }),
+    duration: z.string().min(1).max(120),
+    concentration: z.boolean(),
+    ritual: z.boolean(),
+    /** The caster makes a spell attack roll, when it casts or on a later turn: read from the cast model for the SRD,
+     *  since the source marks every spell whose text mentions an attack roll (Bless, Shining Smite). */
+    attackRoll: z.boolean(),
+    damage: z.object({
+      roll: z.string().nullable().describe('Base damage/healing roll ("8d6"), or null when the spell rolls nothing'),
+      types: z.array(z.string())
+    }),
+    /** The save the spell forces: the ability the target rolls and what the save does. The caster supplies the DC. */
+    save: z
+      .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
+      .strict()
+      .describe(
+        "The save a spell forces: the ability the target rolls and what the save does. The caster supplies the DC."
+      )
+      .nullable()
+      .describe("The save the spell forces; null when it forces none"),
+    target: z.object({ type: z.string().nullable(), count: z.number().int().nullable() }),
+    shape: z
+      .object({ type: z.string(), size: z.number().nullable(), unit: z.string().nullable() })
+      .describe("A spell's area of effect.")
+      .nullable()
+      .describe("The area of effect; null for a single-target spell"),
+    /** The area a cast covers, for the map template, read from the text at build time. `shape` above is the source's
+     *  own field, which records a line's width as its size and has no emanations. */
+    area: ActionAreaSchema.nullable().default(null),
+    /** What one cast does to its targets: the spell attacks it makes, the damage it deals, the hit points it restores.
+     *  Read from the text at build time with a reviewed table, because the source's `damage` and `attack_roll` columns
+     *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against") and no single cast. A zone, a summons or a
+     *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
+    effect: SpellEffectSchema.nullable().default(null),
+    classes: z
+      .array(z.string())
+      .describe(
+        'Spell-list ids this spell belongs to ("wizard", a homebrew list slug). A HomebrewSpellListRecord can also pull a spell in without touching this'
+      ),
+    description: z.string().min(1).max(20000),
+    higherLevel: z.string().max(4000).nullable(),
+    castingOptions: z
+      .array(
+        z.object({
+          type: z.string(),
+          damageRoll: z.string().nullable(),
+          targetCount: z.number().int().nullable(),
+          description: z.string().nullable()
+        })
+      )
+      .describe("Per-slot-level upcast scaling; the sheet applies the row matching the chosen cast level")
+  })
+  .describe(
+    "A spell. `classes` carries the spell-list ids this spell belongs to; it is how a homebrew spell joins a list, paired with the class record's `spellcasting.spellListId`."
+  );
 export type SpellReference = z.infer<typeof SpellReferenceSchema>;
 
 /** A cantrip's printed character-level rows (Fire Bolt's 2d10 at 5), from its `player_level_N` casting options. */
@@ -335,17 +373,37 @@ export const ItemSpellCastSchema = z
   .object({
     spellId: ContentIdSchema,
     /** Cast at this slot level; absent = the spell's own level. */
-    atLevel: z.number().int().min(0).max(9).optional(),
+    atLevel: z
+      .number()
+      .int()
+      .min(0)
+      .max(9)
+      .optional()
+      .describe("Cast at this slot level; absent = the spell's own level"),
     /** Which ability powers it; absent = the wielder's own spellcasting ability. */
-    ability: AbilitySchema.optional(),
+    ability: AbilitySchema.optional().describe(
+      "Which ability powers it; absent = the wielder's own spellcasting ability"
+    ),
     /** A flat printed DC ("save DC 15"). It overrides any derivation. */
-    saveDc: z.number().int().min(1).max(40).optional(),
+    saveDc: z
+      .number()
+      .int()
+      .min(1)
+      .max(40)
+      .optional()
+      .describe('A flat printed DC ("save DC 15"). It overrides any derivation'),
     /** Charges. Share one pool across several casts with `uses.pool`. */
-    uses: FeatureUsesSchema.optional(),
+    uses: FeatureUsesSchema.optional().describe("Charges. Share one pool across several casts with `uses.pool`"),
     /** Whether casting it also spends one of the bearer's own spell slots. */
-    consumesSpellSlot: z.boolean().default(false)
+    consumesSpellSlot: z
+      .boolean()
+      .default(false)
+      .describe("Whether casting it also spends one of the bearer's own spell slots")
   })
-  .strict();
+  .strict()
+  .describe(
+    'A spell an item can cast. Needs no new machinery: an item cast is one more synthesised action whose limited uses collapse into the same live uses namespace a feature\'s do, and rests already re-arm it. "Once per day" is `uses: {"limit": 1, "per": "long-rest"}`; there is deliberately no "day" in the `per` vocabulary, because this app already treats a Long Rest as the day.'
+  );
 export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
 
 /**
@@ -369,9 +427,16 @@ export type ItemCharges = z.infer<typeof ItemChargesSchema>;
 export const ItemAttunementSchema = z
   .object({
     required: z.boolean().default(false),
-    restrictedTo: z.array(ContentIdSchema).max(8).default([])
+    restrictedTo: z
+      .array(ContentIdSchema)
+      .max(8)
+      .default([])
+      .describe("Class or species ids the item is meant for. Advisory only")
   })
-  .strict();
+  .strict()
+  .describe(
+    'Attunement. `restrictedTo` matches class ids or a species id and is advisory: shown on the sheet ("Requires attunement by a cleric"), never a block: it is an open slug set, blocking on a fuzzy match would be wrong, and a GM handing a player a restricted item on purpose is a normal table event, with nothing to refuse.'
+  );
 export type ItemAttunement = z.infer<typeof ItemAttunementSchema>;
 
 /**
@@ -384,15 +449,36 @@ const EquipmentWeaponStatsSchema = z.object({
   damageDice: z.string().max(20),
   damageType: z.string().max(40),
   rangeFeet: z.number().int().positive().nullable(),
-  longRangeFeet: z.number().int().positive().nullable(),
+  longRangeFeet: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .describe("Attacks past `rangeFeet` up to this roll at disadvantage"),
   /** The Weapons table's band: a thrown Dagger is melee, a Dart is ranged. Absent = read from range and Thrown. */
-  melee: z.boolean().optional(),
+  melee: z
+    .boolean()
+    .optional()
+    .describe(
+      "The SRD Weapons table's band: true for a melee weapon (a thrown Dagger), false for a ranged one (a Dart). Only a melee weapon gets a melee reach. Absent reads the band from the range and the Thrown property"
+    ),
   /** A Versatile weapon's two-handed damage die. */
-  versatileDice: z.string().max(20).optional(),
+  versatileDice: z
+    .string()
+    .max(20)
+    .optional()
+    .describe(
+      'A Versatile weapon\'s damage die with two hands ("1d10" for a Longsword). The sheet offers the two-handed attack while no Shield is equipped'
+    ),
   /** What an Ammunition weapon fires. Absent = any ammunition the bearer carries. */
   ammunition: AmmunitionKindSchema.optional(),
   /** Optional here: gear and homebrew rows map through this shape and have no mastery. */
-  mastery: z.enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"]).optional(),
+  mastery: z
+    .enum(["cleave", "graze", "nick", "push", "sap", "slow", "topple", "vex"])
+    .optional()
+    .describe(
+      "The SRD weapon-mastery property, if this weapon has one. Optional: a homebrew weapon may have none, and a mastery does nothing until a character unlocks this weapon through Weapon Mastery."
+    ),
   /** Copied onto the inventory row, where `weaponPropertiesOf` reads it. */
   properties: z
     .array(
@@ -403,6 +489,9 @@ const EquipmentWeaponStatsSchema = z.object({
     )
     .max(12)
     .optional()
+    .describe(
+      "The weapon's property slugs. The engine reads three of them off the character's inventory row: `finesse` makes the swing take the better of Strength and Dexterity, `thrown` lets a melee weapon be thrown at range, and `reach` makes its reach 10 feet; the rest narrow a `weapon-property-is` rider. Open slugs, unlike `mastery`, so a homebrew property is expressible, but only the nine SRD ones have readers, and an unknown slug is inert and raises no error. Omit to record nothing; an empty array says the weapon has none."
+    )
 });
 
 /** The light a lit item sheds, as its description prints it: Bright Light out to `brightFeet` and Dim Light for
@@ -445,21 +534,37 @@ export type ItemAppliesTo = z.infer<typeof ItemAppliesToSchema>;
  */
 export const EquipmentReferenceSchema = z
   .object({
-    id: z.string().regex(/^[a-z0-9-]+$/),
+    id: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .describe(
+        "The record's own id. The server forces it to the row's minted id (`hb-<slug>-<6 hex>`) on every write, because a body whose id drifted from the row would resolve to nothing once the merge reads it back through the bundle schemas"
+      ),
     name: z.string().min(1).max(80),
-    source: ContentSourceSchema,
+    source: ContentSourceSchema.describe(
+      'Always "homebrew" once stored; the field exists so an authored record and a merged-catalog row read the same'
+    ),
     /** Open slug. The engine reads only "weapon", "armor" and "shield"; other categories need `slot` to derive AC or attacks. */
     category: z
       .string()
       .regex(/^[a-z0-9-]+$/)
-      .max(40),
+      .max(40)
+      .describe(
+        'Open slug: "relic", "vehicle" and "trinket" need no schema change. Display and grouping; `slot` is what the engine switches on'
+      ),
     costGp: z.number().nonnegative().max(1_000_000).nullable(),
     weightLb: z.number().nonnegative().max(1000).nullable(),
     /** Matches `InventoryItemSchema.description`, which add-from-catalog copies this string onto. Long enough for
      *  the longest SRD item with its tables (Mysterious Deck). */
-    description: z.string().max(12000).nullable(),
+    description: z
+      .string()
+      .max(12000)
+      .nullable()
+      .describe(
+        "Matches both `EquipmentReferenceSchema` and `InventoryItemSchema.description`, the row this string is copied onto by add-from-catalog. Long enough for the longest SRD item with its tables (Mysterious Deck, Wand of Wonder)"
+      ),
     light: ItemLightSchema.optional(),
-    weapon: EquipmentWeaponStatsSchema.nullable().optional(),
+    weapon: EquipmentWeaponStatsSchema.nullable().optional().describe("Populated for weapons only"),
     armor: z
       .object({
         acBase: z.number().int().min(2).max(25),
@@ -468,48 +573,105 @@ export const EquipmentReferenceSchema = z
         stealthDisadvantage: z.boolean(),
         strengthRequired: z.number().int().nullable()
       })
+      .describe("Body armor carries its full base AC (11-18); a shield carries its +2 bonus.")
       .nullable()
-      .optional(),
+      .optional()
+      .describe("Populated for armor and shields only"),
 
     // ---- the magic-item vocabulary ---------------------------------------------------------------
 
     /** Where it is worn or held. Absent = fall back to `category` for the three the engine already knows. */
-    slot: ItemSlotSchema.optional(),
+    slot: ItemSlotSchema.optional().describe(
+      "Where it is worn or held: the mechanical hook, and the one closed enum here. Absent = fall back to `category` for the three the engine already knows (weapon, armor, shield)"
+    ),
     /** With no `weapon`/`armor` block this row is a template and derives nothing until the player binds it to a base. */
-    appliesTo: ItemAppliesToSchema.nullable().optional(),
+    appliesTo: ItemAppliesToSchema.nullable()
+      .optional()
+      .describe(
+        'Makes the item a template (the SRD\'s "Weapon, +1 (Any Simple or Martial)"). `label` is the printed wording the chooser shows; `baseIds` the resolved weapon/armor ids the player may pick from; publish refuses an id the merged catalog cannot resolve, a category other than weapon, armor or ammunition, and fixed stats alongside a template. The picked base\'s stats are copied onto the inventory row by the server at set-inventory; the row records the pick as `baseId`. Magic ammunition names the gear table\'s ammunition ("Any Ammunition": Arrows, Crossbow Bolts...): its pick copies no stats and says which launchers fire it.'
+      ),
     /** Display and filtering only ("uncommon", "legendary"). An open slug. */
-    rarity: ContentIdSchema.optional(),
+    rarity: ContentIdSchema.optional().describe(
+      'Display and filtering only ("uncommon", "legendary"). An open slug: rarity is identity and drives no mechanics'
+    ),
     isMagic: z.boolean().default(false),
-    attunement: ItemAttunementSchema.optional(),
+    attunement: ItemAttunementSchema.optional().describe(
+      "Attunement requirement and its advisory class/species restriction"
+    ),
     /** Cannot be voluntarily removed once attuned; its magic is hidden from the player until attunement, and only until then. */
-    cursed: z.boolean().default(false),
-    casts: z.array(ItemSpellCastSchema).max(8).default([]),
-    charges: ItemChargesSchema.optional(),
+    cursed: z
+      .boolean()
+      .default(false)
+      .describe(
+        "A cursed item cannot be voluntarily removed once attuned, and its magic half is withheld from the player until attunement. It must require attunement, because a curse you can drop by taking the hat off is not a curse, and requiring attunement gives the hiding rule one well-defined boundary: hidden until attuned, fully visible after, because by then the player has learned it and hiding further would only make their own sheet lie to them"
+      ),
+    casts: z
+      .array(ItemSpellCastSchema)
+      .max(8)
+      .default([])
+      .describe("Spells the item can cast (Amulet of Message, Wand of Fireballs)"),
+    charges: ItemChargesSchema.optional().describe(
+      "How a charged item's charges come back. `regain` is the dice a Long Rest rolls (absent: every charge returns); `lastChargeRoll` rolls a d20 when the last charge is spent and tells the GM, since a 1 does what the item's text says. The charges themselves are the `uses` on its casts and actions, counted per carried copy"
+    ),
     /** Mithral: the armor it is bound to has no Stealth Disadvantage and no Strength requirement. */
-    removesArmorDrawbacks: z.boolean().optional(),
+    removesArmorDrawbacks: z
+      .boolean()
+      .optional()
+      .describe(
+        "Mithral: the armor this template is bound to keeps neither its Stealth Disadvantage nor its Strength requirement, on the bound row and in the derivation"
+      ),
     /** Each use of one of its actions uses one up (a potion drunk, a flask thrown), and its actions work from the
      *  pack: drinking or throwing one needs no equipping. */
-    consumedOnUse: z.boolean().optional(),
+    consumedOnUse: z
+      .boolean()
+      .optional()
+      .describe(
+        "Each use of one of its actions takes one from the carried stack (a potion drunk, a flask thrown), on the fight's resolve and on the loose route alike, and its actions work from the pack without equipping it"
+      ),
     /** This row is ammunition sold in bundles: each one quantity is `count` pieces of `kind` ("Arrows (20)"). */
     ammunition: z
       .object({ kind: AmmunitionKindSchema, count: z.number().int().min(1).max(100) })
       .strict()
-      .optional(),
+      .optional()
+      .describe(
+        'This row is ammunition sold in bundles: each one of its quantity is `count` pieces of `kind` ("Arrows (20)" is 20 arrows). A shot from a weapon that fires that kind spends a piece, and half the pieces fired come back when the encounter ends. Absent on magic ammunition, counted one piece per quantity'
+      ),
     /** A Spell Scroll: each carried copy bears one spell, of a level in this range, picked when it is added
      *  (`InventoryItem.spellId`). Reading it casts that spell at its level, with the scroll's DC and attack bonus. */
     spellScroll: z
       .object({ minLevel: z.number().int().min(0).max(9), maxLevel: z.number().int().min(0).max(9) })
       .strict()
       .refine((range) => range.minLevel <= range.maxLevel, { message: "A scroll's lowest level is above its highest." })
-      .optional(),
+      .optional()
+      .describe(
+        "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`"
+      ),
     /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
      *  replaces the printed default in `grants.damageResistances` for that carried copy. */
-    damageTypeChoice: z.array(DamageTypeSchema).min(2).max(13).optional(),
+    damageTypeChoice: z
+      .array(DamageTypeSchema)
+      .min(2)
+      .max(13)
+      .optional()
+      .describe(
+        '"The GM chooses the type" (Ring of Resistance, Dragon Scale Mail): the types the GM may pick for the one resistance in `grants.damageResistances`, which is the printed default until the GM picks. The pick is stored per carried copy as the row\'s `chosenDamageType`, which only the GM can set'
+      ),
     /** Armor of Vulnerability's curse: while attuned, worn or not, Vulnerability to every type in `damageTypeChoice`
      *  but the one it resists. */
-    vulnerableToOtherChoices: z.boolean().optional(),
+    vulnerableToOtherChoices: z
+      .boolean()
+      .optional()
+      .describe(
+        "Armor of Vulnerability's curse: while the bearer is attuned, worn or not, Vulnerability to every `damageTypeChoice` type except the one it resists. Needs `cursed` and `damageTypeChoice`"
+      ),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
-    grantsFeatIds: z.array(ContentIdSchema).max(4).default([]),
+    grantsFeatIds: z
+      .array(ContentIdSchema)
+      .max(4)
+      .default([])
+      .describe(
+        "Feats the item grants while active. Depth 1, no transitive expansion, and the grant edge is one-directional (nothing ever grants an item back), so a cycle cannot be drawn, and no check for one is needed"
+      ),
 
     /** The same rider block a feature, feat and chosen option carry, spread in whole. */
     ...featureRiders
@@ -558,7 +720,10 @@ export const EquipmentReferenceSchema = z
         });
       }
     });
-  });
+  })
+  .describe(
+    'Any item: weapon, armor, shield, gear, tool, pack, focus, consumable, magic item, or a homebrew kind nobody has invented yet. It has no `summary` or `attribution`, and an undeclared key is refused. `slot` is now the mechanical hook (`category` stays the open display slug), so a homebrew `category: "relic"` with `slot: "armor"` does derive AC. Every rider below lives on the catalog record and never on the carried inventory row: an owner is handed their whole inventory verbatim in their projection, so a rider mirrored onto that row would reach the player the instant they picked the item up, which is what makes hiding a cursed item\'s mechanics structural, with no deletion for someone to remember.'
+  );
 export type EquipmentReference = z.infer<typeof EquipmentReferenceSchema>;
 
 export const RuleReferenceSchema = z.object({

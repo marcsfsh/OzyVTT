@@ -4,18 +4,22 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas/index.ts",
+    "./routes": "./src/routes/index.ts",
+    "./openapi": "./src/openapi/index.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@vtt/content-srd-5.2.1": "*",
+    "@vtt/domain": "*",
+    "@vtt/schemas": "*",
     "zod": "^4.6.0"
   },
   "devDependencies": {
-    "@vtt/content-srd-5.2.1": "*",
-    "@vtt/schemas": "*",
     "ajv": "^8.20.0",
     "typescript": "^5.8.2",
     "vitest": "^4.1.10"

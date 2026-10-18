@@ -33,7 +33,7 @@ and a change to one never bumps another. They are constructed together in
 | `apps/client`                | React/Vite UI. Entries: `index.html` (the app), `viewer.html` (table viewer), `sheet.html` (standalone sheet). |
 | `packages/domain`            | The wire contract: `GameState`, socket event maps, projection view types, the Codex's HTTP shapes.             |
 | `packages/schemas`           | Zod schemas for actors, effects and the modifier vocabulary, shared by server and content.                     |
-| `packages/api-contract`      | The public HTTP API: path constants, command scopes and the wire schemas both sides share.                     |
+| `packages/api-contract`      | The public HTTP API: path constants, command scopes, wire schemas, the route registry and the OpenAPI builder. |
 | `packages/rules-5e`          | Pure 5e rules helpers: dice grammar, ability scores, progression tables, rider evaluation.                     |
 | `packages/content-srd-5.2.1` | SRD 5.2.1 content bundles and the scripts that generate them from vendored sources.                            |
 | `packages/dndbeyond-pdf`     | Turns a D&D Beyond character-sheet PDF into an actor definition (runs in the browser).                         |
@@ -410,18 +410,31 @@ crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the 
 ## Public HTTP API
 
 `/api/v1` exposes the game commands, the Codex, homebrew and the viewer over versioned
-envelopes, with the same handlers, authorization and projections as the UI. The OpenAPI
-document is assembled in `apps/server/src/openapi/` and served at `/api/v1/openapi.json`. The
-components with a Zod schema behind them (the contract's shapes, the homebrew vocabulary and record
-bodies, the Codex write bodies and records, the content catalogs, the viewer, map, available-actions and
-builder-offer responses, every game command's request body) are generated from it in `components.ts`,
-with their prose in `descriptions.ts`; each game command's operation comes from the command table. Each
-response's TypeScript type is inferred from its schema (`packages/domain/src/codex-wire.ts`, `content.ts`
-and `results.ts`, and the server's viewer and map modules), so a field added to a projection reaches the
-document with it. `document.ts` keeps the structure around them: the response envelopes, the
-role-projected `oneOf` reads, a few small fixed shapes, and the objects it deliberately leaves opaque. Conventions are in
+envelopes, with the same handlers, authorization and projections as the UI. Conventions are in
 ADR-0016; every router builds them from `apps/server/src/http-kit.ts` (bearer tokens, request ids,
 envelopes), and a caught error reaches the caller only as a known refusal, never as raw text.
+
+Every operation is declared once, in the route registry in `packages/api-contract/src/routes/`
+(ADR-0034): its method and path, operation id, tag, summary and description, who may call it and with
+which scope, its path, query and body schemas, and every answer by status. A game command's route is
+generated from its entry in the command table (`gameCommandRoute`), so a command has no separate
+declaration. The routers mount from the registry (`mount` in `http-kit.ts`) and parse each request
+with the route's own schemas, and `apps/server/src/api-routes.ts` builds the OpenAPI 3.1 document
+from the registry alone when the server starts. It is served at `/api/v1/openapi.json`.
+
+Every schema in the document is generated from Zod, and its prose is the Zod schema's `.describe()`.
+The response types are inferred from the same schemas (`packages/domain/src/codex-wire.ts`,
+`content.ts` and `results.ts`, and the contract's `schemas/`), so a field added to a projection
+reaches the document with it. `routes/components.ts` names the components. A response's data must
+have a name there, and a body without one is named after its operation. Tests hold the server to the
+registry. `api-routes.test.ts` fails when Express mounts a route the registry lacks or the reverse, and
+validates real answers against the schema documented for their status. `credential-walk.test.ts`
+checks every route's 401 and 403 against the document, and `codex-queries.test.ts` checks the two
+Codex query strings the server reads by hand.
+
+To add a route, declare it with `defineRoute` in the registry file for its surface, add it to that
+file's route list (`API_ROUTES` gathers them), name its response data in `components.ts`, and mount
+it with `mount(router, routes.name, ...)`, parsing the body with `routes.name.body.schema`.
 
 ## Persistence
 
