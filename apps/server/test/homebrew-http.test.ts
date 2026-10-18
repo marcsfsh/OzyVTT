@@ -516,7 +516,7 @@ describe("homebrew HTTP CRUD", () => {
     // The one thing a fresh copy cannot do yet, and the publish button says so.
     const refused = await post(base, sub(HOMEBREW_PATHS.contentPublish, copy.id), GM, {});
     expect(refused.status).toBe(409);
-    expect((await body(refused)).error.details.invalid.issues[0].message).toContain("no subclass names");
+    expect((await body(refused)).error.details.invalid.issues[0].message).toContain("no subclass belongs to");
   });
 
   // End to end in the order a GM would work: duplicate a class and a subclass, re-point the subclass,

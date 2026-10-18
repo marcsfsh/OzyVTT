@@ -1064,7 +1064,7 @@ export class HomebrewStore implements HomebrewContentSource {
   ): HomebrewRecordRow {
     const database = this.requireDatabase();
     const existing = this.recordRow(id);
-    if (existing && !overwrite) throw new HomebrewStateError(`A record already has the id ${id}.`);
+    if (existing && !overwrite) throw new HomebrewStateError("A record here already has that id.");
     if (existing && existing.type !== type)
       throw new HomebrewStateError(
         `${existing.name} is ${withArticle(kindWords(existing.type as HomebrewContentType))}, so it can't be replaced with ${withArticle(kindWords(type))}.`
@@ -1595,14 +1595,14 @@ export function overwriteRefusal(row: Pick<HomebrewSummaryRow, "state" | "audien
 /** The type list is the contract's; a value outside it would otherwise fail as a raw SQLite CHECK error. */
 function contentType(value: string): HomebrewContentType {
   const parsed = HomebrewContentTypeSchema.safeParse(value);
-  if (!parsed.success) throw new HomebrewStateError(`"${value}" is not a homebrew content type.`);
+  if (!parsed.success) throw new HomebrewStateError("That kind of record is not one this table can make.");
   return parsed.data;
 }
 
 /** Validates only that the body is a JSON object with a usable name; drafts may otherwise be invalid. */
 export function recordName(body: unknown): string {
   if (!body || typeof body !== "object" || Array.isArray(body))
-    throw new HomebrewStateError("The record must be a JSON object.");
+    throw new HomebrewStateError("Send the record as an object of its fields.");
   const raw = (body as Record<string, unknown>).name;
   const name = typeof raw === "string" ? raw.trim() : "";
   if (!name) throw new HomebrewStateError("Name this record.");
