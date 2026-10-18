@@ -96,6 +96,18 @@ describe("The web", () => {
     expect(edges[0]).not.toHaveClass("is-hidden");
   });
 
+  it("draws one node for a neighbour tied twice, its line naming the declared tie", async () => {
+    api.codexApi.listConnections.mockResolvedValue([
+      ...TIES,
+      tie({ id: null, fromId: "f1", toPageId: "p1", label: null, origin: "mention", createdAt: null })
+    ]);
+    renderGmCodex("/codex/relationships?focus=f1");
+    await waitFor(() => expect(web().querySelectorAll(".cx-web-edge")).toHaveLength(3));
+    const ysolde = [...web().querySelectorAll(".cx-web-edge")].find((edge) => edge.textContent === "member of");
+    expect(ysolde).toHaveAttribute("data-origin", "declared");
+    expect(screen.getAllByRole("link", { name: "Centre on Ysolde Varn" })).toHaveLength(1);
+  });
+
   it("re-centres on a neighbour", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/relationships?focus=f1");

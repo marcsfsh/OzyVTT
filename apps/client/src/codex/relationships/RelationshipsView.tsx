@@ -1,6 +1,12 @@
 import { useContext, useMemo, useState } from "react";
 import { Eyebrow, IconEyeOff, SegmentedControl, useToast, cx } from "@vtt/ui";
-import { dateToInstant, type CodexEntityType, type CodexCalendar, type CodexInWorldDate } from "@vtt/domain";
+import {
+  dateToInstant,
+  instantToDate,
+  type CodexEntityType,
+  type CodexCalendar,
+  type CodexInWorldDate
+} from "@vtt/domain";
 import type { CodexConnection, PlayerCodexConnection } from "@vtt/domain";
 import { entityColor, entityIconId } from "../entities";
 import { EntityIcon, iconChildren } from "../icons";
@@ -55,7 +61,11 @@ function tiesOf(focus: Node, connections: readonly AnyConnection[], nodes: Reado
 /** Ties grouped under their label, the way a page's panel lists them. */
 function TieList({ ties, go }: Readonly<{ ties: readonly Tie[]; go: (path: string) => void }>) {
   const groups = new Map<string, Tie[]>();
-  for (const tie of ties) groups.set(tie.label, [...(groups.get(tie.label) ?? []), tie]);
+  for (const tie of ties) {
+    const rows = groups.get(tie.label) ?? [];
+    // A page that mentions this one twice is one row.
+    if (!rows.some((row) => row.other.id === tie.other.id)) groups.set(tie.label, [...rows, tie]);
+  }
   if (ties.length === 0) return <p className="cx-hint">No relationships yet.</p>;
   return (
     <div className="cx-meta-groups">
@@ -93,10 +103,27 @@ function Web({
 }: Readonly<{ focus: Node; ties: readonly Tie[]; onCentre: (id: string) => void }>) {
   const width = 860;
   const height = 600;
-  const radius = Math.min(250, 120 + ties.length * 12);
-  const placed = ties.map((tie, index) => {
-    const angle = (index / Math.max(1, ties.length)) * Math.PI * 2 - Math.PI / 2;
-    return { tie, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+  // One node per neighbour, its line naming every declared tie, or "mentions" when the text is the only tie.
+  const neighbours = new Map<string, { other: Node; ties: Tie[] }>();
+  for (const tie of ties) {
+    const entry = neighbours.get(tie.other.id) ?? { other: tie.other, ties: [] };
+    entry.ties.push(tie);
+    neighbours.set(tie.other.id, entry);
+  }
+  const lines = [...neighbours.values()].map(({ other, ties: own }) => {
+    const declared = own.filter((tie) => tie.connection.origin === "declared");
+    const shown = declared.length > 0 ? declared : own.slice(0, 1);
+    return {
+      other,
+      origin: declared.length > 0 ? "declared" : "mention",
+      label: [...new Set(shown.map((tie) => edgeWord(tie.connection)))].join(", "),
+      hidden: shown.every((tie) => tie.hidden)
+    };
+  });
+  const radius = Math.min(250, 120 + lines.length * 12);
+  const placed = lines.map((line, index) => {
+    const angle = (index / Math.max(1, lines.length)) * Math.PI * 2 - Math.PI / 2;
+    return { line, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
   });
   const node = (target: Node, x: number, y: number, size: number, hiddenNode: boolean, centre: boolean) => (
     <g
@@ -126,26 +153,26 @@ function Web({
       role="img"
       aria-label={`${focus.title} and the pages tied to it`}
     >
-      {placed.map(({ tie, x, y }) => (
-        <g key={tie.key} className={cx("cx-web-edge", tie.hidden && "is-hidden")} data-origin={tie.connection.origin}>
+      {placed.map(({ line, x, y }) => (
+        <g key={line.other.id} className={cx("cx-web-edge", line.hidden && "is-hidden")} data-origin={line.origin}>
           <line x1={0} y1={0} x2={x} y2={y} />
           <text x={x / 2} y={y / 2 - 6} textAnchor="middle" className="cx-web-edgelabel">
-            {edgeWord(tie.connection)}
+            {line.label}
           </text>
         </g>
       ))}
       {node(focus, 0, 0, 28, focus.revealedToPlayers === false, true)}
-      {placed.map(({ tie, x, y }) => (
+      {placed.map(({ line, x, y }) => (
         <a
-          key={`n${tie.key}`}
-          href={pagePath(tie.other.id)}
-          aria-label={`Centre on ${tie.other.title}`}
+          key={`n${line.other.id}`}
+          href={pagePath(line.other.id)}
+          aria-label={`Centre on ${line.other.title}`}
           onClick={(event) => {
             event.preventDefault();
-            onCentre(tie.other.id);
+            onCentre(line.other.id);
           }}
         >
-          {node(tie.other, x, y, 20, tie.other.revealedToPlayers === false, false)}
+          {node(line.other, x, y, 20, line.other.revealedToPlayers === false, false)}
         </a>
       ))}
     </svg>
@@ -265,6 +292,19 @@ function OverTime({
   const max = instants.length > 0 ? Math.max(...instants, min + 1) : 1;
   const left = 22; // the Before lane, in percent of the chart
   const at = (instant: number) => left + ((instant - min) / (max - min)) * (98 - left);
+  // A few days along the axis, clear of Today's own label.
+  const span = max - min;
+  const ticks =
+    calendar && span >= 2
+      ? [...new Set([0, 0.25, 0.5, 0.75].map((part) => Math.round(min + span * part)))].filter(
+          (instant) => today === null || Math.abs(instant - today) > span / 10
+        )
+      : [];
+  const tickLabel = (instant: number) => {
+    if (!calendar) return "";
+    const date = instantToDate(calendar, instant);
+    return `${calendar.months[date.month]?.name ?? ""} ${date.day}`;
+  };
   if (ties.length === 0) return <p className="cx-hint">No relationships to draw yet.</p>;
   return (
     <div className="cx-time" role="list" aria-label="Relationships over time">
@@ -272,6 +312,11 @@ function OverTime({
         <span className="cx-time-before" style={{ width: `${left}%` }}>
           Before
         </span>
+        {ticks.map((instant) => (
+          <span key={instant} className="cx-time-tick" style={{ left: `${at(instant)}%` }}>
+            {tickLabel(instant)}
+          </span>
+        ))}
         {today !== null && (
           <span className="cx-time-today" style={{ left: `${at(today)}%` }}>
             Today
@@ -380,6 +425,8 @@ export function RelationshipsView() {
     (phone ? "grid" : "web")) as ViewId;
   const focus = nodes.get(query.get("focus") ?? "") ?? factions[0] ?? pages[0] ?? null;
   const ties = useMemo(() => (focus ? tiesOf(focus, connections, nodes) : []), [focus, connections, nodes]);
+  // Only a declared tie has dates, so only those go over time.
+  const declaredTies = useMemo(() => ties.filter((tie) => tie.connection.origin === "declared"), [ties]);
 
   const picker = (
     <PagePicker
@@ -450,7 +497,7 @@ export function RelationshipsView() {
               <span className="cx-hint">Swipe the grid sideways to see every column.</span>
             </>
           )}
-          {view === "time" && <OverTime ties={ties} calendar={calendar} />}
+          {view === "time" && <OverTime ties={declaredTies} calendar={calendar} />}
           <Eyebrow>{tieTitle}</Eyebrow>
           <TieList ties={ties} go={go} />
         </div>
@@ -469,7 +516,7 @@ export function RelationshipsView() {
         <div className="cx-rel-main scroll-y">
           {view === "web" && focus && <Web focus={focus} ties={ties} onCentre={(id) => go(relationshipsPath(id))} />}
           {view === "grid" && grid}
-          {view === "time" && <OverTime ties={ties} calendar={calendar} />}
+          {view === "time" && <OverTime ties={declaredTies} calendar={calendar} />}
         </div>
         <aside className="cx-page-meta scroll-y" aria-label={tieTitle}>
           <Eyebrow>{tieTitle}</Eyebrow>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, cx } from "@vtt/ui";
+import { Button, IconButton, IconEyeOff, cx } from "@vtt/ui";
 import { formatWorldDate, weekdayOf, type CodexCalendar, type CodexInWorldDate } from "@vtt/domain";
 import { calendarApi } from "../api";
 import { sameInWorldDate } from "../chronicle";
@@ -70,9 +70,9 @@ export function DateBar({
       <span className="cx-datebar-value">{date(published)}</span>
       <span className="cx-grow" />
       {!tight && published && (
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void unpublish()}>
-          Hide from players
-        </Button>
+        <IconButton label="Hide the date from players" size="sm" disabled={busy} onClick={() => void unpublish()}>
+          <IconEyeOff />
+        </IconButton>
       )}
       {!tight && (
         <Button size="sm" disabled={busy || same || !calendar.currentDate} onClick={() => void publish()}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clocksOf, nextSessionCard } from "./rules";
+import { clocksOf, nextSessionCard, realDateLabel } from "./rules";
 import type { CodexChronicleRecord } from "@vtt/domain";
 
 /** Home's pure selection rules. The session card's heading must reflect the record, never a constant. */
@@ -94,5 +94,16 @@ describe("The clocks a player's Home lists", () => {
       ["d1", false]
     ]);
     expect(clocks[1].summary).toBe("The duke's ultimatum expires.");
+  });
+});
+
+describe("A session's real date", () => {
+  it("reads a calendar day in words, and keeps whatever else the GM wrote as it is", () => {
+    expect(realDateLabel("2026-10-24")).toBe(
+      new Date("2026-10-24T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
+    );
+    expect(realDateLabel("next Saturday")).toBe("next Saturday");
+    expect(realDateLabel(null)).toBeNull();
+    expect(realDateLabel("  ")).toBeNull();
   });
 });

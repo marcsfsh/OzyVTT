@@ -43,3 +43,13 @@ export function clocksOf(records: readonly (CodexChronicleRecord | PlayerCodexCh
     fired: record.fired
   }));
 }
+
+/** A session's real date as the GM wrote it, or "Saturday, October 24" when it is a calendar day. */
+export function realDateLabel(realDate: string | null): string | null {
+  if (!realDate?.trim()) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(realDate.trim())) return realDate.trim();
+  const day = new Date(`${realDate.trim()}T00:00:00`);
+  return Number.isNaN(day.getTime())
+    ? realDate.trim()
+    : day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+}

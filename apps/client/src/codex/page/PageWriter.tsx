@@ -28,8 +28,8 @@ import { useCodexAutosave } from "../autosave";
 import { atlasPath, journalEntryPath, relationshipsPath } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex } from "../shell/context";
-import { FieldAudienceToggle } from "../shared/WhoSeesIt";
-import type { Audience } from "../shared/audience";
+import { AudienceChip, FieldAudienceToggle } from "../shared/WhoSeesIt";
+import { EVERYONE, HIDDEN, type Audience } from "../shared/audience";
 import { useCodexQuery } from "../useCodexQuery";
 import { DocEditor } from "./DocEditor";
 import { draftDocument, saveShape, type DraftItem } from "./document";
@@ -506,6 +506,9 @@ export function PageWriter({
               onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
             />
             <KindChip type={draft.entityType} />
+          </div>
+          <div className="cx-visline">
+            <AudienceChip value={page.revealedToPlayers ? EVERYONE : HIDDEN} party={party} />
           </div>
         </div>
         <div className="cx-page-actions">

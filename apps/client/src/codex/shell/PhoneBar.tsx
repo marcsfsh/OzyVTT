@@ -12,6 +12,8 @@ export type PhoneBarSlot = Readonly<{
   target: HTMLElement | null;
   /** Counts the views holding the bar, so the default steps aside while one does. */
   claim: () => () => void;
+  /** The shell's own controls (New, the GM menu and Search), kept on a section's bar that brings none. */
+  defaults: ReactNode;
 }>;
 
 export const PhoneBarContext = createContext<PhoneBarSlot | null>(null);
@@ -27,7 +29,7 @@ export function CodexPhoneBar({
   content?: ReactNode;
   /** Shows Back at the start of the bar. */
   onBack?: () => void;
-  /** Controls at the end of the bar. */
+  /** Controls at the end of the bar. A section's bar without them keeps the shell's own; a record's has Back. */
   actions?: ReactNode;
 }>) {
   const slot = useContext(PhoneBarContext);
@@ -42,7 +44,9 @@ export function CodexPhoneBar({
         </IconButton>
       )}
       {content ?? <h2 className="cx-phonebar-title">{title}</h2>}
-      {actions && <div className="cx-phonebar-actions">{actions}</div>}
+      {(actions ?? (onBack ? null : slot.defaults)) && (
+        <div className="cx-phonebar-actions">{actions ?? slot.defaults}</div>
+      )}
     </>,
     slot.target
   );

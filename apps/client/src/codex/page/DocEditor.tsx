@@ -129,7 +129,12 @@ export function DocEditor({
   const suggestions = useMemo(() => {
     if (!link) return [];
     const needle = link.query.trim().toLowerCase();
-    return pages.filter((page) => page.id !== excludePageId && page.title.toLowerCase().includes(needle)).slice(0, 6);
+    // A title that starts with what was typed comes before one that only contains it.
+    const starts = (page: (typeof pages)[number]) => (page.title.toLowerCase().startsWith(needle) ? 0 : 1);
+    return pages
+      .filter((page) => page.id !== excludePageId && page.title.toLowerCase().includes(needle))
+      .sort((a, b) => starts(a) - starts(b) || a.title.localeCompare(b.title))
+      .slice(0, 6);
   }, [link, pages, excludePageId]);
 
   const replaceItem = (key: string, patch: Readonly<{ text?: string; title?: string }>) =>

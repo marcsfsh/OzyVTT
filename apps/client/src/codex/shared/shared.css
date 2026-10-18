@@ -40,9 +40,21 @@
   color: var(--cyan-hi);
 }
 /* The control is the chip, raised as a trigger with the menu's own caret. */
+/* As small as the chip it is, with the full tap height around it. */
 .nh-menu-trigger.cx-aud {
-  min-height: var(--tap-min);
-  padding-inline: var(--space-2);
+  min-height: 1.75rem;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  font: 600 var(--fs-xs) / 1.1 var(--font-label);
+}
+.nh-menu-trigger.cx-aud::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: max(100%, var(--tap-min));
+  transform: translateY(-50%);
 }
 .nh-menu-trigger.cx-aud::before {
   border-color: inherit;
@@ -469,6 +481,10 @@
   border: 1px solid var(--line-strong);
   background: var(--material-lip), var(--material-plate);
 }
+/* One line: a long date wraps inside its own value and the buttons stay at the end. */
+.cx-datebar:not(.is-tight, :has(.cx-datebar-error)) {
+  flex-wrap: nowrap;
+}
 .cx-datebar.is-tight {
   padding: var(--space-1) var(--space-2);
 }
@@ -479,6 +495,7 @@
   text-transform: uppercase;
 }
 .cx-datebar-value {
+  min-width: 0;
   margin-right: var(--space-2);
   color: var(--text);
   font: 700 var(--fs-sm) / 1.2 var(--font-body);
@@ -490,4 +507,12 @@
   flex-basis: 100%;
   color: var(--danger-text);
   font: 600 var(--fs-xs) / 1.3 var(--font-body);
+}
+
+/* The app's base sheet stacks and dims every span inside a button; the Codex's own rows lay theirs out. */
+:where(.cx-home, .cx-search, .cx-page, .cx-index, .cx-quests, .cx-rel, .cx-tab) button span {
+  display: revert;
+  margin-top: 0;
+  color: inherit;
+  font-size: inherit;
 }

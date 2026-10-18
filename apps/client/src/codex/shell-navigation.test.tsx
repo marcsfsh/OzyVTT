@@ -228,6 +228,16 @@ describe("The phone's tab bar under the thumb", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Backup" })).toBeInTheDocument();
   });
 
+  it("keeps New, the GM menu and Search on a section's own top bar", async () => {
+    renderShell("/codex");
+    expect(await screen.findByRole("heading", { level: 2, name: "Codex" })).toBeInTheDocument();
+    expect(screen.getByLabelText("GM menu")).toBeInTheDocument();
+    expect(screen.getByLabelText("New")).toBeInTheDocument();
+    expect(
+      within(document.querySelector(".cx-phonebar") as HTMLElement).getByRole("button", { name: "Search" })
+    ).toBeInTheDocument();
+  });
+
   it("keeps New and the GM menu reachable from the top bar", async () => {
     renderShell("/codex/story");
     await waitFor(() => expect(listPages).toHaveBeenCalled());

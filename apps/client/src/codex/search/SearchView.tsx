@@ -191,7 +191,7 @@ export function SearchView() {
     );
 
   const typeMenu = (
-    <Dropdown label={typeLabel} panelClassName="cx-typemenu">
+    <Dropdown label={typeLabel} panelClassName="cx-typemenu scroll-y">
       {() => (
         <>
           <div className="cx-dropdown-row">

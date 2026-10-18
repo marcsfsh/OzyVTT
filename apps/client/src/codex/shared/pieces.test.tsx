@@ -53,7 +53,7 @@ describe("The date bar", () => {
     await user.click(screen.getByRole("button", { name: "Publish" }));
     await waitFor(() => expect(api.calendarApi.publish).toHaveBeenCalledWith("gm"));
     await waitFor(() => expect(onPublished).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole("button", { name: "Hide from players" }));
+    await user.click(screen.getByRole("button", { name: "Hide the date from players" }));
     await waitFor(() => expect(api.calendarApi.unpublish).toHaveBeenCalledWith("gm"));
   });
 
@@ -62,7 +62,7 @@ describe("The date bar", () => {
     api.calendarApi.publish.mockRejectedValue(new Error("The codex request failed (500)."));
     render(<DateBar calendar={gmCalendar(15, null)} role="gm" token="gm" />);
     expect(screen.getByText("No date yet")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Hide from players" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide the date from players" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Publish" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The codex request failed (500).");
   });

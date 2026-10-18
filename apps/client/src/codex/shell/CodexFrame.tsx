@@ -107,7 +107,21 @@ export function CodexFrame({
     setClaims((count) => count + 1);
     return () => setClaims((count) => count - 1);
   }, []);
-  const slot = useMemo<PhoneBarSlot>(() => ({ target: phone ? barTarget : null, claim }), [phone, barTarget, claim]);
+  const defaults = useMemo(
+    () => (
+      <>
+        {phoneActions}
+        <IconButton label="Search" size="sm" onClick={() => onPaletteChange(true)}>
+          <CodexIcon iconId="search" className="cx-icon" />
+        </IconButton>
+      </>
+    ),
+    [phoneActions, onPaletteChange]
+  );
+  const slot = useMemo<PhoneBarSlot>(
+    () => ({ target: phone ? barTarget : null, claim, defaults }),
+    [phone, barTarget, claim, defaults]
+  );
 
   const searchBox = (
     <button
@@ -132,12 +146,7 @@ export function CodexFrame({
             {claims === 0 && (
               <>
                 <h2 className="cx-phonebar-title">{section ? SECTION_TITLE[section] : "Codex"}</h2>
-                <div className="cx-phonebar-actions">
-                  {phoneActions}
-                  <IconButton label="Search" size="sm" onClick={() => onPaletteChange(true)}>
-                    <CodexIcon iconId="search" className="cx-icon" />
-                  </IconButton>
-                </div>
+                <div className="cx-phonebar-actions">{defaults}</div>
               </>
             )}
             <div className="cx-phonebar-slot" ref={setBarTarget} />

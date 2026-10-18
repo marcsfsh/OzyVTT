@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Input, Skeleton, cx } from "@vtt/ui";
-import type { CodexEntityType } from "@vtt/domain";
+import { pageLinkKey, type CodexEntityType } from "@vtt/domain";
+import { codexApi, playerCodexApi } from "../codex/api";
 import { findApi, pageRecordApi } from "../codex/api-records";
 import type { CodexBlock, CodexPage, CodexSearchHit, PlayerCodexBlock, PlayerCodexSearchHit } from "@vtt/domain";
 import { CodexMarkdown } from "../codex/CodexMarkdown";
@@ -45,6 +46,25 @@ function useTabSearch(role: "gm" | "player", token: string, q: string) {
   return useCodexQuery(settled.trim() ? load : null, { failure: "The search could not be completed." });
 }
 
+/** The pages this reader can open, by link key, so a `[[link]]` in the tab opens its page in the tab. */
+function useTabLinks(role: "gm" | "player", token: string, open: (page: Recent) => void) {
+  const load = useCallback(
+    () => (role === "gm" ? codexApi.listPages(token) : playerCodexApi.listPages(token)),
+    [role, token]
+  );
+  const pages = useCodexQuery(load).data;
+  return useMemo(() => {
+    const byKey = new Map((pages ?? []).map((page) => [pageLinkKey(page.title), page]));
+    return {
+      known: new Set(byKey.keys()),
+      follow: (target: string) => {
+        const page = byKey.get(pageLinkKey(target));
+        if (page) open({ id: page.id, title: page.title });
+      }
+    };
+  }, [pages, open]);
+}
+
 /** A page's role line: its role or kind field, then where it is. */
 function roleLine(type: CodexEntityType, fields: Readonly<Record<string, string>>): string {
   return [fields.role?.trim() || fields.kind?.trim() || entityDef(type).label, fields.location?.trim()]
@@ -53,11 +73,14 @@ function roleLine(type: CodexEntityType, fields: Readonly<Record<string, string>
 }
 
 /** The GM's compact page: who can open it, the fields only the GM sees, and each block with Reveal or Hide again. */
+type TabLinks = ReturnType<typeof useTabLinks>;
+
 function GmCompactPage({
   token,
   id,
-  party
-}: Readonly<{ token: string; id: string; party: readonly PartyCharacter[] }>) {
+  party,
+  links
+}: Readonly<{ token: string; id: string; party: readonly PartyCharacter[]; links: TabLinks }>) {
   const read = useCodexQuery(
     useCallback(() => pageRecordApi.get(token, id), [token, id]),
     { failure: "Couldn't load this page." }
@@ -115,7 +138,7 @@ function GmCompactPage({
           onReveal={() => setRevealing(block)}
           onHide={() => void setAudience(block, HIDDEN)}
         >
-          <CodexMarkdown text={block.text} token={token} />
+          <CodexMarkdown text={block.text} token={token} onNavigate={links.follow} knownTitles={links.known} />
         </HiddenBlock>
       ))}
       <Button size="sm" variant="ghost" onClick={() => void navigate(pagePath(id))}>
@@ -137,7 +160,7 @@ function GmCompactPage({
 }
 
 /** A player's compact page: the blocks that reached them, the newest marked, and the way to the whole page. */
-function PlayerCompactPage({ token, id }: Readonly<{ token: string; id: string }>) {
+function PlayerCompactPage({ token, id, links }: Readonly<{ token: string; id: string; links: TabLinks }>) {
   const read = useCodexQuery(
     useCallback(() => pageRecordApi.getForPlayer(token, id), [token, id]),
     { failure: "Couldn't load this page." }
@@ -157,12 +180,24 @@ function PlayerCompactPage({ token, id }: Readonly<{ token: string; id: string }
       <span className="cx-hint">{roleLine(page.entityType, page.fields)}</span>
       {blocks.length === 0 && (
         <div className="cx-doc-text">
-          <CodexMarkdown text={page.body} token={token} audience="player" />
+          <CodexMarkdown
+            text={page.body}
+            token={token}
+            audience="player"
+            onNavigate={links.follow}
+            knownTitles={links.known}
+          />
         </div>
       )}
       {blocks.map((item, index) => (
         <div key={index} className={cx("cx-doc-text", item.block === newest && "is-new")}>
-          <CodexMarkdown text={item.text} token={token} audience="player" />
+          <CodexMarkdown
+            text={item.text}
+            token={token}
+            audience="player"
+            onNavigate={links.follow}
+            knownTitles={links.known}
+          />
         </div>
       ))}
       <Button size="sm" variant="ghost" onClick={() => void navigate(pagePath(id))}>
@@ -186,17 +221,23 @@ export function CodexTab({
   const [recent, setRecent] = useState<readonly Recent[]>(() => readRecent(role));
   const search = useTabSearch(role, token, q);
   const hits: readonly (CodexSearchHit | PlayerCodexSearchHit)[] = q.trim() ? (search.data?.hits ?? []) : [];
-  const open = (hit: Recent) => {
-    setOpenId(hit.id);
-    setQ("");
-    const next = [hit, ...recent.filter((row) => row.id !== hit.id)].slice(0, 4);
-    setRecent(next);
-    try {
-      localStorage.setItem(`${RECENT_KEY}.${role}`, JSON.stringify(next));
-    } catch {
-      /* private mode: no recent pages */
-    }
-  };
+  const open = useCallback(
+    (hit: Recent) => {
+      setOpenId(hit.id);
+      setQ("");
+      setRecent((current) => {
+        const next = [hit, ...current.filter((row) => row.id !== hit.id)].slice(0, 4);
+        try {
+          localStorage.setItem(`${RECENT_KEY}.${role}`, JSON.stringify(next));
+        } catch {
+          /* private mode: no recent pages */
+        }
+        return next;
+      });
+    },
+    [role]
+  );
+  const links = useTabLinks(role, token, open);
   return (
     <div className="cx-tab scroll-y">
       <Input
@@ -249,9 +290,9 @@ export function CodexTab({
           )}
           {openId ? (
             role === "gm" ? (
-              <GmCompactPage key={openId} token={token} id={openId} party={party} />
+              <GmCompactPage key={openId} token={token} id={openId} party={party} links={links} />
             ) : (
-              <PlayerCompactPage key={openId} token={token} id={openId} />
+              <PlayerCompactPage key={openId} token={token} id={openId} links={links} />
             )
           ) : (
             <p className="cx-hint">Search for a page to read it here, beside the map.</p>
