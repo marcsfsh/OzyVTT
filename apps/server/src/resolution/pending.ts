@@ -1,3 +1,4 @@
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { PendingSave } from "@vtt/domain";
 import { catalogIdOf, type ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
@@ -14,6 +15,7 @@ import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
 import { coverBonusOf, coverFor } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
+import { spellOf, spellSaveDuration } from "./concentration.js";
 
 type HalfDamageReaction = Extract<ActionReaction, { response: "half-damage" }>;
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
@@ -174,17 +176,29 @@ const ATHLETICS_ESCAPES: ReadonlySet<string> = new Set(["entangle", "web", "blac
 /** SRD Stinking Cloud: "While Poisoned in this way, the creature can't take an action or a Bonus Action." */
 const NO_ACTIONS_FAILURES: ReadonlySet<string> = new Set(["stinking-cloud"]);
 
+/** The spell an effect comes from and the level it was cast at, which sets the effect's duration and is what Dispel
+ *  Magic weighs. */
+export type SpellCast = Readonly<{ spell: SpellReference; level: number }>;
+
+/** The spell a resolve casts, at the level it casts it. */
+export function spellCastOf(ctx: ResolveContext): SpellCast | undefined {
+  const spell = spellOf(ctx);
+  return spell ? { spell, level: ctx.plan.castLevel ?? spell.level } : undefined;
+}
+
 /**
  * What a failed save puts on its target, as one source-linked effect (SRD: each condition ends by its own rules):
- * the conditions with their printed duration, the save repeated at the end of each of the target's turns, a
- * grapple's escape DC and range, ending on damage, the damage it deals at the start of each turn, and the
- * Concentration the cast is sustained by, what the action declares a failure leaves besides (Bane's -1d4), and the
- * hazard it starts (Alchemist's Fire's burning). Charmed's "can't attack the charmer" and Grappled's "except the
- * grappler" read the source from it. Undefined when every condition stays bare and the action declares nothing more.
+ * the conditions with their printed duration (else, from a spell, the spell's duration at its level), the save repeated
+ * at the end of each of the target's turns, a grapple's escape DC and range, ending on damage, the damage it deals at
+ * the start of each turn, and the Concentration the cast is sustained by, what the action declares a failure leaves
+ * besides (Bane's -1d4), and the hazard it starts (Alchemist's Fire's burning). Charmed's "can't attack the charmer" and
+ * Grappled's "except the grappler" read the source from it. Undefined when every condition stays bare and the action
+ * declares nothing more.
  */
 export function failureEffectFor(
   ctx: MagicalSource & Pick<ResolveContext, "castId">,
-  conditionIds: readonly string[]
+  conditionIds: readonly string[],
+  cast?: SpellCast
 ): PendingSave["onFailEffect"] {
   const { action, attacker, castId } = ctx;
   const save = action.save;
@@ -198,7 +212,11 @@ export function failureEffectFor(
   const grapple = linked.includes("grappled");
   const athletics =
     action.spellId !== undefined && ATHLETICS_ESCAPES.has(action.spellId) && linked.includes("restrained");
-  const duration = save.failureDuration ?? declared?.duration ?? hazard?.duration;
+  const duration =
+    save.failureDuration ??
+    declared?.duration ??
+    hazard?.duration ??
+    (cast ? spellSaveDuration(cast.spell, cast.level) : undefined);
   const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
   return {
     name: (
@@ -223,11 +241,13 @@ export function failureEffectFor(
     ...(duration ? { duration } : {}),
     ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(save.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
+    ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
     ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
     sourceActionId: action.id
   };
@@ -235,7 +255,10 @@ export function failureEffectFor(
 
 /** What a successful save leaves on its target instead, as the action declares it (Stunning Strike: the target's Speed
  *  halved and the next attack roll against it with Advantage, until the start of the Monk's next turn). */
-function successEffectFor(ctx: MagicalSource & Pick<ResolveContext, "castId">): PendingSave["onSuccessEffect"] {
+function successEffectFor(
+  ctx: MagicalSource & Pick<ResolveContext, "castId">,
+  cast: SpellCast | undefined
+): PendingSave["onSuccessEffect"] {
   const { action, attacker, castId } = ctx;
   const declared = action.save?.successEffect;
   if (!declared) return undefined;
@@ -250,6 +273,7 @@ function successEffectFor(ctx: MagicalSource & Pick<ResolveContext, "castId">): 
     sourceName: attacker.name,
     ...(declared.duration ? { duration: declared.duration } : {}),
     ...(castId !== null ? { castId } : {}),
+    ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
     ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
     sourceActionId: action.id
   };
@@ -272,8 +296,10 @@ export function parkActionSave(ctx: ResolveContext): void {
   if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
   // The GM's explicit choice wins over the condition the action declares.
   const conditionIds = input.conditionId ? [input.conditionId] : action.save.failureConditions;
-  const onFailEffect = failureEffectFor(ctx, conditionIds);
-  let saving = targets;
+  const cast = spellCastOf(ctx);
+  const onFailEffect = failureEffectFor(ctx, conditionIds, cast);
+  // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at.
+  let saving = action.save.bySelf ? [attacker] : targets;
   const threshold = action.save.failsAtHitPoints;
   if (threshold !== undefined) {
     saving = [];
@@ -326,7 +352,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   }
   if (saving.length === 0) return;
   const parts = rider ? [] : damagePartsOf(ctx);
-  const onSuccessEffect = successEffectFor(ctx);
+  const onSuccessEffect = successEffectFor(ctx, cast);
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
   // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
   const saveBonusOf = (target: (typeof targets)[number]) =>

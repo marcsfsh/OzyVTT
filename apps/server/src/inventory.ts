@@ -2,7 +2,7 @@ import type { Actor, GameState } from "@vtt/domain";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
 import { effectiveSlot, wornBodyArmor } from "@vtt/rules-5e";
-import { spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
+import { refreshBaseArmorClass, spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { castAction, itemAction } from "./item-actions.js";
 import { keepAmmunitionCount } from "./ammunition.js";
@@ -49,6 +49,7 @@ export function reconcileEquipment(
   if (!definition) return;
   const derivation = deriveEquipment(actor, definition, deps.catalog);
   actor.armorClass = storedArmorClass(actor, definition, deps.catalog);
+  refreshBaseArmorClass(actor, definition, deps.catalog);
 
   if (actor.spellSlots && definition.spellcasting) {
     const maxByLevel = new Map(
@@ -400,6 +401,23 @@ export function setInventoryItem(
   }
   reconcileEquipment(actor, definition, deps);
   return donningEndsMageArmor(state, actor);
+}
+
+/** SRD Remove Curse: "If the object is a cursed magic item, its curse remains, but the spell breaks its owner's
+ *  Attunement to the object so it can be removed or discarded." Each cursed item the creature is attuned to loses the
+ *  Attunement (the curse stays on the item); the names of those items. */
+export function breakCursedAttunement(
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  deps: InventoryDeps
+): string[] {
+  const cursed = actor.inventory.filter(
+    (row) => row.attuned === true && deps.catalog?.equipmentRecord(catalogIdOf(row))?.cursed === true
+  );
+  if (cursed.length === 0) return [];
+  actor.inventory = actor.inventory.map((row) => (cursed.includes(row) ? { ...row, attuned: false } : row));
+  reconcileEquipment(actor, definition, deps);
+  return cursed.map((row) => row.name);
 }
 
 /** SRD Mage Armor: "The spell ends early if the target dons armor." A Shield is no armor here: it still adds to it. */

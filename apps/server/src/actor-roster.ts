@@ -219,11 +219,21 @@ export function unarmoredDefensesOf(definition: ActorDefinition, catalog?: Equip
  * Defenses) only one applies at a time (SRD Multiclassing): the best.
  */
 export function storedArmorClass(actor: Actor, definition: ActorDefinition, catalog?: EquipmentCatalog): number {
+  return armorClassWith(actor, definition, catalog, []);
+}
+
+/** `storedArmorClass` with more ways to work out base AC while no armor is worn (Mage Armor's 13 + Dexterity). */
+function armorClassWith(
+  actor: Actor,
+  definition: ActorDefinition,
+  catalog: EquipmentCatalog | undefined,
+  extra: readonly UnarmoredDefense[]
+): number {
   if (actor.armorClassOverride !== undefined) return actor.armorClassOverride;
   const derivation = deriveEquipment(actor, definition, catalog);
   const dex = abilityModifier(definition.abilityScores.dex);
   const items = withResolvedSlots(actor.inventory, catalog);
-  const unarmored = unarmoredDefensesOf(definition, catalog);
+  const unarmored = [...unarmoredDefensesOf(definition, catalog), ...extra];
   const training = { shield: derivation.untrainedShield === null };
   const worn = [null, ...unarmored]
     .map((option) => armorClassFromEquipment(dex, items, option, training))
@@ -232,8 +242,36 @@ export function storedArmorClass(actor: Actor, definition: ActorDefinition, cata
   if (armorClassFromLoadout(definition))
     return (equipmentAc ?? 10 + dex + Math.max(0, ...unarmored.map((option) => option.bonus))) + derivation.armorClass;
   const base =
-    equipmentAc !== null && wornBodyArmor(items) ? equipmentAc + armorClassRiderOf(definition) : definition.armorClass;
+    equipmentAc !== null && wornBodyArmor(items)
+      ? equipmentAc + armorClassRiderOf(definition)
+      : Math.max(definition.armorClass, ...extra.map((option) => 10 + dex + option.bonus));
   return base + derivation.armorClass;
+}
+
+/**
+ * A live effect's way to work out base AC (SRD Mage Armor: "base AC becomes 13 plus its Dexterity modifier") is chosen
+ * like Unarmored Defense: the creature's AC with it is the best of its ways, and its other AC bonuses (a Ring of
+ * Protection, a Shield) add to it as they add to any. What it raises the stored AC by is kept on the effect as its AC
+ * bonus, and worked out again whenever the stored AC is (equipment, content). True when any changed.
+ */
+export function refreshBaseArmorClass(
+  actor: Actor,
+  definition: ActorDefinition,
+  catalog: EquipmentCatalog | undefined
+): boolean {
+  if (!actor.effects.some((effect) => effect.baseArmorClass !== undefined)) return false;
+  const without = storedArmorClass(actor, definition, catalog);
+  let changed = false;
+  actor.effects = actor.effects.map((effect) => {
+    if (effect.baseArmorClass === undefined) return effect;
+    const option = { bonus: effect.baseArmorClass - 10, allowShield: true };
+    const gain = Math.min(10, armorClassWith(actor, definition, catalog, [option]) - without);
+    const { armorClassBonus: _old, ...rest } = effect;
+    const next: typeof effect = gain > 0 ? { ...rest, armorClassBonus: gain } : rest;
+    if (next.armorClassBonus !== effect.armorClassBonus) changed = true;
+    return next;
+  });
+  return changed;
 }
 
 /** Re-derives every stored AC from current content. Inventory writes reconcile AC, but a homebrew publish or a
@@ -248,6 +286,7 @@ export function reconcileArmorClasses(
   for (const actor of state.actors) {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
     if (!definition) continue;
+    if (refreshBaseArmorClass(actor, definition, catalog)) changed = true;
     const next = storedArmorClass(actor, definition, catalog);
     if (actor.armorClass === next) continue;
     actor.armorClass = next;

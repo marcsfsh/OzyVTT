@@ -35,6 +35,7 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { applySpellEndings } from "./resolution/dispel.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
@@ -147,6 +148,7 @@ export function resolveDefinitionAction(
   applyGrant(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
+  applySpellEndings(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);

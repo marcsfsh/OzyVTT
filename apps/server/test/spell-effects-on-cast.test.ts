@@ -253,7 +253,7 @@ describe("Hex and Hunter's Mark", () => {
     expect(moved.tableNarration?.map((line) => line.text)).toContain("Vex moves Hex to Orc.");
     expect(actorOf(state, FOE).effects).toEqual([]);
     const curse = actorOf(state, FOE2).effects[0]!;
-    expect(curse).toMatchObject({ name: "Hex", sourceActorId: HERO, tags: ["hexed"] });
+    expect(curse).toMatchObject({ name: "Hex", sourceActorId: HERO, tags: ["hexed", "curse"] });
     // Still held by the caster's Concentration on that cast: ending it ends the moved curse.
     const concentration = actorOf(state, HERO).effects.find((effect) => effect.tags.includes("concentrating"))!;
     expect(curse.castId).toBe(concentration.castId);

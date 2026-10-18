@@ -26,20 +26,31 @@ function riderSpeed(derivation: EquipmentDerivation): number {
   return sumRiders(collectRiders(derivation.carriers, { ...derivation.context, moment: null }), "speed");
 }
 
-/** An effect that halves Speed applies after every other change, rounded down, and two of them halve it once (SRD
- *  "Combining Game Effects": the same effect's instances don't stack). It halves a special speed too (SRD "Speed"). */
-function halvedIfSlowed(actor: Actor, feet: number): number {
-  return actor.effects.some((effect) => effect.tags.includes(SPEED_HALVED_TAG)) ? Math.floor(feet / 2) : feet;
+/** An effect that doubles or halves Speed applies after every other change, to the Speed of the moment (SRD Haste:
+ *  "the target's Speed is doubled"; Slow: "Speed is halved"), rounded down. Two instances of one effect count once
+ *  (SRD "Combining Game Effects": a `stackKey`, or the halving tag), and it changes a special speed too (SRD "Speed":
+ *  "if your Speed is halved and you have a Fly Speed, your Fly Speed is also halved"). */
+function multipliedSpeed(actor: Actor, feet: number): number {
+  const multipliers = new Map<string, number>();
+  for (const effect of actor.effects) {
+    if (effect.speedMultiplier === undefined) continue;
+    const key = effect.stackKey ?? effect.id;
+    multipliers.set(key, Math.max(multipliers.get(key) ?? 1, effect.speedMultiplier));
+  }
+  const multiplied = [...multipliers.values()].reduce((total, factor) => total * factor, feet);
+  return actor.effects.some((effect) => effect.tags.includes(SPEED_HALVED_TAG))
+    ? Math.floor(multiplied / 2)
+    : multiplied;
 }
 
 /** Current Speed in feet, before Dash: base minus 5 x exhaustion (floored at 0, so no debt carries), plus the
- *  standing `speed` riders, floored again, then halved where an effect halves it. A Speed-0 condition returns 0.
- *  Never writes `actor.speedFeet`. Null when base speed is unknown. */
+ *  standing `speed` riders, floored again, then doubled or halved where an effect does so. A Speed-0 condition returns
+ *  0. Never writes `actor.speedFeet`. Null when base speed is unknown. */
 export function currentSpeedFeet(actor: Actor, derivation: EquipmentDerivation): number | null {
   if (actor.speedFeet === undefined) return null;
   if (speedZeroed(actor)) return 0;
   const base = Math.max(0, actor.speedFeet - 5 * exhaustionLevel(actor));
-  return halvedIfSlowed(actor, Math.max(0, base + riderSpeed(derivation)));
+  return multipliedSpeed(actor, Math.max(0, base + riderSpeed(derivation)));
 }
 
 /** How many Dashes the creature has taken this turn, and whether one predates the stored grant (then it doubles). */
@@ -139,6 +150,6 @@ export function travelBudgetFeet(
   if (special === undefined) return mode === "climb" || mode === "swim" ? walking : null;
   if (walking === null) return null;
   if (speedZeroed(actor)) return 0;
-  const speed = halvedIfSlowed(actor, Math.max(0, special - 5 * exhaustionLevel(actor) + riderSpeed(derivation)));
+  const speed = multipliedSpeed(actor, Math.max(0, special - 5 * exhaustionLevel(actor) + riderSpeed(derivation)));
   return speed * (1 + dashesOf(actor).count);
 }

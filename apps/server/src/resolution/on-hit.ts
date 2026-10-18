@@ -5,6 +5,7 @@ import { previewDamage } from "../hit-points.js";
 import { masteryHitEffects } from "../weapon-mastery.js";
 import { sizeAtMost, tableLineOf, type ResolveContext } from "./context.js";
 import { damagePartsOf } from "./damage.js";
+import { spellCastOf } from "./pending.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
 function dealsDamage(ctx: ResolveContext): boolean {
@@ -47,6 +48,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {}),
     ...(deps.catalog ? { catalog: deps.catalog } : {})
   };
+  const cast = spellCastOf(ctx);
   action.onHit.forEach((rider, index) => {
     if (rider.maxTargetSize && !sizeAtMost(target.size, rider.maxTargetSize)) {
       warnings.push(
@@ -98,7 +100,9 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
         escapeDc: rider.escapeDc ?? null,
         ...(grapple ? { rangeFeet: action.attack?.reachFeet ?? 5 } : {}),
         // A stirge attached, a rug smothering: what it deals each turn while it holds on, and it lets go as it dies.
-        ...(rider.ongoingDamage ? { ongoingDamage: rider.ongoingDamage, endsWhenSourceDefeated: true } : {})
+        ...(rider.ongoingDamage ? { ongoingDamage: rider.ongoingDamage, endsWhenSourceDefeated: true } : {}),
+        // A spell's hit (Ray of Sickness): the spell and its level, which Dispel Magic weighs.
+        ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {})
       }),
       gained,
       deps

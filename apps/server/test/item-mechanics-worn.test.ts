@@ -628,7 +628,13 @@ describe("the casts that survived the spell-record check", () => {
 
     // The DC is the item's: this Wizard has no spellcasting block, so 13 can only be authored.
     expect(detect.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: [] });
-    expect(suggest.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["charmed"] });
+    expect(suggest.save).toEqual({
+      ability: "wis",
+      dc: 13,
+      successDamage: "none",
+      failureConditions: ["charmed"],
+      endsOnSourceSideDamage: true
+    });
     // Neither cast synthesizes damage or an attack from the spell's text.
     expect(detect.damage).toEqual([]);
     expect(suggest.damage).toEqual([]);
@@ -659,7 +665,13 @@ describe("the casts that survived the spell-record check", () => {
     const cast = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-eyes-of-charming-cast-charm-person"
     )!;
-    expect(cast.save).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["charmed"] });
+    expect(cast.save).toEqual({
+      ability: "wis",
+      dc: 13,
+      successDamage: "none",
+      failureConditions: ["charmed"],
+      endsOnSourceSideDamage: true
+    });
     expect(cast.uses).toEqual({ limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" });
     resolveDefinitionAction(
       state,

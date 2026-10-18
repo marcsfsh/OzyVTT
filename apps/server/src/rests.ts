@@ -6,7 +6,15 @@ import { holdsFeature } from "./class-features.js";
 import { CommandRejectedError } from "./game-store.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
-import { endEffectsAtLongRest, reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
+import {
+  endEffectsAtLongRest,
+  endEffectsAtRest,
+  LONG_REST_MINUTES,
+  reduceExhaustion,
+  removeConditionDirect,
+  type EffectNarration
+} from "./effects.js";
+import { passGameTime } from "./game-time.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
@@ -15,8 +23,6 @@ import { chargesAfterDawn } from "./item-charges.js";
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
 export const LONG_REST_HOURS = 8;
-/** The clock's ceiling, as the state schema bounds it. */
-const CLOCK_LIMIT_HOURS = 10_000_000;
 
 const hoursText = (hours: number) => `${hours} ${hours === 1 ? "hour" : "hours"}`;
 
@@ -162,10 +168,12 @@ function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined)
  * the dying and the dead get nothing from it, and a Long Rest waits 16 hours of game time after the last one.
  * Short: per-short-rest, recharge and per-encounter pools and Pact Magic slots re-arm, and long-rest pools a feature
  * partly refills (Rage's one use) get those uses back; healing is only by spending Hit Point Dice.
- * Long: Concentration and turn-measured effects end first (onEnd grants land), then HP to max, temp HP cleared, all
- * pools refreshed, all Hit Point Dice restored, Exhaustion drops one level. It counts as ending at the current game
- * hour; a party rest moves the clock past it. With `charges.random`, a charged item regains its printed dice rather
- * than every charge, and `charges.lines` hears what each regained.
+ * Long: Concentration ends first (onEnd grants land), then HP to max, temp HP cleared, all pools refreshed, all Hit
+ * Point Dice restored, Exhaustion drops one level. It counts as ending at the current game hour.
+ * A Long Rest's eight hours count down the creature's own effects, as time passing does, unless the game clock moved
+ * them for everyone already (`clockMoved`: a party rest). A Short Rest leaves effects to the clock: a player takes one
+ * on their own, and only the GM moves game time (the party's Short Rest moves it an hour). With `charges.random`, a
+ * charged item regains its printed dice rather than every charge, and `charges.lines` hears what each regained.
  */
 export function applyRest(
   state: GameState,
@@ -173,7 +181,8 @@ export function applyRest(
   kind: "long" | "short",
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   catalog?: EquipmentCatalog,
-  charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>
+  charges?: Readonly<{ random: (sides: number) => number; lines: string[] }>,
+  clockMoved = false
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -194,10 +203,11 @@ export function applyRest(
     restorePactSlots(actor, definition);
     // SRD Tireless: "Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1."
     if (holdsFeature(definition, "tireless", "Tireless")) reduceExhaustion(actor);
+    events.push(...endEffectsAtRest(state, actorId, "short"));
     return events;
   }
-  // Eight hours of sleep: Concentration ends and turn-measured effects lapse; "until ended" ones (a curse) stay.
-  events.push(...endEffectsAtLongRest(state, actorId));
+  // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
+  events.push(...endEffectsAtLongRest(state, actorId, clockMoved), ...endEffectsAtRest(state, actorId, "long"));
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
   // Every die size in the pool comes back (SRD 5.2.1 "Regain All HP").
@@ -290,17 +300,26 @@ function longRest(
   actorId: string,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   catalog: EquipmentCatalog | undefined,
-  random: ((sides: number) => number) | undefined
+  random: ((sides: number) => number) | undefined,
+  clockMoved = false
 ): EffectNarration[] {
   const lines: string[] = [];
-  const events = applyRest(state, actorId, "long", resolveDefinition, catalog, random ? { random, lines } : undefined);
+  const events = applyRest(
+    state,
+    actorId,
+    "long",
+    resolveDefinition,
+    catalog,
+    random ? { random, lines } : undefined,
+    clockMoved
+  );
   return [...events, ...lines.map((text) => ({ kind: "effect" as const, text, actorId }))];
 }
 
 /**
  * The GM rests several characters together. Every one must be able to, or none rests: the refusal names who can't and
- * why. Long: each rests now and 8 hours pass. Short: the rest opens for each player to spend Hit Dice on their own
- * device, and `finishPartyShortRest` ends it.
+ * why. Long: 8 hours pass on the game clock for everyone (what runs out in them ends), and each rests. Short: the rest
+ * opens for each player to spend Hit Dice on their own device, and `finishPartyShortRest` ends it.
  */
 export function startPartyRest(
   state: GameState,
@@ -325,10 +344,9 @@ export function startPartyRest(
     state.rest = { ...state.rest, shortRest: { actorIds: [...actorIds], done: [] } };
     return [];
   }
-  const events = members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random));
-  const clockHours = Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + LONG_REST_HOURS);
-  state.rest = { ...state.rest, clockHours };
-  for (const actor of members) actor.lastLongRestAt = clockHours;
+  const events = passGameTime(state, LONG_REST_MINUTES);
+  events.push(...members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random, true)));
+  for (const actor of members) actor.lastLongRestAt = state.rest.clockHours;
   return events;
 }
 
@@ -344,9 +362,9 @@ export function markShortRestDone(state: GameState, actorId: string, done: boole
 }
 
 /**
- * Ends the party's Short Rest. With `apply`, each member who can still rest gets its benefits and an hour passes;
- * anyone who can't any more (down, or pulled into a fight) gets nothing and a line saying why. Without, it is called
- * off and no time passes.
+ * Ends the party's Short Rest. With `apply`, each member who can still rest gets its benefits and an hour passes on
+ * the game clock for everyone; anyone who can't any more (down, or pulled into a fight) gets nothing and a line saying
+ * why. Without, it is called off and no time passes.
  */
 export function finishPartyShortRest(
   state: GameState,
@@ -369,14 +387,14 @@ export function finishPartyShortRest(
       events.push({ kind: "effect", text: `${actor.name} ${why}, so the Short Rest gives them nothing.`, actorId });
       continue;
     }
-    events.push(...applyRest(state, actorId, "short", resolveDefinition, catalog));
+    events.push(...applyRest(state, actorId, "short", resolveDefinition, catalog, undefined, true));
     rested.push(actor.name);
   }
-  state.rest = { ...state.rest, clockHours: Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + SHORT_REST_HOURS) };
+  events.push(...passGameTime(state, SHORT_REST_HOURS * 60));
   return { events, rested };
 }
 
-/** The GM moves game time forward. */
-export function passTime(state: GameState, hours: number): void {
-  state.rest = { ...state.rest, clockHours: Math.min(CLOCK_LIMIT_HOURS, state.rest.clockHours + hours) };
+/** The GM moves game time forward by hours and minutes, and what runs out in that time ends (`passGameTime`). */
+export function passTime(state: GameState, hours: number, minutes = 0): EffectNarration[] {
+  return passGameTime(state, hours * 60 + minutes);
 }

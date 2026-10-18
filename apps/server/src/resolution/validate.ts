@@ -91,6 +91,8 @@ function combatantsOf(
     !action.healing &&
     action.grants === undefined &&
     action.multiattack === undefined &&
+    action.dispel === undefined &&
+    action.endsCurses === undefined &&
     !spendsALimitedUse &&
     !startsALastingSpell &&
     input.builtin !== true

@@ -43,6 +43,7 @@ import {
 import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
+import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
 import { withSpellcasting } from "./monster-spells.js";
@@ -735,6 +736,10 @@ for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk))
     throw new Error(`Spell correction targets unknown spell ${pk} - check for a typo or an upstream rename.`);
 }
+for (const id of UPCAST_DURATION_IDS) {
+  if (!spells.some((spell) => spell.pk === `srd-2024_${id}` && spell.fields.higher_level))
+    throw new Error(`An upcast duration targets ${id}, which is not a spell with higher-level text - check for a typo.`);
+}
 for (const id of SPELL_SAVE_OVERRIDE_IDS) {
   if (!spells.some((spell) => spell.pk === `srd-2024_${id}` && spell.fields.saving_throw_ability))
     throw new Error(
@@ -1154,6 +1159,12 @@ for (const option of spellOptions) {
   spellOptionsBySpell.set(option.fields.parent, list);
 }
 
+/** The reviewed higher-slot durations, on the spells that have them. */
+const withUpcastDurations = (id: string) => {
+  const rows = upcastDurationsFor(id);
+  return rows ? { upcastDurations: rows } : {};
+};
+
 const spellRecords = onlySrd(spells).map((spell) => {
   const correction = SPELL_CORRECTIONS[spell.pk];
   if (correction) report.corrections.push(spell.pk);
@@ -1182,6 +1193,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     },
     duration: fields.duration,
     concentration: fields.concentration,
+    ...withUpcastDurations(slugOf(spell.pk)),
     ritual: fields.ritual,
     attackRoll: makesSpellAttack(fields.desc, effect),
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },

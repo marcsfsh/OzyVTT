@@ -244,6 +244,8 @@ export function spellCastMechanics(
       | "drain"
       | "endsConditions"
       | "endsOneCondition"
+      | "dispel"
+      | "endsCurses"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -279,8 +281,10 @@ export function spellCastMechanics(
         ? {
             save: {
               ...castSave,
-              dc: numbers.saveDc,
-              ...(numbers.bearersDc ? { spellcasting: true } : {}),
+              // A save the caster makes itself is at the DC the spell prints (Contact Other Plane's 15).
+              ...(effect.selfSave
+                ? { dc: effect.selfSave.dc, bySelf: true as const }
+                : { dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) }),
               ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {})
             }
           }
@@ -305,7 +309,10 @@ export function spellCastMechanics(
           endsConditions: [...effect.endsConditions],
           ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
         }
-      : {})
+      : {}),
+    // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
+    ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
+    ...(effect.endsCurses ? { endsCurses: true as const } : {})
   };
 }
 

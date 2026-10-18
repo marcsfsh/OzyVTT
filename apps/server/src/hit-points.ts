@@ -29,6 +29,7 @@ import {
   addEffect,
   applyCondition,
   DEATH_WARD_TAG,
+  endConcentrationOnTheDead,
   endConcentrationSustainedBy,
   endEffect,
   endEffectsOnDamage,
@@ -388,6 +389,8 @@ function fallToZero(
   // concentration (SRD Concentration).
   events.push(...endEffectsSustainedBy(state, actor.id));
   events.push(...endConcentrationSustainedBy(state, actor.id));
+  // A spell whose last creature just died has nothing left.
+  events.push(...endConcentrationOnTheDead(state, actor));
   return { instantDeath, defeated };
 }
 
@@ -593,7 +596,16 @@ export function applyDamageDetailed(
     );
   // Sleep, Turn Undead and the like end the moment the bearer takes any damage, and so does a Short Rest.
   if (totalAdjusted > 0)
-    events.push(...endEffectsOnDamage(state, actor), ...leaveShortRest(state, new Set([actor.id]), "took damage"));
+    events.push(
+      ...endEffectsOnDamage(
+        state,
+        actor,
+        input.sourceActorId
+          ? { actorId: input.sourceActorId, ...(deps ? { resolveDefinition: deps.resolveDefinition } : {}) }
+          : undefined
+      ),
+      ...leaveShortRest(state, new Set([actor.id]), "took damage")
+    );
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
@@ -806,6 +818,7 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
     // The same transition as damage to 0: what it sustains ends, and so does its Concentration.
     events.push(...endEffectsSustainedBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
+    events.push(...endConcentrationOnTheDead(state, actor));
   }
   events.push(...wakeOnHealing(state, actor, before));
   return events;

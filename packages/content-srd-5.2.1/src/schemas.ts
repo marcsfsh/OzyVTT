@@ -19,6 +19,7 @@ import {
   DamageDrainSchema,
   DamageFormulaSchema,
   DamageTypeSchema,
+  DispelSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
   OnHitRiderSchema,
@@ -190,10 +191,34 @@ export const SpellEffectSchema = z
     /** What a failed save against the cast leaves on the creature (Bane's -1d4, Faerie Fire's outline). */
     failureEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
-    reaction: ActionReactionSchema.optional()
+    reaction: ActionReactionSchema.optional(),
+    /** The caster makes the spell's save itself, at this DC whatever its own (Contact Other Plane's DC 15). */
+    selfSave: z
+      .object({ dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** The cast ends spells on its target (Dispel Magic). */
+    dispel: DispelSchema.optional(),
+    /** The cast ends the curses on its target and its Attunement to cursed items (Remove Curse). */
+    endsCurses: z.literal(true).optional(),
+    /** The spell keeps something of its own besides what it leaves on creatures (Entangle's tangled ground, an
+     *  earthquake's fissures), so its Concentration holds when no creature is affected any more. */
+    persistsWithoutTargets: z.literal(true).optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;
+
+/** A spell's duration from a higher spell slot, as its higher-level text prints it: from `level` up, the spell lasts
+ *  `duration` (in the grammar of the spell's own: "10 minutes", "8 hours", "until dispelled"), and needs Concentration
+ *  only when `concentration` says so (Bestow Curse from a level 5 slot needs none). */
+export const UpcastDurationSchema = z
+  .object({
+    level: z.number().int().min(1).max(9),
+    duration: z.string().min(1).max(120),
+    concentration: z.boolean()
+  })
+  .strict();
+export type UpcastDuration = z.infer<typeof UpcastDurationSchema>;
 
 export const SpellReferenceSchema = z
   .object({
@@ -233,6 +258,15 @@ export const SpellReferenceSchema = z
     }),
     duration: z.string().min(1).max(120),
     concentration: z.boolean(),
+    /** How a higher slot changes the duration and the Concentration, lowest slot first (Dominate Beast from a level 5
+     *  slot lasts 10 minutes). Absent: every slot lasts `duration`. */
+    upcastDurations: z
+      .array(UpcastDurationSchema)
+      .max(8)
+      .optional()
+      .describe(
+        "How a higher spell slot changes the duration and whether it needs Concentration, lowest slot first. Absent: every slot lasts the spell's own duration"
+      ),
     ritual: z.boolean(),
     /** The caster makes a spell attack roll, when it casts or on a later turn: read from the cast model for the SRD,
      *  since the source marks every spell whose text mentions an attack roll (Bless, Shining Smite). */

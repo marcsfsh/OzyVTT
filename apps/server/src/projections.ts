@@ -235,6 +235,7 @@ const ON_FAIL_EFFECT_FIELDS = {
   duration: "player",
   repeatSave: "player",
   endsOnDamage: "player",
+  endsOnSourceSideDamage: "player",
   speedZero: "player",
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
@@ -244,6 +245,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   sourceName: "derived",
   sourceActorId: "derived",
   castId: "never",
+  // The level a spell was cast at is the caster's to know.
+  spell: "never",
   sourceActionId: "never",
   ongoingDamage: "never",
   currentTurn: "player",
@@ -452,6 +455,8 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
+    // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
+    endsWhenUnaffected: _endsWhenUnaffected,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

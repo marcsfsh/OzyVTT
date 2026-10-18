@@ -34,6 +34,7 @@ import {
   effectDurationOf,
   endConcentrationSustainedBy,
   endEffectIfPresent,
+  endIdleConcentration,
   makeEffect,
   sourceOf,
   type ConditionImmunitySource,
@@ -451,9 +452,11 @@ export function applyFailureEffect(
       escapeDc: onFail.escapeDc,
       ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
       ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
+      ...(onFail.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
       ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
       ...(onFail.speedZero ? { speedZero: true } : {}),
       ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
+      ...(onFail.spell ? { spell: { ...onFail.spell } } : {}),
       ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
       ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
       ...(onFail.magical ? { magical: true as const } : {}),
@@ -889,6 +892,9 @@ export function answerSave(
   if (success && pending.repeatOf)
     events.push(...endEffectIfPresent(state, pending.repeatOf.actorId, pending.repeatOf.effectId));
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
+  // A spell whose last target saved has nothing left (Hold Person, Phantasmal Killer's "the spell ends").
+  const castId = pending.onFailEffect?.castId;
+  if (castId !== undefined) events.push(...endIdleConcentration(state, castId));
   // A save the GM called for reports back to the call.
   if (pending.callId !== undefined)
     recordCallResult(state, pending.callId, target.id, {

@@ -911,7 +911,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Ungated in the SRD. Cold tolerance and ignoring ice or snow difficult terrain are not modeled.
   "boots-of-the-winterlands": { grants: { damageResistances: ["cold"] } },
 
-  // 4 charges exact; the Fly Speed lasts until the wearer ends it on the sheet, the hour being the GM's to count.
+  // 4 charges exact; the Fly Speed lasts an hour of game time.
   "winged-boots": {
     charges: { regain: "1d4" },
     actions: [
@@ -920,12 +920,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Winged Flight",
         activation: "action",
         description:
-          "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land. End it on your sheet once the hour is up.",
+          "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
         uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" },
         grants: {
-          name: "Winged Flight (1 hour)",
+          name: "Winged Flight",
           tags: ["winged-flight"],
-          duration: { type: "manual" },
+          duration: { type: "minutes", minutes: 60 },
           modifiers: [{ type: "special-speed", movement: "fly", feet: 30 }]
         }
       }
@@ -1482,7 +1482,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "potion-of-healing-superior": healingPotion("Potion of Healing (superior)", "8d4 + 8"),
   "potion-of-healing-supreme": healingPotion("Potion of Healing (supreme)", "10d4 + 20"),
 
-  // "You gain a Fly Speed equal to your Speed for 1 hour and can hover." The drinker ends it once the hour is up.
+  // "You gain a Fly Speed equal to your Speed for 1 hour and can hover", an hour of game time.
   "potion-of-flying": {
     consumedOnUse: true,
     actions: [
@@ -1491,12 +1491,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Drink Potion of Flying",
         activation: "bonus-action",
         description:
-          "Drink it: you gain a Fly Speed equal to your Speed for 1 hour and can hover. If you're in the air when it wears off, you fall unless you have some other means of staying aloft. End it on your sheet once the hour is up.",
+          "Drink it: you gain a Fly Speed equal to your Speed for 1 hour and can hover. If you're in the air when it wears off, you fall unless you have some other means of staying aloft.",
         damage: [],
         grants: {
-          name: "Potion of Flying (1 hour)",
+          name: "Potion of Flying",
           tags: ["potion-of-flying"],
-          duration: { type: "manual" },
+          duration: { type: "minutes", minutes: 60 },
           modifiers: [{ type: "special-speed", movement: "fly", equalToSpeed: true, hover: true }]
         }
       }

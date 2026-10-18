@@ -226,7 +226,8 @@ function act(
   const conditionIds = save.failureConditions;
   const onFail = failureEffectFor(
     { action, attacker: caster, castId: zone.castId, riderItemId: null, deps: { catalog: deps.catalog } },
-    conditionIds
+    conditionIds,
+    { spell, level: zone.level }
   );
   // A save at the start of the creature's own turn that lasts "until the end of that turn" ends with this one.
   const currentTurn = meeting === "starts its turn in" && save.failureDuration?.type === "until-bearer-turn-end";

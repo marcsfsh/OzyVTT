@@ -772,12 +772,34 @@ const TurnEndDurationSchemas = [
   z.object({ type: z.literal("until-source-turn-end"), skipsCurrentTurn: z.boolean().default(false) }).strict()
 ] as const;
 
-/** How long a failed save's conditions last, as the text prints it: "for 1 minute" (10 rounds), "until the start of
- * the X's next turn", "until the end of its next turn" (the target's) or "until the end of your next turn" (the
- * source's). `until-bearer-next-turn` is the start of the target's own next turn (an aura it started its turn in).
- * Absent: until something ends them (a Concentration spell's with its Concentration). */
+/** The longest game-time span an effect counts: 366 days (Mass Suggestion and Planar Binding from a level 9 slot). */
+export const MAX_EFFECT_MINUTES = 527_040;
+
+/** A span of game time past ten minutes ("for 1 hour", "24 hours"), counted on the game clock: time the GM passes and
+ *  rests use it up. Ten minutes or less count rounds, ten to a minute. */
+const MinutesDurationSchema = z
+  .object({ type: z.literal("minutes"), minutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES) })
+  .strict()
+  .describe("A span of game time in minutes, used up as the game clock moves (time passing, rests).");
+
+/** "Until you finish a Long Rest" (`long`), or "a Short or Long Rest" (`short`): the bearer's next rest of that kind
+ *  ends it, whenever the clock says. */
+const UntilRestDurationSchema = z
+  .object({ type: z.literal("until-rest"), rest: z.enum(["short", "long"]) })
+  .strict()
+  .describe(
+    'Until the bearer finishes a rest: "long" ends with its next Long Rest, "short" with its next Short or Long Rest.'
+  );
+
+/** How long a failed save's conditions last, as the text prints it: "for 1 minute" (10 rounds), "for 1 hour" (60
+ * minutes of game time), "until the start of the X's next turn", "until the end of its next turn" (the target's) or
+ * "until the end of your next turn" (the source's). `until-bearer-next-turn` is the start of the target's own next turn
+ * (an aura it started its turn in). Absent: until something ends them (a Concentration spell's with its Concentration,
+ * a spell's with its duration). */
 export const SaveFailureDurationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) }).strict(),
+  MinutesDurationSchema,
+  UntilRestDurationSchema,
   z.object({ type: z.literal("until-source-next-turn") }).strict(),
   z.object({ type: z.literal("until-bearer-next-turn") }).strict(),
   z.object({ type: z.literal("until-bearer-turn-end") }).strict(),
@@ -814,6 +836,10 @@ export const EffectInstanceSchema = z
     startedRound: z.number().int().positive().default(1),
     duration: z.discriminatedUnion("type", [
       z.object({ type: z.literal("rounds"), remaining: z.number().int().min(0).max(100) }).strict(),
+      /** Game time left past ten minutes (Mage Armor's 8 hours), used up as the game clock moves. */
+      z.object({ type: z.literal("minutes"), remaining: z.number().int().min(0).max(MAX_EFFECT_MINUTES) }).strict(),
+      /** Until the bearer's next Long Rest, or Short or Long Rest (Contact Other Plane's Incapacitated). */
+      UntilRestDurationSchema,
       z.object({ type: z.literal("until-source-next-turn") }).strict(),
       /** Until the start of the bearer's own next turn (a ghast's Stench, taken as that turn starts). */
       z.object({ type: z.literal("until-bearer-next-turn") }).strict(),
@@ -870,6 +896,8 @@ export const EffectInstanceSchema = z
       .optional(),
     /** Ends early when the bearer takes any damage (Sleep, Turn Undead, Hypnotic Pattern, a knocked-out creature). */
     endsOnDamage: z.boolean().optional(),
+    /** Ends early when its source or one of the source's allies deals damage to the bearer (Charm Person). */
+    endsOnSourceSideDamage: z.literal(true).optional(),
     /** The bearer's Speed is 0 while this lasts, beyond what its conditions do (Hypnotic Pattern's charm). */
     speedZero: z.boolean().optional(),
     /** One Concentration cast: every effect it made (the caster's marker, each failed target's conditions) shares
@@ -900,8 +928,9 @@ export const EffectInstanceSchema = z
       })
       .strict()
       .optional(),
-    /** The spell this effect keeps up on its caster and the level it was cast at, so what the spell lets the caster do
-     *  on later turns (Spiritual Weapon's attack) is offered while it lasts, at that level. */
+    /** The spell that made this effect and the level it was cast at: on its caster, so what the spell lets the caster
+     *  do on later turns (Spiritual Weapon's attack) is offered while it lasts, at that level; on any creature, so
+     *  Dispel Magic can weigh it. */
     spell: z
       .object({
         id: z
@@ -915,7 +944,17 @@ export const EffectInstanceSchema = z
     /** It comes from a spell or a magic item, so a save repeated against it is one Magic Resistance helps with. */
     magical: z.literal(true).optional(),
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
-    endsOnSpellHealing: z.literal(true).optional()
+    endsOnSpellHealing: z.literal(true).optional(),
+    /** On a caster's Concentration: the spell is nothing but what it leaves on creatures (Hold Person's paralysis,
+     *  Bless's d4), so it ends once no living creature keeps any of it. */
+    endsWhenUnaffected: z.literal(true).optional(),
+    /** The bearer's Speed is multiplied by this after every other change (Haste: doubled), its special speeds too. */
+    speedMultiplier: z.number().int().min(2).max(4).optional(),
+    /** A way to work out base AC while the bearer wears no armor: this plus its Dexterity modifier, a Shield adding
+     *  (Mage Armor's 13). The best of its ways counts, and AC bonuses add to it. */
+    baseArmorClass: z.number().int().min(11).max(20).optional(),
+    /** The bearer's AC is at least this while it lasts (Barkskin's 17). */
+    armorClassFloor: z.number().int().min(10).max(25).optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1351,6 +1390,8 @@ export const EffectGrantSchema = z
           .object({ type: z.literal("rounds"), rounds: z.number().int().min(1).max(100) })
           .strict()
           .describe("A fixed number of rounds."),
+        MinutesDurationSchema,
+        UntilRestDurationSchema,
         z
           .object({ type: z.literal("until-source-next-turn") })
           .strict()
@@ -1430,7 +1471,14 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   hitPointMaximumGain: z
     .object({ amount: z.number().int().min(1).max(100), perSlot: z.number().int().min(1).max(50).optional() })
     .strict()
-    .optional()
+    .optional(),
+  /** The recipient's Speed is multiplied by this while it lasts, after every other change (Haste: 2). */
+  speedMultiplier: z.number().int().min(2).max(4).optional(),
+  /** A base AC the recipient may use while it wears no armor: this plus its Dexterity modifier, a Shield adding
+   *  (Mage Armor: 13). */
+  baseArmorClass: z.number().int().min(11).max(20).optional(),
+  /** The recipient's AC is at least this while it lasts (Barkskin: 17). */
+  armorClassFloor: z.number().int().min(10).max(25).optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
@@ -1548,6 +1596,12 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("The failure's conditions end early if the target takes any damage"),
+  /** They end early when the source or one of its allies deals damage to the target (Charm Person: "until you or your
+   *  allies damage it"). */
+  endsOnSourceSideDamage: z
+    .literal(true)
+    .optional()
+    .describe("The failure's conditions end early when the source or one of its allies deals damage to the target"),
   /** The failure also makes the target's Speed 0 while its conditions last (Hypnotic Pattern). */
   speedZero: z
     .literal(true)
@@ -1658,6 +1712,16 @@ export const SaveFailureEffectSchema = z
     endsOnSpellHealing: z.literal(true).optional()
   })
   .strict();
+
+/** How an action ends the spells on its target (SRD Dispel Magic): every spell of `automaticLevel` or lower ends, and
+ *  each higher one takes a check. */
+export const DispelSchema = z
+  .object({ automaticLevel: z.number().int().min(0).max(9) })
+  .strict()
+  .describe(
+    "Ends the spells on its target: each of this level or lower outright (a higher slot raises it to the slot's level), each higher one on a spellcasting ability check against DC 10 plus its level"
+  );
+export type Dispel = z.infer<typeof DispelSchema>;
 
 /** What bursts after an attack, hit or miss (Ice Knife's shard): the target and each creature within `radiusFeet` of it
  *  make the save, a failure taking `damage`, and `diceAddedPerSlot` more dice for each slot level above the spell's. */
@@ -1821,7 +1885,13 @@ export const ActionSchema = z
         failureEffect: SaveFailureEffectSchema.optional(),
         /** What a successful save leaves on the creature instead (Stunning Strike: its Speed halved and the next attack
          *  roll against it with Advantage). */
-        successEffect: SaveFailureEffectSchema.optional()
+        successEffect: SaveFailureEffectSchema.optional(),
+        /** The user makes this save itself, whatever it targets (Contact Other Plane: "make a DC 15 Intelligence saving
+         *  throw"). */
+        bySelf: z
+          .literal(true)
+          .optional()
+          .describe("The user makes this save itself, whatever it targets (Contact Other Plane)")
       })
       .optional()
       .describe("A printed save DC, and what the save does"),
@@ -1862,6 +1932,13 @@ export const ActionSchema = z
     endsConditions: z.array(ConditionIdSchema).min(1).max(6).optional(),
     /** It ends one of `endsConditions`, the one its user picks (Lesser Restoration); absent, it ends each one present. */
     endsOneCondition: z.literal(true).optional(),
+    /** It ends spells on its target (Dispel Magic): each of `automaticLevel` or lower ends, the slot it was cast with
+     *  raising that level, and each higher one takes its user's spellcasting ability check against DC 10 plus the
+     *  spell's level. */
+    dispel: DispelSchema.optional(),
+    /** It ends every curse on its target, and breaks the target's Attunement to a cursed magic item, whose curse stays
+     *  on the item (Remove Curse). */
+    endsCurses: z.literal(true).optional(),
     /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
      *  The resolve's targets assign them in order, a target named twice taking two. */
     darts: z.number().int().min(2).max(20).optional(),

@@ -17,7 +17,6 @@ const NO_CAST_DAMAGE: Readonly<Record<string, string>> = {
   "conjure-animals": "the pack harms on later turns",
   "conjure-elemental": "the spirit harms on later turns",
   "conjure-woodland-beings": "the spirits harm on later turns",
-  "contact-other-plane": "harms the caster on a failed save",
   "delayed-blast-fireball": "detonates later",
   "dimension-door": "harms the caster when the destination is occupied",
   "divine-favor": "a rider on later weapon hits",
@@ -75,6 +74,8 @@ const CAST_DAMAGE: Readonly<Record<string, Damage>> = {
   "spiritual-weapon": [{ formula: "1d8", type: "force", addsModifier: true }],
   "arcane-sword": [{ formula: "4d12", type: "force", addsModifier: true }],
   "conjure-fey": [{ formula: "3d12", type: "psychic", addsModifier: true }],
+  // The caster's own failed save: "you take 6d6 Psychic damage" (`CAST_SELF_SAVES`).
+  "contact-other-plane": [{ formula: "6d6", type: "psychic" }],
   // A type the caster chooses (`DAMAGE_CHOICES`); the first is the default.
   "chromatic-orb": [{ formula: "3d8", type: "acid" }],
   "sorcerous-burst": [{ formula: "1d8", type: "acid" }]
@@ -664,9 +665,9 @@ const markDamage = (type: DamageType): Modifier => ({
 
 /**
  * What a cast leaves on the creatures it targets (or the one its attack hits) while it lasts, in the effect vocabulary
- * the engine reads (SRD 5.2.1 text). The durations are the spells' own, "until ended" past 10 minutes (the engine keeps
- * no clock outside a fight); a Concentration spell's effects also end with the caster's Concentration. Mage Armor's AC
- * and Haste's Speed are measured on the creature when it lands (`grant.ts`).
+ * the engine reads (SRD 5.2.1 text). A grant "until ended" lasts the spell's own duration at the level it was cast
+ * (`grant.ts`), and a Concentration spell's effects also end with the caster's Concentration; a duration given here is
+ * one the text prints apart from the spell's (Guiding Bolt's light).
  */
 const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   // "Its Speed is reduced by 10 feet until the start of your next turn."
@@ -716,14 +717,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: rounds(100),
     armorClassBonus: 2
   }),
-  // The next attack roll against the creature before the end of the caster's next turn, whoever makes it, which
-  // spends the light; it lasts until the start of the caster's turn after, as Vex does.
+  // "The next attack roll made against it before the end of your next turn has Advantage": whoever makes it spends the
+  // light.
   "guiding-bolt": spellGrant({
     name: "Guiding Bolt's light",
     tags: ["until-attacked"],
     target: "target",
     onHit: true,
-    duration: rounds(2),
+    duration: { type: "until-source-turn-end" },
     modifiers: [attackedWithAdvantage]
   }),
   "hunters-mark": spellGrant({
@@ -733,9 +734,10 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [markDamage("force")]
   }),
+  // "You place a curse on a creature", which Remove Curse ends.
   hex: spellGrant({
     name: "Hex",
-    tags: ["hexed"],
+    tags: ["hexed", "curse"],
     target: "target",
     duration: { type: "manual" },
     modifiers: [markDamage("necrotic")]
@@ -825,8 +827,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
     ]
   }),
-  // "An Armor Class of 17 if its AC is lower than that", measured as the spell lands.
-  barkskin: spellGrant({ name: "Barkskin", tags: ["barkskin"], target: "target", duration: { type: "manual" } }),
+  // "The target has an Armor Class of 17 if its AC is lower than that."
+  barkskin: spellGrant({
+    name: "Barkskin",
+    tags: ["barkskin"],
+    target: "target",
+    duration: { type: "manual" },
+    armorClassFloor: 17
+  }),
   // "The first time the target would drop to 0 Hit Points before the spell ends, the target instead drops to 1 Hit
   // Point, and the spell ends."
   "death-ward": spellGrant({
@@ -866,11 +874,13 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     conditions: ["invisible"]
   }),
+  // "The target's base AC becomes 13 plus its Dexterity modifier", a way to work out AC that riders add to.
   "mage-armor": spellGrant({
     name: "Mage Armor",
     tags: ["mage-armor"],
     target: "target",
-    duration: { type: "manual" }
+    duration: { type: "manual" },
+    baseArmorClass: 13
   }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
@@ -904,11 +914,13 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
   }),
+  // "The target's Speed is doubled", whatever its Speed is at each moment.
   haste: spellGrant({
     name: "Haste",
     tags: ["hasted"],
     target: "target",
     duration: rounds(10),
+    speedMultiplier: 2,
     armorClassBonus: 2,
     modifiers: [
       {
@@ -944,6 +956,20 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
   // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).
   "vitriolic-sphere": { name: "Vitriolic Sphere", tags: ["vitriolic-sphere"], duration: rounds(1), modifiers: [] },
+  // "Has Disadvantage on ability checks and attack rolls for the duration", and the save at the end of each of its turns
+  // ends the spell on a success.
+  "phantasmal-killer": {
+    name: "Phantasmal Killer",
+    tags: ["phantasmal-killer"],
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "disadvantage" },
+      { type: "roll-mode", roll: "check", mode: "disadvantage" }
+    ]
+  },
+  // "Become cursed for the duration": the curse the caster picks is the GM's to apply, and Remove Curse ends it.
+  "bestow-curse": { name: "Bestow Curse", tags: ["curse"], modifiers: [] },
+  // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."
+  geas: { name: "Geas", tags: ["curse"], modifiers: [] },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
   "vicious-mockery": {
     name: "Vicious Mockery",
@@ -952,6 +978,24 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
     modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage" }]
   }
 };
+
+/** Saves the caster makes itself at a printed DC (SRD Contact Other Plane: "When you cast this spell, make a DC 15
+ *  Intelligence saving throw"). */
+const CAST_SELF_SAVES: Readonly<Record<string, NonNullable<SpellEffect["selfSave"]>>> = {
+  "contact-other-plane": { dc: 15 }
+};
+
+/** What a cast ends on its target (SRD 5.2.1 text): Dispel Magic's spells of level 3 or lower, and Remove Curse's
+ *  curses. */
+const CAST_DISPELS: Readonly<Record<string, NonNullable<SpellEffect["dispel"]>>> = {
+  "dispel-magic": { automaticLevel: 3 }
+};
+const CAST_ENDS_CURSES: ReadonlySet<string> = new Set(["remove-curse"]);
+
+/** Concentration spells that keep a part of their own besides what they leave on creatures, so they don't end when no
+ *  creature is affected any more: Entangle's tangled ground, an earthquake's shaking ground and fissures, and the storm
+ *  cloud of Storm of Vengeance. */
+const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set(["earthquake", "entangle", "storm-of-vengeance"]);
 
 /** Areas the text gives no template shape for (a wall, a thing placed at a point), so the GM can place them on the
  *  map: a straight wall as a 5-foot-wide Line (a ringed one is the GM's to draw), and a sphere, guardian or pack as the
@@ -993,6 +1037,8 @@ export function spellEffectFor(
   const drain = CAST_DRAINS[id];
   const cures = CAST_CURES[id];
   const burst = CAST_BURSTS[id];
+  const dispel = CAST_DISPELS[id];
+  const selfSave = CAST_SELF_SAVES[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
@@ -1012,7 +1058,11 @@ export function spellEffectFor(
       : {}),
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
-    ...(reaction ? { reaction } : {})
+    ...(reaction ? { reaction } : {}),
+    ...(selfSave ? { selfSave: { ...selfSave } } : {}),
+    ...(dispel ? { dispel: { ...dispel } } : {}),
+    ...(CAST_ENDS_CURSES.has(id) ? { endsCurses: true as const } : {}),
+    ...(PERSISTS_WITHOUT_TARGETS.has(id) ? { persistsWithoutTargets: true as const } : {})
   };
 }
 
@@ -1090,5 +1140,9 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_CURES),
   ...Object.keys(CAST_HEALING),
   ...Object.keys(SAVE_FAILURE_EFFECTS),
-  ...Object.keys(SPELL_AREAS)
+  ...Object.keys(SPELL_AREAS),
+  ...Object.keys(CAST_DISPELS),
+  ...Object.keys(CAST_SELF_SAVES),
+  ...CAST_ENDS_CURSES,
+  ...PERSISTS_WITHOUT_TARGETS
 ];
