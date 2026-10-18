@@ -381,6 +381,7 @@ function TextHelper({ draft, onDraft }: StepProps) {
 export function equipmentSummaryOf(draft: Draft, id: string): ContentEquipmentSummary {
   const weapon = draft.weapon as ContentEquipmentSummary["weapon"] | undefined;
   const armor = draft.armor as ContentEquipmentSummary["armor"] | undefined;
+  const attunement = draft.attunement as { required?: boolean; restrictedTo?: string[] } | undefined;
   return {
     id,
     name: typeof draft.name === "string" && draft.name.trim() ? draft.name : "Untitled item",
@@ -390,7 +391,11 @@ export function equipmentSummaryOf(draft: Draft, id: string): ContentEquipmentSu
     description: typeof draft.description === "string" ? draft.description : null,
     weapon: weapon ?? null,
     armor: armor && typeof armor.acBase === "number" ? armor : null,
-    appliesTo: null
+    appliesTo: null,
+    rarity: typeof draft.rarity === "string" && draft.rarity ? draft.rarity : null,
+    attunement: attunement
+      ? { required: attunement.required === true, restrictedTo: attunement.restrictedTo ?? [] }
+      : null
   } as ContentEquipmentSummary;
 }
 

@@ -677,6 +677,12 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     armor: item.armor ?? null,
     // The template eligibility list, for the base chooser. Printed SRD text plus resolved ids; nothing GM-secret.
     appliesTo: item.appliesTo ?? null,
+    // Rarity and attunement are what the printed line in the description already says, so they are public to every
+    // reader who receives the item.
+    rarity: item.rarity ?? null,
+    attunement: item.attunement
+      ? { required: item.attunement.required, restrictedTo: [...item.attunement.restrictedTo] }
+      : null,
     // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
     ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
     // The levels a Spell Scroll can bear, as its name says, for the picker's spell step.

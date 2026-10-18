@@ -70,6 +70,13 @@ describe("bundled reference content exposed to the client", () => {
       weapon: null,
       armor: null
     });
+    // Rarity and attunement say what the item's printed line says, and no mechanics travel with them.
+    const wand = equipment.find((item) => item.id === "wand-of-the-war-mage-1")!;
+    expect(wand).toMatchObject({ rarity: "uncommon", attunement: { required: true } });
+    expect(wand.description).toContain("Wand, Uncommon (Requires Attunement by a Spellcaster).");
+    for (const key of ["modifiers", "effects", "actions", "casts", "cursed", "uses", "grants"])
+      expect(wand, key).not.toHaveProperty(key);
+    expect(equipment.find((item) => item.id === "thieves-tools")).toMatchObject({ rarity: null, attunement: null });
     // The attribution line is available for any surface that renders the catalog (CC-BY requirement).
     expect(library.attribution).toContain("System Reference Document 5.2.1");
   });
