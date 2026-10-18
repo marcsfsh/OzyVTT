@@ -29,7 +29,7 @@ import {
   sortScenes,
   writeSceneFilters,
   setOrDelete
-} from "./sceneList";
+} from "./scene-lists";
 import { SceneFiltersFlyout, SceneListToolbar } from "./SceneListToolbar";
 import { MapThumb, StateChip } from "./pieces";
 

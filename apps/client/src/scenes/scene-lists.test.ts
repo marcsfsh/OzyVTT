@@ -8,7 +8,7 @@ import {
   readMapFilters,
   sortMaps,
   writeMapFilters
-} from "../maps/mapList";
+} from "../maps/map-lists";
 import { backPathOf, pathForMap, pathForScene } from "./routes";
 import { drawnLine, factsOf, lightLine, needsOf, tokensLine } from "./sceneFacts";
 import {
@@ -22,7 +22,7 @@ import {
   sortParam,
   sortScenes,
   writeSceneFilters
-} from "./sceneList";
+} from "./scene-lists";
 
 // What the scene and map tables say, filter and sort on, worked out without a screen.
 

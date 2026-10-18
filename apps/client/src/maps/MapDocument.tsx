@@ -22,7 +22,7 @@ import { pathForMap, pathForScene, SCENES_PATHS } from "../scenes/routes";
 import { gridLine, gridStateOf, whenLabel } from "../scenes/sceneFacts";
 import { PaneDivider, useMomentShare } from "../table/PaneDivider";
 import { folderNamesOf, useMapActions } from "./mapActions";
-import { MAP_KIND_LABEL, MAP_KINDS } from "./mapList";
+import { MAP_KIND_LABEL, MAP_KINDS } from "./map-lists";
 import type { MapKind } from "./map-catalog";
 import "../scenes/scene-page.css";
 

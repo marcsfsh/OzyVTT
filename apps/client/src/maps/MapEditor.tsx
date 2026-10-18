@@ -19,7 +19,7 @@ import { useScenes } from "../scenes/context";
 import { backPathOf, MAP_STEPS, pathForMap, SCENES_PATHS, type MapStep } from "../scenes/routes";
 import { gridLine, gridStateOf } from "../scenes/sceneFacts";
 import { folderNamesOf, useMapActions } from "./mapActions";
-import { MAP_KIND_LABEL, MAP_KINDS } from "./mapList";
+import { MAP_KIND_LABEL, MAP_KINDS } from "./map-lists";
 import { uploadMap, type MapAsset, type MapKind } from "./map-catalog";
 import { useCalibration } from "./useCalibration";
 import { EditorFrame } from "../scenes/EditorFrame";

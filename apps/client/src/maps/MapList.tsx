@@ -6,7 +6,7 @@ import { pathForMap, SCENES_PATHS } from "../scenes/routes";
 import { gridLine, gridStateOf, whenLabel } from "../scenes/sceneFacts";
 import { folderNamesOf, useMapActions } from "./mapActions";
 import { replaceQuery, useRoute } from "../router";
-import { readSort, setOrDelete, sortParam } from "../scenes/sceneList";
+import { readSort, setOrDelete, sortParam } from "../scenes/scene-lists";
 import {
   DEFAULT_MAP_SORT,
   filterMaps,
@@ -15,7 +15,7 @@ import {
   readMapFilters,
   sortMaps,
   writeMapFilters
-} from "./mapList";
+} from "./map-lists";
 import { MapFiltersFlyout, MapListToolbar } from "./MapListToolbar";
 import type { MapAsset } from "./map-catalog";
 

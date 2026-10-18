@@ -1,7 +1,7 @@
 import { Button, Eyebrow } from "@vtt/ui";
 import { FilterChips, FilterFlyout, FiltersButton } from "../codex/shared/FilterFlyout";
 import { ModifiedDropdown, OneChoice, SortButton, TickDropdown } from "../scenes/listTools";
-import type { SortLevel } from "../scenes/sceneList";
+import type { SortLevel } from "../scenes/scene-lists";
 import {
   activeMapFilterCount,
   MAP_KIND_LABEL,
@@ -11,7 +11,7 @@ import {
   NO_MAP_FILTERS,
   type MapFilters,
   type MapSortKey
-} from "./mapList";
+} from "./map-lists";
 
 export const MAP_FILTERS_ID = "sc-map-filters";
 

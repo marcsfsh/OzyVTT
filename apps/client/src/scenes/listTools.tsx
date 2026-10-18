@@ -3,7 +3,7 @@ import { Button, Eyebrow, Input } from "@vtt/ui";
 import { Dropdown } from "../codex/shared/Dropdown";
 import { FilterChips } from "../codex/shared/FilterFlyout";
 import { SortDialog, type SortLevelOf } from "../codex/shared/SortDialog";
-import { firstSortDirection, modifiedRangeLabel, sortDirectionLabel, sortSummary } from "./sceneList";
+import { firstSortDirection, modifiedRangeLabel, sortDirectionLabel, sortSummary } from "./scene-lists";
 
 /**
  * The pieces both tables' toolbars are built from, over the Codex's shared Dropdown, chips and Sort dialog: a

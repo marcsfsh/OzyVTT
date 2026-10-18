@@ -12,7 +12,7 @@ import {
   type SceneFilters,
   type SceneSortKey,
   type SortLevel
-} from "./sceneList";
+} from "./scene-lists";
 
 export const SCENE_FILTERS_ID = "sc-scene-filters";
 
