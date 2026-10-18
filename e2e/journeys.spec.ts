@@ -91,7 +91,7 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expect(gm.getByText("That is not the GM password. Check it and try again.")).toBeVisible();
   await press(gm.getByRole("button", { name: "Forgot the password" }));
   const reset = gm.getByRole("dialog", { name: "Reset the GM password" });
-  await expect(reset.getByText("data/auth.json")).toBeVisible();
+  await expect(reset.getByText("apps/server/data/auth.json")).toBeVisible();
   await expectPageFits(gm);
   await press(reset.getByRole("button", { name: "Close" }));
   await fillIn(gm.getByPlaceholder("GM password"), GM_PASSWORD);

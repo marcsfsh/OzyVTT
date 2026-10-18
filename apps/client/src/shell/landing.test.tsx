@@ -51,7 +51,7 @@ describe("the GM sign-in", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Forgot the password" }));
     const dialog = screen.getByRole("dialog", { name: "Reset the GM password" });
-    expect(dialog).toHaveTextContent("Delete the file data/auth.json");
+    expect(dialog).toHaveTextContent("Delete the file apps/server/data/auth.json");
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
   });

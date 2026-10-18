@@ -233,7 +233,8 @@ export function ResetSteps() {
       <ol>
         <li>Stop OzyVTT there.</li>
         <li>
-          Delete the file <code>data/auth.json</code> in the OzyVTT folder.
+          Delete the file <code>apps/server/data/auth.json</code> in the OzyVTT folder. If you set <code>DATA_DIR</code>{" "}
+          or run OzyVTT in Docker, delete <code>auth.json</code> from that folder or volume.
         </li>
         <li>Start OzyVTT again and set a new password on that computer.</li>
       </ol>
