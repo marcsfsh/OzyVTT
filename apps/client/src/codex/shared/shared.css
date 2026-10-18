@@ -84,6 +84,67 @@
   color: var(--violet-hi);
 }
 
+/* ----- Who sees a whole record: three segments with the word under them ----- */
+.cx-whoswitch {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.cx-whoswitch-track {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.cx-whoswitch-option,
+.nh-menu-trigger.cx-whoswitch-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.1 var(--font-label);
+  cursor: pointer;
+}
+.cx-whoswitch-option:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+.cx-whoswitch-option.is-on {
+  background: var(--tab-on);
+  box-shadow: var(--tab-on-sheen);
+  color: var(--text);
+}
+.cx-whoswitch-option.is-hidden.is-on {
+  border-color: var(--rim-gm);
+  color: var(--violet-hi);
+}
+.cx-whoswitch-option.is-everyone.is-on {
+  border-color: var(--indigo);
+  color: var(--indigo-text);
+}
+.cx-whoswitch-option.is-characters.is-on {
+  border-color: var(--cyan);
+  color: var(--cyan-hi);
+}
+.cx-whoswitch-word {
+  max-width: 22rem;
+  overflow: hidden;
+  color: var(--text-dim);
+  font: 600 var(--fs-2xs) / 1.2 var(--font-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-whoswitch-word.is-reason {
+  color: var(--text-muted);
+}
+
 /* ----- The hidden block ----- */
 .cx-block {
   --cx-block-hue: var(--rim-gm);

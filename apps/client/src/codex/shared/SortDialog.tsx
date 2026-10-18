@@ -16,6 +16,7 @@ export function SortDialog<Key extends string>({
   directionLabel,
   firstDirection,
   maxLevels = 4,
+  align = "center",
   onCancel,
   onSort
 }: Readonly<{
@@ -28,6 +29,8 @@ export function SortDialog<Key extends string>({
   /** The direction a column starts in when it is chosen: dates newest first, words A to Z. */
   firstDirection: (key: Key) => SortDirection;
   maxLevels?: number;
+  /** A phone's list opens it as a sheet from the bottom, under the thumb. */
+  align?: "center" | "bottom";
   onCancel: () => void;
   onSort: (levels: readonly SortLevelOf<Key>[]) => void;
 }>) {
@@ -50,6 +53,7 @@ export function SortDialog<Key extends string>({
       open
       onClose={onCancel}
       size="sm"
+      align={align}
       title="Sort"
       className="cx-sortdialog"
       footer={

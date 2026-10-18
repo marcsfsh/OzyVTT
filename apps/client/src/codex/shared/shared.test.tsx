@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { EVERYONE, HIDDEN, audienceLabel, revealedLabel, sinceLabel, toggleCharacter, type Audience } from "./audience";
-import { AudienceChip, FieldAudienceToggle, WhoSeesItMenu } from "./WhoSeesIt";
+import { AudienceChip, FieldAudienceToggle, WhoSeesItMenu, WhoSeesItSwitch } from "./WhoSeesIt";
 import { HiddenBlock } from "./HiddenBlock";
 import { RevealPanel } from "./RevealPanel";
 import { FilterChips, FilterFlyout, FiltersButton } from "./FilterFlyout";
@@ -87,6 +87,38 @@ describe("Who sees it", () => {
     await user.click(screen.getByLabelText("Who sees The debt: Everyone"));
     await user.click(screen.getByRole("menuitemradio", { name: "Everyone" }));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("sets a whole record's audience inline, with who it reaches said under the switch", async () => {
+    const user = userEvent.setup();
+    function Record() {
+      const [value, setValue] = useState<Audience>(HIDDEN);
+      return <WhoSeesItSwitch value={value} party={PARTY} onChange={setValue} what="Brine Burst" />;
+    }
+    render(<Record />);
+    const group = within(screen.getByRole("group", { name: "Who sees Brine Burst" }));
+    expect(group.getByRole("button", { name: "Hidden" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("Hidden");
+    await user.click(group.getByLabelText("Who sees Brine Burst: choose characters"));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Lyra Emberwise" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Revealed to Lyra Emberwise");
+    await user.click(group.getByRole("button", { name: "Everyone" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Revealed to everyone");
+  });
+
+  it("keeps a record that cannot be shown at its audience, and says why under the switch", () => {
+    render(
+      <WhoSeesItSwitch
+        value={HIDDEN}
+        party={PARTY}
+        onChange={vi.fn()}
+        what="Lantern Bearer"
+        disabledReason="Publish it before you share it."
+      />
+    );
+    const group = within(screen.getByRole("group", { name: "Who sees Lantern Bearer" }));
+    for (const name of ["Hidden", "Everyone", "Characters"]) expect(group.getByRole("button", { name })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Publish it before you share it.");
   });
 
   it("toggles a field between Everyone and Hidden, with the word under the switch", async () => {
@@ -240,6 +272,15 @@ describe("The filter flyout", () => {
       </div>
     );
   }
+
+  it("names its Close button after what it holds", () => {
+    render(
+      <FilterFlyout id="spells" open title="Spells" closeLabel="Close the table" onClose={vi.fn()}>
+        <p>Rows</p>
+      </FilterFlyout>
+    );
+    expect(screen.getByRole("button", { name: "Close the table" })).toBeInTheDocument();
+  });
 
   it("opens from Filters and closes with Close, out of the way", async () => {
     const user = userEvent.setup();

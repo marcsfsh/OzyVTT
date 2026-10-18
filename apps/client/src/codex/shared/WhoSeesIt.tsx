@@ -1,5 +1,13 @@
 import { IconCheck, IconEye, IconEyeOff, IconUser, Menu, MenuItem, cx } from "@vtt/ui";
-import { EVERYONE, HIDDEN, audienceLabel, toggleCharacter, type Audience, type PartyCharacter } from "./audience";
+import {
+  EVERYONE,
+  HIDDEN,
+  audienceLabel,
+  revealedLabel,
+  toggleCharacter,
+  type Audience,
+  type PartyCharacter
+} from "./audience";
 import "./shared.css";
 
 function AudienceIcon({ value }: Readonly<{ value: Audience }>) {
@@ -125,5 +133,97 @@ export function FieldAudienceToggle({
         {hidden ? "Hidden" : "Everyone"}
       </span>
     </span>
+  );
+}
+
+/**
+ * Who sees a whole record, inline with its title: Hidden, Everyone or chosen characters as three segments, with the
+ * word under them so the control stays put when the word changes. Characters opens the party to tick. A record that
+ * cannot be shown yet (a draft) keeps the control at Hidden, with the reason under it.
+ */
+export function WhoSeesItSwitch({
+  value,
+  party,
+  onChange,
+  what,
+  word,
+  disabledReason = null,
+  className
+}: Readonly<{
+  value: Audience;
+  party: readonly PartyCharacter[];
+  onChange: (next: Audience) => void;
+  /** What the control sets, for its accessible name: "Who sees Brine Burst". */
+  what: string;
+  /** The word under the control; "Revealed to Lyra Emberwise" when the caller has none of its own. */
+  word?: string;
+  /** Why the control cannot change now; it is said under it in place of the word. */
+  disabledReason?: string | null;
+  className?: string;
+}>) {
+  const disabled = disabledReason !== null;
+  const chosen = value.audience === "characters" ? value.characterIds : [];
+  const segment = (audience: Audience["audience"]) =>
+    cx("cx-whoswitch-option", "interactive", value.audience === audience && "is-on", `is-${audience}`);
+  return (
+    <div className={cx("cx-whoswitch", className)}>
+      <div className="cx-whoswitch-track" role="group" aria-label={`Who sees ${what}`}>
+        <button
+          type="button"
+          className={segment("hidden")}
+          aria-pressed={value.audience === "hidden"}
+          disabled={disabled}
+          onClick={() => value.audience !== "hidden" && onChange(HIDDEN)}
+        >
+          <IconEyeOff className="cx-aud-icon" />
+          Hidden
+        </button>
+        <button
+          type="button"
+          className={segment("everyone")}
+          aria-pressed={value.audience === "everyone"}
+          disabled={disabled}
+          onClick={() => value.audience !== "everyone" && onChange(EVERYONE)}
+        >
+          <IconEye className="cx-aud-icon" />
+          Everyone
+        </button>
+        {disabled || party.length === 0 ? (
+          <button type="button" className={segment("characters")} disabled aria-pressed={false}>
+            <IconUser className="cx-aud-icon" />
+            Characters
+          </button>
+        ) : (
+          <Menu
+            align="end"
+            label={`Who sees ${what}: choose characters`}
+            className="cx-whoswitch-menu"
+            triggerClassName={segment("characters")}
+            hideCaret
+            trigger={
+              <>
+                <IconUser className="cx-aud-icon" />
+                Characters
+              </>
+            }
+          >
+            {party.map((character) => (
+              <MenuItem
+                key={character.id}
+                role="menuitemcheckbox"
+                aria-checked={chosen.includes(character.id)}
+                icon={chosen.includes(character.id) ? <IconCheck /> : <IconUser />}
+                onClick={() => onChange(toggleCharacter(value, character.id))}
+              >
+                {character.name}
+              </MenuItem>
+            ))}
+          </Menu>
+        )}
+      </div>
+      <span className={cx("cx-whoswitch-word", disabled && "is-reason")} role="status">
+        {disabledReason ?? word ?? revealedLabel(value, party)}
+      </span>
+    </div>
   );
 }
