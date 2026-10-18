@@ -37,7 +37,7 @@ const STEP_ASK: Readonly<Record<MapStep, string>> = {
   upload: "Choose the image. Name it and file it now, or later.",
   grid: "Mark the printed grid, or a distance you know, so tokens snap and rulers measure.",
   check: "Check a far point against the grid, then save it.",
-  use: "Name the map, file it, and start a scene on it."
+  use: "Name the map and file it. A battle map can start a scene from here."
 };
 
 /** The first step: the image and what to call it. Upload adds it to the library and opens its Grid step. */

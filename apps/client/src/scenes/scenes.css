@@ -341,9 +341,6 @@
   flex: 1 1 auto;
   min-height: 0;
 }
-.sc-grow {
-  flex: 1 1 auto;
-}
 .sc-list-body {
   padding: var(--space-2) var(--pane-gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
   overscroll-behavior: contain;
