@@ -23,8 +23,9 @@ export function useMapTree<M extends TreeMap>(maps: readonly M[], currentMapId: 
   }, [maps, currentMapId]);
 }
 
-/** The map the atlas opens on when the address names none: the first top-level map. */
-export function defaultMapId(maps: readonly TreeMap[]): string | null {
+/** The map the atlas opens on when the address names none: where the party is, else the first top-level map. */
+export function defaultMapId(maps: readonly TreeMap[], partyMapId: string | null = null): string | null {
+  if (partyMapId && maps.some((map) => map.id === partyMapId)) return partyMapId;
   return maps.find((map) => map.parentMapId === null)?.id ?? maps[0]?.id ?? null;
 }
 

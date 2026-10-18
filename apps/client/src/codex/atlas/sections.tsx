@@ -40,6 +40,7 @@ export function PlayerAtlasSection() {
       onFilterChange={setFilter}
       onQueryChange={setQuery}
       onOpen={go}
+      partyMapId={feeds.party?.marker.mapId ?? null}
     />
   );
 }

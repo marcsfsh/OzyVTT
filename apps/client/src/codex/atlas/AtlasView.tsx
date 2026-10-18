@@ -51,6 +51,8 @@ type AtlasMeta = Readonly<{
   maps: readonly CodexMap[];
   pages: readonly CodexPageSummary[];
   assets: readonly MapAsset[];
+  /** The map the party pin is on, which the atlas opens on. */
+  partyMapId: string | null;
 }>;
 type PanelTab = "pins" | "maps" | "details";
 type PhoneView = "map" | PanelTab;
@@ -101,12 +103,13 @@ export function AtlasView({
   const { toast } = useToast();
   const meta = useCodexQuery(
     useCallback(async (): Promise<AtlasMeta> => {
-      const [maps, pages, assets] = await Promise.all([
+      const [maps, pages, assets, party] = await Promise.all([
         atlasApi.listMaps(gmToken),
         codexApi.listPages(gmToken),
-        atlasApi.listAssets(gmToken).catch(() => [])
+        atlasApi.listAssets(gmToken).catch(() => []),
+        codexApi.party(gmToken).catch(() => null)
       ]);
-      return { maps, pages, assets };
+      return { maps, pages, assets, partyMapId: party?.marker.mapId ?? null };
     }, [gmToken]),
     { failure: "Could not load the atlas." }
   );
@@ -121,7 +124,7 @@ export function AtlasView({
   useEffect(() => {
     if (mapId) setChosenMapId(mapId);
   }, [mapId]);
-  const currentMapId = chosenMapId ?? defaultMapId(maps);
+  const currentMapId = chosenMapId ?? defaultMapId(maps, meta.data?.partyMapId ?? null);
   const readPins = useCallback(() => atlasApi.listMarkers(gmToken, currentMapId ?? ""), [gmToken, currentMapId]);
   const pinFeed = useCodexQuery(currentMapId ? readPins : null);
   const markers = currentMapId && !pinFeed.error ? (pinFeed.data ?? EMPTY) : EMPTY;
@@ -213,6 +216,9 @@ export function AtlasView({
     () => (layers.factions ? factionGround(shownPins, pages) : undefined),
     [layers.factions, shownPins, pages]
   );
+  const partyPin = markers.find((marker) => marker.isParty) ?? null;
+  // The map opens on the party when it is here; once open, the camera is the reader's.
+  const partyFocus = useMemo(() => (partyPin ? { x: partyPin.x, y: partyPin.y } : null), [partyPin?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const hiddenPinCount = markers.filter((marker) => !marker.revealedToPlayers).length;
   const hiddenMapCount = children.filter((map) => !map.revealedToPlayers).length;
   const pageTitle = useCallback((id: string) => pages.find((page) => page.id === id)?.title ?? null, [pages]);
@@ -388,6 +394,7 @@ export function AtlasView({
       assetId={currentMap.assetId}
       ariaLabel={currentMap.name}
       pins={shownPins}
+      initialFocus={partyFocus}
       selectedPinId={pinId}
       dimmedPinIds={dimmed}
       people={people}

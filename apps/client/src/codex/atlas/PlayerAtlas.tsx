@@ -30,10 +30,13 @@ export function PlayerAtlas({
   query,
   onFilterChange,
   onQueryChange,
-  onOpen
+  onOpen,
+  partyMapId = null
 }: Readonly<{
   token: string;
   maps: readonly PlayerCodexMap[];
+  /** The map the party pin is on, when this player can see it: the atlas opens there. */
+  partyMapId?: string | null;
   pages: readonly PlayerCodexPageSummary[];
   /** From `/codex/atlas/:mapId`. Null opens the first top-level map. */
   mapId: string | null;
@@ -43,7 +46,7 @@ export function PlayerAtlas({
   onOpen: (path: string) => void;
 }>) {
   const phone = useMediaQuery(ATLAS_PHONE_QUERY);
-  const currentMapId = mapId ?? defaultMapId(maps);
+  const currentMapId = mapId ?? defaultMapId(maps, partyMapId);
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
   const { roots, chain, children } = useMapTree(maps, currentMapId);
   const parentName = currentMap?.parentMapId
@@ -64,6 +67,8 @@ export function PlayerAtlas({
     () => (layers.factions ? factionGround(pins, pages) : undefined),
     [layers.factions, pins, pages]
   );
+  const partyPin = pins.find((pin) => pin.isParty) ?? null;
+  const partyFocus = useMemo(() => (partyPin ? { x: partyPin.x, y: partyPin.y } : null), [partyPin?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tab, setTab] = useState<PanelTab>("pins");
   const [phoneView, setPhoneView] = useState<PhoneView>("map");
   const [centerOn, setCenterOn] = useState<string | null>(null);
@@ -80,6 +85,7 @@ export function PlayerAtlas({
       assetId={currentMap.assetId}
       ariaLabel={currentMap.name}
       pins={pins}
+      initialFocus={partyFocus}
       selectedPinId={selectedId}
       dimmedPinIds={dimmed}
       people={people}

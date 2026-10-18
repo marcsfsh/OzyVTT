@@ -67,8 +67,8 @@ export type AtlasMapProps = Readonly<{
   /** A one-shot request to centre on a pin, kept apart from selection so a tap never moves the map under a finger. */
   centerOnPinId?: string | null;
   onCentered?: () => void;
-  /** Where the camera starts, in image pixels; the whole map when absent. */
-  initialFocus?: Readonly<{ x: number; y: number; zoom: number }> | null;
+  /** Where the camera starts, in image pixels, and how far in; the map's middle, filling the frame, when absent. */
+  initialFocus?: Readonly<{ x: number; y: number; zoom?: number }> | null;
   /** A label for the map in words, for assistive technology. */
   ariaLabel?: string;
   onPinClick?: (pinId: string) => void;
@@ -129,17 +129,37 @@ export function AtlasMap({
   const width = image.status === "ready" ? image.width : 0;
   const height = image.status === "ready" ? image.height : 0;
 
-  // A new image passes through loading, where its size reads 0, so it refits even at the same size.
+  /**
+   * The camera starts with the map filling its frame, centred on the focus when there is one. It waits for the frame's
+   * size, and a new image passes through loading, where its size reads 0, so it refits even at the same size. After
+   * that the camera is the reader's: a resize or a new focus never moves a map someone is looking at.
+   */
+  const fittedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!width) return;
-    setCamera(
-      initialFocus
-        ? { cx: initialFocus.x, cy: initialFocus.y, zoom: clampZoom(initialFocus.zoom) }
-        : { cx: width / 2, cy: height / 2, zoom: 1 }
-    );
-    // The focus is where the camera starts; a later change of it never moves a map someone is looking at.
+    if (image.status !== "ready") fittedFor.current = null;
+  }, [image.status]);
+  useEffect(() => {
+    if (!width || !frame.width || !frame.height || fittedFor.current === assetId) return;
+    fittedFor.current = assetId;
+    const contain = Math.min(frame.width / width, frame.height / height);
+    const cover = Math.max(frame.width / width, frame.height / height);
+    const zoom = clampZoom(initialFocus?.zoom ?? cover / contain);
+    const viewW = width / zoom;
+    const viewH = height / zoom;
+    // Keep the centre where the view still lies on the map.
+    const clampAxis = (value: number, size: number, view: number) =>
+      view >= size ? size / 2 : Math.min(size - view / 2, Math.max(view / 2, value));
+    setCamera({
+      cx: clampAxis(initialFocus?.x ?? width / 2, width, viewW),
+      cy: clampAxis(initialFocus?.y ?? height / 2, height, viewH),
+      zoom
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, assetId]);
+  }, [width, height, assetId, frame.width, frame.height]);
+  // jsdom and a frame that never measures: fall back to the whole map.
+  useEffect(() => {
+    if (width && !camera && (!frame.width || !frame.height)) setCamera({ cx: width / 2, cy: height / 2, zoom: 1 });
+  }, [width, height, frame.width, frame.height, camera]);
 
   // The frame's size in CSS pixels, which turns screen sizes into map units.
   useEffect(() => {
