@@ -710,9 +710,14 @@ export function endEncounterEffects(state: GameState, combatantIds: readonly str
 /**
  * Game time passing for `actorIds` (time the GM passes, a rest): an effect measured in rounds loses 10 for each minute,
  * one measured in minutes loses them, and one measured in turns ends. What runs out ends as at a turn boundary, its
- * on-end grants firing; "until ended" effects stay.
+ * on-end grants firing; "until ended" effects stay. With `countDown` false, what lasts longer is left as it is.
  */
-export function ageEffects(state: GameState, actorIds: ReadonlySet<string>, minutes: number): EffectNarration[] {
+export function ageEffects(
+  state: GameState,
+  actorIds: ReadonlySet<string>,
+  minutes: number,
+  countDown = true
+): EffectNarration[] {
   const events: EffectNarration[] = [];
   if (minutes <= 0) return events;
   for (const actor of state.actors) {
@@ -726,7 +731,7 @@ export function ageEffects(state: GameState, actorIds: ReadonlySet<string>, minu
       if (left <= 0) {
         if (current.tags.includes(STABLE_RECOVERY_TAG)) events.push(...stableRecovers(actor));
         endEffectInternal(state, actor, current.id, events, true);
-      } else
+      } else if (countDown)
         actor.effects = actor.effects.map((candidate) =>
           candidate.id === current.id
             ? { ...candidate, duration: { ...(candidate.duration as { type: "rounds" | "minutes" }), remaining: left } }
@@ -791,13 +796,14 @@ function remainingAfter(duration: EffectInstance["duration"], minutes: number): 
 export const LONG_REST_MINUTES = 8 * 60;
 
 /** A Long Rest: eight hours pass and the creature sleeps (Unconscious, so its Concentration ends). Unless the game clock
- *  has already moved those hours for everyone (`clockMoved`, a party rest), its own effects count them down here; "until
- *  ended" ones (a curse, a disease) stay. */
+ *  has already moved those hours for everyone (`clockMoved`, a party rest), what of its own would run out in them ends
+ *  here. What lasts longer waits for the GM to pass the hours, so they never count twice; "until ended" ones (a curse, a
+ *  disease) stay. */
 export function endEffectsAtLongRest(state: GameState, actorId: string, clockMoved = false): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
-  if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), LONG_REST_MINUTES));
+  if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), LONG_REST_MINUTES, false));
   // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal." A gain kept until ended (one from
   // before gains counted game time) is spent by the rest's end too.
   for (const effect of [...actor.effects])

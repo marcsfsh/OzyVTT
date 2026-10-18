@@ -51,6 +51,8 @@ export type GmCodexValue = Readonly<{
   onOpenReplay?: (archiveId: number) => void;
   /** The game clock (`rest.clockHours`), whose hour goes with the calendar's date. */
   gameHours: number | null;
+  /** The minutes past that hour (`rest.clockMinutes`). */
+  gameMinutes?: number;
   autosave: CodexAutosaveSettings;
   /** The feeds the shell owns, so two views never disagree about, say, which session is active. */
   feeds: ReturnType<typeof useGmFeeds>;

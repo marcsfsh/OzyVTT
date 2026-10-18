@@ -170,9 +170,10 @@ function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined)
  * partly refills (Rage's one use) get those uses back; healing is only by spending Hit Point Dice.
  * Long: Concentration ends first (onEnd grants land), then HP to max, temp HP cleared, all pools refreshed, all Hit
  * Point Dice restored, Exhaustion drops one level. It counts as ending at the current game hour.
- * A Long Rest's eight hours count down the creature's own effects, as time passing does, unless the game clock moved
- * them for everyone already (`clockMoved`: a party rest). A Short Rest leaves effects to the clock: a player takes one
- * on their own, and only the GM moves game time (the party's Short Rest moves it an hour). With `charges.random`, a
+ * A Long Rest ends the creature's own effects that would run out in its eight hours. When the game clock moved them
+ * for everyone already (`clockMoved`: a party rest) that has happened; otherwise what lasts longer waits for the GM to
+ * pass the hours. A Short Rest leaves effects to the clock: a player takes one on their own, and only the GM moves game
+ * time (the party's Short Rest moves it an hour). With `charges.random`, a
  * charged item regains its printed dice rather than every charge, and `charges.lines` hears what each regained.
  */
 export function applyRest(

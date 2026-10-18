@@ -58,15 +58,24 @@ describe("what lasts in game time", () => {
     expect(effectNames(table.state, HERO)).toEqual([]);
   });
 
-  it("a party Long Rest moves the clock 8 hours for everyone; a creature's own Long Rest counts down its effects", () => {
+  it("a party Long Rest moves the clock 8 hours for everyone; a creature's own Long Rest ends what runs out in them", () => {
     const table = caster();
     cast(table, "mage-armor", { targetIds: [HERO] });
     heroTurnAgain(table.state);
     cast(table, "mage-armor", { targetIds: [ALLY] });
     endFight(table.state);
     passTime(table.state, 7);
+    actorOf(table.state, HERO).effects.push({
+      ...actorOf(table.state, HERO).effects[0]!,
+      id: "10000000-0000-4000-8000-0000000000d1",
+      name: "A day's ward",
+      duration: { type: "minutes", remaining: 1440 }
+    });
     applyRest(table.state, HERO, "long", resolveDefinition);
-    expect(effectNames(table.state, HERO)).toEqual([]);
+    // The GM passes the rest's 8 hours on the clock afterwards, so a day-long effect is left for that to count down.
+    expect(effectNames(table.state, HERO)).toEqual(["A day's ward"]);
+    expect(actorOf(table.state, HERO).effects[0]?.duration).toEqual({ type: "minutes", remaining: 1440 });
+    actorOf(table.state, HERO).effects = [];
     expect(effectNames(table.state, ALLY)).toEqual(["Mage Armor"]);
     expect(table.state.rest.clockHours).toBe(7);
     // The Wizard's party rest moves the clock past the ally's hour too.

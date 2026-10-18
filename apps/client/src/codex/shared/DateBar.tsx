@@ -22,6 +22,8 @@ type GmDateBarProps = Readonly<{
   calendar: GmCodexCalendar | null;
   /** The game clock's hour, which goes with your date. */
   gameHours?: number | null;
+  /** The minutes past that hour. */
+  gameMinutes?: number;
   /** A phone's bar: the two dates and Publish, in less room. */
   tight?: boolean;
   onChanged: () => void | Promise<void>;
@@ -43,7 +45,7 @@ export function DateBar(props: GmDateBarProps | PlayerDateBarProps) {
   return props.role === "gm" ? <GmDateBar {...props} /> : <PlayerDateBar {...props} />;
 }
 
-function GmDateBar({ token, calendar, gameHours = null, tight = false, onChanged }: GmDateBarProps) {
+function GmDateBar({ token, calendar, gameHours = null, gameMinutes = 0, tight = false, onChanged }: GmDateBarProps) {
   const { toast } = useToast();
   const [dateOpen, setDateOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -113,7 +115,7 @@ function GmDateBar({ token, calendar, gameHours = null, tight = false, onChanged
         >
           {now ? barDate(calendar, now, published) : "Set your date"}
         </button>
-        {now && gameHours !== null && <span className="cx-datebar-hour">{hourLabel(gameHours)}</span>}
+        {now && gameHours !== null && <span className="cx-datebar-hour">{hourLabel(gameHours, gameMinutes)}</span>}
         <span className="cx-datebar-hidden">
           <IconEyeOff /> Hidden
         </span>
