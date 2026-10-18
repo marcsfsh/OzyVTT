@@ -110,7 +110,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "Whether a record may be published, and why not. Carried on every single-record read so the GM's library can say \"3 drafts can't publish yet\" without a round-trip per record."
   },
   HomebrewRecord: {
-    "": "The AUTHORED CONTENT ONLY. `state`, `visibleToPlayers`, and `deletedAt` are row state and live on HomebrewRecordDocument, which is what stops an imported pack from inheriting the exporting table's visibility policy. One branch per `HomebrewContentType`, discriminated by the body's own `type`. A field with a server-side default is optional on the wire, and an unset optional field is left out entirely."
+    "": "The AUTHORED CONTENT ONLY. `state`, `audience`, the pack and `deletedAt` are row state and live on HomebrewRecordDocument, which is what stops an imported pack from inheriting the exporting table's sharing. One branch per `HomebrewContentType`, discriminated by the body's own `type`. A field with a server-side default is optional on the wire, and an unset optional field is left out entirely."
   },
   HomebrewClassRecord: {
     "": "A character class. The heaviest of the nine: a full 20-row printed table plus every feature it can grant. Duplicating an SRD class (`POST /content/{id}/duplicate` with `wizard`) is what makes that tractable to author.",
@@ -816,14 +816,24 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     "": "FILTER. Narrows to targets currently under any of these conditions."
   },
   HomebrewRecordDocument: {
-    "": "One stored row: the authored body plus the three orthogonal row-state fields. `state` is set only by /publish and /unpublish, `visibleToPlayers` only by /visibility, `deletedAt` only by DELETE and /restore. A player sees a record only when it is published AND visible AND not deleted, and even then only through the merged CONTENT_PATHS catalogs, never through this component.",
-    visibleToPlayers: "Publishing does not reveal: this is the separate, deliberate second step",
+    "": "One stored row: the authored body plus its row state. `state` is set only by /publish and /unpublish, `audience` only by /audience and /sharing (and /unpublish, which hides), `deletedAt` only by DELETE and /restore. A player receives a record only when it is published, not deleted, in a pack that is on, and shared with everyone or one of that player's characters, and even then only through the merged CONTENT_PATHS catalogs, never through this component.",
+    audience:
+      "Who sees it: hidden (the GM only), everyone, or characters (the players of the party characters in `characterIds`). Publishing does not reveal: sharing is the separate, deliberate second step, and a draft is always hidden",
+    reveals:
+      "Each time the published record reached an audience it did not reach just before, oldest first. Hiding keeps them",
+    visibleToPlayers: "Deprecated: `audience` is not hidden",
+    inCatalogs:
+      "Published, not deleted, and its pack is on: what every catalog, the GM's pickers and the bestiary hold",
+    references:
+      "Every other record the body names by id, with its name, so an editor shows a name where the body holds an id",
     deletedAt: "Soft delete; a deleted row leaves every merged catalog at once and is restorable",
     pendingChanges:
       "A published record has edits that are not live yet. `record` and `validity` describe the pending body; the catalogs still serve the live one until /publish"
   },
   HomebrewRecordSummary: {
-    "": "The flat, deliberately NON-polymorphic list row: a name and a badge. Carries `valid` alone (the issue list costs a GET), so listing a 300-record library never ships a 20-row level table.",
+    "": "The flat, deliberately NON-polymorphic list row: the row state, the issue count and the kind's own columns. The issue list costs a GET, so listing a 300-record library never ships a 20-row level table.",
+    valid: "The live body publishes. A held edit is counted in `issueCount` instead",
+    issueCount: "How many publish issues the body the editor shows has, pending edits included",
     source: 'Always "homebrew" on this surface; the field exists so a summary and a merged-catalog row read the same',
     usageCount: "How many characters took this record; 0 is the common case"
   },
@@ -853,14 +863,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "Why the id changed. srd-collision: outside `hb-`, the bundle's namespace, ALWAYS re-minted. homebrew-collision: an existing row or an earlier record in the pack holds it; follows onIdCollision. foreign-shape: an `hb-` id this table would not mint for that type, ALWAYS re-minted"
   },
   HomebrewCreateRequest: {
-    "": "The authored body only. Row state is never client-supplied: a new record is always a draft, invisible to players."
+    "": "The authored body only, with the name the GM chose: the id is minted from it and never changes. Row state is never client-supplied: a new record is always a Hidden draft in this table's own pack."
   },
   HomebrewUpdateRequest: {
     "": "Replaces the whole authored body and touches no row state.",
     expectedRev: "Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on."
   },
   HomebrewDuplicateRequest: {
-    name: "Name for the copy; omitted derives one server-side."
+    name: "The name the GM typed for the copy; its id is minted from it. Omitted, the copy is named after its source."
   },
   HomebrewStateChangeRequest: {
     expectedRev: "Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on."
@@ -870,7 +880,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   HomebrewPackImportRequest: {
     onIdCollision:
-      "How to resolve a collision with an EXISTING HOMEBREW id; an SRD collision is always re-minted regardless.",
+      "Without `decisions`: how to resolve a collision with an EXISTING HOMEBREW id; an SRD collision is always re-minted regardless.",
+    decisions:
+      "What to do with each record, by its position in the pack: new, replace (only the GM's own draft it clashes with), skip, or rename. Send an empty list for a dry run that proposes the default decision for each record.",
     dryRun: "Run the whole collision + rewrite + re-validate pass and return the identical report without writing."
   },
   CodexDowntimeInput: {

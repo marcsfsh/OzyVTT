@@ -90,7 +90,10 @@ Socket.IO over the same origin as HTTP. Server-to-client events come in two kind
   of each audience a connected player holds (`playerCodexFingerprint` in `codex/player-reads.ts`;
   an audience is the set of party characters the session has claimed), so a GM-only write sends
   players nothing and a block shown to Lyra pings only Lyra's player. A claim or a release
-  changes a socket's audience, and pings it.
+  changes a socket's audience, and pings it. `homebrew:changed` follows the same rule: the GM's
+  devices get the homebrew store's revision on every write, and a player's device is pinged only
+  when the homebrew its reader receives changed (`HomebrewStore.fingerprintFor`), with a number that
+  grows for that device alone and says nothing of anyone else's changes.
 - **GM-only channels** go to GM sockets alone: `sound:changed` carries the sound board and the table
   screens' sound state. A player's socket is never sent it.
 
@@ -131,7 +134,7 @@ four credentials and pins the answers.
 ## Projections: the security boundary
 
 Every byte that reaches a player or the shared screen goes through a projection built for that
-audience. There are four:
+audience. There are five:
 
 - **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
   get only `public` actors, a health band with no exact HP, and owner-only sheet resources
@@ -190,6 +193,19 @@ audience. There are four:
   reveal to another character, leaves it as it was. The GM's preview is a signed player session
   that reads as everyone or as one party character and only reads: game commands and uploads
   refuse it.
+- **Homebrew** (`content-library.ts`, `homebrew-store.ts`, `homebrew-player.ts`): every content read is
+  built for one audience (`ContentLibrary.forAudience`). A player session is a reader: the party
+  characters it has claimed, or the ones a Codex preview names. A reader receives a homebrew record
+  only when it is published, not archived, in a pack that is on, and shared with everyone or with one
+  of the reader's characters (`audienceReceives`); a draft is always Hidden. Everything a player gets
+  of homebrew (the builder's catalogs and offers, the gear picker, the spell catalog, the Compendium,
+  next level, spell swaps) is derived from that reader's slice, so a record shown to Lyra leaves no
+  trace in Mirena's reads: no row, no count, no list id in a spell's `classes`, no ping. The GM's
+  catalog is every published record in a pack that is on. Play-time resolution of what a character or
+  a monster already has reads a third audience, `play`, which ignores the pack switch, so a pack
+  switched off takes its records out of every catalog and picker while a character keeps its items
+  and spells. The GM's See as reads one reader's catalog through GM-only routes. Players never get a
+  pack name, an audience or a reveal date.
 - **Replay** (`replay-projection.ts`): a shared fight archive is rebuilt per turn from an
   allow-list. It carries no session ids, notes, stat blocks, or rolls that were not public. A player's
   list of shared replays carries the GM's name for one, never the name of the scene it was fought on.
@@ -329,7 +345,25 @@ names no family is the GM's own ruling on the whole command.
   the package's `sources/` by `npm run content`. Class and magic-item mechanics are authored
   separately and merged at build time.
 - The GM authors homebrew in the app. It is stored in its own store (`homebrew-store.ts`),
-  validated against the same schemas, and served through `homebrew-http.ts`.
+  validated against the same schemas, and served through `homebrew-http.ts`. A record is named before
+  it is made (its id is minted from the name and never changes), and a duplicate keeps what it was
+  based on (the SRD or homebrew record, its name and when it was copied) for Compare.
+- Who sees a record is its audience: Hidden, Everyone, or chosen party characters, with a stamp each
+  time it reached an audience. A draft is always Hidden, and unpublishing hides. The GM sets it per
+  record or for many records in one write. Every record belongs to a pack: this table's own, or an
+  imported pack with its name, credit and an on or off switch. Import is decided per record (as new,
+  replacing the GM's own draft, skipped, or as a renamed copy) from a dry run that reports each
+  record's kind, clash and problems in names; a published record is never replaced. Export takes a
+  chosen set under a pack name.
+- Every write leaves a history row (`homebrew_record_revisions`) with the device, the event and the
+  fields it changed. History is read and restored over HTTP (a restored version becomes changes not
+  live), and a stale save's 409 carries the fields the stored copy changed since, with both values.
+- The publish gate (`homebrew-validate.ts`) returns sentences a GM reads: `homebrew-issues.ts` turns
+  the schemas' findings into plain words that name the field and its owner, and every reference names
+  a record. The gate reads the table with every pack on and warns when a record needs one from a pack
+  that is off. The GM's Compendium reads (`homebrew-library.ts`) put the SRD's rows beside the
+  homebrew of a kind with the kind's own columns, count by source and kind, and search the homebrew's
+  text. Players read the same kinds, without monsters, through `content:compendium`.
 - New homebrew opens in a step-by-step wizard (`apps/client/src/homebrew/wizard/`, ADR-0026). A
   wizard is data over the same draft the full editor edits: its questions are the editor's own
   fields in plainer words, and a few composers keep derived values in step, such as a monster's

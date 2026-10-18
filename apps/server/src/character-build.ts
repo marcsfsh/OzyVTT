@@ -693,7 +693,7 @@ function dedupeFeatureRefs(
 }
 
 // The build. `library` is always an audience-scoped view, so a player can never build against (or
-// name) a homebrew record the GM has not made player-visible.
+// name) a homebrew record the GM has not shared with one of that player's characters.
 
 /** Rolled HP entries as ledger rows (level N is entry N-2), in place of any already in the input. A multiclass sheet's
  *  rows name the class each roll was for, so a later rebuild reuses a roll only where that class still is. */

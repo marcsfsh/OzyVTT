@@ -814,7 +814,6 @@ export function createServer(options: CreateServerOptions) {
       store: homebrewStore,
       verifiers,
       notifyChanged: notifyHomebrewChanged,
-      // The GM catalog: a dependency that is published but not player-visible is valid here.
       // The table with every pack on: a dependency in a pack that is off publishes, with a warning.
       validate: createHomebrewValidator({
         forAudience: (audience) => contentLibrary.forAudience(audience),
