@@ -121,3 +121,10 @@
     box-shadow: 0 -8px 20px color-mix(in srgb, var(--void) 60%, transparent);
   }
 }
+
+/* Six tabs share a 392px laptop panel when Tonight and the Codex join the fight's own, so each keeps a narrower side
+   padding and the row fills the width with every tab in view. */
+.table-panel-tabs .nh-tab {
+  flex: 1 0 auto;
+  padding-inline: var(--space-2);
+}
