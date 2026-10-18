@@ -78,8 +78,8 @@ export const VIEWER_PATHS = {
 
 /**
  * The worldbuilding Codex surface (`codex-http.ts`). Reads accept a GM or player session (players get the
- * revealed-only projection with `gmBody`, GM fields and unrevealed pages/maps/markers/entries stripped
- * server-side); every write is GM-grade. A `codex:read` / `codex:write` credential acts at GM grade, except
+ * revealed-only projection for their own characters, with hidden blocks, Hidden fields and unrevealed
+ * pages/maps/markers/entries stripped server-side); every write is GM-grade. A `codex:read` / `codex:write` credential acts at GM grade, except
  * `POST /codex/preview-session`, which mints a player token and stays GM-session-only.
  * `{id}` is OpenAPI-style; the Express router substitutes `:id`.
  */
@@ -91,7 +91,15 @@ export const CODEX_PATHS = {
   pageMarkers: `${API_NAMESPACE}/codex/pages/{id}/markers`,
   pageRevisions: `${API_NAMESPACE}/codex/pages/{id}/revisions`,
   pageRevisionRestore: `${API_NAMESPACE}/codex/pages/{id}/revisions/{revisionId}/restore`,
+  // Hidden blocks in a page's text, and who sees each one and each field.
+  pageBlocks: `${API_NAMESPACE}/codex/pages/{id}/blocks`,
+  pageBlockById: `${API_NAMESPACE}/codex/pages/{id}/blocks/{blockId}`,
+  pageBlockMove: `${API_NAMESPACE}/codex/pages/{id}/blocks/{blockId}/move`,
+  pageBlockAudience: `${API_NAMESPACE}/codex/pages/{id}/blocks/{blockId}/audience`,
+  pageFieldAudience: `${API_NAMESPACE}/codex/pages/{id}/fields/{key}/audience`,
   search: `${API_NAMESPACE}/codex/search`,
+  // Role-projected: the GM's counts, latest changes and reveal check; a player's new since their last visit.
+  home: `${API_NAMESPACE}/codex/home`,
   previewSession: `${API_NAMESPACE}/codex/preview-session`,
   folders: `${API_NAMESPACE}/codex/folders`,
   foldersMove: `${API_NAMESPACE}/codex/folders/move`,
@@ -122,9 +130,26 @@ export const CODEX_PATHS = {
   sessionById: `${API_NAMESPACE}/codex/sessions/{id}`,
   sessionReveal: `${API_NAMESPACE}/codex/sessions/{id}/reveal`,
   sessionActivate: `${API_NAMESPACE}/codex/sessions/{id}/activate`,
+  sessionApplyTemplate: `${API_NAMESPACE}/codex/sessions/{id}/apply-template`,
+  sessionHappened: `${API_NAMESPACE}/codex/sessions/{id}/happened`,
+  sessionLog: `${API_NAMESPACE}/codex/sessions/{id}/log`,
+  sessionTick: `${API_NAMESPACE}/codex/sessions/{id}/tick`,
+  sessionCurrentScene: `${API_NAMESPACE}/codex/sessions/{id}/current-scene`,
+  // The active session's live board, GM-only.
+  board: `${API_NAMESPACE}/codex/board`,
+  // The GM's library of session prep templates. The built-in starting template is read-only.
+  prepTemplates: `${API_NAMESPACE}/codex/prep-templates`,
+  prepTemplateById: `${API_NAMESPACE}/codex/prep-templates/{id}`,
+  prepTemplateDuplicate: `${API_NAMESPACE}/codex/prep-templates/{id}/duplicate`,
+  prepTemplateDefault: `${API_NAMESPACE}/codex/prep-templates/{id}/default`,
   quests: `${API_NAMESPACE}/codex/quests`,
   questById: `${API_NAMESPACE}/codex/quests/{id}`,
   questReveal: `${API_NAMESPACE}/codex/quests/{id}/reveal`,
+  questBlocks: `${API_NAMESPACE}/codex/quests/{id}/blocks`,
+  questBlockById: `${API_NAMESPACE}/codex/quests/{id}/blocks/{blockId}`,
+  questBlockMove: `${API_NAMESPACE}/codex/quests/{id}/blocks/{blockId}/move`,
+  questBlockAudience: `${API_NAMESPACE}/codex/quests/{id}/blocks/{blockId}/audience`,
+  questObjectiveAudience: `${API_NAMESPACE}/codex/quests/{id}/objectives/{objectiveId}/audience`,
   // A standing is addressed by its faction page id, which is unique.
   standing: `${API_NAMESPACE}/codex/standing`,
   standingByFaction: `${API_NAMESPACE}/codex/standing/{factionPageId}`,

@@ -104,7 +104,7 @@ const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", day
 
 /** The session's prep is typed sections; one notes section stands in for the whole plan. */
 const notes = (text: string) => [
-  { id: "p1", type: "text", title: "Prep for this session", prompt: null, templateSectionId: null, text }
+  { id: "p1", type: "text" as const, title: "Prep for this session", prompt: null, templateSectionId: null, text }
 ];
 const SESSION = (over: Partial<CodexSession> & Readonly<{ prep?: unknown }> = {}): CodexSession =>
   ({
@@ -113,7 +113,6 @@ const SESSION = (over: Partial<CodexSession> & Readonly<{ prep?: unknown }> = {}
     tags: [],
     realDate: "2026-07-12",
     attendees: ["Ozy"],
-    prepBody: "",
     prep: notes("Strahd ambushes them at the bridge."),
     prepTemplateId: null,
     currentSceneId: null,
@@ -124,6 +123,7 @@ const SESSION = (over: Partial<CodexSession> & Readonly<{ prep?: unknown }> = {}
     rev: 1,
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-01T00:00:00.000Z",
+    firstShownAt: null,
     ...over
   }) as CodexSession;
 const S3 = SESSION({ id: "s3" });
@@ -329,7 +329,16 @@ describe("The player's session card (viewer safety)", () => {
     playerSessions.mockResolvedValue([
       {
         ...PLAYER_SESSION,
-        prepBody: "The heart of the castle.",
+        prep: [
+          {
+            id: "prep-8",
+            templateSectionId: null,
+            title: "Prep notes",
+            prompt: null,
+            type: "text",
+            text: "The heart of the castle."
+          }
+        ],
         attendees: ["Ana", "Bo"],
         status: "planned",
         rev: 7,

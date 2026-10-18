@@ -219,6 +219,7 @@ function standingRow(overrides: Partial<CodexStanding> = {}): CodexStanding {
     revealedToPlayers: false,
     createdAt: "2026-07-29T00:00:00.000Z",
     updatedAt: "2026-07-29T00:00:00.000Z",
+    firstShownAt: null,
     ...overrides
   };
 }
@@ -241,6 +242,7 @@ function markerRow(overrides: Partial<CodexMarker> = {}): CodexMarker {
     isParty: false,
     createdAt: "2026-07-29T00:00:00.000Z",
     updatedAt: "2026-07-29T00:00:00.000Z",
+    firstShownAt: null,
     ...overrides
   };
 }
@@ -473,12 +475,22 @@ function pageRow(overrides: Partial<CodexPage> = {}): CodexPage {
     id: "22222222-2222-4222-8222-222222222222",
     title: "The Lantern Order",
     entityType: "faction",
-    fields: { motto: "Light the way" },
-    gmFields: { goal: "Seize the capital" },
+    fields: { leader: "Maelis", goals: "Seize the capital" },
+    hiddenFields: ["goals"],
     folder: "Villains/Secret societies",
     tags: ["order"],
     playerBody: "A guild of lamplighters.",
-    gmBody: "A front for the cult.",
+    blocks: [
+      {
+        id: "77777777-7777-4777-8777-777777777777",
+        anchor: 1,
+        title: null,
+        text: "A front for the cult.",
+        audience: "hidden",
+        characterIds: [],
+        reveals: []
+      }
+    ],
     revealedToPlayers: true,
     bannerAssetId: null,
     inWorldLabel: null,
@@ -488,6 +500,7 @@ function pageRow(overrides: Partial<CodexPage> = {}): CodexPage {
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-30T00:00:00.000Z",
     playerUpdatedAt: "2026-07-02T00:00:00.000Z",
+    characterUpdatedAt: {},
     firstShownAt: "2026-07-03T00:00:00.000Z",
     ...overrides
   };
@@ -503,14 +516,22 @@ describe("page projection: no folder and no GM edit time reach a player", () => 
 
     expect(Object.keys(page).sort()).toEqual([
       "bannerAssetId",
+      "blocks",
       "body",
       "entityType",
       "fields",
+      "firstShownAt",
       "id",
       "playerUpdatedAt",
       "tags",
       "title"
     ]);
+    // A Hidden field and a hidden block leave nothing behind.
+    expect(page.fields).toEqual({ leader: "Maelis" });
+    expect(page.body).toBe("A guild of lamplighters.");
+    expect(page.blocks).toEqual([]);
+    expect(JSON.stringify(page)).not.toContain("Seize");
+    expect(JSON.stringify(page)).not.toContain("front");
     expect(Object.keys(summary).sort()).toEqual([
       "bannerAssetId",
       "entityType",

@@ -33,14 +33,15 @@ import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
  *  (ADR-0016); players keep player limits. The public viewer never reaches a command. */
+/** `preview` marks the GM's See as players session, which reads and never acts. */
 export type GamePrincipal =
   | Readonly<{ kind: "gm"; sessionId: string }>
-  | Readonly<{ kind: "player"; sessionId: string }>
+  | Readonly<{ kind: "player"; sessionId: string; preview?: true }>
   | Readonly<{ kind: "integration"; credentialId: string; name: string }>;
 
 export function isGmGrade(
   principal: GamePrincipal
-): principal is Exclude<GamePrincipal, Readonly<{ kind: "player"; sessionId: string }>> {
+): principal is Exclude<GamePrincipal, Readonly<{ kind: "player"; sessionId: string; preview?: true }>> {
   return principal.kind !== "player";
 }
 

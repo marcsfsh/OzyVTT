@@ -36,7 +36,8 @@ const page: CodexPage = {
   title: "Barovia",
   entityType: "location",
   fields: {},
-  gmFields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags: [],
   revealedToPlayers: false,
@@ -50,7 +51,7 @@ const page: CodexPage = {
   playerUpdatedAt: "2026-07-28T00:00:00.000Z",
   firstShownAt: null,
   playerBody: "Fog.",
-  gmBody: ""
+  blocks: []
 };
 
 function renderEditor() {

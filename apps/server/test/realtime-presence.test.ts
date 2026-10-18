@@ -467,7 +467,7 @@ describe("codex:changed on the wire (socket half)", () => {
       );
 
       // Four writes no player can see.
-      await codex("PATCH", `/pages/${page.id}`, { gmBody: "A front for the cult." });
+      await codex("POST", `/pages/${page.id}/blocks`, { anchor: 0, text: "A front for the cult." });
       await codex("PATCH", `/pages/${page.id}`, { folder: "Villains" });
       await codex("POST", "/pages", { title: "The real Lantern Order" });
       await codex("POST", "/journal", { playerText: "Prep.", revealedToPlayers: false });

@@ -94,26 +94,37 @@ import { navigate } from "../router";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, openQuests, questProgress, questStatusTone } from "./quests";
-import type { CodexCalendar, CodexQuest, CodexSearchHit, PlayerCodexQuest } from "@vtt/domain";
+import type { CodexBlock, CodexCalendar, CodexQuest, CodexSearchHit, PlayerCodexQuest } from "@vtt/domain";
 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
 
+/** An objective as the server lists it, shown to everyone. */
+const objective = (text: string, done: boolean, id = `o-${text}`) =>
+  ({ id, text, done, audience: "everyone", characterIds: [] }) as const;
+/** A hidden block as the server lists it. */
+const hidden = (text: string): CodexBlock => ({
+  id: `b-${text}`,
+  anchor: 1,
+  title: null,
+  text,
+  audience: "hidden",
+  characterIds: [],
+  reveals: []
+});
 const QUEST = (over: Partial<CodexQuest> = {}): CodexQuest => ({
   id: "q1",
   title: "The Sunless Crown",
   status: "active",
   playerBody: "The burgomaster wants the crown returned.",
-  gmBody: "The crown is a phylactery and the burgomaster knows it.",
-  objectives: [
-    { text: "Find the crypt", done: true },
-    { text: "Open the sarcophagus", done: false }
-  ],
+  blocks: [hidden("The crown is a phylactery and the burgomaster knows it.")],
+  objectives: [objective("Find the crypt", true), objective("Open the sarcophagus", false)],
   entityIds: [],
   revealedToPlayers: false,
   tags: [],
   rev: 3,
   createdAt: "2026-07-01T00:00:00.000Z",
   updatedAt: "2026-07-02T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 const OPEN = QUEST();
@@ -121,24 +132,36 @@ const DONE = QUEST({
   id: "q2",
   title: "The Bell of Vallaki",
   status: "completed",
-  gmBody: "Already spent.",
+  blocks: [hidden("Already spent.")],
   objectives: []
 });
-const LOST = QUEST({ id: "q3", title: "The Missing Caravan", status: "failed", gmBody: "Eaten.", objectives: [] });
-const FRESH = QUEST({ id: "q0", title: "A rumour in Vallaki", status: "not-started", gmBody: "Bait.", objectives: [] });
+const LOST = QUEST({
+  id: "q3",
+  title: "The Missing Caravan",
+  status: "failed",
+  blocks: [hidden("Eaten.")],
+  objectives: []
+});
+const FRESH = QUEST({
+  id: "q0",
+  title: "A rumour in Vallaki",
+  status: "not-started",
+  blocks: [hidden("Bait.")],
+  objectives: []
+});
 const DROPPED = QUEST({
   id: "q4",
   title: "The Amber Bargain",
   status: "canceled",
-  gmBody: "They walked away.",
+  blocks: [hidden("They walked away.")],
   objectives: []
 });
 /** A second open quest. Jumps target this one because the log's fallback would select the first. */
 const OTHER = QUEST({
   id: "q4",
   title: "The Amber Temple",
-  gmBody: "The vestiges are still bargaining.",
-  objectives: [{ text: "Cross the pass", done: false }]
+  blocks: [hidden("The vestiges are still bargaining.")],
+  objectives: [objective("Cross the pass", false)]
 });
 
 const gmDefaults = (quests: CodexQuest[] = [OPEN, OTHER, DONE, LOST]) => {
@@ -226,8 +249,6 @@ describe("The dashboard's open-quests card", () => {
       expect(log.getByRole("button", { name: /The Amber Temple/ })).toHaveAttribute("aria-current", "true")
     );
     expect(log.getByRole("button", { name: /The Sunless Crown/ })).not.toHaveAttribute("aria-current");
-    await user.click(screen.getByRole("button", { name: "GM-only notes" }));
-    expect(screen.getByRole("textbox", { name: /GM-only notes/ })).toHaveValue("The vestiges are still bargaining.");
 
     // The card is a view: one read, no writes.
     expect(listQuests).toHaveBeenCalledTimes(1);
@@ -248,7 +269,12 @@ describe("The dashboard's open-quests card", () => {
           title: "The Amber Temple",
           tags: [],
           entityType: null,
-          mapId: null
+          mapId: null,
+          type: "quest",
+          revealedToPlayers: true,
+          modifiedAt: "2026-07-28T00:00:00.000Z",
+          columns: {},
+          match: null
         } as CodexSearchHit
       ],
       truncated: false
@@ -335,11 +361,12 @@ describe("The GM's objective checklist", () => {
     const [, , input] = updateQuest.mock.calls[0] as [
       string,
       string,
-      { objectives: readonly { text: string; done: boolean }[]; expectedRev: number }
+      { objectives: readonly { id?: string; text: string; done: boolean }[]; expectedRev: number }
     ];
+    // Existing rows keep their ids, so the server keeps each one's audience; the new row has none yet.
     expect(input.objectives).toEqual([
-      { text: "Find the crypt", done: true },
-      { text: "Open the sarcophagus", done: false },
+      { id: "o-Find the crypt", text: "Find the crypt", done: true },
+      { id: "o-Open the sarcophagus", text: "Open the sarcophagus", done: false },
       { text: "", done: false }
     ]);
     // A stale edit is a 409, and nothing is silently overwritten.
@@ -362,12 +389,12 @@ describe("The GM's objective checklist", () => {
     const [, , input] = updateQuest.mock.calls[0] as [
       string,
       string,
-      { objectives: readonly { text: string; done: boolean }[] }
+      { objectives: readonly { id?: string; text: string; done: boolean }[] }
     ];
     // Order is content: a done item is not moved.
     expect(input.objectives).toEqual([
-      { text: "Find the crypt", done: true },
-      { text: "Open the sarcophagus", done: true }
+      { id: "o-Find the crypt", text: "Find the crypt", done: true },
+      { id: "o-Open the sarcophagus", text: "Open the sarcophagus", done: true }
     ]);
   });
 });
@@ -378,6 +405,7 @@ const PLAYER_QUEST: PlayerCodexQuest = {
   title: "The Sunless Crown",
   status: "active",
   body: "The burgomaster wants the crown returned.",
+  blocks: [],
   objectives: [
     { text: "Find the crypt", done: true },
     { text: "Open the sarcophagus", done: false }
@@ -391,6 +419,7 @@ const PLAYER_DONE: PlayerCodexQuest = {
   title: "The Bell of Vallaki",
   status: "completed",
   body: "The bell was hauled back up the hill.",
+  blocks: [],
   objectives: [{ text: "Raise the bell", done: true }],
   entityIds: [],
   tags: []
@@ -400,6 +429,7 @@ const PLAYER_LOST: PlayerCodexQuest = {
   title: "The Missing Caravan",
   status: "failed",
   body: "",
+  blocks: [],
   objectives: [],
   entityIds: [],
   tags: []
@@ -409,6 +439,7 @@ const PLAYER_FRESH: PlayerCodexQuest = {
   title: "A rumour in Vallaki",
   status: "not-started",
   body: "Someone is buying coffins.",
+  blocks: [],
   objectives: [],
   entityIds: [],
   tags: []
@@ -418,6 +449,7 @@ const PLAYER_DROPPED: PlayerCodexQuest = {
   title: "The Amber Bargain",
   status: "canceled",
   body: "The party walked away.",
+  blocks: [],
   objectives: [],
   entityIds: [],
   tags: []
@@ -465,7 +497,7 @@ describe("The player's copy of the card (viewer safety)", () => {
     playerDefaults([
       {
         ...PLAYER_QUEST,
-        gmBody: "The crown is a phylactery and the burgomaster knows it.",
+        blocks: [hidden("The crown is a phylactery and the burgomaster knows it.")],
         playerBody: "a GM-shaped duplicate of the hook",
         revealedToPlayers: true,
         rev: 3
@@ -557,7 +589,12 @@ describe("The player's quest reader", () => {
           title: "The Bell of Vallaki",
           tags: [],
           entityType: null,
-          mapId: null
+          mapId: null,
+          type: "quest",
+          revealedToPlayers: true,
+          modifiedAt: "2026-07-28T00:00:00.000Z",
+          columns: {},
+          match: null
         } as CodexSearchHit
       ],
       truncated: false
@@ -589,7 +626,7 @@ describe("The player's quest reader", () => {
     playerDefaults([
       {
         ...PLAYER_QUEST,
-        gmBody: "The crown is a phylactery and the burgomaster knows it.",
+        blocks: [hidden("The crown is a phylactery and the burgomaster knows it.")],
         playerBody: "a GM-shaped duplicate of the hook",
         revealedToPlayers: true,
         rev: 3
@@ -658,7 +695,12 @@ describe("A quest in suite-wide search", () => {
     title: "The Amber Temple",
     tags: [],
     entityType: null,
-    mapId: null
+    mapId: null,
+    type: "quest",
+    revealedToPlayers: true,
+    modifiedAt: "2026-07-28T00:00:00.000Z",
+    columns: {},
+    match: null
   };
 
   it("names its kind in TEXT and opens the quest log ON that quest", async () => {

@@ -56,6 +56,8 @@ const summary = (
   title,
   entityType,
   fields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags,
   revealedToPlayers: false,
@@ -92,7 +94,7 @@ describe("Codex shell: cross-mode navigation", () => {
     listMaps.mockResolvedValue([]);
     getCalendar.mockResolvedValue({ yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] });
     getPage.mockImplementation(async (_t: string, id: string) => ({
-      page: { ...PAGES.find((p) => p.id === id)!, playerBody: "", gmBody: "", gmFields: {} } as CodexPage,
+      page: { ...PAGES.find((p) => p.id === id)!, playerBody: "", blocks: [] } as CodexPage,
       connections: []
     }));
   });

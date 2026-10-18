@@ -103,6 +103,8 @@ const summary = (
   title,
   entityType,
   fields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags: [],
   revealedToPlayers: false,
@@ -116,7 +118,7 @@ const summary = (
   playerUpdatedAt: "2026-07-28T00:00:00.000Z",
   firstShownAt: null
 });
-const full = (row: CodexPageSummary): CodexPage => ({ ...row, playerBody: "", gmBody: "", gmFields: {} });
+const full = (row: CodexPageSummary): CodexPage => ({ ...row, playerBody: "", blocks: [] });
 
 const PAGE = summary("p1", "Barovia");
 const OTHER = summary("p2", "Strahd", "character");
@@ -182,7 +184,8 @@ const MAP_OTHER: CodexMap = {
   sortKey: 0,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 };
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia valley", kind: "regional" };
 const MARKER: CodexMarker = {
@@ -201,7 +204,8 @@ const MARKER: CodexMarker = {
   isParty: false,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 };
 
 const renderWorkspace = () =>

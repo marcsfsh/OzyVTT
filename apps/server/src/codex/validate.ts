@@ -1,9 +1,12 @@
 import {
-  CODEX_SECRET_FIELD_KEYS,
+  CODEX_BLOCK_TITLE_MAX,
+  codexFieldKeys,
   isCodexEntityType,
+  type CodexAudience,
   type CodexEntityType,
+  type CodexFieldAudience,
+  type CodexInWorldDate,
   type CodexMapKind,
-  type CodexQuestObjective,
   type CodexQuestStatus,
   type CodexSessionStatus
 } from "@vtt/domain";
@@ -119,20 +122,79 @@ export function entityFields(value: Readonly<Record<string, string>> | undefined
   if (JSON.stringify(out).length > 10_000) throw new CodexValidationError("Entity fields are too large.");
   return out;
 }
-/** Moves any secret-keyed value out of player-facing `fields` into `gmFields`, so a secret can never ship. */
-export function sealSecretFields(
-  fields: Record<string, string>,
-  gmFields: Record<string, string>
-): { fields: Record<string, string>; gmFields: Record<string, string> } {
-  const outFields = { ...fields };
-  const outGm = { ...gmFields };
-  for (const key of CODEX_SECRET_FIELD_KEYS) {
-    if (key in outFields) {
-      outGm[key] = outFields[key];
-      delete outFields[key];
-    }
+/** The keys of `keys` that belong to `type`, deduped, in the order given. */
+export function hiddenFieldKeys(type: CodexEntityType, keys: readonly string[]): string[] {
+  const allowed = codexFieldKeys(type);
+  return [...new Set(keys)].filter((key) => allowed.has(key));
+}
+export function fieldAudience(value: string): CodexFieldAudience {
+  if (value !== "hidden" && value !== "everyone")
+    throw new CodexValidationError("A field is shown to everyone or hidden.");
+  return value;
+}
+
+// Hidden blocks and audiences
+
+/** The most blocks one page or quest holds. */
+export const MAX_BLOCKS = 200;
+/** The most characters one audience names. */
+const MAX_AUDIENCE_CHARACTERS = 12;
+export function blockTitle(value: string | null | undefined): string | null {
+  return shortLabel(value, CODEX_BLOCK_TITLE_MAX, "block title");
+}
+export function blockText(value: string | undefined): string {
+  const text = value ?? "";
+  if (text.length > MAX_BODY) throw new CodexValidationError("A block is limited to 100000 characters.");
+  return text;
+}
+/** A paragraph count: where a block sits in the player text. */
+export function anchor(value: number | undefined, fallback: number): number {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || value < 0 || value > MAX_BODY)
+    throw new CodexValidationError("A block's place must be a whole number of paragraphs from 0.");
+  return value;
+}
+/** A place among the blocks at one anchor, 0 first; past the end is last. */
+export function slot(value: number | undefined): number | null {
+  if (value === undefined) return null;
+  if (!Number.isInteger(value) || value < 0)
+    throw new CodexValidationError("A block's slot must be a whole number from 0.");
+  return value;
+}
+/** An audience and its characters, checked together: characters only with `characters`, and then at least one. */
+export function audience(
+  value: string,
+  characterIds: readonly string[] | null | undefined
+): Readonly<{ audience: CodexAudience; characterIds: string[] }> {
+  if (value !== "hidden" && value !== "everyone" && value !== "characters")
+    throw new CodexValidationError("Who sees it is hidden, everyone, or chosen characters.");
+  const ids = idArray(characterIds);
+  if (value !== "characters") {
+    if (ids.length > 0) throw new CodexValidationError("Name characters only when it is shown to chosen characters.");
+    return { audience: value, characterIds: [] };
   }
-  return { fields: outFields, gmFields: outGm };
+  if (ids.length === 0) throw new CodexValidationError("Choose at least one character to show it to.");
+  if (ids.length > MAX_AUDIENCE_CHARACTERS)
+    throw new CodexValidationError(`Show it to at most ${MAX_AUDIENCE_CHARACTERS} characters.`);
+  return { audience: value, characterIds: ids };
+}
+
+// Relationship dates
+
+/** When a tie began: a date, or before the campaign; `null` clears it. */
+export function relationshipBegan(
+  value: Readonly<{ inWorldDate: CodexInWorldDate | null; beforeCampaign: boolean }> | null | undefined
+): Readonly<{ inWorldDate: CodexInWorldDate | null; beforeCampaign: boolean }> | null {
+  if (value === null || value === undefined) return null;
+  if (value.beforeCampaign === true) {
+    if (value.inWorldDate !== null && value.inWorldDate !== undefined)
+      throw new CodexValidationError("A tie that began before the campaign has no date.");
+    return { inWorldDate: null, beforeCampaign: true };
+  }
+  const date = value.inWorldDate;
+  if (!date || ![date.year, date.month, date.day].every((part) => Number.isInteger(part)))
+    throw new CodexValidationError("Give the date the tie began, or mark it as before the campaign.");
+  return { inWorldDate: { year: date.year, month: date.month, day: date.day }, beforeCampaign: false };
 }
 
 // Connections
@@ -247,17 +309,14 @@ export function coerceQuestStatus(value: unknown): CodexQuestStatus {
   return typeof value === "string" && QUEST_STATUSES.has(value) ? (value as CodexQuestStatus) : "active";
 }
 /** Order is content (never sorted or deduped); blank text is allowed (add-then-type); only `done === true` counts. */
-export function questObjectives(value: readonly CodexQuestObjective[] | undefined): CodexQuestObjective[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value)) throw new CodexValidationError("Objectives must be a list.");
-  if (value.length > MAX_OBJECTIVES)
-    throw new CodexValidationError(`A quest may carry at most ${MAX_OBJECTIVES} objectives.`);
-  return value.map((objective) => {
-    const text = typeof objective?.text === "string" ? objective.text.trim() : "";
-    if (text.length > MAX_OBJECTIVE_TEXT || CONTROL_CHARS.test(text))
-      throw new CodexValidationError(`An objective is up to ${MAX_OBJECTIVE_TEXT} printable characters.`);
-    return { text, done: objective?.done === true };
-  });
+export function questObjectiveCount(count: number): void {
+  if (count > MAX_OBJECTIVES) throw new CodexValidationError(`A quest may carry at most ${MAX_OBJECTIVES} objectives.`);
+}
+export function objectiveText(value: unknown): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text.length > MAX_OBJECTIVE_TEXT || CONTROL_CHARS.test(text))
+    throw new CodexValidationError(`An objective is up to ${MAX_OBJECTIVE_TEXT} printable characters.`);
+  return text;
 }
 
 // Standing
@@ -315,21 +374,5 @@ export function parseFields(raw: string | null | undefined): Record<string, stri
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, string>) : {};
   } catch {
     return {};
-  }
-}
-/** Order-preserving, the read side of "order is content". */
-export function parseObjectives(raw: string | null | undefined): CodexQuestObjective[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (entry): entry is { text?: unknown; done?: unknown } =>
-          !!entry && typeof entry === "object" && !Array.isArray(entry)
-      )
-      .map((entry) => ({ text: typeof entry.text === "string" ? entry.text : "", done: entry.done === true }));
-  } catch {
-    return [];
   }
 }

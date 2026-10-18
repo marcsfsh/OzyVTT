@@ -82,11 +82,18 @@ export function createTokenRouter(options: TokenRouterOptions) {
       response.locals.tokenPrincipal = { role: "gm" };
       return next();
     }
-    if (caller.kind === "player") {
+    // The GM's preview of the players' view only reads, so it uploads nothing.
+    if (caller.kind === "player" && !caller.preview) {
       response.locals.tokenPrincipal = { role: "player", sessionId: caller.sessionId };
       return next();
     }
-    return refuse(response, caller, "The token library takes a GM or player session.");
+    return refuse(
+      response,
+      caller,
+      caller.kind === "player"
+        ? "A preview of the players' view only reads. Upload from your own session."
+        : "The token library takes a GM or player session."
+    );
   };
   const principalOf = (response: Response) =>
     response.locals.tokenPrincipal as { role: "gm" } | { role: "player"; sessionId: string };

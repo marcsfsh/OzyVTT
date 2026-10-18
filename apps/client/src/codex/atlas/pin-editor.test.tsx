@@ -32,7 +32,8 @@ const MAP = (revealed: boolean): CodexMap => ({
   sortKey: 0,
   tags: ["faerun"],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 });
 const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   id: "k1",
@@ -51,6 +52,7 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   tags: ["dungeon"],
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 

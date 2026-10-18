@@ -111,7 +111,8 @@ const MAP_OTHER: CodexMap = {
   sortKey: 0,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 };
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia", kind: "regional" };
 const MARKER: CodexMarker = {
@@ -130,7 +131,8 @@ const MARKER: CodexMarker = {
   isParty: false,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 };
 
 const renderWorkspace = (onOpenReplay?: (archiveId: number) => void) =>

@@ -17,8 +17,9 @@ It has two parts:
   the GM uploads and runs from a sound board.
 - **The Codex.** A wiki of typed pages (characters, locations, factions, items and more), an
   atlas of nested maps, a journal on a custom calendar, sessions, quests, downtime and a
-  relationship graph. Every record has a player half and a GM-only half, and players only ever
-  receive what the GM has revealed.
+  relationship graph. A page or quest holds the text players read and hidden blocks the GM can
+  show to everyone or to one character later, and players only ever receive what the GM has
+  revealed to them.
 
 Characters can be built in a guided builder, imported from a D&D Beyond PDF, or authored as
 homebrew. SRD 5.2.1 monsters, spells, equipment and magic items are included. The GM makes

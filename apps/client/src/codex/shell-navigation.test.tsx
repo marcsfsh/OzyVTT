@@ -95,7 +95,7 @@ const renderShell = (at: string) =>
 beforeEach(() => {
   localStorage.clear();
   listPages.mockResolvedValue([PAGE]);
-  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", gmBody: "", gmFields: {} }, connections: [] });
+  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", blocks: [] }, connections: [] });
   createPreviewSession.mockResolvedValue("preview-token");
 });
 

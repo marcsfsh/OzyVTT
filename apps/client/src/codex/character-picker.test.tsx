@@ -39,6 +39,8 @@ const page = (
   title,
   entityType,
   fields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags: [],
   revealedToPlayers: true,
@@ -76,7 +78,6 @@ const SESSION = {
   tags: [],
   realDate: "2026-07-12",
   attendees: [],
-  prepBody: "",
   prep: [],
   prepTemplateId: null,
   currentSceneId: null,
@@ -86,7 +87,8 @@ const SESSION = {
   sceneIds: [],
   rev: 1,
   createdAt: "2026-07-01T00:00:00.000Z",
-  updatedAt: "2026-07-01T00:00:00.000Z"
+  updatedAt: "2026-07-01T00:00:00.000Z",
+  firstShownAt: null
 } as CodexSession;
 
 /** The session's details dialog, where Who played lives; it saves when it closes. */

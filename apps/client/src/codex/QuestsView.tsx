@@ -18,12 +18,12 @@ import {
   TagInput,
   VisibilityBadge
 } from "@vtt/ui";
-import type { CodexAutosaveSettings, CodexQuest, CodexQuestObjective, CodexQuestStatus } from "@vtt/domain";
-import { questApi } from "./api";
+import type { CodexAutosaveSettings, CodexQuest, CodexQuestStatus } from "@vtt/domain";
+import { questApi, type CodexQuestObjectiveInput } from "./api";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, questProgress, questStatusTone } from "./quests";
 import { createQuest } from "./creates";
 import { CodexEditor } from "./CodexEditor";
-import { BODY_LAYER, TwoLayerBodyTabs, type BodyLayer } from "./TwoLayerBodyTabs";
+import { BODY_LAYER } from "./TwoLayerBodyTabs";
 import { CodexIcon, EntityIcon } from "./icons";
 import { useCodexAutosave } from "./autosave";
 import { useConfirm } from "../components/feedback";
@@ -223,13 +223,13 @@ type QuestDraft = Readonly<{
   title: string;
   status: CodexQuestStatus;
   playerBody: string;
-  gmBody: string;
-  objectives: readonly CodexQuestObjective[];
+  /** Each objective keeps the id the server gave it, so a save keeps who sees it. A new row has none yet. */
+  objectives: readonly CodexQuestObjectiveInput[];
   entityIds: readonly string[];
   tags: readonly string[];
 }>;
 
-/** A quest uses the page editor's shape: one body at a time behind `TwoLayerBodyTabs`, everything else behind Details. */
+/** A quest uses the page editor's shape: the player text in the centre, everything else behind Details. */
 const QUEST_DETAILS_KEY = "codex-quest-details";
 const QUEST_DETAILS_ID = "codex-quest-details";
 
@@ -255,7 +255,6 @@ function QuestEditor({
   onDeleted: () => void;
 }>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [tab, setTab] = useState<BodyLayer>("player");
   const detailsRef = useRef<HTMLElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(() => {
     try {
@@ -279,8 +278,7 @@ function QuestEditor({
     title: quest.title,
     status: quest.status,
     playerBody: quest.playerBody,
-    gmBody: quest.gmBody,
-    objectives: quest.objectives,
+    objectives: quest.objectives.map(({ id, text, done }) => ({ id, text, done })),
     entityIds: quest.entityIds,
     tags: quest.tags
   });
@@ -301,15 +299,21 @@ function QuestEditor({
         title: next.title.trim() || "Untitled quest",
         status: next.status,
         playerBody: next.playerBody,
-        gmBody: next.gmBody,
         /* Sent exactly as rendered: order is content and a blank row is one the GM is still writing. */
-        objectives: next.objectives,
+        objectives: next.objectives.map(({ id, text, done }) => (id ? { id, text, done } : { text, done })),
         // Always sent: omitting `entityIds` keeps the stored list, so unlinking the last page needs `[]`.
         entityIds: next.entityIds,
         tags: next.tags,
         expectedRev: revRef.current
       });
       revRef.current = updated.rev;
+      // A row saved for the first time takes the id the server gave it, so the next save keeps it.
+      setDraft((prev) => ({
+        ...prev,
+        objectives: prev.objectives.map((objective, index) =>
+          objective.id || !updated.objectives[index] ? objective : { ...objective, id: updated.objectives[index].id }
+        )
+      }));
       setError(null);
       await onChanged();
     },
@@ -406,41 +410,20 @@ function QuestEditor({
 
       <div className="codex-editor-cols">
         <div className="codex-editor-center">
-          <TwoLayerBodyTabs value={tab} onChange={setTab} />
-          {/* The same editor as a page body; the GM layer keeps its violet block and "GM only" pill. */}
-          {tab === "player" ? (
-            <CodexEditor
-              id="q-player"
-              token={gmToken}
-              value={draft.playerBody}
-              onChange={(playerBody) => patch({ playerBody })}
-              fill
-              ariaLabel={BODY_LAYER.player.label}
-              placeholder="What players have been told about this quest"
-              pages={pages}
-              onNavigate={onFollowLink}
-              onCreatePage={onFollowLink}
-            />
-          ) : (
-            <CodexEditor
-              id="q-gm"
-              token={gmToken}
-              value={draft.gmBody}
-              onChange={(gmBody) => patch({ gmBody })}
-              fill
-              ariaLabel={BODY_LAYER.gm.label}
-              placeholder="Details players cannot see"
-              pages={pages}
-              onNavigate={onFollowLink}
-              onCreatePage={onFollowLink}
-              gmLayer
-            />
-          )}
-          <p className="codex-composer-hint">
-            {tab === "player"
-              ? "Players see this once the quest is shown to them."
-              : "Never sent to a player, whatever the quest's reveal state."}
-          </p>
+          {/* The same editor as a page's player text. Hidden blocks have their own routes. */}
+          <CodexEditor
+            id="q-player"
+            token={gmToken}
+            value={draft.playerBody}
+            onChange={(playerBody) => patch({ playerBody })}
+            fill
+            ariaLabel={BODY_LAYER.player.label}
+            placeholder="What players have been told about this quest"
+            pages={pages}
+            onNavigate={onFollowLink}
+            onCreatePage={onFollowLink}
+          />
+          <p className="codex-composer-hint">Players see this once the quest is shown to them.</p>
         </div>
 
         {detailsOpen && (
@@ -494,7 +477,7 @@ function QuestEditor({
                 items={draft.objectives}
                 ariaLabel="Objectives"
                 max={24}
-                onChange={(objectives: readonly CodexQuestObjective[]) => patch({ objectives })}
+                onChange={(objectives: readonly CodexQuestObjectiveInput[]) => patch({ objectives })}
                 /* The caller appends the blank row the GM is about to type into. */
                 onAdd={() => patch({ objectives: [...draft.objectives, { text: "", done: false }] })}
                 addLabel="Add objective"

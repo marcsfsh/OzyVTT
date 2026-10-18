@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Alert, Button, Field, Modal, Panel, PanelHeader, SegmentedControl, useToast } from "@vtt/ui";
-import type { CodexImportCounts } from "@vtt/domain";
+import { splitCodexHiddenBlocks, type CodexImportCounts } from "@vtt/domain";
 import { codexApi, type CodexImportBundle } from "./api";
 import { BODY_LAYER, type BodyLayer } from "./TwoLayerBodyTabs";
 import { newId } from "../lib/ids";
@@ -111,8 +111,8 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
         const title = file.name.replace(/\.(md|markdown|txt)$/i, "").trim();
         await codexApi.createPage(gmToken, {
           title: title || "Imported page",
-          // The GM picks the destination layer.
-          ...(notesSide === "gm" ? { gmBody: text } : { playerBody: text }),
+          // The GM picks the destination layer: GM notes arrive as Hidden blocks, one per heading.
+          ...(notesSide === "gm" ? { blocks: splitCodexHiddenBlocks(text) } : { playerBody: text }),
           commandId: newId()
         });
         imported += 1;

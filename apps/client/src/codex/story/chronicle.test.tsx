@@ -116,6 +116,8 @@ const page = (id: string, title: string, entityType: CodexPageSummary["entityTyp
     createdAt: "2026-07-31T00:00:00.000Z",
     updatedAt: "2026-07-31T00:00:00.000Z",
     playerUpdatedAt: "2026-07-31T00:00:00.000Z",
+    characterUpdatedAt: {},
+    hiddenFields: [],
     firstShownAt: null
   }) as CodexPageSummary;
 

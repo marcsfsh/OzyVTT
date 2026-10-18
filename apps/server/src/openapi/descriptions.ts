@@ -25,7 +25,20 @@ const FIRST_SHOWN_AT =
 const FIRST_SHOWN_AT_PLAYER =
   "When players could first read the record. It stands in for `createdAt`, which would tell them when the GM prepared it, and a hide and a re-reveal never move it.";
 const PAGE_PLAYER_UPDATED_AT =
-  "When something a player can see last changed: the title, kind, player body, shared fields, tags or banner, an event page's date, or a reveal or hide. It is the only edit time a player receives, since `updatedAt` also moves on GM-only saves.";
+  "When something everyone who can read the page sees last changed: the title, kind, player text, fields shown to everyone, tags or banner, an event page's date, a block shown to everyone, or a reveal or hide. A player receives the later of this and `characterUpdatedAt` for each character they hold, the only edit time they get, since `updatedAt` also moves on GM-only saves.";
+const PLAYER_UPDATED_AT_READER =
+  "When something this reader can see last changed: the page's `playerUpdatedAt`, or a later change to a block shown only to one of their characters. A change only another character sees never moves it.";
+const AUDIENCE =
+  "Who sees it: `hidden` (the GM only), `everyone`, or `characters` (the party characters in `characterIds`).";
+const AUDIENCE_CHARACTERS =
+  "The party characters it is shown to, by actor id. Present exactly when `audience` is `characters`, and then at least one.";
+const BLOCK_ANCHOR =
+  "Where the block sits: the number of player-text paragraphs before it. Paragraphs split at blank lines (`codexParagraphs` in `@vtt/domain`). An anchor past the last paragraph reads as the end.";
+const BLOCK_SLOT = "Its place among the blocks at that anchor, 0 first. Omitted or past the end: last.";
+const BLOCK_EXPECTED_REV =
+  "Optimistic concurrency: reject with 409 if the record moved on. Block content and place are edits, so they move `rev`.";
+const LAYOUT =
+  "Every block of the record exactly once, in document order, each with its anchor. Applied after `playerBody` in the same write. Omitted: each block keeps its place by paragraph.";
 
 // Prose the content catalogs share.
 const CHOICE_CATALOG =
@@ -876,14 +889,49 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       'Why, in one line. Optional and may be empty: "we hit 5" with the why in the record\'s own prose is a legitimate body, and a minimum here would reject a state the composer can reach. Defaults to an empty string.'
   },
   CodexQuestObjective: {
-    "": "One tickable step of a quest. Deliberately exactly two keys: a shape richer than `{ text, done }` (assignees, due dates, sub-objectives) is unapproved scope. The text is PLAYER-FACING: it lives beside `playerBody`, never beside `gmBody`, so a GM-only detail belongs in the quest's GM body and never in an objective.",
-    text: "What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after \"Add item\", and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state. The server accepts it; this says so, and publishes no rule it does not enforce."
+    "": "One tickable step of a quest, with its own audience. A player receives only the objectives shown to everyone or to a character they hold, so a count built from their list counts only those.",
+    id: "Stable across edits: send it back with the objective so it keeps its audience.",
+    text: "What the party has to do, in one line. Deliberately NOT `minLength: 1`: the checklist's real flow is add-a-row-then-type-into-it and the editor autosaves the whole draft, so a minimum would reject the first save after \"Add item\", and dropping the blank row server-side would renumber the list under the GM's cursor. A blank objective is a legitimate transient state.",
+    audience: AUDIENCE,
+    characterIds: AUDIENCE_CHARACTERS
+  },
+  CodexQuestObjectiveInput: {
+    "": "An objective as a quest write lists it.",
+    id: "The id the server gave the objective; leave it out for a new one. An id the quest does not hold is a 400.",
+    audience:
+      "Only on a new objective, which is shown to everyone when this is omitted. An existing objective's audience has its own route, so a write is a 400 if it sends one with an `id`.",
+    characterIds: AUDIENCE_CHARACTERS
+  },
+  CodexQuestObjectivePlayer: {
+    "": "An objective as a player receives it: only one they may read, so it carries no audience."
+  },
+  CodexBlockInput: {
+    "": "A hidden block as a create takes it. It starts Hidden.",
+    title: "Optional, one line. It reads as a level 2 heading over the text once the block is shown.",
+    text: "The block's markdown.",
+    anchor: `${BLOCK_ANCHOR} Omitted: after the player text.`
+  },
+  CodexBlockPlacement: {
+    "": "Where one block sits.",
+    anchor: BLOCK_ANCHOR
+  },
+  CodexRelationshipBeganInput: {
+    "": "When a tie began in the world.",
+    inWorldDate: "The date it began. Null when it began before the campaign.",
+    beforeCampaign: "It began before the campaign; `inWorldDate` must then be null, and is required otherwise."
   },
   CodexPageCreateRequest: {
+    fields: "Every field value, whatever its audience.",
+    hiddenFields:
+      "The field keys only the GM sees. Omitted: the kind's default, which hides Motives on a character and Secret agenda on a faction.",
+    blocks: "Hidden blocks to place in the page. Each starts Hidden.",
     inWorldDate: "The in-world date that places an `event` page on the chronicle. Omit for undated.",
     commandId: CODEX_COMMAND_ID
   },
   CodexPageUpdateRequest: {
+    "": "No reveal flag, field audience or block content: each has its own route, so an edit cannot show players anything as a side effect.",
+    fields: "Every field value, whatever its audience. Replaced wholesale when present; a field's audience stays.",
+    layout: LAYOUT,
     inWorldDate: "The in-world date. Omitted leaves the stored date alone; `null` clears it.",
     expectedRev: "Optimistic concurrency: reject with 409 if the page moved on.",
     commandId: CODEX_COMMAND_ID
@@ -891,12 +939,50 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   CodexRevealRequest: {
     commandId: CODEX_COMMAND_ID
   },
+  CodexBlockAddRequest: {
+    "": "A new hidden block. It starts Hidden; show it through its audience route.",
+    anchor: BLOCK_ANCHOR,
+    slot: BLOCK_SLOT,
+    title: "Optional, one line.",
+    expectedRev: BLOCK_EXPECTED_REV,
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexBlockEditRequest: {
+    "": "A block's title or text; an omitted field is left alone. Its audience stays.",
+    expectedRev: BLOCK_EXPECTED_REV,
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexBlockMoveRequest: {
+    anchor: BLOCK_ANCHOR,
+    slot: BLOCK_SLOT,
+    expectedRev: BLOCK_EXPECTED_REV,
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexAudienceRequest: {
+    "": "Who sees a hidden block or an objective. Not an edit: it moves neither `rev` nor `updatedAt`.",
+    audience: AUDIENCE,
+    characterIds: `${AUDIENCE_CHARACTERS} Each must be a player character in the game (400 otherwise).`,
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexFieldAudienceRequest: {
+    "": "Who sees one field: `everyone` or `hidden`. Not an edit.",
+    commandId: CODEX_COMMAND_ID
+  },
+  CodexPreviewSessionRequest: {
+    "": "Which reader the preview is. The body is optional.",
+    characterId:
+      "A player character to read as, exactly as that character's player reads. Omitted or null: a preview as everyone, which reads as a player with no character. Must be a player character (400 otherwise).",
+    commandId: CODEX_COMMAND_ID
+  },
   CodexConnectionCreateRequest: {
     label:
       'Optional. An unlabelled connection is a legitimate "these two are related" (the same thing a `[[wiki link]]` already expresses), so forcing a word would make the declared half of one concept stricter than the derived half.',
+    began: "When the tie began in the world. Null or omitted: no date.",
     commandId: CODEX_COMMAND_ID
   },
   CodexConnectionUpdateRequest: {
+    "": "Moving a connection to the player layer is how the party learns it: the write stamps `learned` once players can read it.",
+    began: "When the tie began in the world; `null` clears it, and omitted leaves it.",
     commandId: CODEX_COMMAND_ID
   },
   CodexFolderPathRequest: {
@@ -979,12 +1065,14 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   CodexQuestCreateRequest: {
     "": "Only `title` is required; a lead can be named the moment it appears at the table and filled in later.",
+    blocks: "Hidden blocks to place in the quest. Each starts Hidden.",
     status: QUEST_STATUS,
     tags: CODEX_TAGS,
     commandId: CODEX_COMMAND_ID
   },
   CodexQuestUpdateRequest: {
-    "": 'An omitted field is left alone; the console PATCHes a whole draft on every autosave, so "absent means clear" would wipe the half of the record the editing surface does not carry. `objectives` and `entityIds` are REPLACED wholesale when present, and objectives are stored in exactly the order given. `revealed` is deliberately NOT here: reveal is its own route because it is not an edit (it moves neither `rev` nor `updatedAt`), exactly as on a page.',
+    "": 'An omitted field is left alone; the console PATCHes a whole draft on every autosave, so "absent means clear" would wipe the half of the record the editing surface does not carry. `objectives` and `entityIds` are REPLACED wholesale when present, and objectives are stored in exactly the order given; an objective sent with its `id` keeps its audience. `revealed` is deliberately NOT here: reveal is its own route because it is not an edit (it moves neither `rev` nor `updatedAt`), exactly as on a page.',
+    layout: LAYOUT,
     status: QUEST_STATUS,
     tags: CODEX_TAGS,
     expectedRev: "Optimistic concurrency: reject with 409 if the quest moved on.",
@@ -1020,7 +1108,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   CodexImportRequest: {
     codex: "The export's `codex` bundle, verbatim.",
     bundleVersion:
-      'Optional. Absent = a pre-versioning v1 bundle. Anything but 1 is refused: "This backup was made by a newer version of the app. Update, then restore."',
+      'Optional. Absent = a pre-versioning v1 bundle. Version 1 restores through the same conversion as the upgrade (each GM body becomes Hidden blocks, secret fields become Hidden fields), and version 2 as written. A newer version is refused: "This backup was made by a newer version of the app. Update, then restore."',
     exportedAt: "Accepted and IGNORED, so a saved export file can be POSTed without editing.",
     commandId: CODEX_COMMAND_ID
   },
@@ -1031,20 +1119,67 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     intervalSeconds:
       'How long the editors wait after you stop typing before saving. SECONDS, and the unit is the same everywhere (wire, column, and store), so nothing converts at a boundary. Default `1`, which is what the shipping editors already did (an 800 ms debounce) expressed on this scale, so an upgraded codex saves exactly as often as it used to. `0` is not in range: a zero-second autosave is a save per keystroke, which is not a cadence anyone means; a GM who wants none says `enabled: false`. The 600 ceiling is ten minutes, past which the setting stops meaning "save while I work".'
   },
+  CodexRevealStamp: {
+    "": "When something first reached an audience. Set once, by the write after which that audience could read it, and never moved after: a hide keeps it and a second reveal does not replace it.",
+    sessionId: "The session active at that moment, or null.",
+    sessionNumber: "That session's number now, or the number it had when it was deleted.",
+    inWorldDate: "The PLAYERS' published date at that moment, never the GM's clock. Null when none was published.",
+    inWorldLabel: IN_WORLD_LABEL
+  },
+  CodexRevealStampPlayer: {
+    "": "A stamp as a player receives it.",
+    sessionNumber: "Only while that session exists and is revealed; null otherwise.",
+    inWorldDate: "The players' published date at that moment."
+  },
+  CodexBlockReveal: {
+    "": "One audience a block reached.",
+    to: "`everyone`, or the character id it reached."
+  },
+  CodexBlock: {
+    "": "A hidden block: markdown placed in a page's or quest's player text with its own audience. A player receives a block only when it is shown to everyone or to a character they hold, and only after its record is revealed.",
+    anchor: BLOCK_ANCHOR,
+    title: "Optional, one line. It reads as a level 2 heading over the text once the block is shown.",
+    text: "The block's markdown.",
+    audience: AUDIENCE,
+    characterIds: AUDIENCE_CHARACTERS,
+    reveals: "One stamp per audience the block has reached, oldest first. A hide keeps them."
+  },
+  CodexBlockContent: {
+    "": "A block as a revision keeps it: content and place, no audience, since a revision is content and a restore never shows players anything new.",
+    anchor: BLOCK_ANCHOR
+  },
+  CodexBlockPlayer: {
+    "": "A block the reader may read, as it sits in their assembled `body`. No id, anchor or audience, and nothing about a block they may not read.",
+    start: "Where the block's markdown starts in `body`, as a UTF-16 offset.",
+    end: "Where it ends in `body`, exclusive.",
+    characterIds: "Which of the reader's characters it is shown to; empty when it is shown to everyone.",
+    revealed: "When it first reached the reader: the earliest stamp for everyone or for one of their characters."
+  },
+  CodexRelationshipBegan: {
+    "": "When a declared connection began in the world.",
+    inWorldDate: "The date it began; null when it began before the campaign.",
+    beforeCampaign: "It began before the campaign.",
+    inWorldLabel: IN_WORLD_LABEL,
+    calendarInstant: CALENDAR_INSTANT
+  },
   CodexPageSummary: {
-    fields: "Player-facing typed entity fields (free-form key/value).",
+    fields: "Every field value, whatever its audience. `hiddenFields` says which only the GM sees.",
+    hiddenFields: "The field keys only the GM sees. A key absent here is shown to everyone who can read the page.",
     folder: PAGE_FOLDER,
     inWorldLabel: IN_WORLD_LABEL,
     calendarInstant: CALENDAR_INSTANT,
     inWorldDate: IN_WORLD_DATE,
     updatedAt: PAGE_UPDATED_AT,
     playerUpdatedAt: PAGE_PLAYER_UPDATED_AT,
+    characterUpdatedAt:
+      "GM-only. For each character id, when something shown only to some characters last changed for that character.",
     firstShownAt: FIRST_SHOWN_AT
   },
   CodexPage: {
-    gmFields: "GM-only fields; never present in a player projection.",
-    playerBody: "Player-facing markdown body.",
-    gmBody: "GM-only markdown body; stripped from a player projection.",
+    fields: "Every field value, whatever its audience. `hiddenFields` says which only the GM sees.",
+    hiddenFields: "The field keys only the GM sees.",
+    playerBody: "The text everyone who can read the page reads, with no block in it.",
+    blocks: "The page's hidden blocks, in document order.",
     folder: PAGE_FOLDER,
     inWorldLabel: IN_WORLD_LABEL,
     calendarInstant: CALENDAR_INSTANT,
@@ -1055,13 +1190,15 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
   },
   CodexPageSummaryPlayer: {
     "": "A page summary as a PLAYER receives it. A strict subset of the GM summary: no `fields`, no dating trio, no `rev`, no `revealedToPlayers`, no `createdAt`, no `folder` and no `updatedAt`.",
-    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT
+    playerUpdatedAt: PLAYER_UPDATED_AT_READER
   },
   CodexPagePlayer: {
-    "": "A page as a PLAYER receives it: the player body (renamed `body`; the layer prefix only means something when there are two layers), the player-facing `fields`, and no `gmBody`, `gmFields`, `rev`, `revealedToPlayers`, `createdAt`, `folder` or `updatedAt`. An unrevealed page is never projected at all; it 404s.",
-    fields: "The player-facing typed entity fields. `gmFields` has no player form.",
-    body: "The page's `playerBody`.",
-    playerUpdatedAt: PAGE_PLAYER_UPDATED_AT
+    "": "A page as a PLAYER receives it: the player text with the blocks this reader may read in place, the fields shown to everyone, and no Hidden field, block, `rev`, `revealedToPlayers`, `createdAt`, `folder` or `updatedAt`. Nothing marks where a block they may not read sits. An unrevealed page is never projected at all; it 404s.",
+    fields: "The fields shown to everyone.",
+    body: "The page's player text with the reader's blocks inserted at their anchors. A `[[link]]` to a page the reader cannot open reads as plain text.",
+    playerUpdatedAt: PLAYER_UPDATED_AT_READER,
+    firstShownAt: FIRST_SHOWN_AT_PLAYER,
+    blocks: "The blocks in `body`, in document order, with when each reached the reader."
   },
   CodexConnection: {
     "": "One edge in the codex graph, GM view. ONE shape for both origins: a connection the GM declared and a connection derived from `[[wiki link]]` text differ only by an `origin` attribute, in one system with one panel and one edge kind.",
@@ -1071,11 +1208,17 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "Connections v1 are edges INTO pages. `[[map:...]]`/`[[marker:...]]` targets still parse and persist but get no graph exposure.",
     label: 'The out-label ("ally of", "located in"). Null for an unlabelled connection.',
     layer:
-      "Which layer the connection lives on. A `mention` inherits the body it was written in; a `declared` one is chosen at create (default `player`).",
+      "Which layer the connection lives on. A `mention` takes the layer of the text it was written in: player text and blocks shown to everyone are the player layer, and any other block is the GM layer. A `declared` one is chosen at create (default `player`).",
+    characterIds:
+      "A GM-layer mention from a block shown to these characters: a reader holding one of them receives it. Empty otherwise.",
+    began: "When the tie began in the world. Declared connections only.",
+    learned:
+      "When players could first read it: on the player layer, between two revealed pages. Declared connections only. Null until then, and for one players could read before stamps existed.",
     createdAt: "Null for a mention row."
   },
   CodexConnectionPlayer: {
-    "": "A connection as a PLAYER receives it. No `id` (a player never addresses one), no `layer` (every connection they receive is on the player layer, so the key could only be a constant), no `createdAt`."
+    "": "A connection as a PLAYER receives it: one on the player layer, or a mention from a block shown to a character they hold. No `id` (a player never addresses one), no `layer`, no `characterIds` and no `createdAt`. The list comes in a fixed order of its own, never the order connections were made in.",
+    learned: "When the party learned it, as a player stamp."
   },
   CodexPageConnection: {
     "": "One row of a page's Connections panel: the OTHER endpoint resolved, plus which way the edge points. Folds in what used to be two separate views (backlinks and typed relationships).",
@@ -1084,13 +1227,15 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     otherEntityType: "Pages only; null for every other kind.",
     otherRevealed:
       "GM-only; not declared on `CodexPageConnectionPlayer` (a player only ever receives connections to records they can see).",
-    section: "The heading the mention sits under; null for a declared connection."
+    section: "The heading the mention sits under; null for a declared connection.",
+    characterIds: "As on `CodexConnection`."
   },
   CodexPageConnectionPlayer: {
-    "": "A page's Connections panel as a PLAYER receives it: revealed others only, so `otherRevealed` would be a constant, and no `id` or `layer`."
+    "": "A page's Connections panel as a PLAYER receives it: revealed others only, so `otherRevealed` would be a constant, and no `id`, `layer` or `characterIds`."
   },
   CodexMap: {
-    parentMapId: "Parent map in the atlas tree; for a player, nulled when the parent is not itself revealed."
+    parentMapId: "Parent map in the atlas tree; for a player, nulled when the parent is not itself revealed.",
+    firstShownAt: `${FIRST_SHOWN_AT} It orders the players' list, which never carries it.`
   },
   CodexMapPlayer: {
     "": "An atlas map as a PLAYER receives it. `parentMapId` survives only when the parent is itself revealed; otherwise a revealed child would leak the id of a still-secret ancestor.",
@@ -1101,7 +1246,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     subMapId: "Drill-down sub-map; nulled for a player when that map is not revealed.",
     sceneIds: "Linked prepared scenes; GM-only, stripped from a player projection.",
     isParty:
-      "Whether this is the party's pin. At most one marker in the whole atlas carries it. PLAYER-FACING: the party pin is for the players, and it is the ONE such key on the player marker projection, but it grants no visibility of its own: a hidden party pin, or one on a hidden map, is exactly as hidden as any other pin, because `isParty` is not part of any reveal predicate anywhere."
+      "Whether this is the party's pin. At most one marker in the whole atlas carries it. PLAYER-FACING: the party pin is for the players, and it is the ONE such key on the player marker projection, but it grants no visibility of its own: a hidden party pin, or one on a hidden map, is exactly as hidden as any other pin, because `isParty` is not part of any reveal predicate anywhere.",
+    firstShownAt: `${FIRST_SHOWN_AT} A pin is read once it and its map are revealed. It orders the players' lists.`
   },
   CodexMarkerPlayer: {
     "": "A pin as a PLAYER receives it: no `sceneIds`, no `actorId`, no `revealedToPlayers`, no timestamps, and page/sub-map links only when those targets are themselves revealed. `isParty` IS here (the party pin is for the players), but it grants no visibility: a hidden party pin, or one on a hidden map, is exactly as hidden as any other.",
@@ -1181,7 +1327,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     title: "An event page's title; null for a journal entry, which has no name.",
     text: "The player-facing layer: a journal entry's full text, or a bounded excerpt of an event page's player body.",
     gmText:
-      "GM-only: an entry's GM note, or an excerpt of an event page's GM body. Not declared at all on `CodexChronicleRecordPlayer`.",
+      "GM-only: an entry's GM note, or an excerpt of an event page's hidden blocks. Not declared at all on `CodexChronicleRecordPlayer`.",
     revealedToPlayers:
       "GM-only field; not declared on `CodexChronicleRecordPlayer` (a player only ever receives revealed records).",
     sessionId: "the session this row belongs to, by identity. Null for an `event` page and for an unfiled entry.",
@@ -1213,7 +1359,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     firstShownAt: FIRST_SHOWN_AT_PLAYER
   },
   CodexSession: {
-    "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record, like a page's `playerBody`/`gmBody`: `recapBody` is the player-facing half and `prepBody` is the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, and `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`). Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused, so no group silently turns ambiguous.",
+    "": "One play session: the GM's prep for an evening at the table, and the recap of it afterwards. Two layers in one record: `recapBody` is the player-facing half and the `prep` sections are the GM's. A player projection is deliberately narrow: a revealed session reduces to EXACTLY `id`, `sessionNumber`, `realDate`, `recap` (the recap body, renamed the way a page's `playerBody` becomes `body` and a journal entry's `playerText` becomes `text`) and `tags`, with every `[[link]]` to a page the reader cannot open as plain text. Everything else here is GM-only. `sessionNumber` is the join to the journal: entries carry the same number, which is what the journal's by-session lens groups on, so it is unique across sessions, and a number already in use is refused, so no group silently turns ambiguous.",
     sessionNumber:
       '"Session 12": the session\'s DISPLAY number. Unique across sessions; null until the GM assigns one. Journal entries link to the session by ID and resolve this live, so renumbering a session relabels every one of its entries with no journal write.',
     realDate:
@@ -1221,8 +1367,9 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     attendees: "Who was at the table. GM-only; absent from a player projection.",
     sceneIds:
       "the prepared scenes staged for this session, so the GM can put any of them live in one tap at the table. GM-ONLY, ALWAYS: stricter than the session's own reveal, because a revealed session publishes its RECAP and tonight's planned fights are spoilers even then.",
-    prepBody:
-      "GM-only prep notes for the session (markdown). NEVER present in a player projection, revealed or not; revealing a session publishes its recap, never its prep.",
+    prep: "GM-only: the session's prep sections, its own copy of a template's. NEVER present in a player projection, revealed or not; revealing a session publishes its recap, never its prep.",
+    prepTemplateId: "GM-only: the template the prep was last copied from. It may name a deleted template.",
+    currentSceneId: "GM-only: the live board's current scene, a scene id in one of the prep's Scenes sections.",
     recapBody: "The player-facing recap (markdown). Reaches a revealed session's player projection as `recap`.",
     revealedToPlayers:
       "GM-only field; absent from a player projection (a player only ever receives revealed sessions).",
@@ -1231,22 +1378,23 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     rev: GM_REV,
     createdAt: GM_ONLY,
     updatedAt:
-      "GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal or an activate, because neither is an edit."
+      "GM-only; absent from a player projection. Moves on an edit, but NOT on a reveal or an activate, because neither is an edit.",
+    firstShownAt: `${FIRST_SHOWN_AT} It orders the players' unnumbered sessions.`
   },
   CodexSessionPlayer: {
-    "": "A session as a PLAYER receives it: the tightest projection in the Codex, and every omission is a decision. `prepBody` is the GM's plan for the evening and has no player form; `attendees` is real-world personal data; `status` is the GM's own scheduling state; `rev` is the editor's conflict token. `recapBody` arrives renamed `recap`, because with only one layer left the prefix means nothing.",
+    "": "A session as a PLAYER receives it: the tightest projection in the Codex, and every omission is a decision. `prep` is the GM's plan for the evening and has no player form; `attendees` is real-world personal data; `status` is the GM's own scheduling state; `rev` is the editor's conflict token. `recapBody` arrives renamed `recap`, because with only one layer left the prefix means nothing.",
     recap: "The session's `recapBody`.",
     tags: "tags are SINGLE-LAYER in this codex (there is no GM-only tag) and every other record kind already ships its tags to players. A revealed session's tags are its player-facing categorization, and they are already in the player search index by the same rule."
   },
   CodexQuest: {
-    "": "One quest: a thread the party is pulling on, and whether it is still open. Two layers in one record, like a page's `playerBody`/`gmBody`: `playerBody` is what the table may read and `gmBody` is the GM's own half (who is really behind it, what happens if they fail). A player projection of a REVEALED quest is exactly `id`, `title`, `status`, `body` (the player body, renamed the way a page's `playerBody` becomes `body`), `objectives`, and `entityIds`; everything else here is GM-only. `status` is the one field that is player-facing here but GM-only on a session: \"what is still open\" is the whole point of the feature, and a revealed quest whose state the player cannot see is useless. Objectives are the Codex's first ORDERED mutable list: the array is stored and returned exactly as given, never sorted, deduped, or keyed by position across a write.",
+    "": "One quest: a thread the party is pulling on, and whether it is still open. `playerBody` is what the table may read and hidden blocks hold the GM's own half (who is really behind it, what happens if they fail), each with its own audience. A player projection of a REVEALED quest is exactly `id`, `title`, `status`, `body` (the player text with the reader's blocks in place), `blocks`, the objectives the reader may see, and `entityIds`; everything else here is GM-only. `status` is the one field that is player-facing here but GM-only on a session: \"what is still open\" is the whole point of the feature. Objectives are an ORDERED mutable list: the array is stored and returned exactly as given, never sorted or deduped.",
     title: "The quest's name: the line that appears on the dashboard's open-quests card.",
     status:
       "Player-facing (unlike a session's `status`). Queryable server-side: the dashboard counts the OPEN ones: `not-started` and `active`.",
-    playerBody: "The player-facing description (markdown). Reaches a revealed quest's player projection as `body`.",
-    gmBody:
-      "GM-only notes (markdown). NEVER present in a player projection, revealed or not; revealing a quest publishes its player body, never its GM body. It is also kept out of the player search index, because a HIT on a GM-only phrase leaks the phrase even when the body itself is never returned.",
-    objectives: "The ordered checklist. Player-facing in full; the order is content.",
+    playerBody: "The text everyone who can read the quest reads, with no block in it.",
+    blocks:
+      "The quest's hidden blocks, in document order. A block reaches a player only when it is shown to everyone or to a character they hold; one they may not read is also kept out of their search, because a HIT on a hidden phrase leaks the phrase.",
+    objectives: "The ordered checklist, each objective with its own audience; the order is content.",
     entityIds:
       "Codex pages this quest involves (the NPC who gave it, the location it points at). Player-facing, but filtered to the revealed subset, the same rule a marker's `pageIds` follows, so a quest can never name a page the player cannot open.",
     revealedToPlayers: "GM-only field; absent from a player projection (a player only ever receives revealed quests).",
@@ -1254,12 +1402,15 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     rev: GM_REV,
     createdAt: GM_ONLY,
     updatedAt:
-      "GM-only; absent from a player projection. Moves on an edit. A reveal is not an edit and does not move it."
+      "GM-only; absent from a player projection. Moves on an edit. A reveal or an audience change is not an edit and does not move it.",
+    firstShownAt: `${FIRST_SHOWN_AT} It orders the players' list.`
   },
   CodexQuestPlayer: {
-    "": 'A quest as a PLAYER receives it. `status` is KEPT: this is the one place a quest differs from a session, because "what is still open" is the entire point of the feature. `gmBody` and `rev` never travel, and `entityIds` is filtered to the revealed subset so a quest can never name a page the player cannot open.',
+    "": 'A quest as a PLAYER receives it. `status` is KEPT: this is the one place a quest differs from a session, because "what is still open" is the entire point of the feature. Hidden blocks and objectives the reader may not see and `rev` never travel, and `entityIds` is filtered to the revealed subset so a quest can never name a page the player cannot open.',
     status: QUEST_STATUS,
-    body: "The quest's `playerBody`.",
+    body: "The quest's player text with the reader's blocks inserted at their anchors.",
+    blocks: "The blocks in `body`, in document order, with when each reached the reader.",
+    objectives: "Only the objectives the reader may see, in order; a count of them counts only those.",
     entityIds: REVEALED_SUBSET,
     tags: "the `CodexSessionPlayer.tags` rule verbatim: tags are single-layer, and the quest's own reveal flag remains the whole predicate."
   },
@@ -1273,7 +1424,8 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
       "GM-only field; absent from a player projection (a player only ever receives revealed standings).",
     createdAt: GM_ONLY,
     updatedAt:
-      'GM-only; absent from a player projection. "When did this move" is a question the chronicle answers, with the reason attached.'
+      'GM-only; absent from a player projection. "When did this move" is a question the chronicle answers, with the reason attached.',
+    firstShownAt: `${FIRST_SHOWN_AT} A standing is read once it and its faction page are revealed. It orders the players' list.`
   },
   CodexStandingPlayer: {
     "": 'A standing as a PLAYER receives it: two keys. The row\'s own `id` is noise (a player never addresses a standing, and `factionPageId` is unique), and "when did this last move" is a question the chronicle answers with the reason attached. A standing reaches a player only when the standing AND its faction page are both revealed.',
@@ -1304,12 +1456,51 @@ export const DESCRIPTIONS: Readonly<Record<string, Readonly<Record<string, strin
     tags: "Always present, so no consumer branches on key presence.",
     entityType: "The page's entity type; null for every other kind.",
     mapId:
-      "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed."
+      "The map a marker sits on; null for every other kind. Never names an unrevealed map, because a player only ever receives a marker hit when that map is revealed.",
+    type: "A page's entity type, else the record kind: what the `types` filter and the `type` sort read.",
+    revealedToPlayers:
+      "Whether players can read the record, by its kind's player read: a pin also needs its map. What the `visibility` filter reads.",
+    modifiedAt: "When the GM last saved the record.",
+    columns:
+      "The values the record's kind shows as table columns, by column key: a page's fields (hidden ones included), a quest's `status`, a session's `number`, `date` and `status`, an entry's `kind` and `date`, a pin's `map`, a map's `kind` and `parent`. A column with no value is absent.",
+    match:
+      "The line that matched, cut to about 160 characters; null without `q` or when only the title or tags matched. `hidden` is true when the line is text not every player reads: a block not shown to everyone, a Hidden field, an objective not shown to everyone, a journal entry's GM note, prep or attendees."
   },
-  CodexSearchData: {
-    hits: "The one ranked result list, all record kinds. A title equal to the query comes first for both roles. After it, a GM's hits are ranked by relevance (bm25, the title weighted 10x). A player's come by tier: a title holding every query word, then the rest, each tier ordered by kind, title and id. A player hit's place depends on its own title alone, so records a player cannot see never move it.",
-    truncated:
-      'The result list was CUT at the cap. Narrow the query. The Codex is unpaginated by design at LAN scale, which is honest only while a caller can tell a complete list from a clipped one; this is that difference, and it tells "exactly 50 matches" from "50 and more". A player\'s list is counted after every player gate, so a record they cannot see never takes a place under the cap or sets this flag.'
+  CodexSearchHitPlayer: {
+    "": "One search hit as a PLAYER receives it, built from what that player reads: the blocks, fields and objectives that reach their characters, with every `[[link]]` to a page they cannot open as plain text. No `revealedToPlayers`, and its line never comes from text that does not reach them.",
+    modifiedAt:
+      "A page's `playerUpdatedAt` as this player reads it, else the record's `firstShownAt`. Never when the GM saved the record.",
+    columns: "As the GM's, from the player's own read: a page's fields are the ones the player can read.",
+    match: "The line of the player's own text that matched; null without `q` or when only the title or tags matched."
+  },
+  CodexHome: {
+    "": "The GM's front page aggregates.",
+    collections:
+      "Every search type in a fixed order, zeros included. `revealed` counts what players can read by each kind's player read; `hidden` is the rest. The same split as the search's `visibility` filter.",
+    recent:
+      "The 12 latest changed records, newest first. `change` says what it was; only a page tells a reveal or a hide from an edit. `audience` is who sees the change: `everyone` when players can read the record and, for a page, the change moved what they all read; `characters` when, on a revealed page, it moved only what some characters read (a block or field shown to them), named in `characterIds`; `hidden` otherwise.",
+    revealCheck:
+      "Revealed records that point at something players can't read: a link to a hidden page or map, a field players read that holds a placeholder, a hidden pin on a revealed map. Players get plain text there, so each is safe. At most 100 rows; `total` counts them all."
+  },
+  CodexHomePlayer: {
+    "": "A player's front page: what they can read that is new or changed since `since`.",
+    newSince:
+      "Newest first, at most 50: pages by their `playerUpdatedAt` as this player reads it, every other record by its `firstShownAt`. `change` is `new` when the record was first shown after `since`, else `updated`. Built from this player's own reads, so it lists, names and dates only what reaches them."
+  },
+  CodexPrepTemplate: {
+    "": "A reusable plan for session prep: an ordered list of sections, each with a title, a prompt and a type. GM-only.",
+    builtIn: "The starting template ships with the app and is read-only. Duplicate it to edit a copy.",
+    isDefault: "The template a new session copies when it names none.",
+    rev: "The conflict token for `PATCH`; 0 on the built-in.",
+    createdAt: "Null on the built-in.",
+    updatedAt: "Null on the built-in."
+  },
+  CodexLiveBoard: {
+    "": "The active session's live board, read from its prep. GM-only.",
+    rev: "The session's `rev`, so an open editor can stay current.",
+    pageGroups: "One group per Linked pages section. A page that no longer exists is left out.",
+    clocks: "The deadlines of every Clocks section, deduped. `fired` is measured against the GM's date.",
+    logged: "The 50 latest journal entries filed under the session, oldest first."
   },
   CodexRevisionHistorySettings: {
     "": "How much page version history the codex keeps, and what keeping it costs. The two knobs are exactly `CodexRevisionHistoryInput`'s; the two usage figures are server-computed and READ-ONLY, and they ride along here in one object because a settings screen wants the cost beside the control that changes it.",

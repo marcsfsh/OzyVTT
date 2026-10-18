@@ -63,7 +63,8 @@ const MAP = (id: string, name: string, revealedToPlayers = true, parentMapId: st
   sortKey: 0,
   tags: [],
   createdAt: "2026-10-01T00:00:00.000Z",
-  updatedAt: "2026-10-01T00:00:00.000Z"
+  updatedAt: "2026-10-01T00:00:00.000Z",
+  firstShownAt: null
 });
 const PIN = (id: string, label: string, over: Partial<CodexMarker> = {}): CodexMarker => ({
   id,
@@ -82,6 +83,7 @@ const PIN = (id: string, label: string, over: Partial<CodexMarker> = {}): CodexM
   revealedToPlayers: true,
   createdAt: "2026-10-01T00:00:00.000Z",
   updatedAt: "2026-10-01T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 const PAGE = (id: string, title: string, over: Partial<CodexPageSummary> = {}) =>
