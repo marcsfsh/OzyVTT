@@ -401,11 +401,10 @@
 .atlas-pintable tbody th {
   font-weight: 600;
 }
-/* The row's real control is a compact line under a mouse and grows to 44px on a phone; rows are stacked, so no
-   ::after overhang. */
+/* The row's real control grows to 44px; rows are stacked, so no ::after overhang. */
 .atlas-pintable-open {
   width: 100%;
-  min-height: 2rem;
+  min-height: var(--tap-min);
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -832,10 +831,4 @@
 }
 .atlas.is-phone > .nh-alert {
   margin: 0 var(--space-3);
-}
-
-@media (max-width: 760px) {
-  .atlas-pintable-open {
-    min-height: var(--tap-min);
-  }
 }
