@@ -121,7 +121,7 @@ describe("Everything that carries the tag, across types", () => {
     await user.click(screen.getByRole("button", { name: /Barovia/ }));
     expect(onNavigate).toHaveBeenLastCalledWith("/codex/atlas/m1");
     await user.click(screen.getByRole("button", { name: /We reached the shore/ }));
-    expect(onNavigate).toHaveBeenLastCalledWith("/codex/journal?entry=j1");
+    expect(onNavigate).toHaveBeenLastCalledWith("/codex/story?entry=j1");
     await user.click(screen.getByRole("button", { name: /Session 4/ }));
     expect(onNavigate).toHaveBeenLastCalledWith("/codex/sessions/s1");
     await user.click(screen.getByRole("button", { name: /The Missing Cask/ }));

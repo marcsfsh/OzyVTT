@@ -141,7 +141,7 @@ const renderWorkspace = (onOpenReplay?: (archiveId: number) => void) =>
 /** Open the Journal from the nav and wait for the chronicle. */
 const openJournal = async (user: ReturnType<typeof userEvent.setup>) => {
   await waitFor(() => expect(listPages).toHaveBeenCalled());
-  await user.click(screen.getByRole("button", { name: "Journal" }));
+  await user.click(screen.getByRole("button", { name: "Story" }));
   await waitFor(() => expect(chronicle).toHaveBeenCalled());
 };
 

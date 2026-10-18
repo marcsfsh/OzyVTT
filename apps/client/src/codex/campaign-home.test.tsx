@@ -294,7 +294,7 @@ describe("Home is the section name, and 'World' is not a destination", () => {
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
 
-    await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+    await user.click(screen.getByRole("button", { name: /Search the Codex/ }));
     const palette = within(screen.getByRole("dialog", { name: "Codex command palette" }));
     expect(palette.queryByText("Go to World")).not.toBeInTheDocument();
     await user.click(palette.getByText("Go to Home"));
@@ -355,7 +355,7 @@ describe("The Campaign dashboard shows what exists today", () => {
     const journal = within(await screen.findByRole("navigation", { name: "Latest journal activity" }));
     await user.click(journal.getByText("The party crossed the mists."));
 
-    expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Story" })).toHaveAttribute("aria-current", "page");
     // The entry is marked as well as the Journal opened.
     await waitFor(() => expect(document.getElementById("codex-entry-j1")).toHaveAttribute("aria-current", "true"));
     expect(document.getElementById("codex-entry-j2")).not.toHaveAttribute("aria-current");
@@ -532,7 +532,7 @@ describe("The player's Campaign dashboard is the server's projection (viewer saf
       )
     );
 
-    expect(screen.getByRole("button", { name: "Journal" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Story" })).toHaveAttribute("aria-current", "page");
     await waitFor(() =>
       expect(document.getElementById("codex-player-entry-j1")).toHaveAttribute("aria-current", "true")
     );

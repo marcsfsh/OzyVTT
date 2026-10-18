@@ -100,7 +100,7 @@ describe("Codex shell: cross-mode navigation", () => {
   it("starts on Pages: the GM's first action is actionable", async () => {
     renderWorkspace();
     await waitFor(() => expect(listPages).toHaveBeenCalled());
-    expect(screen.getByRole("button", { name: "Pages" })).toHaveAttribute("aria-current", "page");
+    expect(window.location.pathname).toBe("/codex/pages");
   });
 
   it("switches mode when a mode tab is chosen", async () => {
@@ -117,7 +117,7 @@ describe("Codex shell: cross-mode navigation", () => {
     await waitFor(() => expect(listPages).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "Home" }));
     await user.click(await screen.findByText(/character/i));
-    expect(screen.getByRole("button", { name: "Pages" })).toHaveAttribute("aria-current", "page");
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/pages"));
     // The filter names the type, and the non-matching page is filtered out.
     expect(await screen.findByText(/Characters/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("Barovia")).not.toBeInTheDocument());

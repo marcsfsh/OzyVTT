@@ -109,7 +109,7 @@ describe("Codex loading states (CF-2)", () => {
     const user = userEvent.setup();
     renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Graph" }));
+    await user.click(screen.getByRole("button", { name: "Relationships" }));
     expect(screen.queryByText(/No pages yet/i)).not.toBeInTheDocument();
     pages.resolve([]);
     // A genuinely empty campaign still reaches the empty state.

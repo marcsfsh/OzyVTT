@@ -197,6 +197,8 @@ export type PlayerPanelSlots = Readonly<{
   party?: ReactNode;
   /** Under the player's own sheet: the shared replays and Leave table. */
   sheetFooter?: ReactNode;
+  /** The Codex at the table, read through this player's projection. */
+  codex?: ReactNode;
 }>;
 
 /**
@@ -224,7 +226,10 @@ export function PlayerEncounterPanel({
     revealInRegion(activeRowRef.current, "nearest", "smooth");
   }, [combat.turnActorId]);
   const fighting = combat.active;
-  const tabIds = fighting ? ["turn", "order", "sheet", "dice", "log"] : ["me", "party", "dice", "log"];
+  const codexIds = slots?.codex ? ["codex"] : [];
+  const tabIds = fighting
+    ? ["turn", "order", "sheet", ...codexIds, "dice", "log"]
+    : ["me", "party", ...codexIds, "dice", "log"];
   const [tab, setTab] = useRememberedTab(
     `vtt.table-tab.player.${phone ? "phone" : "laptop"}`,
     tabIds,
@@ -441,12 +446,16 @@ export function PlayerEncounterPanel({
     </section>
   );
 
+  const codexTab: PanelTab[] = slots?.codex
+    ? [{ id: "codex", label: "Codex", content: slots.codex, scrolls: false }]
+    : [];
   const tabs: PanelTab[] = fighting
     ? [
         { id: "turn", label: "Turn", content: turnBody },
         { id: "order", label: "Order", content: orderBody },
         // The sheet holds its own row and strip above the one region that scrolls.
         { id: "sheet", label: "Sheet", content: sheet(true), scrolls: !myActor },
+        ...codexTab,
         { id: "dice", label: "Dice", content: slots?.dice },
         { id: "log", label: "Log", content: slots?.log, scrolls: false }
       ]
@@ -457,6 +466,7 @@ export function PlayerEncounterPanel({
           label: "Party",
           content: slots?.party ?? <p className="table-panel-empty">The party is hidden.</p>
         },
+        ...codexTab,
         { id: "dice", label: "Dice", content: slots?.dice },
         { id: "log", label: "Log", content: slots?.log, scrolls: false }
       ];

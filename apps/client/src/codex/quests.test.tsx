@@ -90,6 +90,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
+import { navigate } from "../router";
 import { CodexShell } from "./CodexShell";
 import { PlayerCodex } from "./PlayerCodex";
 import { QUEST_STATUS_LABEL, QUEST_STATUS_ORDER, openQuests, questProgress, questStatusTone } from "./quests";
@@ -256,7 +257,7 @@ describe("The dashboard's open-quests card", () => {
     await renderWorkspace();
 
     const jumpViaPalette = async () => {
-      await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+      await user.click(screen.getByRole("button", { name: /Search the Codex/ }));
       const palette = within(await screen.findByRole("dialog", { name: "Codex command palette" }));
       await user.type(palette.getByLabelText("Search the Codex"), "temple");
       await user.click(await palette.findByText("The Amber Temple"));
@@ -567,8 +568,8 @@ describe("The player's quest reader", () => {
     await screen.findByRole("heading", { name: "By kind" });
     expect(screen.queryByRole("navigation", { name: "Open quests" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Pages" }));
-    await user.type(screen.getAllByLabelText("Search the Codex")[0], "bell");
+    await navigate("/codex/pages");
+    await user.type((await screen.findAllByLabelText("Search the Codex"))[0], "bell");
     const results = within(screen.getByRole("navigation", { name: "Pages" }));
     expect(await results.findByText("Quest")).toBeInTheDocument();
     await user.click(results.getByText("The Bell of Vallaki"));
@@ -667,7 +668,7 @@ describe("A quest in suite-wide search", () => {
     await renderWorkspace();
 
     // Search lives in the palette.
-    await user.click(screen.getAllByRole("button", { name: "Search" })[0]);
+    await user.click(screen.getByRole("button", { name: /Search the Codex/ }));
     const results = within(await screen.findByRole("dialog", { name: "Codex command palette" }));
     await user.type(results.getByLabelText("Search the Codex"), "temple");
     // The row names its kind in words.

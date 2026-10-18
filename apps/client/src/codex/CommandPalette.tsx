@@ -3,7 +3,8 @@ import { Alert, Modal, Skeleton } from "@vtt/ui";
 import type { CodexSearchHit } from "@vtt/domain";
 import { codexApi, playerCodexApi, SEARCH_HIT_CAP } from "./api";
 import { SearchResultRow, searchHitKey, useCodexSearch } from "./SearchResults";
-import { GM_SIDEBAR, PLAYER_SIDEBAR, pathForSection } from "./routes";
+import { codexDestinations, pathForSection } from "./routes";
+import { withQuery } from "../router";
 
 /**
  * The Codex command palette: jump to a record, go to a section, or create. It belongs to the Codex alone;
@@ -30,7 +31,7 @@ export type CommandPaletteProps = Readonly<{
   player?: boolean;
 }>;
 
-/** The full result list lives in the rail. */
+/** The full result list lives in Search. */
 const MAX_HITS = 8;
 
 export function CommandPalette({
@@ -56,13 +57,14 @@ export function CommandPalette({
   );
   const state = useCodexSearch(query, runSearch);
 
-  /** Every sidebar destination, from the table the sidebar renders. */
+  /** Every place the shell can open for this role, from the table the shell reads. */
   const gotoVerbs = useMemo<Action[]>(
     () =>
-      (player ? PLAYER_SIDEBAR : GM_SIDEBAR)
-        .flatMap((group) => group.items)
-        .filter((item) => item.path)
-        .map((item) => ({ kind: "goto" as const, label: `Go to ${item.label}`, path: item.path! })),
+      codexDestinations(player ? "player" : "gm").map((item) => ({
+        kind: "goto" as const,
+        label: `Go to ${item.label}`,
+        path: item.path
+      })),
     [player]
   );
 
@@ -85,8 +87,12 @@ export function CommandPalette({
           // These two create; the "Log ..." rows below navigate to a form.
           ...(onCreateSession ? [{ kind: "verb" as const, label: "New session", run: onCreateSession }] : []),
           ...(onCreateQuest ? [{ kind: "verb" as const, label: "New quest", run: onCreateQuest }] : []),
-          { kind: "verb", label: "Log a journal entry", run: () => onNavigate(pathForSection("journal")) },
-          { kind: "verb", label: "Log downtime", run: () => onNavigate(pathForSection("downtime")) }
+          { kind: "verb", label: "Log a journal entry", run: () => onNavigate(pathForSection("story")) },
+          {
+            kind: "verb",
+            label: "Log downtime",
+            run: () => onNavigate(withQuery(pathForSection("story"), { kind: "downtime" }))
+          }
         );
       }
       list.push(...gotoVerbs);

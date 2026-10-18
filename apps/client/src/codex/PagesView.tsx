@@ -20,7 +20,7 @@ import { SearchResultList, useCodexSearch } from "./SearchResults";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import { MissingRecordNotice } from "../components/NotFoundView";
 import { navigate, replaceQuery, withQuery } from "../router";
-import { atlasPath, graphPath, pagePath, pathForHit, pathForSection, tagPath } from "./routes";
+import { atlasPath, relationshipsPath, pagePath, pathForHit, pathForSection, tagPath } from "./routes";
 import { useConfirm, usePrompt } from "../components/feedback";
 import type { QuickCreateRequest } from "./QuickCreate";
 import { useCodexQuery } from "./useCodexQuery";
@@ -447,7 +447,7 @@ export function PagesView({
             onConnectionsChanged={refreshSelected}
             onPickTag={(tag) => navigate(tagPath(tag))}
             onOpenMarker={(markerId, mapId) => navigate(atlasPath(mapId, markerId))}
-            onShowInGraph={(pageId) => navigate(graphPath(pageId))}
+            onShowInGraph={(pageId) => navigate(relationshipsPath(pageId))}
             onOpenConnection={(kind, id) =>
               navigate(
                 kind === "page"

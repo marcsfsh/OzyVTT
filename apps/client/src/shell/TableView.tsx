@@ -9,6 +9,7 @@ import { DicePanel } from "../dice/DicePanel";
 import { CombatLogPanel } from "../encounter/CombatLog";
 import { EncounterPanel } from "../encounter/EncounterPanel";
 import { useTargeting } from "../encounter/targeting";
+import { lazySurface } from "../components/lazySurface";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import type { MapSelection } from "../maps/MapManager";
 import { ReplayShelf } from "../replay/ReplayShelf";
@@ -24,6 +25,10 @@ import { PromptSlot } from "../table/PromptSlot";
 import { TableHeader } from "../table/TableHeader";
 import { TokenTab } from "../table/TokenTab";
 import "./table-view.css";
+
+// The Codex's two table tabs load on first use, like the Codex itself, so the table's first paint stays small.
+const TonightTab = lazySurface(() => import("../table/TonightTab").then((m) => m.TonightTab), null);
+const CodexTab = lazySurface(() => import("../table/CodexTab").then((m) => m.CodexTab), null);
 
 type StagedScene = GmView["combat"]["scenes"][number];
 
@@ -193,7 +198,9 @@ export function TableView(props: TableViewProps) {
           log,
           token: <TokenTab state={props.state} token={token} />,
           party: <PartyStrip role="gm" state={props.state} onOpenRoster={() => navigate(pathForGmTab("roster"))} />,
-          rest: <PartyRest state={props.state} token={token} />
+          rest: <PartyRest state={props.state} token={token} />,
+          tonight: <TonightTab token={token} />,
+          codex: <CodexTab role="gm" token={token} />
         }}
       />
     );
@@ -221,6 +228,7 @@ export function TableView(props: TableViewProps) {
           ),
           dice,
           log,
+          codex: <CodexTab role="player" token={token} />,
           // The party is a party surface, so the `off` tier removes it for players.
           ...(partyVisibilityOf(props.state) !== "off"
             ? { party: <PartyStrip role="player" state={props.state} /> }
