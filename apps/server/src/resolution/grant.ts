@@ -189,7 +189,12 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
         ? rage.duration
         : steadyAim
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
-          : grantDuration(state, grant.duration, attacker.id, spell && castLevel !== null ? { spell, castLevel } : null),
+          : grantDuration(
+              state,
+              grant.duration,
+              attacker.id,
+              spell && castLevel !== null ? { spell, castLevel } : null
+            ),
       // A spell's effect outlasts its caster's fall; only Concentration ends it early.
       endsWhenSourceDefeated: action.spellId === undefined,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,

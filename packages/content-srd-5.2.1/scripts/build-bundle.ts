@@ -738,7 +738,9 @@ for (const pk of Object.keys(SPELL_CORRECTIONS)) {
 }
 for (const id of UPCAST_DURATION_IDS) {
   if (!spells.some((spell) => spell.pk === `srd-2024_${id}` && spell.fields.higher_level))
-    throw new Error(`An upcast duration targets ${id}, which is not a spell with higher-level text - check for a typo.`);
+    throw new Error(
+      `An upcast duration targets ${id}, which is not a spell with higher-level text - check for a typo.`
+    );
 }
 for (const id of SPELL_SAVE_OVERRIDE_IDS) {
   if (!spells.some((spell) => spell.pk === `srd-2024_${id}` && spell.fields.saving_throw_ability))

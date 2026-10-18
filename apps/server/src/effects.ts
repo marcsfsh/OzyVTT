@@ -594,7 +594,8 @@ export function endEffectsOnDamage(
     return source !== undefined && areAllies(source, by, dealer?.resolveDefinition);
   };
   for (const effect of actor.effects.filter(
-    (candidate) => candidate.endsOnDamage === true || (candidate.endsOnSourceSideDamage === true && fromSourceSide(candidate))
+    (candidate) =>
+      candidate.endsOnDamage === true || (candidate.endsOnSourceSideDamage === true && fromSourceSide(candidate))
   ))
     endEffectInternal(state, actor, effect.id, events);
   return events;
