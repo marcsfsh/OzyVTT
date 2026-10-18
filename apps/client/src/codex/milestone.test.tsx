@@ -78,6 +78,8 @@ const FACTION: CodexPageSummary = {
   title: "The Zhentarim",
   entityType: "faction",
   fields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags: [],
   revealedToPlayers: false,

@@ -1,6 +1,6 @@
-// Codex entity vocabulary shared by client and server: the field keys of each entity type, which are
-// GM-secret, and how a page title becomes a link key. One copy, because a key marked secret on the client but
-// missing on the server is never sealed and ships to players. Presentation stays in the client.
+// Codex entity vocabulary shared by client and server: the field keys of each entity type, which start Hidden on a
+// new page, and how a page title becomes a link key. One copy, because a key the client treats as Hidden by default
+// but the server does not would ship to players. Presentation stays in the client.
 
 export const CODEX_ENTITY_TYPES = [
   "note",
@@ -14,10 +14,10 @@ export const CODEX_ENTITY_TYPES = [
 ] as const;
 export type CodexEntityType = (typeof CODEX_ENTITY_TYPES)[number];
 
-/** A field key belonging to an entity type. `secret` means the value rests in `gmFields`, never in player-facing `fields`. */
+/** A field key belonging to an entity type. `secret` means the field starts Hidden on a new page; the GM can show it. */
 export type CodexFieldKeyDef = Readonly<{ key: string; secret?: boolean }>;
 
-/** Structured fields of each entity type, in display order. A key here is storable; `secret` makes the server seal it. */
+/** Structured fields of each entity type, in display order. A key here is storable; `secret` makes it start Hidden. */
 export const CODEX_ENTITY_FIELD_KEYS: Readonly<Record<CodexEntityType, readonly CodexFieldKeyDef[]>> = {
   note: [],
   character: [
@@ -52,12 +52,12 @@ export function codexFieldKeys(type: CodexEntityType | undefined): ReadonlySet<s
   return new Set((CODEX_ENTITY_FIELD_KEYS[type ?? "note"] ?? CODEX_ENTITY_FIELD_KEYS.note).map((field) => field.key));
 }
 
-/** Every key marked secret on any type, as one flat set: a key secret anywhere is never player-facing elsewhere. */
-export const CODEX_SECRET_FIELD_KEYS: ReadonlySet<string> = new Set(
-  Object.values(CODEX_ENTITY_FIELD_KEYS).flatMap((fields) =>
-    fields.filter((field) => field.secret).map((field) => field.key)
-  )
-);
+/** The field keys a page of this type starts with Hidden: Motives on a character, Secret agenda on a faction. */
+export function codexDefaultHiddenFields(type: CodexEntityType | undefined): string[] {
+  return (CODEX_ENTITY_FIELD_KEYS[type ?? "note"] ?? CODEX_ENTITY_FIELD_KEYS.note)
+    .filter((field) => field.secret)
+    .map((field) => field.key);
+}
 
 /** Drop any key that does not belong to `type`. Used server-side so a type switch cannot strand unreachable values. */
 export function pruneCodexFields(

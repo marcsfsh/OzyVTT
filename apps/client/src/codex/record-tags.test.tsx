@@ -119,6 +119,7 @@ const MAP = (over: Partial<CodexMap> = {}): CodexMap => ({
   tags: ["faerun"],
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 
@@ -139,6 +140,7 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   tags: ["dungeon"],
   createdAt: "2026-07-28T00:00:00.000Z",
   updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 

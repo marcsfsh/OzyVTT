@@ -1,6 +1,18 @@
 import { z } from "zod";
-import { CodexAutosaveSettingsSchema, CodexInWorldDateSchema, CodexQuestObjectiveSchema } from "@vtt/domain";
+import {
+  CODEX_PREP_LIMITS,
+  CODEX_PREP_SECTION_TYPES,
+  CODEX_SEARCH_SORT_KEYS,
+  CODEX_SEARCH_TYPES,
+  CODEX_SEARCH_VISIBILITIES,
+  CodexAutosaveSettingsSchema,
+  CodexInWorldDateSchema,
+  CodexPrepLinkSchema,
+  type CodexSearchType
+} from "@vtt/domain";
 import { CODEX_BUNDLE_VERSION } from "./codex/bundle.js";
+import { DEFAULT_FIND_LIMIT, MAX_FIND_LIMIT, type CodexFindQuery, type CodexSortLevel } from "./codex/find.js";
+import { CodexValidationError } from "./codex/validate.js";
 
 /**
  * What each Codex write may contain. Bounds mirror the store's validators, which run again on every write so a
@@ -15,16 +27,34 @@ export const InWorldDateFields = CodexInWorldDateSchema;
 const InWorldDateSchema = InWorldDateFields.nullable();
 const EntityTypeSchema = z.enum(["note", "character", "location", "faction", "item", "species", "religion", "event"]);
 const FieldsSchema = z.record(z.string().max(40), z.string().max(2000));
+const ExpectedRevSchema = z.number().int().nonnegative().optional();
+/** A paragraph count: where a block sits in the player text. */
+const AnchorSchema = z.number().int().min(0).max(100_000);
+const BlockTitleSchema = z.string().max(160).nullable();
+const BlockTextSchema = z.string().max(100_000);
+/** A block as create takes it; it is created hidden. Omitted `anchor`: after the player text. */
+export const BlockInputSchema = z
+  .object({ title: BlockTitleSchema.optional(), text: BlockTextSchema, anchor: AnchorSchema.optional() })
+  .strict();
+const BlocksSchema = z.array(BlockInputSchema).max(200);
+/** Where one block sits. */
+export const BlockPlacementSchema = z.object({ id: z.uuid(), anchor: AnchorSchema }).strict();
+/** Every block of the record exactly once, in document order. */
+const LayoutSchema = z.array(BlockPlacementSchema).max(200);
+const AudienceSchema = z.enum(["hidden", "everyone", "characters"]);
+const CharacterIdsSchema = z.array(z.uuid()).max(12);
 export const PageCreateSchema = z
   .object({
     title: z.string().trim().min(1).max(160),
     entityType: EntityTypeSchema.optional(),
+    /** Every field value, whatever its audience. */
     fields: FieldsSchema.optional(),
-    gmFields: FieldsSchema.optional(),
+    /** Omitted: the kind's default-hidden keys. */
+    hiddenFields: z.array(z.string().max(40)).max(40).optional(),
     folder: z.string().max(160).nullable().optional(),
     tags: TagsSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
-    gmBody: z.string().max(100_000).optional(),
+    blocks: BlocksSchema.optional(),
     revealedToPlayers: z.boolean().optional(),
     bannerAssetId: z.uuid().nullable().optional(),
     /** What places an `event` page on the chronicle. Omitted = unchanged/undated; `null` = clear the date. */
@@ -32,21 +62,63 @@ export const PageCreateSchema = z
     commandId: CommandIdSchema
   })
   .strict();
+/** No reveal flag, field audience or block content: each has its own route. */
 export const PageUpdateSchema = z
   .object({
     title: z.string().trim().min(1).max(160).optional(),
     entityType: EntityTypeSchema.optional(),
     fields: FieldsSchema.optional(),
-    gmFields: FieldsSchema.optional(),
     folder: z.string().max(160).nullable().optional(),
     tags: TagsSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
-    gmBody: z.string().max(100_000).optional(),
+    layout: LayoutSchema.optional(),
     bannerAssetId: z.uuid().nullable().optional(),
     inWorldDate: InWorldDateSchema.optional(),
-    expectedRev: z.number().int().nonnegative().optional(),
+    expectedRev: ExpectedRevSchema,
     commandId: CommandIdSchema
   })
+  .strict();
+/** A new hidden block at `anchor`; `slot` places it among the blocks there (default: last). */
+export const BlockAddSchema = z
+  .object({
+    anchor: AnchorSchema,
+    slot: z.number().int().min(0).optional(),
+    title: BlockTitleSchema.optional(),
+    text: BlockTextSchema,
+    expectedRev: ExpectedRevSchema,
+    commandId: CommandIdSchema
+  })
+  .strict();
+export const BlockEditSchema = z
+  .object({
+    title: BlockTitleSchema.optional(),
+    text: BlockTextSchema.optional(),
+    expectedRev: ExpectedRevSchema,
+    commandId: CommandIdSchema
+  })
+  .strict();
+export const BlockMoveSchema = z
+  .object({
+    anchor: AnchorSchema,
+    slot: z.number().int().min(0).optional(),
+    expectedRev: ExpectedRevSchema,
+    commandId: CommandIdSchema
+  })
+  .strict();
+/** Who sees a block or an objective. `characterIds` only, and then at least one, with `characters`. */
+export const AudienceSetSchema = z
+  .object({ audience: AudienceSchema, characterIds: CharacterIdsSchema.optional(), commandId: CommandIdSchema })
+  .strict();
+export const FieldAudienceSchema = z
+  .object({ audience: z.enum(["hidden", "everyone"]), commandId: CommandIdSchema })
+  .strict();
+/** Which party character a preview reads as; omitted or null is a preview as everyone. */
+export const PreviewSessionSchema = z
+  .object({ characterId: z.uuid().nullable().optional(), commandId: CommandIdSchema })
+  .strict();
+/** When a tie began: a date, or before the campaign (`inWorldDate` null). `null` clears it. */
+export const RelationshipBeganSchema = z
+  .object({ inWorldDate: InWorldDateFields.nullable(), beforeCampaign: z.boolean() })
   .strict();
 /** `label` is optional: an unlabelled connection just means "related", as a `[[wiki link]]` does. */
 export const ConnectionCreateSchema = z
@@ -54,14 +126,16 @@ export const ConnectionCreateSchema = z
     toPageId: z.uuid(),
     label: z.string().trim().max(40).nullable().optional(),
     layer: z.enum(["player", "gm"]).optional(),
+    began: RelationshipBeganSchema.nullable().optional(),
     commandId: CommandIdSchema
   })
   .strict();
-/** Relabel or re-layer a declared connection. An omitted field is left alone. */
+/** Relabel, re-layer or re-date a declared connection. An omitted field is left alone. */
 export const ConnectionUpdateSchema = z
   .object({
     label: z.string().trim().max(40).nullable().optional(),
     layer: z.enum(["player", "gm"]).optional(),
+    began: RelationshipBeganSchema.nullable().optional(),
     commandId: CommandIdSchema
   })
   .strict();
@@ -136,6 +210,16 @@ export const MarkerUpdateSchema = z
 export const MarkerMoveSchema = z.object({ x: Coord, y: Coord, commandId: CommandIdSchema }).strict();
 /** Only the flag: the party marker is an ordinary marker, moved via `POST /markers/{id}/move`. */
 export const MarkerPartySchema = z.object({ isParty: z.boolean(), commandId: CommandIdSchema }).strict();
+/** Put the party at a point on a map: the party pin moves there, or one is made. */
+export const PartyPlaceSchema = z
+  .object({
+    mapId: z.uuid(),
+    x: Coord,
+    y: Coord,
+    revealedToPlayers: z.boolean().optional(),
+    commandId: CommandIdSchema
+  })
+  .strict();
 
 export const JournalWriteSchema = z
   .object({
@@ -185,18 +269,108 @@ export const MilestoneInputSchema = z
   })
   .strict();
 export const MilestoneCreateSchema = JournalWriteSchema.extend({ milestone: MilestoneInputSchema });
+// Session prep. Nested ids are optional on a write (the store mints missing ones) and `doneAt` is the server's.
+const PrepTitleSchema = z.string().trim().min(1).max(CODEX_PREP_LIMITS.sectionTitle);
+const PrepPromptSchema = z.string().max(CODEX_PREP_LIMITS.prompt).nullable().optional();
+const PrepIdsSchema = (max: number) => z.array(z.uuid()).max(max).optional();
+export const PrepTemplateSectionInputSchema = z
+  .object({
+    id: z.uuid().optional(),
+    title: PrepTitleSchema,
+    prompt: PrepPromptSchema,
+    type: z.enum(CODEX_PREP_SECTION_TYPES)
+  })
+  .strict();
+const PrepTemplateSectionsSchema = z.array(PrepTemplateSectionInputSchema).max(CODEX_PREP_LIMITS.templateSections);
+const PrepTemplateNameSchema = z.string().trim().min(1).max(CODEX_PREP_LIMITS.templateName);
+export const PrepTemplateCreateSchema = z
+  .object({ name: PrepTemplateNameSchema, sections: PrepTemplateSectionsSchema.optional(), commandId: CommandIdSchema })
+  .strict();
+/** Send `sections` whole to add, remove, rename or reorder them. */
+export const PrepTemplateUpdateSchema = z
+  .object({
+    name: PrepTemplateNameSchema.optional(),
+    sections: PrepTemplateSectionsSchema.optional(),
+    expectedRev: z.number().int().nonnegative().optional(),
+    commandId: CommandIdSchema
+  })
+  .strict();
+export const PrepTemplateDuplicateSchema = z
+  .object({ name: PrepTemplateNameSchema.optional(), commandId: CommandIdSchema })
+  .strict();
+const prepSectionBase = {
+  id: z.uuid().optional(),
+  templateSectionId: z.uuid().nullable().optional(),
+  title: PrepTitleSchema,
+  prompt: PrepPromptSchema
+};
+/** `doneAt` is accepted so a read item can be sent back whole, and ignored: the server stamps it. */
+export const PrepChecklistItemInputSchema = z
+  .object({
+    id: z.uuid().optional(),
+    text: z.string().max(CODEX_PREP_LIMITS.itemText),
+    done: z.boolean().optional(),
+    doneAt: z.string().nullable().optional(),
+    link: CodexPrepLinkSchema.nullable().optional()
+  })
+  .strict();
+export const PrepSceneInputSchema = z
+  .object({
+    id: z.uuid().optional(),
+    title: z.string().max(CODEX_PREP_LIMITS.sceneTitle),
+    placePageId: z.uuid().nullable().optional(),
+    notes: z.string().max(CODEX_PREP_LIMITS.sceneNotes).optional()
+  })
+  .strict();
+export const PrepSectionInputSchema = z.discriminatedUnion("type", [
+  z
+    .object({ ...prepSectionBase, type: z.literal("text"), text: z.string().max(CODEX_PREP_LIMITS.text).optional() })
+    .strict(),
+  z
+    .object({
+      ...prepSectionBase,
+      type: z.literal("checklist"),
+      items: z.array(PrepChecklistItemInputSchema).max(CODEX_PREP_LIMITS.items).optional()
+    })
+    .strict(),
+  z.object({ ...prepSectionBase, type: z.literal("pages"), pageIds: PrepIdsSchema(CODEX_PREP_LIMITS.pages) }).strict(),
+  z
+    .object({
+      ...prepSectionBase,
+      type: z.literal("scenes"),
+      scenes: z.array(PrepSceneInputSchema).max(CODEX_PREP_LIMITS.scenes).optional()
+    })
+    .strict(),
+  z
+    .object({ ...prepSectionBase, type: z.literal("clocks"), deadlineIds: PrepIdsSchema(CODEX_PREP_LIMITS.deadlines) })
+    .strict(),
+  z
+    .object({ ...prepSectionBase, type: z.literal("quests"), questIds: PrepIdsSchema(CODEX_PREP_LIMITS.quests) })
+    .strict(),
+  z
+    .object({
+      ...prepSectionBase,
+      type: z.literal("encounters"),
+      sceneIds: PrepIdsSchema(CODEX_PREP_LIMITS.encounters)
+    })
+    .strict()
+]);
+const PrepSchema = z.array(PrepSectionInputSchema).max(CODEX_PREP_LIMITS.sessionSections);
+
 /** Sessions. `sessionNumber` uses the journal's bounds because a journal entry resolves against it. */
 const SessionNumberSchema = z.number().int().min(0).max(100_000).nullable();
 const AttendeesSchema = z.array(z.string().trim().min(1).max(40)).max(24);
 const SessionStatusSchema = z.enum(["planned", "played"]);
 /** Scene attachments, capped at the table's own scene cap. */
 const SessionSceneIdsSchema = z.array(z.uuid()).max(20);
+/** `templateId` omitted copies the default template, `null` starts empty; `prep` sets the sections instead. */
 export const SessionCreateSchema = z
   .object({
     sessionNumber: SessionNumberSchema.optional(),
     realDate: z.string().max(40).nullable().optional(),
     attendees: AttendeesSchema.optional(),
-    prepBody: z.string().max(100_000).optional(),
+    templateId: z.uuid().nullable().optional(),
+    prep: PrepSchema.optional(),
     recapBody: z.string().max(100_000).optional(),
     revealedToPlayers: z.boolean().optional(),
     status: SessionStatusSchema.optional(),
@@ -212,7 +386,8 @@ export const SessionUpdateSchema = z
     sessionNumber: SessionNumberSchema.optional(),
     realDate: z.string().max(40).nullable().optional(),
     attendees: AttendeesSchema.optional(),
-    prepBody: z.string().max(100_000).optional(),
+    /** The whole list of sections. */
+    prep: PrepSchema.optional(),
     recapBody: z.string().max(100_000).optional(),
     status: SessionStatusSchema.optional(),
     tags: TagsSchema.optional(),
@@ -221,9 +396,37 @@ export const SessionUpdateSchema = z
     commandId: CommandIdSchema
   })
   .strict();
+export const SessionApplyTemplateSchema = z
+  .object({ templateId: z.uuid(), expectedRev: z.number().int().nonnegative().optional(), commandId: CommandIdSchema })
+  .strict();
+/** One line logged at the table. */
+export const SessionLogSchema = z
+  .object({
+    text: z.string().trim().min(1).max(2000),
+    revealedToPlayers: z.boolean().optional(),
+    commandId: CommandIdSchema
+  })
+  .strict();
+export const SessionTickSchema = z.object({ itemId: z.uuid(), done: z.boolean(), commandId: CommandIdSchema }).strict();
+export const SessionCurrentSceneSchema = z
+  .object({ sceneId: z.uuid().nullable(), commandId: CommandIdSchema })
+  .strict();
+
 /** Bounds mirror the store's. Objective text may be empty (the editor autosaves right after "Add item"). */
 const QuestStatusSchema = z.enum(["not-started", "active", "completed", "failed", "canceled"]);
-export const ObjectiveSchema = CodexQuestObjectiveSchema;
+/**
+ * An objective as a write lists it: `id` for one the server gave, none for a new one. `audience` only on a new one
+ * (default everyone); an existing objective's audience has its own route.
+ */
+export const ObjectiveSchema = z
+  .object({
+    id: z.uuid().optional(),
+    text: z.string().max(120),
+    done: z.boolean(),
+    audience: AudienceSchema.optional(),
+    characterIds: CharacterIdsSchema.optional()
+  })
+  .strict();
 const ObjectivesSchema = z.array(ObjectiveSchema).max(24);
 const QuestEntityIdsSchema = z.array(z.uuid()).max(24);
 export const QuestCreateSchema = z
@@ -231,7 +434,7 @@ export const QuestCreateSchema = z
     title: z.string().trim().min(1).max(160),
     status: QuestStatusSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
-    gmBody: z.string().max(100_000).optional(),
+    blocks: BlocksSchema.optional(),
     objectives: ObjectivesSchema.optional(),
     entityIds: QuestEntityIdsSchema.optional(),
     revealedToPlayers: z.boolean().optional(),
@@ -245,7 +448,7 @@ export const QuestUpdateSchema = z
     title: z.string().trim().min(1).max(160).optional(),
     status: QuestStatusSchema.optional(),
     playerBody: z.string().max(100_000).optional(),
-    gmBody: z.string().max(100_000).optional(),
+    layout: LayoutSchema.optional(),
     objectives: ObjectivesSchema.optional(),
     entityIds: QuestEntityIdsSchema.optional(),
     tags: TagsSchema.optional(),
@@ -277,14 +480,18 @@ export const CodexSettingsSchema = z
   .strict();
 /** The Codex's one destructive route, so bad values are rejected and never clamped; the max matches the store's `MAX_PRUNE_DAYS`. */
 export const RevisionsDeleteSchema = z.object({ olderThanDays: z.number().int().min(0).max(36_500) }).strict();
-/** A saved export's `data`, posted back unedited. A missing `bundleVersion` is an older v1 backup; other versions are refused. */
+/**
+ * A saved export's `data`, posted back unedited. A missing `bundleVersion` is an older v1 backup; v1 and v2 restore,
+ * and a newer version is refused.
+ */
 export const CodexImportSchema = z
   .object({
     codex: z.record(z.string(), z.unknown()),
     bundleVersion: z
       .number()
       .int()
-      .refine((value) => value === CODEX_BUNDLE_VERSION, {
+      .min(1)
+      .refine((value) => value <= CODEX_BUNDLE_VERSION, {
         error: "This backup was made by a newer version of the app. Update, then restore."
       })
       .optional(),
@@ -318,3 +525,76 @@ export const CalendarSchema = z
     commandId: CommandIdSchema
   })
   .strict();
+
+// ----- Query strings -----
+
+/** A query parameter as one string: a repeated one is joined with commas, as a comma list reads. */
+function queryText(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) return value.map(String).join(",");
+  return String(value);
+}
+function commaList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** A bound on a modified date: a whole UTC day for `YYYY-MM-DD`, else an ISO date and time. */
+function dateBound(value: string | undefined, end: "start" | "end"): string | null {
+  if (value === undefined || value.trim() === "") return null;
+  const text = value.trim();
+  const instant = DAY.test(text) ? `${text}T${end === "start" ? "00:00:00.000" : "23:59:59.999"}Z` : text;
+  const parsed = Date.parse(instant);
+  if (Number.isNaN(parsed) || !(DAY.test(text) || z.iso.datetime({ offset: true }).safeParse(text).success))
+    throw new CodexValidationError("Give a modified date as 2026-10-17, or as an ISO date and time.");
+  return new Date(parsed).toISOString();
+}
+const SORT_KEY = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const PAGE_TYPES: readonly CodexSearchType[] = CODEX_SEARCH_TYPES.slice(0, CODEX_SEARCH_TYPES.indexOf("journal"));
+
+/** `GET /codex/search`'s parameters. Every one is optional; a malformed one is a 400. */
+export function parseSearchQuery(raw: Readonly<Record<string, unknown>>): CodexFindQuery {
+  const types = new Set<CodexSearchType>();
+  for (const type of commaList(queryText(raw.types))) {
+    if (type === "page") PAGE_TYPES.forEach((pageType) => types.add(pageType));
+    else if ((CODEX_SEARCH_TYPES as readonly string[]).includes(type)) types.add(type as CodexSearchType);
+    else throw new CodexValidationError(`"${type}" is not a type search knows.`);
+  }
+  const visibility = queryText(raw.visibility) ?? "all";
+  if (!(CODEX_SEARCH_VISIBILITIES as readonly string[]).includes(visibility))
+    throw new CodexValidationError("Visibility is all, revealed or hidden.");
+  const sort = commaList(queryText(raw.sort)).map((level): CodexSortLevel => {
+    const [key = "", direction = "asc"] = level.split(":");
+    if (!SORT_KEY.test(key) && !(CODEX_SEARCH_SORT_KEYS as readonly string[]).includes(key))
+      throw new CodexValidationError(`"${key}" is not a column search can sort by.`);
+    if (direction !== "asc" && direction !== "desc") throw new CodexValidationError("Sort each column asc or desc.");
+    return { key, direction };
+  });
+  if (sort.length > 4) throw new CodexValidationError("Sort by at most 4 columns.");
+  const limitText = queryText(raw.limit);
+  const limit = limitText === undefined ? DEFAULT_FIND_LIMIT : Number(limitText);
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_FIND_LIMIT)
+    throw new CodexValidationError(`Ask for 1 to ${MAX_FIND_LIMIT} results.`);
+  const q = queryText(raw.q) ?? "";
+  if (q.length > 200) throw new CodexValidationError("A search is up to 200 characters.");
+  return {
+    q,
+    types,
+    visibility: visibility as CodexFindQuery["visibility"],
+    modifiedFrom: dateBound(queryText(raw.modifiedFrom), "start"),
+    modifiedTo: dateBound(queryText(raw.modifiedTo), "end"),
+    sort,
+    limit
+  };
+}
+
+/** `GET /codex/home`'s `since`: when the player last looked, as an ISO date and time. */
+export function parseHomeSince(raw: Readonly<Record<string, unknown>>): string | null {
+  const since = queryText(raw.since);
+  if (since === undefined || since.trim() === "") return null;
+  if (!z.iso.datetime({ offset: true }).safeParse(since.trim()).success)
+    throw new CodexValidationError("Give `since` as an ISO date and time.");
+  return new Date(Date.parse(since.trim())).toISOString();
+}

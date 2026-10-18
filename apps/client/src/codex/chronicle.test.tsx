@@ -245,7 +245,8 @@ describe("An event page is dated in the editor", () => {
     title: "The Sundering",
     entityType: "event",
     fields: {},
-    gmFields: {},
+    hiddenFields: [],
+    characterUpdatedAt: {},
     folder: null,
     tags: [],
     revealedToPlayers: false,
@@ -259,7 +260,7 @@ describe("An event page is dated in the editor", () => {
     playerUpdatedAt: "2026-07-28T00:00:00.000Z",
     firstShownAt: null,
     playerBody: "The sky tore open.",
-    gmBody: ""
+    blocks: []
   };
   const renderEditor = (page: CodexPage) =>
     render(

@@ -53,7 +53,8 @@ const MAP: CodexMap = {
   sortKey: 0,
   tags: [],
   createdAt: "2026-07-29T00:00:00.000Z",
-  updatedAt: "2026-07-29T00:00:00.000Z"
+  updatedAt: "2026-07-29T00:00:00.000Z",
+  firstShownAt: null
 };
 const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   id: "k1",
@@ -72,6 +73,7 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
   tags: [],
   createdAt: "2026-07-29T00:00:00.000Z",
   updatedAt: "2026-07-29T00:00:00.000Z",
+  firstShownAt: null,
   ...over
 });
 

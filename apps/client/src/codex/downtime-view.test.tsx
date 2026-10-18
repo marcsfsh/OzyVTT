@@ -44,6 +44,8 @@ const page = (
   title,
   entityType,
   fields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags: [],
   revealedToPlayers: true,

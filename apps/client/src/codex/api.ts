@@ -22,9 +22,9 @@ import type {
   CodexPageRevision,
   CodexPageSummary,
   CodexQuest,
-  CodexQuestObjective,
   CodexQuestStatus,
   CodexSearchResult,
+  CodexPrepSectionInput,
   CodexSession,
   CodexSessionStatus,
   CodexSettings,
@@ -59,15 +59,19 @@ export const REVISION_WINDOW_MAX = 10_080;
 /** The server's cap on one search's hits. */
 export const SEARCH_HIT_CAP = 50;
 
+/** A hidden block as a create takes it; it starts Hidden. */
+export type CodexBlockInput = Readonly<{ title?: string | null; text: string; anchor?: number }>;
+
 export type CodexPageInput = Readonly<{
   title?: string;
   entityType?: CodexEntityType;
+  /** Every field value, whatever its audience. */
   fields?: Readonly<Record<string, string>>;
-  gmFields?: Readonly<Record<string, string>>;
   folder?: string | null;
   tags?: readonly string[];
   playerBody?: string;
-  gmBody?: string;
+  /** Create only. */
+  blocks?: readonly CodexBlockInput[];
   revealedToPlayers?: boolean;
   bannerAssetId?: string | null;
   /** Omitted leaves the stored date alone; `null` clears it. */
@@ -227,7 +231,7 @@ export const playerCodexApi = {
     request<{ records: PlayerCodexChronicleRecord[] }>(token, "/timeline").then((data) => data.records),
   sessions: (token: string) =>
     request<{ sessions: PlayerCodexSession[] }>(token, "/sessions").then((data) => data.sessions),
-  /** `gmBody` and `rev` stripped; `entityIds` filtered to pages this player can see. */
+  /** Hidden blocks and objectives this player may not read, and `rev`, stripped; `entityIds` filtered to pages this player can see. */
   quests: (token: string) => request<{ quests: PlayerCodexQuest[] }>(token, "/quests").then((data) => data.quests),
   standing: (token: string) =>
     request<{ standing: PlayerCodexStanding[] }>(token, "/standing").then((data) => data.standing),
@@ -440,7 +444,8 @@ export type CodexSessionInput = Readonly<{
   sessionNumber?: number | null;
   realDate?: string | null;
   attendees?: readonly string[];
-  prepBody?: string;
+  /** The whole list of prep sections. */
+  prep?: readonly CodexPrepSectionInput[];
   recapBody?: string;
   status?: CodexSessionStatus;
   /** Slug-normalized server-side. */
@@ -476,13 +481,17 @@ export const sessionApi = {
 
 // ----- Quests -----
 
+/** An objective as a write lists it: with the id the server gave it, or none for a new one. */
+export type CodexQuestObjectiveInput = Readonly<{ id?: string; text: string; done: boolean }>;
+
 /** Same split as `CodexSessionInput`. */
 export type CodexQuestInput = Readonly<{
   title?: string;
   status?: CodexQuestStatus;
   playerBody?: string;
-  gmBody?: string;
-  objectives?: readonly CodexQuestObjective[];
+  /** Create only. */
+  blocks?: readonly CodexBlockInput[];
+  objectives?: readonly CodexQuestObjectiveInput[];
   entityIds?: readonly string[];
   /** Slug-normalized server-side. */
   tags?: readonly string[];

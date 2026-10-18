@@ -109,6 +109,8 @@ const summary = (
   title,
   entityType,
   fields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags,
   revealedToPlayers: false,
@@ -160,7 +162,8 @@ const MAP_OTHER: CodexMap = {
   sortKey: 0,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 };
 const MAP_TARGET: CodexMap = {
   ...MAP_OTHER,

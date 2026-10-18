@@ -146,22 +146,6 @@ export function entityIconId(type: EntityType | undefined): string {
 export function entityColor(type: EntityType | undefined): string {
   return entityDef(type).color;
 }
-/** Split field values into player-facing `fields` and GM-only `gmFields` (secret fields), per the type's schema. */
-export function splitEntityFields(
-  type: EntityType | undefined,
-  values: Readonly<Record<string, string>>
-): { fields: Record<string, string>; gmFields: Record<string, string> } {
-  const secret = new Set(
-    entityDef(type)
-      .fields.filter((field) => field.secret)
-      .map((field) => field.key)
-  );
-  const fields: Record<string, string> = {};
-  const gmFields: Record<string, string> = {};
-  for (const [key, value] of Object.entries(values)) (secret.has(key) ? gmFields : fields)[key] = value;
-  return { fields, gmFields };
-}
-
 /**
  * Connection label suggestions for a datalist; labels are free text. "ally of", "enemy of", "rival of" and
  * "related to" are symmetric, which the server uses so declaring one from both ends makes one edge.

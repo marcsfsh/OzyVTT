@@ -169,6 +169,8 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     if (!command) throw new Error(`No command is registered for ${type}.`);
     if (command.gmOnly !== undefined && !isGmGrade(principal)) throw new GameAccessDeniedError(command.gmOnly);
     if (command.playerOnly !== undefined && isGmGrade(principal)) throw new GameAccessDeniedError(command.playerOnly);
+    if (principal.kind === "player" && principal.preview)
+      throw new GameAccessDeniedError("A preview of the players' view only reads. Act from your own session.");
     const request = parse(command.schema, raw, command.malformed, command.issueMessage) as {
       commandId: string;
       expectedRevision?: number;

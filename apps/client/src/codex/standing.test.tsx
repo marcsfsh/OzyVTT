@@ -48,7 +48,8 @@ const STANDING = (value: number, revealed = false): CodexStanding => ({
   value,
   revealedToPlayers: revealed,
   createdAt: "2026-07-29T00:00:00.000Z",
-  updatedAt: "2026-07-29T00:00:00.000Z"
+  updatedAt: "2026-07-29T00:00:00.000Z",
+  firstShownAt: null
 });
 
 const CARD = (value: number, name = "The Zhentarim"): CampaignStanding => ({ factionPageId: "f1", name, value });

@@ -6,14 +6,21 @@ export function fixedVerifiers(
   tokens: Readonly<{
     gm?: readonly string[];
     player?: readonly string[];
+    /** Player tokens that are the GM's preview, each reading as the characters listed (none: as everyone). */
+    previews?: Readonly<Record<string, readonly string[]>>;
     integration?: (token: string, scope: IntegrationScope | null | "any") => IntegrationVerdict | null;
     viewer?: readonly string[] | ((token: string) => boolean);
   }>
 ): Required<CredentialVerifiers> {
   const viewer = tokens.viewer;
+  const previews = tokens.previews ?? {};
   return {
     gm: (token) => (tokens.gm?.includes(token) ? { sessionId: `gm:${token}` } : null),
-    player: (token) => (tokens.player?.includes(token) ? { sessionId: `player:${token}` } : null),
+    player: (token) => {
+      if (Object.hasOwn(previews, token))
+        return { sessionId: `player:${token}`, preview: { characterIds: previews[token]! } };
+      return tokens.player?.includes(token) ? { sessionId: `player:${token}` } : null;
+    },
     integration: (token, scope) => tokens.integration?.(token, scope) ?? null,
     viewer: (token) => (typeof viewer === "function" ? viewer(token) : (viewer?.includes(token) ?? false))
   };

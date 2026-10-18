@@ -24,7 +24,8 @@ const MAP = (revealed: boolean): CodexMap => ({
   sortKey: 0,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 });
 const MARKER = (revealed: boolean): CodexMarker => ({
   id: "k1",
@@ -42,7 +43,8 @@ const MARKER = (revealed: boolean): CodexMarker => ({
   isParty: false,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 });
 
 const renderInspector = (markerRevealed: boolean, mapRevealed: boolean, onRevealMap?: () => void) =>

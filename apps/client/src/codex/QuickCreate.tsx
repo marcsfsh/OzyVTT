@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Field, Input, Modal, Select } from "@vtt/ui";
-import type { CodexPage } from "@vtt/domain";
+import { splitCodexHiddenBlocks, type CodexPage } from "@vtt/domain";
 import { codexApi } from "./api";
 import { ENTITY_DEFS, ENTITY_TYPE_LIST, type EntityType } from "./entities";
 import { newId } from "../lib/ids";
@@ -67,7 +67,8 @@ export function QuickCreate({ gmToken, request, onClose, onOpen, onChanged }: Qu
         entityType,
         ...(request.folder ? { folder: request.folder } : {}),
         playerBody: scaffold.player,
-        gmBody: scaffold.gm,
+        // The scaffold's GM sections become Hidden blocks, one per heading.
+        blocks: splitCodexHiddenBlocks(scaffold.gm),
         // Idempotency key: the button can be double-tapped, and a retry must not create two pages.
         commandId: newId()
       });

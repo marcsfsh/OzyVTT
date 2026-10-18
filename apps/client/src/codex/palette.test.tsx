@@ -116,7 +116,12 @@ const HIT: CodexSearchHit = {
   title: "Strahd von Zarovich",
   tags: [],
   entityType: "character",
-  mapId: null
+  mapId: null,
+  type: "character",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 
 const palette = () => screen.findByRole("dialog", { name: "Codex command palette" });
@@ -132,7 +137,7 @@ beforeEach(() => {
   listFolders.mockResolvedValue([]);
   listConnections.mockResolvedValue([]);
   party.mockResolvedValue(null);
-  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", gmBody: "", gmFields: {} }, connections: [] });
+  getPage.mockResolvedValue({ page: { ...PAGE, playerBody: "", blocks: [] }, connections: [] });
   getSettings.mockResolvedValue({ revealWarn: true, autosave: { enabled: true, intervalSeconds: 1 } });
   search.mockResolvedValue({ hits: [], truncated: false });
   playerSearch.mockResolvedValue({ hits: [], truncated: false });

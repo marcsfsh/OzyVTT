@@ -58,11 +58,12 @@ const PAGE: CodexPage = {
   title: "Strahd von Zarovich",
   entityType: "character",
   fields: {},
-  gmFields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   folder: null,
   tags: [],
   playerBody: "",
-  gmBody: "",
+  blocks: [],
   revealedToPlayers: false,
   bannerAssetId: null,
   inWorldLabel: null,
@@ -80,14 +81,15 @@ const QUEST: CodexQuest = {
   title: "The Sunless Crown",
   status: "active",
   playerBody: "The burgomaster wants the crown returned.",
-  gmBody: "The crown is a phylactery and the burgomaster knows it.",
+  blocks: [],
   objectives: [],
   entityIds: [],
   revealedToPlayers: false,
   tags: [],
   rev: 3,
   createdAt: "2026-07-01T00:00:00.000Z",
-  updatedAt: "2026-07-02T00:00:00.000Z"
+  updatedAt: "2026-07-02T00:00:00.000Z",
+  firstShownAt: null
 };
 
 /** Both options on screen under the canonical names. */
@@ -131,7 +133,8 @@ describe("The two-layer notes control names its layers the same way everywhere (
     });
   }
 
-  it("says it the same way in the quest editor", async () => {
+  // The quest and page editors write the player text alone; hidden blocks have their own routes.
+  it("names the player text the same way in the quest editor", async () => {
     render(
       <QuestsView
         gmToken="gm"
@@ -147,12 +150,10 @@ describe("The two-layer notes control names its layers the same way everywhere (
         autosave={{ enabled: false, intervalSeconds: 1 }}
       />
     );
-    await expectCanonicalPair();
-    await userEvent.setup().click(screen.getByRole("button", { name: BODY_LAYER.gm.label }));
-    expect(screen.getByRole("textbox", { name: BODY_LAYER.gm.label })).toHaveValue(QUEST.gmBody);
+    expect(await screen.findByRole("textbox", { name: BODY_LAYER.player.label })).toHaveValue(QUEST.playerBody);
   });
 
-  it("says it the same way in the page editor", async () => {
+  it("names the player text the same way in the page editor", async () => {
     (goTo("/codex/pages/p1"), render)(
       <ToastProvider>
         <PageEditor
@@ -169,8 +170,7 @@ describe("The two-layer notes control names its layers the same way everywhere (
         />
       </ToastProvider>
     );
-    await expectCanonicalPair();
-    // The tab doesn't say "GM only", which is the content pill's wording.
+    expect(await screen.findByRole("textbox", { name: BODY_LAYER.player.label })).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Show this page to players" })).toBeInTheDocument();
     // The page's own switch says its state in words as well as with the eye.
     expect(screen.getByRole("switch", { name: "Show this page to players" })).toHaveTextContent(

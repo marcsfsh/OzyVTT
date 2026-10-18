@@ -100,7 +100,12 @@ const HIT_PAGE: CodexSearchHit = {
   title: "Strahd von Zarovich",
   tags: ["villain"],
   entityType: "character",
-  mapId: null
+  mapId: null,
+  type: "character",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 const HIT_JOURNAL: CodexSearchHit = {
   kind: "journal",
@@ -108,7 +113,12 @@ const HIT_JOURNAL: CodexSearchHit = {
   title: "The party crossed the mists.",
   tags: [],
   entityType: null,
-  mapId: null
+  mapId: null,
+  type: "journal",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 const HIT_MAP: CodexSearchHit = {
   kind: "map",
@@ -116,7 +126,12 @@ const HIT_MAP: CodexSearchHit = {
   title: "Barovia",
   tags: ["gothic"],
   entityType: null,
-  mapId: null
+  mapId: null,
+  type: "map",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 const HIT_MARKER: CodexSearchHit = {
   kind: "marker",
@@ -124,7 +139,12 @@ const HIT_MARKER: CodexSearchHit = {
   title: "Old Svalich Road",
   tags: ["road"],
   entityType: null,
-  mapId: "m1"
+  mapId: "m1",
+  type: "marker",
+  revealedToPlayers: true,
+  modifiedAt: "2026-07-28T00:00:00.000Z",
+  columns: {},
+  match: null
 };
 const HITS: readonly CodexSearchHit[] = [HIT_PAGE, HIT_JOURNAL, HIT_MAP, HIT_MARKER];
 
@@ -139,7 +159,8 @@ const MAP_OTHER: CodexMap = {
   sortKey: 0,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 };
 const MAP_TARGET: CodexMap = { ...MAP_OTHER, id: "m1", assetId: "a1", name: "Barovia", kind: "regional" };
 const MARKER: CodexMarker = {
@@ -158,7 +179,8 @@ const MARKER: CodexMarker = {
   isParty: false,
   tags: [],
   createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z"
+  updatedAt: "2026-07-28T00:00:00.000Z",
+  firstShownAt: null
 };
 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
@@ -329,14 +351,15 @@ describe("Suite-wide search: every jump prepares its destination", () => {
         title: "Strahd von Zarovich",
         entityType: "character",
         fields: {},
-        gmFields: {},
+        hiddenFields: [],
+        characterUpdatedAt: {},
         folder: null,
         tags: [],
         revealedToPlayers: false,
         bannerAssetId: null,
         rev: 1,
         playerBody: "",
-        gmBody: "",
+        blocks: [],
         createdAt: "2026-07-28T00:00:00.000Z",
         updatedAt: "2026-07-28T00:00:00.000Z"
       },

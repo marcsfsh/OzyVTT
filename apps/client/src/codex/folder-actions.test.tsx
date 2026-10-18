@@ -17,6 +17,8 @@ const PAGE = (id: string, title: string, folder: string | null): CodexPageSummar
   folder,
   entityType: "note",
   fields: {},
+  hiddenFields: [],
+  characterUpdatedAt: {},
   tags: [],
   revealedToPlayers: false,
   bannerAssetId: null,
