@@ -73,6 +73,8 @@ export function spellState(spell: SpellReference): CoverageState {
       effect.grant !== undefined ||
       effect.failureEffect !== undefined ||
       effect.endsConditions !== undefined ||
+      effect.dispel !== undefined ||
+      effect.endsCurses === true ||
       effect.reaction !== undefined ||
       effect.darts !== undefined ||
       (effect.laterActions ?? []).some(laterApplies));
@@ -340,8 +342,9 @@ const TABLE_GROUPS = new Set(["Monster traits", "Conditions", "Rules glossary"])
 /** How the rows of each kind of group get their state, for the page's opening. */
 const CLASSIFICATION = [
   "- **Spells:** a cast resolves in `action-resolution.ts` and the steps in `resolution/`, at the caster's own",
-  "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, or",
-  "  when the area it leaves applies them as creatures enter it or start or end a turn there (`spell-zones.ts`).",
+  "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, ends",
+  "  spells or curses (`resolution/dispel.ts`), or when the area it leaves applies them as creatures enter it or",
+  "  start or end a turn there (`spell-zones.ts`).",
   "  Guided when the app spends the slot and holds the Concentration, the area or a save while a person applies",
   "  what the spell does. A spell whose cast leaves a rider to the table (Storm of Vengeance's later turns) is",
   "  curated as guided, with a note.",

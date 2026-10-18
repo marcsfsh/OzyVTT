@@ -78,7 +78,8 @@ export type StabilizeOutcome = Readonly<{
 const KIT_ID = "healers-kit";
 const STABLE: DeathSaves = { successes: 0, failures: 0, stable: true };
 
-/** What the target needs: dying (and not yet stable), or knocked out, which only first aid or the GM ends. */
+/** What the target needs: dying (and not yet stable), or knocked out, which first aid, an hour of game time or the GM
+ *  ends. */
 function targetState(target: LiveActor): "dying" | "knocked-out" {
   if (isDead(target))
     throw new CommandRejectedError(`${target.name} is dead. It's too late to stabilize ${target.name}.`);

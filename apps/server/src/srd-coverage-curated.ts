@@ -139,10 +139,10 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "speed.ts gives a creature with a Climb Speed its own budget for climbing, with no extra cost."
   ),
   concentration: enforced(
-    "resolution/concentration.ts ends the first Concentration spell when a second starts. hit-points.ts asks for a Constitution save against DC 10 or half the damage, up to 30, and effects.ts ends it when the caster is Incapacitated or dies."
+    "resolution/concentration.ts ends the first Concentration spell when a second starts. hit-points.ts asks for a Constitution save against DC 10 or half the damage, up to 30, and effects.ts ends it when the caster is Incapacitated or dies, or when a spell that only affects creatures has none left under it. Its duration counts down on the game clock (game-time.ts)."
   ),
   condition: enforced(
-    "effects.ts applies every condition through applyCondition, which honours immunities, and ends it when its duration or its save says."
+    "effects.ts applies every condition through applyCondition, which honours immunities, ends one a creature becomes immune to, and ends it when its save says or its duration runs out, in rounds during a fight and on the game clock between them (game-time.ts)."
   ),
   cone: areaShape("its width at any point equals that point's distance from the origin."),
   cover: enforced(
@@ -158,7 +158,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   cube: areaShape("a Cube is a square on the map with its own size for each side."),
   curses: guided(
-    "inventory.ts hides a cursed item's curse until it is attuned, and its bearer can't end the Attunement. Other curses, and the magic that ends them, are the GM's to track."
+    "inventory.ts hides a cursed item's curse until it is attuned, and its bearer can't end the Attunement. Hex, Bestow Curse and Geas mark what they leave as a curse, which Remove Curse ends (resolution/dispel.ts), and Remove Curse breaks the Attunement to a cursed item. A monster's curse, and other magic that ends curses, are the GM's to track."
   ),
   cylinder: areaShape("a Cylinder is drawn as a circle of its radius, and its height is the GM's."),
   "d20-test": enforced(
@@ -245,7 +245,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   hover: guided("speed.ts records whether a creature hovers. Falling while flying is the GM's to apply."),
   illusions: reference("Illusions are the GM's to run."),
   immunity: enforced(
-    "hit-points.ts ignores damage of an immune type, and effects.ts refuses a condition the creature is immune to."
+    "hit-points.ts ignores damage of an immune type. effects.ts refuses a condition the creature is immune to, and a creature that becomes immune (Heroism, a Periapt of Proof against Poison) loses the condition it already has."
   ),
   "improvised-weapons": reference("An improvised attack is the GM's to set up."),
   incapacitated: condition("incapacitated"),
@@ -259,13 +259,13 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   invisible: condition("invisible"),
   jumping: reference("Jumps aren't measured."),
   "knocking-out-a-creature": enforced(
-    "hit-points.ts leaves a creature dropped by a melee attack chosen to knock out at 1 Hit Point and Unconscious, until it regains Hit Points or stabilize.ts gives it first aid."
+    "hit-points.ts leaves a creature dropped by a melee attack chosen to knock out at 1 Hit Point and Unconscious until it regains Hit Points, stabilize.ts gives it first aid, or an hour passes on the game clock and its Short Rest ends (game-time.ts)."
   ),
   "lightly-obscured": reference("The map has no obscurement."),
   line: areaShape("a Line has a fixed width, and the point it starts from isn't in it."),
   "long-jump": reference("Jumps aren't measured."),
   "long-rest": enforced(
-    "rests.ts needs 1 Hit Point and 16 hours since the last one. It restores Hit Points, Hit Point Dice, spell slots and uses, and removes a level of Exhaustion."
+    "rests.ts needs 1 Hit Point and 16 hours since the last one. It restores Hit Points, Hit Point Dice, spell slots and uses, removes a level of Exhaustion and ends what lasts until a Long Rest. The party's Long Rest moves the game clock 8 hours, which counts down every effect (game-time.ts)."
   ),
   magic: enforced(
     "resolution/economy.ts spends the action when a spell or an item's action is used. A casting time longer than an action is a reminder to the GM (resolution/validate.ts)."
@@ -320,7 +320,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "shape-shifting": reference("Changing form is the GM's to run; the sheet keeps the creature's own statistics."),
   "short-rest": enforced(
-    "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent and gives back what a Short Rest restores. short-rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
+    "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. short-rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
   ),
   "simultaneous-effects": reference("The order of simultaneous effects is the table's."),
   size: enforced(
@@ -337,7 +337,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "spellcasting-focus": reference("Spell components and focuses aren't tracked."),
   sphere: areaShape("a Sphere is a circle of its radius, and the point it starts from is in it."),
   stable: enforced(
-    "stabilize.ts stops death saves after three successes, first aid or Spare the Dying. Regaining 1 Hit Point after 1d4 hours is the GM's."
+    "stabilize.ts stops death saves after three successes, first aid or Spare the Dying. effects.ts rolls the 1d4 hours on the game clock after which the creature regains 1 Hit Point, and damage before then starts its dying again."
   ),
   "stat-block": reference("A definition. Each monster's actions and traits have their own rows above."),
   study: guided(
@@ -848,6 +848,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:befuddlement": enforced(
     "A failed save deals the Psychic damage and bars the target from casting spells and the Magic action (resolution/economy.ts). The save every 30 days, and Greater Restoration, Heal or Wish ending it, are the GM's."
   ),
+  "spell:bestow-curse": guided(
+    "A failed save leaves the curse on the target for the slot's duration (resolution/concentration.ts: with Concentration below level 5, 10 minutes from a level 4 slot, 8 hours from 5, 24 hours from 7, until dispelled from 9), and Remove Curse or Dispel Magic ends it. The curse the caster chooses, and what it does, are the GM's to apply."
+  ),
   "spell:blur": enforced(
     "Attack rolls against the caster have Disadvantage while it lasts. An attacker that perceives the caster with Blindsight or Truesight is the GM's to spare."
   ),
@@ -861,16 +864,19 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The Healing Light on the cast is applied. Searing Light, and moving the Cylinder, are the GM's."
   ),
   "spell:conjure-elemental": guided(
-    "The spirit's save, its 8d8 damage and Restrained are a later action the GM calls. The repeat save with 4d8 damage at the start of each of the target's turns is the GM's."
+    "spell-zones.ts asks for the spirit's Dexterity save when an enemy enters its space or starts its turn within 5 feet of it, while it has no creature Restrained: 8d8 damage of its element and Restrained until the spell ends on a failure. The Restrained creature's repeat save with 4d8 damage at the start of each of its turns is the GM's."
   ),
-  "spell:contact-other-plane": guided(
-    "The DC 15 Intelligence save is opened, and a failure imposes Incapacitated. The 6d6 Psychic damage on a failure, and the entity's answers, are the GM's."
+  "spell:contact-other-plane": enforced(
+    "The caster makes the DC 15 Intelligence save (resolution/pending.ts); a failure deals 6d6 Psychic damage and leaves it Incapacitated until it finishes a Long Rest (rests.ts). The entity's answers, and a Greater Restoration ending the condition, are the GM's."
   ),
   "spell:contagion": guided(
     "The save's 11d8 Necrotic damage and Poisoned condition are applied. The Disadvantage on saves with the chosen ability, and the three repeat saves, are the GM's."
   ),
   "spell:delayed-blast-fireball": guided(
-    "The explosion's save and 12d6 Fire damage are a later action. The 1d6 added for each turn the bead waits, and a creature touching it, are the GM's."
+    "Cast in a fight, the bead waits at its point and spell-zones.ts explodes it when the spell ends, Concentration broken included: the Dexterity save and 12d6 Fire damage, plus 1d6 for each of the caster's turns that ended while it waited. A creature touching the bead, and a bead left outside a fight, are the GM's."
+  ),
+  "spell:dispel-magic": enforced(
+    "resolution/dispel.ts ends each spell on the target creature of the slot's level or lower, and for each higher one rolls the caster's spellcasting ability check against DC 10 plus its level. The GM can aim it at a spell's area on the map instead. A spell on an object the app doesn't track is the GM's."
   ),
   "spell:death-ward": enforced(
     "hit-points.ts leaves the target at 1 Hit Point the first time it would drop to 0, and ends the spell. Negating an effect that would kill it without damage is the GM's."
@@ -879,19 +885,22 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The save and its Psychic damage are applied. The target's move away with its Reaction is the GM's."
   ),
   "spell:dominate-beast": guided(
-    "A failed save imposes Charmed. The repeat save each time the target takes damage, and its orders, are the GM's."
+    "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
   ),
   "spell:dominate-monster": guided(
-    "A failed save imposes Charmed. The repeat save each time the target takes damage, and its orders, are the GM's."
+    "A failed save imposes Charmed for the spell's duration, longer from a level 9 slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
   ),
   "spell:dominate-person": guided(
-    "A failed save imposes Charmed. The repeat save each time the target takes damage, and its orders, are the GM's."
+    "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
   ),
   "spell:earthquake": guided(
     "The cast's Dexterity save and Prone condition are applied. The save at the end of each of the caster's turns, the broken Concentration and the fissures are the GM's."
   ),
   "spell:fear": guided(
     "A failed save imposes Frightened. The Dash away on each of its turns, and the save out of the caster's sight, are the GM's."
+  ),
+  "spell:faithful-hound": guided(
+    "Cast in a fight, spell-zones.ts makes the hound bite at the start of each of the caster's turns: the enemy nearest it within 5 feet makes the Dexterity save against 4d8 Force damage. Cast before a fight, the bite is a later action the GM runs. Its warning bark and its sight of Invisible creatures are the GM's."
   ),
   "spell:flesh-to-stone": guided(
     "A failed save imposes Restrained. The repeat saves toward Petrified, and Speed 0 on a success, are the GM's."
@@ -908,11 +917,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:irresistible-dance": guided(
     "A failed save imposes Charmed. The dance's Disadvantage, the Advantage against the dancer and its save to collect itself are the GM's."
   ),
+  "spell:major-image": guided(
+    "resolution/concentration.ts holds the caster's Concentration on it, and from a level 4 slot it lasts until dispelled with none. The illusion itself is the GM's to run."
+  ),
   "spell:mass-heal": enforced(
     "resolution/heal.ts divides the 700 Hit Points evenly among the creatures the caster picks, none past its maximum, and ends Blinded, Deafened and Poisoned on each. A different split is the caster's to make by hand."
   ),
   "spell:phantasmal-killer": guided(
-    "The save and its 4d10 Psychic damage are applied. The Disadvantage it leaves, and the save with damage at the end of each of its turns, are the GM's."
+    "The save and its 4d10 Psychic damage are applied, and a failure leaves Disadvantage on the target's ability checks and attack rolls, with the save repeated at the end of each of its turns until it succeeds (resolution/pending.ts). The 4d10 damage on each failed repeat is the GM's."
   ),
   "spell:power-word-heal": enforced(
     "resolution/heal.ts restores all the target's Hit Points and ends Charmed, Frightened, Paralyzed, Poisoned and Stunned. Standing up from Prone with its Reaction is the creature's choice."
@@ -927,7 +939,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's."
   ),
   "spell:protection-from-poison": enforced(
-    "The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned. The GM ends the effect when the hour is up."
+    "The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned, for an hour counted on the game clock (game-time.ts)."
+  ),
+  "spell:remove-curse": enforced(
+    "resolution/dispel.ts ends every effect marked a curse on the target (Hex, Bestow Curse, Geas), and breaks its Attunement to a cursed item so the item can be removed; the item's own curse stays. A curse the app doesn't track is the GM's."
   ),
   "spell:regenerate": guided(
     "The 4d8 + 15 Hit Points are applied. The 1 Hit Point at the start of each of the target's turns is the GM's."
@@ -936,7 +951,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it. The second save, and Unconscious on its failure, are the GM's."
   ),
   "spell:sleet-storm": guided(
-    "spell-zones.ts asks for the save against Prone when a creature enters the area or starts its turn there. The broken Concentration on a failure is the GM's."
+    "spell-zones.ts asks for the Dexterity save when a creature enters the area or starts its turn there, and a failure leaves it Prone and ends its Concentration. The Difficult Terrain is the GM's to paint, and the Heavily Obscured area and the doused flames are the GM's."
   ),
   "spell:sorcerous-burst": guided(
     "The attack and the chosen damage type are applied. Rolling another d8 on each 8 is the GM's."
