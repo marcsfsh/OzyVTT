@@ -117,7 +117,8 @@ next to it.
 - Hover owns the surface lift; selection owns the edge, the glow and the check mark.
 - Disabled controls dim colour, border and background individually, never with group opacity,
   and keep the reason for being disabled at full strength.
-- Who-can-see-this decisions use the `RevealSwitch` and `VisibilityBadge` primitives.
+- Who-can-see-this decisions use the `RevealSwitch` and `VisibilityBadge` primitives, except in the Codex, whose
+  audiences can name characters (see The Codex below).
 - Feedback is a toast. Destructive actions are labelled and confirmed.
 - Icons are SVG. Never render an emoji or a text symbol such as `⚠` as an icon.
 
@@ -181,6 +182,22 @@ ADR-0030 records the layout and which views come from which mockup. A change to 
 - Every control only the GM has is violet with a `GmOnlyTag` beside its group, wherever it sits.
 - Rest controls are hidden in a fight, where the server refuses them.
 - The latest-roll line shows only rolls made from this sheet (`sheet-roll-ids.ts`).
+
+## The Codex
+
+ADR-0031 records the layout and which views come from which mockup. A change to the Codex keeps these:
+
+- No left rail. A laptop has the section bar and a phone the tab bar, and a section joins both through
+  `CODEX_SECTIONS` in `codex/shell/sections.tsx`. A phone's top bar belongs to the view on screen (`CodexPhoneBar`).
+- A page or quest reads as one document with its hidden blocks in place and its metadata panel beside it. A Hidden
+  block is violet with the crossed eye, the word Hidden and Reveal in its corner. A revealed one says who it reached
+  ("Revealed to everyone", "Revealed to Lyra Emberwise") with its stamp and Hide again. On a phone each block is a
+  card with its Who sees it menu at the top.
+- Who sees it is Everyone, Hidden or chosen characters, through the pieces in `codex/shared/`: `WhoSeesItMenu`,
+  `AudienceChip`, `FieldAudienceToggle`, `HiddenBlock` and `RevealPanel`. A field has two audiences, Everyone or
+  Hidden.
+- Filters fly out from a Filters button (`FilterFlyout`) and live in the address, so a filtered list is a link.
+- The words are Hidden, Revealed, Reveal, Hide again, See as players and Who sees it.
 
 ## Writing
 

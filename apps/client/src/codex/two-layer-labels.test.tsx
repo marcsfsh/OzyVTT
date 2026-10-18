@@ -37,13 +37,10 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { ToastProvider } from "@vtt/ui";
-import { goTo } from "../../test/route";
 import { BODY_LAYER } from "./TwoLayerBodyTabs";
 import { JournalView } from "./JournalView";
-import { QuestsView } from "./QuestsView";
-import { PageEditor } from "./PageEditor";
 import { BackupView } from "./BackupView";
-import type { CodexCalendar, CodexPage, CodexQuest } from "@vtt/domain";
+import type { CodexCalendar } from "@vtt/domain";
 
 /**
  * Every surface that offers the two-layer split shows the canonical pair from `BODY_LAYER`. Renders each
@@ -52,45 +49,6 @@ import type { CodexCalendar, CodexPage, CodexQuest } from "@vtt/domain";
  */
 
 const CALENDAR: CodexCalendar = { yearName: "DR", months: [{ name: "Hammer", days: 30 }], weekdays: [] };
-
-const PAGE: CodexPage = {
-  id: "p1",
-  title: "Strahd von Zarovich",
-  entityType: "character",
-  fields: {},
-  hiddenFields: [],
-  characterUpdatedAt: {},
-  folder: null,
-  tags: [],
-  playerBody: "",
-  blocks: [],
-  revealedToPlayers: false,
-  bannerAssetId: null,
-  inWorldLabel: null,
-  calendarInstant: null,
-  inWorldDate: null,
-  rev: 3,
-  createdAt: "2026-07-28T00:00:00.000Z",
-  updatedAt: "2026-07-28T00:00:00.000Z",
-  playerUpdatedAt: "2026-07-28T00:00:00.000Z",
-  firstShownAt: null
-};
-
-const QUEST: CodexQuest = {
-  id: "q1",
-  title: "The Sunless Crown",
-  status: "active",
-  playerBody: "The burgomaster wants the crown returned.",
-  blocks: [],
-  objectives: [],
-  entityIds: [],
-  revealedToPlayers: false,
-  tags: [],
-  rev: 3,
-  createdAt: "2026-07-01T00:00:00.000Z",
-  updatedAt: "2026-07-02T00:00:00.000Z",
-  firstShownAt: null
-};
 
 /** Both options on screen under the canonical names. */
 const expectCanonicalPair = async () => {
@@ -132,51 +90,6 @@ describe("The two-layer notes control names its layers the same way everywhere (
       expect(screen.getByRole("textbox", { name: BODY_LAYER.player.label })).toBeInTheDocument();
     });
   }
-
-  // The quest and page editors write the player text alone; hidden blocks have their own routes.
-  it("names the player text the same way in the quest editor", async () => {
-    render(
-      <QuestsView
-        gmToken="gm"
-        quests={[QUEST]}
-        pages={[]}
-        loading={false}
-        error={null}
-        openQuestId="q1"
-        onOpenQuest={vi.fn()}
-        onChanged={vi.fn()}
-        onOpenPage={vi.fn()}
-        onFollowLink={vi.fn()}
-        autosave={{ enabled: false, intervalSeconds: 1 }}
-      />
-    );
-    expect(await screen.findByRole("textbox", { name: BODY_LAYER.player.label })).toHaveValue(QUEST.playerBody);
-  });
-
-  it("names the player text the same way in the page editor", async () => {
-    (goTo("/codex/pages/p1"), render)(
-      <ToastProvider>
-        <PageEditor
-          gmToken="gm"
-          page={PAGE}
-          pages={[]}
-          connections={[]}
-          autosave={{ enabled: false, intervalSeconds: 1 }}
-          onChange={vi.fn()}
-          onDeleted={vi.fn()}
-          onNavigate={vi.fn()}
-          onConnectionsChanged={vi.fn()}
-          onOpenConnection={vi.fn()}
-        />
-      </ToastProvider>
-    );
-    expect(await screen.findByRole("textbox", { name: BODY_LAYER.player.label })).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Show this page to players" })).toBeInTheDocument();
-    // The page's own switch says its state in words as well as with the eye.
-    expect(screen.getByRole("switch", { name: "Show this page to players" })).toHaveTextContent(
-      /Hidden from players|Shown to players/
-    );
-  });
 
   it("says it the same way on the notes importer, which asks the same question about a destination", async () => {
     render(

@@ -496,6 +496,17 @@ an item or a spell to copy opens through `SheetDetail.tsx`: where its list was, 
 column. The sheet notes the ids of the rolls it starts (`sheet-roll-ids.ts`), and its latest-roll line shows only
 those.
 
+The Codex client (ADR-0031) lives in `codex/`. `CodexShell.tsx` (the GM) and `PlayerCodex.tsx` (a player, and the
+GM's preview, which runs on a local route) both draw `shell/CodexFrame.tsx`, the section bar or the phone's tab bar,
+and render the section the address names from `shell/sections.tsx`, each entry a GM view and a player view. Views read
+the shell through context (`shell/context.ts`): the role and token, the address, and for the GM the shared feeds,
+the party and quick create. A player's views read only `playerCodexApi` and the player shapes of `api-records.ts`,
+which holds the record reads and writes (pages and quests with their blocks and audiences, search, home). The views
+live in their own folders (`home/`, `search/`, `page/`, `quests/`, `relationships/`) over the pieces in `shared/`.
+A page's editor (`page/DocEditor.tsx`) writes the player text and the hidden blocks in one document;
+`page/document.ts` places blocks by `codexParagraphs` from `@vtt/domain`, the rule the server assembles bodies by.
+The table's Codex tab is `table/CodexTab.tsx`, over the same reads.
+
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
 homebrew, settings and the API reference, the character builder and level flow, replays, the map
 library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets
