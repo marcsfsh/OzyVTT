@@ -44,14 +44,49 @@ const words = (list: readonly string[]) =>
 
 const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six"];
 
+/** The damage the action deals. A part whose dice are blank deals nothing, so it is no part: a saving throw with its
+ *  dice cleared prints no damage and halves none. */
 export const partsOf = (action: MonsterAction): readonly Part[] =>
-  Array.isArray(action.damage) ? (action.damage as Part[]) : [];
+  Array.isArray(action.damage)
+    ? (action.damage as Part[]).filter((part) => typeof part.formula === "string" && part.formula.trim() !== "")
+    : [];
 
 export function kindOf(action: MonsterAction): ActionKind {
   if (Array.isArray(action.multiattack)) return "multiattack";
   if (action.attack) return "attack";
   if (action.save) return "save";
   return "other";
+}
+
+const KIND_WORD: Readonly<Record<ActionKind, string>> = {
+  attack: "Attack",
+  save: "Saving throw",
+  multiattack: "Multiattack",
+  other: "Other"
+};
+
+/** One action as the actions table reads it, a row a column at a time: its name, kind, hit or DC, and damage. */
+export function actionLine(action: MonsterAction): string {
+  const name = typeof action.name === "string" && action.name ? action.name : "Unnamed action";
+  const kind = kindOf(action);
+  const attack = action.attack as Attack | undefined;
+  const save = action.save as Save | undefined;
+  const hit =
+    kind === "attack" && attack
+      ? [
+          `${attack.bonus >= 0 ? "+" : ""}${attack.bonus}`,
+          typeof attack.reachFeet === "number" ? `reach ${attack.reachFeet} ft.` : null,
+          typeof attack.rangeFeet === "number" ? `range ${attack.rangeFeet} ft.` : null
+        ]
+          .filter(Boolean)
+          .join(", ")
+      : kind === "save" && save
+        ? `${ABILITY_NAMES[save.ability].slice(0, 3)} DC ${save.dc}`
+        : null;
+  const damage = partsOf(action)
+    .map((part) => `${part.formula} ${title(part.type)}`)
+    .join(", ");
+  return [name, KIND_WORD[kind], hit, damage || null].filter(Boolean).join(" · ");
 }
 
 export function activationOf(action: MonsterAction): Activation {

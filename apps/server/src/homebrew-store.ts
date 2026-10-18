@@ -58,8 +58,6 @@ export type HomebrewRecordRow = Readonly<{
   audience: HomebrewAudienceKind;
   characterIds: readonly string[];
   reveals: readonly HomebrewReveal[];
-  /** Derived: shown to any player at all. Kept for the API's older `visibleToPlayers` field. */
-  visibleToPlayers: boolean;
   packId: string;
   basedOn: HomebrewBasedOn | null;
   /** NULL = live. Soft delete only; there is no hard delete. */
@@ -101,8 +99,6 @@ export type HomebrewListFilter = Readonly<{
   state?: HomebrewContentState;
   audience?: HomebrewAudienceKind;
   packId?: string;
-  /** Shown to any player at all (`audience` is not hidden). */
-  visibleToPlayers?: boolean;
   /** Case-insensitive name substring (not full-text search). */
   q?: string;
   includeDeleted?: boolean;
@@ -632,8 +628,6 @@ export class HomebrewStore implements HomebrewContentSource {
       where.push("pack_id = ?");
       parameters.push(filter.packId);
     }
-    if (filter.visibleToPlayers !== undefined)
-      where.push(filter.visibleToPlayers ? "audience <> 'hidden'" : "audience = 'hidden'");
     if (filter.q) {
       where.push("name LIKE ? ESCAPE '\\'");
       parameters.push(`%${likeEscape(filter.q)}%`);
@@ -995,11 +989,6 @@ export class HomebrewStore implements HomebrewContentSource {
     author = SERVER_AUTHOR
   ): HomebrewRecordRow {
     return state === "published" ? this.publish(id, expectedRev, author) : this.unpublish(id, expectedRev, author);
-  }
-
-  /** The older on-or-off switch: on is Everyone, off is Hidden. */
-  setVisibility(id: string, visibleToPlayers: boolean, expectedRev: number | undefined, author = SERVER_AUTHOR) {
-    return this.setAudience(id, visibleToPlayers ? EVERYONE_AUDIENCE : HIDDEN_AUDIENCE, expectedRev, author);
   }
 
   /** Who sees one record. Only a published, live record can be shown; library audience only (`Actor.visibility`
@@ -1411,7 +1400,6 @@ function projectSummary(row: RecordRow): HomebrewSummaryRow {
     audience,
     characterIds: parseStringList(row.audience_characters),
     reveals: parseReveals(row.reveals_json),
-    visibleToPlayers: audience !== "hidden",
     packId: row.pack_id,
     basedOn: parseBasedOn(row.based_on_json),
     deletedAt: row.deleted_at,

@@ -1,9 +1,11 @@
-import type { HomebrewValidationIssue } from "@vtt/api-contract";
+/** One issue at its path, in the shape the homebrew API answers with (`HomebrewValidationIssue`). */
+export type HomebrewIssue = { path: (string | number)[]; message: string; recordId: string | null };
 
 /**
  * The publish gate's issues as sentences a GM reads: the schema's own findings turned into plain words, with the
  * field and the part of the record that owns it named, and no schema text, slugs, ids or backticks. The path is kept,
- * so the client places each issue on the step that owns it. The rules are the gate's; only the words change here.
+ * so the client places each issue on the step that owns it. The server's gate and the editor's checklist both read
+ * these, so a GM meets one sentence for one problem wherever it is shown. The rules are the gate's; only the words change here.
  */
 
 type Path = ReadonlyArray<string | number>;
@@ -157,6 +159,8 @@ const LABELS: Readonly<Record<string, string>> = {
   alignment: "alignment",
   experiencePoints: "XP"
 };
+/** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
+const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };
 /** Keys that say nothing alone: their parent names the field. */
 const GENERIC = new Set(["value", "maximum", "text", "id", "min", "max", "kind"]);
 
@@ -176,7 +180,8 @@ export function fieldLabel(path: Path): string {
   for (let index = keys.length - 1; index >= 0; index -= 1) {
     const key = keys[index]!;
     if (GENERIC.has(key) && index > 0) continue;
-    return LABELS[key] ?? spelledOut(key);
+    const nested = index > 0 ? NESTED_LABELS[`${keys[index - 1]}.${key}`] : undefined;
+    return nested ?? LABELS[key] ?? spelledOut(key);
   }
   return "record";
 }
@@ -283,7 +288,7 @@ function plainWords(message: string): string {
 }
 
 /** One schema finding as a sentence, at its own path. */
-export function plainSchemaIssue(issue: SchemaIssue, body: unknown, recordId: string | null): HomebrewValidationIssue {
+export function plainSchemaIssue(issue: SchemaIssue, body: unknown, recordId: string | null): HomebrewIssue {
   const path = issue.path.map((key) => (typeof key === "number" ? key : String(key)));
   const label = fieldLabel(path);
   const owner = ownerOf(body, path);

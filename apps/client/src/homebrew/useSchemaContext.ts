@@ -51,10 +51,14 @@ function merge(
   return [...map.values()].sort(byLabel);
 }
 
+/** One empty map, so a caller with no references keeps the context's identity. */
+const NO_REFERENCES: SchemaContext["references"] = {};
+
 export function useSchemaContext(
   recordId: string,
   type: HomebrewType,
-  records: readonly HomebrewRecordSummary[]
+  records: readonly HomebrewRecordSummary[],
+  references: SchemaContext["references"] = NO_REFERENCES
 ): { ctx: SchemaContext; spells: readonly SpellMembership[] } {
   const classes = useClassCatalog();
   const species = useSpeciesCatalog();
@@ -173,7 +177,8 @@ export function useSchemaContext(
         } catch (error) {
           return { error: error instanceof CatalogChoiceError ? error.message : "That catalog doesn't resolve." };
         }
-      }
+      },
+      references
     };
 
     return { ctx, spells };
@@ -188,6 +193,7 @@ export function useSchemaContext(
     skills.items,
     spellRows,
     equipment.catalog,
-    builder.choice
+    builder.choice,
+    references
   ]);
 }

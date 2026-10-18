@@ -2,10 +2,8 @@
     its powers. */
 
 import { useEffect, useState } from "react";
-import type { ContentEquipmentSummary } from "@vtt/domain";
 import { RARITY_IDS } from "@vtt/content-srd-5.2.1/schemas";
 import { Chip, Field, Input, Select } from "@vtt/ui";
-import { metaLine } from "../../encounter/equipment";
 import { newId } from "../../lib/ids";
 import { RiderEditor, ITEM_RIDERS } from "../RiderEditor";
 import { SUB_OBJECT_DEFAULTS } from "../defaults";
@@ -14,7 +12,7 @@ import { opt, type Draft } from "../schema";
 import { DAMAGE_TYPES } from "../vocabulary";
 import { ChipGroup } from "./MonsterActions";
 import { ask } from "./questions";
-import type { PreviewProps, StepProps, WizardDef } from "./types";
+import type { StepProps, WizardDef } from "./types";
 
 export type ItemKind = "weapon" | "armor" | "shield" | "gear" | "consumable" | "ammunition" | "wondrous";
 
@@ -377,50 +375,6 @@ function TextHelper({ draft, onDraft }: StepProps) {
 
 /* ---------------------------------------------------------------- preview ---- */
 
-/** The record as the catalog serves it to the equipment picker and a sheet's inventory. */
-export function equipmentSummaryOf(draft: Draft, id: string): ContentEquipmentSummary {
-  const weapon = draft.weapon as ContentEquipmentSummary["weapon"] | undefined;
-  const armor = draft.armor as ContentEquipmentSummary["armor"] | undefined;
-  return {
-    id,
-    name: typeof draft.name === "string" && draft.name.trim() ? draft.name : "Untitled item",
-    category: typeof draft.category === "string" ? draft.category : "gear",
-    costGp: typeof draft.costGp === "number" ? draft.costGp : null,
-    weightLb: typeof draft.weightLb === "number" ? draft.weightLb : null,
-    description: typeof draft.description === "string" ? draft.description : null,
-    weapon: weapon ?? null,
-    armor: armor && typeof armor.acBase === "number" ? armor : null,
-    appliesTo: null
-  } as ContentEquipmentSummary;
-}
-
-function ItemPreview({ draft, recordId }: PreviewProps) {
-  const item = equipmentSummaryOf(draft, recordId);
-  const effects = [
-    bonusOf(draft, "attack-bonus")
-      ? `${bonusOf(draft, "attack-bonus") > 0 ? "+" : ""}${bonusOf(draft, "attack-bonus")} to hit and damage`
-      : null,
-    bonusOf(draft, "armor-class")
-      ? `${bonusOf(draft, "armor-class") > 0 ? "+" : ""}${bonusOf(draft, "armor-class")} AC`
-      : null,
-    bonusOf(draft, "save-bonus")
-      ? `${bonusOf(draft, "save-bonus") > 0 ? "+" : ""}${bonusOf(draft, "save-bonus")} to saving throws`
-      : null
-  ].filter(Boolean);
-  return (
-    <article className="hb-wiz-card" aria-label={`${item.name} item card`}>
-      <h4 className="hb-wiz-card-name">{item.name}</h4>
-      <p className="hb-wiz-card-meta tabular">{metaLine(item)}</p>
-      {effects.length > 0 && <p className="hb-wiz-card-meta tabular">{effects.join(" · ")}</p>}
-      {item.description ? (
-        <p className="hb-wiz-card-text">{item.description}</p>
-      ) : (
-        <p className="hb-wiz-card-text">No text yet.</p>
-      )}
-    </article>
-  );
-}
-
 /* ----------------------------------------------------------------- wizard ---- */
 
 export const EQUIPMENT_WIZARD: WizardDef = {
@@ -566,6 +520,8 @@ export const EQUIPMENT_WIZARD: WizardDef = {
         "removesArmorDrawbacks"
       ],
       sections: ["magic"],
+      // More powers is the editor's own rider list.
+      covers: ["riders"],
       visibleWhen: isMagic,
       questions: [
         { key: "modifiers", render: (props) => <CommonMagic {...props} /> },
@@ -594,6 +550,5 @@ export const EQUIPMENT_WIZARD: WizardDef = {
         ask("equipment", "description", { label: "Text" })
       ]
     }
-  ],
-  Preview: ItemPreview
+  ]
 };

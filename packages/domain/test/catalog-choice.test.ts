@@ -148,6 +148,8 @@ const equipmentSummary = (id: string, category: ContentEquipmentSummary["categor
       ? { category: "simple", damageDice: "1d6", damageType: "slashing", rangeFeet: null, longRangeFeet: null }
       : null,
   appliesTo: null,
+  rarity: null,
+  attunement: null,
   armor: null
 });
 

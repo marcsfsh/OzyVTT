@@ -164,7 +164,8 @@ or an overhaul builds from them. A page that needs something else says why in it
 - Who sees it. An audience control offers Hidden, Everyone and, where the server supports it, chosen characters. It
   sits inline with the title or the field it governs, and its label sits under the switch so the switch stays put
   when the label changes. Hidden is violet with the crossed eye and the word Hidden. Revealed content says who it is
-  revealed to.
+  revealed to. Play surfaces say Shown to players and Hidden from players; records say Hidden, Everyone or the
+  characters' names.
 - A front page starts with what needs the GM, each line carrying its action. Recent changes come next, with who sees
   each one, and then a way to start each kind of thing.
 - Decisions the GM owes wait in one Needs you list, each with its buttons, and each view has one primary action.

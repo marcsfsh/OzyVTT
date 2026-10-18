@@ -1,4 +1,4 @@
-/** The step-by-step wizards' vocabulary: a wizard is data (its steps and its preview), and `WizardView` draws any
+/** The step-by-step wizards' vocabulary: a wizard is data (its steps), and the Compendium's studio draws any
     of them. A step asks questions as `FieldDef`s, borrowed from the editor's own form where one exists so the
     record a step writes is the record the editor would write, or renders a bespoke composer. */
 
@@ -38,15 +38,17 @@ export type WizardStep = Readonly<{
   /** The editor sections this step stands in for: the fallback for an issue with no path, and where "Full editor"
       opens. */
   sections: readonly string[];
+  /** Editor fields this step's composers answer under other names (the challenge rating question writes the
+      stat block's extension), so the step's More answers leaves them out. */
+  covers?: readonly string[];
   /** A step the record's answers make irrelevant is left out of the flow (an item's weapon step for armor). */
   visibleWhen?: (draft: Draft) => boolean;
+  /** Claims an issue by its whole path before `owns` is read: one row of a list that several steps share, such as a
+      monster's actions, which belong to the step for their timing. */
+  claims?: (segments: ReadonlyArray<string | number>, draft: Draft) => boolean;
 }>;
-
-export type PreviewProps = Readonly<{ draft: Draft; ctx: SchemaContext; recordId: string }>;
 
 export type WizardDef = Readonly<{
   type: HomebrewType;
   steps: readonly WizardStep[];
-  /** The record as the app shows it: the stat block, the spell card, the item card, the feature list. */
-  Preview: (props: PreviewProps) => ReactNode;
 }>;

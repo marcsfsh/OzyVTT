@@ -44,20 +44,6 @@ export const TYPE_WORDS: Readonly<Record<HomebrewType, TypeWords>> = {
 export function typeLabel(type: HomebrewType): string {
   return TYPE_WORDS[type]?.label ?? type;
 }
-export function typePlural(type: HomebrewType): string {
-  return TYPE_WORDS[type]?.plural ?? type;
-}
 export function isHomebrewType(value: string): value is HomebrewType {
   return HomebrewContentTypeSchema.safeParse(value).success;
 }
-
-/** The rail's status filter: a view over `state` and `deletedAt`, with no stored state of its own.
-    "Removed" is a soft-deleted row of either state. */
-export type StatusFilter = "all" | "draft" | "published" | "removed";
-
-export const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
-  { value: "all", label: "Drafts and published" },
-  { value: "draft", label: "Drafts" },
-  { value: "published", label: "Published" },
-  { value: "removed", label: "Archived" }
-];

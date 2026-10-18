@@ -35,6 +35,8 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
   weapon: item.weapon ?? null,
   armor: item.armor ?? null,
   appliesTo: item.appliesTo ?? null,
+  rarity: item.rarity ?? null,
+  attunement: item.attunement ?? null,
   ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
   ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
 }));

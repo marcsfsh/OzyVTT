@@ -201,7 +201,6 @@ export const HOMEBREW_PATHS = {
   contentPublish: `${API_NAMESPACE}/homebrew/content/{id}/publish`,
   contentUnpublish: `${API_NAMESPACE}/homebrew/content/{id}/unpublish`,
   contentDiscard: `${API_NAMESPACE}/homebrew/content/{id}/discard`,
-  contentVisibility: `${API_NAMESPACE}/homebrew/content/{id}/visibility`,
   contentUsages: `${API_NAMESPACE}/homebrew/content/{id}/usages`,
   contentAudience: `${API_NAMESPACE}/homebrew/content/{id}/audience`,
   contentRevisions: `${API_NAMESPACE}/homebrew/content/{id}/revisions`,
@@ -1078,7 +1077,6 @@ export const HomebrewRecordDocumentSchema = z
     reveals: z
       .array(HomebrewRevealSchema)
       .describe("A stamp for each time the published record reached a new audience, oldest first. Hiding keeps them"),
-    visibleToPlayers: z.boolean().describe("Deprecated: `audience` is not hidden"),
     packId: z.string().max(60).describe("The record's pack: `table` for this table's own, or an imported pack's id"),
     packName: z.string().max(120).nullable().describe("The pack's name; null for this table's own pack"),
     inCatalogs: z
@@ -1126,8 +1124,6 @@ export const HomebrewRecordSummarySchema = z
     state: HomebrewContentStateSchema,
     audience: HomebrewAudienceSchema,
     characterIds: HomebrewCharacterIdsSchema,
-    /** Deprecated: `audience` is not `hidden`. */
-    visibleToPlayers: z.boolean(),
     packId: z.string().max(60),
     packName: z.string().max(120).nullable(),
     inCatalogs: z.boolean(),
@@ -1379,18 +1375,6 @@ export const HomebrewStateChangeRequestSchema = z
       .describe("Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on.")
   })
   .strict();
-/** Deprecated: `true` is Everyone and `false` is Hidden. Use `HomebrewAudienceRequest`. */
-export const HomebrewVisibilityRequestSchema = z
-  .object({
-    visibleToPlayers: z.boolean(),
-    expectedRev: z
-      .number()
-      .int()
-      .nonnegative()
-      .optional()
-      .describe("Optimistic concurrency: reject with 409 (and `error.currentRevision`) if the row moved on.")
-  })
-  .strict();
 /** Who sees one record. `characterIds` only, and then at least one, with `characters`. */
 export const HomebrewAudienceRequestSchema = z
   .object({
@@ -1583,9 +1567,6 @@ export const HomebrewListQuerySchema = z.object({
     .max(60)
     .optional()
     .describe("Only the records of one pack: `table` for this table's own, or an imported pack's id."),
-  visibleToPlayers: QueryBooleanSchema.optional().describe(
-    "Deprecated: true lists the records any player sees, false the Hidden ones. Use `audience`."
-  ),
   q: z.string().max(120).optional().describe("Part of a name, matched without regard to case."),
   includeDeleted: QueryBooleanSchema.optional().describe("Lists soft-deleted records too. Default false."),
   limit: z.coerce.number().int().min(1).max(200).optional().describe("Records per page, 1 to 200. Default 50."),

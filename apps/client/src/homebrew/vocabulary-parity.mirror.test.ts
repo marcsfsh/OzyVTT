@@ -2742,7 +2742,7 @@ describe("the spell window and the ASI ceiling: through both paths", () => {
     // An inverted window is refused by the schema's cross-field refinement.
     const upsideDown = publishVerdict("feat", authoredMystery({ min: 6, max: 2 }), WINDOW.featId);
     expect(upsideDown.publishable).toBe(false);
-    expect(upsideDown.why).toContain("minSpellLevel 6 is above maxSpellLevel 2");
+    expect(upsideDown.why).toContain("The lowest spell level for Borrowed Mystery's choice is above the highest");
   });
 
   it("2. SRD content authors the same shapes: 17 ceilings, 11 floors, 7 epic boons", () => {

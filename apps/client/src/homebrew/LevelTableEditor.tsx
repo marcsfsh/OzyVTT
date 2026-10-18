@@ -155,8 +155,11 @@ export function LevelTableEditor({
 
       const before = generateFor(value, wasProgression, classId);
       const now = generated[index];
+      // A row with no slots column follows the pattern: an override always writes one. A progression picked on an
+      // earlier step, while this table was not mounted, otherwise leaves a blank class with no slots at all.
       const followed =
-        sameSlots(stored?.spellSlots, before.spellSlots) && samePact(stored?.pactSlots, before.pactSlots);
+        (!stored?.spellSlots && !stored?.pactSlots) ||
+        (sameSlots(stored?.spellSlots, before.spellSlots) && samePact(stored?.pactSlots, before.pactSlots));
       if (followed) {
         // Omit, never null: the row schema is `.strict()` with `.optional()` columns.
         if (now.spellSlots) row.spellSlots = now.spellSlots;

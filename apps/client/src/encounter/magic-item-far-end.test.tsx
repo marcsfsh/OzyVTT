@@ -26,8 +26,9 @@ import { CharacterSheet } from "../sheet/CharacterSheet";
 /**
  * A GM adds `Wand of the War Mage, +1` and its rarity and attunement requirement appear on screen,
  * using the real folded catalog (`loadEquipment()`). Only the actor holding it is a fixture.
- * The description is the channel: neither `ContentEquipmentSummary` nor `ItemMagicMarkerSchema`
- * carries a `rarity`, and adding one to a projection would be a viewer-safety change.
+ * The description's printed line is the channel the sheet reads. The browse row also carries `rarity` and
+ * `attunement` for the Compendium's columns: they say what that line says, so they are public to every reader who
+ * receives the item, and nothing else of the item's mechanics travels with them.
  */
 
 const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) => ({
@@ -40,7 +41,11 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
   description: item.description,
   weapon: item.weapon ?? null,
   armor: item.armor ?? null,
-  appliesTo: item.appliesTo ?? null
+  appliesTo: item.appliesTo ?? null,
+  rarity: item.rarity ?? null,
+  attunement: item.attunement
+    ? { required: item.attunement.required, restrictedTo: [...item.attunement.restrictedTo] }
+    : null
 }));
 
 /** Answer `content:equipment` with the real catalog, the way the server's projection does. */
@@ -199,28 +204,44 @@ describe("the far end of the magic-item ETL", () => {
     expect(Object.keys(wand).sort()).toEqual([
       "appliesTo",
       "armor",
+      "attunement",
       "category",
       "costGp",
       "description",
       "id",
       "name",
+      "rarity",
       "source",
       "weapon",
       "weightLb"
     ]);
-    for (const key of [
-      "modifiers",
-      "effects",
-      "actions",
-      "casts",
-      "cursed",
-      "uses",
-      "grants",
-      "rarity",
-      "attunement"
-    ]) {
+    for (const key of ["modifiers", "effects", "actions", "casts", "cursed", "uses", "grants"]) {
       expect(wand, key).not.toHaveProperty(key);
     }
+  });
+
+  it("carries a rarity and an attunement that say what the item's printed line says", () => {
+    const titled = (slug: string) =>
+      slug
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    const rated = CATALOG.filter((item) => item.rarity !== null && item.rarity !== "varies");
+    expect(rated.length).toBeGreaterThan(200);
+    for (const item of rated) {
+      // The printed line is the description's first sentence: "Wand, Uncommon (Requires Attunement by a Spellcaster)."
+      const line = (item.description ?? "").split("\n")[0]!;
+      expect(line, item.id).toContain(titled(item.rarity!));
+      expect(line.includes("Requires Attunement"), item.id).toBe(item.attunement?.required === true);
+    }
+    const wand = CATALOG.find((item) => item.id === "wand-of-the-war-mage-1")!;
+    expect(wand.rarity).toBe("uncommon");
+    expect(wand.attunement?.required).toBe(true);
+    expect(wand.description).toContain("Wand, Uncommon (Requires Attunement by a Spellcaster).");
+    // A mundane item says nothing of either.
+    const rope = CATALOG.find((item) => item.id === "rope")!;
+    expect(rope.rarity).toBeNull();
+    expect(rope.attunement).toBeNull();
   });
 });
 

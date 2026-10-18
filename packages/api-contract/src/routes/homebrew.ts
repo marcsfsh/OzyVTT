@@ -36,8 +36,7 @@ import {
   HomebrewTableQuerySchema,
   HomebrewTableSchema,
   HomebrewUpdateRequestSchema,
-  HomebrewUsagesSchema,
-  HomebrewVisibilityRequestSchema
+  HomebrewUsagesSchema
 } from "../index.js";
 import { defineRoute, GM_SESSION, json, noBody, ok, refused } from "./define.js";
 
@@ -278,27 +277,6 @@ export const unpublishHomebrewContent = defineRoute({
     403: refused(),
     404: refused(),
     409: STALE
-  }
-});
-
-export const setHomebrewContentVisibility = defineRoute({
-  method: "post",
-  path: HOMEBREW_PATHS.contentVisibility,
-  operationId: "setHomebrewContentVisibility",
-  tag: "Homebrew",
-  summary: "Share a published record with everyone, or hide it",
-  description:
-    "Deprecated: use `PUT /homebrew/content/{id}/audience`. The older on-or-off switch, where `true` shares the record with everyone and `false` makes it Hidden. A draft cannot be shared, so asking to share one is a 409 that changes nothing.",
-  access: GM_SESSION,
-  params: record,
-  body: json(HomebrewVisibilityRequestSchema, { example: { visibleToPlayers: true } }),
-  responses: {
-    200: ok(HomebrewContentSchema, "The record."),
-    400: refused(),
-    401: refused(),
-    403: refused(),
-    404: refused(),
-    409: refused("The record is still a draft: publish it first. A stale `expectedRev` is a 409 too.")
   }
 });
 
@@ -638,7 +616,6 @@ export const HOMEBREW_ROUTES = [
   publishHomebrewContent,
   discardHomebrewChanges,
   unpublishHomebrewContent,
-  setHomebrewContentVisibility,
   setHomebrewContentAudience,
   setHomebrewSharing,
   getHomebrewContentUsages,

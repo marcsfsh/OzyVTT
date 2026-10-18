@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, Eyebrow, Input } from "@vtt/ui";
 import { Dropdown } from "../codex/shared/Dropdown";
 import { FilterChips } from "../codex/shared/FilterFlyout";
-import { SortDialog, type SortLevelOf } from "../codex/shared/SortDialog";
+import { SortDialog, type SortDirection, type SortLevelOf } from "../codex/shared/SortDialog";
 import { firstSortDirection, modifiedRangeLabel, sortDirectionLabel, sortSummary } from "./scene-lists";
 
 /**
@@ -121,26 +121,35 @@ export function SortButton<Key extends string>({
   sort,
   keys,
   labels,
-  onSort
+  onSort,
+  directionLabel = sortDirectionLabel,
+  firstDirection = firstSortDirection,
+  phone = false
 }: Readonly<{
   sort: readonly SortLevelOf<Key>[];
   keys: readonly Key[];
   labels: Readonly<Record<Key, string>>;
   onSort: (levels: readonly SortLevelOf<Key>[]) => void;
+  /** How a direction reads for a column, when the list's columns read differently from the Scenes table's. */
+  directionLabel?: (key: Key, direction: SortDirection) => string;
+  firstDirection?: (key: Key) => SortDirection;
+  /** On a phone the button says Sort, and the dialog opens as a sheet from the bottom. */
+  phone?: boolean;
 }>) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button size="sm" aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        {sortSummary(sort, labels)}
+        {phone ? "Sort" : sortSummary(sort, labels)}
       </Button>
       {open && (
         <SortDialog
           levels={sort}
           keys={keys}
           keyLabel={(key) => labels[key]}
-          directionLabel={sortDirectionLabel}
-          firstDirection={firstSortDirection}
+          directionLabel={directionLabel}
+          firstDirection={firstDirection}
+          align={phone ? "bottom" : "center"}
           onCancel={() => setOpen(false)}
           onSort={(levels) => {
             onSort(levels);

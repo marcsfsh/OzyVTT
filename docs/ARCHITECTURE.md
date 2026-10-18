@@ -371,13 +371,21 @@ names no family is the GM's own ruling on the whole command.
   that is off. The GM's Compendium reads (`homebrew-library.ts`) put the SRD's rows beside the
   homebrew of a kind with the kind's own columns, count by source and kind, and search the homebrew's
   text. Players read the same kinds, without monsters, through `content:compendium`.
-- New homebrew opens in a step-by-step wizard (`apps/client/src/homebrew/wizard/`, ADR-0026). A
-  wizard is data over the same draft the full editor edits: its questions are the editor's own
-  fields in plainer words, and a few composers keep derived values in step, such as a monster's
-  Proficiency Bonus, XP and Hit Points or a spell's upcast rows and healing sentence. `RecordDetail`
-  owns the draft, autosave and publish for both views, and the review step places the editor's
-  publish checklist on the step that answers each item. The monster wizard compares its numbers with
-  the SRD stat blocks of its CR, read from the bundle by `content:monster-benchmarks`.
+- The GM's tab is the Compendium (`apps/client/src/compendium/`, ADR-0033): one table per kind with the
+  SRD and the homebrew together, and each record at its own address with Card, Edit, Sharing and History.
+  A record is made and edited in steps (`homebrew/wizard/`, ADR-0026): a wizard is data over the editor's
+  own fields in plainer words, and a few composers keep derived values in step, such as a monster's
+  Proficiency Bonus, XP and Hit Points or a spell's upcast rows. `wizard/steps.ts` gives every field no
+  step asks a home step. `useHomebrewRecord` owns the draft, autosave, Publish and a conflict's merge for
+  every tab, and the review step places the publish checklist on the step that answers each item. The
+  checklist's sentences come from `homebrew-issues.ts` in the content package, the same words the gate
+  sends. The monster wizard compares its numbers with the SRD stat blocks of its CR, read from the bundle
+  by `content:monster-benchmarks`.
+- A preview is the page: `CompendiumCard` draws a draft with the sheet's spell and item cards, the
+  builder's detail and the bestiary's stat block (`encounter/StatBlock.tsx`), fed by
+  `homebrew/summaries.ts`, which a mirror test holds equal to the server's catalog summaries. See as reads
+  the server's own read for Everyone or one character (`see-as/content`). Players read the Compendium in
+  the Codex (`compendium/player/`) over `GET /content/compendium` with their own token.
 - Characters are built server-side (`character-build.ts`) from content and the choices made in
   the guided builder. What a build may pick is one survey (`character-offers.ts`): a create
   validates against it, the random generator answers it, and the builder is served it for each
@@ -556,7 +564,7 @@ The themes are Night, Dusk, Dawn and Day (`dark`, `dusk`, `dawn`, `light` on `<h
 in every app bar and `ThemeToggle` in Settings share `useTheme`, which hears every change on the page.
 
 Surfaces not needed for first paint load on first use (`components/lazySurface.tsx`): the Codex,
-homebrew, settings and the API reference, the character builder and level flow, replays, the map
+the Compendium, settings and the API reference, the character builder and level flow, replays, the map
 library, the shared-screen controls and the sound board. pdf.js loads with the first imported PDF. The build targets
 current phone and laptop browsers (Chrome and Edge 111, Firefox 121, Safari 16.4; `build.target` in
 `apps/client/vite.config.ts`), the floor the stylesheets' `:has()` and `dvh` already set.

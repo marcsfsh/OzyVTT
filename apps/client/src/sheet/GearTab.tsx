@@ -14,6 +14,7 @@ import { useSpellReference } from "../encounter/spells";
 import { slugify, titleCase } from "../encounter/format";
 import { SheetDetail, type DetailPlace } from "./SheetDetail";
 import type { SheetActor } from "./sheet-model";
+import { ItemCard, itemLine } from "./ItemCard";
 import { returnsWords, UseBoxes } from "./Uses";
 import type { RowFacts } from "./useSheetDefinition";
 import type { SheetEdit } from "./useSheetEdit";
@@ -22,39 +23,6 @@ const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
 type Coins = Record<(typeof COINS)[number], number>;
 
 const words = (slug: string) => slug.split("-").map(titleCase).join(" ");
-
-/** The item's own line: a weapon's damage and properties, an armor's AC, else what kind of thing it is. */
-export function itemLine(item: InventoryItem): string {
-  if (item.weapon) {
-    const weapon = item.weapon;
-    const range = weapon.rangeFeet ? ` (${weapon.rangeFeet}/${weapon.longRangeFeet ?? weapon.rangeFeet})` : "";
-    const properties = (weapon.properties ?? []).map((property) =>
-      property === "versatile" && weapon.versatileDice
-        ? `Versatile (${weapon.versatileDice})`
-        : property === "thrown" || property === "ammunition"
-          ? `${words(property)}${range}`
-          : words(property)
-    );
-    return [`${weapon.damageDice} ${weapon.damageType}`, properties.join(", ")].filter(Boolean).join(" · ");
-  }
-  if (item.armor) {
-    const armor = item.armor;
-    const dex = armor.addDexModifier
-      ? armor.dexModifierCap !== null
-        ? ` + Dex (up to ${armor.dexModifierCap})`
-        : " + Dex"
-      : "";
-    return [
-      armor.acBase <= 3 && !armor.addDexModifier ? `+${armor.acBase} AC` : `AC ${armor.acBase}${dex}`,
-      armor.strengthRequired ? `Strength ${armor.strengthRequired}` : null,
-      armor.stealthDisadvantage ? "Stealth Disadvantage" : null
-    ]
-      .filter(Boolean)
-      .join(" · ");
-  }
-  const sentence = item.description?.split(/(?<=\.)\s/)[0] ?? "";
-  return sentence || (item.category ? words(item.category) : "");
-}
 
 /** The server's rows an item gives: its swing (and two-handed and Light forms), a wand's casts, a potion's drink. */
 const itemActions = (item: InventoryItem, serverActions: readonly ContentActionSummary[]) =>
@@ -236,20 +204,16 @@ export function GearTab({
         const mastery = facts.get(`item-${open.id}`)?.mastery ?? null;
         const choices = summary?.damageTypeChoice;
         return (
-          <section className="cs-card cs-item-detail" aria-label={nameOf(open)}>
-            <div className="cs-cast-head">
+          <ItemCard
+            item={open}
+            name={nameOf(open)}
+            suffix={mastery ? ` · ${mastery}` : ""}
+            before={
               <button type="button" className="cs-back interactive" aria-label="Back" onClick={() => setOpenId(null)}>
                 <IconChevronLeft />
               </button>
-              <span className="cs-cast-title">
-                <strong className="cs-cast-name">
-                  {nameOf(open)}
-                  {mastery ? ` · ${mastery}` : ""}
-                </strong>
-                <span className="cs-sub">{itemLine(open)}</span>
-              </span>
-            </div>
-            {open.description && <p className="cs-item-desc">{open.description}</p>}
+            }
+          >
             {charges && (
               <p className="cs-item-charges">
                 <UseBoxes
@@ -386,7 +350,7 @@ export function GearTab({
                 {actionBlocked && <p className="cs-sub">{actionBlocked}</p>}
               </div>
             )}
-          </section>
+          </ItemCard>
         );
       })()
     : null;
@@ -399,6 +363,7 @@ export function GearTab({
           busy={busy}
           onAdd={addFromCatalog}
           onClose={() => setPickerOpen(false)}
+          gm={role === "gm"}
         />
       )}
       {(() => {

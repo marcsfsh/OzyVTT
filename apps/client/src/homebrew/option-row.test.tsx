@@ -12,7 +12,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { blankDraft, forStorage } from "./defaults";
 import { FeatureEditor } from "./FeatureEditor";
-import { SchemaForm } from "./SchemaForm";
+import { SchemaForm } from "./form-harness";
 import { SCHEMAS } from "./schemas";
 import { EMPTY_CONTEXT, type Draft } from "./schema";
 
@@ -44,7 +44,7 @@ const GATED_FEAT: Draft = {
   }
 };
 
-/** The real form, driven as `RecordDetail` drives it: one draft, one `onDraft`, the same `custom`
+/** The real form, driven as the record view drives it: one draft, one `onDraft`, the same `custom`
     map (without it the custom `features` section renders empty). */
 function RecordForm({ seed, onBody }: { seed: Draft; onBody: (body: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(seed);

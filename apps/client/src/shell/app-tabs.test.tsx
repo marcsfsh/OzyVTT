@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AppTabs, type AppTab } from "./AppTabs";
 
-const TABS: AppTab[] = ["Table", "Scenes", "Roster", "Codex", "Homebrew", "Sound", "Shared screen", "Settings"].map(
+const TABS: AppTab[] = ["Table", "Scenes", "Roster", "Codex", "Compendium", "Sound", "Shared screen", "Settings"].map(
   (name) => ({ id: name.toLowerCase(), label: name, name })
 );
 
@@ -43,7 +43,7 @@ describe("the GM tab bar at every width", () => {
     const onChange = vi.fn();
     render(<AppTabs tabs={TABS} activeId="table" onChange={onChange} ariaLabel="Sections" fits={[8, 5, 4, 3]} />);
     expect(tabNames()).toEqual(["Table", "Scenes", "Roster"]);
-    expect(menuNames()).toEqual(["Codex", "Homebrew", "Sound", "Shared screen", "Settings", "Rules"]);
+    expect(menuNames()).toEqual(["Codex", "Compendium", "Sound", "Shared screen", "Settings", "Rules"]);
     expect(screen.getByLabelText("More sections")).toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "Settings", hidden: true }));
     expect(onChange).toHaveBeenCalledWith("settings");

@@ -100,7 +100,7 @@ describe("The writing rules, on every string a person reads", () => {
     );
     expect(confirm?.confirm, "a confirm({ title }) is confirm text").toBe(true);
     const label = strings.find(
-      (entry) => entry.file === "apps/client/src/homebrew/CreateRecordModal.tsx" && entry.text === "Record type"
+      (entry) => entry.file === "apps/client/src/compendium/NewRecordDialog.tsx" && entry.text === "Kind"
     );
     expect(label?.confirm, "a field label is not").toBe(false);
   });

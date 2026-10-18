@@ -1,25 +1,17 @@
 /** The wizards for what a character is built from, from a class to a spell list. Their feature steps use the
-    editor's own feature form, and each preview shows the record as the character builder lists it. */
+    editor's own feature form. */
 
-import { FeatureList, Field, Select, type FeatureItem } from "@vtt/ui";
+import { Field, Select } from "@vtt/ui";
 import { useBuilderCatalogs, useFeatCatalog } from "../../content/catalogs";
 import { FeatureEditor } from "../FeatureEditor";
 import { LevelTableEditor } from "../LevelTableEditor";
 import { SpellListContents } from "../SpellListContents";
-import { getAt } from "../paths";
 import { opt, type Draft } from "../schema";
 import { ask } from "./questions";
-import type { PreviewProps, StepProps, WizardDef, WizardStep } from "./types";
+import type { StepProps, WizardDef, WizardStep } from "./types";
 
 type Feature = Readonly<{ id?: string; name?: string; level?: number; description?: string }>;
 
-const title = (slug: string) =>
-  slug
-    .split("-")
-    .map((word, index) => (index > 0 && word === "of" ? word : word ? word[0].toUpperCase() + word.slice(1) : word))
-    .join(" ");
-const nameOf = (draft: Draft, fallback: string) =>
-  typeof draft.name === "string" && draft.name.trim() ? draft.name : fallback;
 const textOf = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
 
 /** The levels a class grants a feature at, from its level table, as the builder counts them. */
@@ -37,19 +29,6 @@ const featuresAt = (draft: Draft, key: string): Feature[] => {
   if (Array.isArray(held)) return held as Feature[];
   return held && typeof held === "object" ? [held as Feature] : [];
 };
-
-/** The builder's feature rows: a name, the level it arrives at, its text. */
-function featureItems(features: readonly Feature[], levels?: ReadonlyMap<string, number[]>): FeatureItem[] {
-  return features.map((feature, index) => {
-    const at = (feature.id && levels?.get(feature.id)?.[0]) ?? feature.level;
-    return {
-      id: feature.id ?? String(index),
-      title: feature.name?.trim() || "Unnamed feature",
-      meta: at ? `Level ${at}` : undefined,
-      body: <p>{feature.description?.trim() || "No text yet."}</p>
-    };
-  });
-}
 
 const identity = (
   type: "class" | "subclass" | "species" | "background" | "feat" | "spell-list",
@@ -120,33 +99,6 @@ function ClassFeatures({ draft, onDraft, ctx }: StepProps) {
 
 function ClassTable({ draft, onDraft, recordId }: StepProps) {
   return <LevelTableEditor draft={draft} onDraft={onDraft} classId={recordId} />;
-}
-
-function ClassPreview({ draft }: PreviewProps) {
-  const levels = grantLevels(draft);
-  const saves = Array.isArray(draft.savingThrows) ? (draft.savingThrows as string[]) : [];
-  const armor = Array.isArray(draft.armorProficiencies) ? (draft.armorProficiencies as string[]) : [];
-  const weapons = Array.isArray(draft.weaponProficiencies) ? (draft.weaponProficiencies as string[]) : [];
-  const features = [...featuresAt(draft, "features")].sort(
-    (left, right) => (levels.get(left.id ?? "")?.[0] ?? 21) - (levels.get(right.id ?? "")?.[0] ?? 21)
-  );
-  return (
-    <article className="hb-wiz-card" aria-label={`${nameOf(draft, "Untitled class")} in the character builder`}>
-      <h4 className="hb-wiz-card-name">{nameOf(draft, "Untitled class")}</h4>
-      {textOf(draft.summary) && <p className="hb-wiz-card-meta">{draft.summary as string}</p>}
-      <p className="hb-wiz-card-text">{textOf(draft.description) ?? textOf(draft.summary) ?? "No text yet."}</p>
-      <p className="tabular">
-        Hit Point Die {typeof draft.hitDie === "string" ? draft.hitDie : "None"} · Saving throws{" "}
-        {saves.map((ability) => ability.toUpperCase()).join(", ") || "None"}
-      </p>
-      <p className="tabular">
-        Armor training: {armor.join(", ") || "None"} · Weapons: {weapons.join(", ") || "None"}
-      </p>
-      {features.length > 0 && (
-        <FeatureList items={featureItems(features, levels)} allowExpandAll ariaLabel="Class features" />
-      )}
-    </article>
-  );
 }
 
 export const CLASS_WIZARD: WizardDef = {
@@ -270,8 +222,7 @@ export const CLASS_WIZARD: WizardDef = {
       sections: ["level-table"],
       questions: [{ key: "levelTable", render: (props) => <ClassTable {...props} /> }]
     }
-  ],
-  Preview: ClassPreview
+  ]
 };
 
 /* --------------------------------------------------------------- subclass ---- */
@@ -337,52 +288,6 @@ function SubclassFeatures({ draft, onDraft, ctx }: StepProps) {
   );
 }
 
-function FeaturesPreview({ draft, featuresKey, word }: PreviewProps & Readonly<{ featuresKey: string; word: string }>) {
-  const features = [...featuresAt(draft, featuresKey)].sort((left, right) => (left.level ?? 0) - (right.level ?? 0));
-  return (
-    <article className="hb-wiz-card" aria-label={`${nameOf(draft, `Untitled ${word}`)} in the character builder`}>
-      <h4 className="hb-wiz-card-name">{nameOf(draft, `Untitled ${word}`)}</h4>
-      {textOf(draft.summary) && <p className="hb-wiz-card-meta">{draft.summary as string}</p>}
-      <p className="hb-wiz-card-text">{textOf(draft.description) ?? textOf(draft.summary) ?? "No text yet."}</p>
-      {word === "species" && (
-        <p className="tabular">
-          {(Array.isArray(draft.sizes) ? (draft.sizes as string[]) : []).map(title).join(" or ") || "No size"} · Speed{" "}
-          {typeof draft.speedFeet === "number" ? draft.speedFeet : 0} ft.
-          {typeof draft.darkvisionFeet === "number" && draft.darkvisionFeet > 0
-            ? ` · Darkvision ${draft.darkvisionFeet} ft.`
-            : ""}
-        </p>
-      )}
-      {word === "background" && <BackgroundLines draft={draft} />}
-      {features.length > 0 ? (
-        <FeatureList
-          items={featureItems(features)}
-          allowExpandAll={features.length > 6}
-          ariaLabel={`${title(word)} features`}
-        />
-      ) : (
-        <p className="nh-field-help">No {word === "species" ? "traits" : "features"} yet.</p>
-      )}
-    </article>
-  );
-}
-
-function BackgroundLines({ draft }: Readonly<{ draft: Draft }>) {
-  const feats = useFeatCatalog();
-  const skills = Array.isArray(draft.skillProficiencies) ? (draft.skillProficiencies as string[]) : [];
-  const abilities = (getAt(draft, "abilityOptions.from") as string[] | undefined) ?? [];
-  const featId = typeof draft.originFeatId === "string" ? draft.originFeatId : "";
-  const feat = feats.items.find((entry) => entry.id === featId)?.name ?? (featId ? title(featId) : "None");
-  return (
-    <>
-      <p className="tabular">Skills: {skills.map(title).join(", ") || "None"}</p>
-      <p className="tabular">
-        Ability scores: {abilities.map((ability) => ability.toUpperCase()).join(", ") || "None"} · Origin feat: {feat}
-      </p>
-    </>
-  );
-}
-
 export const SUBCLASS_WIZARD: WizardDef = {
   type: "subclass",
   steps: [
@@ -412,8 +317,7 @@ export const SUBCLASS_WIZARD: WizardDef = {
         { key: "features", render: (props) => <SubclassFeatures {...props} /> }
       ]
     }
-  ],
-  Preview: (props) => <FeaturesPreview {...props} featuresKey="features" word="subclass" />
+  ]
 };
 
 /* ---------------------------------------------------------------- species ---- */
@@ -474,8 +378,7 @@ export const SPECIES_WIZARD: WizardDef = {
       sections: ["lineages"],
       questions: [ask("species", "lineages", { label: "Lineages" })]
     }
-  ],
-  Preview: (props) => <FeaturesPreview {...props} featuresKey="traits" word="species" />
+  ]
 };
 
 /* ------------------------------------------------------------- background ---- */
@@ -569,8 +472,7 @@ export const BACKGROUND_WIZARD: WizardDef = {
       sections: ["features"],
       questions: [{ key: "features", render: (props) => <BackgroundFeatures {...props} /> }]
     }
-  ],
-  Preview: (props) => <FeaturesPreview {...props} featuresKey="features" word="background" />
+  ]
 };
 
 /* ------------------------------------------------------------------- feat ---- */
@@ -628,42 +530,13 @@ export const FEAT_WIZARD: WizardDef = {
       sections: ["feature"],
       questions: [{ key: "feature", render: (props) => <FeatEffect {...props} /> }]
     }
-  ],
-  Preview: (props) => <FeaturesPreview {...props} featuresKey="feature" word="feat" />
+  ]
 };
 
 /* ------------------------------------------------------------- spell list ---- */
 
 function ListContents({ draft, onDraft, ctx, recordId, spells }: StepProps) {
   return <SpellListContents draft={draft} onDraft={onDraft} ctx={ctx} listId={recordId} spells={spells} />;
-}
-
-function SpellListPreview({ draft, recordId, ctx }: PreviewProps) {
-  const basedOn = Array.isArray(draft.basedOn) ? (draft.basedOn as string[]) : [];
-  const add = new Set(Array.isArray(draft.add) ? (draft.add as string[]) : []);
-  const remove = new Set(Array.isArray(draft.remove) ? (draft.remove as string[]) : []);
-  const byId = new Map(ctx.spells.map((spell) => [spell.id, spell]));
-  return (
-    <article className="hb-wiz-card" aria-label={`${nameOf(draft, "Untitled spell list")} spells`}>
-      <h4 className="hb-wiz-card-name">{nameOf(draft, "Untitled spell list")}</h4>
-      <p className="hb-wiz-card-text">{textOf(draft.description) ?? textOf(draft.summary) ?? "No text yet."}</p>
-      <p className="tabular">
-        {basedOn.length > 0 ? `Starts from ${basedOn.map(title).join(", ")}` : "Starts empty"} · {add.size} added ·{" "}
-        {remove.size} removed
-      </p>
-      {add.size > 0 && (
-        <ul className="hb-wiz-card-list">
-          {[...add].map((id) => (
-            <li key={id}>
-              {byId.get(id)?.name ?? title(id)}
-              {byId.get(id)?.meta ? ` · ${byId.get(id)!.meta}` : ""}
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="nh-field-help">Spells that name this list ({recordId}) in their own lists also join it.</p>
-    </article>
-  );
 }
 
 export const SPELL_LIST_WIZARD: WizardDef = {
@@ -676,11 +549,12 @@ export const SPELL_LIST_WIZARD: WizardDef = {
       intro: "Start from an SRD list and change it, or build the list spell by spell.",
       owns: ["basedOn", "add", "remove"],
       sections: ["contents"],
+      // The list's contents are the editor's own contents control.
+      covers: ["contents"],
       questions: [
         ask("spell-list", "basedOn", { label: "Starts from" }),
         { key: "add", render: (props) => <ListContents {...props} /> }
       ]
     }
-  ],
-  Preview: SpellListPreview
+  ]
 };

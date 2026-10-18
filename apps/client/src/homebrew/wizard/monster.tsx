@@ -8,7 +8,7 @@ import { Chip, Field, FieldGrid, Input, NumberField, RowEditor, Select, Stepper,
 import { opt, type Draft, type FieldDef } from "../schema";
 import { MonsterActions } from "./MonsterActions";
 import { MonsterBenchmarks } from "./MonsterBenchmarks";
-import { StatBlockPreview } from "./StatBlockPreview";
+import { tagsField } from "../riders/actions";
 import { ask } from "./questions";
 import {
   ABILITY_IDS,
@@ -41,7 +41,7 @@ import {
   type AbilityId,
   type Tier
 } from "./monster-build";
-import { withName } from "./monster-actions";
+import { actionsOf, activationOf, withName, type Activation } from "./monster-actions";
 import type { StepProps, WizardDef } from "./types";
 
 const ratingWords = (rating: number) =>
@@ -480,6 +480,16 @@ function LegendaryQuestion({ draft, onDraft, idPrefix }: StepProps) {
 
 /* ----------------------------------------------------------------- the wizard ---- */
 
+/** An issue in one of the monster's actions belongs to the step for that action's timing: a legendary action's dice
+ *  are fixed on Legendary Actions. */
+function claimsActions(activation: Activation) {
+  return (segments: ReadonlyArray<string | number>, draft: Draft) => {
+    if (segments[0] !== "actions" || typeof segments[1] !== "number") return false;
+    const action = actionsOf(draft)[segments[1]];
+    return action !== undefined && activationOf(action) === activation;
+  };
+}
+
 export const MONSTER_WIZARD: WizardDef = {
   type: "monster",
   steps: [
@@ -489,6 +499,7 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "These answers make the first lines of its stat block.",
       owns: ["name", "size", "extensions", "proficiencyBonus", "summary", "token"],
       sections: ["identity"],
+      covers: ["challengeRating"],
       questions: [
         ask("monster", "name", {
           label: "Name",
@@ -520,7 +531,8 @@ export const MONSTER_WIZARD: WizardDef = {
         ask("monster", "summary", {
           label: "Bestiary line",
           help: "It follows your answers above until you change it."
-        })
+        }),
+        tagsField("Tags")
       ]
     },
     {
@@ -604,6 +616,9 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "Its attacks and other actions go here. A Multiattack makes several of them as one action.",
       owns: ["actions"],
       sections: ["actions"],
+      // The actions table writes what the editor's action list did; its tags have their own question.
+      covers: ["riders"],
+      claims: claimsActions("action"),
       questions: [
         {
           key: "actions",
@@ -625,6 +640,7 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "A Bonus Action comes on top of its action, like the goblin's Nimble Escape. Most monsters have none.",
       owns: [],
       sections: [],
+      claims: claimsActions("bonus-action"),
       questions: [
         {
           key: "actions",
@@ -645,6 +661,7 @@ export const MONSTER_WIZARD: WizardDef = {
       intro: "A Reaction answers a trigger, even on another turn, like the knight's Parry.",
       owns: [],
       sections: [],
+      claims: claimsActions("reaction"),
       questions: [
         {
           key: "actions",
@@ -664,8 +681,8 @@ export const MONSTER_WIZARD: WizardDef = {
       title: "Legendary Actions",
       owns: ["legendary"],
       sections: ["token"],
+      claims: claimsActions("legendary"),
       questions: [{ key: "legendary", render: (props) => <LegendaryQuestion {...props} /> }]
     }
-  ],
-  Preview: StatBlockPreview
+  ]
 };

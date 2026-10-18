@@ -1,10 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentMonsterSummary } from "@vtt/domain";
-import { Modal, Input, Select, Switch } from "@vtt/ui";
-import { command } from "../lib/command";
+import { IconChevron, Modal, Input, Select, Switch, cx } from "@vtt/ui";
+import { HomebrewMarks, useHomebrewMarks } from "../homebrew/marks";
+import { command, read } from "../lib/command";
 import { formatChallenge, titleCase } from "./format";
 import { loadMonsterCatalog } from "./monster-catalog";
+import { StatBlock, type StatBlockRecord } from "./StatBlock";
 import "./monster-browser.css";
+
+/** A monster's stat block, read when the GM opens it. */
+function BestiaryStatBlock({ monster }: Readonly<{ monster: ContentMonsterSummary }>) {
+  const [definition, setDefinition] = useState<StatBlockRecord | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void read("content:monster-sheet", { definitionId: monster.id }).then((result) => {
+      if (!live) return;
+      if (result.ok && result.definition) setDefinition(result.definition as unknown as StatBlockRecord);
+      else setFailed(result.message ?? "The stat block could not be loaded.");
+    });
+    return () => {
+      live = false;
+    };
+  }, [monster.id]);
+  if (failed) return <p className="monster-browser-status">{failed}</p>;
+  if (!definition) return <p className="monster-browser-status">Loading the stat block.</p>;
+  return <StatBlock monster={definition} className="monster-browser-statblock" />;
+}
 
 /** Challenge-rating bands for the filter: wide enough to browse by, and close to the SRD's tiers of play. */
 const CR_BANDS = [
@@ -57,6 +79,9 @@ export function MonsterBrowser({
    * which the one-feedback-channel check reserves.
    */
   const [addedIds, setAddedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [readingId, setReadingId] = useState<string | null>(null);
+  // The bestiary is the GM's, so a Hidden homebrew monster is marked from the GM's own homebrew list.
+  const marks = useHomebrewMarks(true);
 
   useEffect(() => {
     void loadMonsterCatalog().then(
@@ -120,7 +145,7 @@ export function MonsterBrowser({
       size="lg"
       className="monster-browser"
       title="Add monsters"
-      ariaLabel="Add monsters from the SRD bestiary"
+      ariaLabel="Add monsters from the bestiary"
     >
       <div className="monster-browser-controls">
         <Input
@@ -179,10 +204,16 @@ export function MonsterBrowser({
       {monsters && (
         <ol className="monster-browser-list scroll-y">
           {shown.map((monster) => (
-            <li key={monster.id}>
-              <div className="monster-browser-name">
+            <li key={monster.id} className={cx(readingId === monster.id && "is-reading")}>
+              <button
+                type="button"
+                className="monster-browser-name interactive"
+                aria-expanded={readingId === monster.id}
+                onClick={() => setReadingId((open) => (open === monster.id ? null : monster.id))}
+              >
                 <strong>
                   {monster.name}
+                  <HomebrewMarks source={monster.source} mark={marks.get(monster.id)} />
                   {addedIds.has(monster.id) && <span className="monster-browser-added">Added</span>}
                 </strong>
                 <small>
@@ -190,7 +221,10 @@ export function MonsterBrowser({
                   {monster.experiencePoints !== null && ` (${monster.experiencePoints.toLocaleString()} XP)`} ·{" "}
                   {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}
                 </small>
-              </div>
+                <span className={cx("monster-browser-caret", readingId === monster.id && "is-open")} aria-hidden="true">
+                  <IconChevron />
+                </span>
+              </button>
               <button
                 type="button"
                 className="monster-browser-add"
@@ -199,6 +233,7 @@ export function MonsterBrowser({
               >
                 {busyIds.has(monster.id) ? "Adding…" : "Add"}
               </button>
+              {readingId === monster.id && <BestiaryStatBlock monster={monster} />}
             </li>
           ))}
           {shown.length === 0 && (

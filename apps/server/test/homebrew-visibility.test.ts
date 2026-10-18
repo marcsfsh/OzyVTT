@@ -29,7 +29,7 @@ import {
   type GamePrincipal
 } from "../src/commands/index.js";
 import { GameStore } from "../src/game-store.js";
-import { HomebrewStore } from "../src/homebrew-store.js";
+import { EVERYONE_AUDIENCE, HomebrewStore } from "../src/homebrew-store.js";
 import { createStateReader } from "../src/state-reader.js";
 
 // Every content read must respect the caller's audience once homebrew merges in. Against a fake
@@ -441,8 +441,8 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
         store.setState(monster.id, "published", undefined);
       }
       if (tier === "playersafe") {
-        store.setVisibility(created.id, true, undefined);
-        store.setVisibility(monster.id, true, undefined);
+        store.setAudience(created.id, EVERYONE_AUDIENCE, undefined);
+        store.setAudience(monster.id, EVERYONE_AUDIENCE, undefined);
       }
       ids[tier] = { classId: created.id, monsterId: monster.id };
     }
@@ -492,7 +492,7 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
       body: SLICES.playersafe.spells[0] as unknown as Record<string, unknown>
     });
     store.setState(spell.id, "published", undefined);
-    store.setVisibility(spell.id, true, undefined);
+    store.setAudience(spell.id, EVERYONE_AUDIENCE, undefined);
     // The list is published but not player-visible: its id must never appear in a player-visible spell's
     // `classes`, or the list's existence leaks through /v1/content/spells.
     const list = store.create({ type: "spell-list", body: { name: "Secret Order", add: [spell.id, "fireball"] } });
@@ -536,7 +536,7 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
     await store.initialize();
     const list = store.create({ type: "spell-list", body: { name: "Only A List", add: ["fireball"] } });
     store.setState(list.id, "published", undefined);
-    store.setVisibility(list.id, true, undefined);
+    store.setAudience(list.id, EVERYONE_AUDIENCE, undefined);
 
     const library = new ContentLibrary(store);
     expect(
@@ -554,12 +554,12 @@ describe("HomebrewStore.publishedFor, end to end through the content reads", () 
       body: SLICES.playersafe.classes[0] as unknown as Record<string, unknown>
     });
     store.setState(good.id, "published", undefined);
-    store.setVisibility(good.id, true, undefined);
+    store.setAudience(good.id, EVERYONE_AUDIENCE, undefined);
     // A body the schema refuses, as stored data looks after a schema tightens. It cannot be published
     // through the router, so this reaches past the store's API; one bad row must not blank the catalogs.
     const rotten = store.create({ type: "class", body: { name: "Half-Formed", hitDie: "d10" } });
     store.setState(rotten.id, "published", undefined);
-    store.setVisibility(rotten.id, true, undefined);
+    store.setAudience(rotten.id, EVERYONE_AUDIENCE, undefined);
 
     const summaries = new ContentLibrary(store).forAudience({ characterIds: [] }).classSummaries();
     expect(summaries.some((entry) => entry.id === rotten.id)).toBe(false);

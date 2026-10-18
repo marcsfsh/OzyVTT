@@ -2,7 +2,7 @@
     standing in for its editor section) and, inside that step, the question that answers it. The requirements
     themselves are the editor's (`publishIssues`, then the server's verdict); a wizard only places them. */
 
-import type { FieldDef } from "../schema";
+import type { Draft, FieldDef } from "../schema";
 import type { BlockedReason } from "../validate";
 import { isCustomQuestion, type WizardStep } from "./types";
 
@@ -32,7 +32,12 @@ export function questionKeys(step: WizardStep): readonly string[] {
   return out;
 }
 
-function stepFor(steps: readonly WizardStep[], reason: BlockedReason): WizardStep | null {
+function stepFor(steps: readonly WizardStep[], reason: BlockedReason, draft: Draft): WizardStep | null {
+  const segments = reason.segments;
+  if (segments) {
+    const claimant = steps.find((step) => step.claims?.(segments, draft));
+    if (claimant) return claimant;
+  }
   const path = reason.path;
   if (path) {
     const owner = steps.find((step) => step.owns.some((prefix) => under(path, prefix)));
@@ -53,9 +58,13 @@ function questionFor(step: WizardStep, path: string): string | null {
   return best;
 }
 
-export function placeIssues(steps: readonly WizardStep[], reasons: readonly BlockedReason[]): readonly PlacedIssue[] {
+export function placeIssues(
+  steps: readonly WizardStep[],
+  reasons: readonly BlockedReason[],
+  draft: Draft
+): readonly PlacedIssue[] {
   return reasons.map((reason) => {
-    const step = stepFor(steps, reason);
+    const step = stepFor(steps, reason, draft);
     return {
       ...reason,
       stepId: step?.id ?? null,

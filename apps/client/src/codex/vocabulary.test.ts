@@ -131,7 +131,8 @@ describe("The words the navigation itself uses", () => {
       "Atlas",
       "Story",
       "Quests",
-      "Relationships"
+      "Relationships",
+      "Compendium"
     ]);
     expect(CODEX_PHONE_TABS.map((tab) => tab.label)).toEqual(["Home", "Pages", "Atlas", "Campaign", "Search"]);
     expect(CAMPAIGN_PARTS.map((part) => part.label)).toEqual(["Story", "Quests", "Relationships", "Sessions"]);

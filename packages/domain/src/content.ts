@@ -221,6 +221,22 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .describe(
       'The eligibility column for a template magic item: the printed type-line qualifier ("Any Simple or Martial") plus the base ids it resolved to at build/authoring time. Null everywhere except weapon, armor and ammunition templates (the bases of magic ammunition are the kinds of ammunition, which decide the launchers that fire it). A template row derives nothing until the player\'s pick binds it to one of `baseIds`, validated and copied server-side at set-inventory.'
     ),
+  /** The magic-item rarity, which the item's printed line already says ("Wand, Rare (Requires Attunement...)"). */
+  rarity: slug(40)
+    .nullable()
+    .describe(
+      'The magic-item rarity as a slug ("rare", "very-rare"); null for an item with none. The printed line in the description already says it'
+    ),
+  /** Whether the item needs attunement, and by whom: the printed line's "(Requires Attunement by a Spellcaster)". */
+  attunement: z
+    .strictObject({
+      required: z.boolean(),
+      restrictedTo: z.array(slug()).max(8).describe("Class or species ids the item is meant for; advisory only")
+    })
+    .nullable()
+    .describe(
+      "Whether the item needs attunement and who it is meant for, as its printed line says; null for an item that says nothing of it"
+    ),
   /** The damage types the GM may pick for the item's resistance ("The GM chooses the type"). */
   damageTypeChoice: z
     .array(slug(20))

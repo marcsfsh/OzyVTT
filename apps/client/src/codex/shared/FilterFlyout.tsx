@@ -50,7 +50,8 @@ export function FilterFlyout({
   title,
   onClose,
   children,
-  className
+  className,
+  closeLabel = "Close filters"
 }: Readonly<{
   id: string;
   open: boolean;
@@ -58,6 +59,8 @@ export function FilterFlyout({
   onClose: () => void;
   children: ReactNode;
   className?: string;
+  /** The Close button's name, for a flyout that holds more than filters. */
+  closeLabel?: string;
 }>) {
   const ref = useRef<HTMLElement>(null);
   // Opening moves focus into the flyout, so a keyboard user lands on its first control.
@@ -82,7 +85,7 @@ export function FilterFlyout({
     >
       <div className="cx-flyout-head">
         <h2 className="cx-flyout-title">{title}</h2>
-        <IconButton label="Close filters" size="sm" className="cx-flyout-close" onClick={onClose}>
+        <IconButton label={closeLabel} size="sm" className="cx-flyout-close" onClick={onClose}>
           <IconX />
         </IconButton>
       </div>

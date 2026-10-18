@@ -52,7 +52,7 @@ describe("The address table", () => {
   });
 
   it("round-trips every GM tab through its address", () => {
-    for (const tab of ["scenes", "table", "roster", "codex", "homebrew", "viewer", "replay", "settings"] as const) {
+    for (const tab of ["scenes", "table", "roster", "codex", "compendium", "viewer", "replay", "settings"] as const) {
       expect(gmTabForPath(pathForGmTab(tab))).toBe(tab);
     }
   });
@@ -113,6 +113,7 @@ describe("The address table", () => {
   it("redirects the addresses that moved, and nothing else", () => {
     expect(redirectForRetiredPath("/encounter", new URLSearchParams())).toBe("/table");
     expect(redirectForRetiredPath("/setup", new URLSearchParams())).toBe("/settings");
+    expect(redirectForRetiredPath("/homebrew", new URLSearchParams())).toBe("/compendium");
     expect(redirectForRetiredPath("/scenes", new URLSearchParams("view=maps"))).toBe("/scenes/maps");
     // The map library's one-map address lands on that map's grid step, still knowing to go back to the table.
     expect(redirectForRetiredPath("/scenes/maps", new URLSearchParams("map=m1&from=table"))).toBe(
@@ -255,7 +256,8 @@ describe("Which addresses a player may reach (viewer safety)", () => {
     expect(isGmOnlyPath("/scenes")).toBe(true);
     expect(isGmOnlyPath("/scenes/maps")).toBe(true);
     expect(isGmOnlyPath("/roster")).toBe(true);
-    expect(isGmOnlyPath("/homebrew")).toBe(true);
+    expect(isGmOnlyPath("/compendium")).toBe(true);
+    expect(isGmOnlyPath("/compendium/spells/hb-brine-burst-a1b2c3")).toBe(true);
     expect(isGmOnlyPath("/viewer-controls")).toBe(true);
     expect(isGmOnlyPath("/codex")).toBe(false);
   });
@@ -347,9 +349,17 @@ describe("The addresses D29 added", () => {
     expect(isKnownPath("/settings/api/keys/1")).toBe(false);
     expect(isKnownPath("/settings/api/%20")).toBe(false);
     expect(isKnownPath("/me/anything")).toBe(false);
+    // The Compendium's views, and each record at its kind's address.
+    expect(isKnownPath("/compendium")).toBe(true);
+    expect(isKnownPath("/compendium/tables/spells")).toBe(true);
+    expect(isKnownPath("/compendium/sources")).toBe(true);
+    expect(isKnownPath("/compendium/spells/hb-brine-burst-a1b2c3")).toBe(true);
+    expect(isKnownPath("/compendium/tables/dragons")).toBe(false);
+    expect(isKnownPath("/compendium/spells/fireball/extra")).toBe(false);
     // Retired addresses no longer exist, so a stale stored location self-heals.
     expect(isKnownPath("/encounter")).toBe(false);
     expect(isKnownPath("/setup")).toBe(false);
+    expect(isKnownPath("/homebrew")).toBe(false);
   });
 });
 
@@ -553,7 +563,7 @@ describe("Resume-last-location", () => {
     });
 
     it("has nothing to say about a tab never visited", () => {
-      expect(lastLocationForTab("gm", "homebrew")).toBeNull();
+      expect(lastLocationForTab("gm", "compendium")).toBeNull();
     });
 
     it("refuses an address that no longer exists, so a deleted record cannot strand a tab", () => {
