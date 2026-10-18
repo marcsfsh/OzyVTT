@@ -442,8 +442,10 @@ export function AtlasMap({
         {pins.map((pin) => {
           const pos = dragPreview && dragPreview.id === pin.id ? dragPreview : pin;
           const here = people?.get(pin.id) ?? [];
+          // A party pin whose own label already names the party needs no second caption under it.
+          const labelSaysParty = pin.isParty && /\bparty\b/i.test(pin.label ?? "");
           const name = pin.isParty
-            ? pin.label
+            ? pin.label && !labelSaysParty
               ? `${pin.label}, ${PARTY_LABEL.toLowerCase()}`
               : PARTY_LABEL
             : (pin.label ?? "Unlabelled pin");
@@ -484,7 +486,7 @@ export function AtlasMap({
                   {pin.label}
                 </text>
               )}
-              {pin.isParty && (
+              {pin.isParty && !labelSaysParty && (
                 <text
                   className="atlas-pin-partylabel"
                   y={pinSize / 2 + labelSize * (pin.label ? 2.2 : 1.05)}

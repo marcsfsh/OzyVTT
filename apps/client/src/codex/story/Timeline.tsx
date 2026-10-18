@@ -274,7 +274,7 @@ function Year({
                     key={record.id}
                     className={`story-month-clock${record.revealedToPlayers === false ? " is-hidden" : ""}`}
                   >
-                    {summaryOf(record.title ?? record.text)}: {instantToDate(calendar, record.calendarInstant!).day}
+                    {instantToDate(calendar, record.calendarInstant!).day} · {summaryOf(record.title ?? record.text)}
                   </span>
                 ))}
                 {events.map((record) => (

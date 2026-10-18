@@ -48,6 +48,15 @@ describe("The atlas map", () => {
     expect(pin.querySelector(".atlas-pin-partyring")).not.toBeNull();
   });
 
+  it("draws no second caption when the party pin's own label already names the party", () => {
+    render(
+      <AtlasMap token="gm" assetId="a1" pins={[PIN({ isParty: true, label: "The party" })]} selectedPinId={null} />
+    );
+    const pin = document.querySelector('[data-pin-id="k1"]')!;
+    expect(pin.querySelectorAll("text")).toHaveLength(1);
+    expect(pin.querySelector("title")!.textContent).toBe("The party is here");
+  });
+
   it("says nothing about the party on an ordinary pin, and names a hidden pin as hidden", () => {
     render(<AtlasMap token="gm" assetId="a1" pins={[PIN({ revealedToPlayers: false })]} selectedPinId={null} />);
     const pin = document.querySelector('[data-pin-id="k1"]')!;

@@ -13,15 +13,15 @@ import {
   Skeleton,
   useToast
 } from "@vtt/ui";
-import type { CodexAutosaveSettings } from "@vtt/domain";
+import { CODEX_PREP_LIMITS, type CodexAutosaveSettings, type CodexPrepTemplate, type CodexSession } from "@vtt/domain";
 import { useConfirm } from "../../components/feedback";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { nextSessionNumber } from "../creates";
 import { CodexIcon } from "../icons";
 import { prepSessionApi, templateApi } from "../prep/api";
-import { CODEX_PREP_LIMITS, type CodexPrepTemplate, type CodexSession } from "@vtt/domain";
 import { sectionTypeLabel } from "../prep/sections";
 import { sessionTitle } from "../sessions";
+import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexQuery } from "../useCodexQuery";
 import { TemplateEditor } from "./TemplateEditor";
 import "./templates.css";
@@ -45,6 +45,7 @@ export function TemplatesView({
   onSelectTemplate,
   onOpenSession,
   onSessionsChanged,
+  onBack,
   onOpenMenu
 }: Readonly<{
   gmToken: string;
@@ -56,6 +57,8 @@ export function TemplatesView({
   onSelectTemplate: (templateId: string) => void;
   onOpenSession: (sessionId: string) => void;
   onSessionsChanged: () => void | Promise<void>;
+  /** A phone's Back, to Sessions. */
+  onBack?: () => void;
   /** The crumb back to the GM menu. */
   onOpenMenu?: () => void;
 }>) {
@@ -196,7 +199,7 @@ export function TemplatesView({
   if (phone)
     return (
       <div className="tpl-view is-phone">
-        <h2 className="tpl-title">Prep templates</h2>
+        <CodexPhoneBar title="Prep templates" onBack={onBack} />
         <p className="tpl-hint">Templates are edited on a laptop. A new session here can use any of them.</p>
         {error && <Alert tone="danger">{error}</Alert>}
         {library.error && <Alert tone="danger">{library.error}</Alert>}

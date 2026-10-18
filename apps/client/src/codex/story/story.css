@@ -759,9 +759,8 @@ button.story-datebar-date {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(var(--months), minmax(5.5rem, 1fr));
+  grid-template-columns: repeat(var(--months), minmax(0, 1fr));
   gap: 2px;
-  overflow-x: auto;
 }
 .story-year.is-phone .story-months {
   grid-template-columns: 1fr;
@@ -818,6 +817,13 @@ button.story-datebar-date {
 .story-month-clock.is-hidden,
 .story-month-event.is-hidden {
   color: var(--violet-hi);
+}
+/* A clock or event in a month cell is one line: the day and the start of what happens, the rest on its record. */
+.story-month-clock,
+.story-month-event {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .story-month-clock {
   color: var(--caution-hi);

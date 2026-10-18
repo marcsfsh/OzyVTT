@@ -41,13 +41,6 @@ span.tpl-crumb {
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
-.tpl-title {
-  margin: 0;
-  font: 400 var(--fs-h2) / 1.1 var(--font-display);
-  color: var(--heading-ink);
-  text-shadow: var(--heading-shadow);
-}
-
 /* ----- The library ----- */
 .tpl-library {
   list-style: none;

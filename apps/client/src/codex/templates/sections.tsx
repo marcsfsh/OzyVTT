@@ -1,4 +1,4 @@
-import { sessionPath, templatePath } from "../routes";
+import { pathForSection, sessionPath, templatePath } from "../routes";
 import { useCodexShell, useGmCodex } from "../shell/context";
 import { TemplatesView } from "./TemplatesView";
 
@@ -15,6 +15,7 @@ export function GmTemplatesSection() {
       onSelectTemplate={(id) => go(templatePath(id), { replace: true })}
       onOpenSession={(id) => go(sessionPath(id))}
       onSessionsChanged={feeds.sessionFeed.reload}
+      onBack={() => go(pathForSection("sessions"))}
     />
   );
 }
