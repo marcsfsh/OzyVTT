@@ -205,7 +205,15 @@ export function TableView(props: TableViewProps) {
           token: <TokenTab state={props.state} token={token} />,
           party: <PartyStrip role="gm" state={props.state} onOpenRoster={() => navigate(pathForGmTab("roster"))} />,
           rest: <PartyRest state={props.state} token={token} />,
-          tonight: <TonightTab token={token} />,
+          tonight: (
+            <TonightTab
+              token={token}
+              party={party}
+              scenes={props.state.combat.scenes}
+              liveSceneId={props.state.combat.activeSceneId}
+              onMakeLive={props.gm.onMakeLive}
+            />
+          ),
           codex: <CodexTab role="gm" token={token} party={party} />
         }}
       />

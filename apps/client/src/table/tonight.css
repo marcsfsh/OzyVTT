@@ -1,0 +1,252 @@
+/* The table's Tonight tab: the active session's live board in the table panel. Tokens only. */
+
+.tonight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-2) var(--space-3) var(--space-5);
+}
+.tonight-empty {
+  justify-content: center;
+  align-items: flex-start;
+}
+.tonight-empty p {
+  margin: 0;
+  color: var(--text-dim);
+}
+.tonight-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.tonight-grow {
+  flex: 1 1 auto;
+}
+.tonight-eyebrow {
+  margin: 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.tonight-date {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.tonight-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ----- Scenes: one card each, the current one in cyan ----- */
+.tonight-scenes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tonight-scene {
+  width: 100%;
+  height: 100%;
+  min-height: calc(var(--tap-min) + var(--space-5));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-2);
+  background: var(--surface-1);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.tonight-scene:hover {
+  border-color: var(--line-hover);
+}
+.tonight-scene.is-current {
+  background: var(--tab-on);
+  border-color: var(--cyan);
+  box-shadow: inset 0 0 0 1px var(--cyan);
+}
+.tonight-scene-step {
+  color: var(--text-muted);
+  font: 700 var(--fs-2xs) / 1.2 var(--font-label);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.tonight-scene.is-current .tonight-scene-step {
+  color: var(--cyan-hi);
+}
+.tonight-scene-title {
+  font: 700 var(--fs-sm) / 1.25 var(--font-body);
+}
+.tonight-scene-place {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.tonight-notes {
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 2px solid var(--cyan);
+  background: var(--surface-1);
+  font-size: var(--fs-sm);
+}
+
+/* ----- Rows: the cast, clues, clocks, quests, encounters and the log ----- */
+.tonight-rows,
+.tonight-cast,
+.tonight-clues {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tonight-cast {
+  gap: var(--space-2);
+}
+.tonight-row,
+.tonight-person,
+.tonight-check {
+  width: 100%;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  color: var(--text);
+  text-align: start;
+}
+.tonight-row {
+  border-bottom: 1px solid var(--line);
+}
+.tonight-row.is-button,
+.tonight-person {
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.tonight-row.is-button {
+  border-bottom: 1px solid var(--line);
+}
+.tonight-row.is-button:hover,
+.tonight-person:hover {
+  background: var(--surface-2);
+}
+.tonight-person {
+  align-items: flex-start;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--line-strong);
+  border-top: 2px solid var(--cyan);
+}
+/* A page players can't read keeps the violet edge that marks what only the GM sees. */
+.tonight-person.is-hidden {
+  border-top-color: var(--violet);
+  border-inline-start: 2px solid var(--violet);
+}
+.tonight-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--line-raised);
+  color: var(--text);
+  font: 700 var(--fs-xs) / 1 var(--font-label);
+}
+.tonight-icon {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  color: var(--text-dim);
+}
+.tonight-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tonight-row-title {
+  font: 600 var(--fs-sm) / 1.3 var(--font-body);
+  overflow-wrap: anywhere;
+}
+.tonight-person-name {
+  font: 700 var(--fs-body) / 1.2 var(--font-body);
+}
+.tonight-row-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.tonight-person-drive {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.tonight-person-drive.is-hidden {
+  color: var(--violet-hi);
+}
+.tonight-hidden {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--violet-hi);
+  font: 700 var(--fs-xs) / 1 var(--font-label);
+}
+
+/* ----- Clues: a checklist; a ticked one that links something hidden offers to reveal it ----- */
+.tonight-clue {
+  border-bottom: 1px solid var(--line);
+}
+.tonight-check {
+  cursor: pointer;
+}
+.tonight-check input {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--cyan);
+}
+.tonight-check.is-done .tonight-row-title {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+.tonight-offer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 var(--space-2) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--violet);
+  border-inline-start: 3px solid var(--violet);
+  background: color-mix(in srgb, var(--violet) 10%, var(--surface-1));
+}
+.tonight-offer p {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.tonight-offer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ----- Log what happens ----- */
+.tonight-log {
+  display: flex;
+  gap: var(--space-2);
+}
+.tonight-log .nh-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
