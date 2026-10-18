@@ -269,6 +269,14 @@ export function stabilizeCreature(
   return { stabilized: true, woke: false, check: null, events, overridden };
 }
 
+/** A spell's cast that makes a dying creature Stable (Spare the Dying): true when it did, false when the creature
+ *  isn't dying (it has Hit Points, is dead or is already Stable). */
+export function stabilizeBySpell(target: LiveActor): boolean {
+  if (isDead(target) || target.hp.current > 0 || target.deathSaves === null || target.deathSaves.stable) return false;
+  target.deathSaves = { ...STABLE };
+  return true;
+}
+
 /** Makes a dying creature Stable (its counters reset, its Unconscious kept), or ends a knock-out. */
 function settle(
   state: GameState,

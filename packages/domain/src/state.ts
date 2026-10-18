@@ -301,6 +301,9 @@ export const PendingSaveSchema = z
     failurePush: ForcedPushSchema.optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
+     *  card says so, so it never reads as if the engine did. */
+    gmApplies: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -606,7 +609,7 @@ export type RuleMode = z.infer<typeof RuleModeSchema>;
 
 /** A GM relaxes rules a family at a time, never per rule id. The rule-id → family mapping lives in
  * `apps/server/src/rules-families.ts`. */
-export const RuleFamilySchema = z.enum(["movement", "economy", "resources", "targeting", "slots"]);
+export const RuleFamilySchema = z.enum(["movement", "economy", "resources", "targeting", "slots", "components"]);
 export type RuleFamily = z.infer<typeof RuleFamilySchema>;
 
 /** Per-family overrides of the standing dial; an absent key follows the dial. Not `.strict()`, so an unknown
@@ -616,7 +619,8 @@ export const RuleExceptionsSchema = z.object({
   economy: RuleModeSchema.optional(),
   resources: RuleModeSchema.optional(),
   targeting: RuleModeSchema.optional(),
-  slots: RuleModeSchema.optional()
+  slots: RuleModeSchema.optional(),
+  components: RuleModeSchema.optional()
 });
 export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
 
@@ -804,7 +808,7 @@ const sceneCombatShape = {
       /** Feet of movement the current turn's actor has spent (fractional on gridless maps). */
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
-      rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional(),
+      rulesOverriddenFamilies: z.array(RuleFamilySchema).max(6).optional(),
       /** Who has expended a spell slot to cast a spell this turn (SRD: one per turn). Engine bookkeeping, never
        *  projected. */
       spellSlotCasters: z.array(z.uuid()).max(200).optional(),

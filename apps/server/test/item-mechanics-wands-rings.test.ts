@@ -388,7 +388,9 @@ describe("a staff's resistance and its shared charge pool", () => {
     );
     expect(actor.actionUses["staff-of-charming-charges"]).toBe(10);
     // The last charge rolls a d20; on a 1 the staff's own text decides, so the GM is told.
-    expect(last.warnings?.[0]).toMatch(/^Staff of Charming's last charge is spent and the d20 shows 1/);
+    expect(last.warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Staff of Charming's last charge is spent and the d20 shows 1/)])
+    );
 
     newTurn(state);
     // A different cast on the same pool is refused too: one pool.

@@ -223,6 +223,14 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
       per: "long-rest",
       pool: "mystic-arcanum-level-6-spell"
     });
+    // True Seeing consumes "mushroom powder worth 25+ GP".
+    built.hero.inventory.push({
+      id: "mushroom-powder",
+      name: "Mushroom powder",
+      quantity: 2,
+      equipped: false,
+      attuned: false
+    });
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-true-seeing-free"),

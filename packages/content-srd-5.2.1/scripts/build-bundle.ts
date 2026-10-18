@@ -42,6 +42,7 @@ import {
 } from "./save-outcomes.js";
 import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
+import { costlyMaterialsFor } from "./spell-materials.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
@@ -1178,7 +1179,8 @@ const spellRecords = onlySrd(spells).map((spell) => {
       somatic: fields.somatic,
       material: fields.material,
       materialText: fields.material_specified || null,
-      materialConsumed: fields.material_consumed
+      materialConsumed: fields.material_consumed,
+      ...(costlyMaterialsFor(slugOf(spell.pk)) ? { costly: costlyMaterialsFor(slugOf(spell.pk)) } : {})
     },
     duration: fields.duration,
     concentration: fields.concentration,

@@ -145,18 +145,35 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "attack.cleave-same-target": () => "Choose a second creature.",
   "attack.cleave-too-far": () => "The second creature must be within 5 feet of the first.",
   "target.too-many": () => "Too many targets.",
+  "target.wrong-type": () => "It can't target that kind of creature.",
+  "target.unseen": () => "You can't see that creature.",
+  "target.outside-area": () => "Those creatures don't fit in one of its areas.",
   "attack.hit-option-unqualified": () => "That hit can't carry it.",
   "condition.charmed-charmer": () => "You can't attack the creature that charmed you.",
   "slots.none-remaining": slotsReason,
   "slots.below-spell-level": ({ action }) => `It needs a level ${action.spellSlot?.level ?? 1} spell slot or higher.`,
   "slots.one-per-turn": () => "You already spent a spell slot this turn.",
-  "slots.not-prepared": () => "Not prepared."
+  "slots.not-prepared": () => "Not prepared.",
+  "spell.no-verbal": () => "You can't speak now, and it has a Verbal component.",
+  "spell.no-free-hand": () => "Its gestures need a free hand. Unequip a weapon or a Shield on the Gear tab.",
+  "spell.no-material": materialReason
 };
+
+/** A Material component the caster lacks: the priced or consumed material itself, else a pouch or focus in reach. */
+function materialReason({ spell }: ReasonFacts): string {
+  const costly = spell?.components.costly ?? [];
+  if (costly.length > 0)
+    return `It needs ${listed(costly.map((material) => (material.costGp !== null ? `${material.name} worth ${material.costGp}+ GP` : material.name)))}. Add it to your gear.`;
+  return "It needs a Component Pouch, or a Spellcasting Focus you can use, and a hand free to reach it.";
+}
 
 /** Rules about the option itself, which outlast the turn, so they are named before the turn's own. */
 const ABOUT_THE_OPTION: ReadonlySet<RuleId> = new Set([
   "slots.not-prepared",
   "spell.untrained-armor",
+  "spell.no-verbal",
+  "spell.no-free-hand",
+  "spell.no-material",
   "spell.scroll-unreadable",
   "attack.no-ammunition",
   "attack.two-handed",

@@ -37,7 +37,7 @@ import { MAX_SOUND_EFFECTS, MAX_SOUND_LAYERS, MAX_SOUND_TRACKS, SoundVolumeSchem
 export const RulesOverrideSchema = z
   .object({
     reason: z.string().trim().min(1).max(300).optional(),
-    families: z.array(RuleFamilySchema).min(1).max(5).optional()
+    families: z.array(RuleFamilySchema).min(1).max(6).optional()
   })
   .strict();
 /** Per-family exceptions on the wire are strict: a misspelled family is a rejection, never a silent no-op. */

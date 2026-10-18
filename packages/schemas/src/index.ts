@@ -1613,7 +1613,9 @@ const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
  * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage.
  * - melee-attack (Retaliation): make one melee attack against that creature instead.
- * `rangeFeet` skips the prompt when the map shows the damaging creature farther away.
+ * - counter (Counterspell): a creature the reactor can see casts a spell with components; the cast waits, and "use"
+ *   makes the caster roll an `ability` saving throw against the reactor's spell save DC, its spell lost on a failure.
+ * `rangeFeet` skips the prompt when the map shows the damaging or casting creature farther away.
  */
 export const ActionReactionSchema = z.discriminatedUnion("response", [
   z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict(),
@@ -1637,6 +1639,14 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
     .object({
       trigger: z.literal("damaged-by-creature"),
       response: z.literal("melee-attack"),
+      rangeFeet: ReactionRangeFeet
+    })
+    .strict(),
+  z
+    .object({
+      trigger: z.literal("casts-spell"),
+      response: z.literal("counter"),
+      ability: AbilitySchema,
       rangeFeet: ReactionRangeFeet
     })
     .strict()
@@ -1752,6 +1762,12 @@ export const CastsSpellsSchema = z
     saveDc: z.number().int().min(1).max(40),
     attackBonus: z.number().int().min(-10).max(30),
     self: z.literal(true).optional(),
+    /** The components its casts go without ("requiring no Material components"; "no spell components" is all three). */
+    waives: z
+      .array(z.enum(["verbal", "somatic", "material"]))
+      .min(1)
+      .max(3)
+      .optional(),
     spells: z
       .array(
         z

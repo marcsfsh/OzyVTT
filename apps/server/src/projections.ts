@@ -222,7 +222,9 @@ const PENDING_SAVE_FIELDS = {
   drain: "never",
   failurePush: "never",
   // The save's own roll mode is read when it is answered.
-  advantageAtSize: "never"
+  advantageAtSize: "never",
+  // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
+  gmApplies: "player"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.

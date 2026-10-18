@@ -45,6 +45,7 @@ import {
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
 import {
+  castAreaOf,
   isLongCastingTime,
   laterSpellAction,
   ritualSpellActionId,
@@ -329,10 +330,10 @@ const spellActionId = (spellId: string): string => `spell-${spellId}`;
 const DICE_FORMULA = /^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i;
 
 /**
- * The server-resolved action for one known cantrip, or null. Cantrips only, since a leveled spell
- * action would need a slot the sheet can't express. A roll counts as damage only with a damage type,
- * and an action is minted only for typed damage or a save (save outranks attack). Scaled by character
- * level from the printed rows (Fire Bolt's 2d10 at 5, Eldritch Blast's second beam), as the sheet is.
+ * The server-resolved action for one known cantrip, or null for a leveled spell. Every cantrip is cast through the
+ * server, so a cast that rolls nothing (Light, Guidance) still spends its action, holds its Concentration and is told
+ * to the table. Scaled by character level from the printed rows (Fire Bolt's 2d10 at 5, Eldritch Blast's second
+ * beam), as the sheet is.
  */
 function cantripActionFor(
   spell: SpellReference,
@@ -348,16 +349,13 @@ function cantripActionFor(
       ...(tier?.targetCount && spell.effect?.attacks ? { attacks: tier.targetCount } : {})
     }
   );
-  // A cantrip that lasts and acts later (Produce Flame) is cast to start it, with nothing to roll.
-  if (mechanics.damage.length === 0 && !mechanics.save && (spell.effect?.laterActions ?? []).length === 0) return null;
   return {
     id: spellActionId(spell.id),
     name: spell.name,
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    ...castAreaOf(spell, mechanics),
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
@@ -379,29 +377,18 @@ type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLe
 /**
  * A leveled spell as an action. Cast with a slot, it carries `spellSlot` at the spell's level, which the economy
  * spends (a higher slot on request upcasts the dice). Cast without one (`free`), it spends the granting
- * feature's uses, or nothing at will. Null for an at-will cast with nothing to resolve.
+ * feature's uses, or nothing at will. A cast that rolls nothing still spends its action and is told to the table.
  */
 function leveledSpellActionFor(
   spell: SpellReference,
   numbers: CasterNumbers,
   free?: ActorAction["uses"] | null
-): ActorAction | null {
+): ActorAction {
   const mechanics = spellCastMechanics(
     spell,
     { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: numbers.modifier },
     {}
   );
-  // A reaction the table can offer (Shield) is something to resolve too.
-  const resolvable =
-    mechanics.damage.length > 0 ||
-    mechanics.save !== undefined ||
-    mechanics.healing !== undefined ||
-    mechanics.attack ||
-    mechanics.grants !== undefined ||
-    spell.effect?.reaction !== undefined ||
-    // A spell that lasts and acts on later turns (Flame Blade) is cast to start it.
-    (spell.effect?.laterActions ?? []).length > 0;
-  if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;
   return {
     id: freeCast ? `${spellActionId(spell.id)}-free` : spellActionId(spell.id),
@@ -409,8 +396,7 @@ function leveledSpellActionFor(
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    ...castAreaOf(spell, mechanics),
     // A reaction spell's trigger rides its action, so the table offers it (Shield when an attack would hit).
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     ...(freeCast ? (free ? { uses: free } : {}) : { spellSlot: { level: spell.level } }),
@@ -482,7 +468,7 @@ function linkSpellActions(
         const cast = leveledSpellActionFor(record, numbers);
         mint(cast, "actionId");
         // SRD Rituals: a prepared ritual spell can be cast without a slot and takes 10 minutes longer.
-        if (cast && record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
+        if (record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
       }
       if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
     }

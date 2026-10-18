@@ -11,7 +11,7 @@ import type { AbilityId, ActorAction } from "@vtt/schemas";
 
 type CastsSpells = NonNullable<ActorAction["castsSpells"]>;
 type Entry = CastsSpells["spells"][number];
-type Numbers = Pick<CastsSpells, "ability" | "saveDc" | "attackBonus">;
+type Numbers = Pick<CastsSpells, "ability" | "saveDc" | "attackBonus" | "waives">;
 
 const ABILITIES: Readonly<Record<string, AbilityId>> = {
   strength: "str",
@@ -56,7 +56,18 @@ function numbersOf(
   const modifier = abilityModifier(creature.abilityScores[ability]);
   const saveDc = using[2] ? Number(using[2]) : 8 + creature.proficiencyBonus + modifier;
   const attackBonus = using[3] ? Number(using[3]) : saveDc - 8;
-  return { ability, saveDc, attackBonus };
+  return { ability, saveDc, attackBonus, ...waivedComponents(text) };
+}
+
+/** The components the text says its casts go without: "requiring no Material components", "requiring no Somatic or
+ *  Material components", or "requiring no spell components" (all three). */
+export function waivedComponents(text: string): Pick<CastsSpells, "waives"> {
+  const requiring = /\brequiring no ([A-Za-z ]+?) components\b/.exec(text);
+  if (!requiring) return {};
+  const named = requiring[1]!.toLowerCase();
+  if (named === "spell") return { waives: ["verbal", "somatic", "material"] };
+  const waives = (["verbal", "somatic", "material"] as const).filter((component) => named.includes(component));
+  return waives.length > 0 ? { waives } : {};
 }
 
 /** A Spellcasting action's lists: "- **At Will:** A, B" (no limit) and "- **2/Day Each:** C" (two uses of each). */
@@ -147,7 +158,9 @@ export function withSpellcasting(
         body
       );
     if (!casts) return action;
-    const numbers = casts[2]!.startsWith("the same") ? listNumbers : numbersOf(body, creature);
+    const numbers = casts[2]!.startsWith("the same")
+      ? listNumbers && { ...listNumbers, ...waivedComponents(body) }
+      : numbersOf(body, creature);
     const spells = namedSpells(casts[1]!)
       .map(({ name, atLevel }) => ({ name, atLevel, spellId: spellIdOfName(name) }))
       .filter(({ spellId }) => knownSpell(spellId));

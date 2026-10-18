@@ -1,5 +1,4 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
@@ -32,7 +31,7 @@ import {
   rememberOverride,
   type RuleId
 } from "../rules-families.js";
-import { laterRowOf, laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -41,6 +40,8 @@ import { hitRiderOf } from "./hit-riders.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
+import { readComponents, spendComponents, type ComponentSpend } from "./components.js";
+import { spellTargetViolations } from "./spell-targets.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -78,6 +79,8 @@ export type EconomyPlan = Readonly<{
   surge: boolean;
   /** The turn's uses key of a feature used once per turn beside a pool of its own (Stunning Strike), or null. */
   oncePerTurn?: string | null;
+  /** The consumed materials and coins the cast uses up (SRD Components). */
+  componentSpends?: readonly ComponentSpend[];
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -137,7 +140,10 @@ export function evaluateActionEconomy(
   /** The spell the action casts, for the slot, preparation and targeting checks. */
   spell?: SpellReference,
   /** Any combatant's stat block, for the side a creature fights on (Help distracts an enemy). */
-  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined,
+  /** What the map says of the cast: the caster stands where no sound can be made (Silence), and the targets are a
+   *  placed template's catch. */
+  cast: Readonly<{ silenced?: boolean; areaPlaced?: boolean }> = {}
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -182,7 +188,36 @@ export function evaluateActionEconomy(
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
   if (spell) checkLaterTurn(evaluation, spell);
-  if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
+  if (spell)
+    evaluation.violations.push(
+      ...spellTargetViolations({
+        state,
+        attacker,
+        action,
+        spell,
+        targetIds,
+        castLevel: spendSpellSlot?.level ?? continued ?? spell.level,
+        areaPlaced: cast.areaPlaced === true,
+        characterLevel: (definition?.character?.classes ?? []).reduce((sum, entry) => sum + entry.level, 0),
+        distanceFeet,
+        resolveDefinition,
+        catalog
+      })
+    );
+  // A later ray of a spell already cast this action is no new cast, so it needs no components again.
+  const components =
+    continued === null
+      ? readComponents({
+          attacker,
+          action,
+          spell: spell ?? (action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined),
+          definition,
+          catalog,
+          ...(cast.silenced ? { silenced: true } : {}),
+          targetCount: new Set(targetIds).size
+        })
+      : { gaps: [], spends: [] };
+  evaluation.violations.push(...components.gaps);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
     violations: evaluation.violations,
@@ -196,7 +231,8 @@ export function evaluateActionEconomy(
       castLevel: spendSpellSlot?.level ?? continued,
       magicAction: evaluation.onOwnTurn && isMagicAction(action),
       surge,
-      oncePerTurn
+      oncePerTurn,
+      ...(components.spends.length > 0 ? { componentSpends: components.spends } : {})
     },
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
@@ -1255,48 +1291,6 @@ function checkTargeting(
   }
 }
 
-/**
- * A spell's own targeting (SRD Spells, "Range" and "Targets"): a save or healing spell reaches the creatures it names
- * only within its range (a Touch spell within 5 feet), and no more of them than it targets at this slot. An attack's
- * range is the attack's; an area's targets are whoever the template covers; a later action's trigger is wherever the
- * creature is.
- */
-function checkSpellTargets(
-  { state, attacker, action, targetIds, violations }: Evaluation,
-  spell: SpellReference,
-  castLevel: number,
-  distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined
-): void {
-  if (
-    action.area ||
-    (spell.effect?.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === action.id)
-  )
-    return;
-  const targets = spell.effect?.targets;
-  const unique = [...new Set(targetIds)];
-  if (targets && action.darts === undefined) {
-    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level);
-    if (unique.length > limit)
-      violations.push({
-        rule: "target.too-many",
-        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level ${castLevel} slot` : ""}; ${unique.length} were chosen.`
-      });
-  }
-  if (action.attack !== undefined || !distanceFeet) return;
-  const range = spellRangeFeet(spell.range) ?? (/^touch\b/i.test(spell.range.text ?? "") ? 5 : null);
-  if (range === null) return;
-  for (const targetId of unique) {
-    if (targetId === attacker.id) continue;
-    const distance = distanceFeet(attacker.id, targetId);
-    if (distance === null || distance <= range + DISTANCE_TOLERANCE_FEET) continue;
-    const targetName = state.actors.find((candidate) => candidate.id === targetId)?.name ?? "The target";
-    violations.push({
-      rule: "range.out-of-range",
-      message: `${targetName} is ${Math.round(distance * 10) / 10} ft away, beyond ${spell.name}'s ${range === 5 ? "touch" : `${range} ft range`}.`
-    });
-  }
-}
-
 /** Range/reach (SRD): checked only when distance is measurable. A thrown weapon is legal in either
  *  envelope; long-range disadvantage lives in the attack roll's sources. */
 function checkRange(
@@ -1366,7 +1360,11 @@ export function planEconomy(
     asHitRider,
     catalog,
     spell,
-    resolveDefinition
+    resolveDefinition,
+    {
+      ...(input.silenced === true ? { silenced: true } : {}),
+      ...(input.areaPlaced === true ? { areaPlaced: true } : {})
+    }
   );
   warnings.push(...notes);
 
@@ -1481,6 +1479,8 @@ export function commitEconomy({
         turn: { ...state.combat.turn, spellSlotCasters: [...casters, attacker.id] }
       };
   }
+  // A consumed material is used up as the cast happens ("which the spell consumes").
+  if (plan.componentSpends) spendComponents(attacker, plan.componentSpends);
   if (plan.oncePerTurn) {
     const key = plan.oncePerTurn;
     state.combat = {

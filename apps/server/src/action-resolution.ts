@@ -5,6 +5,7 @@ import {
   type ActionResolution,
   type GameState
 } from "@vtt/domain";
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
@@ -38,6 +39,7 @@ import { applyGrant } from "./resolution/grant.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
+import { stabilizeOnCast } from "./resolution/stabilize.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
@@ -147,6 +149,7 @@ export function resolveDefinitionAction(
   applyGrant(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
+  stabilizeOnCast(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
@@ -351,7 +354,7 @@ export function actionAvailability(
       // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
       targeting: builtin
         ? (BUILTIN_TARGETING[action.id] ?? "none")
-        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null),
+        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null, spell),
       // A spell cast from an item picks as the spell's own cast does: darts by target, the type to deal.
       darts: action.darts ?? null,
       damageTypes: action.damageTypes ? [...action.damageTypes] : null,
@@ -367,11 +370,22 @@ export function actionAvailability(
 /** Who a tap of this action picks, as the resolver will take it: one creature for an attack, a grant aimed at a
  *  target or a heal (a potion: the drinker); several for a save, damage with no attack roll, a grant on each
  *  creature it targets (a scroll of Bless) or a divided heal; none for what acts on its user (a self heal, Rage, a
- *  scroll of Detect Magic). Null for an action with nothing structured to resolve. */
-function tapTargeting(action: DefinitionAction, usesUpItem: boolean): "none" | "single" | "multi" | null {
+ *  scroll of Detect Magic). A spell that rolls nothing picks the creatures it names (Guidance's one), else none (Light).
+ *  Null for an action with nothing structured to resolve. */
+function tapTargeting(
+  action: DefinitionAction,
+  usesUpItem: boolean,
+  spell: SpellReference | undefined
+): "none" | "single" | "multi" | null {
   if (action.attack || action.grants?.target === "target") return "single";
   if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
+  // A touch that ends a condition picks who it touches (Lesser Restoration).
+  if (action.endsConditions) return "single";
+  if (action.spellId !== undefined) {
+    const named = spell?.effect?.targets;
+    return named === undefined ? "none" : named.count > 1 || named.perSlot !== undefined ? "multi" : "single";
+  }
   const structured =
     action.grants !== undefined ||
     action.multiattack !== undefined ||

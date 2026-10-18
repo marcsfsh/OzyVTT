@@ -22,6 +22,7 @@ import { areEnemies } from "../creature-sides.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { scrollOfAction } from "../scrolls.js";
+import { creatureTypeOf } from "../statblock-facts.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
   resolveHiddenCheck,
@@ -69,16 +70,24 @@ function combatantsOf(
     action.spellSlot !== undefined ||
     action.legendary !== undefined ||
     consumableRowFor(action, attacker.inventory, catalog) !== null;
-  // Casting a spell that lasts and acts again later (Produce Flame, a lingering area) is something done, even with no
-  // creature under it yet.
-  const startsALastingSpell =
-    spell !== undefined && (spell.effect?.laterActions ?? []).length > 0 && laterRowOf(spell, action.id) === undefined;
+  // Casting a spell is something done even when it rolls nothing (Light, Guidance): it spends its casting time and is
+  // told to the table. What a spell lets its caster do later is no new cast.
+  const castsASpell = action.spellId !== undefined && !(spell !== undefined && laterRowOf(spell, action.id));
+  // A spell that lasts and acts again later (Produce Flame, a lingering area) starts with no creature under it yet.
+  const startsALastingSpell = castsASpell && (spell?.effect?.laterActions ?? []).length > 0;
+  const rollsOnTargets =
+    action.attack !== undefined ||
+    action.save !== undefined ||
+    action.damage.length > 0 ||
+    (action.healing !== undefined && action.healing.self !== true) ||
+    action.endsConditions !== undefined;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
     action.healing?.self === true ||
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     startsALastingSpell ||
+    (castsASpell && !rollsOnTargets) ||
     input.builtin === true;
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
@@ -92,7 +101,7 @@ function combatantsOf(
     action.grants === undefined &&
     action.multiattack === undefined &&
     !spendsALimitedUse &&
-    !startsALastingSpell &&
+    !castsASpell &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
@@ -134,7 +143,10 @@ export function openResolve(
   const hiddenFromInitiator = resolveHiddenCheck(state, deps, true);
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
-  const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog, spell);
+  const combatants = combatantsOf(state, reaching, input, deps.catalog, spell);
+  const { attacker } = combatants;
+  const warnings: string[] = [];
+  const targets = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
@@ -143,7 +155,6 @@ export function openResolve(
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
   const action = withChosenDamageType(upcast, input.damageType ?? null);
-  const warnings: string[] = [];
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derived, attacker.inventory);
@@ -271,6 +282,27 @@ export function openResolve(
       ...laterActionReminders(spell, action, scrollOfAction(action, attacker.inventory, deps.catalog) !== null)
     );
   return ctx;
+}
+
+/** An area's catch, less the creatures of a type the spell doesn't affect ("Each Humanoid in a 20-foot-radius
+ *  Sphere"), each named to the GM. A type the stat block doesn't print stays in. */
+function onlyTargetTypes(
+  targets: LiveActor[],
+  spell: SpellReference | undefined,
+  deps: ResolveDependencies,
+  warnings: string[]
+): LiveActor[] {
+  const types = spell?.effect?.targetTypes;
+  if (!types || !deps.resolveDefinition) return targets;
+  return targets.filter((target) => {
+    const definition = target.definitionId ? deps.resolveDefinition!(target.definitionId) : undefined;
+    const type = creatureTypeOf(target, definition);
+    if (type === null || types.includes(type)) return true;
+    warnings.push(
+      `${target.name} isn't affected by ${spell!.name}, which affects only ${types.join(" or ")} creatures.`
+    );
+    return false;
+  });
 }
 
 /** An action whose caster picks the damage type (Chromatic Orb) deals the one picked, every part of it. */

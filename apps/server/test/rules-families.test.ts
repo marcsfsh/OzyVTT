@@ -106,6 +106,10 @@ describe("rule families", () => {
       ["hide.seen", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],
+      // Whom a spell may pick: a creature of a type it targets, one the caster sees, all in one of its areas.
+      ["target.wrong-type", "targeting"],
+      ["target.unseen", "targeting"],
+      ["target.outside-area", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.
@@ -114,7 +118,11 @@ describe("rule families", () => {
       ["slots.none-remaining", "slots"],
       ["slots.below-spell-level", "slots"],
       ["slots.one-per-turn", "slots"],
-      ["slots.not-prepared", "slots"]
+      ["slots.not-prepared", "slots"],
+      // "Check spell components" relaxes speech, hands and materials alone.
+      ["spell.no-verbal", "components"],
+      ["spell.no-free-hand", "components"],
+      ["spell.no-material", "components"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
     expect(expected.map(([rule]) => rule).sort()).toEqual([...RULE_IDS].sort());

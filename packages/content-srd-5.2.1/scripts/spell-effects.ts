@@ -106,48 +106,205 @@ const CAST_ATTACKS: Readonly<Record<string, number>> = {
 };
 
 /** How many creatures a cast targets (SRD "up to three creatures", "one additional creature for each spell slot level
- *  above 1"), for the spells a table casts in a fight. */
+ *  above 1"), for every spell whose text names a number of creatures it picks. The caster counts among them where the
+ *  text adds it ("You and up to eight willing creatures"). An area's targets are whoever its template covers, and a
+ *  spell that picks "any number" has no row. */
 const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>> = {
   aid: { count: 3 },
   "animal-friendship": { count: 1, perSlot: 1 },
+  "animal-messenger": { count: 1 },
+  antipathysympathy: { count: 1 },
+  "arcanists-magic-aura": { count: 1 },
+  "astral-projection": { count: 9 },
   bane: { count: 3, perSlot: 1 },
   banishment: { count: 1, perSlot: 1 },
+  barkskin: { count: 1 },
+  befuddlement: { count: 1 },
+  "bestow-curse": { count: 1 },
   bless: { count: 3, perSlot: 1 },
+  blight: { count: 1 },
   blindnessdeafness: { count: 1, perSlot: 1 },
+  // The first target and the three bolts that leap from it, one more for each slot level above 6.
+  "chain-lightning": { count: 4, perSlot: 1 },
   "charm-monster": { count: 1, perSlot: 1 },
   "charm-person": { count: 1, perSlot: 1 },
+  clone: { count: 1 },
   command: { count: 1, perSlot: 1 },
+  contagion: { count: 1 },
+  counterspell: { count: 1 },
   "cure-wounds": { count: 1 },
+  darkvision: { count: 1 },
+  "death-ward": { count: 1 },
+  disintegrate: { count: 1 },
+  "dispel-magic": { count: 1 },
   "dissonant-whispers": { count: 1 },
   "dominate-beast": { count: 1 },
   "dominate-monster": { count: 1 },
   "dominate-person": { count: 1 },
+  "dragons-breath": { count: 1 },
+  dream: { count: 1 },
   "enhance-ability": { count: 1, perSlot: 1 },
+  enlargereduce: { count: 1 },
+  eyebite: { count: 1 },
+  "feather-fall": { count: 5 },
+  "finger-of-death": { count: 1 },
+  "flesh-to-stone": { count: 1 },
   fly: { count: 1, perSlot: 1 },
+  foresight: { count: 1 },
   "freedom-of-movement": { count: 1, perSlot: 1 },
   "gaseous-form": { count: 1, perSlot: 1 },
+  geas: { count: 1 },
+  "greater-invisibility": { count: 1 },
+  "greater-restoration": { count: 1 },
+  guidance: { count: 1 },
+  harm: { count: 1 },
   haste: { count: 1 },
+  heal: { count: 1 },
   "healing-word": { count: 1 },
+  "hellish-rebuke": { count: 1 },
   heroism: { count: 1, perSlot: 1 },
+  hex: { count: 1 },
   "hideous-laughter": { count: 1, perSlot: 1 },
   "hold-monster": { count: 1, perSlot: 1 },
   "hold-person": { count: 1, perSlot: 1 },
+  "hunters-mark": { count: 1 },
+  imprisonment: { count: 1 },
   "inflict-wounds": { count: 1 },
   invisibility: { count: 1, perSlot: 1 },
+  "irresistible-dance": { count: 1 },
   jump: { count: 1, perSlot: 1 },
+  "lesser-restoration": { count: 1 },
+  levitate: { count: 1 },
   longstrider: { count: 1, perSlot: 1 },
   "mage-armor": { count: 1 },
   "mass-cure-wounds": { count: 6 },
   "mass-healing-word": { count: 6 },
+  "mass-suggestion": { count: 12 },
+  maze: { count: 1 },
+  message: { count: 1 },
+  "mind-blank": { count: 1 },
+  "mind-spike": { count: 1 },
+  "modify-memory": { count: 1 },
+  nondetection: { count: 1 },
+  "phantasmal-force": { count: 1 },
   "phantasmal-killer": { count: 1 },
+  "plane-shift": { count: 9 },
   polymorph: { count: 1 },
+  "power-word-heal": { count: 1 },
+  "power-word-kill": { count: 1 },
   "power-word-stun": { count: 1 },
   "prayer-of-healing": { count: 5 },
+  "protection-from-energy": { count: 1 },
+  "protection-from-evil-and-good": { count: 1 },
+  "protection-from-poison": { count: 1 },
+  "raise-dead": { count: 1 },
+  "ray-of-enfeeblement": { count: 1 },
+  regenerate: { count: 1 },
+  reincarnate: { count: 1 },
+  "remove-curse": { count: 1 },
+  "resilient-sphere": { count: 1 },
+  resistance: { count: 1 },
+  resurrection: { count: 1 },
+  revivify: { count: 1 },
   "sacred-flame": { count: 1 },
+  sanctuary: { count: 1 },
+  slow: { count: 6 },
+  scrying: { count: 1 },
+  sending: { count: 1 },
+  sequester: { count: 1 },
   "shield-of-faith": { count: 1 },
+  "spare-the-dying": { count: 1 },
   "spider-climb": { count: 1, perSlot: 1 },
+  stoneskin: { count: 1 },
   suggestion: { count: 1 },
-  "vicious-mockery": { count: 1 }
+  telekinesis: { count: 1 },
+  "telepathic-bond": { count: 8 },
+  teleport: { count: 9 },
+  tongues: { count: 1 },
+  "true-polymorph": { count: 1 },
+  "true-resurrection": { count: 1 },
+  "true-seeing": { count: 1 },
+  "vicious-mockery": { count: 1 },
+  "warding-bond": { count: 1 },
+  "water-breathing": { count: 10 },
+  "water-walk": { count: 10 },
+  "wind-walk": { count: 11 },
+  "word-of-recall": { count: 6 }
+};
+
+/** Spells whose targets are creatures the caster can see (SRD "a creature you can see within range"). */
+const SEEN_TARGETS: ReadonlySet<string> = new Set([
+  "animal-friendship",
+  "animal-messenger",
+  "animal-shapes",
+  "bane",
+  "banishment",
+  "befuddlement",
+  "blight",
+  "blindnessdeafness",
+  "chain-lightning",
+  "charm-monster",
+  "charm-person",
+  "command",
+  "compulsion",
+  "counterspell",
+  "disintegrate",
+  "dissonant-whispers",
+  "dominate-beast",
+  "dominate-monster",
+  "dominate-person",
+  "enlargereduce",
+  "enthrall",
+  "eyebite",
+  "finger-of-death",
+  "flesh-to-stone",
+  "geas",
+  "harm",
+  "haste",
+  "heal",
+  "healing-word",
+  "hex",
+  "hideous-laughter",
+  "hold-monster",
+  "hold-person",
+  "hunters-mark",
+  "imprisonment",
+  "irresistible-dance",
+  "levitate",
+  "magic-missile",
+  "mass-heal",
+  "mass-healing-word",
+  "mass-suggestion",
+  "maze",
+  "mind-spike",
+  "modify-memory",
+  "phantasmal-force",
+  "phantasmal-killer",
+  "polymorph",
+  "power-word-heal",
+  "power-word-kill",
+  "power-word-stun",
+  "sacred-flame",
+  "seeming",
+  "suggestion",
+  "telekinesis",
+  "teleport",
+  "true-polymorph"
+]);
+
+/** The creature types a spell can target, where its text names them ("Choose a Humanoid", "Target a Beast"). */
+const TARGET_TYPES: Readonly<Record<string, readonly string[]>> = {
+  "animal-friendship": ["beast"],
+  "animal-messenger": ["beast"],
+  awaken: ["beast", "plant"],
+  // "Each Humanoid in a 20-foot-radius Sphere": the area's other creatures are left out.
+  "calm-emotions": ["humanoid"],
+  "charm-person": ["humanoid"],
+  "dominate-beast": ["beast"],
+  "dominate-person": ["humanoid"],
+  "hold-person": ["humanoid"],
+  reincarnate: ["humanoid"],
+  simulacrum: ["beast", "humanoid"]
 };
 
 /** Missiles one cast makes, each striking a creature of the caster's choice. */
@@ -161,6 +318,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "conjure-animals",
   "conjure-elemental",
   "conjure-woodland-beings",
+  // The caster it interrupts makes the save, when the reaction is used (`CAST_REACTIONS`).
+  "counterspell",
   "delayed-blast-fireball",
   "dragons-breath",
   "dream",
@@ -570,8 +729,29 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
 const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"]>>> = {
   // +5 AC until the start of the caster's next turn, including against the triggering attack.
   shield: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true },
-  "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 }
+  "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 },
+  // "When you see a creature within 60 feet of yourself casting a spell with Verbal, Somatic, or Material components":
+  // the caster makes a Constitution saving throw.
+  counterspell: { trigger: "casts-spell", response: "counter", ability: "con", rangeFeet: 60 }
 };
+
+/** Spells that make a creature at 0 Hit Points Stable, and whose range doubles with the cantrip's tiers. */
+const STABILIZES: ReadonlySet<string> = new Set(["spare-the-dying"]);
+const RANGE_DOUBLES: ReadonlySet<string> = new Set(["spare-the-dying"]);
+/** "No sound can be created within or pass through" its area: no spell with a Verbal component is cast inside it. */
+const SILENCES_AREA: ReadonlySet<string> = new Set(["silence"]);
+/** Area spells whose caster picks the creatures in the area it affects ("each creature of your choice in a 30-foot
+ *  Sphere"), so the cast picks them; the rest of the area's creatures are spared. */
+const PICKS_IN_AREA: ReadonlySet<string> = new Set([
+  "holy-aura",
+  "mass-cure-wounds",
+  "pass-without-trace",
+  "sleep",
+  "slow",
+  "weird"
+]);
+/** "Three bolts then leap from that target to as many as three other targets ... within 30 feet of the first target." */
+const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
 
 /** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
 const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
@@ -1012,7 +1192,14 @@ export function spellEffectFor(
       : {}),
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
-    ...(reaction ? { reaction } : {})
+    ...(reaction ? { reaction } : {}),
+    ...(SEEN_TARGETS.has(id) ? { seenTargets: true as const } : {}),
+    ...(TARGET_TYPES[id] ? { targetTypes: [...TARGET_TYPES[id]] } : {}),
+    ...(STABILIZES.has(id) ? { stabilizes: true as const } : {}),
+    ...(RANGE_DOUBLES.has(id) ? { rangeDoubles: true as const } : {}),
+    ...(SILENCES_AREA.has(id) ? { silencesArea: true as const } : {}),
+    ...(PICKS_IN_AREA.has(id) ? { picksInArea: true as const } : {}),
+    ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {})
   };
 }
 
@@ -1090,5 +1277,12 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_CURES),
   ...Object.keys(CAST_HEALING),
   ...Object.keys(SAVE_FAILURE_EFFECTS),
-  ...Object.keys(SPELL_AREAS)
+  ...Object.keys(SPELL_AREAS),
+  ...SEEN_TARGETS,
+  ...Object.keys(TARGET_TYPES),
+  ...STABILIZES,
+  ...RANGE_DOUBLES,
+  ...SILENCES_AREA,
+  ...PICKS_IN_AREA,
+  ...Object.keys(CHAIN_FEET)
 ];

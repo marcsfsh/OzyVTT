@@ -16,7 +16,7 @@ import {
 import { useTableWrites } from "./table-writes";
 
 /**
- * One toggle per server rule family, never finer: the engine classifies every rule into these five
+ * One toggle per server rule family, never finer: the engine classifies every rule into these six
  * (`apps/server/src/rules-families.ts`). On means the family follows the dial; off pins it Off.
  */
 const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>> = [
@@ -24,7 +24,8 @@ const FAMILY_COPY: ReadonlyArray<Readonly<{ family: RuleFamily; label: string }>
   { family: "economy", label: "Check the action economy" },
   { family: "resources", label: "Check limited uses" },
   { family: "targeting", label: "Check targeting, range and cover" },
-  { family: "slots", label: "Check spell slots and prepared spells" }
+  { family: "slots", label: "Check spell slots and prepared spells" },
+  { family: "components", label: "Check spell components" }
 ];
 
 /** Fights: the rules assistant and what it checks, how players' hits, initiative and dice work, and tokens. */

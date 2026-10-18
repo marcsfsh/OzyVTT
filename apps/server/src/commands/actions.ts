@@ -35,6 +35,8 @@ import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
 import { applyLooseHealing, looseHealTargets } from "../loose-healing.js";
 import { countOptionUse } from "../option-uses.js";
+import { castLine, castSpellOf } from "../cast-narration.js";
+import { standsInSilence } from "../silence.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -102,6 +104,8 @@ export const actionCommands = [
       // A player's confirmed hit (or darts) in "direct" mode applies server-side inside the mutation; captured for
       // narration.
       let playerDamageApplied: readonly AppliedDamage[] = [];
+      // The spell this resolve casts and whom at, for the table's "casts" line.
+      let cast = null as Readonly<{ name: string; targetIds: readonly string[] }> | null;
       const { state, duplicate } = await execute((draft) => {
         // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
         // else's get one answer, so a player can't probe which ids exist.
@@ -158,9 +162,16 @@ export const actionCommands = [
           );
           // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
           // player can see, so an empty refusal never tells them a hidden creature is there. A spell that leaves its
-          // area behind (Moonbeam, Web, a wall) may be placed where no one stands yet.
+          // area behind (Moonbeam, Web, a wall), or does nothing to whoever is in it (Minor Illusion's image), may be
+          // placed where no one stands.
           const unseen = isPlayer ? hiddenFromPlayer(draft) : new Set<string>();
-          if (!resolvedTargetIds.some((id) => !unseen.has(id)) && !(spell && zoneRowOf(spell)))
+          const catches =
+            action.save !== undefined ||
+            action.damage.length > 0 ||
+            action.healing !== undefined ||
+            action.grants !== undefined ||
+            action.endsConditions !== undefined;
+          if (!resolvedTargetIds.some((id) => !unseen.has(id)) && !(spell && (zoneRowOf(spell) || !catches)))
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
@@ -218,7 +229,10 @@ export const actionCommands = [
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(template ? { areaPlaced: true } : {}),
-            ...(request.ready === true ? { ready: true } : {})
+            ...(request.ready === true ? { ready: true } : {}),
+            ...(action.spellId !== undefined && standsInSilence(draft, actorId, geometry, kit.equipmentCatalog())
+              ? { silenced: true }
+              : {})
           },
           {
             random: (sides) => kit.context.random(sides),
@@ -236,6 +250,8 @@ export const actionCommands = [
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
+        const spell = castSpellOf(action, kit.equipmentCatalog().spellRecord);
+        cast = spell ? { name: spell.name, targetIds: resolvedTargetIds } : null;
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
@@ -282,12 +298,15 @@ export const actionCommands = [
       kit.publishRolls(state, commandId);
       if (!resolution.preview) {
         const hidden = kit.actorHidden(actorId);
-        kit.context.broadcastTableEvent({
-          kind: "action",
-          text: `${kit.actorName(actorId)} used ${resolution.actionName}.`,
-          actorIds: [actorId],
-          gmOnly: hidden
-        });
+        const told: { text: string; actorIds: string[] } = cast
+          ? castLine(
+              { id: actorId, name: kit.actorName(actorId) },
+              cast.name,
+              cast.targetIds.map((id) => ({ id, name: kit.actorName(id) })),
+              kit.hiddenFromTable(state)
+            )
+          : { text: `${kit.actorName(actorId)} used ${resolution.actionName}.`, actorIds: [actorId] };
+        kit.context.broadcastTableEvent({ kind: "action", text: told.text, actorIds: told.actorIds, gmOnly: hidden });
         // Rules-engine narration (ADR-0020): overrides are audited, warnings reach the GM, applied effects reach the table.
         if (resolution.overridden)
           kit.context.appendLog({
@@ -583,9 +602,12 @@ export const actionCommands = [
             : cost > 1
               ? ` (${cost} spent, ${spend.usesLeft} left)`
               : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
+        const casting = castSpellOf(action, kit.equipmentCatalog().spellRecord);
         kit.context.appendLog({
           kind: "action",
-          text: `${kit.actorName(actorId)} uses ${action.name}${left}.`,
+          text: casting
+            ? `${kit.actorName(actorId)} casts ${casting.name}${left}.`
+            : `${kit.actorName(actorId)} uses ${action.name}${left}.`,
           actorId,
           actorIds: [actorId],
           gmOnly: kit.actorHidden(actorId)

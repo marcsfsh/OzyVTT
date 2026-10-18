@@ -89,6 +89,8 @@ export type ResolveInput = Readonly<{
   areaPlaced?: boolean;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** The caster stands where no sound can be made (Silence's sphere), measured on the map by the server. */
+  silenced?: boolean;
 }>;
 
 export type ResolveDependencies = Readonly<{

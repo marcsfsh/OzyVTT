@@ -10,7 +10,7 @@ import {
 } from "@vtt/schemas";
 import type { CheckSubject } from "./ability-checks.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { itemActionId, spellCastMechanics } from "./item-actions.js";
+import { castAreaOf, itemActionId, spellCastMechanics } from "./item-actions.js";
 import { itemRowOfAction } from "./item-charges.js";
 
 /**
@@ -208,8 +208,7 @@ export function scrollCastAction(
         12000
       ),
     ...mechanics,
-    // A healing area heals the creatures the reader picks, as the spell's own cast does, so it isn't templated.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    ...castAreaOf(spell, mechanics),
     // A reaction spell's trigger rides the scroll's action too, so the table offers it when the trigger happens.
     ...(spell.effect?.reaction ? { reaction: structuredClone(spell.effect.reaction) } : {}),
     spellId: spell.id

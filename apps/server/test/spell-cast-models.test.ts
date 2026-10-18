@@ -98,7 +98,9 @@ describe("a failed save's conditions", () => {
 
 describe("a damage type the caster picks", () => {
   it("deals Chromatic Orb's damage as the type picked, and refuses one the spell doesn't offer", () => {
-    const { resolve } = fight(wizard);
+    const { resolve, hero } = fight(wizard);
+    // Its material is "a diamond worth 50+ GP", which the caster must carry.
+    hero.inventory.push({ id: "diamond", name: "Diamond", quantity: 1, equipped: false, attuned: false });
     expect(resolve("spell-chromatic-orb", { damageType: "fire" }, [15, 3, 3, 3]).damage[0]).toMatchObject({
       type: "fire",
       total: 9

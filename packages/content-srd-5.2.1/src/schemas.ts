@@ -190,10 +190,73 @@ export const SpellEffectSchema = z
     /** What a failed save against the cast leaves on the creature (Bane's -1d4, Faerie Fire's outline). */
     failureEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
-    reaction: ActionReactionSchema.optional()
+    reaction: ActionReactionSchema.optional(),
+    /** Its targets are creatures the caster can see ("a creature you can see within range"): with the map's vision on,
+     *  the server refuses one the caster can't see. */
+    seenTargets: z.literal(true).optional(),
+    /** The creature types it can target (Hold Person: a Humanoid). A creature of another type picked as its target is
+     *  refused, and one caught in its area is left out of it. */
+    targetTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(6)
+      .optional(),
+    /** The caster picks its targets among the creatures in its area ("up to six creatures of your choice in a 40-foot
+     *  Cube", Mass Cure Wounds' Sphere), so a cast picks creatures that one such area can hold within range; `targets`
+     *  caps how many. Without it, an area's targets are every creature its template covers. */
+    picksInArea: z.literal(true).optional(),
+    /** Its targets after the first stand within this many feet of the first (Chain Lightning's leaping bolts). */
+    chainFeet: z.number().int().min(5).max(300).optional(),
+    /** The cast makes a creature at 0 Hit Points that isn't dead Stable (Spare the Dying). */
+    stabilizes: z.literal(true).optional(),
+    /** A cantrip whose range doubles at character levels 5, 11 and 17 (Spare the Dying's 15 feet). */
+    rangeDoubles: z.literal(true).optional(),
+    /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
+     *  with a Verbal component while the spell lasts. */
+    silencesArea: z.literal(true).optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;
+
+/**
+ * A material a cast needs in hand that a Component Pouch or a Spellcasting Focus can't stand in for (SRD Components):
+ * one with a printed worth, or one the spell consumes. A carried item is that material when it is one of `itemIds`
+ * (Holy Water) or its name holds one of `matches` ("diamond"); the GM judges its worth. `coins` are paid from the purse
+ * instead (Gentle Repose's 2 Copper Pieces).
+ */
+export const SpellMaterialSchema = z
+  .object({
+    /** What the text names ("a diamond"), for the reason a cast is refused. */
+    name: z.string().min(1).max(80),
+    matches: z.array(z.string().min(2).max(40)).max(6).optional(),
+    itemIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      )
+      .max(4)
+      .optional(),
+    /** Its printed worth in GP for each one ("worth 300+ GP"); null when the text prints none. */
+    costGp: z.number().min(0).max(100_000).nullable(),
+    /** How many the cast needs ("four ivory strips"); with `perTarget`, for each creature it targets. */
+    count: z.number().int().min(1).max(20).optional(),
+    perTarget: z.literal(true).optional(),
+    /** The spell consumes it ("which the spell consumes"), so the cast uses it up. */
+    consumed: z.boolean(),
+    coins: z
+      .object({ unit: z.enum(["cp", "sp", "ep", "gp", "pp"]), amount: z.number().int().min(1).max(10_000) })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type SpellMaterial = z.infer<typeof SpellMaterialSchema>;
 
 export const SpellReferenceSchema = z
   .object({
@@ -229,7 +292,10 @@ export const SpellReferenceSchema = z
       somatic: z.boolean(),
       material: z.boolean(),
       materialText: z.string().nullable(),
-      materialConsumed: z.boolean()
+      materialConsumed: z.boolean(),
+      /** The materials of `materialText` a cast needs in hand, read from it when the bundle is built: each one with a
+       *  worth or that the spell consumes. Absent, a Component Pouch or a Spellcasting Focus stands in for the material. */
+      costly: z.array(SpellMaterialSchema).min(1).max(4).optional()
     }),
     duration: z.string().min(1).max(120),
     concentration: z.boolean(),
