@@ -23,6 +23,8 @@ vi.mock("./lib/api", async (original) => ({
 
 import { touchMoveCancelled } from "../test/drag-surface";
 import { MapSurface } from "./codex/MapSurface";
+import { AtlasMap } from "./codex/atlas/AtlasMap";
+import { TemplateEditor } from "./codex/templates/TemplateEditor";
 import { ConnectionGraph } from "./codex/RelationshipGraph";
 import { CalibrationPane } from "./maps/CalibrationPane";
 import { MapTokenTray } from "./scene/MapTokenTray";
@@ -111,6 +113,36 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
         onBackgroundClick={() => {}}
         onMarkerClick={() => {}}
         onMarkerDragEnd={() => {}}
+      />
+    )
+  },
+  {
+    selector: ".atlas-map",
+    ui: () => <AtlasMap token="gm" assetId={MAP_ID} pins={[]} selectedPinId={null} />
+  },
+  {
+    selector: ".tpl-handle",
+    ui: () => (
+      <TemplateEditor
+        gmToken="gm"
+        autosave={{ enabled: false, intervalSeconds: 1 }}
+        builtInIsDefault={false}
+        template={{
+          id: "t1",
+          name: "Heist night",
+          builtIn: false,
+          isDefault: false,
+          rev: 1,
+          createdAt: null,
+          updatedAt: null,
+          sections: [
+            { id: "s1", title: "The mark", prompt: null, type: "pages" },
+            { id: "s2", title: "Clues", prompt: null, type: "checklist" }
+          ]
+        }}
+        onSaved={() => {}}
+        onDuplicate={() => {}}
+        onSetDefault={() => {}}
       />
     )
   },
