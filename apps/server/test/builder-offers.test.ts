@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { io as connect } from "socket.io-client";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { GAME_PATHS } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import {
   BuilderPolicySchema,
   GameStateSchema,

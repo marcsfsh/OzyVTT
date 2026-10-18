@@ -19,7 +19,7 @@ import {
   SystemHealthResponseSchema,
   SystemVersionResponseSchema
 } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { createApiV1Router } from "../src/api-v1.js";
 import { requestConventions } from "../src/http-kit.js";
 import { IntegrationCredentialStore } from "../src/integration-credentials.js";

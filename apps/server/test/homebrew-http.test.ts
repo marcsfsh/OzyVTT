@@ -13,7 +13,7 @@ import {
   HomebrewPackImportResponseSchema,
   HomebrewUsagesResponseSchema
 } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { BuilderPolicySchema, GameStateSchema } from "@vtt/domain";
 import { buildCharacterDefinition } from "../src/character-build.js";
 import { createServer as createAppServer } from "../src/server.js";

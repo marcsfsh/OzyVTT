@@ -4,13 +4,13 @@ import { z } from "zod";
 import * as bundle from "@vtt/content-srd-5.2.1";
 import { ModifierSchema, RiderTriggerSchema } from "@vtt/schemas";
 import * as contract from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 
 /**
- * The components generated from Zod (`src/openapi/components.ts`) must accept what the server really sends and
- * parses: each payload is parsed through its Zod schema first, so every `.default()` is filled in, and then
- * validated against the component with Ajv. `@vtt/content-srd-5.2.1` is a dev dependency only: `apps/client`
- * imports this package and the SRD bundle must never reach a browser.
+ * The components the route registry (`@vtt/api-contract/routes`) generates from Zod must accept what the server
+ * really sends and parses: each payload is parsed through its Zod schema first, so every `.default()` is filled in,
+ * and then validated against the component with Ajv. The SRD bundle is imported here, in a server test, because
+ * the client imports only the contract's root entry and the bundle must never reach a browser.
  */
 
 const components = (openApiDocument as unknown as { components: { schemas: Record<string, Record<string, unknown>> } })
@@ -282,7 +282,6 @@ const FIXTURES: Record<string, unknown> = {
   HomebrewRevisionSummary: revision,
   HomebrewRevisionList: { revisions: [revision] },
   HomebrewRevisionRead: { revision: { ...revision, record } },
-  HomebrewConflict: conflict,
   HomebrewSharingResponse: { ok: true, apiVersion: "1", data: { records: [summary] } },
   HomebrewPackListResponse: { ok: true, apiVersion: "1", data: { srd: { records: 1195 }, packs: [packInfo] } },
   HomebrewPackResponse: { ok: true, apiVersion: "1", data: { pack: packInfo } },
@@ -599,11 +598,22 @@ describe("generated OpenAPI components", () => {
   });
 
   it("keeps a fixture for every homebrew shape, so a new component cannot land uncompiled", () => {
+    // A query schema becomes parameters, so only the shapes that are components need a fixture.
     const missing = pairs
-      .filter((pair) => pair.base.startsWith("Homebrew") && FIXTURES[pair.base] === undefined)
+      .filter(
+        (pair) =>
+          pair.base.startsWith("Homebrew") && components[pair.base] !== undefined && FIXTURES[pair.base] === undefined
+      )
       .map((pair) => pair.base);
     expect(missing).toEqual([]);
     expect(pairs.filter((pair) => pair.base.startsWith("Homebrew")).length).toBeGreaterThanOrEqual(23);
+  });
+
+  it("keeps the edit conflict a contract shape, told in the 409's words since error details are untyped", () => {
+    expect(contract.HomebrewConflictSchema.parse(conflict)).toEqual(conflict);
+    expect(components.HomebrewConflict).toBeUndefined();
+    const stale = openApiDocument.paths["/api/v1/homebrew/content/{id}"]?.patch?.responses["409"]?.description;
+    for (const key of ["baseRev", "currentRev", "baseKnown", "changes", "rowChanges"]) expect(stale).toContain(key);
   });
 });
 

@@ -115,7 +115,9 @@ screen, and playing music on it. It needs Chromium once: `npx playwright install
    Link pages with `[[links]]` and add relationships beside the text.
 2. Upload maps to the **Atlas** and place pins that link pages, sub-maps or scenes.
 3. Set the calendar in **Story** and add dated entries to the chronicle.
-4. Reveal a block to everyone or to chosen characters when the table reaches it. **See as
+4. Make a session from a prep template, fill in its prep, and run it from the table's
+   **Tonight** tab: tick clues, log what happens, and write the recap after play.
+5. Reveal a block to everyone or to chosen characters when the table reaches it. **See as
    players** shows the page exactly as everyone, or one character's player, receives it.
 
 ## HTTP API

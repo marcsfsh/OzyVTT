@@ -40,7 +40,7 @@ export const tableSettingCommands = [
     description:
       "Sets the rules-engine enforcement mode (GM-grade only): `strict` rejects invalid structured actions with an overridable `error.details.blocked`, `assisted` allows them with logged warnings, `freeform` skips validation. Also settable at encounter start.",
     summary:
-      "Set the LIVE fight's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
+      "Set the live fight's rules-engine enforcement mode (strict, assisted, freeform) and, optionally, its per-family exceptions (GM).",
     schema: SetRulesModeSchema,
     malformed: "The rules-mode command is malformed.",
     gmOnly: "Only the GM can change the rules mode.",
@@ -66,7 +66,7 @@ export const tableSettingCommands = [
     type: "rules.set-policy",
     operationId: "setRulesPolicy",
     description:
-      "Sets the table's STANDING rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy. The rules-mode command changes the fight in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
+      "Sets the table's standing rules policy (GM-grade only): the dial every new fight starts from, plus per-family exceptions (movement, economy, resources, targeting, slots). This is campaign policy. The rules-mode command changes the fight in progress. Omitting `exceptions` keeps the stored ones. Every family follows the dial until the GM sets an exception for it.",
     summary:
       "Set the table's standing rules policy: the dial and per-family exceptions every new fight starts from (GM).",
     schema: RulesSetPolicySchema,
@@ -116,7 +116,7 @@ export const tableSettingCommands = [
     type: "table.set-party-visibility",
     operationId: "setPartyVisibility",
     description:
-      "Sets how much a player sees of ANOTHER player's character (GM-grade only): `off` (no party surface: the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card, and the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts FIELDS, never combatants, and is applied SERVER-SIDE in the player projection, so a withheld field is never sent. A player's own claimed character is unaffected at every tier.",
+      "Sets how much a player sees of another player's character (GM-grade only): `off` (no party surface: the combatant still appears on the map and in the turn order, but carries no class, no sheet and no resources), `name-and-class` (the identity card, and the default), `full-sheet` (plus their read-only imported sheet) or `sheet-and-resources` (plus live spell slots, prepared spells, inventory, currency, hit dice and limited uses). The tier subtracts fields, never combatants, and is applied server-side in the player projection, so a withheld field is never sent. A player's own claimed character is unaffected at every tier.",
     summary:
       "Set how much a player sees of another player's character: nothing, name and class, the full sheet, or the sheet plus live resources (GM).",
     schema: TableSetPartyVisibilitySchema,

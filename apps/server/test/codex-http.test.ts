@@ -10,7 +10,7 @@ import { CodexStore } from "../src/codex-store.js";
 import { MapAssetStore } from "../src/map-assets.js";
 import { createCodexRouter } from "../src/codex-http.js";
 import { CODEX_ASSET_PATHS, CODEX_PATHS, VIEWER_SESSION_COOKIE } from "@vtt/api-contract";
-import { openApiDocument } from "../src/openapi/document.js";
+import { openApiDocument } from "../src/api-routes.js";
 import { png } from "./image-fixtures.js";
 import { credentialPerScope, fixedVerifiers } from "./fixed-verifiers.js";
 

@@ -3,18 +3,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
   HOMEBREW_PATHS,
-  HomebrewAudienceRequestSchema,
-  HomebrewAudienceSchema,
-  HomebrewContentStateSchema,
   HomebrewContentTypeSchema,
-  HomebrewCreateRequestSchema,
-  HomebrewDuplicateRequestSchema,
-  HomebrewPackImportRequestSchema,
-  HomebrewPackUpdateRequestSchema,
-  HomebrewSharingRequestSchema,
-  HomebrewStateChangeRequestSchema,
-  HomebrewUpdateRequestSchema,
-  HomebrewVisibilityRequestSchema,
   type HomebrewContentType,
   type HomebrewImportRecord,
   type HomebrewOverview,
@@ -23,17 +12,8 @@ import {
   type HomebrewValidationIssue,
   type HomebrewValidity
 } from "@vtt/api-contract";
-import { ContentCompendiumKindSchema, HomebrewSeeAsSchema } from "@vtt/domain";
-import { HomebrewSeeAsBuilderOffersSchema } from "@vtt/domain/commands";
-import {
-  apiErrorHandler,
-  expressPath,
-  issuesOf,
-  pathParam,
-  sendData,
-  sendFailure,
-  sendInternalError
-} from "./http-kit.js";
+import { homebrewRoutes as routes } from "@vtt/api-contract/routes";
+import { apiErrorHandler, issuesOf, mount, pathParam, sendData, sendFailure, sendInternalError } from "./http-kit.js";
 import {
   bodyAt,
   copyName,
@@ -80,39 +60,6 @@ import { callerOf, refuse, type CredentialVerifiers } from "./request-auth.js";
  * merged `CONTENT_PATHS` catalogs, built for each reader. See as reads what one player would receive, from that
  * player's catalog, and answers only the GM. Writes emit a content-free `homebrew:changed`.
  */
-
-/** Query booleans arrive as strings; accept the two spellings a browser or curl actually sends. */
-const QueryBoolean = z.enum(["true", "false", "1", "0"]).transform((value) => value === "true" || value === "1");
-/** Lenient (unknown keys stripped): a stray query parameter should not 400 a read. */
-const ListQuerySchema = z.object({
-  type: HomebrewContentTypeSchema.optional(),
-  state: HomebrewContentStateSchema.optional(),
-  audience: HomebrewAudienceSchema.optional(),
-  packId: z.string().max(60).optional(),
-  visibleToPlayers: QueryBoolean.optional(),
-  q: z.string().max(120).optional(),
-  includeDeleted: QueryBoolean.optional(),
-  limit: z.coerce.number().int().min(1).max(200).optional(),
-  cursor: z.string().max(200).optional()
-});
-const ExportQuerySchema = z.object({
-  type: HomebrewContentTypeSchema.optional(),
-  id: z.union([z.string().max(60), z.array(z.string().max(60)).max(500)]).optional(),
-  packId: z.string().max(60).optional(),
-  name: z.string().trim().min(1).max(120).optional(),
-  credit: z.string().trim().max(400).optional()
-});
-const TableQuerySchema = z.object({ kind: HomebrewContentTypeSchema, includeArchived: QueryBoolean.optional() });
-const SearchQuerySchema = z.object({
-  q: z.string().trim().min(1).max(120),
-  kind: HomebrewContentTypeSchema.optional(),
-  includeArchived: QueryBoolean.optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional()
-});
-const SeeAsQuerySchema = z.object({ as: HomebrewSeeAsSchema });
-const SeeAsCompendiumQuerySchema = SeeAsQuerySchema.extend({ kind: ContentCompendiumKindSchema });
-const PackIdSchema = z.union([z.literal(TABLE_PACK_ID), z.uuid()]);
-const RevisionIdSchema = z.coerce.number().int().positive();
 
 /** Route-scoped body limit for pack import, above the server's 512kb global default. */
 export const HOMEBREW_PACK_BODY_LIMIT = "4mb";
@@ -353,9 +300,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   // The polymorphic collection
 
-  router.get(expressPath(HOMEBREW_PATHS.content), requireGm, (request, response) => {
+  mount(router, routes.listHomebrewContent, requireGm, (request, response) => {
     try {
-      const filter = ListQuerySchema.parse(request.query);
+      const filter = routes.listHomebrewContent.query.parse(request.query);
       const page = store.list(filter);
       const packs = packLookup();
       return sendData(response, 200, {
@@ -368,25 +315,25 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  router.post(expressPath(HOMEBREW_PATHS.content), requireGm, (request, response) => {
+  mount(router, routes.createHomebrewContent, requireGm, (request, response) => {
     try {
-      const { record } = HomebrewCreateRequestSchema.parse(request.body);
+      const { record } = routes.createHomebrewContent.body.schema.parse(request.body);
       return sent(response, store.create({ type: typeOf(record), body: record }, authorOf(response)), 201);
     } catch (error) {
       return storeError(response, error);
     }
   });
 
-  router.get(expressPath(HOMEBREW_PATHS.contentById), requireGm, (request, response) => {
+  mount(router, routes.getHomebrewContent, requireGm, (request, response) => {
     const row = store.get(pathParam(request, "id"));
     if (!row) return sendFailure(response, 404, "not_found", "That record was not found.");
     return sendData(response, 200, { record: documentOf(row) });
   });
 
   // Always lands (autosave); a published record's edit is held as pending until Publish puts it live.
-  router.patch(expressPath(HOMEBREW_PATHS.contentById), requireGm, (request, response) => {
+  mount(router, routes.updateHomebrewContent, requireGm, (request, response) => {
     try {
-      const { record, expectedRev } = HomebrewUpdateRequestSchema.parse(request.body);
+      const { record, expectedRev } = routes.updateHomebrewContent.body.schema.parse(request.body);
       return sent(response, store.update(pathParam(request, "id"), record, expectedRev, authorOf(response)));
     } catch (error) {
       return storeError(response, error);
@@ -394,7 +341,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   });
 
   // Idempotent: an unknown or already-deleted id is still a 200. Soft delete keeps the row's data.
-  router.delete(expressPath(HOMEBREW_PATHS.contentById), requireGm, (request, response) => {
+  mount(router, routes.deleteHomebrewContent, requireGm, (request, response) => {
     const id = pathParam(request, "id");
     const deleted = store.softDelete(id, authorOf(response));
     if (deleted) options.notifyChanged();
@@ -407,7 +354,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     );
   });
 
-  router.post(expressPath(HOMEBREW_PATHS.contentRestore), requireGm, (request, response) => {
+  mount(router, routes.restoreHomebrewContent, requireGm, (request, response) => {
     try {
       return sent(response, store.restore(pathParam(request, "id"), authorOf(response)));
     } catch (error) {
@@ -417,9 +364,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   // Homebrew row first, else an SRD record; the reserved `hb-` prefix means they cannot collide. The copy keeps
   // what it was based on, for Compare.
-  router.post(expressPath(HOMEBREW_PATHS.contentDuplicate), requireGm, (request, response) => {
+  mount(router, routes.duplicateHomebrewContent, requireGm, (request, response) => {
     try {
-      const { name } = HomebrewDuplicateRequestSchema.parse(request.body ?? {});
+      const { name } = routes.duplicateHomebrewContent.body.schema.parse(request.body ?? {});
       const id = pathParam(request, "id");
       if (store.get(id)) return sent(response, store.duplicate(id, name, authorOf(response)), 201);
 
@@ -446,9 +393,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   });
 
   /** Publishing requires validity. An invalid draft is a 409: the request itself is well formed. */
-  router.post(expressPath(HOMEBREW_PATHS.contentPublish), requireGm, (request, response) => {
+  mount(router, routes.publishHomebrewContent, requireGm, (request, response) => {
     try {
-      const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
+      const { expectedRev } = routes.publishHomebrewContent.body.schema.parse(request.body ?? {});
       const id = pathParam(request, "id");
       const existing = store.get(id);
       if (!existing) return sendFailure(response, 404, "not_found", "That record was not found.");
@@ -469,18 +416,18 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  router.post(expressPath(HOMEBREW_PATHS.contentUnpublish), requireGm, (request, response) => {
+  mount(router, routes.unpublishHomebrewContent, requireGm, (request, response) => {
     try {
-      const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
+      const { expectedRev } = routes.unpublishHomebrewContent.body.schema.parse(request.body ?? {});
       return sent(response, store.unpublish(pathParam(request, "id"), expectedRev, authorOf(response)));
     } catch (error) {
       return storeError(response, error);
     }
   });
 
-  router.post(expressPath(HOMEBREW_PATHS.contentDiscard), requireGm, (request, response) => {
+  mount(router, routes.discardHomebrewChanges, requireGm, (request, response) => {
     try {
-      const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
+      const { expectedRev } = routes.discardHomebrewChanges.body.schema.parse(request.body ?? {});
       return sent(response, store.discardPending(pathParam(request, "id"), expectedRev, authorOf(response)));
     } catch (error) {
       return storeError(response, error);
@@ -488,9 +435,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   });
 
   // The older on-or-off switch: on is Everyone, off is Hidden.
-  router.post(expressPath(HOMEBREW_PATHS.contentVisibility), requireGm, (request, response) => {
+  mount(router, routes.setHomebrewContentVisibility, requireGm, (request, response) => {
     try {
-      const { visibleToPlayers, expectedRev } = HomebrewVisibilityRequestSchema.parse(request.body);
+      const { visibleToPlayers, expectedRev } = routes.setHomebrewContentVisibility.body.schema.parse(request.body);
       return sent(
         response,
         store.setVisibility(pathParam(request, "id"), visibleToPlayers, expectedRev, authorOf(response))
@@ -500,9 +447,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  router.put(expressPath(HOMEBREW_PATHS.contentAudience), requireGm, (request, response) => {
+  mount(router, routes.setHomebrewContentAudience, requireGm, (request, response) => {
     try {
-      const input = HomebrewAudienceRequestSchema.parse(request.body);
+      const input = routes.setHomebrewContentAudience.body.schema.parse(request.body);
       return sent(
         response,
         store.setAudience(pathParam(request, "id"), audienceFrom(input), input.expectedRev, authorOf(response))
@@ -513,9 +460,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   });
 
   // Who sees several records in one write: all or nothing, one history row each.
-  router.post(expressPath(HOMEBREW_PATHS.sharing), requireGm, (request, response) => {
+  mount(router, routes.setHomebrewSharing, requireGm, (request, response) => {
     try {
-      const input = HomebrewSharingRequestSchema.parse(request.body);
+      const input = routes.setHomebrewSharing.body.schema.parse(request.body);
       const rows = store.setAudienceMany(input.records, audienceFrom(input), authorOf(response));
       options.notifyChanged();
       const packs = packLookup();
@@ -538,7 +485,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
       .map((other) => ({ id: other.id, type: other.type, name: other.name }));
 
   // Built characters are self-contained, so `usages` never makes a removal unsafe; a published dependent does.
-  router.get(expressPath(HOMEBREW_PATHS.contentUsages), requireGm, (request, response) => {
+  mount(router, routes.getHomebrewContentUsages, requireGm, (request, response) => {
     const id = pathParam(request, "id");
     const row = store.get(id);
     if (!row) return sendFailure(response, 404, "not_found", "That record was not found.");
@@ -581,7 +528,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     changedFields: [...revision.changedFields]
   });
 
-  router.get(expressPath(HOMEBREW_PATHS.contentRevisions), requireGm, (request, response) => {
+  mount(router, routes.listHomebrewRevisions, requireGm, (request, response) => {
     const id = pathParam(request, "id");
     if (!store.get(id)) return sendFailure(response, 404, "not_found", "That record was not found.");
     return sendData(response, 200, {
@@ -589,11 +536,16 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     });
   });
 
-  router.get(expressPath(HOMEBREW_PATHS.contentRevision), requireGm, (request, response) => {
+  mount(router, routes.getHomebrewRevision, requireGm, (request, response) => {
     try {
       const id = pathParam(request, "id");
       const row = store.get(id);
-      const revision = row && store.getRevision(id, RevisionIdSchema.parse(pathParam(request, "revisionId")));
+      const revision =
+        row &&
+        store.getRevision(
+          id,
+          routes.getHomebrewRevision.params.shape.revisionId.parse(pathParam(request, "revisionId"))
+        );
       if (!row || !revision) return sendFailure(response, 404, "not_found", "That version was not found.");
       return sendData(response, 200, {
         revision: { ...revisionSummaryOf(revision, response), record: { ...revision.body, type: row.type } }
@@ -604,10 +556,10 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   });
 
   // An old version back as the editor's copy; nothing goes live until Update.
-  router.post(expressPath(HOMEBREW_PATHS.contentRevisionRestore), requireGm, (request, response) => {
+  mount(router, routes.restoreHomebrewRevision, requireGm, (request, response) => {
     try {
-      const { expectedRev } = HomebrewStateChangeRequestSchema.parse(request.body ?? {});
-      const revisionId = RevisionIdSchema.parse(pathParam(request, "revisionId"));
+      const { expectedRev } = routes.restoreHomebrewRevision.body.schema.parse(request.body ?? {});
+      const revisionId = routes.restoreHomebrewRevision.params.shape.revisionId.parse(pathParam(request, "revisionId"));
       return sent(
         response,
         store.restoreRevision(pathParam(request, "id"), revisionId, expectedRev, authorOf(response))
@@ -619,9 +571,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   // The GM's tables, overview and search
 
-  router.get(expressPath(HOMEBREW_PATHS.table), requireGm, (request, response) => {
+  mount(router, routes.getHomebrewTable, requireGm, (request, response) => {
     try {
-      const { kind, includeArchived } = TableQuerySchema.parse(request.query);
+      const { kind, includeArchived } = routes.getHomebrewTable.query.parse(request.query);
       const packs = packLookup();
       const rows = [
         ...srdTableRows(kind),
@@ -633,7 +585,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  router.get(expressPath(HOMEBREW_PATHS.overview), requireGm, (_request, response) => {
+  mount(router, routes.getHomebrewOverview, requireGm, (_request, response) => {
     const rows = store.listRecords();
     const events = store.latestEvents();
     const byKind = HOMEBREW_KINDS.map((kind) => {
@@ -673,9 +625,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     });
   });
 
-  router.get(expressPath(HOMEBREW_PATHS.search), requireGm, (request, response) => {
+  mount(router, routes.searchHomebrew, requireGm, (request, response) => {
     try {
-      const { q, kind, includeArchived, limit } = SearchQuerySchema.parse(request.query);
+      const { q, kind, includeArchived, limit } = routes.searchHomebrew.query.parse(request.query);
       const needle = q.toLowerCase();
       const hits = store
         .listRecords({ type: kind, includeDeleted: includeArchived })
@@ -707,7 +659,7 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  router.get(expressPath(HOMEBREW_PATHS.srdRecord), requireGm, (request, response) => {
+  mount(router, routes.getHomebrewSrdRecord, requireGm, (request, response) => {
     const found = findCatalogRecord(srdOnly, pathParam(request, "id"));
     if (!found) return sendFailure(response, 404, "not_found", "That SRD record was not found.");
     return sendData(response, 200, { type: found.type, record: { ...found.body, type: found.type } });
@@ -715,14 +667,14 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   // Packs (Sources)
 
-  router.get(expressPath(HOMEBREW_PATHS.packs), requireGm, (_request, response) =>
+  mount(router, routes.listHomebrewPacks, requireGm, (_request, response) =>
     sendData(response, 200, { srd: { records: srdRecordCount() }, packs: packInfos() })
   );
 
-  router.patch(expressPath(HOMEBREW_PATHS.packById), requireGm, (request, response) => {
+  mount(router, routes.updateHomebrewPack, requireGm, (request, response) => {
     try {
-      const packId = PackIdSchema.parse(pathParam(request, "packId"));
-      const change = HomebrewPackUpdateRequestSchema.parse(request.body ?? {});
+      const packId = routes.updateHomebrewPack.params.shape.packId.parse(pathParam(request, "packId"));
+      const change = routes.updateHomebrewPack.body.schema.parse(request.body ?? {});
       store.updatePack(packId, change);
       options.notifyChanged();
       return sendData(response, 200, { pack: packInfos().find((pack) => pack.id === packId)! });
@@ -732,9 +684,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   });
 
   // Published bodies only, without state or audience, so an importer never inherits this table's policy.
-  router.get(expressPath(HOMEBREW_PATHS.packsExport), requireGm, (request, response) => {
+  mount(router, routes.exportHomebrewPack, requireGm, (request, response) => {
     try {
-      const query = ExportQuerySchema.parse(request.query);
+      const query = routes.exportHomebrewPack.query.parse(request.query);
       const wanted = query.id === undefined ? null : new Set(Array.isArray(query.id) ? query.id : [query.id]);
       const rows: HomebrewRecordRow[] = [];
       let cursor: string | undefined;
@@ -799,13 +751,13 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
   // Every record lands as a hidden draft in a new pack. Without `decisions`, today's one policy applies to every
   // clash (`onIdCollision`); with them, each record is imported as new, replaces the GM's own draft, is skipped, or
   // lands as a renamed copy. A published record is never replaced.
-  router.post(expressPath(HOMEBREW_PATHS.packsImport), requireGm, (request, response) => {
+  mount(router, routes.importHomebrewPack, requireGm, (request, response) => {
     try {
       const rawRecords = (request.body as { pack?: { records?: unknown } } | undefined)?.pack?.records;
       if (Array.isArray(rawRecords) && rawRecords.length > MAX_PACK_RECORDS) {
         return sendFailure(response, 413, "bad_request", `A pack carries at most ${MAX_PACK_RECORDS} records.`);
       }
-      const { pack, onIdCollision, dryRun, decisions } = HomebrewPackImportRequestSchema.parse(request.body);
+      const { pack, onIdCollision, dryRun, decisions } = routes.importHomebrewPack.body.schema.parse(request.body);
       const author = authorOf(response);
       const imported: Array<{ id: string; type: HomebrewContentType; name: string; originalId: string }> = [];
       const reminted: Array<{
@@ -959,18 +911,18 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
 
   // See as: what one player would receive, read from that player's own catalog. Never sent to a player.
 
-  router.get(expressPath(HOMEBREW_PATHS.seeAsCompendium), requireGm, (request, response) => {
+  mount(router, routes.seeHomebrewCompendiumAs, requireGm, (request, response) => {
     try {
-      const { as, kind } = SeeAsCompendiumQuerySchema.parse(request.query);
+      const { as, kind } = routes.seeHomebrewCompendiumAs.query.parse(request.query);
       return sendWithEtag(request, response, compendiumOf(library.forAudience(readerFor(as)), kind));
     } catch (error) {
       return malformed(response, error);
     }
   });
 
-  router.get(expressPath(HOMEBREW_PATHS.seeAsContent), requireGm, (request, response) => {
+  mount(router, routes.seeHomebrewContentAs, requireGm, (request, response) => {
     try {
-      const { as } = SeeAsQuerySchema.parse(request.query);
+      const { as } = routes.seeHomebrewContentAs.query.parse(request.query);
       const reader = readerFor(as);
       const id = pathParam(request, "id");
       const kind = store.get(id)?.type ?? kindInView(srdOnly, id);
@@ -986,9 +938,9 @@ export function createHomebrewRouter(options: HomebrewRouterOptions) {
     }
   });
 
-  router.post(expressPath(HOMEBREW_PATHS.seeAsBuilderOffers), requireGm, (request, response) => {
+  mount(router, routes.seeHomebrewBuilderOffersAs, requireGm, (request, response) => {
     try {
-      const { as, draft } = HomebrewSeeAsBuilderOffersSchema.parse(request.body);
+      const { as, draft } = routes.seeHomebrewBuilderOffersAs.body.schema.parse(request.body);
       return sendData(response, 200, builderOffers(draft, library.forAudience(readerFor(as))));
     } catch (error) {
       if (error instanceof CommandRejectedError) return sendFailure(response, 409, "conflict", error.message);

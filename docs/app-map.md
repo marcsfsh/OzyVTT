@@ -6,7 +6,7 @@ machine-derivable surfaces of the app (state shape, command catalog, HTTP paths)
 file index. For how the pieces fit together, read `docs/ARCHITECTURE.md`.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 305 HTTP paths
+- 14 GameState fields · 137 commands · 312 HTTP paths
 
 ## GameState shape
 
@@ -32,9 +32,9 @@ single JSON blob the server persists and projects per role.
 
 The mutation surface shared by both transports (Socket.IO + HTTP `/api/v1`); each requires the
 listed integration scope. Adding one: its typed socket event in domain `ClientToServerEvents`, its
-schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMANDS` (`packages/api-contract`) with an
-OpenAPI operation, and one table entry under `apps/server/src/commands/`, which both transports
-register from. Then the projection decision.
+schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMANDS` (`packages/api-contract`), and
+one table entry under `apps/server/src/commands/`. Both transports register from that table, and
+the OpenAPI document generates the command's operation from it. Then the projection decision.
 
 Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
@@ -180,8 +180,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 
 ## HTTP surface
 
-Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-identical to
-`@vtt/api-contract`).
+Every path in the served OpenAPI document (`GET /api/v1/openapi.json`), which is generated
+from the route registry in `packages/api-contract/src/routes/`.
 
 - `POST /api/v1/codex-assets`
 - `GET /api/v1/codex-assets/{id}/content`
@@ -467,7 +467,9 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `POST /api/v1/map-assets/{id}/calibration/wizards/{wizardId}/actions`
 - `POST /api/v1/map-assets/{id}/calibration/wizards/{wizardId}/complete`
 - `GET /api/v1/map-assets/{id}/content`
+- `GET /api/v1/map-assets/{id}/grid`
 - `PUT /api/v1/map-assets/{id}/scale`
+- `POST /api/v1/map-assets/folders/rename`
 - `GET /api/v1/openapi.json`
 - `POST /api/v1/sessions/player`
 - `GET POST /api/v1/sound-assets`
@@ -476,6 +478,11 @@ Every path in the served OpenAPI document (`GET /api/v1/openapi.json`, byte-iden
 - `GET /api/v1/system/capabilities`
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/version`
+- `GET POST /api/v1/token-assets`
+- `DELETE PATCH /api/v1/token-assets/{id}`
+- `GET /api/v1/token-assets/{id}/content`
+- `POST /api/v1/token-assets/folders/rename`
+- `POST /api/v1/token-assets/folders/visibility`
 - `GET /api/v1/viewer/access`
 - `DELETE /api/v1/viewer/access/{id}`
 - `GET /api/v1/viewer/events`
@@ -497,7 +504,8 @@ Curated pointers (verify line numbers before relying on them, because code moves
 - **Persisted/importable schemas:** `packages/schemas/src/index.ts`: `Actor`, `ActorDefinition`.
 - **Command Zod schemas:** `packages/domain/src/commands.ts`.
 - **Command table + pipeline:** `apps/server/src/commands/` (`index.ts` lists every command).
-- **Scopes + OpenAPI:** `packages/api-contract/src/index.ts`.
+- **Scopes and paths:** `packages/api-contract/src/index.ts`.
+- **Route registry and OpenAPI generator:** `packages/api-contract/src/routes/`, `packages/api-contract/src/openapi/`.
 - **Projections (GM/player security boundary):** `apps/server/src/projections.ts`.
 - **Public viewer projection:** `apps/server/src/viewer-encounter.ts`, `viewer-presentation.ts`.
 - **Persistence (SQLite):** `apps/server/src/game-store.ts`.

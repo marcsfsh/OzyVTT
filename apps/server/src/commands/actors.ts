@@ -203,7 +203,7 @@ export const actorCommands = [
     type: "actor.set-archived",
     operationId: "setActorArchived",
     description:
-      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a CLAIMED character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
+      "Archives or restores a character (GM-grade only). Archived characters are hidden from players, refused by claim, and rejected server-side by scene staging and encounter start/add; a character in the running encounter must be removed first. Archiving a claimed character releases the claim in the same mutation, so its player is not left holding an invisible claim.",
     summary:
       "Archive or restore a character (GM). An archived character is hidden from players, refused by claim and rejected by scene and encounter staging, and any claim is released on archive.",
     schema: SetActorArchivedSchema,
@@ -239,7 +239,7 @@ export const actorCommands = [
     type: "actor.set-sheet-preview",
     operationId: "setActorSheetPreview",
     description:
-      "Shares (or un-shares) an ARCHIVED character's sheet with players as a read-only keepsake (GM-grade only). Hidden by default: a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.",
+      "Shares (or un-shares) an archived character's sheet with players as a read-only keepsake (GM-grade only). Hidden by default: a retired character stays private until the GM shares it. Meaningless while the character is not archived. Players receive only the character's id and name in their projection.",
     summary: "Share or hide an archived character's sheet as a read-only keepsake for players; hidden by default (GM).",
     schema: SetActorSheetPreviewSchema,
     malformed: "The sheet-preview command is malformed.",

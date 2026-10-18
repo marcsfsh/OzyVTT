@@ -198,7 +198,7 @@ export const reactionCommands = [
     type: "reaction.dismiss",
     operationId: "dismissReaction",
     description:
-      "Dismisses a pending reaction prompt WITHOUT applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield. It is for when the GM settled it by hand.",
+      "Dismisses a pending reaction prompt without applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield. It is for when the GM settled it by hand.",
     summary: "Dismiss a pending reaction prompt without applying what it holds (GM).",
     schema: ReactionDismissSchema,
     malformed: "The dismissal is malformed.",

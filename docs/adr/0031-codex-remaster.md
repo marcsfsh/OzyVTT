@@ -79,6 +79,19 @@ its matching line is hidden text. The player home lists what is new since a time
   to Hidden plus Home's reveal check. Relationships centre on a page with three views: Web, Factions grid (with the
   party's standing) and Over time.
 - The table gets a Codex tab beside the map for both roles, reading through each role's own routes.
+- The Atlas is the map with a side panel (pins as a table, maps inside, details). Pins and labels keep their size on
+  screen at every zoom, viewing a pin is separate from editing it, and layers show people, hidden pins and faction
+  ground. Set party position is a button and then a click on the map, or the spot menu on a right-click or a long
+  press, through `POST /codex/party`.
+- Story has three views. Chronicle is the session spine with the calendar beside it: both dates with Publish, the
+  month, clocks, downtime and Add to the chronicle. Timeline zooms through Ages, Year and Month. Sessions keeps its
+  list in a flyout; a session's page holds its prep sections and, after play, the recap step, where what happened
+  sits beside the recap players read. A phone reads Story as the timeline and reads a session's prep through, with
+  editing one menu item away.
+- Prep templates are a library and an editor of typed sections under the GM menu, read-only on a phone.
+- The table's Tonight tab is the live board: the scenes with the current one, the cast, the clue checklist, clocks,
+  quests, fights to make live and Log what happens. Ticking a clue whose link players can't read offers to reveal it
+  to everyone or to chosen characters through the block's own audience route; the tick itself reveals nothing.
 
 ## Consequences and tradeoffs
 
