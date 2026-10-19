@@ -272,7 +272,8 @@ of a hidden thing. When in doubt, leave it out.
   vision is on and with the conditions and Blindsight, Truesight and See Invisibility by distance
   while it is off: an attack's unseen Advantage and Disadvantage and Invisible, Cover from walls
   and creatures between (`cover.ts`), an area that leaves out what its origin can't reach
-  (`area-targeting.ts`), Hide's hiding place, Search finding a hidden creature, Frightened's line
+  (`area-targeting.ts`), Hide's hiding place and the Passive Perception it tells the GM meets it (5
+  less where the hider is Lightly Obscured), Search finding a hidden creature, Frightened's line
   of sight and its refused approach (`movement-rules.ts`), Dodge and other riders that name who
   sees whom (`sees-other`, `seen-by-other`, `other-lacks-sense`), Blinded and Heavily Obscured
   checks, a save that needs its source seen (a gaze, a pattern), and the traits and features that

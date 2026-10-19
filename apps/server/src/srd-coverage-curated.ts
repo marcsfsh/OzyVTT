@@ -294,7 +294,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "A melee hit's confirm offers Knock out (resolution/knock-out.ts), and every apply path then lands it: hit-points.ts leaves a creature it drops at 1 Hit Point and Unconscious until it regains Hit Points, stabilize.ts gives it first aid, or an hour passes on the game clock and its Short Rest ends (game-time.ts)."
   ),
   "lightly-obscured": enforced(
-    "With dynamic vision on, vision/sight.ts knows Lightly Obscured points (Dim Light, a painted light fog or foliage area), and ability-checks.ts gives a Perception check to find a creature there Disadvantage. Passive Perception against it is the GM's."
+    "With dynamic vision on, vision/sight.ts knows Lightly Obscured points (Dim Light, a painted light fog or foliage area), and ability-checks.ts gives a Perception check to find a creature there Disadvantage, and a Passive Perception compared with a Hide total 5 less (resolution/builtins.ts)."
   ),
   line: areaShape("a Line has a fixed width, and the point it starts from isn't in it."),
   "long-jump": enforced(
@@ -323,7 +323,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   paralyzed: condition("paralyzed"),
   "passive-perception": enforced(
-    "ability-checks.ts works it out as 10 plus the Wisdom (Perception) bonus, 5 more with Advantage and 5 less with Disadvantage. The GM compares it with what is hidden."
+    "ability-checks.ts works it out as 10 plus the Wisdom (Perception) bonus, 5 more with Advantage and 5 less with Disadvantage. After a successful Hide, resolution/builtins.ts names to the GM each enemy whose score meets the Stealth total; whether it notices, and anything else hidden, is the GM's."
   ),
   "per-day": enforced("use-pools.ts counts the uses, and a Long Rest gives them back."),
   petrified: condition("petrified"),
