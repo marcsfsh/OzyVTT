@@ -563,6 +563,33 @@ export function shownRollMode(
 /** How a pending save is answered beyond its method: a typed d20 (`face`), or a reroll of the held die. */
 export type SaveAnswerOptions = Readonly<{ face?: number; reroll?: boolean }>;
 
+/** What lasts only until its bearer's next saving throw (Staggering Blow's Disadvantage) is spent by it; the rest of
+ *  the effect (its no Opportunity Attacks) stays until its own end. */
+export const UNTIL_OWN_SAVE_TAG = "until-own-save";
+
+function spendUntilOwnSave(state: GameState, target: Actor): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const effect of target.effects.filter((candidate) => candidate.tags.includes(UNTIL_OWN_SAVE_TAG))) {
+    const rest = effect.tags.filter((tag) => tag !== UNTIL_OWN_SAVE_TAG);
+    if (rest.length === 0) {
+      events.push(...endEffectIfPresent(state, target.id, effect.id));
+      continue;
+    }
+    target.effects = target.effects.map((candidate) =>
+      candidate.id === effect.id
+        ? {
+            ...candidate,
+            tags: rest,
+            modifiers: candidate.modifiers.filter(
+              (modifier) => modifier.type !== "roll-mode" || modifier.roll !== "save"
+            )
+          }
+        : candidate
+    );
+  }
+  return events;
+}
+
 /** Answers a pending save (a roll, a typed d20, or the GM's typed total) and auto-applies it: fail takes full damage
  *  and the condition; success takes half if the action says so. The structured-save exception to propose-then-apply
  *  (ADR-0008). GM any save; a player only their own character's. A preview holds its die (ADR-0012), so a later
@@ -777,7 +804,7 @@ export function answerSave(
     };
   }
 
-  const events: EffectNarration[] = [];
+  const events: EffectNarration[] = spendUntilOwnSave(state, target);
   if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
   if (autoFailed !== null)
     events.push({

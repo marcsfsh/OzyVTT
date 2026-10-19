@@ -601,7 +601,14 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-rope-of-entanglement-entangle"
     )!;
-    expect(action.save).toEqual({ ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"] });
+    expect(action.save).toEqual({
+      ability: "dex",
+      dc: 15,
+      successDamage: "none",
+      failureConditions: ["restrained"],
+      // "a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check" escapes it.
+      escapeDc: 15
+    });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
     expect(action.damage).toEqual([]);
 

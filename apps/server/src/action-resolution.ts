@@ -18,7 +18,9 @@ import { consumableRowFor } from "./consumables.js";
 import {
   rollAttack,
   spendDistraction,
+  spendForgoneDeclaration,
   spendSteadyAim,
+  spendSundering,
   spendUntilAttacked,
   spendUntilItActs,
   spendUntilOwnAttack
@@ -47,6 +49,7 @@ import {
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
+import { endTargetMarks } from "./resolution/action-targets.js";
 import { markMultiattackDefense, strikeBackOnHit } from "./resolution/struck.js";
 import {
   parkActionSave,
@@ -111,6 +114,7 @@ export function resolveDefinitionAction(
     spendUntilAttacked(ctx);
     spendUntilOwnAttack(ctx);
     spendSteadyAim(ctx);
+    spendForgoneDeclaration(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {
@@ -126,6 +130,7 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
 
+  spendSundering(ctx);
   rollWeaponDamage(ctx);
   ctx.masterySwing = masterySwingOf(ctx);
   // Graze fires on a miss, when no other damage rolled.
@@ -151,6 +156,7 @@ export function resolveDefinitionAction(
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  endTargetMarks(ctx);
   parkBurstSave(ctx);
   parkHeldObjectSave(ctx);
   applyRageRules(ctx);
@@ -319,7 +325,8 @@ export function actionAvailability(
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),
-      ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
+      // A rider tapped before its roll (Brutal Strike) stays on the turn list.
+      ...(hitRiderOf(action) && !hitRiderOf(action)!.declaredBeforeRoll ? { ridesAHit: true as const } : {}),
       // Display values only (ADR-0007), from the effective list; resolution recomputes from the id.
       description: action.description,
       attackBonus: action.attack?.bonus ?? null,
@@ -369,7 +376,7 @@ export function actionAvailability(
  *  creature it targets (a scroll of Bless) or a divided heal; none for what acts on its user (a self heal, Rage, a
  *  scroll of Detect Magic). Null for an action with nothing structured to resolve. */
 function tapTargeting(action: DefinitionAction, usesUpItem: boolean): "none" | "single" | "multi" | null {
-  if (action.attack || action.grants?.target === "target") return "single";
+  if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";
   if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
   const structured =

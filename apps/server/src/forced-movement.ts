@@ -1,6 +1,6 @@
 import type { EncounterTokenPosition, GameState } from "@vtt/domain";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
-import { mapDistance } from "./movement-narration.js";
+import { mapDistance, tokenCreatureDistance } from "./movement-narration.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
 
 /**
@@ -24,6 +24,8 @@ export type ForcedMove = Readonly<{
   /** Who they are moved straight away from: the direction's origin, never a client-supplied vector. */
   awayFromActorId: string;
   distanceFeet: number;
+  /** A pull: straight toward that creature instead, stopping beside it (a balor's Flame Whip). */
+  toward?: boolean;
 }>;
 
 /** Where the pushed token aims before the snap; null when the map cannot express a distance or the two
@@ -72,7 +74,14 @@ export function pushTokenAway(
   const from = state.combat.tokens.find((token) => token.actorId === input.actorId)?.position ?? null;
   const source = state.combat.tokens.find((token) => token.actorId === input.awayFromActorId)?.position ?? null;
   if (from === null || source === null) return null;
-  const destination = pushDestination(geometry, from, source, input.distanceFeet);
+  // A pull runs the same line the other way and stops beside the creature it is pulled to, edge to edge.
+  const apart = input.toward
+    ? (tokenCreatureDistance(state, geometry, input.actorId, input.awayFromActorId) ?? null)
+    : null;
+  if (input.toward && apart === null) return null;
+  const distance = input.toward ? -Math.max(0, Math.min(input.distanceFeet, apart!.value - 5)) : input.distanceFeet;
+  if (distance === 0) return { value: 0, unit: apart?.unit ?? "ft" };
+  const destination = pushDestination(geometry, from, source, distance);
   if (destination === null) return null;
   moveEncounterToken(state, input.actorId, destination, geometry);
   const to = state.combat.tokens.find((token) => token.actorId === input.actorId)?.position ?? null;

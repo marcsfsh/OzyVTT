@@ -582,7 +582,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "Present the rod and command obedience from each creature of your choice that you can see within 120 feet. Each target must succeed on a DC 15 Wisdom saving throw or have the Charmed condition for 8 hours. If harmed by you or your allies, or commanded to do something contrary to its nature, a target ceases to be Charmed in this way.",
         save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["charmed"] },
-        uses: { limit: 1, per: "long-rest" }
+        uses: { limit: 1, per: "long-rest" },
+        targets: { rangeFeet: 120, seen: true }
       }
     ]
   },
@@ -805,7 +806,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           failureDuration: { type: "rounds", rounds: 10 },
           repeatSave: true
         },
-        uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" }
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" },
+        targets: { count: 1, rangeFeet: 60, seen: true }
       }
     ]
   },
@@ -1113,8 +1115,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `robe-of-eyes` - Perception advantage "that rely on sight", Darkvision and Truesight, and its Light/Daylight drawback.
 
   /**
-   * A real DC 15 Wisdom save that Stuns on a failure. Not modeled: the light, the attack disadvantage
-   * for the duration, and the stun ending with the effect (the GM clears it).
+   * A real DC 15 Wisdom save that Stuns until the end of the wearer's next turn, at creatures within its 30 feet of
+   * Bright Light. Not modeled: the light, which creatures can see the wearer, and the attack disadvantage for the
+   * duration.
    */
   "robe-of-scintillating-colors": {
     charges: { regain: "1d3" },
@@ -1125,8 +1128,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have Disadvantage on attack rolls against you. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
-        save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["stunned"] },
-        uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" }
+        save: {
+          ability: "wis",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["stunned"],
+          failureDuration: { type: "until-source-turn-end" }
+        },
+        uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" },
+        targets: { rangeFeet: 30 }
       }
     ]
   },
@@ -1286,7 +1296,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "Remove the stopper and speak the command word: 30 gallons of water gush forth in a Line 30 feet long and 1 foot wide. One creature of your choice in the Line must succeed on a DC 13 Strength saving throw or take 1d4 Bludgeoning damage and have the Prone condition. Instead of a creature, you can target one object in the Line that isn't being worn or carried and that weighs no more than 200 pounds; the object is knocked over.",
         save: { ability: "str", dc: 13, successDamage: "none", failureConditions: ["prone"] },
-        damage: [{ formula: "1d4", type: "bludgeoning" }]
+        damage: [{ formula: "1d4", type: "bludgeoning" }],
+        targets: { count: 1, rangeFeet: 30 }
       }
     ]
   },
@@ -1333,9 +1344,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `ioun-stone` - fourteen stones in one row; a rider would grant all of them.
 
   /**
-   * Its to-hit is printed as Dexterity + Proficiency Bonus, which is exactly the derived form. Not
-   * modeled: Restrained on a hit (`onHit` is dropped), the DC 20 break check, and the bands being
-   * destroyed when broken.
+   * Its to-hit is printed as Dexterity + Proficiency Bonus, which is exactly the derived form. A hit Restrains a Huge or
+   * smaller creature until released, escaped with a DC 20 Strength (Athletics) check. Not modeled: the bands being
+   * destroyed when broken, the 24-hour lockout after a failed check, and the release command.
    */
   "iron-bands": {
     actions: [
@@ -1346,13 +1357,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "Throw the sphere at a Huge or smaller creature you can see within 60 feet of yourself. As the sphere moves through the air, it opens into a tangle of metal bands. On a hit, the target has the Restrained condition until you take a Bonus Action to issue a command that releases it. Doing so or missing with the attack causes the bands to contract and become a sphere once more. A creature that can touch the bands, including the one Restrained, can take an action to make a DC 20 Strength (Athletics) check to break the iron bands. On a successful check, the item is destroyed, and the Restrained creature is freed. On a failed check, any further attempts made by that creature automatically fail until 24 hours have elapsed. Once the bands are used, they can't be used again until the next dawn.",
         attack: { ability: "dex", proficient: true, rangeFeet: 60 },
-        uses: { limit: 1, per: "long-rest", pool: "iron-bands-charges" }
+        uses: { limit: 1, per: "long-rest", pool: "iron-bands-charges" },
+        targets: { count: 1, maxSize: "huge", seen: true },
+        onHit: [{ name: "Iron Bands", conditions: [{ id: "restrained" }], escapeDc: 20, tags: ["escape-athletics"] }]
       }
     ]
   },
 
-  // No limit on attempts, as printed. Not modeled: the trapping itself and the "native to another
-  // plane" precondition (carried in the description for the GM).
+  // No limit on attempts, as printed. "Native to another plane" is read as a Celestial, an Elemental, a Fey or a
+  // Fiend. Not modeled: the trapping itself.
   "iron-flask": {
     actions: [
       {
@@ -1361,7 +1374,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
-        save: { ability: "wis", dc: 17, successDamage: "none", failureConditions: [] }
+        save: { ability: "wis", dc: 17, successDamage: "none", failureConditions: [] },
+        targets: { count: 1, rangeFeet: 60, seen: true, creatureTypes: ["celestial", "elemental", "fey", "fiend"] }
       }
     ]
   },
@@ -1399,7 +1413,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           failureDuration: { type: "rounds", rounds: 10 },
           repeatSave: true
         },
-        uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" }
+        uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" },
+        targets: { rangeFeet: 30 }
       }
     ]
   },
@@ -1426,7 +1441,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `portable-hole` - a container.
   // `rope-of-climbing` - there is no climb check to gate its advantage on.
 
-  // Unlimited, as printed. The escape check is not modeled.
+  // Unlimited, as printed. The rope's own Armor Class and Hit Points are not modeled.
   "rope-of-entanglement": {
     actions: [
       {
@@ -1435,7 +1450,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
-        save: { ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"] }
+        save: { ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"], escapeDc: 15 },
+        targets: { count: 1, rangeFeet: 20, seen: true }
       }
     ]
   },

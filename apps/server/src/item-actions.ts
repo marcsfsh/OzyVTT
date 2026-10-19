@@ -142,8 +142,21 @@ export function itemAction(
     ...(declared.replacesAttack ? { replacesAttack: true } : {}),
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
-    ...(declared.area ? { area: { ...declared.area } } : {})
+    ...(declared.area ? { area: { ...declared.area } } : {}),
+    // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
+    ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),
+    ...(declared.ridesHit ? { ridesHit: itemHitRider(declared.ridesHit, definition) } : {}),
+    ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {})
   };
+}
+
+/** An item's hit rider with its DC as the bearer's number; how many effects it carries doesn't grow with level. */
+function itemHitRider(
+  rider: NonNullable<FeatureAction["ridesHit"]>,
+  definition: ActorDefinition | undefined
+): NonNullable<ActorAction["ridesHit"]> {
+  const { saveDc, effectsChooseByLevel: _byLevel, ...rest } = structuredClone(rider);
+  return { ...rest, ...(saveDc !== undefined ? { saveDc: resolveSaveDc(saveDc, definition) } : {}) };
 }
 
 /** `FeatureSaveDcSchema`'s three forms, resolved against the bearer. Clamped to the action schema's 1-40. */

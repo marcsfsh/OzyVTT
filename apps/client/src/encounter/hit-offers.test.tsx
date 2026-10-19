@@ -84,4 +84,67 @@ describe("the extras a previewed hit offers", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reroll · Heroic Inspiration" }));
     expect(resolve).toHaveBeenLastCalledWith({ commit: false, reroll: true });
   });
+
+  it("sends the effects picked with an extra, as many as one hit carries", () => {
+    const resolve = mount([
+      {
+        id: "sneak-attack",
+        name: "Sneak Attack",
+        dice: "6d6 Piercing",
+        cost: "once per turn",
+        effects: [
+          { id: "trip", name: "Trip", cost: "-1d6" },
+          { id: "withdraw", name: "Withdraw", cost: "-1d6" },
+          { id: "poison", name: "Poison", cost: "-1d6" }
+        ],
+        effectsChoose: 2
+      }
+    ]);
+    expect(screen.getByText("Costs once per turn. Pick up to 2 effects.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Sneak Attack +6d6 Piercing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Trip -1d6" }));
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw -1d6" }));
+    // A third is past the two one hit carries.
+    fireEvent.click(screen.getByRole("button", { name: "Poison -1d6" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
+    expect(resolve).toHaveBeenLastCalledWith({
+      commit: true,
+      hitOptions: [{ id: "sneak-attack", effects: ["trip", "withdraw"] }]
+    });
+  });
+
+  it("starts an extra that needs an effect on its first, and names the save a rider opens", () => {
+    const resolve = mount([
+      {
+        id: "open-hand-technique",
+        name: "Open Hand Technique",
+        dice: "",
+        cost: null,
+        effects: [
+          { id: "addle", name: "Addle" },
+          { id: "topple", name: "Topple" }
+        ],
+        effectsChoose: 1,
+        effectRequired: true
+      },
+      {
+        id: "stunning-strike",
+        name: "Stunning Strike",
+        dice: "",
+        cost: "1 use of Focus Points and once per turn",
+        save: "The target makes a Constitution saving throw."
+      }
+    ]);
+    expect(
+      screen.getByText("Costs 1 use of Focus Points and once per turn. The target makes a Constitution saving throw.")
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open Hand Technique" }));
+    expect(screen.getByRole("button", { name: "Addle" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Topple" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
+    expect(resolve).toHaveBeenLastCalledWith({
+      commit: true,
+      hitOptions: [{ id: "open-hand-technique", effects: ["topple"] }]
+    });
+  });
 });

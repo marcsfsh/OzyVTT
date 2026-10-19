@@ -459,12 +459,27 @@ export const ParkedAttackSchema = z
               .regex(/^[a-z]+$/)
               .max(40)
               .optional(),
-            slotLevel: z.number().int().min(1).max(9).optional()
+            slotLevel: z.number().int().min(1).max(9).optional(),
+            effects: z
+              .array(
+                z
+                  .string()
+                  .regex(/^[a-z0-9-]+$/)
+                  .max(80)
+              )
+              .max(3)
+              .optional()
           })
           .strict()
       )
       .max(6)
-      .default([])
+      .default([]),
+    /** The attack forwent its Advantage for this declared rider (Brutal Strike), so the replay offers its hit. */
+    forgoneAdvantageBy: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional()
   })
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;

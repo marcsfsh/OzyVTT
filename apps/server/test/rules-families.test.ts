@@ -106,6 +106,8 @@ describe("rule families", () => {
       ["hide.seen", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],
+      // A creature the action can't affect (Turn Undead on a goblin, a flask's Holy Water on a bandit).
+      ["target.not-allowed", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.

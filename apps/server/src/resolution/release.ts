@@ -30,8 +30,13 @@ export function releaseHideAndReady(ctx: ResolveContext): void {
     endEffect(state, attacker.id, effect.id);
     effectsEnded.push(endedEffect(attacker, effect));
   };
-  // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends.
-  if (action.attack !== undefined || action.save !== undefined) end("hidden");
+  // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends. Supreme Sneak's Stealth Attack
+  // keeps it, if the Thief ends the turn behind Three-Quarters or Total Cover.
+  if (ctx.keepsHidden && attacker.effects.some((effect) => effect.tags.includes("hidden")))
+    ctx.warnings.push(
+      `Stealth Attack: ${attacker.name} stays hidden only if it ends this turn behind Three-Quarters Cover or Total Cover. If it doesn't, end its Invisible condition then.`
+    );
+  else if (action.attack !== undefined || action.save !== undefined) end("hidden");
   // A released spell of several rays (Scorching Ray) keeps its ready until its last ray, all on the one Reaction.
   const ray = readiedRay(ctx);
   if (ray === "held") return;

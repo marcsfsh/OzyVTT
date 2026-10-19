@@ -201,6 +201,9 @@ export const RiderTriggerSchema = z
     z.object({ type: z.literal("on-attack-roll") }).strict(),
     z.object({ type: z.literal("on-hit") }).strict(),
     z.object({ type: z.literal("on-critical-hit") }).strict(),
+    /** The attack roll's d20 shows a 20 ("When you roll a 20 on an attack roll made with this weapon"), whatever else
+     *  widens the Critical Hit range. */
+    z.object({ type: z.literal("on-natural-20") }).strict(),
     z.object({ type: z.literal("on-damage-roll") }).strict(),
     z.object({ type: z.literal("on-saving-throw") }).strict(),
     z.object({ type: z.literal("on-ability-check") }).strict(),
@@ -298,7 +301,7 @@ export const RiderTriggerSchema = z
     z.object({ type: z.literal("by-effect-source") }).strict()
   ])
   .describe(
-    "When a rider applies. Twenty-eight named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
+    "When a rider applies. Twenty-nine named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   );
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -317,6 +320,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "on-attack-roll": "moment",
   "on-hit": "moment",
   "on-critical-hit": "moment",
+  "on-natural-20": "moment",
   "on-damage-roll": "moment",
   "on-saving-throw": "moment",
   "on-ability-check": "moment",
@@ -341,6 +345,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
 export const DAMAGE_ROLL_MOMENTS: readonly RiderTrigger["type"][] = Object.freeze([
   "on-hit",
   "on-critical-hit",
+  "on-natural-20",
   "on-damage-roll"
 ]);
 
@@ -1542,7 +1547,14 @@ export const SaveOutcomeFields = {
     .min(1)
     .max(40)
     .optional()
-    .describe("A failure that grapples: the grapple's escape DC. Its other conditions last until the grapple ends"),
+    .describe(
+      "A failure that grapples: the grapple's escape DC. Its other conditions last until the grapple ends. On a failure that restrains without grappling (a Net, a Rope of Entanglement), the DC its creature escapes it with"
+    ),
+  /** The escape is a Strength (Athletics) check alone (a Net: "a DC 10 Strength (Athletics) check"). */
+  escapeAthletics: z
+    .literal(true)
+    .optional()
+    .describe("The escape is a Strength (Athletics) check alone, not Athletics or Acrobatics"),
   /** The failure's conditions end early if the target takes any damage (Turn Undead, Hypnotic Pattern). */
   endsOnDamage: z
     .literal(true)
@@ -1717,13 +1729,215 @@ export const OnHitRiderSchema = z
      *  or until the grapple ends when the rider grapples. */
     duration: SaveFailureDurationSchema.optional().describe(
       "How long the conditions last (a lich's touch: until the start of its next turn); absent, until ended or until the grapple ends"
-    )
+    ),
+    /** What the effect does besides conditions, as effect tags the engine reads: `no-healing` (a bearded devil's
+     *  Beard), `no-reactions` (a balor's Lightning Blade), `no-opportunity-attacks`, `speed-halved`. */
+    tags: z
+      .array(EffectTagSchema)
+      .max(6)
+      .optional()
+      .describe(
+        "Effect tags the hit leaves, which the engine reads: no-healing, no-reactions, no-opportunity-attacks, speed-halved, until-own-attack (spent by the target's next attack roll), until-attacked (spent by the next attack roll against it)"
+      ),
+    /** Modifiers the effect carries while it lasts: a Speed cut (a frost giant's Great Bow), Disadvantage on the
+     *  target's next attack roll (an ettin's Morningstar, with the `until-own-attack` tag). */
+    modifiers: EffectModifiersSchema.optional(),
+    /** The hit pulls the target straight toward the attacker (a balor's Flame Whip, a merrow's Harpoon). */
+    pull: ForcedPushSchema.optional(),
+    /** The hit opens a save on the target against the attacker's DC (Giant Slayer: a Giant makes a DC 15 Strength
+     *  save or falls Prone; a Sword of Wounding stops healing). Its failure leaves the rider's own effect. */
+    save: z
+      .object({
+        ability: AbilitySchema,
+        dc: z.number().int().min(1).max(40),
+        /** Damage a failure deals, none on a success (a Dagger of Venom's 2d10 Poison). */
+        failureDamage: z
+          .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+          .max(2)
+          .optional(),
+        repeatSave: z.literal(true).optional(),
+        endsOnDamage: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** It fires only when the attack roll's d20 shows a 20 (Sword of Sharpness: "When you roll a 20"), whatever else
+     *  makes the hit a Critical Hit. */
+    naturalTwenty: z.literal(true).optional(),
+    /** It fires only against these creature types (Giant Slayer: a Giant), read from the target's stat block. */
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+    /** It spends the coat the bearer put on the weapon: an effect on the attacker with this tag (a Dagger of Venom's
+     *  poison), ended by this hit. Without one it doesn't fire. */
+    spendsEffectTag: EffectTagSchema.optional(),
+    /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
+    reminder: z.string().min(1).max(400).optional()
   })
   .strict()
   .describe(
-    "On-hit riders: conditions applied to the target as one source-linked effect (a crocodile's Bite applies Grappled + Restrained with escape DC 15). Prone and Exhaustion stand alone."
+    "On-hit riders: conditions, tags and modifiers applied to the target as one source-linked effect (a crocodile's Bite applies Grappled + Restrained with escape DC 15), a pull, or a save the hit opens. Prone and Exhaustion stand alone."
   );
 export type OnHitRider = z.infer<typeof OnHitRiderSchema>;
+
+/** What a hit rider leaves on the target with no save: a named effect with conditions, tags and modifiers. */
+export const HitOutcomeSchema = z
+  .object({
+    name: z.string().min(1).max(60),
+    conditions: z.array(SaveConditionSchema).max(3).optional(),
+    tags: z.array(EffectTagSchema).max(6).default([]),
+    modifiers: EffectModifiersSchema.default([]),
+    /** Absent: until ended (Quivering Palm's vibrations, which last days). */
+    duration: SaveFailureDurationSchema.optional(),
+    /** A creature has one at a time, the most recent (Hamstring Blow): a new one replaces any other. */
+    onePerTarget: z.literal(true).optional(),
+    /** Its source keeps one at a time (Quivering Palm): marking a second creature ends the first's. */
+    onePerSource: z.literal(true).optional()
+  })
+  .strict();
+export type HitOutcome = z.infer<typeof HitOutcomeSchema>;
+
+/** A save a hit rider opens on the hit's target, at the rider's DC, and what its failure leaves. */
+export const HitRiderSaveSchema = z
+  .object({
+    ability: AbilitySchema,
+    failureConditions: z.array(SaveConditionSchema).max(3).default([]),
+    failureDuration: SaveFailureDurationSchema.optional(),
+    repeatSave: z.literal(true).optional(),
+    endsOnDamage: z.literal(true).optional(),
+    failurePush: ForcedPushSchema.optional(),
+    failureEffect: SaveFailureEffectSchema.optional()
+  })
+  .strict();
+
+/** One effect a hit rider offers (Brutal Strike's Forceful Blow, a Cunning Strike's Trip, Open Hand's Topple). */
+export const HitRiderEffectSchema = z
+  .object({
+    id: RiderSlugSchema,
+    name: z.string().min(1).max(60),
+    /** Sneak Attack dice it forgoes (a Cunning Strike effect's die cost), taken off before the dice roll. */
+    forgoesDice: z.number().int().min(1).max(10).optional(),
+    /** A feature the bearer must hold for it (Devious Strikes' Daze, Improved Brutal Strike's Staggering Blow). */
+    requiresFeature: RiderSlugSchema.optional(),
+    /** An item the bearer must carry, by catalog id (Poison: a Poisoner's Kit). */
+    requiresItem: RiderSlugSchema.optional(),
+    /** Only against a target of at most this size (Trip: Large or smaller). */
+    maxTargetSize: SizeSchema.optional(),
+    save: HitRiderSaveSchema.optional(),
+    applies: HitOutcomeSchema.optional(),
+    /** Pushes the target straight away with no save (Forceful Blow's 15 feet). */
+    push: ForcedPushSchema.optional(),
+    /** The attacker may then move up to half its Speed without provoking Opportunity Attacks (Withdraw, Forceful
+     *  Blow's move toward the target). */
+    grantsHalfSpeedMove: z.literal(true).optional(),
+    /** The Hide action's Invisible condition stays through this attack (Supreme Sneak's Stealth Attack). */
+    keepsHidden: z.literal(true).optional(),
+    /** The attacker spends one of its Hit Point Dice and regains the roll plus its Constitution modifier, minimum 1
+     *  (Lifedrinker). */
+    spendsHitPointDie: z.literal(true).optional()
+  })
+  .strict();
+export type HitRiderEffect = z.infer<typeof HitRiderEffectSchema>;
+
+/**
+ * What makes an action ride a hit (ADR-0020): it is chosen on an attack's preview and never taken alone. Its damage
+ * joins the hit's (so a Critical Hit doubles it), or rides its save when it has one (Hurl Through Hell's 8d10 on a
+ * failure). `rides` names the hits it can ride; the gates and costs below are checked on the server.
+ */
+export const HitRiderSchema = z
+  .object({
+    rides: z.enum([
+      "attack-roll",
+      "weapon",
+      "melee-weapon-or-unarmed",
+      "finesse-or-ranged-weapon",
+      "monk-weapon-or-unarmed",
+      "unarmed",
+      "flurry-of-blows",
+      "strength-attack",
+      "pact-weapon",
+      "this-weapon",
+      "melee-this-weapon"
+    ]),
+    /** "Once per turn", any creature's turn, counted beside its own uses (Stunning Strike spends a Focus Point too). */
+    oncePerTurn: z.literal(true).optional(),
+    /** Only on the bearer's own turn ("once on each of your turns"). */
+    ownTurn: z.literal(true).optional(),
+    /** Tapped before the roll (Brutal Strike): the tap marks the bearer, and the next qualifying attack roll it makes
+     *  gives up its Advantage. Only that roll's hit can carry it. */
+    declaredBeforeRoll: z.literal(true).optional(),
+    /** Sneak Attack's test: Advantage, or an ally within 5 feet of the target who isn't Incapacitated, and no
+     *  Disadvantage. */
+    sneakAttack: z.literal(true).optional(),
+    /** "And deal damage to it": the hit must deal the target damage after its defences. */
+    dealsDamage: z.literal(true).optional(),
+    /** Only against a target of at most this size (Hill's Tumble: Large or smaller). */
+    maxTargetSize: SizeSchema.optional(),
+    /** Its damage takes the weapon's type (Sneak Attack, Brutal Strike). */
+    weaponType: z.literal(true).optional(),
+    /** The types its damage may take, picked when it is chosen (Divine Strike: Necrotic or Radiant). */
+    damageTypes: z.array(DamageTypeSchema).min(2).max(6).optional(),
+    /** More dice against these creature types (Divine Smite: 1d8 more against a Fiend or an Undead). */
+    versus: z
+      .object({ creatureTypes: z.array(RiderSlugSchema).min(1).max(6), formula: DiceFormulaSchema })
+      .strict()
+      .optional(),
+    /** Its damage spares creatures of these types (Hurl Through Hell: a Fiend takes none). */
+    sparesCreatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+    /** The DC of its saves and its effects' saves (8 + Dexterity + Proficiency Bonus for a Cunning Strike). */
+    saveDc: z.number().int().min(1).max(40).optional(),
+    /** Effects to pick when it is chosen (Brutal Strike, Cunning Strike, Open Hand Technique). */
+    effects: z.array(HitRiderEffectSchema).min(1).max(10).optional(),
+    /** How many different effects one hit may carry; absent, one. */
+    effectsChoose: z.number().int().min(1).max(3).optional(),
+    /** It must carry one effect to be chosen at all (Open Hand Technique); absent, the effects are optional. */
+    effectRequired: z.literal(true).optional(),
+    /** What it leaves on the target with no save (Frost's Chill's slow, Quivering Palm's vibrations). */
+    applies: HitOutcomeSchema.optional(),
+    /** It spends a Pact Magic slot and rolls this die once more per slot level (Eldritch Smite's 1d8 + 1d8 per
+     *  level). */
+    pactSlotDie: z
+      .string()
+      .regex(/^1d(?:4|6|8|10|12)$/)
+      .optional(),
+    /** What the table finishes by hand, said with the hit. */
+    reminder: z.string().min(1).max(400).optional()
+  })
+  .strict()
+  .describe(
+    "What makes an action ride a hit: chosen on an attack's preview, never taken alone. `rides` names the hits it can ride; once per turn, own turn, Sneak Attack's test, a target size and dealing damage are checked on the server. Its damage joins the hit's, or rides its save when the action has one. `effects` are picked with it (a Cunning Strike's Trip forgoes a Sneak Attack die), with saves at `saveDc`."
+  );
+export type HitRider = z.infer<typeof HitRiderSchema>;
+
+/**
+ * Who an action without a spell may target, checked on the server like a spell's targets (SRD "Targets"): how many,
+ * how far, and which creatures. A target outside the rules is refused with a sentence. `countAbility` is "a number
+ * of creatures equal to your Charisma modifier (minimum of one creature)".
+ */
+export const ActionTargetsSchema = z
+  .object({
+    count: z.number().int().min(1).max(20).optional(),
+    countAbility: AbilitySchema.optional(),
+    /** How far from the user a target may be; 5 is touch. */
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+    notCreatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+    maxSize: SizeSchema.optional(),
+    /** "A creature you can see": read from the user's sight while dynamic vision is on. */
+    seen: z.literal(true).optional(),
+    /** "A creature Grappled by it" (a swallow, Paralyzing Tentacles). */
+    grappledBySource: z.literal(true).optional(),
+    /** Only a creature with one of these conditions (a Trample's Prone, Death Glare's Frightened). */
+    conditions: z.array(ConditionSchema).min(1).max(4).optional(),
+    /** Only a creature whose space this creature shares or is in (a Vortex, a Whelm). */
+    inSpace: z.literal(true).optional(),
+    /** "Each enemy", "an ally", or "another creature" (not the user itself). */
+    who: z.enum(["enemies", "allies", "others"]).optional(),
+    /** Only a creature this creature's own effect with this tag marks (Quivering Palm's vibrations). */
+    markedBy: EffectTagSchema.optional()
+  })
+  .strict()
+  .describe(
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies or others, or a creature the user marked."
+  );
+export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
 /** One place in a Multiattack's plan: an action taken `count` times, or any of `or` in its place. */
 export const MultiattackComponentSchema = z
@@ -1905,9 +2119,13 @@ export const ActionSchema = z
     /** On-hit conditions applied to the target as one source-linked effect (Bite: Grappled + Restrained, escape DC 15). */
     onHit: z
       .array(OnHitRiderSchema)
-      .max(2)
+      .max(4)
       .optional()
       .describe("Conditions applied to the target as one source-linked effect"),
+    /** It rides a hit: chosen on an attack's preview, never taken alone (Sneak Attack, Stunning Strike). */
+    ridesHit: HitRiderSchema.optional(),
+    /** Who it may target, checked on the server (Lay on Hands' touch, Turn Undead's Undead within 30 feet). */
+    targets: ActionTargetsSchema.optional(),
     /** A miss still deals half the hit's damage, rounded down (Acid Arrow: "half as much of the initial damage only"). */
     missDamage: z.literal("half").optional(),
     /** What its damage drains as it lands (a wraith's Life Drain, Vampiric Touch). */

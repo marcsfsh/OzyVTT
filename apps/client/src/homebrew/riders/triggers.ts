@@ -30,6 +30,7 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "on-attack-roll": "Making an attack roll",
   "on-hit": "An attack hits",
   "on-critical-hit": "Scoring a critical hit",
+  "on-natural-20": "Rolling a 20 to hit",
   "on-damage-roll": "Rolling damage",
   "on-saving-throw": "Making a saving throw",
   "on-ability-check": "Making an ability check",

@@ -41,6 +41,7 @@ import { holdsFeature } from "../class-features.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
 import { auraOfAuthority } from "../statblock-traits.js";
+import { hitRiderOf } from "./hit-riders.js";
 import { wardedConditions } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import {
@@ -511,10 +512,17 @@ export function rollAttack(ctx: ResolveContext): void {
   const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
   // Only the GM's choice reaches here (a player's is stripped by the command); it wins and is named as the GM's.
   const forced = input.rollMode ?? undefined;
-  const mode = forced ?? aggregated.mode;
+  ctx.forgoneAdvantageBy = forced === undefined ? forgoneFor(ctx, sources) : null;
+  const mode = forced ?? (ctx.forgoneAdvantageBy !== null ? "normal" : aggregated.mode);
+  if (ctx.forgoneAdvantageBy !== null)
+    warnings.push(
+      `${ctx.attacker.name} gives up this roll's Advantage for ${ctx.siblings.find((sibling) => sibling.id === ctx.forgoneAdvantageBy)?.name ?? "a declared strike"}.`
+    );
   ctx.rollMode =
     forced === undefined
-      ? aggregated
+      ? ctx.forgoneAdvantageBy !== null
+        ? { mode: "normal", advantage: [], disadvantage: [] }
+        : aggregated
       : {
           mode: forced,
           advantage: forced === "advantage" ? [GM_CHOICE] : [],
@@ -529,7 +537,10 @@ export function rollAttack(ctx: ResolveContext): void {
   });
   const momentaryAttackBonus = sumRiders(atRoll, "attack-bonus");
   // Exhaustion applies -2 x level to every D20 Test (SRD 5.2.1); explained as a warning line.
-  const bonus = action.attack.bonus + exhaustionPenalty(attacker) + momentaryAttackBonus;
+  // Sundering Blow: the next attack roll another creature makes against the target gains +5.
+  const sundering = sunderingOf(ctx, target);
+  if (sundering) warnings.push(`${sundering.name}: +5 to this attack roll against ${target.name}.`);
+  const bonus = action.attack.bonus + exhaustionPenalty(attacker) + momentaryAttackBonus + (sundering ? 5 : 0);
   if (exhaustionLevel(attacker) > 0)
     warnings.push(`Exhaustion ${exhaustionLevel(attacker)}: −${2 * exhaustionLevel(attacker)} to the attack roll.`);
   const { naturalRoll, total: rolled, declaredCrit } = rollD20(ctx, mode, bonus);
@@ -593,6 +604,63 @@ export function spendDistraction(ctx: ResolveContext): void {
   if (!distraction) return;
   endEffect(state, target.id, distraction.id);
   effectsEnded.push(endedEffect(target, distraction));
+}
+
+/** Sundering Blow on its bearer: the next attack roll made against it by a creature other than its source gains +5. */
+export const SUNDERED_TAG = "sundered";
+
+/** The Sundering Blow this attack roll gains, if any: one per roll, and never the source's own. */
+function sunderingOf(ctx: ResolveContext, target: LiveActor) {
+  return target.effects.find(
+    (effect) => effect.tags.includes(SUNDERED_TAG) && effect.sourceActorId !== ctx.attacker.id
+  );
+}
+
+/** The attack roll that gained a Sundering Blow's +5 spends it, hit or miss. Spent once the attack lands for good, so a
+ *  parked attack's replay still counts it. */
+export function spendSundering(ctx: ResolveContext): void {
+  const { state, attack, targets, effectsEnded, input } = ctx;
+  if (attack === null || input.commit === false) return;
+  const target = targets[0];
+  const sundering = target ? sunderingOf(ctx, target) : undefined;
+  if (!target || !sundering) return;
+  endEffect(state, target.id, sundering.id);
+  effectsEnded.push(endedEffect(target, sundering));
+}
+
+/** A declared strike's mark on its bearer (Brutal Strike): the next qualifying attack roll gives up its Advantage. */
+export const FORGOES_ADVANTAGE_TAG = "forgoes-advantage";
+
+/** SRD Brutal Strike: "you can forgo any Advantage on one Strength-based attack roll of your choice on your turn. The
+ *  chosen attack roll mustn't have Disadvantage." The rider declared before the roll whose hit this roll may carry, or
+ *  null. A parked attack's replay says which it was. */
+function forgoneFor(ctx: ResolveContext, sources: RollModeClaims): string | null {
+  const { attacker, state, input, siblings } = ctx;
+  if (input.forgoneAdvantageBy !== undefined) return input.forgoneAdvantageBy;
+  if (state.combat.turnActorId !== attacker.id) return null;
+  if (sources.advantage.length === 0 || sources.disadvantage.length > 0) return null;
+  const kinds = ctx.riderFilters.attackKinds ?? [];
+  for (const effect of attacker.effects.filter((candidate) => candidate.tags.includes(FORGOES_ADVANTAGE_TAG))) {
+    const declared = siblings.find((sibling) => sibling.id === effect.sourceActionId);
+    const rider = declared ? hitRiderOf(declared) : undefined;
+    if (!declared || !rider?.declaredBeforeRoll) continue;
+    const strength = ctx.riderFilters.ability === "str" && (kinds.includes("weapon") || kinds.includes("unarmed"));
+    if (rider.rides === "strength-attack" && !strength) continue;
+    return declared.id;
+  }
+  return null;
+}
+
+/** The roll that gave up its Advantage spends the declaration, hit or miss. */
+export function spendForgoneDeclaration(ctx: ResolveContext): void {
+  const { state, attacker, effectsEnded, input } = ctx;
+  if (ctx.forgoneAdvantageBy === null || input.forgoneAdvantageBy !== undefined) return;
+  const declaration = attacker.effects.find(
+    (effect) => effect.tags.includes(FORGOES_ADVANTAGE_TAG) && effect.sourceActionId === ctx.forgoneAdvantageBy
+  );
+  if (!declaration) return;
+  endEffect(state, attacker.id, declaration.id);
+  effectsEnded.push(endedEffect(attacker, declaration));
 }
 
 /** Steady Aim gives Advantage on the next attack roll this turn: the roll spends it, hit or miss, while the Speed 0 it

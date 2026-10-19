@@ -33,7 +33,7 @@ const newTurn = (table: Table) => {
 };
 
 describe("what a player's turn is told about an item's action", () => {
-  it("says whom a tap picks: a potion's drinker, a flask's targets, nobody for what acts on its user", () => {
+  it("says whom a tap picks: a potion's drinker, a flask's one target, nobody for what acts on its user", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() });
     for (const id of ["potion-of-healing", "acid", "antitoxin"])
       write(table, IDS.wizard, catalogRow(id, { equipped: false }));
@@ -50,7 +50,8 @@ describe("what a player's turn is told about an item's action", () => {
     );
     expect(rows.map((entry) => [entry.id, entry.targeting, entry.healing])).toEqual([
       ["item-potion-of-healing-drink", "single", { formula: "2d4 + 2" }],
-      ["item-acid-throw", "multi", null],
+      // "Throw the vial at a creature or object you can see within 20 feet": one target.
+      ["item-acid-throw", "single", null],
       ["item-antitoxin-drink", "none", null],
       ["item-spell-scroll-read", "none", null]
     ]);

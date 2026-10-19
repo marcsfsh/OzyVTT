@@ -335,7 +335,18 @@ export const HitOptionChoiceSchema = z
       .regex(/^[a-z]+$/)
       .max(40)
       .optional(),
-    slotLevel: z.number().int().min(1).max(9).optional()
+    slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The effects picked with it, from the offer's `effects` (Brutal Strike's Hamstring Blow, a Cunning Strike's
+     *  Trip). */
+    effects: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      )
+      .max(3)
+      .optional()
   })
   .strict();
 export const ActionResolveSchema = z

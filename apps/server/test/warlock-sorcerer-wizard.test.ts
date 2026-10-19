@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { featurePicks } from "@vtt/content-srd-5.2.1";
+import { featurePicks, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -10,6 +10,7 @@ import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation
 import { specialSpeedsOf } from "../src/speed.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
+import { applyFailureEffect } from "../src/saving-throws.js";
 import { endEncounter, startEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
 import { builderOffers } from "../src/builder-offers.js";
@@ -550,8 +551,57 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       )
     );
 
-  it("proposes 8d10 Psychic against a Charisma save at the Warlock's own spell save DC", () => {
-    const built = level14();
+  /** A Dagger in hand, thrown or stabbed: any attack roll's hit carries Hurl Through Hell. */
+  const armed = (built: Built): Built => {
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      {
+        id: "dagger-x",
+        name: "Dagger",
+        quantity: 1,
+        equipped: true,
+        attuned: false,
+        category: "weapon",
+        weapon: {
+          category: "simple",
+          damageDice: "1d4",
+          damageType: "piercing",
+          rangeFeet: 20,
+          longRangeFeet: 60,
+          melee: true,
+          properties: ["finesse", "light", "thrown"]
+        }
+      }
+    ];
+    return built;
+  };
+  let hurlCommand = 30;
+  /** The action back, as on a later turn, while the long-rest use stays spent. */
+  const freshAction = (built: Built) => {
+    built.state.combat = {
+      ...built.state.combat,
+      turn: { ...built.state.combat.turn, actionUsed: false, actionInstance: null, turnUses: {} }
+    };
+  };
+  const stab = (built: Built, faces: number[], hitOptions?: Array<{ id: string }>, commit = true) =>
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "item-dagger-x"),
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++hurlCommand).padStart(12, "0")}`,
+        ...(hitOptions ? { hitOptions } : {}),
+        ...(commit ? {} : { commit: false })
+      },
+      {
+        ...deps(built, faces),
+        resolveDefinition: (id) => built.state.definitions.find((entry) => entry.id === id)?.definition
+      }
+    );
+
+  it("rides an attack roll's hit and proposes 8d10 Psychic against a Charisma save at the Warlock's own DC", () => {
+    const built = armed(level14());
     // CHA 20 (+5) and proficiency +5 at level 14: DC 8 + 5 + 5 = 18, derived.
     const action = actionOf(built, "hurl-through-hell");
     expect(action.save).toEqual({
@@ -561,44 +611,64 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       successDamage: "none",
       failureConditions: ["incapacitated"],
       // "until the end of your next turn": the Warlock's.
-      failureDuration: { type: "until-source-turn-end" }
+      failureDuration: { type: "until-source-turn-end" },
+      failureEffect: { name: "Hurled Through Hell", tags: ["off-plane"], modifiers: [] }
     });
     expect(built.definition.spellcasting!.saveDc).toBe(18);
-
-    const hurled = resolveDefinitionAction(
-      built.state,
-      action,
-      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000030" },
-      deps(built, [10, 10, 10, 10, 10, 10, 10, 10])
-    );
-    expect(hurled.damage).toEqual([{ formula: "8d10", type: "psychic", total: 80 }]);
+    expect(stab(built, [15], undefined, false).hitOffers?.map((offer) => offer.id)).toContain("hurl-through-hell");
+    stab(built, [15, 2, 10, 10, 10, 10, 10, 10, 10, 10], [{ id: "hurl-through-hell" }]);
     expect(
       built.state.combat.pendingSaves.map((save) => ({
         ability: save.ability,
         dc: save.dc,
-        damage: save.proposedDamage
+        damage: save.proposedDamage,
+        half: save.halfOnSuccess
       }))
-    ).toEqual([{ ability: "cha", dc: 18, damage: 80 }]);
+    ).toEqual([{ ability: "cha", dc: 18, damage: 80, half: false }]);
   });
 
-  it("is once per Long Rest and refuses the second hurl", () => {
+  it("is refused tapped alone, with no hit to ride", () => {
     const built = level14();
-    expect(actionOf(built, "hurl-through-hell").uses).toMatchObject({ limit: 1, per: "long-rest" });
-    resolveDefinitionAction(
-      built.state,
-      actionOf(built, "hurl-through-hell"),
-      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000031" },
-      deps(built, [1, 1, 1, 1, 1, 1, 1, 1])
-    );
-    expect(built.hero.actionUses["hurl-through-hell"]).toBe(1);
     expect(() =>
       resolveDefinitionAction(
         built.state,
         actionOf(built, "hurl-through-hell"),
-        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000032" },
-        deps(built, [])
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000029" },
+        deps(built, [10, 10, 10, 10, 10, 10, 10, 10])
       )
-    ).toThrow();
+    ).toThrow(/Hurl Through Hell adds to a hit/);
+  });
+
+  it("deals a Fiend no damage", () => {
+    const built = armed(level14());
+    const imp = loadMonsterDefinitions().find((monster) => monster.source.externalId === "imp")!;
+    built.state.definitions.push({ id: "imp", definition: imp });
+    built.state.actors.find((actor) => actor.id === IDS.foe)!.definitionId = "imp";
+    built.state.actors.find((actor) => actor.id === IDS.foe)!.armorClass = 12;
+    const hurled = stab(built, [15, 2], [{ id: "hurl-through-hell" }]);
+    expect(built.state.combat.pendingSaves.map((save) => save.proposedDamage)).toEqual([0]);
+    expect(hurled.warnings).toContain("Hurl Through Hell: Foe is a Fiend and takes no damage.");
+  });
+
+  it("is once per Long Rest and refuses the second hurl", () => {
+    const built = armed(level14());
+    expect(actionOf(built, "hurl-through-hell").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    stab(built, [15, 2, 1, 1, 1, 1, 1, 1, 1, 1], [{ id: "hurl-through-hell" }]);
+    expect(built.hero.actionUses["hurl-through-hell"]).toBe(1);
+    freshAction(built);
+    expect(stab(built, [15], undefined, false).hitOffers?.map((offer) => offer.id) ?? []).not.toContain(
+      "hurl-through-hell"
+    );
+  });
+
+  it("takes a target that fails out of reach: nothing can target it until it returns", () => {
+    const built = armed(level14());
+    stab(built, [15, 2, 1, 1, 1, 1, 1, 1, 1, 1], [{ id: "hurl-through-hell" }]);
+    const save = built.state.combat.pendingSaves[0]!;
+    expect(save.onFailEffect).toMatchObject({ name: "Hurled Through Hell", tags: ["off-plane"] });
+    applyFailureEffect(built.state, IDS.foe, save.onFailEffect!, "hurled", {});
+    freshAction(built);
+    expect(() => stab(built, [15, 2])).toThrow(/Foe is gone from this plane for now and can't be targeted/);
   });
 });
 

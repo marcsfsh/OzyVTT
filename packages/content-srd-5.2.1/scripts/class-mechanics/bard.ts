@@ -18,7 +18,9 @@ export const bard: ClassMechanicsModule = {
           activation: "bonus-action",
           description:
             "As a Bonus Action, inspire another creature within 60 feet of yourself who can see or hear you. That creature gains one of your Bardic Inspiration dice, which it can roll and add to a failed D20 Test once within the next hour. A creature can have only one Bardic Inspiration die at a time. The die is a d6, becoming a d8 at level 5, a d10 at level 10 and a d12 at level 15.",
-          damage: []
+          damage: [],
+          // "Another creature within 60 feet of yourself"; whether it can see or hear the Bard is the table's.
+          targets: { count: 1, rangeFeet: 60, who: "others" }
         }
       ]
     },

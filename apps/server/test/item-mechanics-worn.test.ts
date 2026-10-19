@@ -565,7 +565,14 @@ describe("the charges a worn item rations", () => {
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-robe-of-scintillating-colors-dazzle"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureConditions: ["stunned"] });
+    expect(action.save).toEqual({
+      ability: "wis",
+      dc: 15,
+      successDamage: "none",
+      failureConditions: ["stunned"],
+      // "until the effect ends", which is the end of the wearer's next turn.
+      failureDuration: { type: "until-source-turn-end" }
+    });
     expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" });
 
     resolveDefinitionAction(

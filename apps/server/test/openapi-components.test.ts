@@ -440,6 +440,7 @@ describe("generated OpenAPI components", () => {
       "on-attack-roll": {},
       "on-hit": {},
       "on-critical-hit": {},
+      "on-natural-20": {},
       "on-damage-roll": {},
       "on-saving-throw": {},
       "on-ability-check": {},

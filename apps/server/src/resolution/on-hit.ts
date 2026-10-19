@@ -7,7 +7,7 @@ import { sizeAtMost, tableLineOf, type ResolveContext } from "./context.js";
 import { damagePartsOf } from "./damage.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
-function dealsDamage(ctx: ResolveContext): boolean {
+export function dealsDamage(ctx: ResolveContext): boolean {
   const { state, targets, deps } = ctx;
   const target = targets[0];
   if (!target) return false;

@@ -29,6 +29,7 @@ export type RiderMoment =
   | "on-attack-roll"
   | "on-hit"
   | "on-critical-hit"
+  | "on-natural-20"
   | "on-damage-roll"
   | "on-saving-throw"
   | "on-ability-check"
@@ -39,6 +40,7 @@ const MOMENTS: ReadonlySet<string> = new Set<RiderMoment>([
   "on-attack-roll",
   "on-hit",
   "on-critical-hit",
+  "on-natural-20",
   "on-damage-roll",
   "on-saving-throw",
   "on-ability-check",

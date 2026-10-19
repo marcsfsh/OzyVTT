@@ -495,6 +495,7 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       ...(parked.damageType !== null ? { damageType: parked.damageType } : {}),
       attackBonusDice: parked.bonusDice,
       ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
+      ...(parked.forgoneAdvantageBy !== undefined ? { forgoneAdvantageBy: parked.forgoneAdvantageBy } : {}),
       economyPaid: true,
       ...(raised && effectName === null && pending.acBonus !== null
         ? { reactionAcBonus: { amount: pending.acBonus, source: pending.actionName } }

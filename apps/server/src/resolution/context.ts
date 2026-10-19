@@ -89,6 +89,11 @@ export type ResolveInput = Readonly<{
   areaPlaced?: boolean;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** A parked attack finishing: the declared rider (Brutal Strike) its roll forwent Advantage for, whose hit it may
+   *  still carry. */
+  forgoneAdvantageBy?: string;
+  /** A melee hit that drops its target to 0 leaves it at 1 Hit Point and Unconscious (SRD Knocking Out a Creature). */
+  knockOut?: boolean;
 }>;
 
 export type ResolveDependencies = Readonly<{
@@ -110,7 +115,7 @@ export type ResolveDependencies = Readonly<{
   /** SRD forced movement (Push): moves a combatant straight away from another and reports the distance, or
    *  null. Built by the operation layer, which has the grid (an opportunity attack's too). */
   pushToken?: (
-    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
+    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number; toward?: boolean }>
   ) => Readonly<{ value: number; unit: string }> | null;
 }>;
 
@@ -240,7 +245,11 @@ export type ResolveContext = {
   /** The Concentration this cast started (a Concentration spell): what its failed saves impose is sustained by it. */
   castId: string | null;
   /** The extras this hit carries whose costs are spent after the hit's own (`spendHitOptions`). */
-  readonly hitRiders: Array<{ action: DefinitionAction; slotLevel?: number }>;
+  readonly hitRiders: Array<{ action: DefinitionAction; slotLevel?: number; pactSlot?: number }>;
+  /** The declared rider (Brutal Strike) this attack roll gave up its Advantage for, or null. */
+  forgoneAdvantageBy: string | null;
+  /** A chosen rider keeps the Hide action's Invisible through this attack (Supreme Sneak's Stealth Attack). */
+  keepsHidden: boolean;
   /** The live effects whose damage riders this hit rolled, so a coat of poison is spent (`spendDamageUses`). */
   readonly damageEffectIds: string[];
 };

@@ -145,6 +145,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "attack.cleave-same-target": () => "Choose a second creature.",
   "attack.cleave-too-far": () => "The second creature must be within 5 feet of the first.",
   "target.too-many": () => "Too many targets.",
+  "target.not-allowed": () => "It can't affect that creature.",
   "attack.hit-option-unqualified": () => "That hit can't carry it.",
   "condition.charmed-charmer": () => "You can't attack the creature that charmed you.",
   "slots.none-remaining": slotsReason,
@@ -214,7 +215,8 @@ const structured = (action: DefinitionAction): boolean =>
  */
 export function passiveOf(action: DefinitionAction, builtin: boolean): PassiveOption | undefined {
   if (builtin) return undefined;
-  if (hitRiderOf(action)) return "rider";
+  // A rider tapped before its roll (Brutal Strike) is on the turn list; any other is chosen on a hit.
+  if (hitRiderOf(action)) return hitRiderOf(action)!.declaredBeforeRoll ? undefined : "rider";
   if (action.activation !== "other") return undefined;
   if (/^spell-.+-then-/.test(action.id)) return "automatic";
   if (structured(action) || TAKEN_ON_A_TURN.has(action.id)) return undefined;

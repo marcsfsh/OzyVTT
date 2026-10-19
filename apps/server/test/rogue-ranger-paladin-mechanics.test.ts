@@ -212,7 +212,7 @@ function swing(
   actionId: string,
   faces: number[],
   options: {
-    hitOptions?: Array<{ id: string; damageType?: string; slotLevel?: number }>;
+    hitOptions?: Array<{ id: string; damageType?: string; slotLevel?: number; effects?: string[] }>;
     rollMode?: "advantage" | "disadvantage";
     commit?: boolean;
     distanceFeet?: (a: string, b: string) => number | null;
@@ -1112,7 +1112,9 @@ describe("Paladin: Channel Divinity is ONE counter that three features spend", (
       failureConditions: ["frightened"],
       // "for 1 minute or until it takes any damage".
       failureDuration: { type: "rounds", rounds: 10 },
-      endsOnDamage: true
+      endsOnDamage: true,
+      // "can do only one of the following on its turns: move, take an action, or take a Bonus Action".
+      failureEffect: { name: "Abjured", tags: ["dazed"], modifiers: [] }
     });
     const resolution = resolve(built, "abjure-foes", [], [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 14 });
@@ -1378,5 +1380,181 @@ describe("Paladin: Oath of Devotion, audit row 28", () => {
     expect(() => buildCharacterDefinition(missing, library, policy)).toThrowError(
       /"Epic Boon" needs 1 pick\(s\) of kind "feat"/
     );
+  });
+});
+
+/** The Rogue's Cunning Strike DC, read off the built sheet: 8 + Dexterity modifier + Proficiency Bonus. */
+const cunningDc = (built: Table) =>
+  8 + Math.floor((built.definition.abilityScores.dex - 10) / 2) + built.definition.proficiencyBonus;
+
+const effectIdsOf = (resolution: ReturnType<typeof swing>) =>
+  resolution.hitOffers?.find((offer) => offer.id === "sneak-attack")?.effects?.map((effect) => effect.id) ?? [];
+
+describe("Rogue: Cunning Strike forgoes Sneak Attack dice for an effect", () => {
+  it("rolls a Rogue 5's Sneak Attack with one die less for Trip, and the target saves at 8 + Dexterity + Proficiency Bonus", () => {
+    const built = table(rogueInput(5));
+    const preview = swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false });
+    expect(preview.hitOffers?.find((offer) => offer.id === "sneak-attack")).toMatchObject({
+      dice: "3d6 Piercing",
+      effects: [
+        { id: "trip", name: "Trip", cost: "-1d6" },
+        { id: "withdraw", name: "Withdraw", cost: "-1d6" }
+      ],
+      effectsChoose: 1
+    });
+    const hit = swing(built, "item-shortsword", [15, 2, 3, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["trip"] }]
+    });
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")).toEqual({
+      formula: "2d6",
+      type: "piercing",
+      total: 8,
+      source: "Sneak Attack"
+    });
+    expect(built.state.combat.pendingSaves).toMatchObject([
+      {
+        targetActorId: IDS.foe,
+        ability: "dex",
+        dc: cunningDc(built),
+        actionName: "Sneak Attack: Trip",
+        conditionIds: ["prone"]
+      }
+    ]);
+  });
+
+  it("offers Poison only with a Poisoner's Kit on the Rogue", () => {
+    const built = table(rogueInput(5));
+    expect(
+      effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))
+    ).not.toContain("poison");
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      { id: "poisoners-kit", name: "Poisoner's Kit", quantity: 1, equipped: false, attuned: false, category: "tool" }
+    ];
+    expect(effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))).toContain(
+      "poison"
+    );
+  });
+
+  it("leaves Trip out against a Huge target", () => {
+    const built = table(rogueInput(5));
+    built.foe.size = "huge";
+    expect(effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))).toEqual([
+      "withdraw"
+    ]);
+    expect(() =>
+      swing(built, "item-shortsword", [15, 2, 3, 4, 4], {
+        rollMode: "advantage",
+        hitOptions: [{ id: "sneak-attack", effects: ["trip"] }]
+      })
+    ).toThrowError(/Sneak Attack can't add Trip to this hit/);
+  });
+
+  it("gives Withdraw's half Speed of movement on the Rogue's own turn", () => {
+    const built = table(rogueInput(5));
+    swing(built, "item-shortsword", [15, 2, 3, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["withdraw"] }]
+    });
+    const speed = currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, built.catalog)) ?? 0;
+    expect(built.hero.effects.find((effect) => effect.tags.includes("half-speed-move"))).toMatchObject({
+      movementGrantFeet: Math.floor(speed / 10) * 5
+    });
+  });
+
+  it("carries two effects from Rogue 11, both costs off the dice", () => {
+    const built = table(rogueInput(11));
+    const preview = swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false });
+    expect(preview.hitOffers?.find((offer) => offer.id === "sneak-attack")?.effectsChoose).toBe(2);
+    const hit = swing(built, "item-shortsword", [15, 2, 3, 4, 4, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["trip", "withdraw"] }]
+    });
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")).toMatchObject({ formula: "4d6" });
+    expect(() =>
+      swing(table(rogueInput(5)), "item-shortsword", [15, 2, 3, 4, 4], {
+        rollMode: "advantage",
+        hitOptions: [{ id: "sneak-attack", effects: ["trip", "withdraw"] }]
+      })
+    ).toThrowError(/Sneak Attack adds one effect to a hit/);
+  });
+
+  it("adds Devious Strikes' Knock Out at Rogue 14: 6 of 7 dice for Unconscious that ends on damage", () => {
+    const built = table(rogueInput(14));
+    expect(effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))).toEqual(
+      expect.arrayContaining(["daze", "knock-out", "obscure"])
+    );
+    const hit = swing(built, "item-shortsword", [15, 2, 3, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["knock-out"] }]
+    });
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")).toMatchObject({ formula: "1d6" });
+    expect(built.state.combat.pendingSaves[0]).toMatchObject({
+      ability: "con",
+      conditionIds: ["unconscious"],
+      onFailEffect: { endsOnDamage: true, repeatSave: { ability: "con" }, duration: { type: "rounds", rounds: 10 } }
+    });
+  });
+
+  it("offers a Thief 9 Stealth Attack, which keeps the Hide action's Invisible through the attack", () => {
+    const built = table(rogueInput(9));
+    expect(effectIdsOf(swing(built, "item-shortsword", [15, 2], { rollMode: "advantage", commit: false }))).toContain(
+      "stealth-attack"
+    );
+    addEffect(
+      built.state,
+      IDS.hero,
+      makeEffect({ id: "hiding", name: "Hidden", tags: ["hidden"], duration: { type: "manual" } })
+    );
+    const hit = swing(built, "item-shortsword", [15, 2, 3, 4, 4, 4, 4], {
+      rollMode: "advantage",
+      hitOptions: [{ id: "sneak-attack", effects: ["stealth-attack"] }]
+    });
+    expect(built.hero.effects.some((effect) => effect.id === "hiding")).toBe(true);
+    expect(hit.warnings?.join(" ")).toMatch(/stays hidden only if it ends this turn behind Three-Quarters Cover/);
+  });
+});
+
+describe("Paladin: Lay on Hands is a touch, and Abjure Foes counts the Charisma modifier", () => {
+  const heal = (built: Table, apart: number) =>
+    resolveDefinitionAction(
+      built.state,
+      { ...actionOf(built, "lay-on-hands")!, useCost: 5 },
+      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: nextCommandId() },
+      { ...deps(built, []), distanceFeet: () => apart }
+    );
+
+  it("refuses a creature beyond 5 feet and heals one within reach", () => {
+    const built = table(paladinInput(5));
+    expect(actionOf(built, "lay-on-hands")?.targets).toEqual({ count: 1, rangeFeet: 5 });
+    expect(() => heal(built, 30)).toThrowError(/Foe is 30 ft away, beyond Lay on Hands's touch/);
+    expect(heal(built, 5).healing?.targets).toHaveLength(1);
+  });
+
+  it("targets no more creatures than the Charisma modifier allows, and none beyond 60 feet", () => {
+    const built = table(paladinInput(9));
+    const limit = Math.max(1, Math.floor((built.definition.abilityScores.cha - 10) / 2));
+    const others = Array.from({ length: limit + 1 }, (_, index) => ({
+      ...built.foe,
+      id: `10000000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`,
+      name: `Foe ${index}`
+    }));
+    built.state.actors.push(...others);
+    built.state.combat.initiative.push(
+      ...others.map((other) => ({ actorId: other.id, score: 5 }) as (typeof built.state.combat.initiative)[number])
+    );
+    const abjure = (targetIds: string[], apart = 30) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "abjure-foes")!,
+        { actorId: IDS.hero, targetIds, commandId: nextCommandId() },
+        { ...deps(built, []), distanceFeet: () => apart }
+      );
+    expect(() => abjure(others.map((other) => other.id))).toThrowError(
+      new RegExp(`targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}; ${limit + 1} were chosen`)
+    );
+    expect(() => abjure([others[0]!.id], 65)).toThrowError(/beyond Channel Divinity: Abjure Foes's 60 ft range/);
+    expect(abjure(others.slice(0, limit).map((other) => other.id)).save?.targets).toHaveLength(limit);
   });
 });
