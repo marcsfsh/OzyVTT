@@ -71,6 +71,10 @@ export function useSheetRolls(
   const [visibility, setVisibility] = useState<RollVisibility>("public");
   // The check this sheet rolled last, which a reroll throws again while it is still the character's latest roll.
   const [lastCheck, setLastCheck] = useState<CheckRollOutcome | null>(null);
+  // The loose save this sheet rolled last (nothing owed), which Heroic Inspiration may reroll the same way.
+  const [lastSave, setLastSave] = useState<Readonly<{ rollId: string; ability: AbilityId; typed: boolean }> | null>(
+    null
+  );
   // The situations the roller says the next check fits. Each is spent by the first check it can fit.
   const [declared, setDeclared] = useState<readonly CheckSituation[]>([]);
   const toggleSituation = (situation: CheckSituation) =>
@@ -170,6 +174,50 @@ export function useSheetRolls(
       return;
     }
     noteSheetRolls(result.rollId);
+    setLastSave(
+      result.route === "loose" && result.rollId && !result.outcome?.autoFailed
+        ? { rollId: result.rollId, ability, typed: face !== undefined }
+        : null
+    );
+    sayLooseSave(name, result);
+  };
+
+  /** Rerolls the loose save this sheet rolled last: Heroic Inspiration for a player, free for the GM. */
+  const rerollSave = async () => {
+    if (!lastSave) return;
+    const name = `${ABILITY_WORDS[lastSave.ability]} save`;
+    const face = lastSave.typed ? await typedFace(`Reroll ${withArticle(name)}`) : undefined;
+    if (face === null) return;
+    setRolling(true);
+    const result = await command("save:roll", {
+      actorId,
+      ability: lastSave.ability,
+      reroll: true,
+      ...(face !== undefined ? { face } : {})
+    });
+    setRolling(false);
+    if (!result.ok) {
+      onFeedback(result.message ?? "The reroll was refused.");
+      return;
+    }
+    noteSheetRolls(result.rollId);
+    setLastSave(result.rollId ? { ...lastSave, rollId: result.rollId } : null);
+    sayLooseSave(name, result);
+  };
+
+  /** Says a save's result: the verdict of one the character owed, or a loose one's total when the line can't. */
+  const sayLooseSave = (
+    name: string,
+    result: Readonly<{
+      outcome?: Readonly<{
+        autoFailed?: string | null;
+        total: number;
+        natural?: number;
+        rollMode?: Parameters<typeof modeWords>[0];
+      }> &
+        Readonly<{ dc?: number; success?: boolean }>;
+    }>
+  ) => {
     const outcome = result.outcome;
     if (!outcome) return;
     if (outcome.autoFailed) {
@@ -238,6 +286,8 @@ export function useSheetRolls(
     rerollCheck,
     answerCheck,
     rollSave,
+    lastSave,
+    rerollSave,
     rollD20,
     rollFlat,
     dialog

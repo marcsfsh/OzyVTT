@@ -519,6 +519,8 @@ export const HeldRollSchema = z
     readAs: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** The other creatures already asked to answer this roll (a check's Cutting Words), so each is asked once. */
     asked: z.array(z.string().min(1).max(300)).max(40).optional(),
+    /** A loose save's ability (one rolled from the sheet with nothing owed), so Heroic Inspiration can reroll it. */
+    looseSave: z.object({ ability: AbilityIdSchema }).strict().optional(),
     /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
     check: z
       .object({

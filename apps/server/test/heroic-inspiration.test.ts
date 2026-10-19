@@ -151,7 +151,7 @@ describe("a second Heroic Inspiration", () => {
   const OWNER = "30000000-0000-4000-8000-000000000001";
   const ALLY = "10000000-0000-4000-8000-00000000a11e";
   const SECOND = "10000000-0000-4000-8000-00000000a11f";
-  async function table() {
+  async function table(tier: "name-and-class" | "sheet-and-resources" = "sheet-and-resources") {
     const directory = await mkdtemp(join(tmpdir(), "vtt-inspiration-"));
     const pc = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
       id,
@@ -171,6 +171,7 @@ describe("a second Heroic Inspiration", () => {
       developmentClientPort: 5173,
       initialGameState: GameStateSchema.parse({
         schemaVersion: 1,
+        partyVisibility: tier,
         actors: [
           pc(IDS.fighter, "Borin", { heroicInspiration: true }),
           pc(ALLY, "Lyra"),
@@ -214,6 +215,38 @@ describe("a second Heroic Inspiration", () => {
     expect((await give(player, ALLY)).status).toBe(200);
     expect(actor(ALLY).heroicInspiration).toBe(true);
     expect(actor(IDS.fighter)).toMatchObject({ heroicInspiration: true, heroicInspirationToGive: false });
+  });
+
+  it("goes without a word when its player can't see the party's resources, and is lost on a holder", async () => {
+    const { gmToken, player, post, give, actor } = await table("name-and-class");
+    await post(GAME_PATHS.actorHeroicInspiration, gmToken, { has: true });
+    expect((await give(player, SECOND)).status).toBe(200);
+    expect(actor(SECOND).heroicInspiration).toBe(true);
+    expect(actor(IDS.fighter)).toMatchObject({ heroicInspiration: true, heroicInspirationToGive: false });
+  });
+
+  it("rerolls a loose save with Heroic Inspiration, which it spends", async () => {
+    const { player, post, actor, server } = await table();
+    const rolled = await post(GAME_PATHS.saveRoll, player, { ability: "dex" });
+    expect(rolled.status).toBe(200);
+    const first = server.store.snapshot.rolls.at(-1)!;
+    const again = await post(GAME_PATHS.saveRoll, player, { ability: "dex", reroll: true });
+    expect(again.status).toBe(200);
+    expect(actor(IDS.fighter).heroicInspiration).toBe(false);
+    const second = server.store.snapshot.rolls.at(-1)!;
+    expect(second.id).not.toBe(first.id);
+    expect(second.label).toMatch(/DEX save reroll/);
+    // Nothing is left to reroll it with.
+    expect((await post(GAME_PATHS.saveRoll, player, { ability: "dex", reroll: true })).status).toBe(409);
+  });
+
+  it("refuses to reroll a loose save that isn't the character's latest roll", async () => {
+    const { player, post } = await table();
+    await post(GAME_PATHS.saveRoll, player, { ability: "dex" });
+    await post(GAME_PATHS.checkRoll, player, { ability: "str" });
+    const refused = await post(GAME_PATHS.saveRoll, player, { ability: "dex", reroll: true });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error.message).toMatch(/no DEX save to reroll/);
   });
 
   it("is lost when its player lets it go", async () => {

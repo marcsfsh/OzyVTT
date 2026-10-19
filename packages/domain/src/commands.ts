@@ -905,11 +905,18 @@ export const SaveRollSchema = z
     face: z.number().int().min(1).max(20).optional(),
     /** GM only: a hand-entered final total, used as given. */
     total: z.number().int().min(-50).max(100).optional(),
+    /** Throw the character's latest loose save of this ability again, while it is still the character's latest roll
+     *  (SRD Heroic Inspiration: "reroll any die immediately after rolling it"): a player spends Heroic Inspiration to
+     *  reroll one d20, the GM throws afresh; a typed save takes `face`. */
+    reroll: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
   .refine((payload) => payload.face === undefined || payload.total === undefined, {
     error: "Supply a typed d20 or a final total, and only one of the two."
+  })
+  .refine((payload) => payload.reroll !== true || payload.total === undefined, {
+    error: "A reroll throws the die again; a final total can't come with it."
   });
 
 const SkillOrToolIdSchema = z
