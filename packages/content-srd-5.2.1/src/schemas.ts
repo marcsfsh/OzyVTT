@@ -142,6 +142,33 @@ export const SpellLaterActionSchema = z
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
 
+/** The most game time a revival reaches back, in minutes: True Resurrection's 200 years. */
+export const MAX_REVIVAL_MINUTES = 200 * 365 * 24 * 60;
+
+/** What a cast that brings the dead back does: which dead creature it can take, and how that creature returns. */
+export const SpellRevivalSchema = z
+  .object({
+    /** It returns with 1 Hit Point (`one`) or all of them (`all`). */
+    hitPoints: z.enum(["one", "all"]),
+    /** The longest the creature may have been dead, in minutes of game time (Revivify's 1, Raise Dead's 10 days). */
+    withinMinutes: z.number().int().min(1).max(MAX_REVIVAL_MINUTES),
+    /** It can't take a creature that was Undead when it died (Raise Dead, Resurrection). */
+    notUndead: z.literal(true).optional(),
+    /** It makes a new body, so a creature whose body is gone comes back (True Resurrection). */
+    newBody: z.literal(true).optional(),
+    /** It neutralizes the poison that affected the creature: its Poisoned condition ends (Raise Dead). */
+    endsPoison: z.literal(true).optional(),
+    /** It lifts the curses on the creature and cures its magical contagions (True Resurrection). */
+    endsCurses: z.literal(true).optional(),
+    /** Bringing back a creature dead at least this many minutes taxes the caster until it finishes a Long Rest: it
+     *  can't cast spells and has Disadvantage on D20 Tests (Resurrection's 365 days). */
+    taxesCasterAfterMinutes: z.number().int().min(1).max(MAX_REVIVAL_MINUTES).optional(),
+    /** The new body's species is rolled on the spell's d10 table (Reincarnate). */
+    rollsSpecies: z.literal(true).optional()
+  })
+  .strict();
+export type SpellRevival = z.infer<typeof SpellRevivalSchema>;
+
 /** One cast's mechanical effect; see `SpellReference.effect`. */
 export const SpellEffectSchema = z
   .object({
@@ -238,6 +265,11 @@ export const SpellEffectSchema = z
     chainFeet: z.number().int().min(5).max(300).optional(),
     /** The cast makes a creature at 0 Hit Points that isn't dead Stable (Spare the Dying). */
     stabilizes: z.literal(true).optional(),
+    /** The cast brings a dead creature back to life (Revivify, Raise Dead, Resurrection, True Resurrection, Reincarnate). */
+    revives: SpellRevivalSchema.optional(),
+    /** The cast touches a corpse and keeps it from decay, so the days it lasts don't count against a revival's time
+     *  limit (Gentle Repose). */
+    reposes: z.literal(true).optional(),
     /** A cantrip whose range doubles at character levels 5, 11 and 17 (Spare the Dying's 15 feet). */
     rangeDoubles: z.literal(true).optional(),
     /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell

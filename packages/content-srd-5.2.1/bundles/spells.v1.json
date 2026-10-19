@@ -11163,7 +11163,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "reposes": true,
+   "targets": {
+    "count": 1
+   },
+   "grant": {
+    "name": "Gentle Repose",
+    "tags": [
+     "gentle-repose"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    },
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false
+   }
   },
   "classes": [
    "cleric",
@@ -19395,7 +19413,13 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "revives": {
+    "hitPoints": "one",
+    "withinMinutes": 14400,
+    "notUndead": true,
+    "endsPoison": true
+   }
   },
   "classes": [
    "bard",
@@ -19783,7 +19807,12 @@
    "healing": null,
    "targetTypes": [
     "humanoid"
-   ]
+   ],
+   "revives": {
+    "hitPoints": "all",
+    "withinMinutes": 14400,
+    "rollsSpecies": true
+   }
   },
   "classes": [
    "druid"
@@ -19998,7 +20027,14 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "revives": {
+    "hitPoints": "all",
+    "withinMinutes": 52560000,
+    "notUndead": true,
+    "endsPoison": true,
+    "taxesCasterAfterMinutes": 525600
+   }
   },
   "classes": [
    "bard",
@@ -20114,7 +20150,11 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "revives": {
+    "hitPoints": "one",
+    "withinMinutes": 1
+   }
   },
   "classes": [
    "cleric",
@@ -24094,7 +24134,14 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "revives": {
+    "hitPoints": "all",
+    "withinMinutes": 105120000,
+    "newBody": true,
+    "endsPoison": true,
+    "endsCurses": true
+   }
   },
   "classes": [
    "cleric",

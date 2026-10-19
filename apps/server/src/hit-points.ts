@@ -39,12 +39,11 @@ import {
   makeEffect,
   STABLE_RECOVERY_TAG,
   NO_HEALING_TAG,
-  reduceExhaustion,
   removeConditionDirect,
   sourceOf,
   type EffectNarration
 } from "./effects.js";
-import { reconcileEquipment } from "./inventory.js";
+import { returnToLife } from "./death.js";
 import { offerDamageReaction } from "./damage-reactions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
@@ -864,9 +863,8 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
 }
 
 /**
- * SRD "Dead": the one way back. The GM applies the revival (Revivify, Raise Dead, a story) and names the hit points it
- * gives. The dying state and the Unconscious it brought end, a creature that died with Exhaustion comes back one
- * level lower, and it is no longer attuned to any magic item. Other conditions stay.
+ * SRD "Dead": the GM's way back, for a revival the server doesn't cast (a story, a wish). The GM names the hit points
+ * it gives, and the creature returns as a revival spell returns it (`returnToLife`).
  */
 export function reviveActor(
   state: GameState,
@@ -881,25 +879,8 @@ export function reviveActor(
   requireGm(scope, "Only the GM can revive a creature.");
   const actor = adjustableActor(state, actorId, scope);
   if (!isDead(actor)) throw new CommandRejectedError(`${actor.name} isn't dead.`);
-  actor.hp.current = Math.max(1, Math.min(actor.hp.maximum, hitPoints));
-  actor.deathSaves = null;
-  if (!actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious")))
-    removeConditionDirect(actor, "unconscious");
-  reduceExhaustion(actor);
-  if (actor.inventory.some((item) => item.attuned)) {
-    actor.inventory = actor.inventory.map((item) => (item.attuned ? { ...item, attuned: false } : item));
-    // Attunement feeds stored AC and slot maxima, so the loadout is reconciled as an inventory write would be.
-    const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
-    reconcileEquipment(actor, definition, { catalog: deps.catalog, role: "gm" });
-  }
-  const regained = actor.hp.current;
-  return [
-    {
-      kind: "condition",
-      text: `${actor.name} returns to life with ${regained} ${regained === 1 ? "hit point" : "hit points"}.`,
-      actorId
-    }
-  ];
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  return returnToLife(actor, hitPoints, { definition, ...(deps.catalog ? { catalog: deps.catalog } : {}) });
 }
 
 /** The GM sets a creature's hit point maximum. Current HP never exceeds it. A character's sheet sets the

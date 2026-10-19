@@ -1254,6 +1254,31 @@ export const DeathSavesSchema = z
   .strict();
 export type DeathSaves = z.infer<typeof DeathSavesSchema>;
 
+/** The game clock's furthest time in rounds (its 10,000,000 hours, ten rounds to the minute). */
+const CLOCK_ROUNDS_LIMIT = 10_000_000 * 600 + 599;
+
+/**
+ * When a creature died and what is left of it (SRD "Dead"), which the server stamps as it dies and clears once it lives
+ * again. The time is the game clock's, in rounds. A fight's rounds don't move the clock, so a death in a fight also
+ * keeps the fight's round, and when the fight ends the rounds it ran after the death are taken off the clock time.
+ * Revival spells read how long ago that was.
+ */
+export const DeathRecordSchema = z
+  .object({
+    clockRound: z.number().int().min(-CLOCK_ROUNDS_LIMIT).max(CLOCK_ROUNDS_LIMIT),
+    fightRound: z.number().int().min(1).max(1_000_000).optional(),
+    /** The scene whose fight it died in, so a parked fight's rounds count for it. */
+    sceneId: z.uuid().nullable().optional(),
+    /** What killed it, when the server knows (Disintegrate), named when a revival is refused. */
+    cause: z.string().min(1).max(120).optional(),
+    /** Nothing is left of its body (Disintegrate's gray dust): only a revival that makes a new body brings it back. */
+    bodyGone: z.literal(true).optional(),
+    /** Rounds of game time its body spent under Gentle Repose, which no revival's time limit counts. */
+    reposedRounds: z.number().int().min(0).max(CLOCK_ROUNDS_LIMIT).optional()
+  })
+  .strict();
+export type DeathRecord = z.infer<typeof DeathRecordSchema>;
+
 /** How a token's health shows on the map. `band` is the coarse badge everyone sees; other styles are gated by
  * `audience`, and only the GM and owner ever get exact fill. */
 export const HealthDisplayStyleSchema = z.enum(["band", "bar", "ring", "aura"]);
@@ -1560,6 +1585,8 @@ export const ActorSchema = z.object({
   effects: z.array(EffectInstanceSchema).max(20).default([]),
   /** Dying state at 0 HP (player characters only); null when not dying. */
   deathSaves: DeathSavesSchema.nullable().default(null),
+  /** When it died and what is left of its body, while it is dead. GM-only, never in a player or viewer projection. */
+  death: DeathRecordSchema.optional(),
   /** Spent limited-use counts by action id. */
   actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
   /** SRD Heroic Inspiration: held or not (never more than one). Spent to reroll one die; the GM gives it, and a Human

@@ -44,6 +44,7 @@ import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { costlyMaterialsFor } from "./spell-materials.js";
 import { spellSightFor } from "./spell-sight.js";
+import { spellDeathFor } from "./spell-death.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
@@ -1407,11 +1408,14 @@ const spellRecords = onlySrd(spells).map((spell) => {
   const fields = { ...spell.fields, ...correction };
   if (fields.saving_throw_ability && !abilityShort[fields.saving_throw_ability])
     throw new Error(`${spell.pk}: unexpected save ability ${fields.saving_throw_ability}`);
-  const effect = spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
-    distance: fields.range,
-    unit: fields.range_unit,
-    text: fields.range_text || null
-  });
+  const effect = {
+    ...spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
+      distance: fields.range,
+      unit: fields.range_unit,
+      text: fields.range_text || null
+    }),
+    ...spellDeathFor(slugOf(spell.pk))
+  };
   return {
     id: slugOf(spell.pk),
     name: fields.name,

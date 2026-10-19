@@ -8,7 +8,7 @@ import { startEncounter } from "../src/encounter.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { standsInSilence } from "../src/silence.js";
-import { build, catalog, clericInput, fight, FOE, HERO, wizardInput } from "./spell-casters.js";
+import { ALLY, build, catalog, clericInput, fight, FOE, HERO, wizardInput } from "./spell-casters.js";
 
 // SRD 5.2.1 Spells, "Components": a Verbal component needs a caster who can speak (not in Silence), a Somatic one a
 // free hand, and a Material one a Component Pouch or a Spellcasting Focus, or the material itself when it has a worth
@@ -140,7 +140,9 @@ describe("a Material component", () => {
     const raise = fight(cleric, { ally: true });
     strictComponents(raise.state);
     raise.hero.inventory.push(row("diamond-300", "Diamond (300 GP)"));
-    raise.resolve("spell-revivify", { targetIds: [HERO] });
+    const fallen = raise.state.actors.find((actor) => actor.id === ALLY)!;
+    fallen.hp = { ...fallen.hp, current: 0 };
+    raise.resolve("spell-revivify", { targetIds: [ALLY] });
     expect(raise.hero.inventory.some((item) => item.id === "diamond-300")).toBe(false);
   });
 
@@ -148,11 +150,14 @@ describe("a Material component", () => {
     const { state, resolve, hero } = fight(cleric);
     strictComponents(state);
     hero.currency = { ...hero.currency, cp: 1 };
-    expect(() => resolve("spell-gentle-repose", { targetIds: [] })).toThrowError(
+    // Its target is a corpse.
+    const corpse = state.actors.find((actor) => actor.id === FOE)!;
+    corpse.hp = { ...corpse.hp, current: 0 };
+    expect(() => resolve("spell-gentle-repose", { targetIds: [FOE] })).toThrowError(
       /Gentle Repose uses up 2 Copper Pieces, and Mira's purse holds 1 CP/
     );
     hero.currency = { ...hero.currency, cp: 5 };
-    resolve("spell-gentle-repose", { targetIds: [] });
+    resolve("spell-gentle-repose", { targetIds: [FOE] });
     expect(hero.currency.cp).toBe(3);
   });
 

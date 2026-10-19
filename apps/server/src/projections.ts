@@ -603,6 +603,8 @@ const PLAYER_ACTOR_FIELDS = {
   tokenAssetId: "table",
   conditions: "table",
   deathSaves: "table",
+  // When it died and how, which the revival rules read: the GM's.
+  death: "never",
   armorClass: "party",
   // Only says the GM set the character's AC by hand; the number is `armorClass`, which the party already sees.
   armorClassOverride: "party",

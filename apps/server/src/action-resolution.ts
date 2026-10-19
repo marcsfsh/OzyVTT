@@ -45,6 +45,7 @@ import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
+import { reviveOnCast } from "./resolution/revival.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
@@ -204,6 +205,7 @@ export function resolveDefinitionAction(
   applyConditionCures(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
+  reviveOnCast(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);

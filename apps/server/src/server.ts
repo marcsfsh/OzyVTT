@@ -76,6 +76,7 @@ import { turnReminder } from "./turn-reminder.js";
 import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
 import { pruneEndedSight } from "./vision/cast-sight.js";
 import { burnOutLights } from "./item-light.js";
+import { keepDeathRecords } from "./death.js";
 import { stampSceneChanges } from "./scenes.js";
 import type { SightContent } from "./vision/senses.js";
 
@@ -134,6 +135,12 @@ export function createServer(options: CreateServerOptions) {
         rememberExplored(state, sightContent());
       } catch (error) {
         console.error("remembering what the party saw failed:", error instanceof Error ? error.message : error);
+      }
+      try {
+        // When each creature died, for the revival spells' time limits.
+        keepDeathRecords(state, before);
+      } catch (error) {
+        console.error("keeping the times of death failed:", error instanceof Error ? error.message : error);
       }
       try {
         hideRollsOfHidden(state, before, sightContent());
