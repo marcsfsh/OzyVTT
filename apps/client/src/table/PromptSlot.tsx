@@ -60,6 +60,14 @@ function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
             ? `${plainActionName(reaction.actionName)} uses your Reaction to take less damage from the fall.`
             : `${plainActionName(reaction.actionName)} uses your Reaction, and ${reaction.sourceName} lands unharmed.`
       };
+    case "attack-targeted":
+      return {
+        title: `${reaction.sourceName} is attacking ${reaction.targetName ?? actor.name}`,
+        detail:
+          reaction.redirectChoices && reaction.redirectChoices.length > 0
+            ? `${plainActionName(reaction.actionName)} uses your Reaction to make an ally the target instead. The attack waits on your answer.`
+            : `${plainActionName(reaction.actionName)} uses your Reaction to make you the target instead. The attack waits on your answer.`
+      };
     case "casts-spell":
       return {
         title: `${reaction.sourceName} is casting a spell`,

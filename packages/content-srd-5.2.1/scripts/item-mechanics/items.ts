@@ -515,6 +515,23 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     light: { brightFeet: 15, dimFeet: 15, sunlight: true }
   },
 
+  // "Whenever an attacker makes a ranged attack roll against a target within 5 feet of you, you can take a Reaction to
+  // become the target of the attack instead": offered before the roll. Not modeled: the +2 AC against ranged attack
+  // rolls, since an AC bonus cannot be limited to them.
+  "arrow-catching-shield": {
+    actions: [
+      {
+        id: "catch-the-attack",
+        name: "Arrow-Catching Shield",
+        activation: "reaction",
+        description:
+          "Whenever an attacker makes a ranged attack roll against a target within 5 feet of you, you can take a Reaction to become the target of the attack instead.",
+        damage: [],
+        reaction: { trigger: "other-targeted-by-attack", response: "become-target", rangeFeet: 5, ranged: true }
+      }
+    ]
+  },
+
   // Prose-only items:
   //   `javelin-of-lightning`: Lightning where the javelin deals Piercing, and a Line area.
   //   `energy-bow`: deals Force where the bow's own type would go; unbound until weapon-swing overrides exist. Its
@@ -523,7 +540,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
   //   `mithral-armor` - no rider removes a base armor's stealth disadvantage or Strength requirement.
   //   `animated-shield` - hands-free wielding is not modeled.
-  //   `arrow-catching-shield` - an AC bonus cannot be limited to ranged attacks.
   //   `dancing-sword` - no detached-attacker model.
   //   `mace-of-terror` - an area Frightened effect; item actions have no radius.
   //   `ammunition-of-slaying` - entirely gated on creature type.

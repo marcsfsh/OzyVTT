@@ -604,6 +604,10 @@ another creature's answer (Cutting Words, Countercharm, Improve Fate) is a `roll
 creature at a time in turn order while the attack, save, check or damage waits at its roll. A hit's damage waits in
 the same way (`damage-window.ts`): another creature's answer to the damage roll, then the target's own reaction
 (Uncanny Dodge, Deflect Attacks, Stone's Endurance), and a failed save's damage waits for a reaction to taking damage.
+An attack can wait before its roll too, while a creature that may change its target answers (`attack-targeted`,
+`resolution/redirect.ts`): Redirect Attack hands it to an ally, the two swapping places, and an Arrow-Catching Shield's
+wielder takes it on itself. A guardian's ward (Shield Guardian's Protection) is an `attack-would-hit` prompt to the
+guardian for the creature that commands it, whose AC it raises.
 Players type die faces, never totals, and only while the table allows typed dice. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).

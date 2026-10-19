@@ -77,6 +77,7 @@ import {
   parkHeldObjectSave,
   parkReaction
 } from "./resolution/pending.js";
+import { parkForRedirect } from "./resolution/redirect.js";
 import {
   markCastTurn,
   markSpellUp,
@@ -206,14 +207,28 @@ export function resolveDefinitionAction(
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
+  // An attack another creature may turn onto someone else before it rolls (Redirect Attack, Arrow-Catching Shield):
+  // the attack is spent, and the answer rolls it at whichever creature it ends at.
+  if (parkForRedirect(ctx)) {
+    commitEconomy(ctx);
+    recallSpellSlot(ctx);
+    rollLastCharge(ctx);
+    spendAmmunition(ctx);
+    useUpConsumable(ctx);
+    recordLightAttack(ctx);
+    recordLoadingShot(ctx);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+  }
   rollAttack(ctx);
   checkKnockOut(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return look ? lookAtDamage(ctx, tape) : previewOf(ctx);
   // The roll is made, so a Vex marker, a Sap or Guiding Bolt's light it read is spent; a finishing replay already
-  // spent them.
-  if (input.economyPaid !== true) {
+  // spent them, unless it was held before its roll.
+  if (input.economyPaid !== true || input.redirectSettled === true) {
     spendVex(ctx);
     spendSap(ctx);
     spendDistraction(ctx);

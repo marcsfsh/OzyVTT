@@ -795,8 +795,9 @@ export const PendingReactionSchema = z
     /** What opened the window: an attack that hit the reactor, an enemy leaving its reach (opportunity attack), an
      *  attack that would hit before its damage (`attack-would-hit`), a creature damaging the reactor, a creature casting
      *  a spell the reactor may counter (`casts-spell`), a roll another creature may answer (`roll-answer`: Cutting
-     *  Words, Countercharm), damage the reactor is about to take from any source (`takes-damage`), or a creature
-     *  falling (`falls`). */
+     *  Words, Countercharm), damage the reactor is about to take from any source (`takes-damage`), a creature
+     *  falling (`falls`), or an attack about to roll that the reactor may give another target (`attack-targeted`:
+     *  Redirect Attack, Arrow-Catching Shield). */
     kind: z
       .enum([
         "hit-by-attack",
@@ -806,9 +807,19 @@ export const PendingReactionSchema = z
         "casts-spell",
         "roll-answer",
         "takes-damage",
-        "falls"
+        "falls",
+        "attack-targeted"
       ])
       .default("hit-by-attack"),
+    /** attack-targeted and a ward's attack-would-hit: the attack's target as it stands, by name. */
+    targetName: z.string().min(1).max(120).optional(),
+    /** attack-targeted (Redirect Attack): the allies the reactor may make the target instead, one picked with the
+     *  answer. */
+    redirectChoices: z
+      .array(z.object({ actorId: z.uuid(), name: z.string().min(1).max(120) }).strict())
+      .min(1)
+      .max(12)
+      .optional(),
     /** falls: how far the falling creature (`targetActorId`) is falling, in feet. */
     fallFeet: z.number().int().min(0).max(10000).optional(),
     actorId: z.uuid(),

@@ -96,6 +96,9 @@ export type ResolveInput = Readonly<{
   economyPaid?: boolean;
   /** A parked attack finishing after its target's AC reaction was answered, so it is not offered again. */
   acSettled?: boolean;
+  /** An attack held before its roll while a creature chose whether to turn it (Redirect Attack): its economy was spent
+   *  when it was held, its roll is made now, and it is not offered for turning again. */
+  redirectSettled?: boolean;
   /** A parked attack finishing after others answered its roll: who was asked already. */
   answersAsked?: readonly string[];
   /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */

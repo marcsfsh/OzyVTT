@@ -324,6 +324,9 @@ const PENDING_REACTION_FIELDS = {
   parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
   attackTotal: "derived",
+  // The attack's target as it stands, and the allies a Redirect Attack may hand it to: masked or left out when hidden.
+  targetName: "derived",
+  redirectChoices: "derived",
   // What kind of roll the reactor is asked to answer, and what its own answer does.
   rollKind: "player",
   answerDoes: "player",
@@ -533,6 +536,14 @@ export function projectPlayerCombat(
         return {
           ...copyPlayerFields(entry, PENDING_REACTION_FIELDS),
           sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName,
+          ...(entry.targetName !== undefined
+            ? {
+                targetName: isHiddenSource(entry.targetActorId, publicActorIds) ? HIDDEN_SOURCE : entry.targetName
+              }
+            : {}),
+          ...(entry.redirectChoices
+            ? { redirectChoices: entry.redirectChoices.filter((choice) => publicActorIds.has(choice.actorId)) }
+            : {}),
           // The roll the prompt answers, only when the player already saw it in their dice log.
           ...(attackRoll !== null ? { attackRoll } : {}),
           // Whether the reactor's own reaction lasts (Shield): a fact of their own spell.

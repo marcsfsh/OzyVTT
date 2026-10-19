@@ -3175,6 +3175,39 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       ability: AbilitySchema,
       rangeFeet: ReactionRangeFeet
     })
+    .strict(),
+  /** Redirect Attack (the Goblin Boss): when a creature it can see makes an attack roll against the reactor, before the
+   *  roll, an ally of a size it names within `rangeFeet` becomes the target instead, the two swapping places when
+   *  `swap` says so. */
+  z
+    .object({
+      trigger: z.literal("targeted-by-attack"),
+      response: z.literal("redirect-to-ally"),
+      rangeFeet: ReactionRangeFeet,
+      allySizes: z.array(SizeSchema).min(1).max(6).optional(),
+      swap: z.literal(true).optional()
+    })
+    .strict(),
+  /** Arrow-Catching Shield: when an attacker makes an attack roll (a ranged one, with `ranged`) against another
+   *  creature within `rangeFeet` of the reactor, before the roll, the reactor becomes the target instead. */
+  z
+    .object({
+      trigger: z.literal("other-targeted-by-attack"),
+      response: z.literal("become-target"),
+      rangeFeet: ReactionRangeFeet,
+      ranged: z.literal(true).optional()
+    })
+    .strict(),
+  /** Shield Guardian's Protection: when an attack roll hits the creature that commands the reactor (the amulet's
+   *  wearer) within `rangeFeet` of it, that creature gains `amount` to AC, against that attack too, until the start of
+   *  the reactor's next turn. */
+  z
+    .object({
+      trigger: z.literal("ward-hit-by-attack"),
+      response: z.literal("ward-ac-bonus"),
+      amount: z.number().int().min(1).max(10),
+      rangeFeet: ReactionRangeFeet
+    })
     .strict()
 ]);
 export type ActionReaction = z.infer<typeof ActionReactionSchema>;
