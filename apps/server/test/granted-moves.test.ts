@@ -14,6 +14,7 @@ import {
   grantTeleport
 } from "../src/granted-moves.js";
 import { proneInSharedSpace } from "../src/occupied-space.js";
+import { projectPlayerView } from "../src/projections.js";
 import { applyMovementRules, movementStatus } from "../src/movement-rules.js";
 import { creatureDistance, footprintOf, mapDistance } from "../src/movement-narration.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
@@ -176,6 +177,20 @@ describe("a granted move", () => {
     expect(activeMoveGrant(state, actor(state, DRAGON))).toBeNull();
     dropStaleGrants(state);
     expect(actor(state, DRAGON).effects).toEqual([]);
+  });
+
+  it("stays off the effects players are sent, which would name the turn it belongs to", () => {
+    const state = game(DRAGON, { [DRAGON]: cell(1, 0), [HERO]: cell(0, 0) });
+    grantMove(state, actor(state, HERO), {
+      id: "flee",
+      name: "Dissonant Whispers",
+      feet: 30,
+      provokes: true,
+      awayFromActorId: DRAGON
+    });
+    const seen = projectPlayerView(state, undefined, () => null).actors.find((candidate) => candidate.id === HERO)!;
+    expect(seen.effects.map((effect) => effect.name)).toEqual(["Dissonant Whispers"]);
+    expect(JSON.stringify(seen.effects)).not.toContain("grantedMove");
   });
 
   it("is reported with the creature's movement", () => {

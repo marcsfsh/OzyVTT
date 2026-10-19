@@ -454,6 +454,10 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
+    // A granted move names the turn it belongs to and the creature it must flee, which can be hidden; its own
+    // character's grant reaches a player through `actor:movement`.
+    grantedMove: _grantedMove,
+    grantedTeleport: _grantedTeleport,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

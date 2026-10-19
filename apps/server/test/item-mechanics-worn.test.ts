@@ -775,20 +775,26 @@ describe("the worn items left as prose, by name", () => {
   const rows = loadMagicItems();
   const worn = rows.filter((row) => row.category === "wondrous-item" && row.slot !== "wondrous");
 
-  it("leaves the five casts that produced the wrong thing unauthored, by name", () => {
+  it("leaves the three casts that produced the wrong thing unauthored, by name", () => {
     // Each of these produced the wrong effect when driven (e.g. a Helm of Teleportation dealing 1d100
     // Force damage). Re-authoring one adds a `casts` entry and fails here.
     for (const [id, why] of [
       ["helm-of-teleportation", "teleport's damage.roll is the SRD's 1d100 MISHAP table"],
-      ["cape-of-the-mountebank", "dimension-door's 4d6 is arrival damage, not a cast's damage"],
       ["circlet-of-blasting", "scorching-ray's 2d6 is ONE of three rays, at the wearer's bonus not the circlet's +5"],
-      ["boots-of-levitation", "levitate's Con save is an unwilling target's; the boots cast on yourself"],
       ["cloak-of-the-bat", "polymorph's Wis save is an unwilling target's; the cloak casts on yourself"]
     ] as const) {
       const row = view.equipmentRecord(id)!;
       expect(row.casts ?? [], `${id} - ${why}`).toEqual([]);
       expect(row.actions ?? [], `${id} - the charge-alone shape does not rescue a cast`).toEqual([]);
     }
+    // Two came back once the engine could carry them: the Cape's Dimension Door is a teleport whose 4d6 lands only on
+    // an arrival in a filled space, and the Boots levitate their wearer with no save to make against themselves.
+    expect(view.equipmentRecord("cape-of-the-mountebank")!.casts?.map((cast) => cast.spellId)).toEqual([
+      "dimension-door"
+    ]);
+    expect(view.spellRecord?.("dimension-door")?.effect?.damage).toEqual([]);
+    const boots = view.equipmentRecord("boots-of-levitation")!.actions ?? [];
+    expect(boots.map((action) => [action.grants?.tags, action.save])).toEqual([[["levitating"], undefined]]);
     // And the two blocked on healing carry nothing at all.
     for (const id of ["periapt-of-health", "necklace-of-prayer-beads"]) {
       const row = view.equipmentRecord(id)!;

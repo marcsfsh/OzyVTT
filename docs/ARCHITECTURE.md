@@ -522,7 +522,8 @@ atlas that name it.
 The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
 (`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that
 crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
-`codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day.
+`codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day. Pass time
+with a travel pace (SRD Travel Pace) logs how far the party went and what the pace does to its checks.
 
 ## Public HTTP API
 
