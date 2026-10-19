@@ -180,6 +180,36 @@ describe("Divine Sense and Detect Evil and Good", () => {
     expect(sensed(walled, SESSION_A)).toEqual([]);
   });
 
+  // SRD Ring of Mind Shielding: "immune to magic that allows other creatures to ... know your creature type."
+  it("doesn't sense a creature wearing a Ring of Mind Shielding with Detect Evil and Good", () => {
+    const spell = loadSpells().find((entry) => entry.id === "detect-evil-and-good")!;
+    const near = { positions: { [GOBLIN]: cell(5, 5) } };
+    const withSpell = (state: GameState) => {
+      state.actors[0]!.effects = [
+        {
+          ...structuredClone(divineSense),
+          detects: structuredClone(spell.effect!.grant!.detects!),
+          spell: { id: "detect-evil-and-good", level: 1 }
+        }
+      ];
+      return state;
+    };
+    expect(sensed(withSpell(dark(near)), SESSION_A)).toHaveLength(1);
+    const ring = {
+      id: "ring-of-mind-shielding",
+      name: "Ring of Mind Shielding",
+      quantity: 1,
+      equipped: true,
+      attuned: true,
+      category: "ring"
+    };
+    const shielded = withSpell(dark({ ...near, actors: { [GOBLIN]: { definitionId: "zombie", inventory: [ring] } } }));
+    expect(sensed(shielded, SESSION_A)).toEqual([]);
+    // Divine Sense isn't a spell, so the ring doesn't hide the zombie from it.
+    const sensedByPaladin = dark({ ...near, actors: { [GOBLIN]: { definitionId: "zombie", inventory: [ring] } } });
+    expect(sensed(sensedByPaladin, SESSION_A)).toHaveLength(1);
+  });
+
   it("is what the Paladin's Divine Sense grants", () => {
     const action = actionOf(classFeature("paladin", "channel-divinity")?.actions, "divine-sense");
     expect(action.grants?.detects).toEqual(divineSense.detects);

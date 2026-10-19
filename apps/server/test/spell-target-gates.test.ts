@@ -8,7 +8,15 @@ import { RulesBlockedError } from "../src/game-store.js";
 import { castAreaOf } from "../src/item-actions.js";
 import { liveAbilityScores } from "../src/live-abilities.js";
 import { creatureTypeOf } from "../src/statblock-facts.js";
-import { catalogRow } from "./equipment-table.js";
+import {
+  catalogRow,
+  fight as gearFight,
+  IDS,
+  resolveAt,
+  tableOf,
+  wizardInput as gearWizard,
+  write
+} from "./equipment-table.js";
 import { ALLY, build, castOf, catalog, clericInput, fight, FOE, FOE2, HERO, view } from "./spell-casters.js";
 
 // SRD 5.2.1 spells whose targets the text limits: a Tiny Beast (Animal Messenger), an Intelligence of 3 or less
@@ -211,5 +219,29 @@ describe("Truesight against a visual illusion", () => {
     const saves = state.combat.pendingSaves;
     expect(saves.find((save) => save.targetActorId === FOE2)).toMatchObject({ autoSucceeds: "Truesight" });
     expect(saves.find((save) => save.targetActorId === FOE)?.autoSucceeds).toBeUndefined();
+  });
+});
+
+describe("a Trident of Fish Command", () => {
+  function trident(foe: string) {
+    const gear = tableOf({ [IDS.wizard]: gearWizard() });
+    write(gear, IDS.wizard, catalogRow("trident-of-fish-command", { attuned: true }), "gm");
+    Object.assign(gear.actor(IDS.foe), { definitionId: foe, name: monster(foe)!.name });
+    gear.state.definitions.push({ id: foe, definition: monster(foe)! } as never);
+    gearFight(gear, IDS.wizard);
+    gear.state.combat = { ...gear.state.combat, ruleExceptions: { targeting: "strict" } };
+    return gear;
+  }
+
+  it("casts Dominate Beast only on a Beast with a Swim Speed", () => {
+    const wolf = trident("wolf");
+    expect(refusal(() => resolveAt(wolf, IDS.wizard, "item-trident-of-fish-command-cast-dominate-beast", []))).toMatch(
+      /targets a creature with a Swim Speed, and Wolf has none/
+    );
+    const shark = trident("reef-shark");
+    resolveAt(shark, IDS.wizard, "item-trident-of-fish-command-cast-dominate-beast", []);
+    expect(shark.state.combat.pendingSaves).toEqual([
+      expect.objectContaining({ targetActorId: IDS.foe, ability: "wis", dc: 15 })
+    ]);
   });
 });

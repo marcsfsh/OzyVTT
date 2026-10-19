@@ -48,7 +48,12 @@ export function huntersLoreOf(
     damageImmunities: defences.immunities.map((row) => row.type),
     damageResistances: defences.resistances.map((row) => row.type),
     damageVulnerabilities: defences.vulnerabilities.map((row) => row.type),
-    conditionImmunities: CONDITION_IDS.filter((conditionId) => immuneToCondition(creature, conditionId, source))
+    // The stat block's own, which the creature holds from the moment it is placed, and what its gear and effects add.
+    conditionImmunities: CONDITION_IDS.filter(
+      (conditionId) =>
+        (definition?.conditionImmunities ?? []).includes(conditionId) ||
+        immuneToCondition(creature, conditionId, source)
+    )
   };
 }
 
