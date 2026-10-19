@@ -2,6 +2,7 @@ import { holdsFeature } from "../class-features.js";
 import { RAGING_TAG } from "../effects.js";
 import { grantFeet, grantMove, grantTeleport, payOwedAction } from "../granted-moves.js";
 import type { ResolveContext } from "./context.js";
+import { isMagicAction } from "./economy.js";
 
 /**
  * What a resolve gives its creature to move or teleport with, beside the turn's own movement (SRD 5.2.1):
@@ -92,12 +93,15 @@ export function applyMovementGrants(ctx: ResolveContext): void {
   if (ctx.crit && ctx.attack !== null && holdsFeature(definition, "remarkable-athlete", "Remarkable Athlete"))
     half(false, "Remarkable Athlete");
   // "Immediately after you take the Attack action or the Magic action, you can teleport up to 30 feet to an unoccupied
-  // space you can see."
+  // space you can see." Once the action is taken: after the last attack of an Extra Attack or the last ray of a spell.
   const attackOrMagic =
-    action.activation === "action" &&
-    (ctx.attack !== null || action.spellId !== undefined || action.save !== undefined);
+    action.activation === "action" && (ctx.attack !== null || action.save !== undefined || isMagicAction(action));
+  const open = ctx.plan.instance;
+  const actionTaken =
+    open === null || open.actorId !== attacker.id || Object.values(open.components).every((left) => left <= 0);
   if (
     attackOrMagic &&
+    actionTaken &&
     !teleport &&
     holdsFeature(definition, "boon-of-dimensional-travel", "Boon of Dimensional Travel")
   ) {

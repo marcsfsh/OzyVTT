@@ -449,7 +449,8 @@ describe("tier 3: cross-record references, continued", () => {
     expect(validateForPublish("species", species("lineage"), contextWith()).valid).toBe(true);
   });
 
-  it("refuses a choice authored on a LINEAGE trait, which the catalog flattens with no lineage tag", () => {
+  // The build offers a lineage trait's pick only to a character of that lineage (the High Elf's cantrip).
+  it("publishes a choice authored on a lineage trait", () => {
     const validity = validateForPublish(
       "species",
       {
@@ -469,7 +470,7 @@ describe("tier 3: cross-record references, continued", () => {
       },
       contextWith()
     );
-    expect(messages(validity)).toContain("Lineage traits cannot carry choices yet");
+    expect(validity.issues.filter((issue) => issue.path[0] === "lineages")).toEqual([]);
   });
 
   it('refuses a monster with no challenge rating or creature type: the picker would show "CR 0 unknown"', () => {

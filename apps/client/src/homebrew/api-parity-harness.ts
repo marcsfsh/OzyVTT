@@ -571,6 +571,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].waives",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spell components a feature's cast goes without (Wild Companion's Find Familiar) - set by the builder from the feature's grant",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "summonScaling.**",
     types: ["monster"],
     reason:
@@ -617,6 +624,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason:
       "attack keys the action rows do not enumerate: surfaced when the bare-group false credit was removed (this batch's adversarial review)",
     status: "gap"
+  },
+  {
+    at: "actions[].attack.countWithItself",
+    types: ACTION_CARRIERS,
+    reason:
+      "a weapon's extra attacks made with itself alone (Thirsting Blade's pact weapon) - set by the server on the bonded weapon's swing",
+    status: "permanent: system-synthesised"
   },
   {
     at: "actions[].attack.criticalBonusDice",
@@ -1334,6 +1348,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "freeCastOf.**",
+    types: "*",
+    reason:
+      "a free casting a feature gives the spells other features grant (Natural Recovery's Circle Spell): no control at feature scope yet",
+    status: "gap"
+  },
+  {
     at: "extraSpellLists",
     types: "*",
     reason:
@@ -1396,6 +1417,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["class"],
     reason: "zero of 12 SRD classes author it (\u00a74); the group's rows never offered it",
     status: "permanent: zero SRD authors"
+  },
+  {
+    at: "startingEquipment[].items[].pickFrom",
+    types: ["class", "background"],
+    reason:
+      "the items a kit entry lets its taker pick (the Bard's instrument of choice): the kit editor writes items without a pick list yet",
+    status: "gap"
   },
   {
     at: "multiclassProficiencies.**",

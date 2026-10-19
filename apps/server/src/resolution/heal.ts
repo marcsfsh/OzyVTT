@@ -35,7 +35,10 @@ export function applyHealing(ctx: ResolveContext): void {
   if (healing.toMaximum) total = toMaximum.reduce((sum, room) => sum + room, 0);
   else
     for (let use = 0; use < uses; use += 1) {
-      const rolled = rollDice(healing.formula, healer.maximized ? (sides) => sides : deps.random);
+      const rolled = rollDice(
+        healing.formula,
+        healer.maximized || healing.maximized === true ? (sides) => sides : deps.random
+      );
       // A flat amount ("1" a point) is no roll for the dice log.
       if (rolled.terms.some((term) => term.kind === "dice")) recordRoll(ctx, rolled, "healing");
       total += rolled.total;

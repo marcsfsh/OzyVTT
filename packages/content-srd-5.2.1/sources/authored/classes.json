@@ -1970,8 +1970,8 @@
             "quantity": 2
           },
           {
-            "id": "quarterstaff",
-            "name": "Quarterstaff"
+            "id": "arcane-focus-staff",
+            "name": "Arcane Focus (Staff)"
           },
           {
             "id": "robe",
@@ -2662,7 +2662,8 @@
           "choose": 2,
           "fromCatalog": "wizard-spells",
           "minSpellLevel": 3,
-          "maxSpellLevel": 3
+          "maxSpellLevel": 3,
+          "fromSpellbook": true
         }
       }
     ]

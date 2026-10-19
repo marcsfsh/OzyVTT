@@ -26,15 +26,15 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Barbarian features (23) | 22 | 0 | 1 |
 | Bard features (16) | 16 | 0 | 0 |
 | Cleric features (19) | 17 | 1 | 1 |
-| Druid features (21) | 18 | 3 | 0 |
+| Druid features (21) | 19 | 2 | 0 |
 | Fighter features (21) | 20 | 0 | 1 |
 | Monk features (30) | 25 | 2 | 3 |
 | Paladin features (26) | 25 | 1 | 0 |
 | Ranger features (22) | 20 | 2 | 0 |
 | Rogue features (23) | 21 | 1 | 1 |
-| Sorcerer features (18) | 16 | 2 | 0 |
+| Sorcerer features (18) | 17 | 1 | 0 |
 | Warlock features (20) | 18 | 2 | 0 |
-| Wizard features (15) | 11 | 3 | 1 |
+| Wizard features (15) | 13 | 1 | 1 |
 | Species traits (77) | 75 | 0 | 2 |
 | Backgrounds (4) | 4 | 0 | 0 |
 | Feats (19) | 17 | 2 | 0 |
@@ -44,7 +44,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 15 | 0 | 0 |
 | Rules glossary (155) | 128 | 11 | 16 |
-| All records (2418) | 1913 | 360 | 145 |
+| All records (2418) | 1917 | 356 | 145 |
 
 ## How records are classified
 
@@ -570,9 +570,9 @@ Notes on the curated rows:
 
 ## Druid features
 
-**Enforced (18):** Ability Score Improvement · Archdruid · Beast Spells · Circle of the Land Spells (Circle of the Land) · Circle of the Land Spells (Level 5) (Circle of the Land) · Circle of the Land Spells (Level 7) (Circle of the Land) · Circle of the Land Spells (Level 9) (Circle of the Land) · Druid Subclass · Druidic · Elemental Fury · Epic Boon · Improved Elemental Fury · Natural Recovery (Circle of the Land) · Nature's Ward (Circle of the Land) · Primal Order · Spellcasting · Wild Resurgence · Wild Shape
+**Enforced (19):** Ability Score Improvement · Archdruid · Beast Spells · Circle of the Land Spells (Circle of the Land) · Circle of the Land Spells (Level 5) (Circle of the Land) · Circle of the Land Spells (Level 7) (Circle of the Land) · Circle of the Land Spells (Level 9) (Circle of the Land) · Druid Subclass · Druidic · Elemental Fury · Epic Boon · Improved Elemental Fury · Natural Recovery (Circle of the Land) · Nature's Ward (Circle of the Land) · Primal Order · Spellcasting · Wild Companion · Wild Resurgence · Wild Shape
 
-**Guided (3):** Land's Aid (Circle of the Land) · Nature's Sanctuary (Circle of the Land) · Wild Companion
+**Guided (2):** Land's Aid (Circle of the Land) · Nature's Sanctuary (Circle of the Land)
 
 Notes on the curated rows:
 
@@ -583,12 +583,12 @@ Notes on the curated rows:
 | Elemental Fury | enforced | Primal Strike's extra damage, of the type the Druid picks, rides a weapon attack or a Beast form's attack in Wild Shape once a turn (resolution/hit-riders.ts). Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp. |
 | Improved Elemental Fury | enforced | Primal Strike deals 2d8. Improved Potent Spellcasting adds 300 feet to a Druid cantrip of 10 feet or more (effective-actions.ts, resolution/spell-targets.ts). |
 | Land's Aid (Circle of the Land) | guided | The save and its Necrotic damage against the Druid's spell save DC are applied, and a use of Wild Shape is spent. Healing the creature it picks is the GM's. |
-| Natural Recovery (Circle of the Land) | enforced | In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Druid level, none of level 6 or higher, once per Long Rest. |
+| Natural Recovery (Circle of the Land) | enforced | One level 1+ spell the Druid has prepared from its Circle Spells is cast with no slot, once per Long Rest: each land spell's free casting spends the one counter (character-build.ts). In the step a Short Rest opens, conversions.ts recovers spent slots of combined level up to half the Druid level (round up), none of level 6 or higher, once per Long Rest. |
 | Primal Order | enforced | Magician's extra cantrip and its Wisdom modifier, at least +1, on Arcana and Nature checks (ability-checks.ts), and Warden's training, are applied. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
-| Wild Companion | guided | Find Familiar is always prepared and cast as a Magic action with a slot or a use of Wild Shape; the familiar is Fey and leaves when the Druid finishes a Long Rest (character-build.ts, summons.ts). Going without the Material component is the GM's. |
+| Wild Companion | enforced | Find Familiar is always prepared and cast as a Magic action with a slot or a use of Wild Shape, with no Material component (resolution/components.ts reads the cast's waiver); the familiar is Fey and leaves when the Druid finishes a Long Rest (character-build.ts, summons.ts). |
 | Wild Resurgence | enforced | conversions.ts spends a spell slot for a use of Wild Shape once a turn, and a use of Wild Shape for a level 1 slot once per Long Rest. |
-| Wild Shape | enforced | The Druid picks its known forms on the sheet, as many as its level allows and within its Challenge Rating and Fly Speed limits, and replaces one after a Long Rest (transform/known-forms.ts). The Bonus Action takes one for hours equal to half its Druid level: the Beast's statistics with the Druid's Hit Points, mind, features and proficiencies, Temporary Hit Points equal to its Druid level, no spells, Concentration kept and gear melded or worn as it picks (transform/compose.ts). It ends as a Bonus Action, on another use, on the Incapacitated condition or at 0 Hit Points (transform/rules.ts). |
+| Wild Shape | enforced | The Druid picks its known forms on the sheet, as many as its level allows and within its Challenge Rating and Fly Speed limits, and replaces one after a Long Rest (transform/known-forms.ts). The Bonus Action takes one for hours equal to half its Druid level: the Beast's statistics with the Druid's Hit Points, mind, type, class features (their defences included), feats and proficiencies (the higher printed modifiers used), Temporary Hit Points equal to its Druid level, no spells, Concentration kept and gear melded or worn as it picks (transform/compose.ts). It ends as a Bonus Action, on another use, on the Incapacitated condition or at 0 Hit Points (transform/rules.ts). |
 
 ## Fighter features
 
@@ -703,16 +703,16 @@ Notes on the curated rows:
 
 ## Sorcerer features
 
-**Enforced (16):** Ability Score Improvement · Arcane Apotheosis · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Wings (Draconic Sorcery) · Epic Boon · Font of Magic · Innate Sorcery · Metamagic · Sorcerer Subclass · Sorcerous Restoration · Sorcery Incarnate · Spellcasting
+**Enforced (17):** Ability Score Improvement · Arcane Apotheosis · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Companion (Draconic Sorcery) · Dragon Wings (Draconic Sorcery) · Epic Boon · Font of Magic · Innate Sorcery · Metamagic · Sorcerer Subclass · Sorcerous Restoration · Sorcery Incarnate · Spellcasting
 
-**Guided (2):** Dragon Companion (Draconic Sorcery) · Elemental Affinity (Draconic Sorcery)
+**Guided (1):** Elemental Affinity (Draconic Sorcery)
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
 | Arcane Apotheosis | enforced | While Innate Sorcery is active, the first Metamagic option on each of the Sorcerer's turns in a fight costs no Sorcery Points (resolution/metamagic.ts). |
-| Dragon Companion (Draconic Sorcery) | guided | Summon Dragon is cast free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts). Going without the Material component is the GM's. |
+| Dragon Companion (Draconic Sorcery) | enforced | Summon Dragon is cast with no Material component (resolution/components.ts reads the cast's waiver), free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts). |
 | Dragon Wings (Draconic Sorcery) | enforced | The Bonus Action gives a Fly Speed of 60 feet, once per Long Rest, and conversions.ts restores the use for 3 Sorcery Points. |
 | Elemental Affinity (Draconic Sorcery) | guided | Resistance to the chosen type is applied, and the Charisma modifier is added to a spell's damage of that type, never a weapon's (resolution/damage.ts). A spell of several rolls gets it on each, which the GM trims to one. |
 | Font of Magic | enforced | conversions.ts turns a spell slot into Sorcery Points equal to its level, and Sorcery Points into a slot at the SRD costs (2, 3, 5, 6 or 7 for levels 1 to 5, each at its Sorcerer level) as a Bonus Action. A created slot is gone after a Long Rest, which sets the slots to their maximum. |
@@ -734,7 +734,7 @@ Notes on the curated rows:
 | Contact Patron | enforced | Contact Other Plane is always prepared and cast once per Long Rest with no slot, and that cast succeeds on its own Intelligence save with no roll (resolution/pending.ts). What the patron answers is the GM's. |
 | Dark One's Blessing (Fiend Patron) | enforced | When the Warlock drops an enemy to 0 Hit Points, or anyone does within 10 feet of it on the map, it gains Temporary Hit Points equal to its Charisma modifier plus its Warlock level, at least 1, keeping the higher (dark-ones-blessing.ts). |
 | Dark One's Own Luck (Fiend Patron) | enforced | roll-answers.ts offers it on the Warlock's check or save once the roll is seen: 1d10 is added, and a use is spent. |
-| Eldritch Invocations | guided | Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied, and level-up-picks.ts lets a level up replace one invocation. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). Devil's Sight and Witch Sight are senses dynamic vision reads (vision/senses.ts), and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Pact of the Chain casts Find Familiar as a Magic action and adds its special forms (character-build.ts, summons.ts); forgoing an attack so the familiar attacks with its Reaction is the GM's. Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's. |
+| Eldritch Invocations | guided | Agonizing Blast adds Charisma to the damage of the cantrip picked for it (effective-actions.ts), Eldritch Spear its range and Repelling Blast its push (resolution/masteries.ts), each repeatable on another cantrip. Eldritch Mind's Advantage and the free casts are applied, an "on yourself" cast targets only the Warlock and Fiendish Vigor's die is at its highest; level-up-picks.ts lets a level up replace one invocation. Pact of the Blade's Bonus Action conjures or bonds the weapon picked, with proficiency, Charisma, the three damage types and its use as a focus, and Thirsting and Devouring Blade add attacks with it (pact-weapon.ts); Eldritch Smite and Lifedrinker ride its hits (resolution/hit-options.ts). Pact of the Tome's book holds three cantrips and two Rituals from any list, prepared and a Spellcasting Focus while it is carried, conjured anew with its picks re-made at the end of a rest; Gift of the Protectors' page holds the names written on it and drops one to 1 Hit Point once a Long Rest (book-of-shadows.ts). Gift of the Depths gives its Swim Speed and water breathing, Lessons of the First Ones its Origin feat, Devil's Sight and Witch Sight are senses dynamic vision reads, and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Pact of the Chain casts Find Familiar as a Magic action with its special forms (summons.ts). Forgoing an attack for the familiar's, Investment of the Chain Master and Gaze of Two Minds are the GM's. |
 | Eldritch Master | enforced | Magical Cunning restores every expended Pact Magic slot (conversions.ts). |
 | Hurl Through Hell (Fiend Patron) | guided | It rides an attack roll's hit once a Long Rest: the Charisma save, 8d10 Psychic unless the target is a Fiend, and Incapacitated off the map with nothing able to target it until the end of the Warlock's next turn, when it returns to the space it left or the nearest unoccupied one (off-plane.ts). conversions.ts restores the use with a Pact Magic slot. |
 | Magical Cunning | enforced | Outside a fight, conversions.ts restores expended Pact Magic slots up to half the maximum, once per Long Rest. |
@@ -742,9 +742,9 @@ Notes on the curated rows:
 
 ## Wizard features
 
-**Enforced (11):** Ability Score Improvement · Arcane Recovery · Epic Boon · Evocation Savant (Evoker) · Memorize Spell · Overchannel (Evoker) · Potent Cantrip (Evoker) · Scholar · Sculpt Spells (Evoker) · Spellcasting · Wizard Subclass
+**Enforced (13):** Ability Score Improvement · Arcane Recovery · Epic Boon · Evocation Savant (Evoker) · Memorize Spell · Overchannel (Evoker) · Potent Cantrip (Evoker) · Scholar · Sculpt Spells (Evoker) · Signature Spells · Spell Mastery · Spellcasting · Wizard Subclass
 
-**Guided (3):** Empowered Evocation (Evoker) · Signature Spells · Spell Mastery
+**Guided (1):** Empowered Evocation (Evoker)
 
 **Reference (1):** Ritual Adept
 
@@ -754,12 +754,13 @@ Notes on the curated rows:
 | --- | --- | --- |
 | Arcane Recovery | enforced | In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Wizard level, none of level 6 or higher, once per Long Rest. |
 | Empowered Evocation (Evoker) | guided | The Intelligence modifier is added to a Wizard Evocation spell's damage (resolution/damage.ts). A spell of several rolls (Scorching Ray's rays) gets it on each, which the GM trims to one. |
+| Evocation Savant (Evoker) | enforced | Two Evocation spells of level 2 or lower go into the spellbook at Wizard 3 (character-build.ts), and one more Evocation spell goes in free each time a new level of spell slots opens, beside the two a Wizard level gives (spell-choices.ts). |
 | Memorize Spell | enforced | Finishing a Short Rest opens a prepare step with one change (rests.ts): one prepared spell swapped for another from the spellbook. |
 | Overchannel (Evoker) | enforced | The cast offers Overchannel beside Metamagic (resolution/metamagic.ts): it deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts). |
 | Potent Cantrip (Evoker) | enforced | resolution/damage.ts deals half an Evoker's cantrip damage on a missed attack roll, and resolution/pending.ts halves it on a successful save, with no other effect. |
 | Sculpt Spells (Evoker) | enforced | An Evoker's Evocation spell protects up to 1 plus the spell's level creatures the Wizard can see: they succeed on its save with no roll and take no damage (resolution/pending.ts). Saves its area calls for later are rolled as usual. |
-| Signature Spells | guided | Both spells are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts). That they come from the spellbook is the player's to keep. |
-| Spell Mastery | guided | The level 1 and level 2 picks are always prepared and cast at will at their own level with no slot (character-build.ts). That they come from the spellbook with a casting time of an action, and swapping one after a Long Rest, are the GM's. |
+| Signature Spells | enforced | Two level 3 spells from the spellbook (spellbook.ts checks the pick as a build or a level up makes it) are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts). |
+| Spell Mastery | enforced | The level 1 and level 2 picks, spells from the spellbook with a casting time of an action (character-offers.ts filters the casting time, spellbook.ts checks the book), are always prepared and cast at will at their own level with no slot (character-build.ts); one is swapped for another of the same level from the book in the step a Long Rest opens (ledger-rechoice.ts). |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
 
 ## Species traits
@@ -772,6 +773,7 @@ Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Arcane Cantrip (High Elf) | enforced | The High Elf knows Prestidigitation, a pick the build fills when the ledger names none (character-build.ts), or the Wizard cantrip it swapped in during the step a Long Rest opens (ledger-rechoice.ts). |
 | Breath Weapon (Dragonborn) | enforced | The ancestry's own Breath Weapon row carries the save, the area and the damage, and resolution/economy.ts takes it in place of an attack. |
 | Damage Resistance (Dragonborn) | enforced | The ancestry's own Damage Resistance row grants the Resistance, which hit-points.ts applies. |
 | Giant Ancestry (Goliath) | enforced | Fire's Burn, Frost's Chill and Hill's Tumble ride a hit that deals damage (resolution/hit-options.ts), Storm's Thunder is offered as a Reaction, and Stone's Endurance as a Reaction to damage from a hit or a failed save, taking 1d12 plus the Constitution modifier off it before it lands (damage-window.ts). Cloud's Jaunt gives a 30-foot teleport taken on the map at once to an unoccupied space the Goliath can see (granted-moves.ts). |
@@ -798,7 +800,7 @@ Notes on the curated rows:
 | Record | State | How |
 | --- | --- | --- |
 | Boon of Combat Prowess | enforced | The ability score increase is applied, and roll-answers.ts offers Peerless Aim on a missed attack roll: the attack hits, and the boon waits for the start of the creature's next turn. |
-| Boon of Dimensional Travel | enforced | The ability score increase is applied, and after the Attack or Magic action resolution/movement-grants.ts gives a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space the creature can see. |
+| Boon of Dimensional Travel | enforced | The ability score increase is applied, and once each Attack or Magic action is taken (after its last attack or ray) resolution/movement-grants.ts gives a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space the creature can see. |
 | Boon of Fate | enforced | The ability score increase is applied. roll-answers.ts offers Improve Fate on the holder's own D20 Test, and asks by a prompt about another creature's within 60 feet: 2d4 is added or taken off, and the use returns when Initiative is rolled or on a rest. |
 | Boon of Irresistible Offense | guided | The ability score increase is applied, and its Bludgeoning, Piercing and Slashing damage ignores Resistance (hit-points.ts). The extra damage on a 20 is the GM's. |
 | Boon of Spell Recall | enforced | The ability score increase is applied, and resolution/spell-recall.ts rolls a d4 for a spell cast with a level 1 to 4 slot, keeping the slot when it matches the level. |

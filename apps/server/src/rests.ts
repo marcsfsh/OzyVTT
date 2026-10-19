@@ -27,6 +27,7 @@ import { gainHeroicInspiration } from "./heroic-inspiration.js";
 import { chargesAfterDawn, neverRegained } from "./item-charges.js";
 import { afterLongRest, deniedRestLine, holdsMaximumAtRest, restDeniedBy } from "./rest-triggers.js";
 import { divineInterventionWaiting } from "./divine-intervention.js";
+import { conjureBookOfShadows } from "./book-of-shadows.js";
 import { finishLongRest, openLongRest, type RestApplier } from "./long-rest.js";
 import { endTravelFor } from "./travel.js";
 
@@ -252,6 +253,7 @@ export function applyRest(
       actor.preparation = { changesLeft: 1 };
     // What a feature does "when you finish a Short Rest" (Arcane Recovery, a re-choice) is made in the step this opens.
     actor.restStep = { after: "short-rest" };
+    events.push(...conjureBookOfShadows(state, actor, definition));
     return events;
   }
   // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
@@ -314,6 +316,7 @@ export function applyRest(
   // SRD Wild Shape: "Whenever you finish a Long Rest, you can replace one of your known forms."
   openFormSwap(actor);
   actor.restStep = { after: "long-rest" };
+  events.push(...conjureBookOfShadows(state, actor, longRestDefinition));
   // SRD Human, Resourceful: "You gain Heroic Inspiration whenever you finish a Long Rest." One at most.
   if (
     holdsFeature(longRestDefinition, "human-resourceful", "Resourceful") ||

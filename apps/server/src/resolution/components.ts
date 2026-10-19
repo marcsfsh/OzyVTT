@@ -7,6 +7,8 @@ import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { isItemActionId, laterRowOf } from "../item-actions.js";
 import { isDivineCast } from "../divine-intervention.js";
 import type { RuleId } from "../rules-families.js";
+import { boundFocusRows } from "../pact-weapon.js";
+import { BOOK_OF_SHADOWS_ID, holdsPactOfTheTome } from "../book-of-shadows.js";
 import { scrollOfAction } from "../scrolls.js";
 import type { DefinitionAction, LiveActor } from "./context.js";
 
@@ -51,17 +53,22 @@ const SPELLBOOK_FOCUS: Readonly<Record<string, string>> = { wizard: "spellbook" 
 const carried = (row: InventoryItem) => row.quantity > 0;
 const equipped = (row: InventoryItem) => row.equipped && carried(row);
 
-/** The components a stat block's Spellcasting says this cast goes without. */
-function waivedBy(definition: ActorDefinition | undefined, action: DefinitionAction): ReadonlySet<Component> {
+/** The components this cast goes without: what the feature that gives it says (Wild Companion's Find Familiar, Divine
+ *  Intervention) or a stat block's Spellcasting. */
+export function waivedBy(
+  definition: ActorDefinition | undefined,
+  action: Pick<DefinitionAction, "id" | "waives">
+): ReadonlySet<Component> {
+  const waived = new Set<Component>(action.waives ?? []);
   // Divine Intervention: "without expending a spell slot or needing Material components".
-  if (isDivineCast(action.id)) return new Set(["material"]);
+  if (isDivineCast(action.id)) waived.add("material");
   for (const parent of definition?.actions ?? []) {
     const casts = parent.castsSpells;
     if (!casts?.waives) continue;
     if ((casts.self && parent.id === action.id) || casts.spells.some((entry) => entry.id === action.id))
-      return new Set(casts.waives);
+      for (const component of casts.waives) waived.add(component);
   }
-  return new Set();
+  return waived;
 }
 
 /** The focus kinds this cast may use: the spell's own class's, else any of the character's classes'. */
@@ -78,7 +85,10 @@ function focusKinds(
     const focus = catalog?.classRecord?.(id)?.spellcasting?.focus;
     return focus ? [focus] : [];
   });
-  return { kinds, books: classIds.flatMap((id) => (SPELLBOOK_FOCUS[id] ? [SPELLBOOK_FOCUS[id]!] : [])) };
+  const books = classIds.flatMap((id) => (SPELLBOOK_FOCUS[id] ? [SPELLBOOK_FOCUS[id]!] : []));
+  // Pact of the Tome: "You can use the book as a Spellcasting Focus."
+  if (holdsPactOfTheTome(definition)) books.push(BOOK_OF_SHADOWS_ID);
+  return { kinds, books };
 }
 
 /** The rows a cast can use as its Spellcasting Focus. */
@@ -182,7 +192,8 @@ export function readComponents(
   const hands = boundHands(attacker);
   const freeHand = hands.free;
   const { kinds, books } = focusKinds(definition, spell.id, catalog);
-  const focuses = focusRows(attacker.inventory, kinds, books);
+  // A weapon a binding lends as a focus serves too (a pact weapon).
+  const focuses = [...focusRows(attacker.inventory, kinds, books), ...boundFocusRows(attacker)];
   // An emblem borne on a Shield serves with no hand of its own, and the Shield's hand makes the gestures.
   const emblem = hands.shield && focuses.some((row) => equipped(row) && catalogIdOf(row) === EMBLEM_ID);
   const costly = material ? (spell.components.costly ?? []) : [];
