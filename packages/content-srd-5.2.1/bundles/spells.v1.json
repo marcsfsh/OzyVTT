@@ -2351,7 +2351,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn. Its space is Difficult Terrain.",
+     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn. Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -2371,7 +2371,8 @@
       "oncePerTurn": true,
       "terrain": {
        "cost": 2
-      }
+      },
+      "cover": "three-quarters"
      }
     }
    ],
@@ -20338,7 +20339,14 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Resilient Sphere",
+    "tags": [
+     "enclosed"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "wizard"
@@ -24317,6 +24325,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "hut",
+     "activation": "other",
+     "when": "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 10,
+      "stays": true,
+      "wardsSpells": 3,
+      "bars": {
+       "way": "both",
+       "insiders": true
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -26076,6 +26103,26 @@
     {
      "formula": "4d8",
      "type": "bludgeoning"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "wall",
+     "activation": "other",
+     "when": "Arrows, bolts and other ordinary projectiles shot or thrown across the wall miss, and Small or smaller flying creatures can't pass through it.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "deflects": true,
+      "bars": {
+       "way": "both",
+       "sizes": [
+        "tiny",
+        "small"
+       ],
+       "flying": true
+      }
+     }
     }
    ],
    "healing": null
