@@ -1158,6 +1158,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:smite-of-protection": enforced(
     "resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts)."
   ),
+  "feature:elf-trance": enforced(
+    "Magic can't put an elf to sleep: it succeeds without rolling against the Sleep spell and a brass dragon's Sleep Breath (resolution/pending.ts), and a magical sleep it fails into (Eyebite's Asleep) never lands (effects.ts). Its own Long Rest runs out 4 hours of its effects, and the party's Long Rest moves the clock 4 hours when every member holds Trance (rests.ts). Not needing sleep has no rule to read: the clock tracks no sleep."
+  ),
   "feature:orc-relentless-endurance": enforced(
     "hit-points.ts holds an Orc reduced to 0 Hit Points, but not killed outright, at 1 Hit Point instead, once a Long Rest. It is taken the first time it can be."
   ),

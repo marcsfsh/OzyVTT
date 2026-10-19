@@ -11,6 +11,7 @@ import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
 import { refreshArmorClass } from "./held-items.js";
+import { doesntSleep } from "./trance.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -47,6 +48,15 @@ export const DASH_ONLY_TAG = "dash-only";
 export const CANT_STAND_TAG = "cant-stand";
 /** An Unconscious bearer another creature can shake awake with an action (Sleep, Eyebite's Asleep). */
 export const WAKEABLE_TAG = "wakeable";
+
+/** A magical sleep: Unconscious that another creature can wake it from (Eyebite's Asleep, a brass dragon's Sleep
+ *  Breath), which a creature that doesn't sleep never falls into. */
+export function isMagicalSleep(effect: Pick<EffectInstance, "linkedConditionIds" | "tags" | "endedBy">): boolean {
+  return (
+    effect.linkedConditionIds.includes("unconscious") &&
+    (effect.tags.includes(WAKEABLE_TAG) || effect.endedBy?.name === "Wake")
+  );
+}
 /** Outlined only against its source: the bearer can't hide from the effect's source, and its Invisible condition
  *  gives no benefit against it (Mind Spike). */
 export const OUTLINED_TO_SOURCE_TAG = "outlined-to-source";
@@ -392,6 +402,19 @@ export function addEffect(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
   if (existing) return existing;
+  // SRD Trance: "magic can't put you to sleep" (Eyebite's Asleep, a brass dragon's Sleep Breath).
+  if (isMagicalSleep(effect)) {
+    const definition = actor.definitionId ? immunities?.resolveDefinition?.(actor.definitionId) : undefined;
+    if (doesntSleep(actor, definition)) {
+      events?.push({
+        kind: "condition",
+        text: `${actor.name} doesn't sleep, so ${effect.name} has no effect.`,
+        actorId,
+        immune: true
+      });
+      return effect;
+    }
+  }
   // SRD Concentration: one at a time, starting a new one ends the source's others. Effects of one cast share a
   // `castId` and are one Concentration.
   if (effect.concentration && effect.sourceActorId !== null) {
@@ -992,12 +1015,13 @@ export function endEffectsAtLongRest(
   state: GameState,
   actorId: string,
   clockMoved = false,
-  holdsMaximum = false
+  holdsMaximum = false,
+  restMinutes = LONG_REST_MINUTES
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
-  if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), LONG_REST_MINUTES, false));
+  if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), restMinutes, false));
   // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal", unless a curse holds it down (a
   // mummy's: "its Hit Point maximum doesn't return to normal when finishing a Long Rest"). A gain kept until ended
   // (one from before gains counted game time) is spent by the rest's end too.

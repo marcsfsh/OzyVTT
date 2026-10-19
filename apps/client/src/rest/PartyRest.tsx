@@ -104,7 +104,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
     send(
       () => command("rest:party", { kind, actorIds: picked.map((actor) => actor.id) }),
       kind === "long"
-        ? "The party finished a Long Rest. 8 hours passed."
+        ? "The party finished a Long Rest. The game clock moved on."
         : "The Short Rest is open on each player's device.",
       kind === "long"
     );

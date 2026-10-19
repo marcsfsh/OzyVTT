@@ -372,6 +372,11 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
     ...(heldBy ? { heldBy } : {}),
     ...(once && lifetime.repeatSave !== true ? { repeatOnce: true as const } : {}),
     ...(second ? { secondFailure: second } : {}),
+    // A magical sleep someone can wake the target from (a brass dragon's Sleep Breath): a creature that doesn't sleep,
+    // an elf in Trance, succeeds without rolling, as against the Sleep spell.
+    ...(second?.conditions.includes("unconscious") && second.endedBy?.name === "Wake"
+      ? { autoSuccess: { sleepless: true as const } }
+      : {}),
     ...(exhaustion ? { failureExhaustion: Number.parseInt(exhaustion[1]!, 10) } : {}),
     ...(onDamage ? { repeatOnDamage: onDamage } : {}),
     // "Success: The target is immune to this cloaker's Moan for the next 24 hours."

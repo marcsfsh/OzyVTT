@@ -20,7 +20,6 @@ import {
   answerLongRest,
   askForLongRest,
   finishPartyShortRest,
-  LONG_REST_HOURS,
   markShortRestDone,
   passTime,
   startPartyRest
@@ -204,7 +203,7 @@ export const restingCommands = [
     type: "rest.party",
     operationId: "restParty",
     description:
-      "GM-only: rests several characters together. All of them must be able to rest (out of any running encounter, at 1 hit point or more, and for a Long Rest 16 hours of game time after their last one) or none does, and the refusal names who can't and why. Long: the game clock moves 8 hours, which ends what runs out in that time on every creature as time.pass does, and each gets a Long Rest. Short: the party's Short Rest opens; each player spends Hit Dice on their own device and marks themselves done (rest.mark-done), and rest.finish ends it. Rolling Initiative, taking any damage or casting a spell other than a cantrip takes a member out of it, with no benefits (SRD Interrupting the Rest).",
+      "GM-only: rests several characters together. All of them must be able to rest (out of any running encounter, at 1 hit point or more, and for a Long Rest 16 hours of game time after their last one) or none does, and the refusal names who can't and why. Long: the game clock moves 8 hours (4 when every member holds an elf's Trance), which ends what runs out in that time on every creature as time.pass does, and each gets a Long Rest. Short: the party's Short Rest opens; each player spends Hit Dice on their own device and marks themselves done (rest.mark-done), and rest.finish ends it. Rolling Initiative, taking any damage or casting a spell other than a cantrip takes a member out of it, with no benefits (SRD Interrupting the Rest).",
     summary: "Rest several characters together: a Long Rest now, or a Short Rest that stays open for Hit Dice.",
     schema: RestPartySchema,
     malformed: "The party rest is malformed.",
@@ -233,7 +232,7 @@ export const restingCommands = [
         kind: "heal",
         text:
           kind === "long"
-            ? `${who} finished a Long Rest. ${LONG_REST_HOURS} hours pass.`
+            ? `${who} finished a Long Rest. ${passedLine(Math.round((span.toHours - span.fromHours) * 60))}`
             : `${who} start a Short Rest.`,
         actorIds,
         gmOnly: hidden

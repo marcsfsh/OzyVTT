@@ -1088,6 +1088,9 @@
        "name": "Wake",
        "by": "others"
       }
+     },
+     "autoSuccess": {
+      "sleepless": true
      }
     },
     "damage": [],
@@ -4556,6 +4559,9 @@
        "name": "Wake",
        "by": "others"
       }
+     },
+     "autoSuccess": {
+      "sleepless": true
      }
     },
     "damage": [],
@@ -11461,6 +11467,9 @@
        "name": "Wake",
        "by": "others"
       }
+     },
+     "autoSuccess": {
+      "sleepless": true
      }
     },
     "damage": [],
@@ -52246,6 +52255,9 @@
        "name": "Wake",
        "by": "others"
       }
+     },
+     "autoSuccess": {
+      "sleepless": true
      }
     },
     "damage": [],

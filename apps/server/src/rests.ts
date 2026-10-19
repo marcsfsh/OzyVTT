@@ -29,10 +29,10 @@ import { spendRerollRight } from "./held-rolls.js";
 import { chargesAfterDawn, neverRegained } from "./item-charges.js";
 import { afterLongRest, deniedRestLine, holdsMaximumAtRest, restDeniedBy } from "./rest-triggers.js";
 import { divineInterventionWaiting } from "./divine-intervention.js";
+import { holdsTrance, TRANCE_LONG_REST_MINUTES } from "./trance.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
-export const LONG_REST_HOURS = 8;
 
 const hoursText = (hours: number) => `${hours} ${hours === 1 ? "hour" : "hours"}`;
 
@@ -255,13 +255,20 @@ export function applyRest(
   const refusal = restRefusal(state, actor, kind);
   if (refusal) throw new CommandRejectedError(refusal);
   const events: EffectNarration[] = [];
+  // SRD Trance: an elf "can finish a Long Rest in 4 hours", so its own rest runs out 4 hours of its effects.
+  const restMinutes = holdsTrance(actor.definitionId ? resolveDefinition(actor.definitionId) : undefined)
+    ? TRANCE_LONG_REST_MINUTES
+    : LONG_REST_MINUTES;
   // "The target gains no benefit from finishing a Short or Long Rest" (a rakshasa's curse): the time passes and what
   // the rest ends still ends, but nothing comes back.
   const denied = restDeniedBy(actor, kind);
   if (denied) {
     events.push(deniedRestLine(actor, denied, kind));
     if (kind === "short") return [...events, ...endEffectsAtRest(state, actorId, "short")];
-    events.push(...endEffectsAtLongRest(state, actorId, clockMoved, true), ...endEffectsAtRest(state, actorId, "long"));
+    events.push(
+      ...endEffectsAtLongRest(state, actorId, clockMoved, true, restMinutes),
+      ...endEffectsAtRest(state, actorId, "long")
+    );
     actor.lastLongRestAt = state.rest.clockHours;
     state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
     if (charges)
@@ -297,7 +304,7 @@ export function applyRest(
   }
   // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
   events.push(
-    ...endEffectsAtLongRest(state, actorId, clockMoved, holdsMaximumAtRest(actor)),
+    ...endEffectsAtLongRest(state, actorId, clockMoved, holdsMaximumAtRest(actor), restMinutes),
     ...endEffectsAtRest(state, actorId, "long"),
     ...easeOrdeals(state, actor)
   );
@@ -461,12 +468,23 @@ export function startPartyRest(
   }
   const events = passGameTime(
     state,
-    LONG_REST_MINUTES,
+    partyLongRestMinutes(members, resolveDefinition),
     random ? { resolveDefinition, ...(catalog ? { catalog } : {}), random } : undefined
   );
   events.push(...members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random, true)));
   for (const actor of members) actor.lastLongRestAt = state.rest.clockHours;
   return events;
+}
+
+/** How long the party's Long Rest takes: 4 hours when every member holds Trance, 8 otherwise. */
+export function partyLongRestMinutes(
+  members: readonly Pick<Actor, "definitionId">[],
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): number {
+  const tranced = members.every((actor) =>
+    holdsTrance(actor.definitionId ? resolveDefinition(actor.definitionId) : undefined)
+  );
+  return tranced && members.length > 0 ? TRANCE_LONG_REST_MINUTES : LONG_REST_MINUTES;
 }
 
 /** A player starts a Short Rest for their own character. It is under way, as the party's is: its player spends Hit

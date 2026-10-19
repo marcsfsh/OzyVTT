@@ -36,6 +36,7 @@ import { areAllies } from "../creature-sides.js";
 import { chosenEffectOption } from "./effect-options.js";
 import { failureFormOf } from "./shape-shift.js";
 import { vitalityOfCast } from "./vitality.js";
+import { doesntSleep } from "../trance.js";
 
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
 
@@ -812,13 +813,7 @@ function autoSuccessOf(ctx: ResolveContext, target: ResolveContext["targets"][nu
   const type = creatureTypeOf(target, definition);
   if (rule.creatureTypes && type !== null && rule.creatureTypes.includes(type))
     return `${type[0]!.toUpperCase()}${type.slice(1)}`;
-  if (
-    rule.sleepless &&
-    (holdsFeature(definition, "elf-trance", "Trance") ||
-      definition?.character?.race?.id === "elf" ||
-      target.conditionImmunities.includes("exhaustion"))
-  )
-    return "doesn't sleep";
+  if (rule.sleepless && doesntSleep(target, definition)) return "doesn't sleep";
   // SRD Truesight: "Visual illusions appear transparent to you, and you automatically succeed on saving throws against
   // them." The illusion is where the creature is (a pattern around it, a phantasm in its mind), so any range reaches.
   if (rule.truesight) {
