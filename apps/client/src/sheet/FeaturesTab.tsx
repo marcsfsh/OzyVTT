@@ -64,6 +64,24 @@ function featureGroups(definition: ActorDefinition, extension: SrdExtension): Gr
   return [...groups.entries()].map(([key, group]) => ({ key, ...group }));
 }
 
+/** The class table's columns no use counts (the Bardic Die, Martial Arts, Sneak Attack), each class at its level. */
+function ClassColumns({ columns }: Readonly<{ columns: ActorDerivedSheet["classColumns"] }>) {
+  const classes = new Set(columns.map((column) => column.classId));
+  return (
+    <section className="cs-group" aria-label="Class table">
+      <span className="cs-eyebrow">Class table</span>
+      <dl className="cs-columns">
+        {columns.map((column) => (
+          <div key={`${column.classId}-${column.id}`} className="cs-column">
+            <dt>{classes.size > 1 ? `${column.className} · ${column.name}` : column.name}</dt>
+            <dd>{column.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 /** The Weapon Mastery picks as tiles, each weapon kind with its property; a tap shows what the property does. */
 function MasteryBlock({ masteries }: Readonly<{ masteries: NonNullable<ActorDerivedSheet["weaponMasteries"]> }>) {
   const [open, setOpen] = useState<string | null>(null);
@@ -184,8 +202,10 @@ export function FeaturesTab({
   }
   // The monster's own actions, which have no uses to count but say what it can do.
   const monsterActions = actor.kind === "player-character" ? [] : definition.actions;
+  const columns = derived?.classColumns ?? [];
   return (
     <div className="cs-features">
+      {columns.length > 0 && <ClassColumns columns={columns} />}
       {pools.length > 0 && (
         <section className="cs-group" aria-label="Uses">
           <span className="cs-eyebrow">Uses</span>

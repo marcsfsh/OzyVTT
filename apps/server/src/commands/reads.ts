@@ -195,7 +195,15 @@ export const gameReads = [
         ),
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
         // request and is never on the broadcast projection (see `actor-derived.ts`).
-        derived: deriveActorSheet(actor, definition, derivation, kit.catalogFor(principal).skillSummaries(), catalog),
+        // The class table's columns read the classes the sheet already has, as play does.
+        derived: deriveActorSheet(
+          actor,
+          definition,
+          derivation,
+          kit.catalogFor(principal).skillSummaries(),
+          catalog,
+          (id) => kit.playCatalog().classRecord(id)
+        ),
         // Read against what the sheet already has, as `actor.rechoose` checks them.
         rechoices: rechoicesOf(actor, definition, kit.playCatalog()),
         // Read against the sheet's content and the table's builder policy, as the swap and the spellbook check them,

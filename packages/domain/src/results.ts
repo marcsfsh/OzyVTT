@@ -574,6 +574,20 @@ const ActorDerivedSheetSchema = z.strictObject({
     )
     .describe(
       "The weapon kinds the character chose under Weapon Mastery, in the order chosen, whether or not it carries one. Empty for a sheet that records no such choice (an import)."
+    ),
+  /** The class table's printed columns no use counts, each class at its own level. */
+  classColumns: z
+    .array(
+      z.strictObject({
+        classId: z.string(),
+        className: z.string().describe("The class as the sheet names it"),
+        id: z.string().describe("The column's id, e.g. bardic-inspiration"),
+        name: z.string().describe('The column as the class table prints it, e.g. "Bardic Die"'),
+        value: z.string().describe('Its value at the character\'s level in that class, e.g. "d8", "3d6", "+2"')
+      })
+    )
+    .describe(
+      "The columns a class table prints that no use counts (the Bardic Die, Martial Arts, Sneak Attack, Rage Damage, Eldritch Invocations, Weapon Mastery), each class at the character's level in it. A column wired to a pool (Rages, Focus Points, Sorcery Points) is a use instead. Empty for a sheet with no class the catalog knows."
     )
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
