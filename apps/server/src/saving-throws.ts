@@ -49,9 +49,11 @@ import { openDamageWindow } from "./damage-window.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
+import { startHoldingBreath } from "./breath.js";
 import {
   addEffect,
   CONCENTRATING_TAG,
+  SMOTHERING_TAG,
   dropHeldItems,
   effectDurationOf,
   endConcentrationSustainedBy,
@@ -426,6 +428,11 @@ export function applyFailureEffect(
   );
   // "It drops whatever it is holding" (Fear), once, as the failure lands.
   if (onFail.tags.includes(DROPS_HELD_TAG)) events.push(...dropHeldItems(target));
+  // "Is suffocating" while engulfed or whelmed: it holds its breath until what smothers it ends.
+  if (onFail.tags.includes(SMOTHERING_TAG)) {
+    const definition = target.definitionId ? immunities?.resolveDefinition?.(target.definitionId) : undefined;
+    events.push(...startHoldingBreath(state, target, definition));
+  }
   return [
     { kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id, ...sourceOf(applied) },
     ...events

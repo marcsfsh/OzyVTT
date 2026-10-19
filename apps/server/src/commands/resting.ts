@@ -1,11 +1,18 @@
 import {
+  ActorHoldBreathSchema,
+  ActorNourishSchema,
   RestAnswerSchema,
   RestAskSchema,
   RestFinishSchema,
   RestMarkDoneSchema,
   RestPartySchema,
+  SurvivalSetTrackingSchema,
   TimePassSchema
 } from "@vtt/domain/commands";
+import { breathesWater, startHoldingBreath } from "../breath.js";
+import { endEffect } from "../effects.js";
+import { CommandRejectedError } from "../game-store.js";
+import { nourish, setSurvivalTracking } from "../survival.js";
 import { gameTimeSpanLabel, type GameState } from "@vtt/domain";
 import type { EffectNarration } from "../effects.js";
 import {
@@ -42,6 +49,86 @@ const names = (list: readonly string[]) =>
   list.length <= 1 ? (list[0] ?? "") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
 
 export const restingCommands = [
+  defineCommand({
+    type: "survival.set-tracking",
+    operationId: "setSurvivalTracking",
+    description:
+      "GM-only: starts or stops tracking food and water (SRD Malnutrition, Dehydration). While it is on, each character records what it eats and drinks during the game day (`actor.nourish`), and at each midnight the clock passes it eats the Rations and drinks from the Waterskins it carries as far as its need goes (1 pound of food and 1 gallon of water for a Small or Medium creature). Less than half its water costs a level of Exhaustion; less than half its food, a DC 10 Constitution save against one; five days with no food, a level each day. Those levels stay until it eats or drinks its full need for a day. Turning it off drops every record.",
+    summary: "Start or stop tracking the party's food and water by the day (GM).",
+    schema: SurvivalSetTrackingSchema,
+    malformed: "The survival setting is malformed.",
+    gmOnly: "Only the GM decides whether food and water are tracked.",
+    async run({ principal, request, execute }, kit) {
+      const { duplicate } = await execute((state) =>
+        setSurvivalTracking(state, request.enabled, initiatorOf(principal))
+      );
+      if (duplicate) return;
+      kit.context.appendLog({
+        kind: "encounter",
+        text: request.enabled
+          ? "The table now tracks food and water: each day's end eats and drinks what the characters carry."
+          : "The table no longer tracks food and water.",
+        gmOnly: false
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.nourish",
+    operationId: "nourishActor",
+    description:
+      "A character eats or drinks, while the table tracks food and water: `food` is a full `meal` (Create Food and Water, Heroes' Feast, an inn), a day's `ration` from its Rations, or a `goodberry` from its Goodberries (a day's food, and 1 Hit Point back); `water` is its `fill` at a source (which also fills its Waterskins) or what its `waterskin`s hold, up to its need. Eating or drinking a full day's need lets a rest take off the Exhaustion hunger or thirst gave. GM-grade for any character; a player session only for their own claimed character, and only from what it carries (a ration, a Goodberry, a Waterskin): a meal or a fill at a source is the GM's to give.",
+    summary: "Eat or drink for the day: a meal, a ration, a Goodberry, a source or a Waterskin.",
+    schema: ActorNourishSchema,
+    malformed: "Say what the character eats or drinks.",
+    async run({ principal, request, execute }, kit) {
+      let events: EffectNarration[] = [];
+      const { duplicate } = await execute((state) => {
+        events = nourish(
+          state,
+          request.actorId,
+          {
+            ...(request.food !== undefined ? { food: request.food } : {}),
+            ...(request.water !== undefined ? { water: request.water } : {})
+          },
+          initiatorOf(principal)
+        );
+      });
+      if (duplicate) return;
+      kit.publishNarrations(events);
+    }
+  }),
+
+  defineCommand({
+    type: "actor.hold-breath",
+    operationId: "setActorBreath",
+    description:
+      "GM-only: a creature starts holding its breath (underwater, engulfed, in a choking cloud), or breathes again (`holding: false`). It holds it for 1 plus its Constitution modifier minutes, at least 30 seconds (a Hold Breath trait's printed time instead), counted as each of its turns ends and as game time passes; then it gains a level of Exhaustion at the end of each of its turns (SRD Suffocation). Breathing again takes those levels off. A creature that breathes water (Amphibious, Water Breathing, a Cloak of the Manta Ray) is refused.",
+    summary: "Start or end a creature's held breath (GM).",
+    schema: ActorHoldBreathSchema,
+    malformed: "The breath command is malformed.",
+    gmOnly: "Only the GM decides who is out of air.",
+    async run({ request, execute }, kit) {
+      let events: EffectNarration[] = [];
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((candidate) => candidate.id === request.actorId);
+        if (!actor) throw new CommandRejectedError("That creature no longer exists.");
+        const definition = actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+        const held = actor.effects.find((effect) => effect.breath !== undefined);
+        if (!request.holding) {
+          if (!held) throw new CommandRejectedError(`${actor.name} is breathing already.`);
+          events = endEffect(state, actor.id, held.id);
+          return;
+        }
+        if (breathesWater(actor, definition)) throw new CommandRejectedError(`${actor.name} breathes water.`);
+        if (held) throw new CommandRejectedError(`${actor.name} is holding its breath already.`);
+        events = startHoldingBreath(state, actor, definition);
+      });
+      if (duplicate) return;
+      kit.publishNarrations(events);
+    }
+  }),
+
   defineCommand({
     type: "rest.ask",
     operationId: "askForLongRest",
@@ -186,7 +273,13 @@ export const restingCommands = [
         timed(
           state,
           () => {
-            ({ events, rested } = finishPartyShortRest(state, apply, kit.resolveDefinition, kit.equipmentCatalog()));
+            ({ events, rested } = finishPartyShortRest(
+              state,
+              apply,
+              kit.resolveDefinition,
+              kit.equipmentCatalog(),
+              (sides) => kit.context.random(sides)
+            ));
           },
           span
         )

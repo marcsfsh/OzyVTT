@@ -631,6 +631,7 @@ const PLAYER_ACTOR_FIELDS = {
   experiencePoints: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
+  nourishment: "derived",
   lastLongRestAt: "never",
   spellSlots: "derived",
   pactSlots: "derived",
@@ -769,6 +770,7 @@ export function projectPlayerView(
           experiencePoints,
           choiceOverrides,
           hitDice,
+          nourishment,
           spellSlots,
           pactSlots,
           preparedSpellIds,
@@ -835,6 +837,8 @@ export function projectPlayerView(
           ...(resourcesVisible && hitDice
             ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } }
             : {}),
+          // Today's food and water is a sheet resource, gated like the Hit Point Dice.
+          ...(resourcesVisible && nourishment ? { nourishment: { ...nourishment } } : {}),
           // Sheet resources reach the owner always and another player only at the top tier.
           ...(resourcesVisible
             ? {

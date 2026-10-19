@@ -1,13 +1,29 @@
 import { useState } from "react";
 import { gameTimeSpanLabel, isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
-import { Badge, Button, Modal, Stepper, useToast } from "@vtt/ui";
+import { Badge, Button, Modal, Stepper, Switch, useToast } from "@vtt/ui";
 import { pathForSection } from "../codex/routes";
 import { command } from "../lib/command";
 import { navigate } from "../router";
+import { NEEDS } from "../sheet/FoodAndWater";
 import { gameDate, useGmCalendar } from "./game-date";
 import "./rest.css";
 
-const NO_REST = { clockHours: 0, clockMinutes: 0, requests: [] as readonly string[], shortRest: null };
+const NO_REST = {
+  clockHours: 0,
+  clockMinutes: 0,
+  requests: [] as readonly string[],
+  shortRest: null,
+  survival: false
+};
+
+/** "Food 1/1 lb · Water 4/8 pints · 2 days unfed": what a character ate and drank today, against its need. */
+function nourishmentNote(actor: GmActor): string {
+  const today = actor.nourishment;
+  if (!today) return "Not tracked yet";
+  const need = NEEDS[actor.size ?? "medium"];
+  const unfed = today.daysUnfed > 0 ? ` · ${today.daysUnfed} ${today.daysUnfed === 1 ? "day" : "days"} unfed` : "";
+  return `Food ${today.foodPounds}/${need.food} lb · Water ${today.waterPints}/${need.water} pints${unfed}`;
+}
 
 /** The minutes the GM can add to the hours passed, from a single minute (10 rounds) up to most of an hour. */
 const MINUTE_STEPS = [0, 1, 5, 10, 15, 20, 30, 45] as const;
@@ -87,6 +103,17 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
       kind === "long"
     );
   const unclaimed = shortRest?.actorIds.some((actorId) => !byId(actorId)?.ownerSessionId) ?? false;
+  /** A meal for everyone, or everyone's fill at a source: one command per living character. */
+  const feedAll = async (choice: Readonly<{ food?: "meal"; water?: "fill" }>, success: string) => {
+    setBusy(true);
+    let failure: string | null = null;
+    for (const actor of party.filter((member) => !isDead(member))) {
+      const result = await command("actor:nourish", { actorId: actor.id, ...choice });
+      if (!result.ok) failure ??= result.message ?? "That was refused.";
+    }
+    setBusy(false);
+    toast(failure ?? success, { tone: failure ? "error" : "success" });
+  };
 
   const label = shortRest ? "Short Rest open" : "Rest";
   return (
@@ -191,6 +218,46 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               Time that passes here moves the Codex calendar too, and counts down spells and effects: a minute is 10
               rounds. A fight&apos;s rounds don&apos;t move the clock. A Long Rest can start 16 hours after a
               character&apos;s last one ends.
+            </p>
+          </section>
+
+          <section className="party-rest-section" aria-label="Food and water">
+            <span className="party-rest-heading">Food and water</span>
+            <Switch
+              checked={rest.survival}
+              disabled={busy}
+              label="Track food and water by the day"
+              onChange={(enabled) =>
+                void send(
+                  () => command("survival:set-tracking", { enabled }),
+                  enabled ? "Food and water are tracked now." : "Food and water are no longer tracked."
+                )
+              }
+            />
+            {rest.survival && party.length > 0 && (
+              <>
+                <ul className="party-rest-list">
+                  {party.map((actor) => (
+                    <li key={actor.id} className="party-rest-member is-static">
+                      <span className="party-rest-name">{actor.name}</span>
+                      <span className="party-rest-note">{nourishmentNote(actor)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="party-rest-row">
+                  <Button disabled={busy} onClick={() => void feedAll({ food: "meal" }, "Everyone ate a meal.")}>
+                    Everyone eats a meal
+                  </Button>
+                  <Button disabled={busy} onClick={() => void feedAll({ water: "fill" }, "Everyone drank their fill.")}>
+                    Everyone drinks their fill
+                  </Button>
+                </div>
+              </>
+            )}
+            <p className="party-rest-hint">
+              At each midnight a character eats the Rations and drinks from the Waterskins it carries. Less than half a
+              day&apos;s water, or less than half its food, can cost a level of Exhaustion that stays until it eats and
+              drinks its fill.
             </p>
           </section>
 

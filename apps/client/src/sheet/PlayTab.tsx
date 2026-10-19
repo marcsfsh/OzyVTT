@@ -10,6 +10,7 @@ import type { SrdExtension } from "../encounter/sheet-extension";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
 import { SkillButton, useSkillRows, type SkillRow } from "./ChecksTab";
+import { FoodAndWater } from "./FoodAndWater";
 import { HitPointDice } from "./HitPointDice";
 import { HpControls, HpReadout } from "./HitPoints";
 import {
@@ -578,6 +579,7 @@ export function PlayCalm({
           </section>
         )
       )}
+      {actor.kind === "player-character" && <FoodAndWater actor={actor} role={role} onFeedback={onFeedback} />}
       {definition && <PinnedChecks actorId={actor.id} definition={definition} derived={derived} rolls={rolls} />}
       {definition && <SlotsLeft definition={definition} actor={actor} />}
       {restPools.length > 0 && (

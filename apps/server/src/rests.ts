@@ -415,7 +415,8 @@ export function finishPartyShortRest(
   state: GameState,
   apply: boolean,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  random?: (sides: number) => number
 ): Readonly<{ events: EffectNarration[]; rested: string[] }> {
   const rest = state.rest.shortRest;
   if (!rest) throw new CommandRejectedError("No Short Rest is under way.");
@@ -435,7 +436,13 @@ export function finishPartyShortRest(
     events.push(...applyRest(state, actorId, "short", resolveDefinition, catalog, undefined, true));
     rested.push(actor.name);
   }
-  events.push(...passGameTime(state, SHORT_REST_HOURS * 60));
+  events.push(
+    ...passGameTime(
+      state,
+      SHORT_REST_HOURS * 60,
+      random ? { random, resolveDefinition, ...(catalog ? { catalog } : {}) } : undefined
+    )
+  );
   return { events, rested };
 }
 

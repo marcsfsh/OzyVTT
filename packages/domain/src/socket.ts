@@ -168,6 +168,9 @@ import type {
   TableSetStagingDefaultsSchema,
   TempHpSchema,
   TimePassSchema,
+  SurvivalSetTrackingSchema,
+  ActorNourishSchema,
+  ActorHoldBreathSchema,
   TokenMoveSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
@@ -636,6 +639,18 @@ export interface ClientToServerEvents {
   /** GM-only: move game time forward. */
   "time:pass": (
     payload: CommandPayload<typeof TimePassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "survival:set-tracking": (
+    payload: CommandPayload<typeof SurvivalSetTrackingSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:nourish": (
+    payload: CommandPayload<typeof ActorNourishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:hold-breath": (
+    payload: CommandPayload<typeof ActorHoldBreathSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (

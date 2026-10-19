@@ -1,4 +1,5 @@
 import type { GameState } from "@vtt/domain";
+import { breathAtTurnEnd } from "./breath.js";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
@@ -45,6 +46,9 @@ export type TurnStartDeps = Readonly<{
  */
 export function endOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps?: TurnEndDeps): void {
   events.push(...expireEffectsAtTurnEnd(state, actorId));
+  // SRD Suffocation: a round of held breath, or once it is out, a level of Exhaustion "at the end of each of its turns".
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (actor) events.push(...breathAtTurnEnd(state, actor));
   if (deps) {
     const sees = sightOf(state, deps);
     events.push(...endEffectsOutOfSight(state, actorId, { ...deps, sees }));

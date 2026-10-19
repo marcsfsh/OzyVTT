@@ -2,6 +2,8 @@ import { ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import { ageEffects, type EffectNarration } from "./effects.js";
 import { endZone } from "./spell-zone-state.js";
 import { afterDays, type RestTriggerDeps } from "./rest-triggers.js";
+import { breathOverTime } from "./breath.js";
+import { endOfDays } from "./survival.js";
 
 /**
  * The game clock (ADR-0029) and what lasts on it. A round is 6 seconds, so 10 rounds make a minute: in a fight, what
@@ -43,7 +45,13 @@ export function passGameTime(state: GameState, minutes: number, deps?: RestTrigg
   state.rest = { ...state.rest, clockHours: Math.floor(total / 60), clockMinutes: total % 60 };
   const inTime = creaturesInTime(state);
   const events = ageEffects(state, inTime, minutes);
-  if (deps) events.push(...afterDays(state, inTime, before, total, deps));
+  // Outside a fight a creature holding its breath spends it as the minutes pass.
+  if (!state.combat.active) events.push(...breathOverTime(state, inTime, total - before));
+  if (deps) {
+    events.push(...afterDays(state, inTime, before, total, deps));
+    // Each midnight the clock crosses ends a day of eating and drinking.
+    events.push(...endOfDays(state, inTime, before, total, deps));
+  }
   for (const zone of [...state.combat.spellZones]) {
     if (zone.rounds === null) continue;
     const left = zone.rounds - (state.combat.round - zone.startedRound);

@@ -1102,6 +1102,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     conditions: ["invisible"]
   }),
+  // "Grants up to ten willing creatures of your choice within range the ability to breathe underwater until the spell
+  // ends": a creature holding its breath breathes again.
+  "water-breathing": spellGrant({
+    name: "Water Breathing",
+    tags: ["water-breathing"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
   // "The target's base AC becomes 13 plus its Dexterity modifier", a way to work out AC that riders add to.
   "mage-armor": spellGrant({
     name: "Mage Armor",

@@ -205,7 +205,11 @@ describe("ending an effect by the action its text prints", () => {
     const built = table("gelatinous-cube");
     use(built, "engulf", [3, 3, 3]);
     failHerosSave(built);
-    expect(hero(built).effects).toMatchObject([{ tags: ["escape-athletics", "cant-speak"], escapeDc: 12 }]);
+    // "Is suffocating": the engulfed hero holds its breath, and breathes again once pulled free.
+    expect(hero(built).effects).toMatchObject([
+      { tags: ["escape-athletics", "cant-speak", "smothering"], escapeDc: 12 },
+      { name: "Holding Breath" }
+    ]);
     const before = ally(built).hp.current;
     const pulled = endIt(built, IDS.ally, IDS.hero, [15, 4, 4, 4]);
     expect(pulled.check).toMatchObject({ dc: 12, success: true });

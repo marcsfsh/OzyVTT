@@ -288,7 +288,11 @@ export const actionCommands = [
         const hours = spell && !draft.combat.active ? Math.floor(castingMinutesOf(spell, action.id) / 60) : 0;
         clock = { fromHours: draft.rest.clockHours, toHours: draft.rest.clockHours };
         if (!resolution.preview && hours > 0) {
-          passTime(draft, hours);
+          passTime(draft, hours, 0, {
+            random: (sides) => kit.context.random(sides),
+            resolveDefinition: kit.resolveDefinition,
+            catalog: kit.equipmentCatalog()
+          });
           clock = { ...clock, toHours: draft.rest.clockHours };
         }
         // Casting a spell other than a cantrip stops a Short Rest, as it does on the loose route.

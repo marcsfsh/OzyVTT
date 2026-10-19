@@ -73,6 +73,7 @@ import { checkKnockOut, knockOutOffered, knocksOut } from "./resolution/knock-ou
 import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
 import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-casting.js";
+import { layOutProvisions } from "./resolution/provisions.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -184,6 +185,7 @@ export function resolveDefinitionAction(
   markCastTurn(ctx);
   openSpellZone(ctx);
   applyGrant(ctx);
+  layOutProvisions(ctx);
   placeCastSight(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);

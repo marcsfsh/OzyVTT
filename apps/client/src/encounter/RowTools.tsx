@@ -178,6 +178,30 @@ export function RowTools({
           >
             {state.combat.reactionsUsed.includes(actor.id) ? "Restore reaction" : "Spend reaction"}
           </Button>
+          {/* SRD Suffocation: out of air (a dive, an engulfing), it holds its breath until it can breathe again. */}
+          {(() => {
+            const holding = actor.effects.some((effect) => effect.breath !== undefined);
+            return (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () =>
+                      command("actor:hold-breath", {
+                        actorId: actor.id,
+                        holding: !holding,
+                        expectedRevision: state.revision
+                      }),
+                    holding ? `${actor.name} breathes again.` : `${actor.name} holds its breath.`
+                  )
+                }
+              >
+                {holding ? "Breathe again" : "Hold breath"}
+              </Button>
+            );
+          })()}
           <Button
             type="button"
             variant="secondary"

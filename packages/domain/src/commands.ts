@@ -1284,6 +1284,34 @@ export const RestFinishSchema = z
   })
   .strict();
 /** The GM moves game time forward, which the 16-hour rule between Long Rests reads. */
+/** The GM starts or stops tracking food and water (SRD Malnutrition, Dehydration). */
+export const SurvivalSetTrackingSchema = z
+  .object({
+    commandId: z.uuid(),
+    enabled: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A character eats or drinks: a meal, a ration or a Goodberry; its fill at a source, or from its Waterskins. */
+export const ActorNourishSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    food: z.enum(["meal", "ration", "goodberry"]).optional(),
+    water: z.enum(["fill", "waterskin"]).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((request) => request.food !== undefined || request.water !== undefined, "Say what it eats or drinks.");
+/** The GM starts or ends a creature's held breath (SRD Suffocation). */
+export const ActorHoldBreathSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    holding: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const TimePassSchema = z
   .object({
     commandId: z.uuid(),

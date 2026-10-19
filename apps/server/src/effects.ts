@@ -229,10 +229,25 @@ export function removeConditionDirect(actor: Actor, conditionId: string) {
   actor.conditions = actor.conditions.filter((condition) => condition.id !== conditionId);
 }
 
-/** One fewer Exhaustion level, and none from level 1 (a Long Rest; coming back from death). */
+/** The tag on what keeps its bearer from breathing while it lasts ("is suffocating": engulfed, whelmed). */
+export const SMOTHERING_TAG = "smothering";
+
+/** Goodberry's berries: the inventory row the cast fills, and the tag on the caster's effect that keeps them. */
+export const GOODBERRY_ID = "goodberry";
+export const GOODBERRY_TAG = "goodberry";
+
+/** The Exhaustion levels hunger and thirst hold in place (SRD Malnutrition, Dehydration: "can't be removed until the
+ *  creature eats [drinks] the full amount ... required for a day"). */
+export function heldExhaustion(actor: Actor): number {
+  return (actor.nourishment?.hungerLevels ?? 0) + (actor.nourishment?.thirstLevels ?? 0);
+}
+
+/** One fewer Exhaustion level, and none from level 1 (a Long Rest; coming back from death), unless hunger or thirst
+ *  holds every level left. */
 export function reduceExhaustion(actor: Actor): void {
   const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
   if (!exhaustion) return;
+  if ((exhaustion.level ?? 1) <= heldExhaustion(actor)) return;
   if ((exhaustion.level ?? 1) <= 1) removeConditionDirect(actor, "exhaustion");
   else
     actor.conditions = actor.conditions.map((condition) =>
@@ -244,12 +259,6 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
   return actor.effects.some((effect) => effect.tags.includes(tag));
 }
 
-/**
- * What gaining a condition does beyond itself, shared by every path that can impose one (a GM chip, a failed save,
- * an on-hit rider, an effect's linked conditions): an Incapacitated creature's grapples release and its
- * Concentration breaks (SRD Incapacitated, Grappling), and its Rage ends; Exhaustion 6 is death. 0 HP is handled
- * by the damage path, which ends everything the creature sustains.
- */
 /** What is carried in a hand rather than worn: a row with weapon stats, a wand, a staff or a rod. */
 const HELD_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "wand", "staff", "rod"]);
 
@@ -269,6 +278,12 @@ export function dropHeldItems(actor: Actor): EffectNarration[] {
   return [{ kind: "condition", text: `${actor.name} drops ${list}.`, actorId: actor.id }];
 }
 
+/**
+ * What gaining a condition does beyond itself, shared by every path that can impose one (a GM chip, a failed save,
+ * an on-hit rider, an effect's linked conditions): an Incapacitated creature's grapples release and its
+ * Concentration breaks (SRD Incapacitated, Grappling), and its Rage ends; an Unconscious one drops what it holds;
+ * Exhaustion 6 is death. 0 HP is handled by the damage path, which ends everything the creature sustains.
+ */
 export function conditionGained(
   state: GameState,
   actor: Actor,
@@ -339,6 +354,10 @@ export function addEffect(
       throw new CommandRejectedError("That combatant already has too many active effects.");
     actor.effects = [...actor.effects, effect];
   }
+  // A creature that can breathe water now (the Water Breathing spell) stops holding its breath.
+  if (effect.tags.includes("water-breathing"))
+    for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
+      endEffectInternal(state, actor, held.id, events ?? []);
   for (const conditionId of effect.linkedConditionIds) {
     const present = actor.conditions.find((condition) => condition.id === conditionId);
     if (present) {
@@ -494,6 +513,28 @@ function endEffectInternal(
     events.push({
       kind: "condition",
       text: `${actor.name} is no longer ${conditionLabel(conditionId)}.`,
+      actorId: actor.id
+    });
+  }
+  // What smothered the creature (an engulfing, a whelm) lets go: it breathes again.
+  if (effect.tags.includes(SMOTHERING_TAG))
+    for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
+      endEffectInternal(state, actor, held.id, events, sweeping);
+  // SRD Goodberry: "Uneaten berries disappear when the spell ends."
+  if (effect.tags.includes(GOODBERRY_TAG) && actor.inventory.some((row) => (row.recordId ?? row.id) === GOODBERRY_ID)) {
+    actor.inventory = actor.inventory.filter((row) => (row.recordId ?? row.id) !== GOODBERRY_ID);
+    events.push({ kind: "effect", text: `${actor.name}'s uneaten Goodberries disappear.`, actorId: actor.id });
+  }
+  // SRD Suffocation: "When a creature can breathe again, it removes all levels of Exhaustion it gained from
+  // suffocating."
+  if (effect.breath && effect.breath.exhaustionGained > 0) {
+    const left = Math.max(0, exhaustionLevel(actor) - effect.breath.exhaustionGained);
+    if (left === 0) removeConditionDirect(actor, "exhaustion");
+    else
+      writeCondition(actor, { ...actor.conditions.find((condition) => condition.id === "exhaustion")!, level: left });
+    events.push({
+      kind: "condition",
+      text: `${actor.name} breathes again, and the Exhaustion suffocating gave it goes.`,
       actorId: actor.id
     });
   }

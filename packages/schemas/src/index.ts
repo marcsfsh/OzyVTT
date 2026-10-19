@@ -1233,6 +1233,16 @@ export const EffectInstanceSchema = z
     endsOnSpellHealing: z.literal(true).optional(),
     /** It ends when the bearer ends its turn where it can't see the effect's source (Horror Nimbus). */
     endsOutOfSight: z.literal(true).optional(),
+    /** SRD Suffocation: the rounds of breath the bearer has left (each of its turns' ends spends one), then the
+     *  Exhaustion levels suffocating gave it (one at the end of each of its turns), which go when it breathes again
+     *  and this ends. */
+    breath: z
+      .object({
+        roundsLeft: z.number().int().min(0).max(100_000),
+        exhaustionGained: z.number().int().min(0).max(6).default(0)
+      })
+      .strict()
+      .optional(),
     /** An action that ends it: waking a sleeper, stanching a wound, studying an illusion, detaching a stirge. */
     endedBy: EndedBySchema.optional(),
     /** What it does as its bearer rests or days pass (a mummy's curse); `dayMark` is the game-clock minute its next 24
@@ -1407,6 +1417,9 @@ export const InventoryItemSchema = z
     /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
      *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
     ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
+    /** A Waterskin row's water left, in pints; absent means every skin in the row is full (4 pints each). Drinking
+     *  as a day ends lowers it, and drinking one's fill at a source fills the skins again. The server keeps it. */
+    waterPints: z.number().int().min(0).max(100_000).optional(),
     /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
@@ -1627,6 +1640,19 @@ export const ActorSchema = z.object({
   /** SRD Influence: a monster's or NPC's attitude toward the party, Indifferent when absent. The GM sets it; an
    *  Influence check against it has Advantage when Friendly and Disadvantage when Hostile. GM-only in projections. */
   attitude: z.enum(["friendly", "indifferent", "hostile"]).optional(),
+  /** SRD Malnutrition and Dehydration, while the table tracks food and water (`rest.survival`): what the creature ate
+   *  and drank this game day, the days in a row it ate nothing, and the Exhaustion levels hunger and thirst gave it,
+   *  which no rest removes until it eats or drinks its full need for a day. The server keeps it. Owner and GM only. */
+  nourishment: z
+    .object({
+      foodPounds: z.number().min(0).max(1000).default(0),
+      waterPints: z.number().int().min(0).max(10_000).default(0),
+      daysUnfed: z.number().int().min(0).max(10_000).default(0),
+      hungerLevels: z.number().int().min(0).max(6).default(0),
+      thirstLevels: z.number().int().min(0).max(6).default(0)
+    })
+    .strict()
+    .optional(),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown, so movement rules skip. */
   speedFeet: z.number().int().min(0).max(500).optional(),
   /** Legendary actions per round and Legendary Resistance per day (SRD 2024). GM knowledge, stripped from player projections. */

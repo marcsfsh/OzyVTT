@@ -1441,7 +1441,10 @@ export const RestStateSchema = z
     clockMinutes: z.number().int().min(0).max(59).default(0),
     /** Characters whose players asked for a Long Rest, oldest first. */
     requests: z.array(z.uuid()).max(50).default([]),
-    shortRest: PartyShortRestSchema.nullable().default(null)
+    shortRest: PartyShortRestSchema.nullable().default(null),
+    /** The table tracks food and water: as each game day ends, every character eats and drinks what it carries and
+     *  what it lacks costs it (SRD Malnutrition, Dehydration). Off by default. */
+    survival: z.boolean().default(false)
   })
   .strict();
 export type RestState = z.infer<typeof RestStateSchema>;
