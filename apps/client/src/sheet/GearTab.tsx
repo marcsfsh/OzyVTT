@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { catalogIdOf, rowUsesKey, type ContentActionSummary, type ContentEquipmentSummary } from "@vtt/domain";
 import { ABILITY_NAMES } from "@vtt/rules-5e";
 import type { InventoryItem } from "@vtt/schemas";
@@ -99,7 +99,8 @@ export function GearTab({
   inFight,
   others = [],
   actionBlocked = null,
-  onUseAction
+  onUseAction,
+  crafting = null
 }: Readonly<{
   actor: SheetActor;
   role: "gm" | "player";
@@ -121,6 +122,8 @@ export function GearTab({
   actionBlocked?: string | null;
   /** Uses an item's action; with `fastHands`, a Thief takes it as a Bonus Action. */
   onUseAction: (row: ContentActionSummary, options?: Readonly<{ fastHands?: boolean }>) => void;
+  /** The character's crafting projects, under the pack. */
+  crafting?: ReactNode;
 }>) {
   const inventory = actor.inventory ?? [];
   const [openId, setOpenId] = useState<string | null>(null);
@@ -708,6 +711,7 @@ export function GearTab({
           <span className="cs-sub">Half of the {fired} fired come back, rounded down.</span>
         </p>
       )}
+      {crafting}
       <section className="cs-group" aria-label="Add an item">
         <span className="cs-eyebrow">Add an item</span>
         <form
