@@ -30,8 +30,8 @@ export type PlayerHp =
   { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
  * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's, and so does its magic
- * mark, which only Magic Resistance reads, the amounts and immunities a spell's level or caster set, and a long casting's
- * targets and slot. `yours` marks one the
+ * mark, which only Magic Resistance reads, the amounts and immunities a spell's level or caster set, a long casting's
+ * targets and slot, and what an effect gives or wards and the row it is bound to. `yours` marks one the
  * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
 export type PlayerEffect = Omit<
   EffectInstance,
@@ -49,15 +49,32 @@ export type PlayerEffect = Omit<
   | "grantedTeleport"
   | "endsWhenUnaffected"
   | "longCast"
+  | "hitPointsEachTurn"
+  | "conditionWards"
+  | "suppressedConditions"
+  | "itemId"
+  | "weapon"
+  | "optionId"
+  | "bonusActions"
+  | "grantedSpellAction"
+  | "endAction"
+  | "usedOnTurn"
+  | "shrinksEachLongRest"
+  | "unarmedStrike"
   | "struck"
   | "light"
   | "findDc"
   | "detects"
   | "heldBy"
+  | "form"
+  | "sizeChange"
+  | "ownSize"
 > & {
   yours?: true;
   /** What holds the creature (a Net), by name: the object any creature can attack to free it. */
   heldBy?: Readonly<{ name: string }>;
+  /** The form its bearer has taken, by name alone (the effect's name says it too). */
+  form?: Readonly<{ name: string }>;
 };
 /** A creature as one player sees it. Their own claimed character gets everything; another player's is limited by
  * `GameState.partyVisibility` (see apps/server/src/projections.ts). */
@@ -103,6 +120,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     pactSlots?: Actor["pactSlots"];
     preparedSpellIds?: Actor["preparedSpellIds"];
     /** A Wizard's spellbook beyond its sheet. Same gate as `preparedSpellIds`. */ spellbook?: Actor["spellbook"];
+    /** A Druid's known Wild Shape forms. Same gate as `preparedSpellIds`. */ knownForms?: Actor["knownForms"];
     preparation?: Actor["preparation"];
     /** The step a finished rest opened (recoveries and re-choices). Same gate as `preparation`. */ restStep?: Actor["restStep"];
     inventory?: Actor["inventory"];

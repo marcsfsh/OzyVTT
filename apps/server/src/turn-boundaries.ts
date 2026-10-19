@@ -1,13 +1,15 @@
-import type { AbilityId, GameState } from "@vtt/domain";
-import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
+import { isDead, type AbilityId, type GameState } from "@vtt/domain";
+import { abilityModifier, parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
-import { applyDamageDetailed, damageAdjustmentDetail, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
+import { applyDamageDetailed, damageAdjustmentDetail, healActor, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { holyNimbusBurns } from "./paladin-auras.js";
 import { createPendingSaves } from "./saving-throws.js";
 import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
+import { deathTraitsAtTurnEnd } from "./death-traits.js";
+import { riseAtTurnStart } from "./risen.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -48,6 +50,8 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
   if (!deps?.rollDie || !deps.resolveDefinition) return;
   const dice = { ...deps, rollDie: deps.rollDie, resolveDefinition: deps.resolveDefinition };
   events.push(...traitsAtTurnEnd(state, actorId, dice));
+  // A hydra grows back its heads and a Bloodied troll loses a limb (Multiple Heads, Loathsome Limbs).
+  events.push(...deathTraitsAtTurnEnd(state, actorId, dice));
   // "Takes 10 (3d6) Acid damage at the end of each of the toad's turns."
   dealOngoingAt(state, actorId, "end", events, dice);
 }
@@ -61,8 +65,18 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
  * (`traitsAtTurnStart`: Regeneration, Berserk, Barbed Hide) and the auras it starts its turn in ask their saves.
  */
 export function startOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+  // "A Humanoid killed by this spell rises at the start of your next turn as a Zombie" (Finger of Death).
+  if (deps.newId)
+    events.push(
+      ...riseAtTurnStart(state, actorId, {
+        resolveDefinition: deps.resolveDefinition,
+        newId: deps.newId,
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      })
+    );
   heroicWarrior(state, actorId, events, deps);
   temporaryHitPointsEachTurn(state, actorId, events);
+  hitPointsEachTurn(state, actorId, events, deps);
   events.push(...traitsAtTurnStart(state, actorId, deps));
   holyNimbus(state, actorId, events, deps);
   dealOngoingAt(state, actorId, "start", events, deps);
@@ -149,6 +163,36 @@ function temporaryHitPointsEachTurn(state: GameState, actorId: string, events: E
       actorId,
       ...sourceOf(effect)
     });
+  }
+}
+
+/** Hit points an effect restores at the start of each of its bearer's turns (SRD Regenerate: "regains 1 Hit Point at
+ *  the start of each of its turns"), and the Champion's Heroic Rally ("5 plus your Constitution modifier if you are
+ *  Bloodied and have at least 1 Hit Point"). Through the healing rules, so a dying creature wakes and the dead don't. */
+function hitPointsEachTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || isDead(actor)) return;
+  const heals: Array<Readonly<{ amount: number; source: string; effect?: (typeof actor.effects)[number] }>> =
+    actor.effects.flatMap((effect) =>
+      effect.hitPointsEachTurn !== undefined ? [{ amount: effect.hitPointsEachTurn, source: effect.name, effect }] : []
+    );
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  const bloodied = actor.hp.current >= 1 && actor.hp.current * 2 <= actor.hp.maximum;
+  if (bloodied && definition && holdsFeature(definition, "survivor", "Survivor"))
+    heals.push({ amount: Math.max(0, 5 + abilityModifier(definition.abilityScores.con)), source: "Heroic Rally" });
+  for (const heal of heals) {
+    if (heal.amount <= 0 || actor.hp.current >= actor.hp.maximum) continue;
+    const before = actor.hp.current;
+    const woke = healActor(state, actor.id, heal.amount, { role: "gm" });
+    const regained = actor.hp.current - before;
+    if (regained > 0)
+      events.push({
+        kind: "effect",
+        text: `${actor.name} regains ${regained} ${regained === 1 ? "hit point" : "hit points"} (${heal.source}).`,
+        actorId,
+        ...(heal.effect ? sourceOf(heal.effect) : {})
+      });
+    events.push(...woke);
   }
 }
 

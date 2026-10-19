@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { GmActor, PlayerActor } from "@vtt/domain";
-import { IconButton, IconX, Select } from "@vtt/ui";
+import { IconButton, IconX, Select, useToast } from "@vtt/ui";
 import { ConditionEditor } from "../encounter/conditions";
 import { HpAdjust } from "../encounter/HpAdjust";
 import { HealthAudienceOptions, HealthStyleOptions, type HealthStyle } from "../encounter/health-display";
@@ -111,12 +111,30 @@ export function TokenContextMenu({
  * Class and hit points. While an attack is being aimed, the attack can be aimed at it here.
  */
 function HeldBy({ actor, role }: Readonly<{ actor: Actor; role: "gm" | "player" }>) {
-  const session = useTargeting();
-  const [note, setNote] = useState("");
   const held = actor.effects.flatMap((effect) =>
     "heldBy" in effect && effect.heldBy ? [{ effectId: effect.id, holder: effect.heldBy }] : []
   );
-  if (held.length === 0) return null;
+  return held.length === 0 ? null : <HeldByRows actor={actor} role={role} held={held} />;
+}
+
+function HeldByRows({
+  actor,
+  role,
+  held
+}: Readonly<{
+  actor: Actor;
+  role: "gm" | "player";
+  held: ReadonlyArray<
+    Readonly<{
+      effectId: string;
+      holder:
+        | Readonly<{ name: string }>
+        | Readonly<{ name: string; armorClass: number; hitPoints: Readonly<{ current: number; maximum: number }> }>;
+    }>
+  >;
+}>) {
+  const session = useTargeting();
+  const { toast } = useToast();
   const attack = session && session.action.attackBonus !== null ? session.action : null;
   return (
     <>
@@ -132,7 +150,11 @@ function HeldBy({ actor, role }: Readonly<{ actor: Actor; role: "gm" | "player" 
               type="button"
               role="menuitem"
               className="token-context-item"
-              onClick={() => resolveAtHeld(actor.id, effectId, undefined, (_ok, text) => setNote(text ?? ""))}
+              onClick={() =>
+                resolveAtHeld(actor.id, effectId, undefined, (ok, text) => {
+                  if (text) toast(text, { tone: ok ? "info" : "error" });
+                })
+              }
             >
               {`Attack the ${holder.name} with ${attack.name}`}
             </button>
@@ -141,11 +163,6 @@ function HeldBy({ actor, role }: Readonly<{ actor: Actor; role: "gm" | "player" 
           )}
         </div>
       ))}
-      {note && (
-        <p className="token-context-feedback" role="status">
-          {note}
-        </p>
-      )}
     </>
   );
 }

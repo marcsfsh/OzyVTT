@@ -429,6 +429,19 @@ dispelled with no Concentration. An effect can also last until its bearer's next
 would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
 once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
 
+Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
+creature died: the fight's round while its fight runs, then the game clock. A rule that kills also says what killed
+it and what is left of the body (Disintegrate's dust, a Vorpal Sword's lost head). A revival spell's conditions are
+data on the spell (`effect.revives`: its time limit, no Undead, a new body, the Hit Points it gives back). They are
+checked before anything is spent and applied as the cast resolves (`resolution/revival.ts`). Time under Gentle
+Repose doesn't count against the limit, and Raise Dead's ordeal is a penalty to D20 Tests that eases with each Long
+Rest. What kills outright is data too: damage that kills at 0 (`drain.killsAtZero`), a corpse that rises
+(`drain.slainRise`, `risen.ts`), a hit that kills (`onHit.kills`, `resolution/kill.ts`), a cast that kills by Hit
+Points (`killsAtHitPoints`) and a save whose failure acts by the target's Hit Points (`failureByHitPoints`,
+`fatal-saves.ts`). All of them die through `killOutright` in `hit-points.ts`: a character makes no death saves, and
+Death Ward turns aside a death that deals no damage. Stat block traits that cheat death (Misty Escape, the
+Restoration traits, Multiple Heads, Loathsome Limbs) run from `death-traits.ts` as damage lands and as turns end.
+
 Each effect a spell leaves records the spell and the level it was cast at (`spell`), so a spell can be
 ended as a whole: Dispel Magic and Remove Curse resolve in `resolution/dispel.ts`, which ends the
 spell's effects, its area or its caster's Concentration (`spell-endings.ts`). A Concentration spell that
@@ -449,6 +462,15 @@ everything the sheet stores (AC, initiative, slots). Senses on any carrier are r
 vision. Riders name damage types and
 conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
 refuses a rider gated on a moment its reader never collects.
+
+A grant or a failed save can offer options (Fire Shield's warm or chill, Bestow Curse's curse), one for
+each target where the text says so. The resolve carries the pick (`optionId`, `targetOptions`), which is
+checked before anything rolls and kept on the effect with what it adds (`resolution/grant-extras.ts`). A
+grant can also bind to one carried weapon (`itemId`): its `this-item` riders reach that row's rolls and
+its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A live effect
+can offer its bearer actions: a Bonus Action Dash or Disengage, an action that ends it with a save or a
+check, and another creature's spell action at the numbers it was cast with (`builtinActionsFor` in
+`builtin-actions.ts`, `granted-actions.ts`).
 
 What rides a hit is data on its action (`ridesHit`): the hits it rides, once a turn or on its user's own
 turn, the dice it gives up, its cost, the save it opens and the effects picked with it (Sneak Attack's
@@ -520,6 +542,21 @@ answer on a missed spell attack. The shaping stays on the cast's open action ins
 readied spell for its release and on a spell area for the saves it calls for later. `actor:available-actions` offers
 each known option with its cost and why it can't be used now, and the sheet's cast detail sends the picks.
 
+A creature that shape-shifts takes a form as an effect (`EffectInstance.form`, `apps/server/src/transform/`). The
+action's `shapeShift` says where forms come from (its user's known forms for Wild Shape, the bestiary under limits for
+Polymorph and Shapechange, or the stat block's printed forms for a werewolf), what the creature keeps of its own
+statistics and how the form ends. Taking one stores a composed definition as `form-<actorId>`
+(`transform/compose.ts`): a stat block's statistics with what is kept of the creature's own, or the creature's own with
+a printed form's size and speeds. The actor's `definitionId` points at it while the form lasts, so every rule that reads
+a definition reads the form, and the true one, Speed and Armor Class wait on the effect for its end
+(`transform/assume.ts`). Ending the effect, by its duration, Concentration, the leave action the form adds, death,
+running out of Temporary Hit Points or the Incapacitated condition (`transform/rules.ts`), gives them back. A form can
+forbid spells, actions or attacks, and an action printed for some forms only is refused in the others; those are
+economy rules (`form.*`). A sheet in a form can't be rebuilt or edited until it ends. A creature's size changes the same
+way: a form's size, or an effect's `sizeChange` (Enlarge/Reduce, Large Form, the size potions), over the size it had
+before (`ownSize`), and its token takes the new footprint from its top-left cell (`transform/forms.ts`). A player sees
+only a form's name on an effect, never its stat block or terms (`projections.ts`).
+
 What a save does is data on the action's save block: `successDamage` (half or none) and the
 `failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
@@ -531,7 +568,10 @@ mastery property a mastered weapon swing carries (`weapon-masteries.ts`). The se
 pins (`character.set-favourites`) and counts each option that resolves for it (`option-uses.ts`), a bounded map.
 
 Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
-(`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
+(`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. Gear that helps a
+check only in a situation (a Book's topic, prying with a Crowbar) carries a rider gated on `situation-is`: the
+derived sheet lists each situation (`check-situations.ts`), the sheet offers it as a toggle, and only a `check.roll`
+that names it gets the rider, its words added to the roll's name for the GM to judge. A die a
 player sees before it counts (a previewed attack, save or death save) is held on the server
 (`held-rolls.ts`, ADR-0012): a second look shows the same die, and a reroll needs Heroic Inspiration or an
 answer. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it
@@ -711,8 +751,9 @@ change as a new numbered migration in the owning store.
 
 ## Client
 
-A routed single-page app (`apps/client/src/router.ts`); every surface has an address. `main.tsx` only
-mounts `shell/App.tsx`, where `useSession` holds the sign-in, the socket and the projected state, and
+A routed single-page app (`apps/client/src/router.ts`); every surface has an address. `main.tsx` installs
+the zoom guard (`lib/zoom-guard.ts`, which holds a phone's page at its own size, as the other two entries do)
+and mounts `shell/App.tsx`, where `useSession` holds the sign-in, the socket and the projected state, and
 the GM and player shells render the surface the address names. The game arrives over the socket; the
 Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib/command.ts`
 (`command` adds the `commandId`, `read` does not, and a lost reply becomes a refusal) and `/api/v1`

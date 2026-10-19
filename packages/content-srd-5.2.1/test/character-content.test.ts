@@ -707,6 +707,23 @@ describe("character-builder content records", () => {
       }
       if (slug === "skills") return skillCount > 0;
       if (slug === "weapons") return weaponCount > 0;
+      // A narrower kind of weapon, each word a filter ("melee-weapons", "martial-finesse-weapons").
+      if (/^((?:simple|martial|melee|ranged|light|finesse)-)+weapons$/.test(slug)) {
+        const words = slug.split("-").slice(0, -1);
+        return loadEquipment().some((item) => {
+          const weapon = item.category === "weapon" ? item.weapon : null;
+          if (!weapon) return false;
+          return words.every((word) =>
+            word === "simple" || word === "martial"
+              ? weapon.category === word
+              : word === "melee"
+                ? weapon.melee === true
+                : word === "ranged"
+                  ? weapon.melee === false
+                  : (weapon.properties ?? []).includes(word)
+          );
+        });
+      }
       if (slug === "tools") return toolCount > 0;
       if (slug === "languages") return languages.length > 0;
       if (slug === "feats") return feats.length > 0;
@@ -972,22 +989,24 @@ describe("character-builder content records", () => {
     const defense = feats.find((feat) => feat.id === "defense")!;
     expect(defense.category).toBe("fighting-style");
     expect(defense.feature.modifiers).toEqual([{ type: "armor-class", amount: 1, whileArmored: true }]);
-    // Archery's +2 is a roll-time rider on Ranged weapons (ammunition marks one; a thrown melee weapon and a
-    // spell attack do not qualify). The other two stay prose.
+    // Archery's +2 is a roll-time rider on attacks with a Ranged weapon (a bow, a Dart, a Net; a thrown melee weapon
+    // and a spell attack do not qualify). Great Weapon Fighting's floor is a die minimum on a two-handed swing's
+    // damage; Two-Weapon Fighting stays prose.
     expect(feats.find((feat) => feat.id === "archery")!.feature.modifiers).toEqual([
       {
         type: "attack-bonus",
         amount: 2,
-        when: [
-          { type: "on-attack-roll" },
-          { type: "attack-kind-is", kinds: ["ranged"] },
-          { type: "weapon-property-is", properties: ["ammunition"] }
-        ]
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged-weapon-kind"] }]
       }
     ]);
-    for (const id of ["great-weapon-fighting", "two-weapon-fighting"]) {
-      expect(feats.find((feat) => feat.id === id)!.feature.modifiers, id).toEqual([]);
-    }
+    expect(feats.find((feat) => feat.id === "great-weapon-fighting")!.feature.modifiers).toEqual([
+      {
+        type: "damage-die-minimum",
+        minimum: 3,
+        when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["two-handed"] }]
+      }
+    ]);
+    expect(feats.find((feat) => feat.id === "two-weapon-fighting")!.feature.modifiers).toEqual([]);
     // An unconditional +1 AC is still expressible and still means "always" (back-compat).
     const always = FeatureRecordSchema.parse({
       id: "x",
@@ -1874,7 +1893,21 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     expect(feat([{ type: "special-speed", movement: "climb", equalToSpeed: true }]).feature.modifiers).toHaveLength(1);
     // So does a movement rule: a jump by Dexterity, a safe fall, a cheap leap.
     expect(feat([{ type: "movement", rule: "jump-by-dexterity" }]).feature.modifiers).toHaveLength(1);
-    expect(ModifierSchema.options).toHaveLength(28);
+    // Floors, immunity, Ignoring Resistance, Advantage denied and the healing riders ride it too.
+    expect(
+      feat([
+        { type: "d20-minimum", roll: "check", minimum: 10, proficientOnly: true },
+        { type: "total-minimum", roll: "check", abilityScore: "str" },
+        { type: "damage-die-minimum", minimum: 3 },
+        { type: "damage-immunity", damageTypes: ["psychic"] },
+        { type: "ignores-resistance", damageTypes: ["fire"] },
+        { type: "advantage-denied", roll: "incoming-attack" },
+        { type: "healing-dice-maximized" },
+        { type: "healing-bonus", amount: 2, perSlotLevel: true }
+      ]).feature.modifiers
+    ).toHaveLength(8);
+    expect(feat([{ type: "healing-received-maximized" }]).feature.modifiers).toHaveLength(1);
+    expect(ModifierSchema.options).toHaveLength(37);
   });
 
   it("15. an item that grants a feat", () => {

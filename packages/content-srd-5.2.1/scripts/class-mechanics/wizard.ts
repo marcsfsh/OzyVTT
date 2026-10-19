@@ -29,14 +29,18 @@ export const wizard: ClassMechanicsModule = {
   subclasses: {
     evoker: {
       // "Whenever you cast a Wizard spell from the Evocation school, you can add your Intelligence modifier to one
-      // damage roll of that spell": the modifier in the spell's own damage type, on each resolve of an Evocation
-      // spell. That it is a Wizard spell, and once for a spell of several rolls, aren't checked.
+      // damage roll of that spell": the modifier in the spell's own damage type, on each resolve of a Wizard Evocation
+      // spell. Once for a spell of several rolls isn't checked.
       "empowered-evocation": {
         modifiers: [
           {
             type: "extra-damage",
             abilityModifier: "int",
-            when: [{ type: "on-damage-roll" }, { type: "spell-school-is", schools: ["evocation"] }]
+            when: [
+              { type: "on-damage-roll" },
+              { type: "spell-school-is", schools: ["evocation"] },
+              { type: "spell-class-is", classIds: ["wizard"] }
+            ]
           }
         ]
       }

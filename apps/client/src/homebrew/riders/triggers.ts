@@ -36,6 +36,7 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "on-ability-check": "Making an ability check",
   "on-initiative-roll": "Rolling initiative",
   "on-taking-damage": "Taking damage",
+  "on-healing": "Healing a creature",
   "attack-kind-is": "A kind of attack",
   "weapon-property-is": "A weapon property",
   "damage-type-is": "A damage type",
@@ -48,14 +49,25 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "versus-condition": "A target's condition",
   "versus-creature-type": "A target's kind",
   "by-effect-source": "The creature that put this effect on",
+  "source-creature-type-is": "The other creature's kind",
+  "versus-effect-source": "Against the creature that put this effect on",
+  "versus-marked": "A target it marked",
+  "versus-hurt": "A target missing Hit Points",
+  "versus-within": "A target within a distance",
+  "spell-class-is": "A spell of one class",
   "sees-other": "You can see the other creature",
   "seen-by-other": "The other creature can see you",
-  "other-lacks-sense": "The other creature lacks a sense"
+  "other-lacks-sense": "The other creature lacks a sense",
+  "situation-is": "A situation the roller names"
 };
 
-/** Read only on an effect the engine puts on another creature (Hunter's Mark), or authored only by the content
- *  (Blur's senses), so the editor doesn't offer them. */
-const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set(["by-effect-source", "other-lacks-sense"]);
+/** Read only on an effect the engine puts on another creature (Hunter's Mark, Bestow Curse), or authored only by the
+ *  content (Blur's senses), so the editor doesn't offer them. */
+const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set([
+  "by-effect-source",
+  "versus-effect-source",
+  "other-lacks-sense"
+]);
 
 const TRIGGER_TYPES: readonly SelectOption[] = (Object.keys(TRIGGER_LABELS) as RiderTrigger["type"][])
   .filter((type) => !ENGINE_ONLY_TRIGGERS.has(type))
@@ -109,7 +121,16 @@ function blankTrigger(type: string): Draft {
     case "versus-condition":
       return { type, conditionIds: [] };
     case "versus-creature-type":
+    case "source-creature-type-is":
       return { type, creatureTypes: [] };
+    case "versus-marked":
+      return { type, tags: [] };
+    case "versus-within":
+      return { type, feet: 5 };
+    case "spell-class-is":
+      return { type, classIds: [] };
+    case "situation-is":
+      return { type, situation: "" };
     default:
       return { type };
   }
@@ -159,6 +180,8 @@ function triggerRowLabel(row: Draft): string {
     .map(String);
   if (values.length > 0) return `${name} · ${values.slice(0, 3).join(", ")}${values.length > 3 ? "…" : ""}`;
   if (typeof row.percent === "number") return `${name} · ${row.percent}% or less`;
+  if (typeof row.feet === "number") return `${name} · ${row.feet} ft`;
+  if (typeof row.situation === "string" && row.situation.trim() !== "") return `${name} · ${row.situation.trim()}`;
   if (row.type === "while-shield") return row.wielding === false ? "Not holding a shield" : name;
   return name;
 }
@@ -221,7 +244,7 @@ export const whenField = (): FieldDef => ({
       label: "Classes",
       kind: "multiselect",
       options: (ctx) => ctx.classes,
-      visibleWhen: hasType("while-character-is")
+      visibleWhen: hasType("while-character-is", "spell-class-is")
     },
     {
       key: "speciesIds",
@@ -248,8 +271,8 @@ export const whenField = (): FieldDef => ({
       key: "tags",
       label: "Effect tags",
       kind: "tags",
-      visibleWhen: hasType("while-effect-tag"),
-      suggestions: ["raging", "blessed", "concentrating", "inspired"]
+      visibleWhen: hasType("while-effect-tag", "versus-marked"),
+      suggestions: ["raging", "blessed", "concentrating", "inspired", "grapple", "hunters-mark"]
     },
     {
       key: "percent",
@@ -288,7 +311,9 @@ export const whenField = (): FieldDef => ({
         opt("unarmed", "Unarmed"),
         opt("thrown", "Thrown"),
         opt("reaction", "Reaction"),
-        opt("opportunity", "Opportunity")
+        opt("opportunity", "Opportunity"),
+        opt("two-handed", "Melee, held in two hands"),
+        opt("ranged-weapon-kind", "With a Ranged weapon (a bow, a Dart)")
       ],
       visibleWhen: hasType("attack-kind-is")
     },
@@ -349,9 +374,27 @@ export const whenField = (): FieldDef => ({
       key: "creatureTypes",
       label: "Kinds of creature",
       kind: "tags",
-      visibleWhen: hasType("versus-creature-type"),
+      visibleWhen: hasType("versus-creature-type", "source-creature-type-is"),
       suggestions: (ctx) => ctx.creatureTypes,
-      help: "Read from the target's stat block. A character has no kind recorded, so it never matches one."
+      help: "Read from the stat block of the target, or of the attacker. A character has no kind recorded, so it never matches one."
+    },
+    {
+      key: "feet",
+      label: "Within",
+      kind: "number",
+      min: 5,
+      max: 300,
+      unit: "ft",
+      visibleWhen: hasType("versus-within"),
+      help: "Measured on the map. Where the map can't measure, it doesn't apply."
+    },
+    {
+      key: "situation",
+      label: "Situation",
+      kind: "text",
+      placeholder: "consulting the book about its topic",
+      visibleWhen: hasType("situation-is"),
+      help: "Plain words that follow the check's name after a comma. The sheet offers it as a toggle beside the checks, and the GM decides whether a roll fits."
     }
   ]
 });

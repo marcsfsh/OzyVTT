@@ -68,6 +68,13 @@ export type ResolveInput = Readonly<{
   skill?: string | null;
   /** The ability a cast chooses (Hex). */
   ability?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
+  /** The option picked for an action that offers several (`grants.options`, `failureEffect.options`); absent, the
+   *  first. */
+  optionId?: string | null;
+  /** An option for each target, for an action that asks for one per target; a target left out takes `optionId`. */
+  targetOptions?: Readonly<Record<string, string>>;
+  /** The carried weapon a grant binds to (`grants.bindsWeapon`). */
+  itemId?: string | null;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];
@@ -120,6 +127,14 @@ export type ResolveInput = Readonly<{
   knockOut?: boolean;
   /** How the caster shapes this spell's cast (Metamagic, Sculpt Spells), checked and applied by `metamagic.ts`. */
   shaping?: readonly CastShaping[];
+  /** The form a shape-shift takes (a known form, a Beast, a printed form's id, or `true`), and one per target where
+   *  each takes its own (`shape-shift.ts`). */
+  form?: string;
+  targetForms?: ReadonlyArray<Readonly<{ targetId: string; form: string }>>;
+  /** Whether the user's gear melds into its form or is worn by it, where the action lets it choose. */
+  gear?: "merged" | "worn";
+  /** The effect a use picks among its action's options (Enlarge or Reduce). */
+  option?: string;
 }>;
 
 export type ResolveDependencies = Readonly<{
@@ -228,6 +243,9 @@ export type ResolveContext = {
   readonly hiddenFromInitiator: (actorId: string) => boolean;
   readonly attacker: LiveActor;
   readonly targets: readonly LiveActor[];
+  /** Targets the cast's damage passes over: killed outright by it, or saved from that by Death Ward (Power Word
+   *  Kill). */
+  spared?: Set<string>;
   /** The builtin's special cases; only for an action taken from the builtin catalog. */
   readonly builtin: BuiltinHandler | undefined;
   /** The attacker's equipment contribution. */

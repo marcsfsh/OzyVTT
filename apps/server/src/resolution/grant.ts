@@ -1,5 +1,5 @@
 import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, type GameState } from "@vtt/domain";
-import { abilityModifier } from "@vtt/rules-5e";
+import { abilityModifier, rollDice } from "@vtt/rules-5e";
 import type { DamageType, EffectInstance, Modifier } from "@vtt/schemas";
 import { ABILITY_NAMES } from "../ability-checks.js";
 import { setCondition } from "../actor-conditions.js";
@@ -21,19 +21,37 @@ import {
   type EffectNarration
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
+import { holdsFeature } from "../class-features.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { currentSpeedFeet } from "../speed.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
-import type { DefinitionAction, LiveActor, ResolveContext } from "./context.js";
+import { recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 import { moveMark } from "./marks.js";
+import { boundWeaponOf, grantExtras, optionFor, optionParts, withOptionName } from "./grant-extras.js";
+import { suppressConditions } from "../suppressed-conditions.js";
 import { effectNameOf } from "../effect-names.js";
+import { ownSizeOf } from "../transform/assume.js";
+import { blockerOfGrowth, changedSize, refreshSize, SIZE_FOOTPRINT, type CreatureSize } from "../transform/forms.js";
+import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 
 /** Reckless Attack's Advantage is on attack rolls using Strength. A sheet built before that gate was authored carries
  *  the roll mode ungated, so it is narrowed as it lands. */
 function strengthAttacksOnly(modifier: Modifier): Modifier {
   if (modifier.type !== "roll-mode" || modifier.roll !== "attack" || (modifier.when?.length ?? 0) > 0) return modifier;
   return { ...modifier, when: [{ type: "on-attack-roll" }, { type: "ability-is", abilities: ["str"] }] };
+}
+
+/** SRD Foe Slayer: "The damage die of your Hunter's Mark is a d10 rather than a d6." */
+function foeSlayerDie(ctx: ResolveContext, modifiers: readonly Modifier[]): readonly Modifier[] {
+  if (
+    !ctx.action.grants?.tags.includes("hunters-mark") ||
+    !holdsFeature(ctx.deps.definition, "foe-slayer", "Foe Slayer")
+  )
+    return modifiers;
+  return modifiers.map((modifier) =>
+    modifier.type === "extra-damage" && modifier.formula === "1d6" ? { ...modifier, formula: "1d10" } : modifier
+  );
 }
 
 /** The feature whose Rage lasts 10 minutes with nothing to extend it (Barbarian 15). */
@@ -124,7 +142,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   // the next attack roll (`spendSteadyAim`). A sheet built earlier says "until your next turn".
   const steadyAim = grant.tags.includes(STEADY_AIM_TAG);
   const rage = rageTiming(ctx, recipient);
-  const modifiers = grant.tags.includes(RECKLESS_TAG) ? grant.modifiers.map(strengthAttacksOnly) : grant.modifiers;
+  const modifiers = foeSlayerDie(
+    ctx,
+    grant.tags.includes(RECKLESS_TAG) ? grant.modifiers.map(strengthAttacksOnly) : grant.modifiers
+  );
   // Hex: "choose one ability. The target has Disadvantage on ability checks made with the chosen ability."
   const hexed = grant.tags.includes(CHOSEN_ABILITY_TAG);
   const hexAbility = hexed ? (input.ability ?? null) : null;
@@ -175,21 +196,49 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   }
   // Barkskin: "an Armor Class of 17 if its AC is lower than that", a floor under whatever else the AC is.
   const armorClassFloor = grant.armorClassFloor ?? (grant.tags.includes(BARKSKIN_TAG) ? 17 : undefined);
+  // Large Form: "You can change your size to Large ... if you're in a big enough space."
+  if (grant.sizeChange?.to) {
+    const grown = changedSize((recipient.size ?? "medium") as CreatureSize, grant.sizeChange);
+    const blocker = blockerOfGrowth(state, recipient.id, SIZE_FOOTPRINT[grown], ctx.hiddenFromInitiator);
+    if (blocker)
+      throw new CommandRejectedError(
+        `${recipient.name} isn't in a big enough space to become ${grown[0]!.toUpperCase()}${grown.slice(1)}: ${blocker} is in the way.`
+      );
+  }
+  // A duration rolled as it lands (Potion of Diminution: "for 1d4 hours").
+  const rolledHours = grant.hoursRolled
+    ? Math.max(1, resolveDice(parseDiceFormula(grant.hoursRolled), ctx.deps.random).total)
+    : null;
   const spell = spellOf(ctx);
   const castLevel = spell ? (ctx.plan.castLevel ?? spell.level) : null;
+  // The choice made as it is granted (Fire Shield's warm or chill), and the weapon it binds to (Magic Weapon).
+  const option = grant.options
+    ? optionFor(
+        ctx,
+        { options: grant.options, perTarget: grant.optionsPerTarget === true },
+        recipient,
+        grant.name ?? action.name
+      )
+    : null;
+  const parts = optionParts(option);
+  const bound = boundWeaponOf(ctx, grant, recipient);
+  if (grant.bindsWeapon && !bound) return;
+  const linkedConditionIds = [...new Set([...(grant.conditions ?? []), ...parts.conditions])].slice(0, 4);
+  const conditionImmunities = [...new Set([...(grant.conditionImmunities ?? []), ...parts.conditionImmunities])];
+  const baseName =
+    ctx.builtin?.grantName?.(ctx) ??
+    ((hexAbility ?? enhancedAbility)
+      ? `${grant.name ?? effectNameOf(action.name)} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
+      : chosenType
+        ? `${grant.name ?? effectNameOf(action.name)} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
+        : (grant.name ?? effectNameOf(action.name)));
   const effect = addEffect(
     state,
     recipient.id,
     makeEffect({
       id: grant.target === "targets" ? `${input.commandId}:grant:${recipient.id}` : `${input.commandId}:grant`,
-      name:
-        ctx.builtin?.grantName?.(ctx) ??
-        ((hexAbility ?? enhancedAbility)
-          ? `${grant.name ?? effectNameOf(action.name)} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
-          : chosenType
-            ? `${grant.name ?? effectNameOf(action.name)} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
-            : (grant.name ?? effectNameOf(action.name))),
-      tags: rage ? [...rage.tags] : grant.tags,
+      name: withOptionName(baseName, option),
+      tags: [...new Set([...(rage ? rage.tags : grant.tags), ...parts.tags])].slice(0, 8),
       sourceActorId: attacker.id,
       sourceName: attacker.name,
       sourceActionId: action.id,
@@ -198,21 +247,30 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
         ? rage.duration
         : steadyAim
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
-          : grantDuration(
-              state,
-              grant.duration,
-              attacker.id,
-              spell && castLevel !== null ? { spell, castLevel } : null
-            ),
+          : rolledHours !== null
+            ? { type: "minutes", remaining: rolledHours * 60 }
+            : grantDuration(
+                state,
+                grant.duration,
+                attacker.id,
+                spell && castLevel !== null ? { spell, castLevel } : null
+              ),
       // A spell's effect outlasts its caster's fall; only Concentration ends it early. A die given to another creature
       // (Bardic Inspiration) is its own once given.
       endsWhenSourceDefeated: action.spellId === undefined && grant.answer === undefined,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
-      modifiers: [...modifiers, ...hexDisadvantage, ...enhancedAdvantage, ...chosenResistance],
+      modifiers: [
+        ...modifiers,
+        ...hexDisadvantage,
+        ...enhancedAdvantage,
+        ...chosenResistance,
+        ...parts.modifiers,
+        ...(bound?.modifiers ?? [])
+      ],
       ...(grant.answer ? { answer: structuredClone(grant.answer) } : {}),
       ...(grant.struck ? { struck: structuredClone(grant.struck) } : {}),
       // Greater Invisibility's Invisible condition, which ends with the effect.
-      ...(grant.conditions ? { linkedConditionIds: [...grant.conditions] } : {}),
+      ...(linkedConditionIds.length > 0 ? { linkedConditionIds } : {}),
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
       concentration: grant.concentration,
@@ -234,21 +292,45 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(steadyAim ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
-      ...(grant.conditionImmunities ? { conditionImmunities: [...grant.conditionImmunities] } : {}),
+      ...(conditionImmunities.length > 0 ? { conditionImmunities: conditionImmunities.slice(0, 6) } : {}),
       ...turnStartTemporaryHitPoints(grant.temporaryHitPointsEachTurn, deps.definition),
-      // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`).
-      ...(grant.hitPointMaximumGain ? { hitPointMaximumGain: grant.hitPointMaximumGain.amount } : {})
+      // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`); Heroes' Feast rolls its
+      // 2d10 for each creature.
+      ...hitPointMaximumGainOf(ctx, grant.hitPointMaximumGain, recipient.name),
+      // Its size while it lasts (Large Form), from the size it had before any change.
+      ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(recipient) } : {}),
+      ...grantExtras(ctx, grant, recipient, option),
+      ...(bound?.fields ?? {})
     }),
     replaced,
     deps
   );
+  if (effect.sizeChange) refreshSize(state, recipient);
   warnings.push(...replaced.map((event) => event.text));
   // A new way to work out AC counts at once.
   if (baseArmorClass !== undefined && recipientDefinition)
     refreshBaseArmorClass(recipient, recipientDefinition, deps.catalog);
+  // Expeditious Retreat: the cast is a Dash too, measured now as the generic action's is.
+  if (grant.dashesNow)
+    addEffect(
+      state,
+      recipient.id,
+      makeEffect({
+        id: `${input.commandId}:dash:${recipient.id}`,
+        name: "Dashing",
+        tags: ["dashing"],
+        sourceActorId: attacker.id,
+        sourceName: attacker.name,
+        startedRound: state.combat.round,
+        duration: { type: "until-source-next-turn" },
+        movementGrantFeet: currentSpeedFeet(recipient, derivation) ?? 0
+      })
+    );
+  // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later, rather than ended.
+  holdOff(ctx, recipient, effect, [...(grant.suppressesConditions ?? []), ...parts.suppresses]);
   // SRD Immunity: a condition the grant makes its bearer immune to ends now (Heroism's Frightened), as the table hears.
-  if (grant.conditionImmunities)
-    for (const event of endConditionsImmuneTo(recipient, grant.conditionImmunities, effect.name))
+  if (conditionImmunities.length > 0)
+    for (const event of endConditionsImmuneTo(recipient, conditionImmunities, effect.name))
       ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [recipient.id] });
   // Mindless Rage: "If you're Charmed or Frightened when you enter your Rage, the condition ends on you." A condition
   // the Rage now makes its bearer immune to ends as it starts.
@@ -270,9 +352,45 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       targetId: recipient.id,
       targetName: recipient.name,
       name: effect.name,
-      conditionIds: [...(grant.conditions ?? [])]
+      conditionIds: [...linkedConditionIds]
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
+}
+
+/** Takes the conditions an effect suppresses off its bearer and keeps them on the effect, as the table hears. */
+export function holdOff(
+  ctx: Pick<ResolveContext, "tableNarration">,
+  bearer: LiveActor,
+  effect: EffectInstance,
+  conditionIds: readonly string[]
+): void {
+  if (conditionIds.length === 0) return;
+  const held = suppressConditions(bearer, conditionIds);
+  if (held.length === 0) return;
+  bearer.effects = bearer.effects.map((candidate) =>
+    candidate.id === effect.id ? { ...candidate, suppressedConditions: held } : candidate
+  );
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${bearer.name} is no longer ${held.map((entry) => conditionLabel(entry.id)).join(" or ")} while ${effect.name} lasts.`,
+    actorIds: [bearer.id]
+  });
+}
+
+/** What a grant adds to its recipient's Hit Point maximum: its amount, and its dice rolled for this recipient. */
+function hitPointMaximumGainOf(
+  ctx: ResolveContext,
+  gain: NonNullable<DefinitionAction["grants"]>["hitPointMaximumGain"],
+  recipientName: string
+): Partial<Pick<EffectInstance, "hitPointMaximumGain">> {
+  if (!gain) return {};
+  let amount = gain.amount;
+  if (gain.formula !== undefined) {
+    const rolled = rollDice(gain.formula, ctx.deps.random);
+    recordRoll(ctx, rolled, "healing", `${ctx.action.name}: ${recipientName}`);
+    amount += rolled.total;
+  }
+  return amount >= 1 ? { hitPointMaximumGain: Math.min(1000, amount) } : {};
 }
 
 /** A grant's printed duration as an effect's. One that lasts until ended, on a spell, lasts the spell's own duration at
@@ -303,11 +421,16 @@ export function grantOutsideFight(
   state: GameState,
   actor: LiveActor,
   action: DefinitionAction,
-  commandId: string
+  commandId: string,
+  random: (sides: number) => number = () => 1
 ): EffectNarration[] {
   const grant = action.grants;
   if (!grant || grant.target !== "self") return [];
   const events: EffectNarration[] = [];
+  // A duration rolled as it lands (Potion of Diminution: "for 1d4 hours").
+  const rolledHours = grant.hoursRolled
+    ? Math.max(1, resolveDice(parseDiceFormula(grant.hoursRolled), random).total)
+    : null;
   const effect = addEffect(
     state,
     actor.id,
@@ -319,7 +442,10 @@ export function grantOutsideFight(
       sourceName: actor.name,
       sourceActionId: action.id,
       startedRound: state.combat.round,
-      duration: grantDuration(state, grant.duration, actor.id, null),
+      duration:
+        rolledHours !== null
+          ? { type: "minutes", remaining: rolledHours * 60 }
+          : grantDuration(state, grant.duration, actor.id, null),
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: grant.modifiers,
@@ -329,9 +455,12 @@ export function grantOutsideFight(
       ...(grant.damageUses !== undefined ? { damageUses: grant.damageUses } : {}),
       // A scroll's spell read on the road stacks as that spell cast in a fight does.
       ...(action.spellId !== undefined ? { stackKey: `spell:${action.spellId}` } : {}),
-      ...(grant.armorClassBonus !== undefined ? { armorClassBonus: grant.armorClassBonus } : {})
+      ...(grant.armorClassBonus !== undefined ? { armorClassBonus: grant.armorClassBonus } : {}),
+      // Its size while it lasts (a Potion of Growth).
+      ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(actor) } : {})
     }),
     events
   );
+  if (effect.sizeChange) refreshSize(state, actor);
   return [{ kind: "effect", text: `${actor.name} gains ${effect.name}.`, actorId: actor.id }, ...events];
 }

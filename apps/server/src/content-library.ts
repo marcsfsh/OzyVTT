@@ -20,7 +20,7 @@ import type {
   ContentStartingEquipmentOption,
   ContentSubclassSummary
 } from "@vtt/domain";
-import { choosesAbility } from "@vtt/domain";
+import { actionChoicesOf, choosesAbility } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { progressionTableFromClasses, type ClassProgressionTable } from "@vtt/rules-5e";
 import {
@@ -285,6 +285,9 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
+    // What it asks for as it resolves; a self grant that asks is aimed at no one, so the pick comes before the tap.
+    ...(actionChoicesOf(action) ? { choices: actionChoicesOf(action)! } : {}),
+    ...(actionChoicesOf(action) && action.grants?.target === "self" ? { targeting: "none" as const } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool (Preserve Life).
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }

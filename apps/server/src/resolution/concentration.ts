@@ -51,6 +51,8 @@ function onlyOnCreatures(spell: SpellReference): boolean {
   return (
     effect.grant !== undefined ||
     effect.failureEffect !== undefined ||
+    // A form on its targets (Polymorph): the spell ends once none of them keeps it.
+    effect.shapeShift !== undefined ||
     (spell.save?.failureConditions ?? []).some((conditionId) => !BARE_CONDITIONS.has(conditionId))
   );
 }

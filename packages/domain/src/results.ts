@@ -383,6 +383,14 @@ const CastShapingOffersSchema = z
     "The ways the caster may shape this spell's cast (Metamagic options it knows, Sculpt Spells), each with its Sorcery Point cost and whether this spell can take it now. Send the picks as `action.resolve`'s `shaping`; the server checks them again."
   );
 export type CastShapingOffers = Wire<z.infer<typeof CastShapingOffersSchema>>;
+/** One form a shape-shift may take, as the sheet lists it. */
+const FormOptionSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  challengeRating: z.number().nullable(),
+  size: z.string(),
+  fly: z.boolean()
+});
 export const ActionAvailabilitySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
@@ -496,6 +504,20 @@ export const ActionAvailabilitySchema = z.strictObject({
     ),
   /** The conditions its caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s `conditionId`. */
   conditionChoices: z.array(SaveConditionSchema).optional(),
+  /** What it asks its user to choose as it resolves: an option (Fire Shield's warm or chill), one for each target, or
+   *  the carried weapon it binds to. */
+  choices: z
+    .strictObject({
+      options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
+      optionsPerTarget: z.literal(true).optional(),
+      bindsWeapon: z
+        .strictObject({ weaponIds: z.array(z.string()).optional(), melee: z.literal(true).optional() })
+        .optional()
+    })
+    .optional()
+    .describe(
+      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`)"
+    ),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
   checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional(),
   /** The weapon mastery property this character uses with this swing (Graze on Borin's Greatsword): present only when
@@ -515,6 +537,24 @@ export const ActionAvailabilitySchema = z.strictObject({
     ),
   /** The ways its caster may shape this spell's cast (Metamagic, Sculpt Spells), for the cast to offer. */
   shaping: CastShapingOffersSchema.optional(),
+  /** The forms a shape-shift may take now, for the user to pick (`action.resolve`'s `form`): Wild Shape's known forms,
+   *  the bestiary's Beasts for Polymorph, a werewolf's printed forms with its true form. Wild Shape also lists the
+   *  forms its user may learn, how many it knows and whether a Long Rest opened one to replace. */
+  forms: z
+    .strictObject({
+      options: z.array(FormOptionSchema),
+      perTarget: z.literal(true).optional(),
+      gearChoice: z.literal(true).optional(),
+      learnable: z.array(FormOptionSchema).optional(),
+      knownLimit: z.number().int().optional(),
+      swapOpen: z.boolean().optional()
+    })
+    .optional()
+    .describe(
+      "The forms a shape-shift may take now, sent back as the resolve's `form` (or `targetForms`, one per target, when `perTarget`); `gearChoice` lets the user say whether its gear melds or is worn. For Wild Shape, the Beasts its user may learn (`learnable`), how many it knows (`knownLimit`) and whether one may be replaced now (`swapOpen`)"
+    ),
+  /** The effects a use picks one of (Enlarge or Reduce), sent back as the resolve's `option`. */
+  options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
   /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
    *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
    *  (a spell area's later save). */
@@ -598,6 +638,15 @@ const DerivedToolRowSchema = z.strictObject({
   reliableTalent: z.boolean()
 });
 export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
+/** A situation the character's riders name for its checks (a Book's topic, prying with a Crowbar), offered as a toggle
+ *  beside the checks. */
+const DerivedSituationSchema = z.strictObject({
+  situation: z.string().describe('The plain words, e.g. "consulting an accurate Book about its topic"'),
+  source: z.string().describe("The item, feature or effect whose rider names it"),
+  effect: z.string().describe('What it gives a check it fits, e.g. "+5" or "Advantage"'),
+  abilities: z.array(AbilityIdSchema).describe("The abilities whose checks it can fit; empty for any"),
+  skills: z.array(z.string()).describe("The skills whose checks it can fit; empty for any")
+});
 /** One damage type a defence covers, and what grants it (null for the stat block itself). */
 const DerivedDefenceSchema = z.strictObject({
   type: z.string().describe('A damage type, e.g. "fire"'),
@@ -683,6 +732,11 @@ const ActorDerivedSheetSchema = z.strictObject({
     )
     .describe(
       "The columns a class table prints that no use counts (the Bardic Die, Martial Arts, Sneak Attack, Rage Damage, Eldritch Invocations, Weapon Mastery), each class at the character's level in it. A column wired to a pool (Rages, Focus Points, Sorcery Points) is a use instead. Empty for a sheet with no class the catalog knows."
+    ),
+  situations: z
+    .array(DerivedSituationSchema)
+    .describe(
+      "The situations the character's equipped items, features and effects name for its checks (a Book's topic, prying with a Crowbar), each with what it gives and the checks it can fit. A check roll that names one gets its rider; the GM judges whether the roll fits."
     )
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;

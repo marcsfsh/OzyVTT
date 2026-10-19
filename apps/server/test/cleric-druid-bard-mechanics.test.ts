@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type GameState } from "@vtt/domain";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
-import { importActorDefinition } from "../src/actor-roster.js";
+import { importActorDefinition, storedDefinition } from "../src/actor-roster.js";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
@@ -240,6 +240,16 @@ const deps = (definition: ReturnType<typeof build>): ResolveDependencies => ({
 });
 const command = () => `50000000-0000-4000-8000-0000000000${String(((commandSeq += 1) % 90) + 10)}`;
 
+/** What Wild Shape reads to take a form: a Beast the Druid knows (the Wolf), and the bestiary that holds it. */
+function shapeShifting(state: GameState, definition: ReturnType<typeof build>): ResolveDependencies {
+  state.actors[0]!.knownForms = { ids: ["wolf"], swapOpen: false };
+  return {
+    ...deps(definition),
+    resolveDefinition: (id) => storedDefinition(state, id) ?? library.monster(id),
+    catalog: equipmentCatalogOf(library)
+  };
+}
+
 // Druid
 
 describe("Primal Order: the twin of the bug that started this area (audit row 4)", () => {
@@ -319,8 +329,8 @@ describe("Wild Shape: the pool, read off the printed column (audit row 54)", () 
     resolveDefinitionAction(
       state,
       actionOf(definition, "wild-shape")!,
-      { actorId: HERO, targetIds: [], commandId: command() },
-      deps(definition)
+      { actorId: HERO, targetIds: [], commandId: command(), form: "wolf" },
+      shapeShifting(state, definition)
     );
     expect(state.actors[0].hp.temporary).toBe(6);
   });
@@ -330,13 +340,19 @@ describe("Wild Shape: the pool, read off the printed column (audit row 54)", () 
     const definition = build(druid(2, [primalOrder("warden")]));
     const state = encounterWith(definition);
     const shape = actionOf(definition, "wild-shape")!;
-    resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+    const shifting = shapeShifting(state, definition);
+    const use = () =>
+      resolveDefinitionAction(
+        state,
+        shape,
+        { actorId: HERO, targetIds: [], commandId: command(), form: "wolf" },
+        shifting
+      );
+    use();
     expect(state.actors[0].actionUses["wild-shape"]).toBe(1);
-    resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+    use();
     expect(state.actors[0].actionUses["wild-shape"]).toBe(2);
-    expect(() =>
-      resolveDefinitionAction(state, shape, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition))
-    ).toThrowError(/no uses remaining \(2\/Long Rest\)/);
+    expect(use).toThrowError(/no uses remaining \(2\/Long Rest\)/);
   });
 });
 
@@ -388,8 +404,8 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
     resolveDefinitionAction(
       state,
       actionOf(definition, "wild-shape")!,
-      { actorId: HERO, targetIds: [], commandId: command() },
-      deps(definition)
+      { actorId: HERO, targetIds: [], commandId: command(), form: "wolf" },
+      shapeShifting(state, definition)
     );
     expect(state.actors[0].actionUses["wild-shape"]).toBe(2);
     expect(() =>
@@ -474,8 +490,13 @@ describe("Nature's Sanctuary - the third feature on the one Wild Shape counter",
       resolveDefinitionAction(
         state,
         actionOf(definition, id)!,
-        { actorId: HERO, targetIds: id === "lands-aid" ? [FOE] : [], commandId: command() },
-        deps(definition)
+        {
+          actorId: HERO,
+          targetIds: id === "lands-aid" ? [FOE] : [],
+          commandId: command(),
+          ...(id === "wild-shape" ? { form: "wolf" } : {})
+        },
+        id === "wild-shape" ? shapeShifting(state, definition) : deps(definition)
       );
     }
     expect(state.actors[0].actionUses["wild-shape"]).toBe(3);

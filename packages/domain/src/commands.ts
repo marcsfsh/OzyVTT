@@ -370,6 +370,26 @@ const CastShapingListSchema = z
   .refine((list) => new Set(list.map((entry) => entry.id)).size === list.length, {
     error: "Choose each way to shape the spell at most once."
   });
+/** A form a shape-shift takes: a bestiary id, a printed form's id, or `true` for the user's true form. */
+const FormChoiceSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(200);
+/** What a shape-shifting use picks: the form, a form per target, whether the user's gear melds or is worn, and the
+ *  effect it takes among its options (Enlarge or Reduce). See `action.resolve`. */
+const ShapeChoiceFields = {
+  form: FormChoiceSchema.optional(),
+  targetForms: z
+    .array(z.object({ targetId: z.uuid(), form: FormChoiceSchema }).strict())
+    .max(20)
+    .optional(),
+  gear: z.enum(["merged", "worn"]).optional(),
+  option: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .max(80)
+    .optional()
+};
 export const ActionResolveSchema = z
   .object({
     commandId: z.uuid(),
@@ -441,6 +461,31 @@ export const ActionResolveSchema = z
       .optional(),
     /** The ability a cast chooses: Hex's target has Disadvantage on ability checks made with it. */
     ability: AbilitySchema.optional(),
+    /** The option picked for an action that offers several (Fire Shield's warm or chill, Bestow Curse's curse);
+     *  absent, the first. */
+    optionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    /** An option for each target, for an action that asks for one per target (Enhance Ability's ability for each
+     *  creature); a target left out takes `optionId`. */
+    targetOptions: z
+      .record(
+        z.uuid(),
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      )
+      .refine((options) => Object.keys(options).length <= 20, "At most 20 targets are given options.")
+      .optional(),
+    /** The carried weapon an action binds to (Magic Weapon's touched weapon, Shillelagh's club). */
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
@@ -460,6 +505,22 @@ export const ActionResolveSchema = z
      *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
     overchannel: z.boolean().optional(),
     shaping: CastShapingListSchema.optional(),
+    /** The form a shape-shift takes (Wild Shape's known form, Polymorph's Beast, a werewolf's wolf): a bestiary id, a
+     *  printed form's id, or `true` for the true form. Refused when it isn't one the action allows. */
+    form: FormChoiceSchema.optional(),
+    /** A form for each target, where each may take its own (Animal Shapes); a target not named takes `form`. */
+    targetForms: z
+      .array(z.object({ targetId: z.uuid(), form: FormChoiceSchema }).strict())
+      .max(20)
+      .optional(),
+    /** Whether the user's gear melds into its new form or is worn by it, where the action lets it choose. */
+    gear: z.enum(["merged", "worn"]).optional(),
+    /** The effect a use picks among those its action offers (Enlarge or Reduce); absent, the first. */
+    option: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -705,6 +766,8 @@ export const ActionUseSchema = z
     damageType: DamageTypeSchema.optional(),
     /** How the spell's caster shapes the cast (Metamagic); see `action.resolve`. Refused on the loose route. */
     shaping: CastShapingListSchema.optional(),
+    /** The form a shape-shift takes, and the rest of what it picks; see `action.resolve`. */
+    ...ShapeChoiceFields,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -755,6 +818,8 @@ export const CheckRollSchema = z
     /** The creature a Wisdom (Perception or Survival) check is made to find: the roller's Hunter's Mark on it gives
      *  Advantage. */
     findActorId: z.uuid().optional(),
+    /** The situations the roller says the check fits, from the sheet's list (a Book's topic, prying with a Crowbar). */
+    situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1498,6 +1563,24 @@ export const CharacterSetFavouritesSchema = z
       .array(OptionIdSchema)
       .max(MAX_FAVOURITE_OPTIONS, `Pin at most ${MAX_FAVOURITE_OPTIONS} options.`)
       .refine((ids) => new Set(ids).size === ids.length, "Each option may be pinned once."),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The Beast forms a Druid knows for Wild Shape (SRD Known Forms), as bestiary ids. A form already known may be
+ *  replaced only after a Long Rest, one at a time; the GM may set any. */
+export const CharacterSetKnownFormsSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    formIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(200)
+      )
+      .max(8, "A Druid knows at most 8 forms.")
+      .refine((ids) => new Set(ids).size === ids.length, "Each form may be known once."),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

@@ -1,3 +1,6 @@
+import { ownSizeOf, takeForm } from "./transform/assume.js";
+import { revertOnFailure } from "./transform/rules.js";
+import { refreshSize } from "./transform/forms.js";
 import type {
   AbilityId,
   Actor,
@@ -31,6 +34,7 @@ import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
+import { d20MinimumOf, totalMinimumOf } from "./ability-checks.js";
 import { heldRollFor, holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
 import {
   answeredLines,
@@ -46,6 +50,7 @@ import {
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
+import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -54,6 +59,7 @@ import {
   CONCENTRATING_TAG,
   effectDurationOf,
   endConcentrationSustainedBy,
+  endConditionsImmuneTo,
   endEffectIfPresent,
   endIdleConcentration,
   makeEffect,
@@ -69,6 +75,8 @@ import {
   type RollModeClaims
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
+import { creatureTypeOf } from "./statblock-facts.js";
+import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 import { lightSensitivities, sightRules } from "./vision/rules.js";
 
@@ -124,7 +132,8 @@ export function saveRollSources(
   ability: AbilityId,
   derivation: EquipmentDerivation,
   concentration = false,
-  stakes: readonly string[] = []
+  stakes: readonly string[] = [],
+  sourceCreatureType: string | null = null
 ): RollModeClaims {
   const claims: RollModeClaims = { advantage: [], disadvantage: [] };
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
@@ -134,9 +143,48 @@ export function saveRollSources(
     derivation,
     concentration ? ["save", "concentration"] : ["save"],
     "on-saving-throw",
-    { ability, ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}) },
+    {
+      ability,
+      ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}),
+      // The creature whose effect forces the save, for a rider against its kind (Protection from Evil and Good).
+      ...(sourceCreatureType !== null ? { sourceCreatureType } : {})
+    },
     claims
   );
+}
+
+/**
+ * A save's total once its riders' floors apply: a d20 under a `d20-minimum` counts as it, and a total under a
+ * `total-minimum` counts as that ability score (Indomitable Might's Strength). With the carrier that raised it, or
+ * null when nothing did.
+ */
+export function flooredSaveTotal(
+  derivation: EquipmentDerivation,
+  definition: ActorDefinition | undefined,
+  ability: AbilityId,
+  natural: number,
+  total: number
+): Readonly<{ total: number; raisedBy: string | null }> {
+  const riders = [
+    ...collectRiders(derivation.carriers, { ...derivation.context, moment: null }),
+    ...collectRiders(derivation.carriers, { ...derivation.context, ability, moment: "on-saving-throw" })
+  ];
+  const floor = d20MinimumOf(riders, "save", true);
+  const raised = floor !== null && natural < floor.face ? total + floor.face - natural : total;
+  const lifted = totalMinimumOf(riders, "save", definition);
+  if (lifted !== null && lifted.total > raised) return { total: lifted.total, raisedBy: lifted.label };
+  return { total: raised, raisedBy: raised > total ? floor!.label : null };
+}
+
+/** The creature type of the creature whose effect forces a save, for riders against its kind; null when unknown. */
+function sourceCreatureTypeOf(
+  state: GameState,
+  sourceActorId: string | null,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): string | null {
+  const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
+  if (!source) return null;
+  return creatureTypeOf(source, source.definitionId ? resolveDefinition(source.definitionId) : undefined);
 }
 
 /** The conditions a pending save is about: what its failure imposes, or what the effect it would end holds. */
@@ -177,9 +225,10 @@ export function saveRiderDiceTermsForAnySave(derivation: EquipmentDerivation): s
   return diceRiderTerms(diceRiders([...standing, ...atSave], "save-bonus"));
 }
 
-/** Advantage and Disadvantage on a saving throw that names no ability (a death save): riders on every save. */
+/** Advantage and Disadvantage on a saving throw that names no ability (a death save): riders on every save, and those
+ *  on Death Saving Throws alone (Beacon of Hope). */
 export function anySaveRollSources(derivation: EquipmentDerivation): RollModeClaims {
-  return rollModeClaims(derivation, ["save"], "on-saving-throw");
+  return rollModeClaims(derivation, ["save", "death-save"], "on-saving-throw");
 }
 
 export type { AuraContext };
@@ -368,7 +417,17 @@ export function createPendingSaves(
     /** The GM's call for a roll these saves answer. */
     callId?: string;
     /** What else each save carries: what a success leaves, a line for a failure, the spell area that raised it. */
-    extra?: Pick<PendingSave, "onSuccessEffect" | "failureNote" | "breaksConcentration" | "zoneId" | "gmApplies">;
+    extra?: Pick<
+      PendingSave,
+      | "onSuccessEffect"
+      | "failureNote"
+      | "breaksConcentration"
+      | "zoneId"
+      | "gmApplies"
+      | "failureByHitPoints"
+      | "failureBanishes"
+      | "endsForm"
+    >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
     /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
@@ -426,6 +485,9 @@ export function createPendingSaves(
     ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
+    ...(input.extra?.endsForm ? { endsForm: true as const } : {}),
+    ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
+    ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
@@ -482,48 +544,78 @@ export function applyFailureEffect(
   }
   const events: EffectNarration[] = [];
   withoutSameHazard(target, onFail);
-  const applied = addEffect(
-    state,
-    target.id,
-    makeEffect({
-      id,
-      name: onFail.name,
-      tags: [...onFail.tags],
-      sourceActorId: onFail.sourceActorId,
-      sourceName: onFail.sourceName,
-      sourceActionId: onFail.sourceActionId ?? null,
-      startedRound: state.combat.round,
-      // "Until the end of the current turn": the end of this turn.
-      duration:
-        onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
-          ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
-          : effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
-      // Saves parked before failures carried their own lifetime were all grapples.
-      endsWhenSourceDefeated: onFail.endsWhenSourceDefeated ?? onFail.tags.includes("grapple"),
-      concentration: onFail.castId !== undefined,
-      linkedConditionIds: [...onFail.linkedConditionIds],
-      escapeDc: onFail.escapeDc,
-      ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
-      ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
-      ...(onFail.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
-      ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
-      ...(onFail.speedZero ? { speedZero: true } : {}),
-      ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
-      ...(onFail.spell ? { spell: { ...onFail.spell } } : {}),
-      ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
-      ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
-      ...(onFail.magical ? { magical: true as const } : {}),
-      ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
-      // The light it sheds while it lasts (Faerie Fire's Dim Light).
-      ...(onFail.light ? { light: { ...onFail.light } } : {}),
-      // What holds it (a Net), whose destruction frees it.
-      ...(onFail.heldBy ? { heldBy: { ...onFail.heldBy, hitPoints: { ...onFail.heldBy.hitPoints } } } : {}),
-      // What it does while it lasts (Bane's -1d4).
-      modifiers: [...onFail.modifiers]
-    }),
-    events,
-    immunities
-  );
+  const failed = makeEffect({
+    id,
+    name: onFail.name,
+    tags: [...onFail.tags],
+    sourceActorId: onFail.sourceActorId,
+    sourceName: onFail.sourceName,
+    sourceActionId: onFail.sourceActionId ?? null,
+    startedRound: state.combat.round,
+    // "Until the end of the current turn": the end of this turn.
+    duration:
+      onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
+        ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+        : effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
+    // Saves parked before failures carried their own lifetime were all grapples.
+    endsWhenSourceDefeated: onFail.endsWhenSourceDefeated ?? onFail.tags.includes("grapple"),
+    concentration: onFail.castId !== undefined,
+    linkedConditionIds: [...onFail.linkedConditionIds],
+    escapeDc: onFail.escapeDc,
+    ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
+    ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(onFail.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
+    ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
+    ...(onFail.speedZero ? { speedZero: true } : {}),
+    ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
+    ...(onFail.spell ? { spell: { ...onFail.spell } } : {}),
+    ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
+    ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
+    ...(onFail.magical ? { magical: true as const } : {}),
+    ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
+    ...(onFail.endAction ? { endAction: { ...onFail.endAction } } : {}),
+    ...(onFail.optionId !== undefined ? { optionId: onFail.optionId } : {}),
+    ...(onFail.conditionImmunities ? { conditionImmunities: [...onFail.conditionImmunities] } : {}),
+    // The light it sheds while it lasts (Faerie Fire's Dim Light).
+    ...(onFail.light ? { light: { ...onFail.light } } : {}),
+    // What holds it (a Net), whose destruction frees it.
+    ...(onFail.heldBy ? { heldBy: { ...onFail.heldBy, hitPoints: { ...onFail.heldBy.hitPoints } } } : {}),
+    // What it does while it lasts (Bane's -1d4).
+    modifiers: [...onFail.modifiers],
+    // A size it changes (Enlarge/Reduce), from the size the creature had before.
+    ...(onFail.sizeChange ? { sizeChange: { ...onFail.sizeChange }, ownSize: ownSizeOf(target) } : {})
+  });
+  // A failure that shape-shifts the creature (Polymorph) takes the form, which needs the stat blocks.
+  if (onFail.form && immunities?.resolveDefinition) {
+    const shifted = takeForm(
+      state,
+      target.id,
+      { ...failed, form: structuredClone(onFail.form) },
+      {
+        resolveDefinition: immunities.resolveDefinition,
+        ...(immunities.catalog ? { catalog: immunities.catalog } : {})
+      },
+      immunities
+    );
+    return shifted;
+  }
+  const applied = addEffect(state, target.id, failed, events, immunities);
+  if (applied.sizeChange) refreshSize(state, target);
+  // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later; one it makes the creature
+  // immune to and doesn't hold off ends.
+  const held = suppressConditions(target, onFail.suppressesConditions ?? []);
+  if (held.length > 0) {
+    target.effects = target.effects.map((effect) =>
+      effect.id === applied.id ? { ...effect, suppressedConditions: held } : effect
+    );
+    events.push({
+      kind: "condition",
+      text: `${target.name} is no longer ${held.map((entry) => conditionLabel(entry.id)).join(" or ")} while ${applied.name} lasts.`,
+      actorId: target.id
+    });
+  }
+  if (onFail.conditionImmunities)
+    events.push(...endConditionsImmuneTo(target, onFail.conditionImmunities, applied.name));
   return [
     { kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id, ...sourceOf(applied) },
     ...events
@@ -694,6 +786,8 @@ export function answerSave(
   let autoFailed: string | null = null;
   let autoSucceeded: string | null = null;
   let rollMode: AggregatedRollMode | undefined;
+  /** What raised the roll past its dice (Indomitable Might), named on the table's line. */
+  let raisedBy: string | null = null;
   // What answered the rolled save (`roll-answers.ts`), and what may still answer it on a preview.
   let answerSucceeds = false;
   let answered: RollAnswered[] = [];
@@ -731,7 +825,8 @@ export function answerSave(
       pending.ability,
       derivation,
       pending.endsEffects !== undefined,
-      conditionsAtStake(state, pending)
+      conditionsAtStake(state, pending),
+      sourceCreatureTypeOf(state, pending.sourceActorId, deps.resolveDefinition)
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
@@ -880,6 +975,10 @@ export function answerSave(
     answerSucceeds = read.succeed;
     answered = answeredLines(held);
     if (!commit) offered = answersOffered(state, answerTarget(held), answerDepsOf(deps, commandId));
+    // A floor under the d20 or the total (Indomitable Might's Strength score) counts as more.
+    const floored = flooredSaveTotal(derivation, definition, pending.ability, natural, total);
+    total = floored.total;
+    if (floored.raisedBy !== null) raisedBy = floored.raisedBy;
   }
   // Waiting on an answer, the confirm reads as a look: nothing lands until the answer finishes it.
   const applying = commit && !awaitingAnswer;
@@ -923,8 +1022,11 @@ export function answerSave(
     !isIncapacitated(target) &&
     hasEvasion(target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined);
   const halved = success !== evasion;
-  const outcomeParts =
-    parts && parts.length > 0
+  // A failure that acts by the target's Hit Points (Divine Word, Slaying Bow) does its band's outcome instead.
+  const band = success ? null : hitPointBandOf(pending, target);
+  const outcomeParts = band
+    ? []
+    : parts && parts.length > 0
       ? success && (!pending.halfOnSuccess || evasion)
         ? []
         : halved
@@ -940,7 +1042,9 @@ export function answerSave(
           ? Math.floor(proposedTotal / 2)
           : proposedTotal;
   const outcomeCondition =
-    !success && (pending.conditionIds.length > 0 || (pending.onFailEffect?.linkedConditionIds.length ?? 0) > 0);
+    !success &&
+    band === null &&
+    (pending.conditionIds.length > 0 || (pending.onFailEffect?.linkedConditionIds.length ?? 0) > 0);
 
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the
   // save stays open until the answerer confirms. The damage is weighed through the target's defences, so the
@@ -992,6 +1096,12 @@ export function answerSave(
     events.push({
       kind: "condition",
       text: `${target.name} automatically succeeds on the ${pending.ability.toUpperCase()} save (${autoSucceeded}).`,
+      actorId: target.id
+    });
+  if (raisedBy !== null)
+    events.push({
+      kind: "condition",
+      text: `${target.name}'s ${pending.ability.toUpperCase()} save counts as ${total} (${raisedBy}).`,
       actorId: target.id
     });
   let appliedDamage = 0;
@@ -1077,7 +1187,34 @@ export function answerSave(
       events.push(...endEffectIfPresent(state, reference.actorId, reference.effectId));
   }
   // A committed failure applies the declared source-linked effect (a grapple, a timed or Concentration condition).
-  if (!success && pending.onFailEffect)
+  if (band)
+    events.push(
+      ...applyHitPointBand(
+        state,
+        target,
+        band,
+        pending,
+        {
+          resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+          ...(deps.catalog ? { catalog: deps.catalog } : {}),
+          newId: deps.newRollId,
+          now: deps.now,
+          rollDie: deps.random
+        },
+        `${commandId}:${saveId}:band`
+      )
+    );
+  if (!success && pending.failureBanishes)
+    events.push(
+      ...banishOnFailure(
+        state,
+        target,
+        pending,
+        target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined,
+        `${commandId}:${saveId}:banished`
+      )
+    );
+  if (!success && band === null && pending.onFailEffect)
     events.push(
       ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
     );
@@ -1098,6 +1235,23 @@ export function answerSave(
   if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
+  // SRD Moonbeam: a shape-shifted creature that fails "reverts to its true form and can't shape-shift until it leaves".
+  if (!success && pending.endsForm) {
+    const zone = state.combat.spellZones.find((entry) => entry.id === pending.zoneId);
+    const caster = state.actors.find((actor) => actor.id === pending.sourceActorId);
+    const castId =
+      zone?.castId ??
+      caster?.effects.find((effect) => effect.castId !== undefined && effect.spell?.id === pending.spell?.id)?.castId;
+    events.push(
+      ...revertOnFailure(state, target, {
+        sourceActorId: pending.sourceActorId,
+        sourceName: pending.sourceName,
+        spellName: pending.actionName,
+        ...(castId ? { castId } : {}),
+        id: `${commandId}:${saveId}:revert`
+      })
+    );
+  }
   if (outcomeCondition)
     conditionApplied = target.conditions.some(
       (condition) =>

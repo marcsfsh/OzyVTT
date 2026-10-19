@@ -1,4 +1,5 @@
-import type { Actor } from "@vtt/domain";
+import { gearMerged } from "./transform/forms.js";
+import type { Actor, ContentMonsterSummary } from "@vtt/domain";
 import type {
   ClassReference,
   EquipmentReference,
@@ -86,6 +87,9 @@ export type EquipmentCatalog = Readonly<{
   /** A class or subclass record, for the spell list a Spell Scroll's reader draws from. */
   classRecord?: (id: string) => ClassReference | undefined;
   subclassRecord?: (id: string) => SubclassReference | undefined;
+  /** The bestiary's rows and stat blocks, for the forms a shape-shift may take (Wild Shape, Polymorph). */
+  monsterSummaries?: () => readonly ContentMonsterSummary[];
+  monster?: (id: string) => ActorDefinition | undefined;
 }>;
 
 /** Narrows a content view to the hooks the derivation reads. */
@@ -96,7 +100,9 @@ export function equipmentCatalogOf(view: EquipmentCatalog): EquipmentCatalog {
     ...(view.featureRecord ? { featureRecord: view.featureRecord } : {}),
     ...(view.spellRecord ? { spellRecord: view.spellRecord } : {}),
     ...(view.classRecord ? { classRecord: view.classRecord } : {}),
-    ...(view.subclassRecord ? { subclassRecord: view.subclassRecord } : {})
+    ...(view.subclassRecord ? { subclassRecord: view.subclassRecord } : {}),
+    ...(view.monsterSummaries ? { monsterSummaries: view.monsterSummaries } : {}),
+    ...(view.monster ? { monster: view.monster } : {})
   };
 }
 
@@ -364,13 +370,19 @@ function effectCarriers(actor: Actor): RiderCarrier[] {
   const lapsed = isIncapacitated(actor) || speedZeroed(actor) || actor.speedFeet === 0;
   return actor.effects.flatMap((effect) => {
     if (effect.voidWhileIncapacitated && lapsed) return [];
-    const modifiers = effect.modifiers.filter(notItemScoped);
+    // One bound to a carried row (Magic Weapon) reaches that row's rolls with its `this-item` riders, and nothing
+    // once the row is gone.
+    const bound =
+      effect.itemId !== undefined && actor.inventory.some((row) => row.id === effect.itemId && row.quantity > 0);
+    if (effect.itemId !== undefined && !bound) return [];
+    const modifiers = bound ? effect.modifiers : effect.modifiers.filter(notItemScoped);
     if (modifiers.length === 0) return [];
     return [
       {
         label: effect.name,
         modifiers,
         sourceEffectId: effect.id,
+        ...(bound ? { sourceItemId: effect.itemId } : {}),
         ...(effect.stackKey !== undefined ? { stackKey: effect.stackKey } : {})
       }
     ];
@@ -394,9 +406,11 @@ export function deriveEquipment(
   /** A curse's vulnerabilities, which hold while attuned whether or not the item is worn. */
   const cursedVulnerabilities: Defence[] = [];
   // Every row read with the catalog's armor and weapon blocks, so what they do holds for a row that names the item only.
-  const inventory = catalog
-    ? actor.inventory.map((item) => withCatalogWeapon(withCatalogArmor(item, catalog), catalog))
-    : [];
+  // Gear melded into a form gives nothing while the form lasts (Polymorph, Wild Shape's merged equipment).
+  const inventory =
+    catalog && !gearMerged(actor)
+      ? actor.inventory.map((item) => withCatalogWeapon(withCatalogArmor(item, catalog), catalog))
+      : [];
   for (const item of inventory) {
     if (item.quantity <= 0) continue;
     const record = catalog!.equipmentRecord(catalogIdOf(item));
@@ -533,7 +547,11 @@ export function deriveEquipment(
   );
   for (const equippedEntry of equipped) {
     const entry = { ...equippedEntry, item: withCatalogWeaponFacts(equippedEntry, catalog!) };
-    const bare = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce);
+    // An effect bound to this row changes how it swings while it lasts (Shillelagh's ability and die).
+    const bound = actor.effects.find((effect) => effect.itemId === entry.item.id && effect.weapon)?.weapon;
+    const bare = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, {
+      ...(bound ? { bound } : {})
+    });
     if (!bare) continue;
     const swing = { ...bare, action: withItemHitRiders(bare.action, entry) };
     const weaponAttack = swing.action;
@@ -541,7 +559,10 @@ export function deriveEquipment(
     weaponActionIds.push(weaponAttack.id);
     const bareTwoHanded = shieldInHand
       ? null
-      : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, { twoHanded: true });
+      : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, {
+          twoHanded: true,
+          ...(bound ? { bound } : {})
+        });
     const twoHanded = bareTwoHanded && { ...bareTwoHanded, action: withItemHitRiders(bareTwoHanded.action, entry) };
     if (twoHanded) {
       actions.push(twoHanded.action);
@@ -602,7 +623,7 @@ export function deriveEquipment(
     saves,
     damageResistances: [...damageResistances, ...defencesOf(standing, "damage-resistance")],
     damageVulnerabilities: [...defencesOf(standing, "damage-vulnerability"), ...cursedVulnerabilities],
-    damageImmunities,
+    damageImmunities: [...damageImmunities, ...defencesOf(standing, "damage-immunity")],
     conditionImmunities,
     armorClass: sumRiders(standing, "armor-class"),
     // "Add your Proficiency Bonus" is proficiency, so it counts once however many carriers grant it.
@@ -715,7 +736,10 @@ function heavyWeaponCarrier(item: InventoryItem, definition: ActorDefinition | u
 }
 
 /** The damage types standing `damage-resistance` or `damage-vulnerability` riders name, each with its carrier. */
-function defencesOf(riders: readonly ResolvedRider[], type: "damage-resistance" | "damage-vulnerability"): Defence[] {
+function defencesOf(
+  riders: readonly ResolvedRider[],
+  type: "damage-resistance" | "damage-vulnerability" | "damage-immunity"
+): Defence[] {
   return riders.flatMap((rider) =>
     rider.modifier.type === type ? (rider.modifier.damageTypes ?? []).map((id) => ({ id, source: rider.label })) : []
   );
@@ -772,18 +796,51 @@ export function skillTierSources(derivation: EquipmentDerivation, skillId: strin
 }
 
 /** The whole rider bonus to one ability check: the standing `derivation.checkBonus` plus the momentary
- *  `on-ability-check` riders that `narrow` lets through. */
+ *  `on-ability-check` riders that `narrow` lets through, and the ability modifiers riders add, each at least its
+ *  minimum (Thaumaturge's Wisdom, minimum +1), read from `scores`. */
 export function checkRiderBonus(
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>
+  narrow: CheckNarrow,
+  scores?: Readonly<Record<RiderAbility, number>>
 ): number {
   const momentary = collectRiders(derivation.carriers, {
     ...derivation.context,
     ...(narrow.ability !== undefined ? { ability: narrow.ability } : {}),
     ...(narrow.skill !== undefined ? { skill: narrow.skill } : {}),
+    ...(narrow.situations !== undefined ? { situations: narrow.situations } : {}),
     moment: "on-ability-check"
   });
-  return derivation.checkBonus + sumRiders(momentary, "check-bonus");
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  return (
+    derivation.checkBonus +
+    sumRiders(momentary, "check-bonus") +
+    abilityModifierBonus([...standing, ...momentary], "check-bonus", scores)
+  );
+}
+
+/** What an ability check's riders are narrowed by: its ability and skill, and the situations the roller says it fits. */
+export type CheckNarrow = Readonly<{ ability?: RiderAbility; skill?: string; situations?: readonly string[] }>;
+
+/** What riders of one type add from an ability modifier (`abilityModifier`), each counted as at least its `minimum`;
+ *  without the scores, the minimum alone. Riders sharing a `stackKey` count once. */
+export function abilityModifierBonus(
+  riders: readonly ResolvedRider[],
+  type: string,
+  scores: Readonly<Record<RiderAbility, number>> | undefined
+): number {
+  const counted = new Set<string>();
+  let total = 0;
+  for (const rider of riders) {
+    const { abilityModifier: ability, minimum } = rider.modifier;
+    if (rider.modifier.type !== type || ability === undefined) continue;
+    if (rider.stackKey !== undefined) {
+      if (counted.has(rider.stackKey)) continue;
+      counted.add(rider.stackKey);
+    }
+    const modifier = scores ? Math.floor((scores[ability] - 10) / 2) : (minimum ?? 0);
+    total += Math.max(minimum ?? modifier, modifier);
+  }
+  return total;
 }
 
 export type RollModeClaims = { advantage: RollModeSource[]; disadvantage: RollModeSource[] };

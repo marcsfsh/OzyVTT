@@ -17,6 +17,8 @@ import {
   fillIn,
   joinAndClaim,
   openGmSection,
+  pageScale,
+  pinch,
   pinchDuringDrag,
   positionOf,
   press,
@@ -217,6 +219,34 @@ test("a player joins and claims a character", async ({ open }) => {
   await press(player.getByRole("button", { name: "Join as Player" }));
   await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
   await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
+});
+
+test("a stray pinch on a phone leaves the page at its size, and a finger still scrolls", async ({
+  open,
+  hasTouch,
+  request
+}) => {
+  test.skip(!hasTouch, "A laptop has no touch screen to pinch.");
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await openGmSection(gm, "Roster");
+  const roster = gm.locator(".party-roster-body");
+  await expect(roster.getByRole("heading", { name: PARTY[0] })).toBeVisible();
+
+  await drag(gm, roster, { x: 0, y: -240 });
+  await expect.poll(() => roster.evaluate((list) => list.scrollTop)).toBeGreaterThan(0);
+  await pinch(gm, roster);
+  expect(await pageScale(gm)).toBe(1);
+  await expectPageFits(gm);
+
+  // This device can let two fingers zoom the page.
+  await gm.goto("/settings/device");
+  const allow = gm.getByRole("switch", { name: "Let pinch zoom the page" });
+  await press(allow);
+  await expect(allow).toHaveAttribute("aria-checked", "true");
+  await pinch(gm, gm.getByRole("heading", { name: "Device", level: 2 }));
+  await expect.poll(() => pageScale(gm)).toBeGreaterThan(1);
 });
 
 test("the GM runs a fight on a new scene and the player moves their token", async ({ open, hasTouch }) => {
@@ -533,7 +563,7 @@ test("the GM draws a door on the live map and locks it from the door's menu", as
   await ensureGmPassword(request);
   const gm = await open("/");
   await signInAsGm(gm);
-  await liveSceneOnNewMap(gm, "Smoke vault.png", battleMap(700, 518));
+  await liveSceneOnNewMap(gm, "Smoke vault.png", battleMap(700, 532));
 
   const rail = gm.getByRole("toolbar", { name: "Map tools" });
   await press(rail.getByRole("button", { name: "Walls" }));
@@ -673,4 +703,41 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await openGmSection(gm, "Shared screen");
   await press(gm.getByRole("button", { name: "Stop all" }));
   await expect(music).toHaveCount(0);
+});
+
+test("a player turns on the situation their Crowbar names and rolls a Strength check it fits", async ({ open }) => {
+  const hero = PARTY[0];
+  const player = await open("/");
+  await ensureGmPassword(player.request);
+  // The GM's side is the API: it hands the character an equipped Crowbar.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
+  const { id: actorId, ownerSessionId } = game.actors.find((actor: { name: string }) => actor.name === hero);
+  const gm = (path: string, data: Record<string, unknown>) =>
+    player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  // An earlier journey's player may still hold the character: the GM frees it for this player.
+  if (ownerSessionId)
+    expect((await gm(`/api/v1/game/claims/${actorId}/force-release`, { actorId, inFight: true })).ok()).toBe(true);
+  const crowbar = { id: "crowbar", name: "Crowbar", category: "adventuring-gear", quantity: 1, equipped: true };
+  expect((await gm(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item: crowbar })).ok()).toBe(true);
+  await joinAndClaim(player, hero);
+
+  await press(player.getByRole("tab", { name: "My character" }));
+  const sheet = player.getByRole("region", { name: `${hero} character sheet` });
+  // On a phone the checks are a tab of their own; on a laptop they are the sheet's left column.
+  const checksTab = sheet.getByRole("tab", { name: "Checks" });
+  if (await checksTab.isVisible()) await press(checksTab);
+  const prying = sheet.getByRole("button", { name: "Prying with the Crowbar (Advantage)" });
+  await expect(prying).toBeVisible();
+  await expectPageFits(player);
+  await press(prying);
+  await expect(prying).toHaveAttribute("aria-pressed", "true");
+  await press(sheet.getByRole("button", { name: /^Roll Athletics,/ }).first());
+  // The roll names the situation for the GM, and the toggle is spent.
+  await expect(player.getByText(/Strength \(Athletics\), prying with the Crowbar/).first()).toBeVisible();
+  await expect(prying).toHaveAttribute("aria-pressed", "false");
+  await expectPageFits(player);
 });

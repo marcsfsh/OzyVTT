@@ -282,6 +282,7 @@ export function ActionRunner({
             picking.action
           )}
           insideNow={insideNow}
+          carried={actor.inventory}
           onMap
           busy={resolveBusy}
           onInvalidFace={onFeedback}

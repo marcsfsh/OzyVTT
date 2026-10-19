@@ -28,11 +28,22 @@ export function useMenuPlacement(
       el.style.maxHeight = previous;
       const left = Math.max(MARGIN, Math.min(x, window.innerWidth - width - MARGIN));
       const top = height > room ? MARGIN : Math.max(MARGIN, Math.min(y, window.innerHeight - height - MARGIN));
-      setBox({ left, top, maxHeight: room });
+      setBox((current) =>
+        current && current.left === left && current.top === top && current.maxHeight === room
+          ? current
+          : { left, top, maxHeight: room }
+      );
     };
     place();
     window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
+    // A menu whose rows grow or shrink while it is open (a form in it, a section that unfolds) is placed again.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => place());
+    const el = ref.current;
+    if (observer && el) for (const child of [el, ...Array.from(el.children)]) observer.observe(child);
+    return () => {
+      window.removeEventListener("resize", place);
+      observer?.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `again` is the caller's list of what moves the menu.
   }, [ref, x, y, ...again]);
   return box

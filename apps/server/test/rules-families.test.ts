@@ -48,6 +48,8 @@ describe("rule families", () => {
       ["movement.occupied", "movement"],
       ["movement.no-speed", "movement"],
       ["movement.blocked-path", "movement"],
+      // Hideous Laughter: standing up is movement the effect holds back.
+      ["movement.cant-stand", "movement"],
       ["movement.altitude", "movement"],
       ["movement.jump", "movement"],
       ["movement.toward-fear", "movement"],
@@ -69,6 +71,11 @@ describe("rule families", () => {
       // An effect that takes away Reactions (Slow) is "you have no reaction", like Incapacitated.
       ["condition.no-reactions", "economy"],
       ["condition.no-spells", "economy"],
+      // What an effect leaves its bearer able to do on a turn (Gaseous Form's no attacks, Abjure Foes' one thing,
+      // Command's Flee): like Slow's no Reactions.
+      ["condition.cant-attack", "economy"],
+      ["condition.dash-only", "economy"],
+      ["condition.one-thing-a-turn", "economy"],
       ["legendary.own-turn", "economy"],
       ["legendary.after-a-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
@@ -93,6 +100,11 @@ describe("rule families", () => {
       ["roll.answers-a-roll", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
+      // A form keeps its creature from casting, acting or attacking, or from an action printed for another form.
+      ["form.no-spells", "economy"],
+      ["form.no-actions", "economy"],
+      ["form.no-attacks", "economy"],
+      ["form.wrong-form", "economy"],
       // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.
       ["feature.once-per-turn", "resources"],
       ["legendary.no-actions-remaining", "resources"],
@@ -120,6 +132,8 @@ describe("rule families", () => {
       ["target.outside-area", "targeting"],
       // A creature the action can't affect (Turn Undead on a goblin, a flask's Holy Water on a bandit).
       ["target.not-allowed", "targeting"],
+      // A revival spell aimed at a creature it can't bring back (Revivify on one dead an hour).
+      ["target.revival", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.

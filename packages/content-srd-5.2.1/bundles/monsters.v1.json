@@ -179,6 +179,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Eldritch Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -9106,6 +9112,11 @@
       "type": "piercing"
      }
     ]
+   },
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -10832,6 +10843,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -12230,6 +12248,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -14897,6 +14922,13 @@
   "damageResistances": [
    "radiant"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -15256,6 +15288,13 @@
    "lightning",
    "thunder"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Elemental Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -15358,7 +15397,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The doppelganger shape-shifts into a Medium or Small Humanoid, or it returns to its true form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "medium-humanoid",
+       "name": "Medium Humanoid",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "small-humanoid",
+       "name": "Small Humanoid",
+       "size": "small",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "slam",
@@ -17020,6 +17078,13 @@
   "damageImmunities": [
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Elemental Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -17434,6 +17499,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -22748,7 +22820,13 @@
       ],
       "maxTargetSize": "medium"
      }
-    ]
+    ],
+    "drain": {
+     "killsAtZero": {
+      "cause": "Bite",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "blinding-spittle",
@@ -23026,6 +23104,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -25335,6 +25420,12 @@
    "poisoned",
    "restrained"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Celestial Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -25988,6 +26079,11 @@
       "type": "until-bearer-next-turn"
      }
     }
+   },
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -26920,6 +27016,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -27126,6 +27229,20 @@
     "height": 3
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "multiple-heads",
+    "name": "Multiple Heads",
+    "heads": 5,
+    "damagePerHead": 25,
+    "regrowHitPoints": 20,
+    "stoppedBy": [
+     "fire"
+    ],
+    "attackId": "bite",
+    "reactiveHeads": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -27436,6 +27553,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 14,
@@ -27728,7 +27852,40 @@
     "name": "Shape-Shift",
     "activation": "action",
     "description": "The imp shape-shifts to resemble a rat (Speed 20 ft.), a raven (20 ft., Fly 60 ft.), or a spider (20 ft., Climb 20 ft.), or it returns to its true form. Its statistics are the same in each form, except for its Speed. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "rat",
+       "name": "Rat",
+       "speeds": {
+        "walk": 20
+       },
+       "modifiers": []
+      },
+      {
+       "id": "raven",
+       "name": "Raven",
+       "speeds": {
+        "walk": 20,
+        "fly": 60
+       },
+       "modifiers": []
+      },
+      {
+       "id": "spider",
+       "name": "Spider",
+       "speeds": {
+        "walk": 20,
+        "climb": 20
+       },
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "invisibility",
@@ -29380,6 +29537,12 @@
    "frightened",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Hellish Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -29733,6 +29896,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Spirit Jar"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -30946,6 +31115,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -31634,7 +31810,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The mimic shape-shifts to resemble a Medium or Small object while retaining its game statistics, or it returns to its true blob form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "medium-object",
+       "name": "Medium object",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "small-object",
+       "name": "Small object",
+       "size": "small",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "pseudopod",
@@ -32159,9 +32354,15 @@
       "tags": [
        "no-healing"
       ],
-      "reminder": "While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+      "reminder": "While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse."
      }
-    ]
+    ],
+    "drain": {
+     "killsAtZero": {
+      "cause": "Rotting Fist",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "dreadful-glare",
@@ -32375,9 +32576,15 @@
       "tags": [
        "no-healing"
       ],
-      "reminder": "While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+      "reminder": "While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse."
      }
-    ]
+    ],
+    "drain": {
+     "killsAtZero": {
+      "cause": "Rotting Fist",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "channel-negative-energy",
@@ -32519,6 +32726,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Undead Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -32708,6 +32921,13 @@
    "frightened",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -32802,7 +33022,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The hag shape-shifts into a Small or Medium Humanoid, or it returns to its true form. Other than its size, its game statistics are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "small-humanoid",
+       "name": "Small Humanoid",
+       "size": "small",
+       "modifiers": []
+      },
+      {
+       "id": "medium-humanoid",
+       "name": "Medium Humanoid",
+       "size": "medium",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "claw",
@@ -33791,7 +34030,32 @@
     "name": "Shape-Shift",
     "activation": "action",
     "description": "The oni shape-shifts into a Small or Medium Humanoid or a Large Giant, or it returns to its true form. Other than its size, its game statistics are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "small-humanoid",
+       "name": "Small Humanoid",
+       "size": "small",
+       "modifiers": []
+      },
+      {
+       "id": "medium-humanoid",
+       "name": "Medium Humanoid",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "large-giant",
+       "name": "Large Giant",
+       "size": "large",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "spellcasting",
@@ -35198,6 +35462,11 @@
      },
      "immuneOnSuccess": true
     }
+   },
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -35448,6 +35717,13 @@
   },
   "damageResistances": [
    "radiant"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -36671,7 +36947,41 @@
     "name": "Shape-Shift",
     "activation": "action",
     "description": "The quasit shape-shifts to resemble a bat (Speed 10 ft., Fly 40 ft.), a centipede (40 ft., Climb 40 ft.), or a toad (40 ft., Swim 40 ft.), or it returns to its true form. Its game statistics are the same in each form, except for its Speed. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "bat",
+       "name": "Bat",
+       "speeds": {
+        "walk": 10,
+        "fly": 40
+       },
+       "modifiers": []
+      },
+      {
+       "id": "centipede",
+       "name": "Centipede",
+       "speeds": {
+        "walk": 40,
+        "climb": 40
+       },
+       "modifiers": []
+      },
+      {
+       "id": "toad",
+       "name": "Toad",
+       "speeds": {
+        "walk": 40,
+        "swim": 40
+       },
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "invisibility",
@@ -36932,6 +37242,13 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Fiendish Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -39073,10 +39390,20 @@
      "ability": "wis",
      "dc": 11,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureByHitPoints": [
+      {
+       "atOrBelow": 20,
+       "dropsToZero": true
+      }
+     ]
     },
-    "damage": [],
-    "reminder": "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage.",
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "psychic"
+     }
+    ],
     "targets": {
      "count": 1,
      "conditions": [
@@ -40293,10 +40620,24 @@
      "ability": "dex",
      "dc": 21,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureByHitPoints": [
+      {
+       "atOrBelow": 100,
+       "dies": true
+      }
+     ]
     },
-    "damage": [],
-    "reminder": "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
+    "damage": [
+     {
+      "formula": "4d8 + 6",
+      "type": "piercing"
+     },
+     {
+      "formula": "8d8",
+      "type": "radiant"
+     }
+    ],
     "targets": {
      "count": 1,
      "rangeFeet": 600,
@@ -40371,6 +40712,13 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -41509,6 +41857,12 @@
   "conditionImmunities": [
    "charmed",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Fiendish Restoration"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -42728,7 +43082,32 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The succubus shape-shifts to resemble a Medium or Small Humanoid or back into its true form. Its game statistics are the same in each form, except its Fly Speed is available only in its true form. Any equipment it's wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "medium-humanoid",
+       "name": "Medium Humanoid",
+       "size": "medium",
+       "modifiers": [],
+       "speeds": {
+        "walk": 30
+       }
+      },
+      {
+       "id": "small-humanoid",
+       "name": "Small Humanoid",
+       "size": "small",
+       "modifiers": [],
+       "speeds": {
+        "walk": 30
+       }
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "fiendish-touch",
@@ -44672,6 +45051,13 @@
      "fire"
     ],
     "deathWaitsForTurn": true
+   },
+   {
+    "kind": "severed-limbs",
+    "name": "Loathsome Limbs",
+    "uses": 4,
+    "slashing": 15,
+    "limbMonsterId": "troll-limb"
    }
   ],
   "extensions": {
@@ -45341,6 +45727,9 @@
       "actionId": "bite-bat-or-vampire-form-only",
       "count": 1
      }
+    ],
+    "formOnly": [
+     "true"
     ]
    },
    {
@@ -45348,7 +45737,63 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "If the vampire isn't in sunlight or running water, it shape-shifts into a Tiny bat (Speed 5 ft., Fly Speed 30 ft.) or a Medium cloud of mist (Speed 5 ft., Fly Speed 20 ft. [hover]), or it returns to its vampire form. Anything it is wearing transforms with it. While in bat form, the vampire can't speak. Its game statistics, other than its size and Speed, are unchanged. While in mist form, the vampire can't take any actions, speak, or manipulate objects. It is weightless and can enter an enemy's space and stop there. If air can pass through a space, the mist can do so, but it can't pass through liquid. It has Resistance to all damage, except the damage it takes from sunlight.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "bat",
+       "name": "Bat",
+       "size": "tiny",
+       "speeds": {
+        "walk": 5,
+        "fly": 30
+       },
+       "noSpeech": true,
+       "modifiers": []
+      },
+      {
+       "id": "mist",
+       "name": "Mist",
+       "size": "medium",
+       "speeds": {
+        "walk": 5,
+        "fly": 20,
+        "hover": true
+       },
+       "noActions": true,
+       "noSpeech": true,
+       "sharesSpaces": true,
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "acid",
+          "bludgeoning",
+          "cold",
+          "fire",
+          "force",
+          "lightning",
+          "necrotic",
+          "piercing",
+          "poison",
+          "psychic",
+          "radiant",
+          "slashing",
+          "thunder"
+         ]
+        }
+       ]
+      }
+     ],
+     "keeps": [],
+     "gear": "worn",
+     "notInSunlight": true,
+     "escapesAtZero": {
+      "form": "mist",
+      "hours": 2
+     }
+    }
    },
    {
     "id": "beguile",
@@ -45438,6 +45883,9 @@
       "escapeDc": 14,
       "maxTargetSize": "large"
      }
+    ],
+    "formOnly": [
+     "true"
     ]
    },
    {
@@ -45460,6 +45908,10 @@
       "formula": "3d8",
       "type": "necrotic"
      }
+    ],
+    "formOnly": [
+     "bat",
+     "true"
     ],
     "drain": {
      "damageType": "necrotic",
@@ -45495,6 +45947,10 @@
      "amount": 20,
      "type": "radiant"
     }
+   },
+   {
+    "kind": "misty-escape",
+    "name": "Misty Escape"
    }
   ],
   "extensions": {
@@ -46213,6 +46669,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -47128,7 +47591,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The werebear shape-shifts into a Large bear-humanoid hybrid form or a Large bear, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "large",
+       "modifiers": []
+      },
+      {
+       "id": "bear",
+       "name": "Bear",
+       "size": "large",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "bite",
@@ -47139,17 +47621,32 @@
      "bonus": 7,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 14,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d12 + 4",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Werebear)",
+      "tags": [
+       "lycanthropy-werebear"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 14
+      },
+      "reminder": "A creature that succeeds is immune to this werebear's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "bear",
+     "hybrid"
     ]
    },
    {
@@ -47168,6 +47665,10 @@
       "formula": "3d6 + 4",
       "type": "slashing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    },
    {
@@ -47184,6 +47685,10 @@
       "formula": "2d8 + 4",
       "type": "slashing"
      }
+    ],
+    "formOnly": [
+     "bear",
+     "hybrid"
     ]
    }
   ],
@@ -47292,7 +47797,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The wereboar shape-shifts into a Medium boar-humanoid hybrid or a Small boar, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "boar",
+       "name": "Boar",
+       "size": "small",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "gore",
@@ -47303,17 +47827,32 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 12,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Wereboar)",
+      "tags": [
+       "lycanthropy-wereboar"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 12
+      },
+      "reminder": "A creature that succeeds is immune to this wereboar's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "boar",
+     "hybrid"
     ]
    },
    {
@@ -47332,6 +47871,10 @@
       "formula": "3d6 + 3",
       "type": "piercing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    },
    {
@@ -47365,6 +47908,10 @@
        "prone"
       ]
      }
+    ],
+    "formOnly": [
+     "boar",
+     "hybrid"
     ]
    }
   ],
@@ -47471,7 +48018,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The wererat shape-shifts into a Medium rat-humanoid hybrid or a Small rat, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "rat",
+       "name": "Rat",
+       "size": "small",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "bite",
@@ -47482,17 +48048,32 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 11,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d4 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Wererat)",
+      "tags": [
+       "lycanthropy-wererat"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 11
+      },
+      "reminder": "A creature that succeeds is immune to this wererat's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "rat",
+     "hybrid"
     ]
    },
    {
@@ -47526,6 +48107,10 @@
       "formula": "1d6 + 3",
       "type": "piercing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    }
   ],
@@ -47636,6 +48221,10 @@
     "activation": "bonus-action",
     "description": "The weretiger moves up to its Speed without provoking Opportunity Attacks. At the end of this movement, the weretiger can take the Hide action.",
     "damage": [],
+    "formOnly": [
+     "tiger",
+     "hybrid"
+    ],
     "move": {
      "speed": "full",
      "provokes": false
@@ -47650,17 +48239,32 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 13,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Weretiger)",
+      "tags": [
+       "lycanthropy-weretiger"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 13
+      },
+      "reminder": "A creature that succeeds is immune to this weretiger's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "tiger",
+     "hybrid"
     ]
    },
    {
@@ -47668,7 +48272,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The weretiger shape-shifts into a Large tiger-humanoid hybrid or a Large tiger, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "large",
+       "modifiers": []
+      },
+      {
+       "id": "tiger",
+       "name": "Tiger",
+       "size": "large",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "scratch",
@@ -47701,6 +48324,10 @@
       "formula": "2d8 + 2",
       "type": "piercing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    }
   ],
@@ -47810,7 +48437,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The werewolf shape-shifts into a Large wolf-humanoid hybrid or a Medium wolf, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "large",
+       "modifiers": []
+      },
+      {
+       "id": "wolf",
+       "name": "Wolf",
+       "size": "medium",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "bite",
@@ -47821,17 +48467,32 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 12,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Werewolf)",
+      "tags": [
+       "lycanthropy-werewolf"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 12
+      },
+      "reminder": "A creature that succeeds is immune to this werewolf's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "wolf",
+     "hybrid"
     ]
    },
    {
@@ -47865,6 +48526,10 @@
       "formula": "2d8 + 2",
       "type": "piercing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    }
   ],
@@ -48845,7 +49510,19 @@
     "name": "Create Specter",
     "activation": "action",
     "description": "The wraith targets a Humanoid corpse within 10 feet of itself that has been dead for no longer than 1 minute. The target's spirit rises as a Specter in the space of its corpse or in the nearest unoccupied space. The specter is under the wraith's control. The wraith can have no more than seven specters under its control at a time.",
-    "damage": []
+    "damage": [],
+    "raisesCorpse": {
+     "monsterId": "specter",
+     "withinMinutes": 1,
+     "most": 7
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 10,
+     "creatureTypes": [
+      "humanoid"
+     ]
+    }
    }
   ],
   "token": {

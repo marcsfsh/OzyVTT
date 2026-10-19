@@ -63,7 +63,7 @@ function sourceActionOf(
   const definition = source.definitionId ? kit.resolveDefinition(source.definitionId) : undefined;
   return (
     effectiveActions(definition, source, kit.equipmentCatalog()).find((candidate) => candidate.id === sourceActionId) ??
-    builtinActionFor(definition, sourceActionId)
+    builtinActionFor(definition, sourceActionId, source)
   );
 }
 
@@ -576,7 +576,8 @@ export const actorHealthCommands = [
           faces,
           initiator,
           (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
-          count
+          count,
+          kit.equipmentCatalog()
         );
         healed = outcome.healed;
         events = outcome.events;

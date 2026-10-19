@@ -31,6 +31,7 @@ export type SaveOutcome = {
   ignoresCover?: true;
   failurePush?: ForcedPush;
   advantageAtSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  failureEndsForm?: true;
   breaksConcentration?: true;
   heldBy?: ObjectPrint;
 };
@@ -42,7 +43,9 @@ function objectDefences(clause: string, label: string): DamageType[] {
   return listed
     .split(/,\s*(?:and\s+)?|\s+and\s+/)
     .map((word) => DamageTypeSchema.safeParse(word.trim().toLowerCase()))
-    .flatMap((parsed) => (parsed.success && parsed.data !== "poison" && parsed.data !== "psychic" ? [parsed.data] : []));
+    .flatMap((parsed) =>
+      parsed.success && parsed.data !== "poison" && parsed.data !== "psychic" ? [parsed.data] : []
+    );
 }
 
 /** What holds the creature a failure restrains when a trait prints its statistics: "until the rope is destroyed", with
@@ -363,6 +366,9 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // "An affected target repeats the save at the end of each of its turns, ending the spell on itself on a success."
   // The spell names no condition, so the reader leaves the repeat out.
   slow: { repeatSave: true },
+  // "The target repeats the save at the end of each of its turns, ending the spell on a success." No condition names
+  // it for the reader.
+  "ray-of-enfeeblement": { repeatSave: true },
   // "Another 5d4 Acid damage at the end of its next turn", with no condition for the reader to hang it on.
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }
@@ -382,7 +388,10 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "ensnaring-strike": {
     ongoingDamage: { damage: [{ formula: "1d6", type: "piercing" }], at: "bearer-turn-start" },
     advantageAtSize: "large"
-  }
+  },
+  // "If the creature is shape-shifted (as a result of the Polymorph spell, for example), it reverts to its true form and
+  // can't shape-shift until it leaves the Cylinder."
+  moonbeam: { failureEndsForm: true }
 };
 
 /** `spellSaveOutcome` with the reviewed corrections applied. Unset fields an override names are dropped. */

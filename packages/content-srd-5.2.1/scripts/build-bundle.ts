@@ -46,11 +46,14 @@ import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } fro
 import { costlyMaterialsFor } from "./spell-materials.js";
 import { spellSightFor } from "./spell-sight.js";
 import { spellWallsFor } from "./spell-walls.js";
+import { spellDeathFor, spellDeathSaveFor } from "./spell-death.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
+import { deathTraitMechanicsOf, monsterDeathFor } from "./death-traits.js";
 import { withSpellcasting } from "./monster-spells.js";
+import { formOnlyOf, lycanthropeCurseOf, shapeShiftOf } from "./monster-forms.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -112,6 +115,8 @@ type ActionFields = {
   uses_type: string | null;
   uses_param: number | null;
   legendary_action_cost: number | null;
+  /** "Wolf or Hybrid Form Only", "Requires Soul Bag". */
+  limited_to_form?: string | null;
 };
 type AttackFields = {
   parent: string;
@@ -510,11 +515,9 @@ function effectRiders(desc: string, maxTargetSize: OnHitRider["maxTargetSize"], 
       modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage" }],
       duration: { type: "until-source-turn-end" }
     });
-  // A mummy's curse: no healing is the engine's; what it does at rests and over days, and the death to dust, the GM's.
-  const cursed =
-    /\bit is cursed\. (While cursed, the target can[\u2019']t regain Hit Points[^.]*\.(?: A creature dies[^.]*\.)?)/.exec(
-      desc
-    );
+  // A mummy's curse: no healing is the engine's; what it does at rests and over days, the GM's. Its death to dust is the
+  // hit's own (`drain.killsAtZero`).
+  const cursed = /\bit is cursed\. (While cursed, the target can[\u2019']t regain Hit Points[^.]*\.)/.exec(desc);
   if (cursed) found.push({ conditions: [], name: "Cursed", tags: ["no-healing"], reminder: cursed[1]! });
   // An incubus's curse acts at rests, and a shadow's touch drains a score: both the GM's.
   const restCurse = /\bthe target is cursed for [^.]*\. Until the curse ends, [^.]*\./.exec(desc);
@@ -797,18 +800,6 @@ const SAVE_ACTION_FIXES: Readonly<
     drop: "outcome",
     reminder:
       "On a failed save: a target with 20 Hit Points or fewer has the Unconscious condition for 1 hour (until it takes damage or is woken); any other target takes 18 (4d8) Psychic damage."
-  },
-  "sea-hag/death-glare": {
-    why: "the failure depends on the target's Hit Points",
-    drop: "outcome",
-    reminder:
-      "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage."
-  },
-  "solar/slaying-bow": {
-    why: "the failure depends on the target's Hit Points",
-    drop: "outcome",
-    reminder:
-      "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage."
   }
 };
 
@@ -995,6 +986,8 @@ const report = {
   legendaryCreatures: 0,
   traitMechanics: 0,
   castingActions: 0,
+  shapeShifts: 0,
+  formOnlyActions: 0,
   typedDefenses: 0,
   corrections: [] as string[],
   untypedDamage: [] as string[],
@@ -1048,7 +1041,9 @@ const monsters: ActorDefinition[] = creatures
       const prose = row ? null : parseProseAttack(action.fields.desc);
       const fix = SAVE_ACTION_FIXES[`${slug}/${idSafe(slugOf(action.pk).replace(`${slug}_`, ""))}`];
       if (fix) report.saveActionFixes.push(`${slug}: ${fix.why}`);
-      const save = fix?.drop === "save" ? null : action.fields.desc.match(SAVE_PATTERN);
+      // A lycanthrope's curse is a save its hit opens on a Humanoid, so the action keeps no save of its own.
+      const curse = lycanthropeCurseOf(slug, fields.name, action.fields.desc);
+      const save = fix?.drop === "save" || curse ? null : action.fields.desc.match(SAVE_PATTERN);
       const legendary = action.fields.action_type === "LEGENDARY_ACTION";
       const legendaryPrefix = legendary
         ? `Legendary Action${(action.fields.legendary_action_cost ?? 1) > 1 ? ` (costs ${action.fields.legendary_action_cost} actions)` : ""}. `
@@ -1087,7 +1082,11 @@ const monsters: ActorDefinition[] = creatures
         /^While Poisoned, the target can[\u2019']t regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success\.$/.test(
           later
         );
-      const reminder = fix?.reminder ?? loss?.reminder ?? (stale ? null : later) ?? undefined;
+      // A failure that kills by the target's Hit Points is the engine's whole, with the damage for those above it.
+      const fatal = monsterDeathFor(slug, idSafe(slugOf(action.pk).replace(`${slug}_`, "")));
+      const reminder = fatal.damage
+        ? undefined
+        : (fix?.reminder ?? loss?.reminder ?? (stale ? null : later) ?? undefined);
       const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
@@ -1136,9 +1135,15 @@ const monsters: ActorDefinition[] = creatures
         !legendary && action.fields.action_type === "ACTION" && /multiattack/i.test(action.fields.name)
           ? multiattackOfProse(action.fields.desc, siblingIdOf)
           : null;
-      const onHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
+      const parsedOnHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
+      const onHit = curse ? [...(parsedOnHit ?? []), curse] : parsedOnHit;
       const uses = usesOf(action.fields);
       const enrichment = ACTION_ENRICHMENTS[`${slug}/${actionId}`];
+      // A Shape-Shift's printed forms, and the forms an action works in ("Bite (Wolf or Hybrid Form Only)").
+      const shapeShift = shapeShiftOf(slug, actionId);
+      const formOnly = formOnlyOf(slug, action.fields.limited_to_form, action.fields.name);
+      if (shapeShift) report.shapeShifts += 1;
+      if (formOnly) report.formOnlyActions += 1;
       report.actionsTotal += 1;
       if (row) report.structuredAttacks += 1;
       if (prose) report.proseAttacks += 1;
@@ -1175,11 +1180,12 @@ const monsters: ActorDefinition[] = creatures
                 ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {}),
                 ...(poisonStopsHealing
                   ? { failureEffect: { name: "Poisoned", tags: ["no-healing"], modifiers: [] } }
-                  : {})
+                  : {}),
+                ...(fatal.failureByHitPoints ? { failureByHitPoints: fatal.failureByHitPoints } : {})
               }
             }
           : {}),
-        damage,
+        damage: fatal.damage ?? damage,
         ...(printed && printed.conditionalDamage.length > 0 ? { conditionalDamage: printed.conditionalDamage } : {}),
         ...(reminder ? { reminder: reminder.slice(0, 600) } : {}),
         ...(multiattack ? { multiattack: multiattack.plan } : {}),
@@ -1191,6 +1197,9 @@ const monsters: ActorDefinition[] = creatures
           : {}),
         ...(onHit ? { onHit } : {}),
         ...(save && !attack ? withSaveTargets(action.fields.desc) : {}),
+        ...(fatal.raisesCorpse
+          ? { raisesCorpse: fatal.raisesCorpse, ...(fatal.targets ? { targets: fatal.targets } : {}) }
+          : {}),
         ...(uses ? { uses } : {}),
         ...(legendary
           ? {
@@ -1203,6 +1212,8 @@ const monsters: ActorDefinition[] = creatures
               }
             }
           : {}),
+        ...(shapeShift ?? {}),
+        ...(formOnly ? { formOnly } : {}),
         ...(enrichment ?? {})
       });
     });
@@ -1258,7 +1269,7 @@ const monsters: ActorDefinition[] = creatures
       name: trait.fields.name,
       description: withoutSourceTags(trait.fields.desc)
     }));
-    const traitMechanics = traitMechanicsOf(traitTexts);
+    const traitMechanics = [...traitMechanicsOf(traitTexts), ...deathTraitMechanicsOf(traitTexts, actions)];
     report.traitMechanics += traitMechanics.length;
     return {
       schemaId: "vtt.actor-monster" as const,
@@ -1421,11 +1432,14 @@ const spellRecords = onlySrd(spells).map((spell) => {
   const fields = { ...spell.fields, ...correction };
   if (fields.saving_throw_ability && !abilityShort[fields.saving_throw_ability])
     throw new Error(`${spell.pk}: unexpected save ability ${fields.saving_throw_ability}`);
-  const effect = spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
-    distance: fields.range,
-    unit: fields.range_unit,
-    text: fields.range_text || null
-  });
+  const effect = {
+    ...spellEffectFor(slugOf(spell.pk), fields.desc, fields.damage_roll || null, fields.damage_types, {
+      distance: fields.range,
+      unit: fields.range_unit,
+      text: fields.range_text || null
+    }),
+    ...spellDeathFor(slugOf(spell.pk))
+  };
   return {
     id: slugOf(spell.pk),
     name: fields.name,
@@ -1449,7 +1463,11 @@ const spellRecords = onlySrd(spells).map((spell) => {
     attackRoll: makesSpellAttack(fields.desc, effect),
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
     save: fields.saving_throw_ability
-      ? { ability: abilityShort[fields.saving_throw_ability], ...spellSaveOutcomeFor(slugOf(spell.pk), fields.desc) }
+      ? {
+          ability: abilityShort[fields.saving_throw_ability],
+          ...spellSaveOutcomeFor(slugOf(spell.pk), fields.desc),
+          ...spellDeathSaveFor(slugOf(spell.pk))
+        }
       : null,
     target: { type: fields.target_type, count: fields.target_count },
     shape: fields.shape_type

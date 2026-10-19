@@ -228,6 +228,11 @@ const PENDING_SAVE_FIELDS = {
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
   disadvantageFrom: "never",
+  // A failure's return to a creature's true form is narrated when it lands.
+  endsForm: "never",
+  // What a failure does at each Hit Point band names the thresholds, the stat block's text; it is narrated as it lands.
+  failureByHitPoints: "never",
+  failureBanishes: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -266,7 +271,17 @@ const ON_FAIL_EFFECT_FIELDS = {
   currentTurn: "player",
   magical: "never",
   // What holds the creature a failure restrains (a Net's AC and Hit Points) reaches players by name on the effect.
-  heldBy: "never"
+  heldBy: "never",
+  // The DC of the action that ends it is the caster's number; the option it carries shows in its name.
+  endAction: "never",
+  optionId: "never",
+  // Kept off as the landed effect keeps them off (`playerEffect`); its name says what it is.
+  conditionImmunities: "never",
+  suppressesConditions: "never",
+  // The form a failure gives is the caster's pick, named in the effect's `name`; its stat block and terms stay the GM's.
+  form: "never",
+  // The size a failure changes is the spell's own text (Enlarge/Reduce).
+  sizeChange: "player"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -514,6 +529,23 @@ function playerEffect(
     endsWhenUnaffected: _endsWhenUnaffected,
     // A long casting's targets and slot are the caster's plan; its name says what is being cast.
     longCast: _longCast,
+    // What a spell's level, its caster's numbers or its choice set, and the engine's bookkeeping: the hit points it
+    // restores each turn, the kinds of creature it wards against, the conditions it holds off, the carried row it is
+    // bound to and how that row swings, the actions it gives (their DCs and damage types), its once-a-turn and
+    // shrinking marks, and how its bearer's Unarmed Strike lands. Its name says what it is; the owner's sheet reads its
+    // actions from the available-actions read.
+    hitPointsEachTurn: _hitPointsEachTurn,
+    conditionWards: _conditionWards,
+    suppressedConditions: _suppressedConditions,
+    itemId: _itemId,
+    weapon: _weapon,
+    optionId: _optionId,
+    bonusActions: _bonusActions,
+    grantedSpellAction: _grantedSpellAction,
+    endAction: _endAction,
+    usedOnTurn: _usedOnTurn,
+    shrinksEachLongRest: _shrinksEachLongRest,
+    unarmedStrike: _unarmedStrike,
     // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
     struck: _struck,
     // The light it sheds reaches players only as the lit ground in their own sight, which the server draws.
@@ -523,12 +555,20 @@ function playerEffect(
     // What holds the creature reaches players by name, so anyone can attack it; its Armor Class and the Hit Points
     // it has left are the GM's.
     heldBy,
+    // A form's stat block, the definition it replaced and its terms are the GM's; its name reaches the table, as the
+    // effect's own name says it. What size the bearer has is on the actor.
+    form,
+    sizeChange: _sizeChange,
+    ownSize: _ownSize,
     // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
     repeatSave,
     ...rest
   } = effect;
-  const holding = heldBy ? { ...rest, heldBy: { name: heldBy.name } } : rest;
-  const visible = repeatSave ? { ...holding, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : holding;
+  const visible = {
+    ...(repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest),
+    ...(heldBy ? { heldBy: { name: heldBy.name } } : {}),
+    ...(form ? { form: { name: form.name } } : {})
+  };
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
   // A readied spell's Metamagic picks are the engine's to apply at its release.
   const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
@@ -609,6 +649,8 @@ const PLAYER_ACTOR_FIELDS = {
   tokenAssetId: "table",
   conditions: "table",
   deathSaves: "table",
+  // When it died and how, which the revival rules read: the GM's.
+  death: "never",
   armorClass: "party",
   // Only says the GM set the character's AC by hand; the number is `armorClass`, which the party already sees.
   armorClassOverride: "party",
@@ -632,6 +674,7 @@ const PLAYER_ACTOR_FIELDS = {
   pactSlots: "derived",
   preparedSpellIds: "derived",
   spellbook: "derived",
+  knownForms: "derived",
   preparation: "derived",
   restStep: "derived",
   inventory: "derived",
@@ -771,6 +814,7 @@ export function projectPlayerView(
           pactSlots,
           preparedSpellIds,
           spellbook,
+          knownForms,
           preparation,
           restStep,
           inventory,
@@ -845,6 +889,7 @@ export function projectPlayerView(
                 pactSlots: pactSlots === null ? null : { ...pactSlots },
                 preparedSpellIds: [...preparedSpellIds],
                 spellbook: spellbook.map((entry) => ({ ...entry })),
+                ...(knownForms ? { knownForms: { ids: [...knownForms.ids], swapOpen: knownForms.swapOpen } } : {}),
                 preparation: preparation === null ? null : { ...preparation },
                 restStep:
                   restStep === null

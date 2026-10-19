@@ -46,6 +46,18 @@ const RULE_FAMILIES = {
   // An effect that takes away Reactions (Slow).
   "condition.no-reactions": "economy",
   "condition.no-spells": "economy",
+  // Effects that take away Bonus Actions (Confusion), attacks (Gaseous Form), every action but Dash (Wind Walk), or
+  // all but one of moving, an action and a Bonus Action a turn (Abjure Foes).
+  "condition.cant-attack": "economy",
+  "condition.dash-only": "economy",
+  "condition.one-thing-a-turn": "economy",
+  // A creature that can't end the Prone condition on itself (Hideous Laughter).
+  "movement.cant-stand": "movement",
+  // A form forbids it: spells (Wild Shape, Polymorph), actions (a vampire's mist), or another form's attack.
+  "form.no-spells": "economy",
+  "form.no-actions": "economy",
+  "form.no-attacks": "economy",
+  "form.wrong-form": "economy",
   // "Legendary actions are taken right after other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   "legendary.after-a-turn": "economy",
@@ -108,6 +120,9 @@ const RULE_FAMILIES = {
   // A creature the action can't affect: the wrong creature type or size, unseen, not grappled or marked by the user,
   // an ally where it names an enemy, or a creature gone from the plane.
   "target.not-allowed": "targeting",
+  // A revival spell, Gentle Repose or an action that raises a corpse, aimed at a creature it can't take: one alive, dead
+  // longer than its limit, Undead when it died, or whose body or head is gone.
+  "target.revival": "targeting",
   // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
   "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction.

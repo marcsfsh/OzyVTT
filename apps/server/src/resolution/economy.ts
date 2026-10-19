@@ -1,3 +1,4 @@
+import { formViolations } from "../transform/rules.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition, CastShaping } from "@vtt/schemas";
@@ -7,6 +8,8 @@ import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
 import {
+  CANT_ATTACK_TAG,
+  DASH_ONLY_TAG,
   HASTED_TAG,
   hasEffectTag,
   NO_ACTIONS_TAG,
@@ -47,6 +50,7 @@ import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 import { readComponents, spendComponents, type ComponentSpend } from "./components.js";
 import { spellTargetViolations } from "./spell-targets.js";
+import { NO_CASTING_TAG, raiseViolations, revivalViolations } from "./revival.js";
 import {
   castInstanceOf,
   commitShaping,
@@ -188,6 +192,15 @@ export function evaluateActionEconomy(
     notes: []
   };
   checkAbleToAct(evaluation);
+  // What the creature's form keeps it from doing (no spells in Wild Shape, a werewolf's Bite only in wolf form).
+  evaluation.violations.push(
+    ...formViolations(
+      attacker,
+      action,
+      definition,
+      spell ?? (action.spellId !== undefined ? catalog?.spellRecord?.(action.spellId) : undefined)
+    )
+  );
   checkTurnsBegun(evaluation);
   checkOwnTurn(evaluation);
   checkExtraAttackOpened(evaluation);
@@ -215,7 +228,8 @@ export function evaluateActionEconomy(
   checkTargeting(evaluation, distanceFeet);
   // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
   evaluation.violations.push(
-    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet })
+    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet }),
+    ...raiseViolations({ state, attacker, action, targetIds })
   );
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
@@ -244,6 +258,9 @@ export function evaluateActionEconomy(
         catalog
       })
     );
+  // A revival's dead creature: dead, not too long ago, and with a body it can bring back.
+  if (spell && newCast)
+    evaluation.violations.push(...revivalViolations({ state, spell, targetIds, resolveDefinition }));
   const shaped = newCast
     ? shapingCheck({
         state,
@@ -340,6 +357,8 @@ function checkMarkMove(
 function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, spell: SpellReference): void {
   const row = laterRowOf(spell, action.id);
   if (!row || !takenWhileUp(row) || spellUpLevel(attacker, spell) !== null) return;
+  // Another creature's spell gave it this action (Dragon's Breath), so it is there while that effect is.
+  if (attacker.effects.some((effect) => effect.grantedSpellAction?.spellId === spell.id)) return;
   // A sheet built before the cast itself was an action (Produce Flame's) has no way to start it, so it isn't asked to.
   if (!siblings.some((sibling) => sibling.spellId === spell.id && !laterRowOf(spell, sibling.id))) return;
   violations.push({
@@ -485,6 +504,10 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
   "boon-of-fate"
 ]);
 
+/** What a creature limited to Dash may still do (Wind Walk): the Dash action, as an action or a Bonus Action, and the
+ *  action that ends its cloud form. */
+const DASH_ONLY_ALLOWED: ReadonlySet<string> = new Set(["dash", "dash-bonus", "end-effect"]);
+
 /** An effect's name in a refusal, as the creature's own sheet shows it: a caster hidden from the table is "A hidden
  *  threat" there. */
 function shownEffectName(
@@ -536,12 +559,39 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
       rule: "condition.incapacitated",
       message: `${attacker.name} is reeling from ${shownEffectName(state, reeling, resolveDefinition)} and can't take an action or a Bonus Action this turn.`
     });
+  // SRD Gaseous Form: the cloud "can't attack".
+  const unarmed = action.id.startsWith("unarmed-");
+  const cantAttack = attacker.effects.find((effect) => effect.tags.includes(CANT_ATTACK_TAG));
+  if (cantAttack && (action.attack !== undefined || action.multiattack !== undefined || unarmed))
+    violations.push({
+      rule: "condition.cant-attack",
+      message: `${attacker.name} can't attack while ${shownEffectName(state, cantAttack, resolveDefinition)} lasts.`
+    });
+  // SRD Wind Walk: "The only actions it can take in this form are the Dash action or a Magic action to begin reverting".
+  const dashOnly = attacker.effects.find((effect) => effect.tags.includes(DASH_ONLY_TAG));
+  if (
+    dashOnly &&
+    !DASH_ONLY_ALLOWED.has(action.id) &&
+    action.activation !== "reaction" &&
+    action.activation !== "other"
+  )
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} can take only the Dash action or end ${shownEffectName(state, dashOnly, resolveDefinition)} while it lasts.`
+    });
   // SRD Befuddlement: the target "can't cast spells or take the Magic action".
   const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));
   if (befuddled && (action.spellId !== undefined || action.spellSlot !== undefined || isMagicAction(action)))
     violations.push({
       rule: "condition.no-spells",
       message: `${attacker.name} can't cast spells or take the Magic action while ${shownEffectName(state, befuddled, resolveDefinition)} lasts.`
+    });
+  // Resurrection's toll on its caster: "Until you finish a Long Rest, you can't cast spells again".
+  const taxed = attacker.effects.find((effect) => effect.tags.includes(NO_CASTING_TAG));
+  if (taxed && (action.spellId !== undefined || action.spellSlot !== undefined))
+    violations.push({
+      rule: "condition.no-spells",
+      message: `${attacker.name} can't cast spells until ${shownEffectName(state, taxed, resolveDefinition)} ends with a Long Rest.`
     });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))
@@ -1455,8 +1505,10 @@ function checkTargeting(
       ...(distanceFeet ? { distanceFeet } : {})
     }) !== null;
   if (!charmWarded && (action.attack !== undefined || action.save !== undefined || action.damage.length > 0)) {
+    // Only while the creature is Charmed: an effect that holds it off (Calm Emotions) lifts the bar too.
+    const charmed = attacker.conditions.some((condition) => condition.id === "charmed");
     const charmers = attacker.effects.filter(
-      (effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
+      (effect) => charmed && effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
     );
     for (const targetId of targetIds) {
       const charmer = charmers.find((effect) => effect.sourceActorId === targetId);

@@ -43,7 +43,10 @@ export function wallPieces(wall: VisionWall): WallEnds[] {
     .map((gap) => ({ from: Math.min(gap.from, gap.to), to: Math.max(gap.from, gap.to) }))
     .sort((left, right) => left.from - right.from);
   if (gaps.length === 0) return [{ a: wall.a, b: wall.b }];
-  const at = (t: number): Point => ({ x: wall.a.x + (wall.b.x - wall.a.x) * t, y: wall.a.y + (wall.b.y - wall.a.y) * t });
+  const at = (t: number): Point => ({
+    x: wall.a.x + (wall.b.x - wall.a.x) * t,
+    y: wall.a.y + (wall.b.y - wall.a.y) * t
+  });
   const pieces: WallEnds[] = [];
   let start = 0;
   for (const gap of gaps) {

@@ -1,5 +1,5 @@
 import { isDead } from "@vtt/domain";
-import { rollDice } from "@vtt/rules-5e";
+import { collectRiders, rollDice } from "@vtt/rules-5e";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { CommandRejectedError } from "../game-store.js";
@@ -7,6 +7,8 @@ import { endEffect } from "../effects.js";
 import { deadCantHealLine, healActor } from "../hit-points.js";
 import { isSwarm } from "../space-sharing.js";
 import { useCostOf } from "../use-cost.js";
+import { deriveEquipment } from "../equipment-derivation.js";
+import { isItemActionId } from "../item-actions.js";
 import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 
 /** Healing (Cure Wounds): rolled once, and every target regains it on the resolve. A willing creature's healing has
@@ -23,17 +25,30 @@ export function applyHealing(ctx: ResolveContext): void {
   if (targets.every((target) => isDead(target)))
     throw new CommandRejectedError(targets.map((target) => deadCantHealLine(target.name)).join(" "));
   let total = 0;
+  // What the healer's riders do to its healing (Supreme Healing, Disciple of Life).
+  const healer = healerRiders(ctx);
   // "The target regains all its Hit Points" (Power Word Heal): nothing to roll.
   const toMaximum = targets.map((target) => Math.max(0, target.hp.maximum - Math.max(0, target.hp.current)));
+  const uses = healing.perUse ? useCostOf(action) : 1;
   if (healing.toMaximum) total = toMaximum.reduce((sum, room) => sum + room, 0);
   else
-    for (let use = 0; use < (healing.perUse ? useCostOf(action) : 1); use += 1) {
-      const rolled = rollDice(healing.formula, deps.random);
+    for (let use = 0; use < uses; use += 1) {
+      const rolled = rollDice(healing.formula, healer.maximized ? (sides) => sides : deps.random);
       // A flat amount ("1" a point) is no roll for the dice log.
       if (rolled.terms.some((term) => term.kind === "dice")) recordRoll(ctx, rolled, "healing");
       total += rolled.total;
     }
-  const shares = healing.toMaximum ? toMaximum : healingShares(targets, Math.max(0, total), healing);
+  // Beacon of Hope: a target that regains the most any healing can gives every die its highest face.
+  const most = healing.toMaximum ? 0 : uses * rollDice(healing.formula, (sides) => sides).total;
+  const received = targets.map((target) =>
+    !healing.toMaximum && !healing.temporary && receivesMaximized(ctx, target) ? Math.max(total, most) : total
+  );
+  const bonus = healing.temporary || healing.toMaximum ? 0 : healer.bonus;
+  const shares = healing.toMaximum
+    ? toMaximum
+    : healing.divided
+      ? healingShares(targets, Math.max(0, total), healing).map((share) => share + bonus)
+      : targets.map((target, index) => healingShares([target], Math.max(0, received[index]! + bonus), healing)[0]!);
   const healed = targets.map((target, index) => {
     // A dead target among living ones regains nothing until it is revived; the others still heal.
     if (isDead(target)) {
@@ -82,6 +97,62 @@ export function applyHealing(ctx: ResolveContext): void {
     return { targetId: target.id, targetName: target.name, regained };
   });
   ctx.healing = { total, targets: healed };
+  // Blessed Healer: a slot spell that restored Hit Points to another creature restores some to its caster too.
+  if (healer.self > 0 && healed.some((entry) => entry.targetId !== ctx.attacker.id && entry.regained > 0)) {
+    const before = ctx.attacker.hp.current;
+    const events = healActor(state, ctx.attacker.id, healer.self, { role: "gm" });
+    const regained = ctx.attacker.hp.current - before;
+    if (regained > 0)
+      tableNarration.push({
+        kind: "heal",
+        text: `${ctx.attacker.name} regains ${regained} ${regained === 1 ? "hit point" : "hit points"} (${healer.selfLabel}).`,
+        actorIds: [ctx.attacker.id]
+      });
+    for (const event of events) tableNarration.push(tableLineOf(ctx, event, "heal"));
+  }
+}
+
+/** What the healer's `on-healing` riders do to this action's healing: every die at its highest face (Supreme
+ *  Healing, a spell or Channel Divinity, never an item), more Hit Points for each creature healed (Disciple of Life:
+ *  2 plus the slot's level, on a spell cast with a slot), and what the healer itself regains (Blessed Healer). */
+function healerRiders(
+  ctx: ResolveContext
+): Readonly<{ maximized: boolean; bonus: number; self: number; selfLabel: string }> {
+  const { derivation, riderFilters, action, plan } = ctx;
+  const riders = collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment: "on-healing" });
+  const slot = plan.spendSpellSlot?.level ?? null;
+  const amountOf = (rider: (typeof riders)[number]) =>
+    rider.modifier.perSlotLevel
+      ? slot === null
+        ? 0
+        : (rider.modifier.amount ?? 0) + slot
+      : (rider.modifier.amount ?? 0);
+  let maximized = false;
+  let bonus = 0;
+  let self = 0;
+  let selfLabel = "";
+  for (const rider of riders) {
+    if (rider.modifier.type === "healing-dice-maximized" && !isItemActionId(action.id)) maximized = true;
+    if (rider.modifier.type !== "healing-bonus") continue;
+    if (rider.modifier.self) {
+      if (amountOf(rider) > self) [self, selfLabel] = [amountOf(rider), rider.label];
+    } else bonus += amountOf(rider);
+  }
+  return { maximized, bonus, self, selfLabel };
+}
+
+/** Whether a creature regains the most any healing can give it (Beacon of Hope). */
+function receivesMaximized(ctx: ResolveContext, target: LiveActor): boolean {
+  const definition =
+    target.id === ctx.attacker.id
+      ? ctx.deps.definition
+      : target.definitionId
+        ? ctx.deps.resolveDefinition?.(target.definitionId)
+        : undefined;
+  const derivation = deriveEquipment(target, definition, ctx.deps.catalog);
+  return collectRiders(derivation.carriers, { ...derivation.context, moment: null }).some(
+    (rider) => rider.modifier.type === "healing-received-maximized"
+  );
 }
 
 /** What each target may regain: the whole roll each, or one pool split as evenly as each target's room allows. A cap

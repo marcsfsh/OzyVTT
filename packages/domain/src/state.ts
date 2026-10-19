@@ -11,6 +11,7 @@ import {
   EffectInstanceSchema,
   EffectModifiersSchema,
   HealthDisplaySchema,
+  HitPointBandSchema,
   ObjectStatsSchema,
   SaveFailureDurationSchema
 } from "@vtt/schemas";
@@ -252,7 +253,27 @@ const PendingSaveEffectSchema = z
      *  where "until the end of its next turn" would run a turn longer. */
     currentTurn: z.literal(true).optional(),
     /** What holds the creature (a Net, a giant spider's web), which can be attacked; destroying it ends the effect. */
-    heldBy: EffectInstanceSchema.shape.heldBy
+    heldBy: EffectInstanceSchema.shape.heldBy,
+    /** An action the bearer may take to end it (Irresistible Dance's "collect itself"). */
+    endAction: EffectInstanceSchema.shape.endAction,
+    /** The option the caster picked for the failure (Bestow Curse's curse). */
+    optionId: EffectInstanceSchema.shape.optionId,
+    /** Conditions the bearer is immune to while it lasts (Calm Emotions' Charmed and Frightened). */
+    conditionImmunities: EffectInstanceSchema.shape.conditionImmunities,
+    /** Conditions the bearer already has that stop applying while it lasts and come back after (Calm Emotions). */
+    suppressesConditions: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .max(6)
+      .optional(),
+    /** The form a failure shape-shifts the creature into (Polymorph's Beast), taken as the effect lands. */
+    form: EffectInstanceSchema.shape.form,
+    /** The creature's size while it lasts (Enlarge/Reduce). */
+    sizeChange: EffectInstanceSchema.shape.sizeChange
   })
   .strict();
 
@@ -322,8 +343,24 @@ export const PendingSaveSchema = z
     failurePush: ForcedPushSchema.optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** A failure that acts by the target's Hit Points as it fails (Divine Word, Slaying Bow). GM bookkeeping, never
+     *  projected: the result says what landed. */
+    failureByHitPoints: z.array(HitPointBandSchema).min(1).max(4).optional(),
+    /** A creature of these types that fails leaves for its home plane for 24 hours (Divine Word). GM bookkeeping. */
+    failureBanishes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(6)
+      .optional(),
     /** What gives the save Disadvantage, as the roll names it (Heightened Spell). GM bookkeeping, never projected. */
     disadvantageFrom: z.string().min(1).max(60).optional(),
+    /** A failure returns a shape-shifted creature to its true form (Moonbeam). Narrated when it lands. */
+    endsForm: z.literal(true).optional(),
     /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
      *  card says so, so it never reads as if the engine did. */
     gmApplies: z.literal(true).optional(),
@@ -436,7 +473,9 @@ export const HeldRollSchema = z
         /** The GM's forced mode, which a reroll keeps. */
         rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
         callId: z.uuid().optional(),
-        findActorId: z.uuid().optional()
+        findActorId: z.uuid().optional(),
+        /** The situations the roller said it fits, which a reroll or an answer keeps. */
+        situations: z.array(z.string().min(3).max(80)).max(6).optional()
       })
       .strict()
       .optional(),
@@ -1631,8 +1670,9 @@ export const GameStateSchema = z.object({
     tokens: [],
     annotations: []
   }),
-  /** Imported stat blocks (canonical ActorDefinition JSON) that live with the campaign (ADR-0007). */
-  definitions: z.array(StoredDefinitionSchema).max(100).default([]),
+  /** Imported stat blocks (canonical ActorDefinition JSON) that live with the campaign (ADR-0007), and the definition
+   *  of each form a creature has taken (`form-<actorId>`), which it reads in place of its own until it reverts. */
+  definitions: z.array(StoredDefinitionSchema).max(200).default([]),
   /** Player-submitted PDF imports awaiting GM approval. GM-only: excluded from PlayerView and the viewer (ADR-0018). */
   pendingImports: z.array(PendingImportSchema).max(20).default([]),
   /** Character-builder table policy. GM-set, player-read. */

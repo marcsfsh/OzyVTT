@@ -1,3 +1,4 @@
+import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -24,6 +25,7 @@ import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { jumpLimits, leapRider } from "./jumping.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { DAZED_TAG } from "./resolution/economy.js";
 import type { MovementCost, MovementCostOptions } from "./terrain.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
 import { fearSources } from "./vision/rules.js";
@@ -351,6 +353,8 @@ const SHARES_SPACE = ["Air Form", "Fire Form", "Water Form", "Swarm"] as const;
 const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInput, swarmOnly = false): boolean => {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
+  // A form that can enter a creature's space and stop there (a vampire's mist, Gaseous Form's cloud).
+  if (!swarmOnly && actor && formEffectOf(actor)?.form?.sharesSpaces) return true;
   return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
 };
 
@@ -361,8 +365,7 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
   const moverActor = state.actors.find((actor) => actor.id === input.actorId);
   // Air Form and Water Form as the stalker and the water elemental print them: "can enter an enemy's space and stop
   // there", so only an enemy's space is one it may end in.
-  const enemiesOnly =
-    moverActor !== undefined && stopsOnlyInEnemySpace(moverDefinitionOf(moverActor, input));
+  const enemiesOnly = moverActor !== undefined && stopsOnlyInEnemySpace(moverDefinitionOf(moverActor, input));
   if (sharesSpace(state, input.actorId, input) && !enemiesOnly) return false;
   const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
   const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
@@ -376,7 +379,8 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
     if (sharesSpace(state, token.actorId, input, true)) return false;
     const occupant = state.actors.find((actor) => actor.id === token.actorId);
-    if (enemiesOnly && moverActor && occupant && areEnemies(moverActor, occupant, input.resolveDefinition)) return false;
+    if (enemiesOnly && moverActor && occupant && areEnemies(moverActor, occupant, input.resolveDefinition))
+      return false;
     if (!everyone && occupant?.visibility === "gm-only") return false;
     if (!everyone && input.perceives && !input.perceives(token.actorId)) return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
@@ -507,6 +511,22 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     return done(mover.conditions.some((condition) => condition.id === "prone"));
   }
   if (!counted) return done();
+  // SRD Abjure Foes, a Rogue's Daze: a creature limited to one of moving, an action or a Bonus Action that took
+  // either can't move (resolution/economy.ts refuses the rest).
+  const limited = mover.effects.find((effect) => effect.tags.includes(DAZED_TAG));
+  if (
+    limited &&
+    !readied &&
+    state.combat.turnActorId === actorId &&
+    (state.combat.turn.actionUsed || state.combat.turn.bonusActionUsed)
+  )
+    police(
+      state,
+      input,
+      "condition.one-thing-a-turn",
+      `${mover.name} has acted this turn, and ${limited.name} allows only one of moving, an action or a Bonus Action.`,
+      outcome
+    );
   if (mode === "jump") {
     landsOnDifficult = applyJump(state, input, mover, fromAltitude, toAltitude, outcome, readied);
     if (readied) spendReadied(state, mover.id);

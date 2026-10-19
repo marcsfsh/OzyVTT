@@ -72,8 +72,7 @@ export function DoorMenu({
   busy = false,
   onOpen,
   onWork,
-  onSaveDoor,
-  onSaveObject,
+  onSave,
   onClose
 }: Readonly<{
   role: "gm" | "player";
@@ -85,8 +84,8 @@ export function DoorMenu({
   busy?: boolean;
   onOpen: (open: boolean) => void;
   onWork: (how: DoorWork) => void;
-  onSaveDoor: (door: DoorState | null) => void;
-  onSaveObject: (object: ObjectStats) => void;
+  /** The GM's edit: what holds the door shut (null for nothing), then its statistics. */
+  onSave: (door: DoorState | null, object: ObjectStats) => void;
   onClose: () => void;
 }>) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -150,8 +149,7 @@ export function DoorMenu({
             wall={wall}
             busy={busy}
             onSave={(door, object) => {
-              onSaveDoor(door);
-              onSaveObject(object);
+              onSave(door, object);
               onClose();
             }}
           />
@@ -231,7 +229,7 @@ function DoorEditor({
         <Select value={substance} onChange={(event) => setSubstance(event.target.value as ObjectSubstance)}>
           {OBJECT_SUBSTANCES.map((entry) => (
             <option key={entry} value={entry}>
-              {`${entry[0]!.toUpperCase()}${entry.slice(1)} · AC ${OBJECT_ARMOR_CLASS[entry]}`}
+              {`${entry[0]!.toUpperCase()}${entry.slice(1)}`}
             </option>
           ))}
         </Select>

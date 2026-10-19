@@ -1,4 +1,5 @@
 import {
+  actionChoicesOf,
   owedDamageParts,
   owedDamageTotal,
   type ActionAvailability,
@@ -45,6 +46,9 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { spendStudy, studyAMiss } from "./resolution/studied.js";
+import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
+import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
@@ -52,6 +56,8 @@ import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
+import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
+import { killOnCast } from "./resolution/kill.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
@@ -122,6 +128,8 @@ export function resolveDefinitionAction(
   checkOverchannel(ctx);
   checkWallTarget(ctx);
   ctx.builtin?.check?.(ctx);
+  // A form the action can't give is refused before anything is spent.
+  checkShapeShift(ctx);
   ctx.builtin?.apply?.(ctx);
   if (longCast && longCast.phase !== "finish") {
     stepLongCast(ctx, longCast);
@@ -193,6 +201,9 @@ export function resolveDefinitionAction(
     spendUntilOwnAttack(ctx);
     spendSteadyAim(ctx);
     spendForgoneDeclaration(ctx);
+    // Studied Attacks: this roll spends the Fighter's mark on its target, and a miss leaves a new one.
+    spendStudy(ctx);
+    studyAMiss(ctx);
   }
   // A roll another creature may still answer (Cutting Words), or a hit the target's Parry or Shield may still turn into
   // a miss: the attack is spent, and the answer finishes it.
@@ -235,6 +246,7 @@ export function resolveDefinitionAction(
   applyMovementGrants(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  applyShapeShift(ctx);
   placeCastSight(ctx);
   applyCastWalls(ctx);
   refuseThePrayedFor(ctx);
@@ -243,6 +255,9 @@ export function resolveDefinitionAction(
   applyConditionCures(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
+  reviveOnCast(ctx);
+  raiseOnAction(ctx);
+  killOnCast(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
@@ -306,8 +321,9 @@ function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"]
   if (darts) return darts;
   const parts = owedDamageParts(ctx);
   const total = parts.reduce((sum, part) => sum + part.amount, 0);
-  if (total <= 0 || ctx.targets.length === 0) return undefined;
-  return ctx.targets.map((target) => ({ targetId: target.id, targetName: target.name, parts, total }));
+  const struck = ctx.targets.filter((target) => !ctx.spared?.has(target.id));
+  if (total <= 0 || struck.length === 0) return undefined;
+  return struck.map((target) => ({ targetId: target.id, targetName: target.name, parts, total }));
 }
 
 /** An ended effect as the result tells it, to the initiator and in the table's toast: a source hidden from the
@@ -410,6 +426,7 @@ export function actionAvailability(
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
     const passive = passiveOf(action, builtin);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
+    const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;
     return {
       id: action.id,
       name: action.name,
@@ -420,6 +437,10 @@ export function actionAvailability(
       ...(reason !== undefined ? { reason } : {}),
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
+      ...(forms !== undefined ? { forms } : {}),
+      ...(action.effectOptions
+        ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
+        : {}),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),
@@ -464,6 +485,8 @@ export function actionAvailability(
       ...(conditionChoicesOf(action, spell).length > 0
         ? { conditionChoices: [...conditionChoicesOf(action, spell)] as SaveCondition[] }
         : {}),
+      // An option, one for each target, or the weapon a grant binds to (Fire Shield, Bestow Curse, Magic Weapon).
+      ...(actionChoicesOf(action) ? { choices: structuredClone(actionChoicesOf(action)!) } : {}),
       // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
       ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
     };
@@ -480,6 +503,8 @@ function tapTargeting(
   usesUpItem: boolean,
   spell: SpellReference | undefined
 ): "none" | "single" | "multi" | null {
+  // A shape-shift on its user (Wild Shape, a werewolf's Shape-Shift), and leaving a form, aim at no one.
+  if (action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)) return "none";
   if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";
   if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";

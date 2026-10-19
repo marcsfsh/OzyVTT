@@ -16,7 +16,7 @@ import type {
 import { Button, useDragSurface, useToastMute } from "@vtt/ui";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { read } from "../lib/command";
-import { resolveAtWall, useTargeting } from "../encounter/targeting";
+import { useTargeting } from "../encounter/targeting";
 import { FogOverlay } from "./FogOverlay";
 import { gesturePreview } from "./gesturePreview";
 import { snapCellCenterPreview, useMapCalibration } from "./gridPreview";
@@ -423,11 +423,7 @@ export function EncounterMap({
     ...(readOnly || moveSceneId
       ? {}
       : {
-          onWallAim: (wallId: string) =>
-            resolveAtWall(wallId, revision, (ok, text) => {
-              if (text) commands.setMessage(text);
-              else if (!ok) commands.setMessage("That could not be aimed at the wall.");
-            })
+          onWallAim: commands.aimAtWall
         })
   });
 
@@ -930,8 +926,7 @@ export function EncounterMap({
                   onWork={(how) => {
                     if (worker) commands.workDoor(wall.id, worker.id, how);
                   }}
-                  onSaveDoor={(door) => commands.setDoorState(wall.id, door)}
-                  onSaveObject={(object) => commands.setWallObject(wall.id, object)}
+                  onSave={(door, object) => commands.saveDoor(wall.id, door, object)}
                   onClose={() => setDoorMenu(null)}
                 />
               ) : null;

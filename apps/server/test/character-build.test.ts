@@ -755,7 +755,8 @@ describe("always-prepared grants are not charged to the prepared count", () => {
   it("keeps a Life Domain spell the player ALSO prepared as the grant's always-prepared form", () => {
     // A domain spell the player also listed must become `alwaysPrepared: true` and not spend a prepared slot.
     expect(spells.get("cure-wounds")).toMatchObject({ level: 1, prepared: true, alwaysPrepared: true });
-    expect(spells.get("cure-wounds")).not.toHaveProperty("classId"); // the grant's entry, with no class pick behind it
+    // The grant's entry, always prepared, and cast as a Cleric spell, so a rider on Cleric spells reaches it.
+    expect(spells.get("cure-wounds")).toMatchObject({ alwaysPrepared: true, classId: "cleric" });
     for (const domainSpell of ["aid", "bless", "cure-wounds", "lesser-restoration"]) {
       expect(spells.get(domainSpell)?.alwaysPrepared, domainSpell).toBe(true);
     }

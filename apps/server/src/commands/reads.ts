@@ -12,6 +12,7 @@ import { BUILTIN_TARGETING, builtinActionsFor } from "../builtin-actions.js";
 import { builtinCheckSkills } from "../resolution/builtins.js";
 import { actionSummariesOf, actionSummaryOf, type ContentView } from "../content-library.js";
 import { effectiveActions } from "../effective-actions.js";
+import { formsOffer } from "../transform/offer.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { rechoicesOf } from "../ledger-rechoice.js";
 import { receivedSpellChoices, spellChoicesOf } from "../spell-choices.js";
@@ -131,9 +132,26 @@ export const gameReads = [
       const played = combatant ? kit.resolveDefinition(definitionId) : undefined;
       // Browse uses the catalog's own lookup (honours draft/published/deleted), and leaves the play-time resolver out.
       const definition = played ?? imported ?? catalog.monster(definitionId);
+      const playedActions = combatant && played ? effectiveActions(played, combatant, kit.equipmentCatalog()) : [];
       const actions =
         combatant && played
-          ? actionSummariesOf([...effectiveActions(played, combatant, kit.equipmentCatalog())])
+          ? actionSummariesOf([...playedActions]).map((summary, index) => {
+              // A Shape-Shift offers its forms and aims at no one; leaving a form too.
+              const action = playedActions[index]!;
+              if (!action.shapeShift && !action.endsForm && !action.effectOptions) return summary;
+              return {
+                ...summary,
+                ...(action.shapeShift
+                  ? { forms: formsOffer(kit.read(), combatant, action, played, kit.equipmentCatalog()) }
+                  : {}),
+                ...(action.effectOptions
+                  ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
+                  : {}),
+                ...(action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)
+                  ? { targeting: "none" as const }
+                  : {})
+              };
+            })
           : imported
             ? actionSummariesOf(imported.actions)
             : catalog.monsterActionSummaries(definitionId);
@@ -197,7 +215,7 @@ export const gameReads = [
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
       const catalog = kit.equipmentCatalog();
       const available = effectiveActions(definition, actor, catalog);
-      const builtins = builtinActionsFor(definition).filter(
+      const builtins = builtinActionsFor(definition, actor).filter(
         (candidate) => !available.some((declared) => declared.id === candidate.id)
       );
       const derivation = deriveEquipment(actor, definition, catalog);

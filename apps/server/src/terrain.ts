@@ -230,8 +230,7 @@ export function movementCost(
       (passesWalls
         ? footprintStepPassage(stepFrom, stepTo, sizeCells, fixedCrosses, fixedWalls) !== "blocked"
         : footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked" ||
-          (options.opening !== undefined &&
-            slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, options.opening))) &&
+          (options.opening !== undefined && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, options.opening))) &&
       // A spell's barrier holds back even a mover that passes walls.
       options.barredStep?.(
         gridToImage(calibration, footprintCenter(stepFrom, sizeCells)),

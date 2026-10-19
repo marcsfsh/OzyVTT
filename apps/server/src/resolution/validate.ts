@@ -1,6 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { isOffPlane } from "../off-plane.js";
 import type { GameState } from "@vtt/domain";
+import { checkChoices } from "./grant-extras.js";
 import { effectiveActions } from "../effective-actions.js";
 import { withShotAmmunitionOnly } from "../ammunition.js";
 import { consumableRowFor } from "../consumables.js";
@@ -61,7 +62,9 @@ function combatantsOf(
   // Outside a fight a creature's own cast still starts what it starts (a grant, Concentration, a save, an area), with
   // no turn to spend; an item's use stays on the loose route, which spends its charges.
   const outsideFight = !state.combat.active;
-  if (outsideFight && !(castsASpell && !isItemActionId(action.id)))
+  // A shape-shift is something a creature does outside a fight too (Wild Shape to scout, a werewolf's change).
+  const shapeShifts = action.shapeShift !== undefined || action.endsForm === true;
+  if (outsideFight && !(castsASpell && !isItemActionId(action.id)) && !shapeShifts)
     throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) =>
     outsideFight
@@ -142,7 +145,9 @@ function combatantsOf(
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
     action.sight !== undefined ||
     // A door or a wall is what it acts on (Knock, Passwall, Disintegrate aimed at a wall of force).
-    (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined));
+    (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined)) ||
+    // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
+    (shapeShifts && action.shapeShift?.onTargets !== true && action.save === undefined);
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
   if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
@@ -160,9 +165,11 @@ function combatantsOf(
     !castsASpell &&
     !movesAnArea &&
     action.sight === undefined &&
+    !shapeShifts &&
     action.move === undefined &&
     action.leap === undefined &&
     action.teleport === undefined &&
+    action.raisesCorpse === undefined &&
     input.builtin !== true &&
     !(spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined))
   )
@@ -217,6 +224,8 @@ export function openResolve(
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
   const action = withChosenDamageType(upcast, input.damageType ?? null);
+  // An option or a weapon the action doesn't offer is refused before anything rolls.
+  checkChoices(action, input, attacker, deps.catalog);
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derived, attacker.inventory);

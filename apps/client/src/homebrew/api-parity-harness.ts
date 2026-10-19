@@ -451,6 +451,9 @@ const SAVE_LIFETIME_KEYS = [
   "escapeAthletics"
 ] as const;
 
+/** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
+const DEATH_SAVE_KEYS = ["failureByHitPoints[].**", "failureBanishes"] as const;
+
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
   // ---- action rider surface (every carrier that mounts actions) ----
@@ -598,6 +601,48 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
     status: "gap"
   })),
+  ...DEATH_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "what a failed save does by the target's Hit Points (a Slaying Bow's death, a Death Glare's drop to 0) and the creature types it sends home - authored in the content scripts; no editor control yet",
+    status: "gap"
+  })),
+  ...DEATH_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason:
+      "what a failed save does by the target's Hit Points and the creature types it sends home (Divine Word) - authored in the content scripts",
+    status: "gap"
+  })),
+  {
+    at: "actions[].save.heldBy.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the object that holds a creature a failure restrains (a Net, a giant spider's web) with its Armor Class and Hit Points - read from the stat block's text or authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.heldBy.**",
+    types: ["spell"],
+    reason:
+      "the object that holds a creature a spell's failure restrains, read from the spell's text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "walls.**",
+    types: ["spell"],
+    reason:
+      "the walls a spell raises, cuts or destroys and what it does to a door (Wall of Force, Knock) - a reviewed table in the content build; the spell form has no control for them",
+    status: "gap"
+  },
+  {
+    at: "actions[].raisesCorpse.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a corpse an action raises as a new creature (a wraith's Create Specter): the stat block, how long dead and how many at once - authored in the content scripts; no editor control yet",
+    status: "gap"
+  },
   {
     at: "actions[].save.breaksConcentration",
     types: ACTION_CARRIERS,
@@ -858,6 +903,53 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].shapeShift.**",
+    types: "*",
+    reason:
+      "how an action shape-shifts a creature (Wild Shape's known forms, Polymorph's Beast, a werewolf's printed forms) - authored in the class, spell and stat block content; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsForm",
+    types: "*",
+    reason: "the action that leaves a form early, added by the form itself as it is taken; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].formOnly",
+    types: "*",
+    reason:
+      "the printed forms an action works in (a werewolf's Bite), read from the stat block as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].effectOptions[].**",
+    types: "*",
+    reason:
+      "the effects a use picks one of (Enlarge or Reduce), copied from the spell's cast model by the character build; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].save.failureEndsForm",
+    types: "*",
+    reason:
+      "a failed save that returns a shape-shifted creature to its true form (Moonbeam), copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.failureEndsForm",
+    types: ["spell"],
+    reason: "one SRD author (Moonbeam), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.unwillingOnly",
+    types: "*",
+    reason:
+      "a save only an unwilling target makes (Enlarge/Reduce, True Polymorph), copied from the spell by the character build; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].spendsNoUses",
     types: "*",
     reason:
@@ -933,10 +1025,9 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
-    at: "modifiers[].**",
+    at: "modifiers[].when[].senses",
     types: FEATURE_CARRIERS,
-    reason:
-      "the modifier rows beyond the editor's offered subset: a type the form does not offer has no field for its keys",
+    reason: "the senses of `other-lacks-sense` (Blur), a trigger the content authors and the editor doesn't offer",
     status: "gap"
   },
 

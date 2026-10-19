@@ -161,7 +161,7 @@ describe("the item mechanics overlay", () => {
     );
     const block = serverFile.split("const CARRIER_RIDER_DISPOSITION")[1]?.split("\n};")[0] ?? "";
     const table = Object.fromEntries(
-      [...block.matchAll(/^\s*"?([a-z-]+)"?:\s*"([a-z-]+)"/gm)].map((match) => [match[1], match[2]])
+      [...block.matchAll(/^\s*"?([a-z0-9-]+)"?:\s*"([a-z-]+)"/gm)].map((match) => [match[1], match[2]])
     );
     expect(Object.keys(table).length, "the disposition table was not found in character-build.ts").toBeGreaterThan(10);
     expect(table).toEqual({ ...CARRIER_RIDER_DISPOSITION_MIRROR });

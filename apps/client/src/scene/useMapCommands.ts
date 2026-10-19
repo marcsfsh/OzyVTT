@@ -10,6 +10,7 @@ import type {
 } from "@vtt/domain";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
+import { resolveAtWall } from "../encounter/targeting";
 import type { MoveMode } from "./movePreview";
 import type { Point } from "./useMapView";
 import type { AreaKindId } from "./mapTools";
@@ -408,19 +409,22 @@ export function useMapCommands({
       setMessage(result.ok ? (result.text ?? "") : (result.message ?? "That could not be done to the door."));
     });
   };
-  /** The GM sets what keeps a door shut, or clears it (null). */
-  const setDoorState = (wallId: string, door: DoorState | null) =>
+  /** The attack or spell being aimed lands on a door or a wall (`resolveAtWall`); the server says how it went. */
+  const aimAtWall = (wallId: string) =>
+    resolveAtWall(wallId, revision, (ok, text) =>
+      setMessage(text ?? (ok ? "" : "That could not be aimed at the wall."))
+    );
+  /** The GM sets what keeps a door shut and its statistics as an object, in that order: the second write follows the
+   *  first one's revision, so it carries none of its own. */
+  const saveDoor = (wallId: string, door: DoorState | null, object: ObjectStats | null) =>
     runVision(
-      () => command("door:set-state", { wallId, door, ...scene, expectedRevision: revision }),
+      async () => {
+        const held = await command("door:set-state", { wallId, door, ...scene, expectedRevision: revision });
+        if (!held.ok) return held;
+        return command("object:set", { wallId, object, ...scene });
+      },
       "The door could not be changed.",
       "Door saved."
-    );
-  /** The GM gives a door or a wall its statistics as an object, or clears them (null). */
-  const setWallObject = (wallId: string, object: ObjectStats | null) =>
-    runVision(
-      () => command("object:set", { wallId, object, ...scene, expectedRevision: revision }),
-      "The statistics could not be saved.",
-      "Statistics saved."
     );
   const addLight = (position: Point, light: Readonly<{ brightFeet: number; dimFeet: number }>) =>
     runVision(
@@ -485,8 +489,8 @@ export function useMapCommands({
     clearWalls,
     setDoorOpen,
     workDoor,
-    setDoorState,
-    setWallObject,
+    aimAtWall,
+    saveDoor,
     addLight,
     removeLight,
     forgetExplored
