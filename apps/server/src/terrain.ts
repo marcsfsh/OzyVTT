@@ -5,7 +5,7 @@ import {
   costWithClimb,
   footprintCenter,
   footprintOrigin,
-  footprintStepBlocked,
+  footprintStepPassage,
   movementPath,
   pointInRects,
   segmentsMeet,
@@ -91,6 +91,8 @@ export type MovementCostOptions = Readonly<{
   perceives?: (actorId: string) => boolean;
   /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
   passesCreatures?: boolean;
+  /** The mover passes through walls as through Difficult Terrain (a ghost's Incorporeal Movement). */
+  throughWalls?: boolean;
   /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
   halvedAt?: (position: Point, sizeCells: number) => boolean;
   /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
@@ -127,7 +129,8 @@ export function movementCost(
   const rise = options.altitude ? options.altitude.toFeet - options.altitude.fromFeet : 0;
   if (!calibration) {
     // No cells to path round a wall on a gridless map: a straight move through one is barred.
-    if (straightThroughWall(state, from, to)) return { feet: 0, difficultFeet: 0, path: [], blocked: true };
+    if (!options.throughWalls && straightThroughWall(state, from, to))
+      return { feet: 0, difficultFeet: 0, path: [], blocked: true };
     const straight = mapDistance(geometry, from, to);
     return straight
       ? {
@@ -177,7 +180,8 @@ export function movementCost(
       for (let row = 0; row < token.sizeCells; row++) cells.add(`${origin.column + column},${origin.row + row}`);
   }
   const terrain = state.combat.terrain.difficult;
-  const crosses = wallCrossing(movementWalls(state, calibration));
+  const walls = movementWalls(state, calibration);
+  const crosses = wallCrossing(walls);
   const halvedAt = options.halvedAt;
   const path = movementPath({
     from: footprintOrigin(imageToGrid(calibration, from), sizeCells),
@@ -192,7 +196,14 @@ export function movementCost(
       const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
-    isStepOpen: (stepFrom, stepTo) => !footprintStepBlocked(stepFrom, stepTo, sizeCells, crosses),
+    isStepOpen: (stepFrom, stepTo) =>
+      options.throughWalls === true || footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked",
+    // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
+    // so does a wall an incorporeal mover passes.
+    isStepSqueezed: (stepFrom, stepTo) => {
+      const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls);
+      return passage === "squeeze" || (options.throughWalls === true && passage === "blocked");
+    },
     extraPerStep: extra,
     ...(halvedAt
       ? {

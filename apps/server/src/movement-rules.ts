@@ -200,7 +200,8 @@ export function movementStatus(
     ...(actor && dragCostsExtra(state, actor.id, grappledBy(state, actor.id), input.resolveDefinition)
       ? { dragging: true }
       : {}),
-    ...grantsOf(state, actor)
+    ...grantsOf(state, actor),
+    ...(incorporeal(definition) ? { throughWalls: true } : {})
   };
 }
 
@@ -653,6 +654,10 @@ function spendReadied(state: GameState, moverId: string): void {
 const moverDefinitionOf = (mover: GameState["actors"][number], input: Pick<MovementRulesInput, "resolveDefinition">) =>
   mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
 
+/** "The ghost can move through other creatures and objects as if they were Difficult Terrain." */
+const incorporeal = (definition: ActorDefinition | undefined) =>
+  holdsFeature(definition, "incorporeal-movement", "Incorporeal Movement");
+
 /** What each foot of a move costs beside itself, and the options the path's cost is measured with. */
 function costOptions(
   state: GameState,
@@ -675,7 +680,8 @@ function costOptions(
       carried: input.dragging?.actorIds ?? [],
       resolveDefinition: input.resolveDefinition,
       ...(input.perceives ? { perceives: input.perceives } : {}),
-      ...(sharesSpace(state, input.actorId, input) ? { passesCreatures: true } : {}),
+      ...(sharesSpace(state, input.actorId, input) || incorporeal(moverDefinition) ? { passesCreatures: true } : {}),
+      ...(incorporeal(moverDefinition) ? { throughWalls: true } : {}),
       ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})
     }
   };

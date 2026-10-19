@@ -4,7 +4,7 @@ import {
   costWithClimb,
   footprintCenter,
   footprintOrigin,
-  footprintStepBlocked,
+  footprintStepPassage,
   movementPath,
   pointInRects,
   spaceHeightCells,
@@ -84,6 +84,8 @@ export function previewMove(
     free?: boolean;
     /** A jump: a straight line over what lies between, a foot of movement for each foot. */
     straight?: boolean;
+    /** The mover passes through walls and creatures as through Difficult Terrain (Incorporeal Movement). */
+    throughWalls?: boolean;
     /** Walls that bar the way while the scene's dynamic vision is on (`movementWallsOf`). */
     walls?: readonly MoveWall[];
     /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
@@ -131,19 +133,18 @@ export function previewMove(
       occupantSize: occupant.size
     });
     if (passage === "open") continue;
-    const cells = passage === "blocked" ? closedCells : difficultCells;
+    const cells = passage === "blocked" && !input.throughWalls ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGridPreview(calibration, token.position), token.sizeCells);
     for (let column = 0; column < token.sizeCells; column++)
       for (let row = 0; row < token.sizeCells; row++) cells.add(`${origin.column + column},${origin.row + row}`);
   }
   const center = (column: number, row: number) =>
     gridToImagePreview(calibration, { column: column + 0.5, row: row + 0.5 });
-  const crosses = wallCrossing(
-    (input.walls ?? []).map((wall) => ({
-      a: imageToGridPreview(calibration, wall.a),
-      b: imageToGridPreview(calibration, wall.b)
-    }))
-  );
+  const gridWalls = (input.walls ?? []).map((wall) => ({
+    a: imageToGridPreview(calibration, wall.a),
+    b: imageToGridPreview(calibration, wall.b)
+  }));
+  const crosses = wallCrossing(gridWalls);
   const path = movementPath({
     from,
     to,
@@ -155,7 +156,15 @@ export function previewMove(
       const point = center(column, row);
       return point.x >= 0 && point.y >= 0 && point.x <= size.width && point.y <= size.height;
     },
-    isStepOpen: (stepFrom, stepTo) => !footprintStepBlocked(stepFrom, stepTo, sizeCells, crosses),
+    isStepOpen: (stepFrom, stepTo) =>
+      input.throughWalls === true ||
+      footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls) !== "blocked",
+    // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
+    // so does a wall an incorporeal mover passes.
+    isStepSqueezed: (stepFrom, stepTo) => {
+      const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls);
+      return passage === "squeeze" || (input.throughWalls === true && passage === "blocked");
+    },
     extraPerStep: input.extraPerStep ?? 0
   });
   if (!path) return null;

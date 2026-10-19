@@ -243,6 +243,47 @@ describe("the drag preview counts height as the server does", () => {
   });
 });
 
+describe("the drag preview squeezes and passes walls as the server does", () => {
+  // A wall along x = 150 with an open door one cell wide between y = 250 and y = 300.
+  const doorway = () =>
+    table([], { [OGRE]: { x: 50, y: 300 } }, [
+      wall({ x: 150, y: 0 }, { x: 150, y: 250 }),
+      wall({ x: 150, y: 250 }, { x: 150, y: 300 }, "door", true),
+      wall({ x: 150, y: 300 }, { x: 150, y: 1000 })
+    ]);
+  const ogrePreview = (state: GameState, extra: { throughWalls?: boolean } = {}) =>
+    previewMove({
+      walls: movementWallsOf(state.combat.vision.walls),
+      calibration: CALIBRATION,
+      size: { width: GRID.width, height: GRID.height },
+      terrain: state.combat.terrain.difficult,
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId: OGRE,
+      from: { x: 50, y: 300 },
+      to: { x: 300, y: 300 },
+      ...extra
+    });
+
+  it("squeezes a Large creature through a 5-foot door as through Difficult Terrain", () => {
+    const state = doorway();
+    const charged = movementCost(state, GRID, OGRE, { x: 50, y: 300 }, { x: 300, y: 300 });
+    expect(charged?.blocked).toBeUndefined();
+    expect(charged?.difficultFeet).toBeGreaterThan(0);
+    const previewed = ogrePreview(state);
+    expect(previewed?.feet).toBe(charged?.feet);
+    expect(previewed?.difficultFeet).toBe(charged?.difficultFeet);
+  });
+
+  it("passes an incorporeal mover through a wall as through Difficult Terrain", () => {
+    const state = table([], { [OGRE]: { x: 50, y: 300 } }, [wall({ x: 150, y: 0 }, { x: 150, y: 1000 })]);
+    expect(movementCost(state, GRID, OGRE, { x: 50, y: 300 }, { x: 300, y: 300 })?.blocked).toBe(true);
+    const charged = movementCost(state, GRID, OGRE, { x: 50, y: 300 }, { x: 300, y: 300 }, { throughWalls: true });
+    expect(charged?.blocked).toBeUndefined();
+    expect(ogrePreview(state, { throughWalls: true })?.feet).toBe(charged?.feet);
+  });
+});
+
 describe("the drag preview takes jumps and granted moves as the server does", () => {
   const base = (state: GameState) => ({
     calibration: CALIBRATION,

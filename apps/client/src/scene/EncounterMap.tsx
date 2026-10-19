@@ -529,6 +529,7 @@ export function EncounterMap({
           carried: grappledBy(actors, dragging.actorId, role),
           free: draggedMode === "teleport" || draggedMode === "forced",
           straight: draggedMode === "jump",
+          throughWalls: draggedBudget?.throughWalls === true,
           walls: moveWalls,
           // A drag keeps the creature at its height; the token menu changes it.
           altitude: {

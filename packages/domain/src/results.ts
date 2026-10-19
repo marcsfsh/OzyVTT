@@ -661,6 +661,8 @@ export const ActorMovementReplySchema = z.strictObject({
       jump: z.boolean().optional()
     })
     .optional(),
+  /** It passes through walls and creatures as through Difficult Terrain (a ghost's Incorporeal Movement). */
+  throughWalls: z.boolean().optional(),
   /** A teleport granted it for this turn (Misty Step): up to `feet` to an unoccupied space it can see. */
   teleport: z.strictObject({ name: z.string(), feet: z.number().min(0) }).optional()
 });
