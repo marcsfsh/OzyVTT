@@ -1647,9 +1647,26 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "web",
+    "saveDc": 13,
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false,
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 40,
+     "widthFeet": null
+    }
+   }
+  ],
   "grantsFeatIds": [],
-  "tags": [],
+  "tags": [
+   "web-walker"
+  ],
   "actions": [],
   "effects": [],
   "grants": {
@@ -1667,7 +1684,13 @@
    "conditionImmunities": [],
    "spells": []
   },
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "climb",
+    "equalToSpeed": true
+   }
+  ]
  },
  {
   "id": "cloak-of-displacement",
