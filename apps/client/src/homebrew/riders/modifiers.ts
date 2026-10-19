@@ -768,11 +768,11 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     },
     {
       key: "typeSenses",
-      label: "Hidden from senses that tell a creature's type",
+      label: "Hidden from senses that tell its type",
       kind: "switch",
       visibleWhen: hasType("spell-ward"),
       ...trueOnly("typeSenses"),
-      help: "On when no magic may learn the bearer's creature type, so Divine Sense doesn't find it either."
+      help: "On when no magic may learn the bearer's type, so Divine Sense doesn't find it either."
     },
     {
       key: "alliesAllowed",
