@@ -25,6 +25,7 @@ const RULE_FAMILIES = {
   // Height changes by flying, climbing, jumping or teleporting, and a creature in the air moves by flying.
   "movement.altitude": "movement",
   "movement.jump": "movement",
+  "movement.frightened": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",

@@ -50,6 +50,7 @@ describe("rule families", () => {
       ["movement.blocked-path", "movement"],
       ["movement.altitude", "movement"],
       ["movement.jump", "movement"],
+      ["movement.frightened", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],

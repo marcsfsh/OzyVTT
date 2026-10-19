@@ -7,6 +7,8 @@ import type {
   RuleMode
 } from "@vtt/domain";
 import { dropStaleGrants } from "./granted-moves.js";
+import { proneInSharedSpace } from "./occupied-space.js";
+import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
@@ -662,6 +664,10 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
+  // "If you somehow end a turn in a space with another creature, you have the Prone condition" (SRD 5.2.1).
+  const calibration = deps?.geometry?.calibration;
+  if (outgoingId && calibration && deps && familyModeFor(state.combat, "movement") !== "freeform")
+    proneInSharedSpace(state, outgoingId, calibration, deps.resolveDefinition, ending);
   endOfTurn(
     state,
     outgoingId,

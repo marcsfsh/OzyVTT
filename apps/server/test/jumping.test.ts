@@ -5,7 +5,8 @@ import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { makeEffect } from "../src/effects.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import { activeMoveGrant } from "../src/granted-moves.js";
-import { landJump } from "../src/jumping.js";
+import { deriveEquipment } from "../src/equipment-derivation.js";
+import { jumpLimits, landJump } from "../src/jumping.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { mapDistance } from "../src/movement-narration.js";
 import { movementCost } from "../src/terrain.js";
@@ -196,6 +197,42 @@ describe("a jump", () => {
     );
     expect(actor(state, HERO).conditions.map((condition) => condition.id)).toEqual(["prone"]);
     expect(events[0]?.text).toBe("Borin lands in difficult terrain: 6 against DC 10, and falls Prone.");
+  });
+});
+
+describe("a stat block's jump traits", () => {
+  const withTraits = (traits: Array<{ name: string; description: string }>) =>
+    ({
+      actions: [],
+      abilityScores: { str: 8, dex: 16, con: 10, int: 2, wis: 10, cha: 5 },
+      extensions: { "open5e.srd-2024": { traits } }
+    }) as unknown as ActorDefinition;
+  const derivation = deriveEquipment(game().actors[0]!, undefined, undefined);
+
+  it("jumps a Standing Leap's printed distances with or without a run-up", () => {
+    const frog = withTraits([
+      {
+        name: "Standing Leap",
+        description:
+          "The frog's Long Jump is up to 10 feet and its High Jump is up to 5 feet with or without a running start."
+      }
+    ]);
+    expect(jumpLimits(frog, derivation, false)).toEqual({ longFeet: 10, highFeet: 5 });
+  });
+
+  it("long jumps a Running Leap's distance after a run-up, half from standing, and jumps by Dexterity with Jumper", () => {
+    const lion = withTraits([
+      { name: "Running Leap", description: "With a 10-foot running start, the lion can Long Jump up to 25 feet." }
+    ]);
+    expect(jumpLimits(lion, derivation, true).longFeet).toBe(25);
+    expect(jumpLimits(lion, derivation, false).longFeet).toBe(12);
+    const cat = withTraits([
+      {
+        name: "Jumper",
+        description: "The cat's jump distance is determined using its Dexterity rather than its Strength."
+      }
+    ]);
+    expect(jumpLimits(cat, derivation, true)).toEqual({ longFeet: 16, highFeet: 6 });
   });
 });
 

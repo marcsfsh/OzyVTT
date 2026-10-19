@@ -865,7 +865,8 @@ export const EffectInstanceSchema = z
      *  bearer's turn or off it: the feet left, the way it travels (any of its ways when absent), whether leaving an
      *  enemy's reach on it provokes Opportunity Attacks, and the turn it belongs to, which ends it. `straight`: it
      *  must end nearer an enemy (a charge). `owedActionId`: the action it came from still owes the rest of itself
-     *  (Pounce taken move first). `jump`: a leap over what lies between, which spends `costFeet` of the turn's own
+     *  (Pounce taken move first). `awayFromActorId`: it must end farther from that creature (Dissonant Whispers).
+     *  `jump`: a leap over what lies between, which spends `costFeet` of the turn's own
      *  movement ("jumps up to 30 feet by spending 10 feet of movement"). */
     grantedMove: z
       .object({
@@ -877,7 +878,8 @@ export const EffectInstanceSchema = z
         costFeet: z.number().int().min(0).max(120).optional(),
         round: z.number().int().positive(),
         turnActorId: z.uuid().nullable(),
-        owedActionId: z.string().min(1).max(120).optional()
+        owedActionId: z.string().min(1).max(120).optional(),
+        awayFromActorId: z.uuid().optional()
       })
       .strict()
       .optional(),

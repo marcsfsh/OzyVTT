@@ -902,7 +902,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `boots-of-levitation` - the Levitate cast would prompt the wearer to save against their own boots.
+  // "You can cast Levitate on yourself at will": the levitation lands on the wearer with no save to make against its
+  // own boots, and the movement rules raise it 20 feet and let it move only as if climbing (`falling.ts`). Ending it
+  // (the spell's Concentration) is the wearer's, on the sheet.
+  "boots-of-levitation": {
+    actions: [
+      {
+        id: "levitate",
+        name: "Levitate (Self)",
+        activation: "action",
+        description:
+          "Cast Levitate on yourself: you rise up to 20 feet and stay suspended, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground. End it on your sheet.",
+        damage: [],
+        grants: {
+          name: "Levitate",
+          tags: ["levitating"],
+          duration: { type: "manual" },
+          modifiers: []
+        }
+      }
+    ]
+  },
   // `boots-of-speed` - doubled speed, a 10-minute budget, and opportunity-attack disadvantage (the
   //     defender's incoming-attack riders get no attack-kind filters).
   // `boots-of-striding-and-springing` - the speed floor and encumbrance are not modeled. "Once on each of your turns,
@@ -1142,7 +1162,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //     bonus has no reader; the AC 15 + Dex base replacement and spell-save advantage are not expressible.
 
   // `robe-of-useful-items` - per-copy patches that become objects and creatures.
-  // `wings-of-flying` - Fly Speed with a rolled 1d12-hour cooldown.
+  // "Turn this cloak into a pair of wings ... a Fly Speed of 60 feet ... for 1 hour or until you end the effect"; the
+  // 1d12 hours before the wings work again are the GM's to count.
+  "wings-of-flying": {
+    actions: [
+      {
+        id: "wings",
+        name: "Wings of Flying",
+        activation: "action",
+        description:
+          "Turn the cloak into wings on your back: a Fly Speed of 60 feet for 1 hour or until you end it with a Magic action. If you are in the air when they vanish, you fall. Once they vanish, you can't use them again for 1d12 hours.",
+        damage: [],
+        grants: {
+          name: "Wings of Flying (1 hour)",
+          tags: ["wings-of-flying"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", feet: 60 }]
+        }
+      }
+    ]
+  },
 
   // ==== Carried wondrous items (slot wondrous), potions and oils ==================================
   //
@@ -1222,7 +1261,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `broom-of-flying` - Fly Speed is not modeled (also `carpet-of-flying`, `horseshoes-of-a-zephyr`).
+  // "It hovers beneath you and can be ridden in the air. It has a Fly Speed of 50 feet"; 30 feet carrying over 200
+  // pounds, which carried weight doesn't track. The carpet's speed depends on its size, so it stays the GM's, and so do
+  // the horseshoes.
+  "broom-of-flying": {
+    actions: [
+      {
+        id: "ride",
+        name: "Ride the Broom",
+        activation: "action",
+        description:
+          "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land; end it on your sheet.",
+        damage: [],
+        grants: {
+          name: "Broom of Flying",
+          tags: ["broom-of-flying"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", feet: 50, hover: true }]
+        }
+      }
+    ]
+  },
 
   // `candle-of-invocation` - advantage on all D20 Tests while within its light; no light-area gate or burn-down duration.
 

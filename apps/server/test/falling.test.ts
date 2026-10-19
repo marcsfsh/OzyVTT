@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition } from "@vtt/schemas";
+import { heightRefusal } from "../src/altitude.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { addEffect, makeEffect } from "../src/effects.js";
@@ -192,6 +193,25 @@ describe("staying in the air", () => {
     expect(height(state, MONK)).toBe(0);
     expect(hp(state, MONK)).toBe(100);
     expect(events.map((event) => event.text)).toContain("Kesh floats gently to the ground.");
+  });
+
+  it("lifts a creature Levitate holds 20 feet, where it moves only as if climbing", () => {
+    const state = game();
+    state.combat.active = false;
+    addEffect(
+      state,
+      MONK,
+      makeEffect({ id: "lev", name: "Levitate", tags: ["levitating"], duration: { type: "manual" } })
+    );
+    expect(needsSettling(state, { resolveDefinition })).toBe(true);
+    const events = settleFalls(state, deps(state));
+    expect(events.map((event) => event.text)).toEqual(["Kesh rises 20 ft and hangs in the air."]);
+    expect(height(state, MONK)).toBe(20);
+    expect(needsSettling(state, { resolveDefinition })).toBe(false);
+    expect(heightRefusal("Kesh", "walk", 20, 20, "levitate")).toBe(
+      "Kesh is levitating, so it moves only by pulling itself along a surface, as if climbing."
+    );
+    expect(heightRefusal("Kesh", "climb", 20, 10, "levitate")).toBeNull();
   });
 });
 

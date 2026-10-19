@@ -330,10 +330,16 @@ export function EncounterMap({
   useEffect(() => {
     setModeChoice(null);
   }, [activeActorId]);
-  // A creature in the air moves by flying until another way is picked.
-  const moverAirborne = moverId !== null && tokensById.get(moverId)?.airborne === "fly";
+  // A creature in the air moves by flying until another way is picked; a levitating one pulls itself along, climbing.
+  const moverAirborne = moverId !== null ? tokensById.get(moverId)?.airborne : undefined;
   const moveMode: MoveMode =
-    modeChoice && modeChoice.actorId === moverId ? modeChoice.mode : moverAirborne ? "fly" : "walk";
+    modeChoice && modeChoice.actorId === moverId
+      ? modeChoice.mode
+      : moverAirborne === "fly"
+        ? "fly"
+        : moverAirborne === "levitate"
+          ? "climb"
+          : "walk";
   const moverBudget = useMovementBudget(moverPlaced ? moverId : null, revision);
   const commands = useMapCommands({
     revision,

@@ -971,6 +971,17 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       }
     ]
   },
+  // "Rises vertically up to 20 feet and remains suspended there for the duration", moving only "as if it were
+  // climbing"; when it ends the target "floats gently to the ground" (`falling.ts` raises and lowers it).
+  levitate: { name: "Levitate", tags: ["levitating"], modifiers: [] },
+  // "Must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route":
+  // the server spends the Reaction and gives the creature a move of its Speed that must end farther away.
+  "dissonant-whispers": {
+    name: "Dissonant Whispers",
+    tags: ["flees-with-reaction"],
+    duration: rounds(1),
+    modifiers: []
+  },
   // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
   befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
   // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).

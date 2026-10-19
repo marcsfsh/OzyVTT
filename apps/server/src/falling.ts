@@ -329,6 +329,17 @@ export function settleFalls(state: GameState, deps: FallDeps): EffectNarration[]
   const events: EffectNarration[] = [];
   for (const token of state.combat.tokens) {
     const height = altitudeOf(token);
+    // A levitation just begun lifts its creature: Levitate's "rises vertically up to 20 feet".
+    const rising = token.position && token.airborne !== "levitate" ? levitated(state, token.actorId) : undefined;
+    if (rising) {
+      setAltitude(state, rising.id, height + LEVITATE_RISE_FEET, "levitate");
+      events.push({
+        kind: "effect",
+        text: `${rising.name} rises ${LEVITATE_RISE_FEET} ft and hangs in the air.`,
+        actorId: rising.id
+      });
+      continue;
+    }
     if (!token.position || height <= 0 || token.airborne === undefined) continue;
     if (state.combat.pendingFalls.some((fall) => fall.actorId === token.actorId)) continue;
     const actor = state.actors.find((candidate) => candidate.id === token.actorId);
@@ -350,10 +361,19 @@ export function settleFalls(state: GameState, deps: FallDeps): EffectNarration[]
   return events;
 }
 
-/** Whether any creature in the air must come down now; cheap enough to ask after every command. */
+const LEVITATE_RISE_FEET = 20;
+
+/** The creature, when a levitation holds it (Levitate's effect). */
+function levitated(state: GameState, actorId: string): Actor | undefined {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  return actor?.effects.some((effect) => effect.tags.includes(LEVITATING_TAG)) ? actor : undefined;
+}
+
+/** Whether any creature must rise or come down now; cheap enough to ask after every command. */
 export function needsSettling(state: GameState, deps: Pick<FallDeps, "resolveDefinition" | "catalog">): boolean {
   if (familyModeFor(state.combat, "movement") === "freeform") return false;
   return state.combat.tokens.some((token) => {
+    if (token.position && token.airborne !== "levitate" && levitated(state, token.actorId)) return true;
     if (!token.position || altitudeOf(token) <= 0 || token.airborne === undefined) return false;
     if (state.combat.pendingFalls.some((fall) => fall.actorId === token.actorId)) return false;
     const actor = state.actors.find((candidate) => candidate.id === token.actorId);

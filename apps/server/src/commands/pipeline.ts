@@ -6,6 +6,7 @@ import { GameAccessDeniedError } from "../authorization.js";
 import { isIncapacitated } from "../condition-rules.js";
 import type { EffectNarration } from "../effects.js";
 import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
+import { compelledMoves, fleesNow } from "../granted-moves.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -180,12 +181,13 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
   async function settleFalls() {
     const state = context.readState();
     const lookup = { resolveDefinition: (definitionId: string) => kit.resolveDefinitionIn(state, definitionId) };
-    if (!needsSettling(state, { ...lookup, catalog: kit.equipmentCatalog() })) return;
+    if (!fleesNow(state) && !needsSettling(state, { ...lookup, catalog: kit.equipmentCatalog() })) return;
     const distance = await kit.creatureDistance();
     const id = context.newId();
     let events: EffectNarration[] = [];
     const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
-      events = settleFallsIn(draft, kit.fallDeps(draft, distance, id));
+      const deps = kit.fallDeps(draft, distance, id);
+      events = [...compelledMoves(draft, deps), ...settleFallsIn(draft, deps)];
     });
     if (result.duplicate) return;
     await context.publishGameState(result.state);

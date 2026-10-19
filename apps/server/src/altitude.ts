@@ -48,7 +48,12 @@ export function heightRefusal(
   toFeet: number,
   airborne: Token["airborne"]
 ): string | null {
-  if (mode === "fly" || mode === "teleport" || mode === "forced") return null;
+  if (mode === "teleport" || mode === "forced") return null;
+  // Levitate: "The target can move only by pushing or pulling against a fixed object or surface within reach ...,
+  // which allows it to move as if it were climbing."
+  if (airborne === "levitate" && fromFeet > 0 && mode !== "climb")
+    return `${name} is levitating, so it moves only by pulling itself along a surface, as if climbing.`;
+  if (mode === "fly") return null;
   if (mode === "climb") return null;
   if (airborne === "fly" && fromFeet > 0) return `${name} is in the air. Fly to move it, or climb onto a surface.`;
   // A jump lands where it lands: up on a ledge, or down off one.

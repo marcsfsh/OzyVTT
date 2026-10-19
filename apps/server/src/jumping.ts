@@ -24,6 +24,28 @@ const movementRiders = (derivation: EquipmentDerivation) =>
     rider.modifier.type === "movement" ? [rider.modifier] : []
   );
 
+/** A stat block's jump traits (SRD 5.2.1): a cat's Jumper ("using its Dexterity rather than its Strength"), a lion's
+ *  Running Leap ("With a 10-foot running start, the lion can Long Jump up to 25 feet") and a frog's Standing Leap ("Long
+ *  Jump is up to 10 feet and its High Jump is up to 5 feet with or without a running start"). Read from the printed
+ *  traits, as senses are. */
+function jumpTraits(definition: ActorDefinition | undefined) {
+  const traits = (definition?.extensions["open5e.srd-2024"] as { traits?: unknown } | undefined)?.traits;
+  const list = Array.isArray(traits) ? (traits as Array<{ name?: unknown; description?: unknown }>) : [];
+  const text = (name: string) => {
+    const trait = list.find((entry) => entry.name === name);
+    return typeof trait?.description === "string" ? trait.description : null;
+  };
+  const standing = /Long Jump is up to (\d+) feet and its High Jump is up to (\d+) feet/.exec(
+    text("Standing Leap") ?? ""
+  );
+  const running = /can Long Jump up to (\d+) feet/.exec(text("Running Leap") ?? "");
+  return {
+    byDexterity: text("Jumper") !== null,
+    standing: standing ? { longFeet: Number(standing[1]), highFeet: Number(standing[2]) } : null,
+    runningLongFeet: running ? Number(running[1]) : null
+  };
+}
+
 /** How far a creature can jump now: across and up, in feet, with a run-up or from a standing start. */
 export function jumpLimits(
   definition: ActorDefinition | undefined,
@@ -31,15 +53,20 @@ export function jumpLimits(
   ranUp: boolean
 ): JumpLimits {
   const riders = movementRiders(derivation);
+  const traits = jumpTraits(definition);
   const strength = definition?.abilityScores.str ?? 10;
   const dexterity = definition?.abilityScores.dex ?? 10;
   // "You can determine your jump distance using your Dexterity rather than your Strength."
-  const score = riders.some((rider) => rider.rule === "jump-by-dexterity") ? Math.max(strength, dexterity) : strength;
+  const byDexterity = traits.byDexterity || riders.some((rider) => rider.rule === "jump-by-dexterity");
+  const score = byDexterity ? Math.max(strength, dexterity) : strength;
   const times = riders
     .filter((rider) => rider.rule === "jump-multiplier")
     .reduce((product, rider) => product * (rider.times ?? 1), 1);
   const run = ranUp ? 1 : 0.5;
-  const long = Math.floor(score * times * run);
+  if (traits.standing)
+    return { longFeet: traits.standing.longFeet * times, highFeet: traits.standing.highFeet * times };
+  const longScore = traits.runningLongFeet ?? score;
+  const long = Math.floor(longScore * times * run);
   const high = Math.floor(Math.max(0, 3 + Math.floor((score - 10) / 2)) * times * run);
   return { longFeet: long, highFeet: high };
 }

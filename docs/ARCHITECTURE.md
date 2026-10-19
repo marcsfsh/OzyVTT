@@ -302,6 +302,12 @@ of a hidden thing. When in doubt, leave it out.
   modifiers: Dexterity for Second-Story Work, Step of the Wind's doubling, the once-a-turn leap of
   the Jump spell and Boots of Striding and Springing); a landing in Difficult Terrain rolls a DC 10
   Dexterity (Acrobatics) check or leaves the jumper Prone.
+- Moves the rules make or forbid: a Frightened creature can't move closer to the creature its fear comes
+  from (`movement.frightened`); an effect tagged `flees-with-reaction` (Dissonant Whispers) is turned by
+  the pipeline's settle step into the creature's Reaction and a granted move of its Speed that must end
+  farther from the source (`compelledMoves`); a levitation (`levitating`) lifts its creature 20 feet,
+  which then moves only as if climbing; and a creature that ends its turn in another's space, unless
+  Tiny or larger, falls Prone (`occupied-space.ts`).
 - Legendary actions are taken right after another creature's turn (`legendary.after-a-turn`): a turn
   change records the creature whose turn ended (`turn.afterActorId`), and the window stays open, one
   action a legendary creature, until the creature whose turn it is does something.

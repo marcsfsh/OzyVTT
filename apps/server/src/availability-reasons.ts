@@ -98,6 +98,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.blocked-path": () => "Enemies block the way.",
   "movement.altitude": () => "Fly, climb or jump to change height.",
   "movement.jump": () => "A jump goes as far as the creature's Strength allows.",
+  "movement.frightened": () => "A Frightened creature can't move closer to what frightens it.",
   "economy.action-used": actionSpentReason,
   "economy.bonus-action-used": ({ state, attacker }) =>
     hasEffectTag(attacker, SLOWED_TAG) && state.combat.turn.actionUsed && !state.combat.turn.bonusActionUsed

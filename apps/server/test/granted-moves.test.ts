@@ -4,13 +4,16 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
 import { RulesBlockedError } from "../src/game-store.js";
+import { makeEffect } from "../src/effects.js";
 import {
   activeMoveGrant,
   activeTeleportGrant,
+  compelledMoves,
   dropStaleGrants,
   grantMove,
   grantTeleport
 } from "../src/granted-moves.js";
+import { proneInSharedSpace } from "../src/occupied-space.js";
 import { applyMovementRules, movementStatus } from "../src/movement-rules.js";
 import { creatureDistance, footprintOf, mapDistance } from "../src/movement-narration.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
@@ -285,5 +288,88 @@ describe("the legendary action window", () => {
     expect(violations(state)).toEqual([]);
     resolveDefinitionAction(state, POUNCE, { actorId: DRAGON, targetIds: [HERO], commandId: "c3" }, resolveDeps());
     expect(violations(state)).toEqual(["legendary.after-a-turn"]);
+  });
+});
+
+describe("a creature made to move", () => {
+  it("flees with its Reaction from Dissonant Whispers, a move of its Speed that must end farther away", () => {
+    const state = game(DRAGON, { [DRAGON]: cell(1, 0), [HERO]: cell(0, 0) });
+    const hero = actor(state, HERO);
+    hero.effects = [
+      makeEffect({
+        id: "whispers",
+        name: "Dissonant Whispers",
+        tags: ["flees-with-reaction"],
+        duration: { type: "rounds", remaining: 1 },
+        sourceActorId: DRAGON,
+        sourceName: "Dragon"
+      })
+    ];
+    const events = compelledMoves(state, { resolveDefinition, newId: () => "60000000-0000-4000-8000-000000000001" });
+    expect(events.map((event) => event.text)).toEqual([
+      "Borin uses its Reaction to flee: it may move 30 ft away from Dragon."
+    ]);
+    expect(state.combat.reactionsUsed).toContain(HERO);
+    expect(activeMoveGrant(state, hero)).toMatchObject({ feet: 30, provokes: true, awayFromActorId: DRAGON });
+    // Toward the dragon is no flight, so the grant doesn't take it and a player's move off its turn needs the GM.
+    expect(blockedBy(() => move(state, HERO, cell(0, 0), cell(0, 1), { byPlayer: true }))).toBe("movement.off-turn");
+    const outcome = move(state, HERO, cell(0, 0), cell(0, 5), { byPlayer: true });
+    expect(outcome.granted).toBe("Dissonant Whispers");
+    expect(outcome.prompts.map((prompt) => prompt.actorId)).toEqual([DRAGON]);
+  });
+
+  it("stays put when its Reaction is spent", () => {
+    const state = game(DRAGON, { [DRAGON]: cell(1, 0), [HERO]: cell(0, 0) });
+    state.combat = { ...state.combat, reactionsUsed: [HERO] };
+    actor(state, HERO).effects = [
+      makeEffect({
+        id: "whispers",
+        name: "Dissonant Whispers",
+        tags: ["flees-with-reaction"],
+        duration: { type: "rounds", remaining: 1 },
+        sourceActorId: DRAGON,
+        sourceName: "Dragon"
+      })
+    ];
+    expect(compelledMoves(state, { resolveDefinition, newId: () => "x" })).toEqual([]);
+    expect(actor(state, HERO).effects).toEqual([]);
+  });
+
+  it("can't willingly move closer to what frightens it", () => {
+    const state = game(HERO, { [DRAGON]: cell(6, 0), [HERO]: cell(0, 0) });
+    const hero = actor(state, HERO);
+    hero.conditions = [{ id: "frightened" }];
+    hero.effects = [
+      makeEffect({
+        id: "fear",
+        name: "Frightful Presence",
+        duration: { type: "rounds", remaining: 10 },
+        sourceActorId: DRAGON,
+        sourceName: "Dragon",
+        linkedConditionIds: ["frightened"]
+      })
+    ];
+    expect(blockedBy(() => move(state, HERO, cell(0, 0), cell(3, 0)))).toBe("movement.frightened");
+    expect(blockedBy(() => move(state, HERO, cell(0, 0), cell(0, 3)))).toBe("nothing");
+  });
+});
+
+describe("ending a turn in another creature's space", () => {
+  const sized = (state: GameState, id: string, size: "tiny" | "medium" | "large") => (actor(state, id).size = size);
+
+  it("leaves the creature Prone unless it is Tiny or larger than the other", () => {
+    const state = game(HERO, { [DRAGON]: cell(0, 0), [HERO]: cell(0, 0) });
+    const events: Parameters<typeof proneInSharedSpace>[4] = [];
+    proneInSharedSpace(state, HERO, GRID.calibration!, resolveDefinition, events);
+    expect(actor(state, HERO).conditions.map((condition) => condition.id)).toEqual(["prone"]);
+    expect(events[0]?.text).toBe("Borin ends its turn in another creature's space and falls Prone.");
+    const larger = game(HERO, { [DRAGON]: cell(0, 0), [HERO]: cell(0, 0) });
+    sized(larger, HERO, "large");
+    proneInSharedSpace(larger, HERO, GRID.calibration!, resolveDefinition, []);
+    expect(actor(larger, HERO).conditions).toEqual([]);
+    const tiny = game(HERO, { [DRAGON]: cell(0, 0), [HERO]: cell(0, 0) });
+    sized(tiny, HERO, "tiny");
+    proneInSharedSpace(tiny, HERO, GRID.calibration!, resolveDefinition, []);
+    expect(actor(tiny, HERO).conditions).toEqual([]);
   });
 });

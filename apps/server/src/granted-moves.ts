@@ -1,9 +1,10 @@
 import type { EffectInstance, GameState } from "@vtt/domain";
 import type { ActionMove, ActionTeleport, ActorDefinition } from "@vtt/schemas";
 import { rollDice } from "@vtt/rules-5e";
-import { makeEffect, type EffectNarration } from "./effects.js";
+import { makeEffect, NO_REACTIONS_TAG, type EffectNarration } from "./effects.js";
 import type { FallDeps } from "./falling.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
+import { isIncapacitated } from "./condition-rules.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { currentTravelSpeedFeet, type TravelMode } from "./speed.js";
 
@@ -54,6 +55,7 @@ export function grantMove(
     jump?: true;
     costFeet?: number;
     owedActionId?: string;
+    awayFromActorId?: string;
   }>
 ): void {
   const grant: MoveGrant = {
@@ -64,7 +66,8 @@ export function grantMove(
     ...(input.jump ? { jump: true as const, costFeet: input.costFeet ?? 0 } : {}),
     round: state.combat.round,
     turnActorId: state.combat.turnActorId,
-    ...(input.owedActionId ? { owedActionId: input.owedActionId } : {})
+    ...(input.owedActionId ? { owedActionId: input.owedActionId } : {}),
+    ...(input.awayFromActorId ? { awayFromActorId: input.awayFromActorId } : {})
   };
   actor.effects = [
     ...actor.effects.filter((effect) => effect.grantedMove === undefined),
@@ -201,4 +204,52 @@ export function failedTeleport(
     actorId: actor.id
   });
   events.push(...landed);
+}
+
+/** An effect that makes its creature flee with its Reaction (Dissonant Whispers: "must immediately use its Reaction,
+ *  if available, to move as far away from you as it can, using the safest route"). The pipeline's settle step turns it
+ *  into a move of the creature's Speed away from the effect's source (`compelledMoves`). */
+export const FLEES_WITH_REACTION_TAG = "flees-with-reaction";
+
+/** Whether a creature has a flight to start. */
+export const fleesNow = (state: GameState) =>
+  state.actors.some((actor) => actor.effects.some((effect) => effect.tags.includes(FLEES_WITH_REACTION_TAG)));
+
+/** Each creature an effect makes flee spends its Reaction, when it has one it can take, on a move of its Speed that
+ *  must end farther from the source, provoking as any move does; with none, nothing moves. The effect goes either way. */
+export function compelledMoves(
+  state: GameState,
+  deps: Pick<FallDeps, "resolveDefinition" | "catalog" | "newId">
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors) {
+    const flee = actor.effects.find((effect) => effect.tags.includes(FLEES_WITH_REACTION_TAG));
+    if (!flee) continue;
+    actor.effects = actor.effects.filter((effect) => effect.id !== flee.id);
+    const inFight = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id);
+    const canReact =
+      inFight &&
+      !state.combat.reactionsUsed.includes(actor.id) &&
+      !isIncapacitated(actor) &&
+      !actor.effects.some((effect) => effect.tags.includes(NO_REACTIONS_TAG));
+    if (!canReact || !flee.sourceActorId) continue;
+    const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+    const feet = grantFeet(actor, { speed: "full" }, definition, deps.catalog);
+    state.combat = { ...state.combat, reactionsUsed: [...state.combat.reactionsUsed, actor.id] };
+    if (feet <= 0) continue;
+    grantMove(state, actor, {
+      id: deps.newId(),
+      name: flee.name,
+      feet,
+      provokes: true,
+      awayFromActorId: flee.sourceActorId
+    });
+    events.push({
+      kind: "reaction",
+      text: `${actor.name} uses its Reaction to flee: it may move ${feet} ft away from ${flee.sourceName ?? "the source"}.`,
+      actorId: actor.id,
+      ...(flee.sourceName ? { source: { actorId: flee.sourceActorId, name: flee.sourceName } } : {})
+    });
+  }
+  return events;
 }

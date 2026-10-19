@@ -12,6 +12,7 @@ import {
   type MoveGrant
 } from "./granted-moves.js";
 import { holdsFeature } from "./class-features.js";
+import { HIDDEN_SOURCE } from "./hidden-source.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
@@ -426,6 +427,16 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
   if ((counted || input.byPlayer || grant) && endsInOccupiedSpace(state, input, to))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
+  // SRD 5.2.1 Frightened: "You can't willingly move closer to the source of the fear."
+  const feared = (counted || input.byPlayer || grant) && approachesFear(state, input, mover, from, to);
+  if (feared)
+    police(
+      state,
+      input,
+      "movement.frightened",
+      `${mover.name} is Frightened of ${feared} and can't move closer.`,
+      outcome
+    );
   // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
   const heightBar =
@@ -604,6 +615,35 @@ function applyJump(
   return input.difficultAt?.(to) === true;
 }
 
+/** The name of a source of fear the move ends closer to: the creature behind an effect that frightens the mover. A
+ *  source hidden from the table is named as such. Null when the move approaches none. */
+function approachesFear(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  from: Point,
+  to: Point
+): string | null {
+  if (!mover.conditions.some((condition) => condition.id === "frightened")) return null;
+  for (const effect of mover.effects) {
+    if (!effect.sourceActorId || !effect.linkedConditionIds.includes("frightened")) continue;
+    const source = state.actors.find((actor) => actor.id === effect.sourceActorId);
+    const at = state.combat.tokens.find((token) => token.actorId === effect.sourceActorId)?.position;
+    if (!source || !at) continue;
+    const measure = (point: Point, altitudeFeet: number) =>
+      input.creatureDistance
+        ? input.creatureDistance({ actorId: source.id, position: at }, point, altitudeFeet)
+        : input.distance(at, point);
+    const before = measure(from, input.fromAltitudeFeet ?? 0);
+    const after = measure(to, input.toAltitudeFeet ?? input.fromAltitudeFeet ?? 0);
+    if (before !== null && after !== null && after < before - DISTANCE_TOLERANCE_FEET)
+      return source.visibility === "gm-only" || input.perceives?.(source.id) === false
+        ? HIDDEN_SOURCE.toLowerCase()
+        : source.name;
+  }
+  return null;
+}
+
 /** A readied move spends the creature's Reaction and uses up the ready, and a spell it held with it. */
 function spendReadied(state: GameState, moverId: string): void {
   state.combat = { ...state.combat, reactionsUsed: [...new Set([...state.combat.reactionsUsed, moverId])] };
@@ -707,12 +747,22 @@ function fittingMoveGrant(
   }
   if (cost === null || cost.feet > grant.feet + DISTANCE_TOLERANCE_FEET) return null;
   if (grant.straight && !endsNearerAnEnemy(state, input, mover, from, to)) return null;
+  if (grant.awayFromActorId && !endsFartherFrom(state, input, grant.awayFromActorId, from, to)) return null;
   return {
     ...grant,
     chargeFeet: grant.jump ? grant.feet : cost.feet,
     costFeet: grant.costFeet ?? 0,
     path: cost.path && cost.path.length > 1 ? cost.path : [from, to]
   };
+}
+
+/** A flight "as far away from you as it can": it ends farther from that creature than it began. */
+function endsFartherFrom(state: GameState, input: MovementRulesInput, actorId: string, from: Point, to: Point) {
+  const at = state.combat.tokens.find((token) => token.actorId === actorId)?.position;
+  if (!at) return true;
+  const before = input.distance(at, from);
+  const after = input.distance(at, to);
+  return before === null || after === null || after > before + DISTANCE_TOLERANCE_FEET;
 }
 
 /** A charge "straight toward an enemy": it ends nearer some enemy than it began. */
