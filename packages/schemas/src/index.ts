@@ -4901,6 +4901,13 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
   /** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition"
    *  (Blurred Form). */
   z.object({ kind: z.literal("blurred"), name: TraitNameSchema }).strict(),
+  /** "The first time it enters a creature's space on a turn, that creature takes 5 (1d10) Fire damage" (Fire Form). */
+  z.object({ kind: z.literal("enters-spaces"), name: TraitNameSchema, damage: TraitDamageSchema }).strict(),
+  /** "Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has
+   *  Disadvantage on the saving throw" (Ooze Cube): the action whose save a creature entering its space makes. */
+  z
+    .object({ kind: z.literal("engulfs-entrants"), name: TraitNameSchema, actionId: z.string().min(1).max(120) })
+    .strict(),
   /** A vampire's Misty Escape: dropped to 0 Hit Points, it turns to mist and lives on at 0 unless it stands in
    *  sunlight, where it can't shape-shift and is destroyed. */
   z.object({ kind: z.literal("misty-escape"), name: TraitNameSchema }).strict(),

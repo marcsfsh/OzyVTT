@@ -9519,6 +9519,50 @@
           "properties": {
             "kind": {
               "type": "string",
+              "const": "enters-spaces"
+            },
+            "name": {
+              "$ref": "#/$defs/__schema708"
+            },
+            "damage": {
+              "$ref": "#/$defs/__schema709"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "damage"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "engulfs-entrants"
+            },
+            "name": {
+              "$ref": "#/$defs/__schema708"
+            },
+            "actionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "actionId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
               "const": "misty-escape"
             },
             "name": {

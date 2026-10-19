@@ -14,6 +14,9 @@ import {
   type MoveGrant
 } from "./granted-moves.js";
 import { holdsFeature } from "./class-features.js";
+import { creaturesEntered } from "./space-entry.js";
+import { sizeAtMost } from "./resolution/context.js";
+import { opensItsSpace } from "./space-sharing.js";
 import { HIDDEN_SOURCE } from "./hidden-source.js";
 import { ridesWith } from "./mounts.js";
 import { isIncapacitated } from "./condition-rules.js";
@@ -241,30 +244,6 @@ function grantsOf(state: GameState, actor: GameState["actors"][number] | undefin
   };
 }
 
-/** The creatures whose spaces a mover's space overlaps at some point of its path (each grid step, or each few feet off
- *  the grid), in no order. Its own token and those it carries are left out. */
-function creaturesEntered(
-  state: GameState,
-  moverId: string,
-  path: readonly Point[],
-  carried: readonly string[]
-): string[] {
-  const mover = state.combat.tokens.find((token) => token.actorId === moverId);
-  if (!mover) return [];
-  const halfOf = (token: (typeof state.combat.tokens)[number]) =>
-    Math.max(token.sizePx, (token.gridSizePx ?? 0) * token.sizeCells) / 2;
-  return state.combat.tokens
-    .filter((token) => token.position !== null && token.actorId !== moverId && !carried.includes(token.actorId))
-    .filter((token) => {
-      // Squares overlap when they are nearer than their two halves on both axes; a corner passed diagonally isn't.
-      const apart = (halfOf(token) + halfOf(mover)) * 0.9;
-      return path
-        .slice(1)
-        .some((at) => Math.max(Math.abs(at.x - token.position!.x), Math.abs(at.y - token.position!.y)) < apart);
-    })
-    .map((token) => token.actorId);
-}
-
 /** The creatures a grappler holds (its `grapple` effects on them). */
 export function grappledBy(state: GameState, grapplerId: string): readonly string[] {
   return state.actors
@@ -389,7 +368,8 @@ const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInpu
   const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
   // A form that can enter a creature's space and stop there (a vampire's mist, Gaseous Form's cloud).
   if (!swarmOnly && actor && formEffectOf(actor)?.form?.sharesSpaces) return true;
-  return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
+  if (swarmOnly) return opensItsSpace(definition);
+  return SHARES_SPACE.some((name) => holdsFeature(definition, name, name));
 };
 
 /** A spell's force that neither blocks a space nor is blocked (Spiritual Weapon's force, an Arcane Eye). */
@@ -397,8 +377,15 @@ const intangible = (state: GameState, actorId: string): boolean =>
   state.actors.find((actor) => actor.id === actorId)?.summon?.intangible === true;
 
 /** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
- *  the refusal can't give one away; neither do the creatures the mover drags. */
-function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point, everyone = false): boolean {
+ *  the refusal can't give one away; neither do the creatures the mover drags, nor those of a size it may move into
+ *  (`engulfing`: a gelatinous cube's Engulf, whose creatures it then holds inside). */
+function endsInOccupiedSpace(
+  state: GameState,
+  input: MovementRulesInput,
+  to: Point,
+  everyone = false,
+  engulfing?: string
+): boolean {
   if (!input.calibration || sharesSpace(state, input.actorId, input) || intangible(state, input.actorId)) return false;
   const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
   const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
@@ -411,7 +398,9 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
     // A creature above or below the mover's space at the end isn't in it (a flier over a goblin).
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
     if (sharesSpace(state, token.actorId, input, true) || intangible(state, token.actorId)) return false;
-    if (!everyone && state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
+    const occupant = state.actors.find((actor) => actor.id === token.actorId);
+    if (engulfing !== undefined && sizeAtMost(occupant?.size, engulfing)) return false;
+    if (!everyone && occupant?.visibility === "gm-only") return false;
     if (!everyone && input.perceives && !input.perceives(token.actorId)) return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
       if (mine.has(cell)) return true;
@@ -495,7 +484,10 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   // feature that grants it is theirs to rule on).
   if (mode === "teleport" && input.byPlayer && !activeTeleportGrant(state, mover))
     police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
-  if ((counted || input.byPlayer || grant) && endsInOccupiedSpace(state, input, to))
+  // A cube's Engulf may stop on the creatures it moves through: they are inside it, or leave it as their save says.
+  const engulfing =
+    grant?.throughCreatures && opensItsSpace(moverDefinitionOf(mover, input)) ? grant.throughCreatures : undefined;
+  if ((counted || input.byPlayer || grant) && endsInOccupiedSpace(state, input, to, false, engulfing))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
   // SRD 5.2.1 Frightened: "You can't willingly move closer to the source of fear."
   const feared = (counted || input.byPlayer || grant) && approachesFear(state, input, mover, from, to);

@@ -22,7 +22,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | --- | --- | --- | --- |
 | Spells (339) | 200 | 139 | 0 |
 | Monster actions (989) | 902 | 79 | 8 |
-| Monster traits (106) | 52 | 16 | 38 |
+| Monster traits (106) | 53 | 16 | 37 |
 | Barbarian features (23) | 22 | 0 | 1 |
 | Bard features (16) | 15 | 1 | 0 |
 | Cleric features (19) | 15 | 2 | 2 |
@@ -44,7 +44,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 15 | 0 | 0 |
 | Rules glossary (155) | 124 | 10 | 21 |
-| All records (2420) | 1797 | 419 | 204 |
+| All records (2420) | 1798 | 419 | 203 |
 
 ## How records are classified
 
@@ -287,7 +287,7 @@ Notes on the curated rows:
 | Dryad: Tree Stride | guided | A teleport of up to 65 feet is granted (granted-moves.ts). Whether a Large tree stands at each end is the GM's, since trees aren't on the map. |
 | Efreeti: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Elementalism, Major Image, Plane Shift apply only as their own rows say. |
 | Ettercap: Reel | enforced | Only a creature within 30 feet Restrained by the ettercap's own Web Strand is pulled, up to 25 feet straight toward it (resolution/action-targets.ts, forced-movement.ts). |
-| Gelatinous Cube: Engulf | guided | Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Large or smaller creatures (movement-rules.ts); the save reaches only the creatures it entered. A failure Restrains the creature inside the cube, where it can't speak, holds its breath, has Total Cover from outside and moves with the cube (swallow.ts); the cube holds one Large or four smaller creatures, and the acid comes at the start of its turns. The Athletics escape and the pull from outside, with the puller's acid, are actions. Moving a creature out on a success, and a creature that walks into the cube, are the GM's. |
+| Gelatinous Cube: Engulf | guided | Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Large or smaller creatures (movement-rules.ts); the save reaches only the creatures it entered. A failure Restrains the creature inside the cube, where it can't speak, holds its breath, has Total Cover from outside and moves with the cube (swallow.ts); the cube holds one Large or four smaller creatures, and the acid comes at the start of its turns. The Athletics escape and the pull from outside, with the puller's acid, are actions, and a creature that walks into the cube makes the save with Disadvantage (space-entry.ts). Moving a creature out of the cube on a success, or failing it when there is no room, is the GM's. |
 | Giant Frog: Swallow | enforced | The action swallows a Small or smaller creature the frog grapples, with no save (swallow.ts): the grapple ends, it is Blinded and Restrained with Total Cover from outside the frog, and the frog can't Bite meanwhile. As the frog's next turn ends it takes 2d4 Acid and, alive, is disgorged Prone; the frog's death lets it climb out. |
 | Giant Hyena: Rampage (1/Day) | enforced | It is offered only right after the hyena damages a creature that was already Bloodied (bloodied-hits.ts). Taken move first, the use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes its Bite. |
 | Giant Octopus: Ink Cloud (1/Day) | guided | The Reaction fills its 10-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when the octopus takes damage underwater is the GM's. |
@@ -397,7 +397,7 @@ The number after each trait is how many stat blocks print it.
 | Fiendish Restoration (2) | guided | death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's. |
 | Fire Absorption (1) | enforced | Each time Fire damage lands on it, the creature regains Hit Points equal to the Fire damage dealt (damage-traits.ts), beside the stat block's own defences against it (hit-points.ts). |
 | Fire Aura (4) | enforced | trait-turns.ts deals the Fire damage at the end of the bearer's turns to each creature in the Emanation, or to an azer's enemies there. A fire elemental's aura also sets them burning. |
-| Fire Form (1) | guided | movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal. |
+| Fire Form (1) | guided | movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The first time on a turn that it enters a creature's space, that creature takes the 1d10 Fire damage (space-entry.ts). Passing a gap an inch wide is the GM's. |
 | Flyby (7) | enforced | movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach. |
 | Freeze (1) | enforced | Cold damage that lands lowers the elemental's Speed by 20 feet until the end of its next turn (damage-traits.ts). |
 | Gibbering (1) | enforced | trait-turns.ts opens the Wisdom save for each creature that starts its turn within 20 feet, and on a failure random-outcomes.ts rolls the d8: doing nothing takes its actions, Bonus Action, Reaction and Speed for the turn, wandering its actions and Bonus Action, and the random attack is said to the table. |
@@ -425,7 +425,7 @@ The number after each trait is how many stat blocks print it.
 | Misty Escape (1) | enforced | death-traits.ts keeps the vampire alive at 0 Hit Points as mist that can't take actions or speak; in sunlight, read with dynamic vision on, it is destroyed instead. The mist is its Shape-Shift's printed form (transform/at-zero.ts): Medium, flying 20 feet with hover, with Resistance to all damage, and no change of form at 0 Hit Points. It lasts the 2 hours it has to reach its resting place, after which it is destroyed, and regaining Hit Points ends it. Running water and the Paralyzed condition at its resting place are the GM's. |
 | Mucus Cloud (1) | enforced | trait-turns.ts asks the Constitution save of each creature within 5 feet at the end of the aboleth's turn while the fight is underwater, and a failure curses it: it breathes water, and it regains no Hit Points out of water (hit-points.ts, rests.ts). The acid out of water every 10 minutes is the GM's. |
 | Multiple Heads (1) | enforced | death-traits.ts kills one head on each turn the hydra takes 25 damage or more, and the hydra with its last. At the end of its turn it grows two heads for each one lost since its last turn and regains 20 Hit Points, unless it took Fire damage since then. Its Multiattack makes one Bite per living head (effective-actions.ts). |
-| Ooze Cube (1) | reference | Its Engulf holds the creatures inside and gives them Total Cover, and pulling one out is an action. A creature that enters the cube's space is the GM's to run with Engulf at Disadvantage. |
+| Ooze Cube (1) | enforced | Any creature may move into the cube's space, and one that does makes the Engulf save with Disadvantage (space-entry.ts). Engulf holds one Large or four smaller creatures inside, with Total Cover from outside, and a creature within 5 feet can pull one out with an action and the Athletics check, taking the acid. |
 | Pack Tactics (18) | enforced | resolution/attack.ts gives Advantage when an ally of the attacker that isn't Incapacitated is within 5 feet of the target. |
 | Probing Telepathy (1) | reference | Communication and senses like this are the GM's to run. |
 | Reactive (1) | enforced | encounter.ts gives the marilith a fresh Reaction at the start of every turn. |

@@ -10,7 +10,10 @@ import {
   templateOfArea,
   type AnnotationActor
 } from "../annotations.js";
+import type { GameState } from "@vtt/domain";
 import { pointInRects } from "@vtt/rules-5e";
+import type { ActorDefinition } from "@vtt/schemas";
+import type { TokenMapGeometry } from "../token-placement.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import {
   AnnotationAddSchema,
@@ -49,6 +52,8 @@ import {
 } from "../movement-narration.js";
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { spaceEntryAfterMove } from "../space-entry.js";
+import { passesCreatures } from "../space-sharing.js";
 import { zoneContentOf } from "../spell-zone-state.js";
 import { policeBarrier, shellsForcedBy, teleportBarredAt } from "../zone-barriers.js";
 import { zoneMovementOptions } from "../zone-ground.js";
@@ -64,6 +69,25 @@ import { defineCommand } from "./pipeline.js";
 
 function annotationActorOf(principal: GamePrincipal): AnnotationActor {
   return { sessionId: sessionIdOf(principal), role: isGmGrade(principal) ? "gm" : "player" };
+}
+
+/** The way a move went for the spaces it entered: a creature that may stop in others' spaces (Fire Form) goes through
+ *  them, and any creature may go into a swarm's or a gelatinous cube's. */
+function entryPathOf(
+  state: GameState,
+  geometry: TokenMapGeometry,
+  actorId: string,
+  from: Readonly<{ x: number; y: number }>,
+  to: Readonly<{ x: number; y: number }>,
+  deps: Readonly<{ resolveDefinition: (definitionId: string) => ActorDefinition | undefined }>
+): ReadonlyArray<Readonly<{ x: number; y: number }>> {
+  const definitionId = state.actors.find((actor) => actor.id === actorId)?.definitionId;
+  const passes = definitionId ? passesCreatures(deps.resolveDefinition(definitionId)) : false;
+  const cost = movementCost(state, geometry, actorId, from, to, {
+    resolveDefinition: deps.resolveDefinition,
+    ...(passes ? { passesCreatures: true } : {})
+  });
+  return cost?.path && cost.path.length > 1 ? cost.path : [from, to];
 }
 
 /** The live encounter map and its geometry; `refusal` when no fight is running. */
@@ -314,7 +338,17 @@ export const mapCommands = [
               : (movementCost(state, geometry, actorId, from, arrived)?.path ?? [from, arrived]);
           zoneEvents.push(
             ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps),
-            ...(mode === "teleport" ? [] : shellsForcedBy(state, actorId, path, zoneDeps))
+            ...(mode === "teleport" ? [] : shellsForcedBy(state, actorId, path, zoneDeps)),
+            // The creatures whose spaces it passed into (a fire elemental's Fire Form, a gelatinous cube's space).
+            ...spaceEntryAfterMove(
+              state,
+              {
+                moverId: actorId,
+                path: mode === "teleport" ? path : entryPathOf(state, geometry, actorId, from, arrived, zoneDeps),
+                teleported: mode === "teleport"
+              },
+              zoneDeps
+            )
           );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.

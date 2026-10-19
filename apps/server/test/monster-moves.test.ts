@@ -5,6 +5,7 @@ import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import { activeMoveGrant } from "../src/granted-moves.js";
 import { applyMovementRules } from "../src/movement-rules.js";
+import { spaceEntryAfterMove } from "../src/space-entry.js";
 import { creatureDistance, footprintOf, mapDistance } from "../src/movement-narration.js";
 import { movementCost } from "../src/terrain.js";
 import type { TokenMapGeometry } from "../src/token-placement.js";
@@ -79,18 +80,18 @@ function use(
   );
 }
 let prompts = 0;
-function move(state: GameState, to: { x: number; y: number }) {
-  const from = state.combat.tokens.find((token) => token.actorId === MONSTER)!.position!;
+function move(state: GameState, to: { x: number; y: number }, mover = MONSTER) {
+  const from = state.combat.tokens.find((token) => token.actorId === mover)!.position!;
   const outcome = applyMovementRules(state, {
-    actorId: MONSTER,
+    actorId: mover,
     from,
     to,
     byPlayer: false,
     distance: (a, b) => mapDistance(GRID, a, b)?.value ?? null,
-    cost: (a, b, costOptions) => movementCost(state, GRID, MONSTER, a, b, costOptions),
+    cost: (a, b, costOptions) => movementCost(state, GRID, mover, a, b, costOptions),
     creatureDistance: (enemy, point, altitudeFeet) => {
       const enemyToken = state.combat.tokens.find((token) => token.actorId === enemy.actorId)!;
-      const moverToken = state.combat.tokens.find((token) => token.actorId === MONSTER)!;
+      const moverToken = state.combat.tokens.find((token) => token.actorId === mover)!;
       return (
         creatureDistance(GRID, footprintOf(enemyToken, enemy.position), footprintOf(moverToken, point, altitudeFeet))
           ?.value ?? null
@@ -105,10 +106,18 @@ function move(state: GameState, to: { x: number; y: number }) {
   });
   state.combat = {
     ...state.combat,
-    tokens: state.combat.tokens.map((token) => (token.actorId === MONSTER ? { ...token, position: to } : token))
+    tokens: state.combat.tokens.map((token) => (token.actorId === mover ? { ...token, position: to } : token))
   };
   return outcome;
 }
+const zoneDeps = (state: GameState) => ({
+  geometry: GRID,
+  resolveDefinition: (id: string) => resolveDefinitionIn(state)(id),
+  rollDie: () => 4,
+  newId: nextId,
+  now: () => "2026-10-19T00:00:00.000Z"
+});
+const hpOf = (state: GameState, id: string) => state.actors.find((actor) => actor.id === id)!.hp.current;
 
 describe("a move through creatures", () => {
   it("lets a centaur's Trampling Charge pass through a creature and target only the ones it entered", () => {
@@ -148,5 +157,45 @@ describe("a move through creatures", () => {
     expect(() => use(state, "engulf", [HERO, BYSTANDER], { owedPaid: true })).toThrow(RulesBlockedError);
     use(state, "engulf", [HERO], { owedPaid: true });
     expect(state.combat.pendingSaves).toMatchObject([{ targetActorId: HERO, ability: "dex", dc: 12 }]);
+  });
+
+  it("lets a gelatinous cube's Engulf move stop on a creature it moves into", () => {
+    const state = game("gelatinous-cube");
+    use(state, "engulf", [], { moveFirst: true });
+    expect(move(state, cell(2, 0)).warning).toBeNull();
+    use(state, "engulf", [HERO], { owedPaid: true });
+    expect(state.combat.pendingSaves.map((save) => save.targetActorId)).toEqual([HERO]);
+  });
+});
+
+describe("a creature's space entered on a move", () => {
+  it("burns a creature a fire elemental enters, once a turn", () => {
+    const state = game("fire-elemental");
+    const path = [cell(0, 0), cell(1, 0), cell(2, 0), cell(3, 0)];
+    const events = spaceEntryAfterMove(state, { moverId: MONSTER, path }, zoneDeps(state));
+    expect(hpOf(state, HERO)).toBe(46);
+    expect(hpOf(state, BYSTANDER)).toBe(50);
+    expect(events[0]?.text).toBe("Borin takes 4 damage from Fire Elemental's Fire Form.");
+    spaceEntryAfterMove(state, { moverId: MONSTER, path: [...path].reverse() }, zoneDeps(state));
+    expect(hpOf(state, HERO)).toBe(46);
+  });
+
+  it("opens a gelatinous cube's space to a creature, which makes its Engulf save with Disadvantage", () => {
+    const state = game("gelatinous-cube");
+    const from = cell(2, 0);
+    expect(move(state, cell(0, 0), HERO).warning).toBeNull();
+    const path = movementCost(state, GRID, HERO, from, cell(0, 0), {
+      resolveDefinition: resolveDefinitionIn(state)
+    })!.path!;
+    spaceEntryAfterMove(state, { moverId: HERO, path }, zoneDeps(state));
+    expect(state.combat.pendingSaves).toMatchObject([
+      {
+        targetActorId: HERO,
+        sourceActorId: MONSTER,
+        actionName: "Engulf",
+        dc: 12,
+        disadvantageFrom: "Ooze Cube"
+      }
+    ]);
   });
 });

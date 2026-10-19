@@ -17,7 +17,7 @@ import {
 import { isIncapacitated } from "./condition-rules.js";
 import { sizeAtMost } from "./resolution/context.js";
 import { areAllies } from "./creature-sides.js";
-import { holdsFeature } from "./class-features.js";
+import { opensItsSpace } from "./space-sharing.js";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
@@ -181,12 +181,12 @@ export function movementCost(
       moverSize: mover.size,
       occupantSize: occupant.size
     });
-    // A mover that can stop in a creature's space, or a swarm's space ("and vice versa"), is never barred; it is still
-    // another creature's space, so it costs as Difficult Terrain.
+    // A mover that can stop in a creature's space, or a swarm's or a gelatinous cube's space, is never barred; it is
+    // still another creature's space, so it costs as Difficult Terrain.
     const swarm =
       occupant.definitionId !== null &&
       occupant.definitionId !== undefined &&
-      holdsFeature(options.resolveDefinition?.(occupant.definitionId), "swarm", "Swarm");
+      opensItsSpace(options.resolveDefinition?.(occupant.definitionId));
     const passes =
       options.passesCreatures === true ||
       (options.passesCreaturesUpTo !== undefined && sizeAtMost(occupant.size, options.passesCreaturesUpTo));

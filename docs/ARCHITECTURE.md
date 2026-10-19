@@ -288,8 +288,11 @@ of a hidden thing. When in doubt, leave it out.
   it, or leaves a mover the attack dropped, Grappled or knocked Prone where it stood and gives back the
   rest of its movement (`held-moves.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
-  mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
-  so it charges those spaces as the server does. Players and the table screen get only the terrain the
+  mover shares spaces (Air Form, a swarm) and which creatures' spaces anyone may enter (a swarm's, a
+  gelatinous cube's) its viewer can see (`space-sharing.ts`), so it charges those spaces as the server
+  does. A move that enters another creature's space can set something off (`space-entry.ts`): Fire Form
+  burns that creature, and walking into a gelatinous cube makes its Engulf save. An action whose move
+  goes through creatures (a cube's Engulf) keeps to the line drawn and targets only those it entered. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen. A spell's area changes the ground while it
   lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
   and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies, and

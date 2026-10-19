@@ -18645,6 +18645,16 @@
     "hazard": "burning"
    },
    {
+    "kind": "enters-spaces",
+    "name": "Fire Form",
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "fire"
+     }
+    ]
+   },
+   {
     "kind": "light",
     "name": "Illumination",
     "brightFeet": 30,
@@ -19698,6 +19708,13 @@
    "exhaustion",
    "frightened",
    "prone"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "engulfs-entrants",
+    "name": "Ooze Cube",
+    "actionId": "engulf"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
