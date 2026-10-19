@@ -60,6 +60,7 @@ import {
   shapingOf,
   type ShapingPlan
 } from "./metamagic.js";
+import { legendaryActionsPerRound } from "../lair.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -1265,7 +1266,7 @@ function checkLegendary(
 ): EconomyPlan["spendLegendary"] {
   if (!action.legendary) return null;
   const cost = action.legendary.cost;
-  const perRound = definition?.legendary?.actionsPerRound ?? 3;
+  const perRound = legendaryActionsPerRound(attacker, definition);
   const spent = state.combat.legendaryUsed[attacker.id] ?? 0;
   if (onOwnTurn)
     violations.push({

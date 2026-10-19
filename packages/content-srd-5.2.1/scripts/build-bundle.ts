@@ -52,6 +52,8 @@ import { traitMechanicsOf } from "./trait-mechanics.js";
 import { deathTraitMechanicsOf, monsterDeathFor } from "./death-traits.js";
 import { withSpellcasting } from "./monster-spells.js";
 import { formOnlyOf, lycanthropeCurseOf, shapeShiftOf } from "./monster-forms.js";
+import { PRINTED_NAME_KEYS, printedName, statBlockActionText, statBlockTraitText } from "./monster-text.js";
+import { lairCountsOf, STATBLOCK_SLUGS, statBlockHeaderOf } from "./monster-statblock.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -941,6 +943,15 @@ for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
   if (!creatures.some((creature) => creature.pk === pk))
     throw new Error(`Correction/exclusion targets unknown creature ${pk} - check for a typo or an upstream rename.`);
 }
+for (const slug of STATBLOCK_SLUGS)
+  if (!creatures.some((creature) => creature.pk === `srd-2024_${slug}`))
+    throw new Error(`A stat block header fact targets unknown creature ${slug} - check for a typo.`);
+for (const [slug, name] of PRINTED_NAME_KEYS) {
+  const named = (row: Fixture<{ parent: string; name: string }>) =>
+    row.fields.parent === `srd-2024_${slug}` && row.fields.name.trim() === name;
+  if (!actions.some(named) && !traits.some(named))
+    throw new Error(`A printed name targets ${slug}'s ${name}, which it doesn't have - check for a typo.`);
+}
 for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk))
     throw new Error(`Spell correction targets unknown spell ${pk} - check for a typo or an upstream rename.`);
@@ -1146,7 +1157,10 @@ const monsters: ActorDefinition[] = creatures
       for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
       return withProseFacts({
         id: actionId,
-        name: `${ACTION_NAME_CORRECTIONS[action.pk] ?? action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
+        name: `${ACTION_NAME_CORRECTIONS[action.pk] ?? printedName(slug, action.fields.name)}${usesSuffix(action.fields)}`.slice(
+          0,
+          120
+        ),
         activation:
           action.fields.action_type === "ACTION"
             ? ("action" as const)
@@ -1155,7 +1169,10 @@ const monsters: ActorDefinition[] = creatures
               : action.fields.action_type === "REACTION"
                 ? ("reaction" as const)
                 : ("other" as const),
-        description: withoutSourceTags(`${legendaryPrefix}${action.fields.desc}`).slice(0, 12000),
+        description: withoutSourceTags(statBlockActionText(actionId, `${legendaryPrefix}${action.fields.desc}`)).slice(
+          0,
+          12000
+        ),
         ...(attack ? { attack } : {}),
         ...(save
           ? {
@@ -1246,14 +1263,19 @@ const monsters: ActorDefinition[] = creatures
       hasLegendaryActions || resistanceTrait
         ? {
             ...(hasLegendaryActions ? { actionsPerRound: 3 } : {}),
-            ...(resistanceTrait ? { resistancesPerDay: Number.parseInt(resistanceTrait[1], 10) } : {})
+            ...(resistanceTrait ? { resistancesPerDay: Number.parseInt(resistanceTrait[1], 10) } : {}),
+            // "Legendary Action Uses: 3 (4 in Lair)" and "3/Day, or 4/Day in Lair": the counts in its lair.
+            ...lairCountsOf(
+              (traitsByCreature.get(creature.pk) ?? []).map((trait) => trait.fields.name),
+              hasLegendaryActions ? 3 : undefined
+            )
           }
         : null;
     if (legendaryResource) report.legendaryCreatures += 1;
     // Upstream order is the stat block's own.
     const traitTexts = (traitsByCreature.get(creature.pk) ?? []).map((trait) => ({
-      name: trait.fields.name,
-      description: withoutSourceTags(trait.fields.desc)
+      name: printedName(slug, trait.fields.name),
+      description: withoutSourceTags(statBlockTraitText(trait.fields.desc))
     }));
     const traitMechanics = [...traitMechanicsOf(traitTexts), ...deathTraitMechanicsOf(traitTexts, actions)];
     report.traitMechanics += traitMechanics.length;
@@ -1299,6 +1321,9 @@ const monsters: ActorDefinition[] = creatures
           experiencePoints: fields.experience_points_integer ?? experienceForChallenge(challenge),
           skills: skillBonuses(fields),
           type: fields.type,
+          // "Medium or Small", the tags after the type and a swarm's creatures, and an NPC's Gear, as printed.
+          ...(MEDIUM_OR_SMALL_PER_SRD.includes(slug) ? { sizes: ["medium", "small"] } : {}),
+          ...statBlockHeaderOf(slug),
           alignment: fields.alignment,
           armorDetail: fields.armor_detail || null,
           speeds: {

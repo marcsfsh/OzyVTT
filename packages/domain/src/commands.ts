@@ -245,6 +245,15 @@ export const SetActorSheetPreviewSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** GM switch: a legendary creature fights in its lair, with the lair's legendary counts (SRD 5.2.1). */
+export const SetActorLairSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    inLair: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const HpAmountSchema = z
   .object({
     commandId: z.uuid(),

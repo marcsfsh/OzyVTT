@@ -2040,11 +2040,15 @@ export const ActorSchema = z.object({
   conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown, so movement rules skip. */
   speedFeet: z.number().int().min(0).max(500).optional(),
-  /** Legendary actions per round and Legendary Resistance per day (SRD 2024). GM knowledge, stripped from player projections. */
+  /** Legendary actions per round and Legendary Resistance per day (SRD 2024), at the lair's counts while `inLair` (the GM's
+   *  switch), with the counts in its lair beside them. GM knowledge, stripped from player projections. */
   legendary: z
     .object({
       actionsPerRound: z.number().int().min(1).max(5).optional(),
-      resistancesPerDay: z.number().int().min(1).max(6).optional()
+      resistancesPerDay: z.number().int().min(1).max(6).optional(),
+      actionsInLair: z.number().int().min(1).max(5).optional(),
+      resistancesInLair: z.number().int().min(1).max(6).optional(),
+      inLair: z.literal(true).optional()
     })
     .strict()
     .optional(),
@@ -3659,6 +3663,16 @@ export const ActionSchema = z
     sight: SightEffectSchema.optional(),
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
     castsSpells: CastsSpellsSchema.optional(),
+    /** The printed entry it belongs to (a spell of a Spellcasting list, Protective Magic's Counterspell): the stat block
+     *  prints it inside that entry, and the turn list offers it on its own. */
+    partOf: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional()
+      .describe(
+        "The id of the printed entry it belongs to (a spell of a Spellcasting list): the stat block prints it inside that entry, and the turn list offers it on its own"
+      ),
     /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
      *  Advantage", "or 2 (1d4) Piercing damage if the swarm is Bloodied"). The engine applies what it can see; a
      *  charge, which it can't, is offered on the hit for the attacker to confirm. */
@@ -4246,12 +4260,15 @@ export const ActorDefinitionSchema = z
     legendary: z
       .object({
         actionsPerRound: z.number().int().min(1).max(5).optional(),
-        resistancesPerDay: z.number().int().min(1).max(6).optional()
+        resistancesPerDay: z.number().int().min(1).max(6).optional(),
+        /** The counts it has fought in its lair ("Legendary Action Uses: 3 (4 in Lair)", "3/Day, or 4/Day in Lair"). */
+        actionsInLair: z.number().int().min(1).max(5).optional(),
+        resistancesInLair: z.number().int().min(1).max(6).optional()
       })
       .strict()
       .optional()
       .describe(
-        "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a Long Rest"
+        "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a Long Rest, with the counts in its lair when it has one"
       ),
     /** What its traits do that the engine runs (Regeneration, auras, Death Burst), read from their text. */
     traitMechanics: z.array(TraitMechanicSchema).max(12).optional(),

@@ -245,6 +245,7 @@ function counterspellOf(
     description: action.description,
     damage: [],
     ...(action.uses ? { uses: { ...action.uses, pool: action.uses.pool ?? action.id } } : {}),
-    castsSpells: { ...numbers, self: true, spells: [{ id, spellId: "counterspell", name: "Counterspell" }] }
+    castsSpells: { ...numbers, self: true, spells: [{ id, spellId: "counterspell", name: "Counterspell" }] },
+    partOf: action.id
   };
 }

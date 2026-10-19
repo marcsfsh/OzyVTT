@@ -79,6 +79,7 @@ import { creatureTypeOf } from "./statblock-facts.js";
 import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 import { lightSensitivities, sightRules } from "./vision/rules.js";
+import { legendaryResistancesPerDay } from "./lair.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -989,7 +990,7 @@ export function answerSave(
     if (!commit) throw new CommandRejectedError("Commit the save to spend Legendary Resistance.");
     requireGm(scope, "Only the GM can spend Legendary Resistance.");
     const definition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
-    const perDay = definition?.legendary?.resistancesPerDay ?? 0;
+    const perDay = legendaryResistancesPerDay(target, definition);
     if (perDay === 0) throw new CommandRejectedError(`${target.name} has no Legendary Resistance.`);
     const spentSoFar = target.actionUses["legendary-resistance"] ?? 0;
     if (spentSoFar >= perDay)

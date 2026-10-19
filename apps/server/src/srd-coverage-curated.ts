@@ -544,7 +544,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Iron Scent": senses,
   Jumper: enforced("jumping.ts measures its jumps with Dexterity in place of Strength."),
   "Legendary Resistance": enforced(
-    "saving-throws.ts lets the GM turn a failed save into a success, as many times a day as the stat block prints. A Long Rest restores them; the extra use in the lair is the GM's."
+    "saving-throws.ts lets the GM turn a failed save into a success, as many times a day as the stat block prints, or its lair count while the GM marks it fighting in its lair (lair.ts). A Long Rest restores them."
   ),
   "Light Sensitivity": enforced(
     "resolution/attack.ts gives the cloaker Disadvantage on attack rolls while it stands in Bright Light (vision/rules.ts). With dynamic vision off, the light is the GM's."

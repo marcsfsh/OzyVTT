@@ -20,12 +20,14 @@ import {
   ActorSetArmorClassSchema,
   SetActorArchivedSchema,
   SetActorHealthDisplaySchema,
+  SetActorLairSchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
   SetTokenImageSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
+import { legendaryInLair } from "../lair.js";
 import { setActorSize, setActorVisibility } from "../token-placement.js";
 import { importedDefinition } from "./characters.js";
 import { initiatorOf } from "./kit.js";
@@ -256,6 +258,36 @@ export const actorCommands = [
         kit.context.appendLog({
           kind: "encounter",
           text: `${kit.actorName(actorId)}'s archived sheet is now ${enabled ? "shared with players" : "hidden from players"}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-lair",
+    operationId: "setActorLair",
+    description:
+      'Marks a legendary creature as fighting in its lair, or out of it (GM-grade only; SRD 5.2.1). In its lair it has the legendary action uses and Legendary Resistance its stat block prints for the lair ("3 (4 in Lair)"); uses already spent stay spent. Refused for a creature whose stat block prints no lair.',
+    summary: "Mark a legendary creature as fighting in its lair, with the lair's legendary counts (GM).",
+    schema: SetActorLairSchema,
+    malformed: "The lair command is malformed.",
+    gmOnly: "Only the GM can say where a creature fights.",
+    // Silent to players: legendary counts are GM knowledge.
+    async run({ request, execute }, kit) {
+      const { actorId, inLair } = request;
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That creature no longer exists.");
+        const definition = actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
+        const legendary = legendaryInLair(definition, inLair);
+        if (!legendary) throw new CommandRejectedError(`${actor.name}'s stat block prints no lair.`);
+        actor.legendary = legendary;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `${kit.actorName(actorId)} ${inLair ? "fights in its lair" : "no longer fights in its lair"}.`,
           actorIds: [actorId],
           gmOnly: true
         });

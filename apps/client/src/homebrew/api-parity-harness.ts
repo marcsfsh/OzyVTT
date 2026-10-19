@@ -895,6 +895,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].partOf",
+    types: "*",
+    reason:
+      "the printed entry a cast belongs to (a Spellcasting list's spell), set as the catalog makes a stat block's casts; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].formOnly",
     types: "*",
     reason:

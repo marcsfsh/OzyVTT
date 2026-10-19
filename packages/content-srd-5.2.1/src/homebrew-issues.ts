@@ -140,6 +140,7 @@ const LABELS: Readonly<Record<string, string>> = {
   answer: "answer to a roll",
   struck: "what a melee hit costs the attacker",
   usesAction: "action it uses",
+  partOf: "entry it is printed in",
   multiattack: "Multiattack",
   count: "number of attacks",
   bonus: "bonus",

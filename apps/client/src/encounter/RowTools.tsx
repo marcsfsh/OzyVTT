@@ -6,6 +6,7 @@ import { ConditionEditor } from "./conditions";
 import { ConfirmRow } from "./ConfirmRow";
 import { CoverControl } from "./CoverControl";
 import { HpAdjust } from "./HpAdjust";
+import { LairControl } from "./LairControl";
 import { EffectChips } from "./EffectChips";
 
 /**
@@ -64,6 +65,7 @@ export function RowTools({
         />
         <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={onFeedback} />
         <CoverControl actor={actor} onFeedback={onFeedback} />
+        <LairControl actor={actor} onFeedback={onFeedback} />
         {/* The GM settles ties the dice leave: this combatant can go just before anyone sharing its score. */}
         {(() => {
           const own = state.combat.initiative.find((entry) => entry.actorId === actor.id);
