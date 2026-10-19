@@ -602,6 +602,26 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].reactionByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a reaction that changes with level (Deflect Energy) - feature-carrier actions only, beside reaction itself",
+    status: "gap"
+  },
+  {
+    at: "actions[].answer.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action does to a roll after it is seen (Bardic Inspiration, Indomitable, a Luck Blade) - authored in the class overlays, item mechanics and stat-block enrichments; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].answerAmountByLevel[].**",
+    types: FEATURE_CARRIERS,
+    reason: "an answer's die that grows with level (the Bardic Inspiration die) - feature-carrier actions only",
+    status: "gap"
+  },
+  {
     at: "actions[].extraAttack.**",
     types: ACTION_CARRIERS,
     reason: "minted by the engine beside an equipped weapon (Light, Cleave), never authored",

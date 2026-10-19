@@ -24,8 +24,21 @@ import "./prompts.css";
  *   its hit can carry (Sneak Attack) to add; the server holds the die, so only Heroic Inspiration or the GM throws it
  *   again. Let them go clears.
  * - Hellish Rebuke or Storm's Thunder: Use strikes the creature that dealt the damage.
- * The GM's dismiss clears the prompt without applying anything it holds, for a moment settled by hand.
+ * - Deflect Attacks, Stone's Endurance: Use rolls the reduction and takes it off the held damage; Superior Hunter's
+ *   Defense resists the damage's type.
+ * - Cutting Words, Countercharm, Improve Fate: another creature's roll waits on the answer; Use applies it (a die that
+ *   can be added or taken off gets a button for each), Decline lets the roll stand.
+ * The GM's dismiss clears the prompt without applying anything it holds, for a moment settled by hand; a roll waiting
+ * on an answer is declined instead.
  */
+
+/** The roll an answer prompt meets, as its label says it. */
+const ROLL_WORDS = {
+  attack: "attack roll",
+  save: "saving throw",
+  check: "ability check",
+  damage: "damage roll"
+} as const;
 export function ReactionPrompt({
   reaction,
   actorName,
@@ -82,6 +95,7 @@ export function ReactionPrompt({
       pushFeet?: number;
       mode?: DieMode;
       hitOptions?: HitOptionChoice[];
+      subtract?: boolean;
     } = {}
   ) => {
     setBusy(true);
@@ -132,6 +146,13 @@ export function ReactionPrompt({
             landed
               ? `The attack hits${outcome.appliedDamage > 0 ? ` for ${outcome.appliedDamage} damage` : ""}`
               : "The attack misses"
+          }.`
+        );
+      } else if (reaction.kind === "roll-answer") {
+        const attack = outcome.resolution?.attack;
+        onFeedback(
+          `${actorName} ${use ? "used" : "declined"} ${reaction.actionName}${
+            attack ? `. The attack ${attack.outcome === "hit" || attack.outcome === "crit" ? "hits" : "misses"}` : ""
           }.`
         );
       } else if (reaction.kind === "damaged-by-creature") {
@@ -198,6 +219,11 @@ export function ReactionPrompt({
           <>
             <strong>{name}</strong> · {reaction.sourceName}'s attack would hit {actorName}. +{reaction.acBonus} AC turns
             it into a miss.
+          </>
+        ) : reaction.kind === "roll-answer" ? (
+          <>
+            <strong>{name}</strong> · {reaction.sourceName}'s {ROLL_WORDS[reaction.rollKind ?? "attack"]}
+            {reaction.rollKind === "damage" ? ` (${reaction.proposedDamage})` : ""}: {reaction.answerDoes}
           </>
         ) : (
           <>
@@ -299,6 +325,77 @@ export function ReactionPrompt({
                 onClick={() => answer(false)}
               >
                 {letGo}
+              </button>
+            </>
+          ) : reaction.kind === "roll-answer" ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                title="Keep the reaction. The roll stands."
+                onClick={() => answer(false)}
+              >
+                Decline
+              </Button>
+              {reaction.answerEither ? (
+                <>
+                  <button
+                    type="button"
+                    className="reaction-use"
+                    disabled={busy}
+                    title={`Add it to ${reaction.sourceName}'s roll.`}
+                    onClick={() => answer(true)}
+                  >
+                    {name} · {reaction.answerDoes?.split(" or ")[0] ?? "add"}
+                  </button>
+                  <button
+                    type="button"
+                    className="reaction-use"
+                    disabled={busy}
+                    title={`Take it off ${reaction.sourceName}'s roll.`}
+                    onClick={() => answer(true, { subtract: true })}
+                  >
+                    {name} · {reaction.answerDoes?.split(" or ")[1] ?? "subtract"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="encounter-primary reaction-use"
+                  disabled={busy}
+                  title={`Answer ${reaction.sourceName}'s roll.`}
+                  onClick={() => answer(true)}
+                >
+                  {useLabel}
+                </button>
+              )}
+            </>
+          ) : reaction.damageResponse ? (
+            <>
+              <button
+                type="button"
+                className="save-prompt-roll"
+                disabled={busy}
+                title={
+                  reaction.damageResponse.kind === "reduce"
+                    ? `Spend the reaction to take ${reaction.damageResponse.formula} off the damage.`
+                    : "Spend the reaction for Resistance to the damage's type until the turn ends."
+                }
+                onClick={() => answer(true)}
+              >
+                {useLabel} ·{" "}
+                {reaction.damageResponse.kind === "reduce"
+                  ? `-${reaction.damageResponse.formula}`
+                  : `take ${weighed?.use ?? "half"}`}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                title={`Keep the reaction and take the damage${weighed ? " after your defences" : " before resistances"}.`}
+                onClick={() => answer(false)}
+              >
+                Take {takeIfDeclined}
               </button>
             </>
           ) : reaction.kind === "attack-would-hit" || reaction.kind === "damaged-by-creature" ? (

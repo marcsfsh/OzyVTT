@@ -38,7 +38,7 @@ import { GmTools } from "./GmTools";
 import { HitPointDice } from "./HitPointDice";
 import { HpCard } from "./HitPoints";
 import { IdentityEditor } from "./IdentityEditor";
-import { LatestRoll, useSessionRoll } from "./LatestRoll";
+import { CheckAnswers, LatestRoll, useSessionRoll } from "./LatestRoll";
 import { LevelBox } from "./LevelBox";
 import { NotesTab } from "./NotesTab";
 import { PlayFight } from "./PlayFight";
@@ -269,7 +269,7 @@ export function CharacterSheet({
   const openLog = state ? () => (layout === "wide" ? setDocked(true) : setDiceOpen(true)) : null;
   const lastRoll = session ? (
     <LatestRoll roll={session} role={role} rolls={rolls} canReroll={canReroll} onOpenLog={openLog} />
-  ) : canReroll ? (
+  ) : canReroll || (rolls.lastCheck?.answers?.length ?? 0) > 0 ? (
     // Without the roll history (a sheet with no state) the server judges the reroll.
     <LatestRollReroll role={role} rolls={rolls} />
   ) : null;
@@ -772,6 +772,7 @@ function LatestRollReroll({
       <Button size="sm" disabled={rolls.rolling} onClick={() => void rolls.rerollCheck()}>
         {role === "gm" ? "Reroll" : "Reroll · Heroic Inspiration"}
       </Button>
+      <CheckAnswers rolls={rolls} />
     </div>
   );
 }

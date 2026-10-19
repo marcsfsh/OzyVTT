@@ -490,16 +490,22 @@ export function PlayerActionRunner({
               Each target makes a DC {result.save.dc} {result.save.ability.toUpperCase()} save. The GM answers these.
             </p>
           )}
-          {result.waitingOnReaction && result.attack && (
-            <p className="action-save-note">
-              Waiting on {result.attack.targetName}'s{" "}
-              <strong>
-                {result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId)
-                  ?.actionName ?? "reaction"}
-              </strong>
-              . It may turn the hit into a miss, and the attack finishes when it is answered.
-            </p>
-          )}
+          {result.waitingOnReaction &&
+            result.attack &&
+            (() => {
+              const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
+              // Another creature's answer to the roll (Cutting Words) is not named: it may be one the player can't see.
+              return prompt ? (
+                <p className="action-save-note">
+                  Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong>. It may turn the hit into
+                  a miss, and the attack finishes when it is answered.
+                </p>
+              ) : (
+                <p className="action-save-note">
+                  Waiting on an answer to the attack roll. The attack finishes when it is answered.
+                </p>
+              );
+            })()}
           {result.damage.length > 0 &&
             !result.preview &&
             (() => {
@@ -521,13 +527,17 @@ export function PlayerActionRunner({
             result.damageTotal > 0 &&
             (() => {
               const reactionPrompt = result.reactionPrompts?.find(
-                (candidate) => candidate.actorId === result.attack!.targetId
+                (candidate) => candidate.holdsDamage || candidate.actorId === result.attack!.targetId
               );
               if (reactionPrompt)
-                return (
+                return reactionPrompt.actorId === result.attack!.targetId ? (
                   <p className="action-save-note">
                     Waiting on {result.attack!.targetName}'s <strong>{reactionPrompt.actionName}</strong>. The damage
                     lands when it is answered.
+                  </p>
+                ) : (
+                  <p className="action-save-note">
+                    Waiting on an answer to the damage roll. The damage lands when it is answered.
                   </p>
                 );
               return (

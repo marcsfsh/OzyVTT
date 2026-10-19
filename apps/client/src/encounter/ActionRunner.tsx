@@ -107,7 +107,8 @@ export function ActionRunner({
     const confirmed = attack !== null && previewedTarget.current === attack.targetId;
     previewedTarget.current = null;
     if (!confirmed || rollMode !== "auto" || result.damageTotal <= 0 || result.waitingOnReaction) return;
-    if (result.reactionPrompts?.some((prompt) => prompt.actorId === attack.targetId)) return;
+    // A prompt holding the damage (the target's Uncanny Dodge, another creature's Cutting Words) applies it itself.
+    if (result.reactionPrompts?.some((prompt) => prompt.holdsDamage || prompt.actorId === attack.targetId)) return;
     applyRef.current(attack.targetId, attack.targetName, attack.targetId);
   }, [result, rollMode]);
 
