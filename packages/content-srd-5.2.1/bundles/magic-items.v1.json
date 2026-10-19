@@ -5721,9 +5721,69 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Diminution",
+    "activation": "bonus-action",
+    "description": "Drink it: for 1d4 hours your size decreases by one category, you have Disadvantage on Strength checks and Strength saving throws, and your attacks with weapons or Unarmed Strikes deal 1d4 less damage on a hit (never below 1).",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Diminution",
+     "tags": [
+      "reduced"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "check",
+       "mode": "disadvantage",
+       "when": [
+        {
+         "type": "on-ability-check"
+        },
+        {
+         "type": "ability-is",
+         "abilities": [
+          "str"
+         ]
+        }
+       ]
+      },
+      {
+       "type": "roll-mode",
+       "roll": "save",
+       "mode": "disadvantage",
+       "when": [
+        {
+         "type": "on-saving-throw"
+        },
+        {
+         "type": "ability-is",
+         "abilities": [
+          "str"
+         ]
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "sizeChange": {
+      "step": -1
+     },
+     "hoursRolled": "1d4"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5804,9 +5864,102 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Gaseous Form",
+    "activation": "bonus-action",
+    "description": "Drink it: for 1 hour you are a misty cloud, as the Gaseous Form spell, with no Concentration. End it early as a Bonus Action.",
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "misty-cloud",
+       "name": "Misty cloud",
+       "speeds": {
+        "walk": 0,
+        "fly": 10,
+        "hover": true
+       },
+       "noAttacks": true,
+       "noSpeech": true,
+       "sharesSpaces": true,
+       "conditionImmunities": [
+        "prone"
+       ],
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "bludgeoning",
+          "piercing",
+          "slashing"
+         ]
+        },
+        {
+         "type": "roll-mode",
+         "roll": "save",
+         "mode": "advantage",
+         "when": [
+          {
+           "type": "on-saving-throw"
+          },
+          {
+           "type": "ability-is",
+           "abilities": [
+            "str"
+           ]
+          }
+         ]
+        },
+        {
+         "type": "roll-mode",
+         "roll": "save",
+         "mode": "advantage",
+         "when": [
+          {
+           "type": "on-saving-throw"
+          },
+          {
+           "type": "ability-is",
+           "abilities": [
+            "dex"
+           ]
+          }
+         ]
+        },
+        {
+         "type": "roll-mode",
+         "roll": "save",
+         "mode": "advantage",
+         "when": [
+          {
+           "type": "on-saving-throw"
+          },
+          {
+           "type": "ability-is",
+           "abilities": [
+            "con"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "keeps": [],
+     "noSpells": true,
+     "gear": "worn",
+     "endsAtZeroHitPoints": true,
+     "leaveAs": "bonus-action",
+     "durationMinutes": 60
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5856,9 +6009,86 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Growth",
+    "activation": "bonus-action",
+    "description": "Drink it: for 10 minutes your size increases by one category, you have Advantage on Strength checks and Strength saving throws, and your attacks with weapons or Unarmed Strikes deal an extra 1d4 damage on a hit.",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Growth",
+     "tags": [
+      "enlarged"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "check",
+       "mode": "advantage",
+       "when": [
+        {
+         "type": "on-ability-check"
+        },
+        {
+         "type": "ability-is",
+         "abilities": [
+          "str"
+         ]
+        }
+       ]
+      },
+      {
+       "type": "roll-mode",
+       "roll": "save",
+       "mode": "advantage",
+       "when": [
+        {
+         "type": "on-saving-throw"
+        },
+        {
+         "type": "ability-is",
+         "abilities": [
+          "str"
+         ]
+        }
+       ]
+      },
+      {
+       "type": "extra-damage",
+       "formula": "1d4",
+       "doubleOnCritical": true,
+       "when": [
+        {
+         "type": "on-hit"
+        },
+        {
+         "type": "attack-kind-is",
+         "kinds": [
+          "weapon",
+          "unarmed"
+         ]
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "sizeChange": {
+      "step": 1
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
