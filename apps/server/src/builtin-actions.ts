@@ -250,6 +250,14 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     damage: []
   },
   {
+    id: "touch-bead",
+    name: "Touch the Bead",
+    activation: "action",
+    description:
+      "Touch a Delayed Blast Fireball's bead within 5 feet and make a Dexterity saving throw. On a failure, the bead explodes. On a success, you throw it at the creature you choose, up to 40 feet away, and it explodes there; choose yourself to set it back down. (SRD 5.2.1 Delayed Blast Fireball)",
+    damage: []
+  },
+  {
     id: "extinguish-fire",
     name: "Put Out the Fire",
     activation: "action",
@@ -491,5 +499,6 @@ export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   "unarmed-grapple-bonus": "single",
   "unarmed-shove-prone-bonus": "single",
   "unarmed-shove-push-bonus": "single",
-  "shake-awake": "single"
+  "shake-awake": "single",
+  "touch-bead": "single"
 };

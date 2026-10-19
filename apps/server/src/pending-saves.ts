@@ -33,6 +33,7 @@ export function createPendingSaves(
       | "failureNote"
       | "breaksConcentration"
       | "zoneId"
+      | "touchedZone"
       | "gmApplies"
       | "failureByHitPoints"
       | "failureBanishes"
@@ -101,6 +102,7 @@ export function createPendingSaves(
     ...(input.extra?.failureNote ? { failureNote: input.extra.failureNote } : {}),
     ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
+    ...(input.extra?.touchedZone ? { touchedZone: { ...input.extra.touchedZone } } : {}),
     ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
     ...(input.extra?.endsForm ? { endsForm: true as const } : {}),
     ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),

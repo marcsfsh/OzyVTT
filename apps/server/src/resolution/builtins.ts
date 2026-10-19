@@ -37,6 +37,7 @@ import { openEndingSave } from "../save-stages.js";
 import { applyDamageDetailed } from "../hit-points.js";
 import { rollPlain } from "./hit-rider-outcomes.js";
 import { CommandRejectedError } from "../game-store.js";
+import { touchBead } from "../zone-touch.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
 import {
   abilityModifier,
@@ -623,6 +624,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "end-an-effect": { check: endAnEffect },
   [END_EFFECT_ID]: { check: endOwnEffect },
   "shake-awake": { apply: shakeAwake },
+  "touch-bead": { apply: touchBead },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
    *  as a Bonus Action brings its own numbers, which stand. */

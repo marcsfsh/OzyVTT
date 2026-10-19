@@ -340,6 +340,12 @@ export const PendingSaveSchema = z
       .optional(),
     /** The spell area that raised it (`SpellZone`), which counts the damage it deals toward its cap. Never projected. */
     zoneId: z.string().min(1).max(120).optional(),
+    /** A save for touching an area that goes off (Delayed Blast Fireball's bead): a failure sets it off where it is, a
+     *  success throws it at `throwAtId`, where it goes off. Never projected. */
+    touchedZone: z
+      .object({ zoneId: z.string().min(1).max(120), throwAtId: z.uuid().optional() })
+      .strict()
+      .optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
     repeatOf: z
       .object({

@@ -881,7 +881,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: save("dex"),
       damage: [{ formula: "12d6", type: "fire" }],
       area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
-      zone: { on: ["spell-end"], grows: true }
+      // "If a creature touches the bead": its Dexterity save, and a success throws it up to 40 feet.
+      zone: { on: ["spell-end"], grows: true, touched: { throwFeet: 40 } }
     }
   ],
   "dragons-breath": [

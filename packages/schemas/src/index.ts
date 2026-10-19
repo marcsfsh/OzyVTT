@@ -4073,6 +4073,12 @@ export const AreaTriggerSchema = z
     concentration: z.literal(true).optional(),
     /** Its user is unaffected by it ("the djinni is unaffected"). */
     sparesUser: z.literal(true).optional(),
+    /** A creature within 5 feet can touch it (Delayed Blast Fireball's bead): it makes the area's save, and a failure
+     *  sets it off, while a success lets it throw it up to `throwFeet` at a creature, where it goes off. */
+    touched: z
+      .object({ throwFeet: z.number().int().min(5).max(120) })
+      .strict()
+      .optional(),
     /** At the end of each of its caster's turns on which it drifted, it loses this much height and one die of its
      *  damage; the spell ends when no height is left (Tsunami's 50 feet and 1d10). */
     fadesFeet: z.number().int().min(5).max(300).optional(),

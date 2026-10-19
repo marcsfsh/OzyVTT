@@ -42,6 +42,7 @@ describe("builtin action catalog", () => {
       "search",
       "shake-awake",
       "study",
+      "touch-bead",
       "unarmed-grapple",
       "unarmed-shove-prone",
       "unarmed-shove-push",

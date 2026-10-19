@@ -179,6 +179,8 @@ export type ResolveDependencies = Readonly<{
   zoneCover?: (fromActorId: string, targetId: string) => "half" | "three-quarters" | "total" | null;
   /** The wall that deflects an ordinary projectile from the first combatant at the second (Wind Wall), or null. */
   deflectedBy?: (fromActorId: string, targetId: string) => string | null;
+  /** Feet from a combatant to the point a spell area was placed at (Delayed Blast Fireball's bead), or null. */
+  zoneFeet?: (actorId: string, zoneId: string) => number | null;
 }>;
 
 type RollBase = Pick<

@@ -42,6 +42,7 @@ import { areaAtLevel } from "../spell-zone-state.js";
 import { pickedZoneRow, zoneRowOf } from "../spell-zones.js";
 import { ringTest } from "../zone-shapes.js";
 import { spellWardedTargets } from "../zone-barriers.js";
+import { zonePointFeet } from "../zone-touch.js";
 import { deflectingWall, zoneCover } from "../zone-walls.js";
 import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
@@ -540,7 +541,8 @@ export const actionCommands = [
                   zoneCover: (fromId: string, targetId: string) =>
                     zoneCover(draft, fromId, targetId, kit.zoneDeps(draft, geometry)),
                   deflectedBy: (fromId: string, targetId: string) =>
-                    deflectingWall(draft, fromId, targetId, kit.zoneDeps(draft, geometry))
+                    deflectingWall(draft, fromId, targetId, kit.zoneDeps(draft, geometry)),
+                  zoneFeet: (fromId: string, zoneId: string) => zonePointFeet(draft, fromId, zoneId, geometry)
                 }
               : {})
           }
