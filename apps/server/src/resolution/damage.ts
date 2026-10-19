@@ -96,7 +96,10 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     for (let dart = 0; dart < action.darts; dart += 1) {
       const targetId = input.targetIds[dart % input.targetIds.length]!;
       for (const part of parts) {
-        const rolled = resolveDice(parseDiceFormula(part.formula), deps.random);
+        const rolled = resolveDice(
+          parseDiceFormula(part.formula),
+          input.overchannel === true ? (sides: number) => sides : deps.random
+        );
         recordRoll(ctx, rolled, "damage");
         damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
         ctx.dartTargetIds.push(targetId);
@@ -105,11 +108,13 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     return;
   }
   const savage = savageAttack(ctx);
+  // Overchannel: each of the spell's damage dice deals its maximum.
+  const dice = input.overchannel === true ? (sides: number) => sides : deps.random;
   parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
     const rolledExpression = ctx.crit ? criticalExpression(expression, extraCritDice) : expression;
-    let rolled = resolveDice(rolledExpression, deps.random);
+    let rolled = resolveDice(rolledExpression, dice);
     recordRoll(ctx, rolled, "damage");
     // The weapon's own dice are rolled again and the higher roll is used: no attacker would choose the lower.
     if (savage && index === 0) {

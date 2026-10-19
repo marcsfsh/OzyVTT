@@ -438,6 +438,9 @@ export const ActionResolveSchema = z
     /** Knocking out a creature (SRD): a melee hit that drops the target to 0 leaves it at 1 Hit Point and Unconscious
      *  instead. Refused on any other attack. */
     knockOut: z.boolean().optional(),
+    /** An Evoker's Overchannel (Wizard 14): a Wizard spell cast with a level 1 to 5 slot deals its maximum damage, the
+     *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
+    overchannel: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()

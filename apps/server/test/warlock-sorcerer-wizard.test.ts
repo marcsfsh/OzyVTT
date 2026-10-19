@@ -358,10 +358,8 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
       deps(built, [3, 3, 3, 3, 3, 3])
     );
     expect(built.hero.actionUses["contact-patron"]).toBe(1);
-    // "When you cast this spell, make a DC 15 Intelligence saving throw": the caster's own, with 6d6 Psychic on it.
-    expect(built.state.combat.pendingSaves).toMatchObject([
-      { targetActorId: IDS.hero, ability: "int", dc: 15, proposedDamage: 18 }
-    ]);
+    // "you automatically succeed on the spell's saving throw": the free cast to the patron opens no save.
+    expect(built.state.combat.pendingSaves).toEqual([]);
     expect(() =>
       resolveDefinitionAction(
         built.state,
@@ -1456,11 +1454,10 @@ describe("Wizard: Signature Spells casts each spell once free, and a Short Rest 
   });
 
   it("holds the counters and picks the hand-authored record already carried", () => {
-    // Arcane Recovery and Overchannel are the Wizard's pools, and Spell Mastery's two spells and the Epic
-    // Boon are picks the level-20 build owes.
+    // Arcane Recovery is the Wizard's pool (Overchannel counts its uses on the cast), and Spell Mastery's two spells
+    // and the Epic Boon are picks the level-20 build owes.
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
     expect(actionOf(built, "arcane-recovery").uses).toMatchObject({ limit: 1, per: "long-rest" });
-    expect(actionOf(built, "overchannel").uses).toMatchObject({ limit: 1, per: "long-rest" });
     expect((built.definition.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
     for (const id of ["magic-missile", "acid-arrow", "fireball", "counterspell", "burning-hands", "shatter"]) {
       expect(spellOf(built.definition, id)).toMatchObject({ id });
@@ -1690,5 +1687,53 @@ describe("Boon of Spell Recall", () => {
       expect(thirdLeft(built)).toBe(kept ? before : before - 1);
       if (kept) expect(result.warnings?.join(" ")).toMatch(/Boon of Spell Recall: the d4 shows 3/);
     }
+  });
+});
+
+// SRD 5.2.1 Overchannel: "you can deal maximum damage with that spell on the turn you cast it. The first time you do
+// so, you suffer no adverse effect. If you use this feature again before you finish a Long Rest, you take 2d12 Necrotic
+// damage for each level of the spell slot ... Each time you use this feature again ... increases by 1d12."
+describe("Overchannel", () => {
+  const overchannel = (built: Built, commandId: string, faces: number[]) =>
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-fireball"),
+      { actorId: IDS.hero, targetIds: [], commandId, overchannel: true },
+      deps(built, faces)
+    );
+
+  it("maximises Fireball, then burns the Evoker for 6d12 and 9d12 Necrotic on later uses", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    endEncounter(built.state);
+    built.hero.hp = { ...built.hero.hp, current: 200, maximum: 200 };
+    const first = overchannel(built, "50000000-0000-4000-8000-000000000160", []);
+    // Eight d6 at 6 each; Empowered Evocation's Intelligence rides as its own part.
+    expect(first.damage[0]).toMatchObject({ type: "fire", total: 48 });
+    expect(built.hero.hp.current).toBe(200);
+    overchannel(built, "50000000-0000-4000-8000-000000000161", Array<number>(6).fill(2));
+    expect(built.hero.hp.current).toBe(200 - 12);
+    overchannel(built, "50000000-0000-4000-8000-000000000162", Array<number>(9).fill(2));
+    expect(built.hero.hp.current).toBe(200 - 12 - 18);
+    applyRest(built.state, IDS.hero, "long", () => built.definition, built.catalog);
+    expect(built.hero.actionUses["overchannel"]).toBeUndefined();
+  });
+
+  it("refuses a cantrip or a slot above level 5", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    endEncounter(built.state);
+    expect(() =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-fireball"),
+        {
+          actorId: IDS.hero,
+          targetIds: [],
+          commandId: "50000000-0000-4000-8000-000000000163",
+          overchannel: true,
+          slotLevel: 6
+        },
+        deps(built, [])
+      )
+    ).toThrow(/level 1 to 5 spell slot/);
   });
 });

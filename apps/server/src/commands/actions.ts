@@ -256,6 +256,7 @@ export const actionCommands = [
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(request.knockOut === true ? { knockOut: true } : {}),
+            ...(request.overchannel === true ? { overchannel: true } : {}),
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             // Spell areas are the GM's to see, so only the GM aims a cast at one.

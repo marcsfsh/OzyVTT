@@ -31,6 +31,7 @@ import { recallSpellSlot } from "./resolution/spell-recall.js";
 import { rollForAnAnswer } from "./resolution/divinations.js";
 import { prayerShortRest, refuseThePrayedFor } from "./resolution/prayer-of-healing.js";
 import { strikeADuplicate } from "./resolution/mirror-image.js";
+import { checkOverchannel, overchannelBacklash } from "./resolution/overchannel.js";
 import type {
   DefinitionAction,
   EndedEffect,
@@ -102,6 +103,7 @@ export function resolveDefinitionAction(
     action.spellId ? deps.catalog?.spellRecord?.(action.spellId) : undefined
   );
   const ctx = openResolve(state, action, longCast?.input ?? input, deps);
+  checkOverchannel(ctx);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
   if (longCast && longCast.phase !== "finish") {
@@ -210,6 +212,7 @@ export function resolveDefinitionAction(
   commitEconomy(ctx);
   recallSpellSlot(ctx);
   rollForAnAnswer(ctx);
+  overchannelBacklash(ctx);
   spendHitOptions(ctx);
   spendDamageUses(ctx);
   rollLastCharge(ctx);
