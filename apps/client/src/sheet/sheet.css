@@ -2026,3 +2026,60 @@ button.cs-circle::after {
   color: var(--cyan-hi);
   font: 600 var(--fs-xs) / 1.2 var(--font-label);
 }
+
+/* A creature in a form (Wild Shape, Polymorph): the sheet reads the form's statistics, and says so. */
+.cs-form-banner {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, var(--surface-2));
+  color: var(--text);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+/* Wild Shape's known forms and the Beasts it may learn, picked on the Features tab. */
+.cs-known-forms-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.cs-known-forms-pick {
+  display: grid;
+  gap: var(--space-1);
+  max-height: 18rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-known-form {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.cs-known-form > input {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+}
+.cs-known-form > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: start;
+}
+.cs-known-form.is-picked {
+  color: var(--cyan-hi);
+}
+.cs-known-forms-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

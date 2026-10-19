@@ -1,3 +1,5 @@
+import { formsAfterDamage } from "./transform/rules.js";
+import { lycanthropyAtZero } from "./transform/at-zero.js";
 import {
   isDead,
   type Actor,
@@ -787,6 +789,14 @@ export function applyDamageDetailed(
       relentlessEndurance(actor, definition, damageToHp - hpBefore, events))
   ) {
     // Up at 1 Hit Point: nothing falls.
+  } else if (
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    deps &&
+    lycanthropyAtZero(state, actor, deps, events)
+  ) {
+    // A lycanthrope's curse: it becomes the lycanthrope instead of dropping.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
     const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
     instantDeath = fell.instantDeath;
@@ -805,6 +815,9 @@ export function applyDamageDetailed(
     instantDeath ||= drained.died && isPlayerCharacter;
     defeated ||= drained.died && !isPlayerCharacter;
   }
+  // A form the damage ends: Polymorph with no Temporary Hit Points left, Wild Shape on falling Unconscious, any form
+  // on death.
+  if (totalAdjusted > 0) events.push(...formsAfterDamage(state, actor));
   // Finger of Death: a Humanoid it kills rises as a Zombie at the start of its caster's next turn.
   if (input.drain?.slainRise && totalAdjusted > 0 && !deadBefore && isDead(actor))
     events.push(...markRising(state, actor, definition, input.drain.slainRise, input.sourceActorId));

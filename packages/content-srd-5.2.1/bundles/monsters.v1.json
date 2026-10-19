@@ -15397,7 +15397,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The doppelganger shape-shifts into a Medium or Small Humanoid, or it returns to its true form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "medium-humanoid",
+       "name": "Medium Humanoid",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "small-humanoid",
+       "name": "Small Humanoid",
+       "size": "small",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "slam",
@@ -27809,7 +27828,40 @@
     "name": "Shape-Shift",
     "activation": "action",
     "description": "The imp shape-shifts to resemble a rat (Speed 20 ft.), a raven (20 ft., Fly 60 ft.), or a spider (20 ft., Climb 20 ft.), or it returns to its true form. Its statistics are the same in each form, except for its Speed. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "rat",
+       "name": "Rat",
+       "speeds": {
+        "walk": 20
+       },
+       "modifiers": []
+      },
+      {
+       "id": "raven",
+       "name": "Raven",
+       "speeds": {
+        "walk": 20,
+        "fly": 60
+       },
+       "modifiers": []
+      },
+      {
+       "id": "spider",
+       "name": "Spider",
+       "speeds": {
+        "walk": 20,
+        "climb": 20
+       },
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "invisibility",
@@ -31734,7 +31786,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The mimic shape-shifts to resemble a Medium or Small object while retaining its game statistics, or it returns to its true blob form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "medium-object",
+       "name": "Medium object",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "small-object",
+       "name": "Small object",
+       "size": "small",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "pseudopod",
@@ -32927,7 +32998,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The hag shape-shifts into a Small or Medium Humanoid, or it returns to its true form. Other than its size, its game statistics are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "small-humanoid",
+       "name": "Small Humanoid",
+       "size": "small",
+       "modifiers": []
+      },
+      {
+       "id": "medium-humanoid",
+       "name": "Medium Humanoid",
+       "size": "medium",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "claw",
@@ -33916,7 +34006,32 @@
     "name": "Shape-Shift",
     "activation": "action",
     "description": "The oni shape-shifts into a Small or Medium Humanoid or a Large Giant, or it returns to its true form. Other than its size, its game statistics are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "small-humanoid",
+       "name": "Small Humanoid",
+       "size": "small",
+       "modifiers": []
+      },
+      {
+       "id": "medium-humanoid",
+       "name": "Medium Humanoid",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "large-giant",
+       "name": "Large Giant",
+       "size": "large",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "spellcasting",
@@ -36808,7 +36923,41 @@
     "name": "Shape-Shift",
     "activation": "action",
     "description": "The quasit shape-shifts to resemble a bat (Speed 10 ft., Fly 40 ft.), a centipede (40 ft., Climb 40 ft.), or a toad (40 ft., Swim 40 ft.), or it returns to its true form. Its game statistics are the same in each form, except for its Speed. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "bat",
+       "name": "Bat",
+       "speeds": {
+        "walk": 10,
+        "fly": 40
+       },
+       "modifiers": []
+      },
+      {
+       "id": "centipede",
+       "name": "Centipede",
+       "speeds": {
+        "walk": 40,
+        "climb": 40
+       },
+       "modifiers": []
+      },
+      {
+       "id": "toad",
+       "name": "Toad",
+       "speeds": {
+        "walk": 40,
+        "swim": 40
+       },
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "invisibility",
@@ -42909,7 +43058,32 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The succubus shape-shifts to resemble a Medium or Small Humanoid or back into its true form. Its game statistics are the same in each form, except its Fly Speed is available only in its true form. Any equipment it's wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "medium-humanoid",
+       "name": "Medium Humanoid",
+       "size": "medium",
+       "modifiers": [],
+       "speeds": {
+        "walk": 30
+       }
+      },
+      {
+       "id": "small-humanoid",
+       "name": "Small Humanoid",
+       "size": "small",
+       "modifiers": [],
+       "speeds": {
+        "walk": 30
+       }
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "fiendish-touch",
@@ -45529,6 +45703,9 @@
       "actionId": "bite-bat-or-vampire-form-only",
       "count": 1
      }
+    ],
+    "formOnly": [
+     "true"
     ]
    },
    {
@@ -45536,7 +45713,63 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "If the vampire isn't in sunlight or running water, it shape-shifts into a Tiny bat (Speed 5 ft., Fly Speed 30 ft.) or a Medium cloud of mist (Speed 5 ft., Fly Speed 20 ft. [hover]), or it returns to its vampire form. Anything it is wearing transforms with it. While in bat form, the vampire can't speak. Its game statistics, other than its size and Speed, are unchanged. While in mist form, the vampire can't take any actions, speak, or manipulate objects. It is weightless and can enter an enemy's space and stop there. If air can pass through a space, the mist can do so, but it can't pass through liquid. It has Resistance to all damage, except the damage it takes from sunlight.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "bat",
+       "name": "Bat",
+       "size": "tiny",
+       "speeds": {
+        "walk": 5,
+        "fly": 30
+       },
+       "noSpeech": true,
+       "modifiers": []
+      },
+      {
+       "id": "mist",
+       "name": "Mist",
+       "size": "medium",
+       "speeds": {
+        "walk": 5,
+        "fly": 20,
+        "hover": true
+       },
+       "noActions": true,
+       "noSpeech": true,
+       "sharesSpaces": true,
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "acid",
+          "bludgeoning",
+          "cold",
+          "fire",
+          "force",
+          "lightning",
+          "necrotic",
+          "piercing",
+          "poison",
+          "psychic",
+          "radiant",
+          "slashing",
+          "thunder"
+         ]
+        }
+       ]
+      }
+     ],
+     "keeps": [],
+     "gear": "worn",
+     "notInSunlight": true,
+     "escapesAtZero": {
+      "form": "mist",
+      "hours": 2
+     }
+    }
    },
    {
     "id": "beguile",
@@ -45626,6 +45859,9 @@
       "escapeDc": 14,
       "maxTargetSize": "large"
      }
+    ],
+    "formOnly": [
+     "true"
     ]
    },
    {
@@ -45648,6 +45884,10 @@
       "formula": "3d8",
       "type": "necrotic"
      }
+    ],
+    "formOnly": [
+     "bat",
+     "true"
     ],
     "drain": {
      "damageType": "necrotic",
@@ -47327,7 +47567,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The werebear shape-shifts into a Large bear-humanoid hybrid form or a Large bear, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "large",
+       "modifiers": []
+      },
+      {
+       "id": "bear",
+       "name": "Bear",
+       "size": "large",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "bite",
@@ -47338,17 +47597,32 @@
      "bonus": 7,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 14,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d12 + 4",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Werebear)",
+      "tags": [
+       "lycanthropy-werebear"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 14
+      },
+      "reminder": "A creature that succeeds is immune to this werebear's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "bear",
+     "hybrid"
     ]
    },
    {
@@ -47367,6 +47641,10 @@
       "formula": "3d6 + 4",
       "type": "slashing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    },
    {
@@ -47383,6 +47661,10 @@
       "formula": "2d8 + 4",
       "type": "slashing"
      }
+    ],
+    "formOnly": [
+     "bear",
+     "hybrid"
     ]
    }
   ],
@@ -47491,7 +47773,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The wereboar shape-shifts into a Medium boar-humanoid hybrid or a Small boar, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "boar",
+       "name": "Boar",
+       "size": "small",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "gore",
@@ -47502,17 +47803,32 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 12,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Wereboar)",
+      "tags": [
+       "lycanthropy-wereboar"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 12
+      },
+      "reminder": "A creature that succeeds is immune to this wereboar's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "boar",
+     "hybrid"
     ]
    },
    {
@@ -47531,6 +47847,10 @@
       "formula": "3d6 + 3",
       "type": "piercing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    },
    {
@@ -47564,6 +47884,10 @@
        "prone"
       ]
      }
+    ],
+    "formOnly": [
+     "boar",
+     "hybrid"
     ]
    }
   ],
@@ -47670,7 +47994,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The wererat shape-shifts into a Medium rat-humanoid hybrid or a Small rat, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "medium",
+       "modifiers": []
+      },
+      {
+       "id": "rat",
+       "name": "Rat",
+       "size": "small",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "bite",
@@ -47681,17 +48024,32 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 11,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d4 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Wererat)",
+      "tags": [
+       "lycanthropy-wererat"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 11
+      },
+      "reminder": "A creature that succeeds is immune to this wererat's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "rat",
+     "hybrid"
     ]
    },
    {
@@ -47725,6 +48083,10 @@
       "formula": "1d6 + 3",
       "type": "piercing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    }
   ],
@@ -47835,6 +48197,10 @@
     "activation": "bonus-action",
     "description": "The weretiger moves up to its Speed without provoking Opportunity Attacks. At the end of this movement, the weretiger can take the Hide action.",
     "damage": [],
+    "formOnly": [
+     "tiger",
+     "hybrid"
+    ],
     "move": {
      "speed": "full",
      "provokes": false
@@ -47849,17 +48215,32 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 13,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Weretiger)",
+      "tags": [
+       "lycanthropy-weretiger"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 13
+      },
+      "reminder": "A creature that succeeds is immune to this weretiger's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "tiger",
+     "hybrid"
     ]
    },
    {
@@ -47867,7 +48248,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The weretiger shape-shifts into a Large tiger-humanoid hybrid or a Large tiger, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "large",
+       "modifiers": []
+      },
+      {
+       "id": "tiger",
+       "name": "Tiger",
+       "size": "large",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "scratch",
@@ -47900,6 +48300,10 @@
       "formula": "2d8 + 2",
       "type": "piercing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    }
   ],
@@ -48009,7 +48413,26 @@
     "name": "Shape-Shift",
     "activation": "bonus-action",
     "description": "The werewolf shape-shifts into a Large wolf-humanoid hybrid or a Medium wolf, or it returns to its true humanoid form. Its game statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed.",
-    "damage": []
+    "damage": [],
+    "shapeShift": {
+     "from": "printed",
+     "printed": [
+      {
+       "id": "hybrid",
+       "name": "Hybrid",
+       "size": "large",
+       "modifiers": []
+      },
+      {
+       "id": "wolf",
+       "name": "Wolf",
+       "size": "medium",
+       "modifiers": []
+      }
+     ],
+     "keeps": [],
+     "gear": "worn"
+    }
    },
    {
     "id": "bite",
@@ -48020,17 +48443,32 @@
      "bonus": 5,
      "reachFeet": 5
     },
-    "save": {
-     "ability": "con",
-     "dc": 12,
-     "successDamage": "none",
-     "failureConditions": []
-    },
     "damage": [
      {
       "formula": "2d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Lycanthropy (Werewolf)",
+      "tags": [
+       "lycanthropy-werewolf"
+      ],
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "save": {
+       "ability": "con",
+       "dc": 12
+      },
+      "reminder": "A creature that succeeds is immune to this werewolf's curse for 24 hours."
+     }
+    ],
+    "formOnly": [
+     "wolf",
+     "hybrid"
     ]
    },
    {
@@ -48064,6 +48502,10 @@
       "formula": "2d8 + 2",
       "type": "piercing"
      }
+    ],
+    "formOnly": [
+     "true",
+     "hybrid"
     ]
    }
   ],

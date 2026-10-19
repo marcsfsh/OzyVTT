@@ -116,6 +116,14 @@ export type ResolveInput = Readonly<{
   /** What the user picked for an action that brings creatures (`summons.ts`): which stat blocks, a form, a creature
    *  type, damage types, and where they appear. */
   summon?: SummonChoice;
+  /** The form a shape-shift takes (a known form, a Beast, a printed form's id, or `true`), and one per target where
+   *  each takes its own (`shape-shift.ts`). */
+  form?: string;
+  targetForms?: ReadonlyArray<Readonly<{ targetId: string; form: string }>>;
+  /** Whether the user's gear melds into its form or is worn by it, where the action lets it choose. */
+  gear?: "merged" | "worn";
+  /** The effect a use picks among its action's options (Enlarge or Reduce). */
+  option?: string;
 }>;
 
 export type ResolveDependencies = Readonly<{

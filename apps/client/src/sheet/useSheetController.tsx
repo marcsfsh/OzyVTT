@@ -13,7 +13,8 @@ import type { CastShaping } from "@vtt/schemas";
 import { useToast } from "@vtt/ui";
 import { regainedText } from "../encounter/ActionResultHead";
 import { HealTargetPicker, type LooseHeal } from "../encounter/HealTargetPicker";
-import { summaryOfOwnAction } from "../encounter/PlayerActionRunner";
+import { ShapeShiftDialog, type LooseShift } from "../encounter/ShapeShiftDialog";
+import { summaryOfOwnAction, withShapeOffer } from "../encounter/PlayerActionRunner";
 import { sameName } from "../encounter/sheet-names";
 import { beginTargeting, setTargetingResult } from "../encounter/targeting";
 import { command } from "../lib/command";
@@ -119,6 +120,19 @@ export function useSheetController({
       .map((other) => ({ id: other.id, name: other.name }))
   ];
   const [looseHeal, setLooseHeal] = useState<LooseHeal | null>(null);
+  const [looseShift, setLooseShift] = useState<LooseShift | null>(null);
+  /** A shape-shift outside a fight (Wild Shape, Polymorph, Enlarge/Reduce) asks for its form, and its targets when it
+   *  has any, before the server resolves it. */
+  const looseShiftOf = (actionId: string, slotLevel?: number, shaping?: readonly CastShaping[]): LooseShift | null => {
+    const row = serverActions.find((candidate) => candidate.id === actionId);
+    if (!row || (!row.forms && !row.options)) return null;
+    return {
+      action: row,
+      aims: row.targeting === "single" || row.targeting === "multi" ? row.targeting : "none",
+      ...(slotLevel !== undefined ? { slotLevel } : {}),
+      ...(shaping && shaping.length > 0 ? { shaping } : {})
+    };
+  };
   /** A spell cast outside a fight at creatures it helps or makes save (Aid, Hold Person) asks whom it targets, so the
    *  server resolves it as it would in a fight. An attack or a save-less blast rolls loose as before. */
   const looseCastOf = (actionId: string, slotLevel?: number, shaping?: readonly CastShaping[]): LooseHeal | null => {
@@ -155,12 +169,39 @@ export function useSheetController({
   /** An action used through the server's loose route, which rolls it and spends what it costs (a heal asks who it
    *  lands on first). In a fight the server refuses it off the creature's turn and says why. */
   const sendThroughServer = (actionId: string, extra: Readonly<{ includeDamage?: boolean }> = {}) => {
+    const shift = inFight ? null : looseShiftOf(actionId);
+    if (shift) {
+      setLooseShift(shift);
+      return;
+    }
     const heal = inFight ? null : looseHealOf(actionId, undefined, extra.includeDamage);
     if (heal) setLooseHeal(heal);
     else sendLoose(actionId, extra, "That could not be used.");
   };
   /** Outside the fight, an action is used through the server. */
   const looseAction = inFight ? null : sendThroughServer;
+  const shiftDialog = looseShift ? (
+    <ShapeShiftDialog
+      shift={looseShift}
+      candidates={castCandidates}
+      defaultId={actor.id}
+      onClose={() => setLooseShift(null)}
+      onConfirm={({ targetIds, ...choice }) => {
+        setLooseShift(null);
+        sendLoose(
+          looseShift.action.id,
+          {
+            ...(targetIds.length > 0 ? { targetIds } : {}),
+            ...choice,
+            ...(looseShift.slotLevel !== undefined ? { slotLevel: looseShift.slotLevel } : {}),
+            ...(looseShift.shaping ? { shaping: looseShift.shaping.map((entry) => ({ ...entry })) } : {}),
+            includeDamage: true
+          },
+          "That could not be used."
+        );
+      }}
+    />
+  ) : null;
   const healDialog = looseHeal ? (
     <HealTargetPicker
       heal={looseHeal}
@@ -195,8 +236,10 @@ export function useSheetController({
         : undefined;
     // A cast with nothing to aim at (Spirit Guardians' Emanation) picks no targets, as the server says, and its
     // Metamagic's picks are named among its targets with the server's counts.
-    const offers = serverActions.find((row) => row.id === action.id)?.shaping;
-    const own = { ...summaryOfOwnAction(action), ...(offers ? { shaping: offers } : {}) };
+    const row = serverActions.find((candidate) => candidate.id === action.id);
+    const offers = row?.shaping;
+    // A shape-shift picks its form as it is aimed (Polymorph), and Enlarge/Reduce its effect.
+    const own = withShapeOffer({ ...summaryOfOwnAction(action), ...(offers ? { shaping: offers } : {}) }, row);
     const aimless =
       own.targeting === undefined && serverActions.some((row) => row.id === action.id && row.targeting === "none");
     beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts, shaping);
@@ -247,6 +290,11 @@ export function useSheetController({
       return;
     }
     const shaped = shaping && shaping.length > 0 ? shaping : undefined;
+    const shift = inFight ? null : looseShiftOf(actionId, slotLevel, shaped);
+    if (shift) {
+      setLooseShift(shift);
+      return;
+    }
     const healing = inFight ? null : looseHealOf(actionId, slotLevel, true);
     const heal = inFight
       ? null
@@ -299,7 +347,8 @@ export function useSheetController({
     sendThroughServer,
     itemAction,
     itemBlocked,
-    healDialog,
+    // A heal's or a shape-shift's picks outside a fight; one at a time.
+    healDialog: healDialog ?? shiftDialog,
     routeAttack,
     routeSummary,
     hitExtraNote,

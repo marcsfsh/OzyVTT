@@ -86,6 +86,9 @@ export function spellState(spell: SpellReference): CoverageState {
       effect.endsCurses === true ||
       effect.reaction !== undefined ||
       effect.darts !== undefined ||
+      // The form it gives (Polymorph's Beast) or the effect it picks (Enlarge or Reduce).
+      effect.shapeShift !== undefined ||
+      effect.effectOptions !== undefined ||
       effect.revives !== undefined ||
       effect.reposes === true ||
       effect.killsAtHitPoints !== undefined ||
@@ -119,6 +122,9 @@ type ResolvingFields = Pick<
   | "endsConditions"
   | "answer"
   | "sight"
+  | "shapeShift"
+  | "endsForm"
+  | "effectOptions"
   | "raisesCorpse"
 > &
   Partial<Pick<ActorAction, "move" | "teleport" | "leap">> &
@@ -144,6 +150,9 @@ const actionResolves = (action: ResolvingFields) =>
   action.grants !== undefined ||
   action.endsConditions !== undefined ||
   action.answer !== undefined ||
+  action.shapeShift !== undefined ||
+  action.endsForm !== undefined ||
+  action.effectOptions !== undefined ||
   action.move !== undefined ||
   action.teleport !== undefined ||
   action.leap !== undefined ||
@@ -161,7 +170,9 @@ export function monsterActionState(
   definition: ActorDefinition,
   spellStates: ReadonlyMap<string, CoverageState>
 ): CoverageState {
-  const tracked = action.untrackedMultiattack || action.reminder || action.legendary || action.uses;
+  // An action printed for some forms only is refused in the others.
+  const tracked =
+    action.untrackedMultiattack || action.reminder || action.legendary || action.uses || action.formOnly !== undefined;
   const floor: CoverageState = tracked ? "guided" : "reference";
   if (action.castsSpells) {
     const casts = action.castsSpells.spells.map((entry) => spellStates.get(entry.spellId) ?? "reference");

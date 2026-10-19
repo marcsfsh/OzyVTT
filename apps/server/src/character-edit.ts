@@ -1,3 +1,4 @@
+import { formEffectOf } from "./transform/forms.js";
 import type { BuilderPolicy, GameState } from "@vtt/domain";
 import { ActorDefinitionSchema, type ActorDefinition } from "@vtt/schemas";
 import { buildCharacterDefinition } from "./character-build.js";
@@ -14,6 +15,9 @@ function editableDefinition(state: GameState, actorId: string): { definitionId: 
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (actor.kind !== "player-character") throw new CommandRejectedError("Only player characters can be edited here.");
+  // A form's sheet is the stat block's for now; the character's own comes back when it ends.
+  const form = formEffectOf(actor);
+  if (form) throw new CommandRejectedError(`${actor.name} is in ${form.name}. End it before editing the sheet.`);
   const definitionId = actor.definitionId;
   if (!definitionId || !definitionId.startsWith("import-"))
     throw new CommandRejectedError("This character has no editable sheet. Import one first.");

@@ -6,6 +6,7 @@ import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.j
 import { areAllies } from "./creature-sides.js";
 import { wardingAura } from "./paladin-auras.js";
 import { endZonesOfCast } from "./spell-zone-state.js";
+import { refreshSize, revertForm } from "./transform/forms.js";
 import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
@@ -261,6 +262,9 @@ export function conditionGained(
     for (const rage of actor.effects.filter((effect) => effect.tags.includes(RAGING_TAG)))
       if (!rage.tags.includes(PERSISTENT_RAGE_TAG) || conditionId === "unconscious")
         endEffectInternal(state, actor, rage.id, events);
+    // Wild Shape: "until you ... have the Incapacitated condition".
+    for (const shaped of actor.effects.filter((effect) => effect.form?.endsOnIncapacitated === true))
+      endEffectInternal(state, actor, shaped.id, events);
   }
   if (conditionId === "exhaustion" && previousExhaustion < 6 && exhaustionLevel(actor) >= 6)
     events.push(...applyExhaustionDeath(state, actor));
@@ -419,6 +423,12 @@ function endEffectInternal(
     actorId: actor.id,
     ...sourceOf(effect)
   });
+  // A form ends with its effect: the bearer returns to its true form (SRD Shape-Shifting), and a size it changed comes
+  // back.
+  if (effect.form) {
+    const reverted = revertForm(state, actor, effect);
+    if (reverted) events.push({ kind: "effect", text: reverted, actorId: actor.id });
+  } else if (effect.sizeChange) refreshSize(state, actor, effect);
   // A drained Hit Point maximum returns to normal; the hit points lost with it stay lost.
   if (effect.hitPointMaximumLoss !== undefined)
     actor.hp = { ...actor.hp, maximum: actor.hp.maximum + effect.hitPointMaximumLoss };

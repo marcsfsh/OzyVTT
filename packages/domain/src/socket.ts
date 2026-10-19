@@ -96,6 +96,7 @@ import type {
   CharacterResolveImportSchema,
   CharacterSetCurrencySchema,
   CharacterSetFavouritesSchema,
+  CharacterSetKnownFormsSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
@@ -693,6 +694,11 @@ export interface ClientToServerEvents {
   ) => void;
   "character:set-currency": (
     payload: CommandPayload<typeof CharacterSetCurrencySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Set a Druid's known Wild Shape forms. The GM for anyone; a player for their own claimed character. */
+  "character:set-known-forms": (
+    payload: CommandPayload<typeof CharacterSetKnownFormsSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** Pin options to the sheet's turn card. The GM for anyone; a player for their own claimed character. */
