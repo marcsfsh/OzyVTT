@@ -66,6 +66,22 @@ describe("Concentration on nothing ends", () => {
     expect(concentrating(table.state)).toEqual([]);
   });
 
+  it("ends Ensnaring Strike when its target saves, and when the Restrained target breaks free", () => {
+    const saved = caster();
+    cast(saved, "ensnaring-strike", { targetIds: [FOE] });
+    expect(concentrating(saved.state)).toEqual(["Concentrating on Ensnaring Strike"]);
+    answer(saved.state, FOE, 19);
+    expect(concentrating(saved.state)).toEqual([]);
+
+    const held = caster();
+    cast(held, "ensnaring-strike", { targetIds: [FOE] });
+    answer(held.state, FOE, 2);
+    expect(actorOf(held.state, FOE).conditions.map((condition) => condition.id)).toEqual(["restrained"]);
+    expect(concentrating(held.state)).toEqual(["Concentrating on Ensnaring Strike"]);
+    endEffect(held.state, FOE, actorOf(held.state, FOE).effects[0]!.id);
+    expect(concentrating(held.state)).toEqual([]);
+  });
+
   it("ends Phantasmal Killer on a successful first save, and on a later repeat save's success", () => {
     const saved = caster();
     cast(saved, "phantasmal-killer", {}, [5, 5, 5, 5]);
