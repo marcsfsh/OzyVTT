@@ -152,7 +152,7 @@ export function CharacterSheet({
     role === "gm" && state && "definitions" in state && "definitionId" in actor
       ? (state as GmView).definitions.find((entry) => entry.id === actor.definitionId)?.definition
       : undefined;
-  const { definitionId, definition, serverActions, facts, derived, rechoices, spellChoices, showEdited } =
+  const { definitionId, definition, serverActions, facts, derived, rechoices, spellChoices, conversions, showEdited } =
     useSheetDefinition(actor, role, sayUnloaded, liveDefinition);
   const { busy, edit } = useSheetEdit(say);
   // With the roll history the latest-roll line shows each result, so only a refusal is a toast.
@@ -412,6 +412,11 @@ export function CharacterSheet({
       derived={derived}
       pools={pools}
       serverActions={serverActions}
+      conversions={conversions}
+      rechoices={rechoices}
+      busy={busy}
+      edit={edit}
+      onFeedback={say}
       onUse={(actionId) => controller.sendThroughServer(actionId)}
       next={
         canLevel && levelUpTo !== null ? (

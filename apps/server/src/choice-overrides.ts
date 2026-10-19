@@ -33,7 +33,7 @@ type ReplaceableRecord = Readonly<{
 /** One offer this character may re-choose on a rest, with the answers that are legal for it. */
 export type ReplaceableOffer = Readonly<{
   offer: string;
-  /** The rest that clears the override. A `short-rest` clause is satisfied by a Long Rest too. */
+  /** The rest after which it may be re-made. A `short-rest` clause is satisfied by a Long Rest too. */
   per: "short-rest" | "long-rest";
   /** The feature's display name, for the refusal message and the GM's log line. */
   label: string;

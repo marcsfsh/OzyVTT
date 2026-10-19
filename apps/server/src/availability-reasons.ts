@@ -40,6 +40,7 @@ function usesReason({ state, attacker, action, siblings }: ReasonFacts): string 
   const spent =
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
   if (spent < useLimitFor(siblings, action)) return "Not enough uses left.";
+  if (uses.per === "never") return "No uses left, and they don't come back.";
   return uses.per === "turn" ? "No uses left this turn." : `No uses left ${USES_COME_BACK[uses.per]}.`;
 }
 

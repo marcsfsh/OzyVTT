@@ -46,7 +46,9 @@ export const returnsWords = (per: string) =>
           ? "Back each round"
           : per === "recharge"
             ? "Recharges"
-            : per;
+            : per === "never"
+              ? "Doesn't come back"
+              : per;
 
 /** Uses left as boxes, the filled ones still to spend; a long pool (Lay on Hands' points) reads as a count. */
 export function UseBoxes({ left, limit, label }: Readonly<{ left: number; limit: number; label?: string }>) {

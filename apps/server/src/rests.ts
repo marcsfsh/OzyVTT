@@ -161,12 +161,6 @@ function usesAfterShortRest(
   return after;
 }
 
-/** Which re-choices a rest ends: a Short Rest clears those naming it; a Long Rest clears everything. */
-function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "short"): Actor["choiceOverrides"] {
-  if (kind === "long") return {};
-  return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
-}
-
 /** SRD Pact Magic: every expended pact slot comes back on a Short or Long Rest. */
 function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined): void {
   const maximum = actor.pactSlots ? pactSlotMaximum(definition) : null;
@@ -208,13 +202,14 @@ export function applyRest(
       effectiveActions(definition, actor, catalog),
       shortRestRegains(deriveEquipment(actor, definition, catalog))
     );
-    // A pick re-made "whenever you finish a Short or Long Rest" lapses here; the build's own answer stands
-    // until the character chooses again.
-    actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
+    // A pick re-made on a rest stands until the character chooses again (Fiendish Resilience: "until you choose a
+    // different one"), so the rest leaves `choiceOverrides` as they are.
     restorePactSlots(actor, definition);
     // SRD Tireless: "Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1."
     if (holdsFeature(definition, "tireless", "Tireless")) reduceExhaustion(actor);
     events.push(...endEffectsAtRest(state, actorId, "short"));
+    // What a feature does "when you finish a Short Rest" (Arcane Recovery, a re-choice) is made in the step this opens.
+    actor.restStep = { after: "short-rest" };
     return events;
   }
   // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
@@ -232,8 +227,6 @@ export function applyRest(
     actor.actionUses = dawn.stillSpent;
     charges.lines.push(...dawn.lines);
   } else actor.actionUses = {};
-  // Both kinds lapse on a Long Rest.
-  actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
   // Rested, by whatever path: nothing left to ask the GM for.
@@ -256,6 +249,7 @@ export function applyRest(
   restorePactSlots(actor, longRestDefinition);
   // The prepared list stands; a caster that prepares after a Long Rest gets the step to change it.
   openPreparation(actor, longRestDefinition);
+  actor.restStep = { after: "long-rest" };
   // SRD Human, Resourceful: "You gain Heroic Inspiration whenever you finish a Long Rest." One at most.
   if (
     holdsFeature(longRestDefinition, "human-resourceful", "Resourceful") ||

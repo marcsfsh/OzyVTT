@@ -6,6 +6,7 @@ import { deriveActorSheet } from "../actor-derived.js";
 import { storedDefinition } from "../actor-roster.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { builderOffers } from "../builder-offers.js";
+import { conversionOffers } from "../conversions.js";
 import { draftOwnerOf } from "../character-drafts.js";
 import { BUILTIN_TARGETING, builtinActionsFor } from "../builtin-actions.js";
 import { builtinCheckSkills } from "../resolution/builtins.js";
@@ -203,7 +204,9 @@ export const gameReads = [
         spellChoices: receivedSpellChoices(
           spellChoicesOf(actor, definition, kit.playCatalog(), state.builderPolicy),
           kit.catalogFor(principal)
-        )
+        ),
+        // Checked as `actor.convert` checks them, so a control the sheet offers is one the server applies.
+        conversions: conversionOffers(state, actor, { resolveDefinition: kit.resolveDefinition, catalog })
       };
     }
   },

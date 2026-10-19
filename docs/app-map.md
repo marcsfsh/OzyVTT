@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 313 HTTP paths
+- 14 GameState fields · 138 commands · 314 HTTP paths
 
 ## GameState shape
 
@@ -43,6 +43,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `action.use` | `combat:write` |
 | `actor.add-from-definition` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
+| `actor.convert` | `actor:write` |
 | `actor.heal` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
 | `actor.rechoose` | `actor:write` |
@@ -290,6 +291,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/check`
 - `POST /api/v1/game/actors/{actorId}/check/reroll`
 - `POST /api/v1/game/actors/{actorId}/conditions`
+- `POST /api/v1/game/actors/{actorId}/convert`
 - `POST /api/v1/game/actors/{actorId}/currency`
 - `POST /api/v1/game/actors/{actorId}/damage`
 - `POST /api/v1/game/actors/{actorId}/death-save`

@@ -380,6 +380,7 @@ function instantiate(
     preparedSpellIds: seedPreparedSpellIds(definition),
     spellbook: [],
     preparation: null,
+    restStep: null,
     inventory,
     currency: definition.startingCurrency ? { ...definition.startingCurrency } : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     archived: false,

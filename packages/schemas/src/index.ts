@@ -1280,8 +1280,8 @@ export const ActorSchema = z.object({
   /** SRD Heroic Inspiration: held or not (never more than one). Spent to reroll one die; the GM gives it, and a Human
    * gains it on finishing a Long Rest. */
   heroicInspiration: z.boolean().default(false),
-  /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest that clears the override,
-   * after which the build's recorded answer applies again. */
+  /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest after which it may be re-made;
+   * it stands until the character chooses again. */
   choiceOverrides: z
     .record(
       z.string(),
@@ -1352,6 +1352,14 @@ export const ActorSchema = z.object({
    *  spells it may still swap in (null: any number). Null when closed. Owner-only. */
   preparation: z
     .object({ changesLeft: z.number().int().min(0).max(60).nullable() })
+    .strict()
+    .nullable()
+    .default(null),
+  /** Open after a rest the character finished, for what a feature lets it do "when you finish" that rest: recover
+   *  slots or points (Arcane Recovery, Sorcerous Restoration), or re-make a pick. Closed by its player's Done or by
+   *  rolling Initiative. Null when closed. Owner-only. */
+  restStep: z
+    .object({ after: z.enum(["short-rest", "long-rest"]) })
     .strict()
     .nullable()
     .default(null),
@@ -1504,7 +1512,7 @@ export const MAX_ACTION_USES = 100;
 export const ActionUsesSchema = z
   .object({
     limit: z.number().int().min(1).max(MAX_ACTION_USES),
-    per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
+    per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never"]),
     pool: z
       .string()
       .regex(/^[a-z0-9-]+$/)

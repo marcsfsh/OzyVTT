@@ -78,7 +78,7 @@ export const contentRecordBase = {
 /** Uses regained on a rest: a flat `limit` or a `scaling` rule. `pool` shares one counter across features. */
 export const FeatureUsesSchema = z
   .object({
-    limit: z.number().int().min(1).max(20).optional().describe("A flat count"),
+    limit: z.number().int().min(1).max(100).optional().describe("A flat count (a Staff of the Magi's 50 charges)"),
     scaling: z
       .discriminatedUnion("type", [
         z
@@ -113,8 +113,9 @@ export const FeatureUsesSchema = z
       ])
       .optional()
       .describe("The four ways 5e actually scales a feature's uses."),
-    /** "own-turn": back at the start of the bearer's next turn ("until the start of your next turn"). */
-    per: z.enum(["turn", "own-turn", "encounter", "short-rest", "long-rest"]),
+    /** "own-turn": back at the start of the bearer's next turn ("until the start of your next turn"); "never": spent
+     *  for good (a Necklace of Fireballs' beads, a Ring of Three Wishes). */
+    per: z.enum(["turn", "own-turn", "encounter", "short-rest", "long-rest", "never"]),
     pool: ContentIdSchema.optional().describe("Shares one counter across every feature carrying the same pool id")
   })
   .strict()

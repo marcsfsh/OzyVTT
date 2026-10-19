@@ -161,14 +161,14 @@ export const characterSheetCommands = [
     type: "character.finish-preparing",
     operationId: "finishPreparing",
     description:
-      "Closes the prepare step a Long Rest opened for a character: its prepared spells stand until the next Long Rest. Player sessions may target only their claimed character.",
-    summary: "Close a character's prepare step after a Long Rest.",
+      "Closes the prepare step a Long Rest opened for a character: its prepared spells stand until the next Long Rest. With `rest`, it closes the step a finished rest opened instead: what a feature does when a rest finishes (Arcane Recovery, a re-choice) waits for the next rest. Player sessions may target only their claimed character.",
+    summary: "Close a character's prepare step after a Long Rest, or the step a finished rest opened.",
     schema: CharacterFinishPreparingSchema,
     malformed: "The finish-preparing command is malformed.",
     async run({ principal, request, execute }) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "resource");
-        finishPreparing(state, request.actorId);
+        finishPreparing(state, request.actorId, request.rest === true);
       });
     }
   }),

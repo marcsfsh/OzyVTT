@@ -1076,6 +1076,24 @@ const PoolAmountFields = {
 export const ActorSpendUsesSchema = z.object(PoolAmountFields).strict();
 /** Give back spent uses of a pool (GM). */
 export const ActorRestoreUsesSchema = z.object(PoolAmountFields).strict();
+/** Turns one resource into another, or recovers one, by a feature's rule (Font of Magic, Arcane Recovery): the slot it
+ *  spends or makes (`level`, `pact` for a Pact Magic slot), the slots it recovers (`levels`), or how many uses or points
+ *  (`count`). The server checks each against the feature. */
+export const ActorConvertSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    conversionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(60),
+    level: z.number().int().min(1).max(9).optional(),
+    pact: z.boolean().optional(),
+    levels: z.array(z.number().int().min(1).max(9)).min(1).max(9).optional(),
+    count: z.number().int().min(1).max(20).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** A player asks the GM for a Long Rest for their character, or takes the ask back (`withdraw`). */
 export const RestAskSchema = z
   .object({
@@ -1161,6 +1179,8 @@ export const CharacterFinishPreparingSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
+    /** Closes the step a finished rest opened (recoveries and re-choices); without it, the Long Rest's prepare step. */
+    rest: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

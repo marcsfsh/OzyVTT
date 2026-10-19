@@ -566,6 +566,7 @@ const PLAYER_ACTOR_FIELDS = {
   preparedSpellIds: "derived",
   spellbook: "derived",
   preparation: "derived",
+  restStep: "derived",
   inventory: "derived",
   currency: "derived",
   notes: "never",
@@ -626,6 +627,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
+ * | restStep (what a finished rest opened)  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | favouriteOptionIds, optionUseCounts     |  Y   |  -  |       -        |     -      |          -          |
@@ -697,6 +699,7 @@ export function projectPlayerView(
           preparedSpellIds,
           spellbook,
           preparation,
+          restStep,
           inventory,
           currency,
           replaySceneId,
@@ -762,6 +765,7 @@ export function projectPlayerView(
                 preparedSpellIds: [...preparedSpellIds],
                 spellbook: spellbook.map((entry) => ({ ...entry })),
                 preparation: preparation === null ? null : { ...preparation },
+                restStep: restStep === null ? null : { ...restStep },
                 inventory: inventory.map(playerInventoryRow),
                 currency: { ...currency }
               }

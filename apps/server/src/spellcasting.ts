@@ -133,9 +133,11 @@ export function setPreparedSpell(
   } else actor.preparedSpellIds = actor.preparedSpellIds.filter((id) => id !== spellId);
 }
 
-/** Closes the prepare step: the prepared list stands until the next Long Rest. */
-export function finishPreparing(state: GameState, actorId: string): void {
+/** Closes the prepare step, whose prepared list stands until the next Long Rest; with `rest`, the step a finished rest
+ *  opened, whose recoveries and re-choices wait for the next rest. */
+export function finishPreparing(state: GameState, actorId: string, rest = false): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  actor.preparation = null;
+  if (rest) actor.restStep = null;
+  else actor.preparation = null;
 }

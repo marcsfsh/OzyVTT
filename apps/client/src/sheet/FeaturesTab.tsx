@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from "react";
-import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary } from "@vtt/domain";
+import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary, ConversionOffer, Rechoice } from "@vtt/domain";
 import { Button, IconLevelUp } from "@vtt/ui";
 import { RichText } from "../encounter/RichText";
 import type { SrdExtension } from "../encounter/sheet-extension";
+import { ConversionList, RestStep } from "./Conversions";
 import type { SheetActor } from "./sheet-model";
+import type { SheetEdit } from "./useSheetEdit";
 import { UseList, type Pool } from "./Uses";
 
 /** What a use costs on a turn, in the SRD's words. */
@@ -118,9 +120,10 @@ function FeatureRow({ entry }: Readonly<{ entry: Entry }>) {
 }
 
 /**
- * The Features tab: the uses first (their boxes, when they come back, and Use), the Weapon Mastery picks, then every
- * feature grouped by where it comes from, one line each with the full text a tap away. It ends with what the next level
- * brings and the way to it, when the table's builder lets this caller level the character.
+ * The Features tab: the step a finished rest opened, the uses (their boxes, when they come back, and Use), what the
+ * features turn into what (Font of Magic, restoring a use), the Weapon Mastery picks, then every feature grouped by
+ * where it comes from, one line each with the full text a tap away. It ends with what the next level brings and the way
+ * to it, when the table's builder lets this caller level the character.
  */
 export function FeaturesTab({
   actor,
@@ -130,6 +133,11 @@ export function FeaturesTab({
   derived,
   pools,
   serverActions,
+  conversions = [],
+  rechoices = [],
+  busy = false,
+  edit,
+  onFeedback = () => {},
   onUse,
   next
 }: Readonly<{
@@ -140,6 +148,14 @@ export function FeaturesTab({
   derived: ActorDerivedSheet | null;
   pools: readonly Pool[];
   serverActions: readonly ContentActionSummary[];
+  /** What the features turn into what, and recover, as the server checks them now. */
+  conversions?: readonly ConversionOffer[];
+  /** The picks the character may re-make after a rest. */
+  rechoices?: readonly Rechoice[];
+  busy?: boolean;
+  /** Sends a conversion, a re-choice or the rest step's Done; absent where the sheet only shows. */
+  edit?: SheetEdit;
+  onFeedback?: (text: string) => void;
   /** Uses a pool's own action through the server, which applies what it does (Second Wind's healing). */
   onUse: (actionId: string) => void;
   /** What the next level brings and the way to it, when the caller may level the character. */
@@ -173,8 +189,20 @@ export function FeaturesTab({
   }
   // The monster's own actions, which have no uses to count but say what it can do.
   const monsterActions = actor.kind === "player-character" ? [] : definition.actions;
+  const converting = conversions.filter((offer) => offer.timing !== "after-short-rest");
   return (
     <div className="cs-features">
+      {edit && actor.restStep && (
+        <RestStep
+          actorId={actor.id}
+          after={actor.restStep.after}
+          offers={conversions}
+          rechoices={rechoices}
+          busy={busy}
+          edit={edit}
+          onFeedback={onFeedback}
+        />
+      )}
       {pools.length > 0 && (
         <section className="cs-group" aria-label="Uses">
           <span className="cs-eyebrow">Uses</span>
@@ -186,6 +214,12 @@ export function FeaturesTab({
             acting={acting}
             onUse={onUse}
           />
+        </section>
+      )}
+      {edit && converting.length > 0 && (
+        <section className="cs-group" aria-label="Convert and recover">
+          <span className="cs-eyebrow">Convert and recover</span>
+          <ConversionList actorId={actor.id} offers={converting} busy={busy} edit={edit} onFeedback={onFeedback} />
         </section>
       )}
       {masteries.length > 0 && <MasteryBlock masteries={masteries} />}

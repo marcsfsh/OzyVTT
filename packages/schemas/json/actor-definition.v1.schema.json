@@ -3716,7 +3716,8 @@
         "encounter",
         "long-rest",
         "short-rest",
-        "recharge"
+        "recharge",
+        "never"
       ]
     },
     "__schema311": {

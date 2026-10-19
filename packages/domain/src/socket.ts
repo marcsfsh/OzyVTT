@@ -37,6 +37,7 @@ import type {
   LooseSaveOutcome,
   MutationResult,
   SpellbookResult,
+  ConversionResult,
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
@@ -71,6 +72,7 @@ import type {
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
   ActorRestoreUsesSchema,
+  ActorConvertSchema,
   AddCombatantSchema,
   RemoveCombatantSchema,
   SpellZoneEndSchema,
@@ -574,6 +576,11 @@ export interface ClientToServerEvents {
   "actor:restore-uses": (
     payload: CommandPayload<typeof ActorRestoreUsesSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** Turn one resource into another, or recover one, by a feature's rule (the character's player or the GM). */
+  "actor:convert": (
+    payload: CommandPayload<typeof ActorConvertSchema>,
+    acknowledgement: (result: ConversionResult) => void
   ) => void;
   /** A player asks the GM for a Long Rest for their character, or takes the ask back. */
   "rest:ask": (

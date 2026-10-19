@@ -56,7 +56,9 @@ export function actionSummaryParts(action: ContentActionSummary, all: readonly C
     parts.push(
       action.usesPer === "recharge"
         ? `Recharge ${action.usesRecharge}${(action.usesRecharge ?? 6) < 6 ? "-6" : ""}`
-        : `${action.usesLimit}/${action.usesPer === null ? "" : usesScopeLabel(action.usesPer)}`
+        : action.usesPer === "never"
+          ? `${action.usesLimit} uses, not regained`
+          : `${action.usesLimit}/${action.usesPer === null ? "" : usesScopeLabel(action.usesPer)}`
     );
   if (action.legendaryCost !== undefined)
     parts.push(

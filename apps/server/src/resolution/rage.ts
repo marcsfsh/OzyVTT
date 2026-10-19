@@ -2,10 +2,15 @@ import { endEffect, RAGE_ROUNDS, RAGING_TAG, turnEndDuration } from "../effects.
 import type { ResolveContext } from "./context.js";
 
 /** SRD Persistent Rage: "When you roll Initiative, you can regain all expended uses of Rage", its once per Long
- *  Rest spent by the action itself. */
+ *  Rest spent by the action itself. The regain comes only in the window rolling Initiative opens (the sheet offers it
+ *  there, `conversions.ts`), so the action taken any other time gives nothing back. */
 function regainRageUses(ctx: ResolveContext): void {
-  const { attacker, action, siblings, warnings } = ctx;
+  const { state, attacker, action, siblings, warnings } = ctx;
   if (action.id !== "persistent-rage") return;
+  if (!state.combat.active || !state.combat.initiativeWindow.includes(attacker.id)) {
+    warnings.push(`Persistent Rage gives Rage back only when ${attacker.name} rolls Initiative.`);
+    return;
+  }
   const key = siblings.find((sibling) => sibling.id === "rage")?.uses?.pool ?? "rage";
   if (attacker.actionUses[key] === undefined) return;
   const { [key]: _spent, ...rest } = attacker.actionUses;

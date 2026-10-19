@@ -997,6 +997,13 @@ button.cs-lastroll-open {
   align-items: center;
   gap: var(--space-2);
 }
+/* A recovery's slot levels, one stepper each, wrapping on a phone. */
+.cs-recover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
 .cs-death {
   border-color: var(--danger);
   box-shadow: var(--glow-danger);

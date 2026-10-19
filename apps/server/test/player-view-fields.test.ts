@@ -80,6 +80,7 @@ const OWNER = [
   "preparedSpellIds",
   "spellbook",
   "preparation",
+  "restStep",
   "inventory",
   "currency"
 ];
