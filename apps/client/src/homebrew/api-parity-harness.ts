@@ -799,13 +799,6 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "how many hits an effect's damage riders last (a coat of poison); authored in the item overlay, no control yet",
     status: "gap"
   },
-  {
-    at: "modifiers[].**",
-    types: FEATURE_CARRIERS,
-    reason:
-      "the modifier rows beyond the editor's offered subset: a type the form does not offer has no field for its keys",
-    status: "gap"
-  },
 
   // ---- feature-scope machinery shared by the feature carriers ----
   {

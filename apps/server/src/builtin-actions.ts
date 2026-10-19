@@ -368,6 +368,15 @@ const skillWords = (skill: string) =>
     .map((word) => `${word[0]!.toUpperCase()}${word.slice(1)}`)
     .join(" ");
 
+/** SRD Empowered Strikes: "Whenever you deal damage with your Unarmed Strike, it can deal your choice of Force damage or
+ *  its normal damage type." A Monk 6's own Unarmed Strike offers both; anything else stays as it is. */
+export function withEmpoweredStrikes(action: BuiltinAction, definition: ActorDefinition | undefined): BuiltinAction {
+  if (builtinBaseId(action.id) !== "unarmed-strike" || action.damage.length === 0 || action.damageTypes) return action;
+  if (!(definition?.character?.features ?? []).some((feature) => feature.id === "empowered-strikes")) return action;
+  const own = action.damage[0]!.type as NonNullable<BuiltinAction["damageTypes"]>[number];
+  return own === "force" ? action : { ...action, damageTypes: [own, "force"] };
+}
+
 /** A generic action taken as a Bonus Action through a feature. Martial Arts' strike keeps the Monk's own numbers
  *  (its die, Dexterity) when the sheet has them; it is one attack outside the Attack action, so Extra Attack's
  *  count and the attack it replaces don't come along. */
@@ -377,7 +386,7 @@ function bonusVariant(base: BonusBase, source: string, definition: ActorDefiniti
     base === "unarmed-strike"
       ? definition?.actions.find((action) => action.id === base && action.attack !== undefined)
       : undefined;
-  const { replacesAttack: _attack, ...shape } = own ?? generic;
+  const { replacesAttack: _attack, ...shape } = withEmpoweredStrikes(own ?? generic, definition);
   const { count: _count, ...attack } = shape.attack ?? { bonus: 0 };
   return {
     ...shape,

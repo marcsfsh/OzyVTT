@@ -587,8 +587,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:mending": castOnly("The repair is the GM's."),
   "spell:message": castOnly("The whisper and its reply are the table's."),
   "spell:prestidigitation": castOnly("Its minor tricks are the GM's."),
-  "spell:shillelagh": castOnly("The weapon's spellcasting ability, larger damage die and Force damage are the GM's."),
-  "spell:thaumaturgy": castOnly("Its wonders are the GM's."),
+  "spell:shillelagh": enforced(
+    "The cast binds to the Club or Quarterstaff the caster picks (resolution/grant-extras.ts): its attack and damage rolls use the better of Strength and the spellcasting ability, its die becomes a d8 (d10 at level 5, d12 at 11, 2d6 at 17), and a hit deals Force or its own type (item-actions.ts). Casting it again moves it, and it ends once the weapon leaves the pack (bound-weapons.ts)."
+  ),
+  "spell:thaumaturgy": enforced(
+    "The cast keeps the wonder picked for a minute (resolution/grant-extras.ts), and Booming Voice gives Advantage on Intimidation checks (ability-checks.ts). What the other wonders look and sound like is the GM's."
+  ),
   "spell:true-strike": castOnly(
     "The weapon attack with the spellcasting ability, and its Radiant damage, are the GM's."
   ),
@@ -648,7 +652,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
 
   // Features and feats whose riders or picks apply part of what they do, and leave a part to the table.
   "feature:abjure-foes": guided(
-    "The Wisdom save against the Paladin's spell save DC, its Frightened and the Channel Divinity use are applied. The number of targets and the frightened creature's limit of one thing a turn are the GM's."
+    "The Wisdom save against the Paladin's spell save DC, its Frightened and the Channel Divinity use are applied, and a frightened target may only move, act or take a Bonus Action on each of its turns (resolution/economy.ts, movement-rules.ts). The number of targets is the GM's."
   ),
   "feature:aura-of-courage": enforced(
     "paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Frightened while it isn't Incapacitated, and an ally already Frightened has no Disadvantage from it there (resolution/attack.ts, check-rolls.ts)."
@@ -674,8 +678,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:goliath-giant-ancestry": guided(
     "The chosen ancestry and its uses are recorded, and Storm's Thunder is offered as a Reaction. The other boons' damage, push and teleport are the GM's."
   ),
-  "feature:divine-order": guided(
-    "Protector's training and Thaumaturge's extra cantrip are applied. Thaumaturge's bonus to Arcana and Religion checks is the GM's."
+  "feature:divine-order": enforced(
+    "Protector's training and Thaumaturge's extra cantrip are applied, and Thaumaturge adds the Wisdom modifier, at least +1, to Arcana and Religion checks (ability-checks.ts)."
   ),
   "feature:eldritch-invocations": guided(
     "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. The senses (Devil's Sight, Witch Sight), the pact-weapon invocations, Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
@@ -692,8 +696,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:primal-knowledge": enforced(
     "The extra skill is applied. While raging, Acrobatics, Intimidation, Perception, Stealth and Survival checks are made as Strength checks when that is the better roll (ability-checks.ts)."
   ),
-  "feature:primal-order": guided(
-    "Magician's extra cantrip and Warden's training are applied. The Wisdom bonus to the checks each role names is the GM's."
+  "feature:primal-order": enforced(
+    "Magician's extra cantrip and its Wisdom modifier, at least +1, on Arcana and Nature checks (ability-checks.ts), and Warden's training, are applied."
   ),
   "feature:stunning-strike": enforced(
     "A target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. On a success resolution/pending.ts halves its Speed until then (speed.ts), and the next attack roll against it before then has Advantage and spends it (resolution/attack.ts)."
@@ -702,7 +706,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The fourth attuned item is applied (inventory.ts). The roll to save a charge, and reading any Spell Scroll, are the GM's."
   ),
   "feature:grappler": guided(
-    "The ability score increase is applied. Punch and Grab, Attack Advantage and Fast Wrestler are the GM's."
+    "The ability score increase is applied, and attack rolls against a creature it grapples have Advantage (resolution/attack.ts). Punch and Grab and Fast Wrestler are the GM's."
   ),
   "feature:boon-of-combat-prowess": guided(
     "The ability score increase is applied, and Peerless Aim's use is counted each turn. Turning the miss into a hit is the GM's."
@@ -714,7 +718,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The ability score increase is applied, and Improve Fate's use is counted. Adding the 2d4 to the roll is the GM's."
   ),
   "feature:boon-of-irresistible-offense": guided(
-    "The ability score increase is applied. Overcoming Resistance, and the extra damage on a 20, are the GM's."
+    "The ability score increase is applied, and its Bludgeoning, Piercing and Slashing damage ignores Resistance (hit-points.ts). The extra damage on a 20 is the GM's."
   ),
   "feature:boon-of-spell-recall": guided(
     "The ability score increase is applied. Casting a spell without spending its slot is the GM's."
@@ -871,8 +875,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:befuddlement": enforced(
     "A failed save deals the Psychic damage and bars the target from casting spells and the Magic action (resolution/economy.ts). The save every 30 days, and Greater Restoration, Heal or Wish ending it, are the GM's."
   ),
-  "spell:bestow-curse": guided(
-    "A failed save leaves the curse on the target for the slot's duration (resolution/concentration.ts: with Concentration below level 5, 10 minutes from a level 4 slot, 8 hours from 5, 24 hours from 7, until dispelled from 9), and Remove Curse or Dispel Magic ends it. The curse the caster chooses, and what it does, are the GM's to apply."
+  "spell:bestow-curse": enforced(
+    "A failed save leaves the curse the caster picks for the slot's duration (resolution/pending.ts, resolution/concentration.ts): Disadvantage on one ability's checks and saves, Disadvantage on its attack rolls against the caster (resolution/attack.ts), or an extra 1d8 Necrotic when the caster's attack hits it (resolution/damage.ts). Remove Curse or Dispel Magic ends it. The forced Dodge's save at the start of each turn is the GM's to ask."
   ),
   "spell:blur": enforced(
     "Attack rolls against the caster have Disadvantage while it lasts. An attacker that perceives the caster with Blindsight or Truesight is the GM's to spare."
@@ -893,7 +897,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The caster makes the DC 15 Intelligence save (resolution/pending.ts); a failure deals 6d6 Psychic damage and leaves it Incapacitated until it finishes a Long Rest (rests.ts). The entity's answers, and a Greater Restoration ending the condition, are the GM's."
   ),
   "spell:contagion": guided(
-    "The save's 11d8 Necrotic damage and Poisoned condition are applied. The Disadvantage on saves with the chosen ability, and the three repeat saves, are the GM's."
+    "The save's 11d8 Necrotic damage and Poisoned are applied, with Disadvantage on saves with the ability the caster picks (resolution/pending.ts). The three repeat saves are the GM's."
   ),
   "spell:delayed-blast-fireball": guided(
     "Cast in a fight, the bead waits at its point and spell-zones.ts explodes it when the spell ends, Concentration broken included: the Dexterity save and 12d6 Fire damage, plus 1d6 for each of the caster's turns that ended while it waited. A creature touching the bead, and a bead left outside a fight, are the GM's."
@@ -929,16 +933,16 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save imposes Restrained. The repeat saves toward Petrified, and Speed 0 on a success, are the GM's."
   ),
   "spell:freedom-of-movement": guided(
-    "speed.ts gives the target a Swim Speed equal to its Speed. Ignoring Difficult Terrain, the immunity to magical Paralyzed and Restrained, and slipping free of restraints are the GM's."
+    "speed.ts gives the target a Swim Speed equal to its Speed, and the target can't have the Paralyzed or Restrained condition (effects.ts), whatever its source. Ignoring Difficult Terrain and keeping its Speed from being reduced are the GM's."
   ),
   "spell:gust-of-wind": guided(
     "The cast's save pushes a creature that fails 15 feet away from the caster. The save at the end of a creature's turn in the Line, the doubled cost of moving toward the caster and turning the Line are the GM's."
   ),
   "spell:hideous-laughter": guided(
-    "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns. The save with Advantage each time it takes damage is the GM's."
+    "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns, and the target can't stand up while it lasts (actor-conditions.ts). The save with Advantage each time it takes damage is the GM's."
   ),
-  "spell:irresistible-dance": guided(
-    "A failed save imposes Charmed. The dance's Disadvantage, the Advantage against the dancer and its save to collect itself are the GM's."
+  "spell:irresistible-dance": enforced(
+    "A failed save Charms the target, holds its Speed at 0, gives it Disadvantage on Dexterity saves and attack rolls and attackers Advantage against it, and offers it an action to collect itself with a Wisdom save at the spell save DC (builtin-actions.ts). A success holds its Speed at 0 until the end of its next turn."
   ),
   "spell:major-image": guided(
     "resolution/concentration.ts holds the caster's Concentration on it, and from a level 4 slot it lasts until dispelled with none. The illusion itself is the GM's to run."
@@ -982,11 +986,120 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:remove-curse": enforced(
     "resolution/dispel.ts ends every effect marked a curse on the target (Hex, Bestow Curse, Geas), and breaks its Attunement to a cursed item so the item can be removed; the item's own curse stays. A curse the app doesn't track is the GM's."
   ),
-  "spell:regenerate": guided(
-    "The 4d8 + 15 Hit Points are applied to one creature (resolution/spell-targets.ts). The 1 Hit Point at the start of each of the target's turns, and regrowing severed parts, are the GM's."
+  "spell:regenerate": enforced(
+    "The 4d8 + 15 Hit Points are applied to one creature, which regains 1 Hit Point at the start of each of its turns for the hour (turn-boundaries.ts). Regrowing severed parts is the GM's."
   ),
   "spell:sleep": guided(
-    "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it. The second save, and Unconscious on its failure, are the GM's."
+    "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it, as does a creature within 5 feet taking the Shake Awake action (resolution/builtins.ts). The second save, and Unconscious on its failure, are the GM's."
+  ),
+  "spell:alter-self": enforced(
+    "The form picked is kept for the hour (resolution/grant-extras.ts): Aquatic Adaptation's Swim Speed (speed.ts), or a natural weapon that makes the Unarmed Strike 1d6 of its type with the spellcasting ability (resolution/builtins.ts). Changing the form is a new cast; Change Appearance and breathing water are the GM's."
+  ),
+  "spell:beacon-of-hope": enforced(
+    "Each target has Advantage on Wisdom saves and Death Saving Throws (saving-throws.ts) and regains the most any healing can give it (resolution/heal.ts) while the caster concentrates."
+  ),
+  "spell:calm-emotions": enforced(
+    "A Humanoid that fails the Charisma save takes the effect picked for it (resolution/pending.ts): immunity to Charmed and Frightened, one it has held off and given back when the spell ends (suppressed-conditions.ts); or Indifferent, whose attitude is the GM's to play."
+  ),
+  "spell:command": enforced(
+    "A failed save leaves the command picked until the end of the target's next turn (resolution/pending.ts): Flee allows only the Dash (resolution/economy.ts), Grovel makes it Prone and holds it still with no actions, Halt holds it still with no actions, and Drop takes its actions. Moving it for Approach and Flee, and what it drops, are the GM's."
+  ),
+  "spell:conjure-minor-elementals": guided(
+    "Each of the caster's hits on a creature within 15 feet deals an extra 2d8 of the type picked at the cast (resolution/damage.ts). Picking the type for each attack instead, the extra 1d8 a slot level, and the Difficult Terrain are the GM's."
+  ),
+  "spell:dispel-evil-and-good": guided(
+    "Celestials, Elementals, Fey, Fiends and Undead have Disadvantage on attack rolls against the caster (resolution/attack.ts). Break Enchantment and Dismissal are the GM's to run, and they end the spell."
+  ),
+  "spell:dragons-breath": enforced(
+    "The touched creature gains an action to exhale the 15-foot Cone at the cast's level, save DC and the damage type picked when it was cast, while the caster concentrates (granted-actions.ts); the caster's own sheet doesn't offer it."
+  ),
+  "spell:enlargereduce": guided(
+    "The target takes the option picked (resolution/grant-extras.ts): Enlarge's Advantage on Strength checks and saves and extra 1d4 on its weapon and Unarmed Strike damage, or Reduce's Disadvantage and 1d4 less (never below 1). The size change on the map, and an unwilling target's Constitution save, are the GM's."
+  ),
+  "spell:enthrall": enforced(
+    "A failed Wisdom save gives -10 to the target's Perception checks while the caster concentrates (ability-checks.ts). Its Passive Perception, and the creatures that succeed automatically because they are fighting the caster's side, are the GM's."
+  ),
+  "spell:expeditious-retreat": enforced(
+    "The cast takes the Dash action at once, and the caster may take it again as a Bonus Action while the spell lasts (builtin-actions.ts)."
+  ),
+  "spell:eyebite": enforced(
+    "A failed save leaves the effect picked (resolution/pending.ts): Asleep (Unconscious, waking on damage or a Shake Awake), Panicked (Frightened, its turns spent on the Dash) or Sickened (Poisoned). Targeting another creature on later turns, and a Panicked creature's route away, are the GM's."
+  ),
+  "spell:fire-shield": enforced(
+    "The shield picked gives Resistance to Cold (warm) or Fire (chill), and a creature within 5 feet that hits the caster with a melee attack roll takes 2d8 Fire or Cold (resolution/struck.ts). Its light is the GM's to place."
+  ),
+  "spell:gaseous-form": guided(
+    "The target has Resistance to Bludgeoning, Piercing and Slashing damage, Advantage on Strength, Dexterity and Constitution saves, a Fly Speed of 10 feet with hover, and takes no action but the Dash (resolution/economy.ts). Its other Speeds, slipping through cracks, and an unwilling target's save are the GM's."
+  ),
+  "spell:glibness": enforced(
+    "A Charisma check's d20 counts as at least 15 for the hour (ability-checks.ts). How magic reads the caster's truthfulness is the GM's."
+  ),
+  "spell:guidance": enforced(
+    "The touched creature adds 1d4 to its checks with the skill picked at the cast while the caster concentrates (ability-checks.ts)."
+  ),
+  "spell:heroes-feast": enforced(
+    "Up to twelve creatures gain Resistance to Poison damage, Immunity to Frightened and Poisoned, and 2d10 rolled for each to its Hit Point maximum and current Hit Points for 24 hours of game time (resolution/grant.ts). The hour the feast takes is the GM's to time."
+  ),
+  "spell:magic-weapon": enforced(
+    "The caster's nonmagical weapon picked gains +1 to its attack and damage rolls, +2 from a level 3 slot and +3 from level 6 (equipment-derivation.ts), for the hour; casting it again moves it. A weapon another creature carries is the GM's."
+  ),
+  "spell:maze": guided(
+    "The target may take an action for a DC 20 Intelligence (Investigation) check, which ends the spell on a success (resolution/builtins.ts). Taking it off the map to the demiplane and back is the GM's."
+  ),
+  "spell:mind-blank": enforced(
+    "The target is immune to Psychic damage (hit-points.ts) and the Charmed condition (effects.ts). What it hides from divination is the GM's."
+  ),
+  "spell:mind-spike": enforced(
+    "The save and its Psychic damage are applied, and a failure outlines the target to the caster: Invisible gives it nothing against the caster's attacks or the caster's against it (resolution/attack.ts). Knowing where it is, and hiding, are the GM's."
+  ),
+  "spell:mislead": guided(
+    "The caster is Invisible until it makes an attack roll, deals damage or casts a spell, while the spell goes on (resolution/attack.ts). The illusory double is the GM's."
+  ),
+  "spell:protection-from-evil-and-good": enforced(
+    "Aberrations, Celestials, Elementals, Fey, Fiends and Undead have Disadvantage on attack rolls against the target and can't make it Charmed or Frightened (effects.ts). Possession, and Advantage on a new save against such a creature's effect, are the GM's."
+  ),
+  "spell:raise-dead": guided(
+    "The target takes -4 on its attack rolls, saving throws and ability checks, one less after each Long Rest (effects.ts). Bringing the creature back is the GM's."
+  ),
+  "spell:ray-of-enfeeblement": enforced(
+    "A failed Constitution save gives Disadvantage on Strength attack rolls, checks and saves and takes 1d8 off each damage roll, never below 1, repeating the save at the end of each turn; a success gives Disadvantage on its next attack roll before the caster's next turn (resolution/pending.ts)."
+  ),
+  "spell:resistance": enforced(
+    "The touched creature takes 1d4 off damage of the type picked, once a turn, while the caster concentrates (hit-points.ts)."
+  ),
+  "spell:resurrection": guided(
+    "The target takes -4 on its attack rolls, saving throws and ability checks, one less after each Long Rest (effects.ts). Bringing the creature back, and the caster's ordeal for one long dead, are the GM's."
+  ),
+  "spell:sequester": enforced(
+    "The target is Invisible and Unconscious until the spell ends, which taking damage does (effects.ts). The end condition the caster sets, and hiding from divination, are the GM's."
+  ),
+  "spell:warding-bond": guided(
+    "The target has +1 to AC and saving throws and Resistance to all damage for the hour. The caster's share of its damage, and the spell ending at 60 feet apart, are the GM's."
+  ),
+  "spell:wind-walk": guided(
+    "Each target has a Fly Speed of 300 feet with hover, Resistance to Bludgeoning, Piercing and Slashing damage, Immunity to Prone, and takes no action but the Dash (resolution/economy.ts). Reverting, its Stunned minute and the descent are the GM's."
+  ),
+  "feature:hunters-prey": guided(
+    "Colossus Slayer's extra 1d8 on a weapon hit against a creature missing any Hit Points is applied once a turn (resolution/damage.ts). Horde Breaker's extra attack, and swapping the pick after a rest, are the GM's."
+  ),
+  "feature:dark-ones-blessing": enforced(
+    "When the Warlock drops an enemy to 0 Hit Points, or anyone does within 10 feet of it on the map, it gains Temporary Hit Points equal to its Charisma modifier plus its Warlock level, at least 1, keeping the higher (dark-ones-blessing.ts)."
+  ),
+  "feature:empowered-strikes": enforced(
+    "A Monk 6's Unarmed Strike deals Force or its normal type, its choice (builtin-actions.ts)."
+  ),
+  "feature:foe-slayer": enforced("A Ranger 20's Hunter's Mark deals 1d10 (resolution/grant.ts)."),
+  "feature:potent-cantrip": enforced(
+    "An Evoker's Wizard cantrip deals half its damage on a missed attack roll or a successful save, with no other effect (effective-actions.ts)."
+  ),
+  "feature:sacred-weapon": enforced(
+    "A use of Channel Divinity binds the held Melee weapon picked for 10 minutes: its attack rolls add the Charisma modifier, at least +1, and its hits deal Radiant or its own type (equipment-derivation.ts). Its light is the GM's to place."
+  ),
+  "feature:studied-attacks": enforced(
+    "A Fighter that misses a creature has Advantage on its next attack roll against it before the end of its next turn, which that roll spends (resolution/studied.ts)."
+  ),
+  "feature:survivor": enforced(
+    "A Champion 18 rolls death saves with Advantage (saving-throws.ts) and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts). An 18 or 19 on a death save counting as a 20 is the GM's."
   ),
   "spell:sleet-storm": guided(
     "spell-zones.ts asks for the Dexterity save when a creature enters the area or starts its turn there, and a failure leaves it Prone and ends its Concentration. The Difficult Terrain is the GM's to paint, and the Heavily Obscured area and the doused flames are the GM's."

@@ -474,7 +474,8 @@ function playerEffect(
     // What a spell's level, its caster's numbers or its choice set, and the engine's bookkeeping: the hit points it
     // restores each turn, the kinds of creature it wards against, the conditions it holds off, the carried row it is
     // bound to and how that row swings, the actions it gives (their DCs and damage types), and its once-a-turn and
-    // shrinking marks. Its name says what it is; the owner's sheet reads its actions from the available-actions read.
+    // shrinking marks, the damage it deals a creature that hits its bearer, and how its bearer's Unarmed Strike lands. Its name says what it is; the owner's
+    // sheet reads its actions from the available-actions read.
     hitPointsEachTurn: _hitPointsEachTurn,
     conditionWards: _conditionWards,
     suppressedConditions: _suppressedConditions,
@@ -486,6 +487,8 @@ function playerEffect(
     endAction: _endAction,
     usedOnTurn: _usedOnTurn,
     shrinksEachLongRest: _shrinksEachLongRest,
+    meleeHitDamage: _meleeHitDamage,
+    unarmedStrike: _unarmedStrike,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

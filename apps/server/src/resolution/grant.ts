@@ -21,6 +21,7 @@ import {
   type EffectNarration
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
+import { holdsFeature } from "../class-features.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
@@ -34,6 +35,18 @@ import { suppressConditions } from "../suppressed-conditions.js";
 function strengthAttacksOnly(modifier: Modifier): Modifier {
   if (modifier.type !== "roll-mode" || modifier.roll !== "attack" || (modifier.when?.length ?? 0) > 0) return modifier;
   return { ...modifier, when: [{ type: "on-attack-roll" }, { type: "ability-is", abilities: ["str"] }] };
+}
+
+/** SRD Foe Slayer: "The damage die of your Hunter's Mark is a d10 rather than a d6." */
+function foeSlayerDie(ctx: ResolveContext, modifiers: readonly Modifier[]): readonly Modifier[] {
+  if (
+    !ctx.action.grants?.tags.includes("hunters-mark") ||
+    !holdsFeature(ctx.deps.definition, "foe-slayer", "Foe Slayer")
+  )
+    return modifiers;
+  return modifiers.map((modifier) =>
+    modifier.type === "extra-damage" && modifier.formula === "1d6" ? { ...modifier, formula: "1d10" } : modifier
+  );
 }
 
 /** The feature whose Rage lasts 10 minutes with nothing to extend it (Barbarian 15). */
@@ -117,7 +130,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   // the next attack roll (`spendSteadyAim`). A sheet built earlier says "until your next turn".
   const steadyAim = grant.tags.includes(STEADY_AIM_TAG);
   const rage = rageTiming(ctx, recipient);
-  const modifiers = grant.tags.includes(RECKLESS_TAG) ? grant.modifiers.map(strengthAttacksOnly) : grant.modifiers;
+  const modifiers = foeSlayerDie(
+    ctx,
+    grant.tags.includes(RECKLESS_TAG) ? grant.modifiers.map(strengthAttacksOnly) : grant.modifiers
+  );
   // Hex: "choose one ability. The target has Disadvantage on ability checks made with the chosen ability."
   const hexed = grant.tags.includes(CHOSEN_ABILITY_TAG);
   const hexAbility = hexed ? (input.ability ?? null) : null;
@@ -257,6 +273,22 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   // A new way to work out AC counts at once.
   if (baseArmorClass !== undefined && recipientDefinition)
     refreshBaseArmorClass(recipient, recipientDefinition, deps.catalog);
+  // Expeditious Retreat: the cast is a Dash too, measured now as the generic action's is.
+  if (grant.dashesNow)
+    addEffect(
+      state,
+      recipient.id,
+      makeEffect({
+        id: `${input.commandId}:dash:${recipient.id}`,
+        name: "Dashing",
+        tags: ["dashing"],
+        sourceActorId: attacker.id,
+        sourceName: attacker.name,
+        startedRound: state.combat.round,
+        duration: { type: "until-source-next-turn" },
+        movementGrantFeet: currentSpeedFeet(recipient, derivation) ?? 0
+      })
+    );
   // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later, rather than ended.
   holdOff(ctx, recipient, effect, [...(grant.suppressesConditions ?? []), ...parts.suppresses]);
   // SRD Immunity: a condition the grant makes its bearer immune to ends now (Heroism's Frightened), as the table hears.

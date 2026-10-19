@@ -7,6 +7,7 @@ import {
   type GameState,
   type HealthBand
 } from "@vtt/domain";
+import { blessOnTheKill } from "./dark-ones-blessing.js";
 import {
   adjustDamageParts,
   collectRiders,
@@ -732,6 +733,9 @@ export function applyDamageDetailed(
     instantDeath = fell.instantDeath;
     defeated = fell.defeated;
   }
+  // A Fiend Warlock near the fall, or the one who dealt it, gains Temporary Hit Points.
+  if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
+    events.push(...blessOnTheKill(state, actor, input.sourceActorId, deps));
   if (input.drain && totalAdjusted > 0) {
     const drained = drainDamage(state, actor, input, { parts, totalAdjusted }, definition, deps, events);
     instantDeath ||= drained.died && isPlayerCharacter;

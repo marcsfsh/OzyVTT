@@ -3,7 +3,7 @@
  * riders already there (Divine Order, Blessed Strikes, Channel Divinity, the domain spell tiers) are
  * not restated here.
  */
-import { potentSpellcasting, type ClassMechanicsModule } from "./overlay.js";
+import { potentSpellcasting, wisdomOnChecks, type ClassMechanicsModule } from "./overlay.js";
 
 export const cleric: ClassMechanicsModule = {
   features: {
@@ -16,10 +16,13 @@ export const cleric: ClassMechanicsModule = {
     "divine-order": {
       options: {
         /**
-         * "You know one extra cantrip from the Cleric spell list." The Arcana/Religion bonus (Wisdom
-         * modifier, minimum +1) stays prose: `check-bonus` takes a flat integer.
+         * "You know one extra cantrip from the Cleric spell list" and "a bonus to your Intelligence (Arcana or
+         * Religion) checks. The bonus equals your Wisdom modifier (minimum of +1)."
          */
-        thaumaturge: { extraPicks: [{ offer: "class-cantrips", amount: 1 }] }
+        thaumaturge: {
+          extraPicks: [{ offer: "class-cantrips", amount: 1 }],
+          modifiers: [wisdomOnChecks(["arcana", "religion"])]
+        }
       }
     },
 
@@ -73,8 +76,27 @@ export const cleric: ClassMechanicsModule = {
       }
     }
 
-    // Not modeled: Sear Undead (ability-scaled dice count) and Life Domain's healing riders (no healing
-    // rider vocabulary).
+    // Not modeled: Sear Undead (ability-scaled dice count).
   },
-  subclasses: { "life-domain": {} }
+  subclasses: {
+    "life-domain": {
+      // "When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional
+      // Hit Points ... equal 2 plus the spell slot's level."
+      "disciple-of-life": {
+        modifiers: [{ type: "healing-bonus", amount: 2, perSlotLevel: true, when: [{ type: "on-healing" }] }]
+      },
+      // "Immediately after you cast a spell with a spell slot that restores Hit Points to one or more creatures other
+      // than yourself, you regain Hit Points equal to 2 plus the spell slot's level."
+      "blessed-healer": {
+        modifiers: [
+          { type: "healing-bonus", amount: 2, perSlotLevel: true, self: true, when: [{ type: "on-healing" }] }
+        ]
+      },
+      // "Instead use the highest number possible for each die" of a spell's or Channel Divinity's healing; an item's
+      // healing rolls as usual.
+      "supreme-healing": {
+        modifiers: [{ type: "healing-dice-maximized", when: [{ type: "on-healing" }] }]
+      }
+    }
+  }
 };

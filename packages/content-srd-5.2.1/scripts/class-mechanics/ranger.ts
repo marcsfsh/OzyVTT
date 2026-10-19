@@ -22,6 +22,19 @@ export const ranger: ClassMechanicsModule = {
       modifiers: [{ type: "extra-attack", count: 1 }]
     },
 
+    // "You have Advantage on attack rolls against the creature currently marked by your Hunter's Mark."
+    "precise-hunter": {
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "attack",
+          mode: "advantage",
+          when: [{ type: "on-attack-roll" }, { type: "versus-marked", tags: ["hunters-mark"] }]
+        }
+      ]
+    },
+    // Foe Slayer's d10 is the Hunter's Mark the Ranger casts (resolution/grant-extras.ts).
+
     /**
      * "Speed increases by 10 feet while you aren't wearing Heavy armor": the +10 is in the sheet's Speed, and a live
      * -10 takes it back while Heavy armor is worn, so sheets built with the +10 stay right. The Climb and Swim
@@ -110,9 +123,8 @@ export const ranger: ClassMechanicsModule = {
   subclasses: {
     hunter: {
       /**
-       * A pick with prose-only options. Colossus Slayer needs a gate on the target's HP and once-per-turn
-       * on a modifier; Horde Breaker's extra attack must target a different creature. Replacing the
-       * choice on a rest stays prose.
+       * Colossus Slayer's 1d8 lands once a turn on a weapon hit against a creature missing hit points. Horde Breaker's
+       * extra attack must target a different creature, and replacing the choice on a rest, stay prose.
        */
       "hunters-prey": {
         choice: {
@@ -123,7 +135,15 @@ export const ranger: ClassMechanicsModule = {
               id: "colossus-slayer",
               name: "Colossus Slayer",
               description:
-                "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn."
+                "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn.",
+              modifiers: [
+                {
+                  type: "extra-damage",
+                  formula: "1d8",
+                  oncePerTurn: true,
+                  when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["weapon"] }, { type: "versus-hurt" }]
+                }
+              ]
             },
             {
               id: "horde-breaker",

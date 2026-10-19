@@ -83,6 +83,16 @@ export const rogue: ClassMechanicsModule = {
     "slippery-mind": {
       grants: { saves: ["wis", "cha"] }
     },
+    // "No attack roll can have Advantage against you unless you have the Incapacitated condition."
+    elusive: {
+      modifiers: [
+        {
+          type: "advantage-denied",
+          roll: "incoming-attack",
+          when: [{ type: "while-condition", conditionIds: ["incapacitated"], present: false }]
+        }
+      ]
+    },
 
     "epic-boon": {
       choice: { kind: "feat", choose: 1, fromCatalog: "feats" }

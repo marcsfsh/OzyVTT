@@ -300,7 +300,8 @@ export const whenField = (): FieldDef => ({
         opt("thrown", "Thrown"),
         opt("reaction", "Reaction"),
         opt("opportunity", "Opportunity"),
-        opt("two-handed", "Held in two hands")
+        opt("two-handed", "Melee, held in two hands"),
+        opt("ranged-weapon-kind", "With a Ranged weapon (a bow, a Dart)")
       ],
       visibleWhen: hasType("attack-kind-is")
     },

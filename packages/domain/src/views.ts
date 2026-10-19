@@ -58,6 +58,8 @@ export type PlayerEffect = Omit<
   | "endAction"
   | "usedOnTurn"
   | "shrinksEachLongRest"
+  | "meleeHitDamage"
+  | "unarmedStrike"
 > & {
   yours?: true;
 };

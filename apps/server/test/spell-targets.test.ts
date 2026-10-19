@@ -60,7 +60,10 @@ describe("how many creatures a spell targets", () => {
   it("caps Power Word Heal, Heal and Regenerate at one creature, and Mass Suggestion at twelve", () => {
     for (const spellId of ["power-word-heal", "heal", "regenerate"]) {
       const { state } = beasts();
-      expect(() => cast(state, spellId, { targetIds: [HERO, ALLY] }), spellId).toThrowError(/targets one creature/);
+      // A spell whose effect lands on its one target is refused by the grant's own target as well.
+      expect(() => cast(state, spellId, { targetIds: [HERO, ALLY] }), spellId).toThrowError(
+        /targets one creature|exactly one target/
+      );
     }
     expect(view.spellRecord("mass-suggestion")!.effect?.targets).toEqual({ count: 12 });
   });

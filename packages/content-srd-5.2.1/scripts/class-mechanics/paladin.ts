@@ -126,7 +126,10 @@ export const paladin: ClassMechanicsModule = {
             successDamage: "none",
             failureConditions: ["frightened"],
             failureDuration: { type: "rounds", rounds: 10 },
-            endsOnDamage: true
+            endsOnDamage: true,
+            // "While Frightened in this way, a target can do only one of the following on its turns: move, take an
+            // action, or take a Bonus Action."
+            failureEffect: { name: "Abjure Foes", tags: ["one-thing-a-turn"], modifiers: [] }
           }
         }
       ]
@@ -198,8 +201,8 @@ export const paladin: ClassMechanicsModule = {
         }
       },
 
-      // A subclass spender of the class's Channel Divinity pool. The Charisma-modifier attack bonus is
-      // not expressible (`attack-bonus` is a flat integer).
+      // A subclass spender of the class's Channel Divinity pool, bound to the Melee weapon picked: its attack rolls add
+      // the Charisma modifier (at least +1), and its hits deal Radiant or the weapon's own type. The light is P6's.
       "sacred-weapon": {
         uses: {
           scaling: { type: "class-resource", id: "channel-divinity" },
@@ -213,7 +216,22 @@ export const paladin: ClassMechanicsModule = {
             activation: "other",
             description:
               "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
-            damage: []
+            damage: [],
+            grants: {
+              name: "Sacred Weapon",
+              tags: ["sacred-weapon"],
+              duration: { type: "rounds", rounds: 100 },
+              modifiers: [],
+              onEnd: [],
+              target: "self",
+              voidWhileIncapacitated: false,
+              concentration: false,
+              bindsWeapon: {
+                melee: true,
+                attackBonusAbility: { ability: "cha", minimum: 1 },
+                damageTypes: ["radiant"]
+              }
+            }
           }
         ]
       },

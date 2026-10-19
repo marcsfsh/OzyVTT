@@ -30,10 +30,8 @@ export const sorcerer: ClassMechanicsModule = {
     // Grouping tag, as on the other casters; no consumer reads class-feature `tags` yet.
     spellcasting: { tags: ["spellcasting"] },
     /**
-     * Bonus Action, two uses per Long Rest, a 10-round `innate-sorcery` tag. The effect carries neither
-     * benefit: effects have no `spell-save-dc` modifier, and an effect's roll-mode drops its `when`
-     * (and nothing announces a "spell" attack kind), so spell-attack advantage would apply to every
-     * attack. The description carries both.
+     * Bonus Action, two uses per Long Rest, for 10 rounds: +1 to the save DC of the spells the sheet casts as a
+     * Sorcerer (`classId`), and Advantage on their spell attack rolls (`spell-class-is`).
      */
     "innate-sorcery": {
       uses: { limit: 2, per: "long-rest" },
@@ -48,7 +46,20 @@ export const sorcerer: ClassMechanicsModule = {
           grants: {
             name: "Innate Sorcery",
             tags: ["innate-sorcery"],
-            duration: { type: "rounds", rounds: 10 }
+            duration: { type: "rounds", rounds: 10 },
+            modifiers: [
+              { type: "spell-save-dc", amount: 1, classId: "sorcerer" },
+              {
+                type: "roll-mode",
+                roll: "attack",
+                mode: "advantage",
+                when: [
+                  { type: "on-attack-roll" },
+                  { type: "attack-kind-is", kinds: ["spell"] },
+                  { type: "spell-class-is", classIds: ["sorcerer"] }
+                ]
+              }
+            ]
           }
         }
       ]
@@ -137,7 +148,8 @@ export const sorcerer: ClassMechanicsModule = {
       },
       /**
        * Five inline options, each granting its resistance and an `extra-damage` rider of the Charisma
-       * modifier for its own type, gated on `damage-type-is`. It can also fire on a weapon of that type.
+       * modifier for its own type, gated on `damage-type-is` and on a spell (`spell-level-is` any level), so a weapon
+       * of that type doesn't fire it.
        */
       "elemental-affinity": {
         choice: {
@@ -153,7 +165,11 @@ export const sorcerer: ClassMechanicsModule = {
                 type: "extra-damage" as const,
                 abilityModifier: "cha" as const,
                 damageType: id,
-                when: [{ type: "on-damage-roll" as const }, { type: "damage-type-is" as const, damageTypes: [id] }]
+                when: [
+                  { type: "on-damage-roll" as const },
+                  { type: "damage-type-is" as const, damageTypes: [id] },
+                  { type: "spell-level-is" as const, levels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+                ]
               }
             ]
           }))

@@ -296,6 +296,10 @@ function successEffectFor(
   };
 }
 
+/** The conditions a failure's pick sets on their own, outside its effect (Command's Grovel: Prone). */
+const barePicks = (option: GrantOption | null): string[] =>
+  (option?.conditions ?? []).filter((id) => BARE_FAILURE_CONDITIONS.has(id));
+
 /** SRD Power Word Stun: a target over its hit-point gate isn't Stunned. Instead, "Otherwise, its Speed is 0 until the start
  *  of your next turn". */
 const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"]);
@@ -318,7 +322,12 @@ export function parkActionSave(ctx: ResolveContext): void {
   const offered = action.save.failureEffect?.options
     ? { options: action.save.failureEffect.options, perTarget: action.save.failureEffect.optionsPerTarget === true }
     : null;
-  const optionOf = (target: LiveActor) => (offered ? optionFor(ctx, offered, target, action.name) : null);
+  // Asked once for each target, so a missing pick is said once.
+  const picked = new Map<string, GrantOption | null>();
+  const optionOf = (target: LiveActor) => {
+    if (!picked.has(target.id)) picked.set(target.id, offered ? optionFor(ctx, offered, target, action.name) : null);
+    return picked.get(target.id)!;
+  };
   const onFailEffect = failureEffectFor(ctx, conditionIds, cast);
   const onFailFor = (option: GrantOption | null) =>
     option ? failureEffectFor(ctx, conditionIds, cast, option) : onFailEffect;
@@ -358,7 +367,7 @@ export function parkActionSave(ctx: ResolveContext): void {
         continue;
       }
       const events = [
-        ...conditionIds
+        ...[...conditionIds, ...barePicks(optionOf(target))]
           .filter((id) => !onFailEffect?.linkedConditionIds.includes(id))
           .flatMap((id) => setCondition(state, target.id, id, true, undefined, { role: "gm" }, conditionDeps(deps))),
         ...(onFailEffect
@@ -428,7 +437,8 @@ export function parkActionSave(ctx: ResolveContext): void {
       proposedDamageParts: parts,
       saveBonus,
       halfOnSuccess: action.save.successDamage === "half",
-      conditionIds,
+      // A pick's own Prone stays bare, as the action's does (Command's Grovel).
+      conditionIds: [...conditionIds, ...barePicks(option)],
       ...(onFailEffect ? { onFailEffect } : {}),
       ...(onSuccessEffect ? { extra: { onSuccessEffect } } : gmApplies ? { extra: { gmApplies: true as const } } : {}),
       ...(action.drain ? { drain: action.drain } : {}),

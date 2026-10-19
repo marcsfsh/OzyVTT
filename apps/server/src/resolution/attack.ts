@@ -4,6 +4,7 @@ import {
   aggregateRollMode,
   collectRiders,
   d20TestFormula,
+  isMeleeWeapon,
   diceRiders,
   keptD20,
   parseDiceFormula,
@@ -92,14 +93,22 @@ function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind
     // non-spell attack (an imported sheet lists its Longsword as an action). A monster's Bite is neither.
     const carried =
       ctx.riderItemId !== null && attacker.inventory.some((item) => item.id === ctx.riderItemId && item.weapon);
-    // Held in two hands: a Two-Handed weapon, or a Versatile one swung with both (Great Weapon Fighting).
+    // A melee swing held in two hands: a Two-Handed weapon, or a Versatile one swung with both (Great Weapon Fighting).
     const wielded = attacker.inventory.find((item) => item.id === ctx.riderItemId);
     if (
+      used === "melee" &&
       wielded?.weapon &&
       (wielded.weapon.properties?.includes("two-handed") ||
         itemActionRest(action.id) === `${wielded.id}-${TWO_HANDED_SUFFIX}`)
     )
       kinds.add("two-handed");
+    // A weapon of the Ranged kind (Archery: "attack rolls you make with Ranged weapons"), a Dart too; a thrown Dagger
+    // is still a Melee weapon.
+    if (
+      wielded?.weapon &&
+      !isMeleeWeapon(wielded.weapon.properties ?? [], wielded.weapon.rangeFeet, wielded.weapon.melee)
+    )
+      kinds.add("ranged-weapon-kind");
     if (
       !unarmed &&
       action.spellId === undefined &&

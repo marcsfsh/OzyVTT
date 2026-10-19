@@ -1112,7 +1112,9 @@ describe("Paladin: Channel Divinity is ONE counter that three features spend", (
       failureConditions: ["frightened"],
       // "for 1 minute or until it takes any damage".
       failureDuration: { type: "rounds", rounds: 10 },
-      endsOnDamage: true
+      endsOnDamage: true,
+      // "A target can do only one of the following on its turns: move, take an action, or take a Bonus Action."
+      failureEffect: { name: "Abjure Foes", tags: ["one-thing-a-turn"], modifiers: [] }
     });
     const resolution = resolve(built, "abjure-foes", [], [IDS.foe]);
     expect(resolution.save).toMatchObject({ ability: "wis", dc: 14 });

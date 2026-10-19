@@ -253,6 +253,21 @@ function shakeAwake(ctx: ResolveContext): void {
   }
 }
 
+/** An effect's natural weapon for the Unarmed Strike (Alter Self): its die and type, and the ability it uses "rather
+ *  than using Strength". */
+function naturalWeaponOf(
+  attacker: ResolveContext["attacker"],
+  definition: ActorDefinition | undefined
+): Readonly<{ dice: string; type: string; modifier: number }> | null {
+  const strike = attacker.effects.find((effect) => effect.unarmedStrike?.dice)?.unarmedStrike;
+  if (!strike?.dice || !strike.damageTypes?.[0]) return null;
+  return {
+    dice: strike.dice,
+    type: strike.damageTypes[0],
+    modifier: abilityModifier(definition, strike.ability ?? "str")
+  };
+}
+
 /** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */
 const unarmedDc = (definition: ActorDefinition | undefined): number =>
   Math.max(1, 8 + abilityModifier(definition, "str") + (definition?.proficiencyBonus ?? 0));
@@ -313,8 +328,16 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
    *  as a Bonus Action brings its own numbers, which stand. */
   "unarmed-strike": {
-    prepare: ({ action, deps }) =>
-      action.attack !== undefined
+    prepare: ({ action, attacker, deps }) => {
+      // Alter Self's claws: the effect's die, type and ability.
+      const grown = naturalWeaponOf(attacker, deps.definition);
+      if (grown)
+        return {
+          ...action,
+          attack: { bonus: grown.modifier + (deps.definition?.proficiencyBonus ?? 0), reachFeet: 5 },
+          damage: [{ formula: `${grown.dice} + ${grown.modifier}`.replace("+ -", "- "), type: grown.type }]
+        };
+      return action.attack !== undefined
         ? action
         : {
             ...action,
@@ -322,7 +345,8 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
               bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0),
               reachFeet: 5
             }
-          },
+          };
+    },
     hitDamage: (ctx) => {
       if (ctx.action.damage.length > 0) return;
       if (ctx.attack === null || (ctx.attack.outcome !== "crit" && ctx.attack.outcome !== "hit")) return;

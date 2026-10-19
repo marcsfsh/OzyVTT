@@ -375,9 +375,9 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       key: "oncePerTurn",
       label: "Once a turn",
       kind: "switch",
-      visibleWhen: hasType("damage-reduction"),
+      visibleWhen: hasType("damage-reduction", "extra-damage"),
       ...trueOnly("oncePerTurn"),
-      help: "On an effect, it reduces one hit a turn."
+      help: "A reduction lands on one hit a turn; extra damage is dealt once a turn, as Colossus Slayer's."
     },
     {
       key: "leavesOne",

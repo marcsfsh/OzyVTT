@@ -37,6 +37,7 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { spendStudy, studyAMiss } from "./resolution/studied.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
@@ -140,6 +141,9 @@ export function resolveDefinitionAction(
     spendUntilAttacked(ctx);
     spendUntilOwnAttack(ctx);
     spendSteadyAim(ctx);
+    // Studied Attacks: this roll spends the Fighter's mark on its target, and a miss leaves a new one.
+    spendStudy(ctx);
+    studyAMiss(ctx);
   }
   // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
   if (parkForAcReaction(ctx)) {

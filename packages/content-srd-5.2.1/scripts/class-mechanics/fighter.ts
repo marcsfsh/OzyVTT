@@ -22,9 +22,22 @@ export const fighter: ClassMechanicsModule = {
       extraPicks: [
         { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
       ]
+    },
+    // "If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against
+    // that creature before the end of your next turn": the miss leaves a `studied` mark (resolution/studied.ts) that
+    // this reads and the next attack roll against that creature spends.
+    "studied-attacks": {
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "attack",
+          mode: "advantage",
+          when: [{ type: "on-attack-roll" }, { type: "versus-marked", tags: ["studied"] }]
+        }
+      ]
     }
     // Not modeled: Tactical Mind (retroactive check bonus with a refund), Tactical Shift and Tactical
-    // Master (movement, mastery swap) and Studied Attacks (needs memory of the missed target).
+    // Master (movement, mastery swap).
   },
   subclasses: {
     champion: {
@@ -46,6 +59,11 @@ export const fighter: ClassMechanicsModule = {
        * "You have Advantage on Initiative rolls and Strength (Athletics) checks." The check half fires via
        * `ability-checks.ts` (e.g. Escape a Grapple with Athletics). The move-after-a-crit clause is prose.
        */
+      // Defy Death: "You have Advantage on Death Saving Throws." Heroic Rally's hit points each turn while Bloodied
+      // are turn-boundaries.ts's.
+      survivor: {
+        modifiers: [{ type: "roll-mode", roll: "death-save", mode: "advantage" }]
+      },
       "remarkable-athlete": {
         modifiers: [
           { type: "roll-mode", roll: "initiative", mode: "advantage" },

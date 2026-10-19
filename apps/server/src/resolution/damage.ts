@@ -208,6 +208,7 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       }
       if (modifier.type !== "extra-damage" || already.has(modifier)) continue;
       if (modifier.formula === undefined && modifier.abilityModifier === undefined) continue;
+      if (modifier.oncePerTurn && !firstThisTurn(ctx, rider.label)) continue;
       already.add(modifier);
       // An ability-modifier amount (Agonizing Blast's "add your Charisma modifier") resolves against the
       // bearer's sheet; it rolls no die and is never crit-doubled.
@@ -232,6 +233,16 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       if (rider.sourceEffectId !== undefined) ctx.damageEffectIds.push(rider.sourceEffectId);
     }
   }
+}
+
+/** Colossus Slayer's "only once per turn": the first time this turn, which it now spends. Outside a fight, always. */
+function firstThisTurn(ctx: ResolveContext, label: string): boolean {
+  const { state, attacker, input } = ctx;
+  if (!state.combat.active || input.commit === false) return true;
+  const key = `${attacker.id}:once:${label}`.slice(0, 200);
+  if ((state.combat.turn.turnUses[key] ?? 0) > 0) return false;
+  state.combat.turn = { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } };
+  return true;
 }
 
 /** Signed dice a rider adds to the damage ("1d4") or takes off it ("-1d8"), rolled and recorded. */

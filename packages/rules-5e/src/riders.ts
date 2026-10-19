@@ -23,7 +23,8 @@ export type AttackKind =
   | "weapon"
   | "melee-weapon"
   | "ranged-weapon"
-  | "two-handed";
+  | "two-handed"
+  | "ranged-weapon-kind";
 
 /** The named roll or event a rider fires at; at most one per rider. */
 export type RiderMoment =

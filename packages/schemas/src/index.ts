@@ -229,7 +229,8 @@ export const RiderTriggerSchema = z
               "thrown",
               "reaction",
               "opportunity",
-              "two-handed"
+              "two-handed",
+              "ranged-weapon-kind"
             ])
           )
           .min(1)
@@ -237,7 +238,7 @@ export const RiderTriggerSchema = z
       })
       .strict()
       .describe(
-        "Filter. Narrows a moment to these attack kinds. melee, ranged and thrown come from the attack's reach, range and distance; `spell` is an attack that casts a spell (its action names a `spellId`); `two-handed` is a weapon held in two hands (a Two-Handed weapon, or a Versatile one swung with both); `reaction` and `opportunity` require the resolver to announce the trigger."
+        "Filter. Narrows a moment to these attack kinds. melee, ranged and thrown come from the attack's reach, range and distance; `spell` is an attack that casts a spell (its action names a `spellId`); `two-handed` is a melee attack with a weapon held in two hands (a Two-Handed weapon, or a Versatile one swung with both); `ranged-weapon-kind` is an attack with a weapon of the Ranged kind (a bow, a Dart, a Net), where `ranged-weapon` is any weapon attack made at range, a thrown Dagger included; `reaction` and `opportunity` require the resolver to announce the trigger."
       ),
     z
       .object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) })
@@ -727,7 +728,7 @@ export const ModifierSchema = z
       .object({ type: z.literal("damage-die-minimum"), minimum: z.number().int().min(2).max(12), ...riderGate })
       .strict()
       .describe(
-        'Each die of the attack\'s own damage that shows less than `minimum` counts as `minimum` (Great Weapon Fighting: "treat any 1 or 2 on a damage die as a 3"). Narrow it with `attack-kind-is` (`two-handed`, `melee-weapon`), and gate it on the damage roll (`on-damage-roll`).'
+        'Each die of the attack\'s own damage that shows less than `minimum` counts as `minimum` (Great Weapon Fighting: "treat any 1 or 2 on a damage die as a 3"). Narrow it with `attack-kind-is` (`two-handed`: a melee swing with both hands), and gate it on the damage roll (`on-damage-roll`).'
       ),
     /** Extra typed damage as dice (`formula`), the bearer's ability modifier (`abilityModifier`), or both.
      * `damageType` absent takes the attack's own type (Empowered Evocation follows the spell). `doubleOnCritical`
@@ -741,6 +742,8 @@ export const ModifierSchema = z
         abilityModifier: AbilitySchema.optional(),
         damageType: DamageTypeSchema.optional(),
         doubleOnCritical: z.boolean().default(true),
+        /** It is dealt once a turn at most, whoever's turn it is (Colossus Slayer). */
+        oncePerTurn: z.literal(true).optional(),
         ...riderGate
       })
       .strict()
@@ -1225,7 +1228,12 @@ export const EffectInstanceSchema = z
     usedOnTurn: z.string().max(160).optional(),
     /** Its attack, save, check and Initiative penalties move one toward 0 as each of the bearer's Long Rests ends, and
      *  it ends when none is left (Raise Dead's -4). */
-    shrinksEachLongRest: z.literal(true).optional()
+    shrinksEachLongRest: z.literal(true).optional(),
+    /** Damage a creature within 5 feet takes when it hits the bearer with a melee attack roll (Fire Shield's 2d8). */
+    meleeHitDamage: z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict().optional(),
+    /** How the bearer's Unarmed Strike lands while this lasts: the ability for its attack and damage rolls, its die
+     *  and its damage type (Alter Self's claws: 1d6 Slashing with the spellcasting ability). */
+    unarmedStrike: EffectWeaponSchema.optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1741,7 +1749,17 @@ export const GrantOptionSchema = z
     /** Generic actions the bearer may take as a Bonus Action while it lasts. */
     bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
     /** The damage type this option sets for what the effect deals (Dragon's Breath's acid, Fire Shield's cold). */
-    damageType: DamageTypeSchema.optional()
+    damageType: DamageTypeSchema.optional(),
+    /** The bearer's Unarmed Strike deals this die of this type while it lasts, using this ability, or the granter's
+     *  spellcasting ability, for its attack and damage rolls (Alter Self's claws: 1d6 Slashing). */
+    unarmedStrike: z
+      .object({
+        dice: DiceFormulaSchema,
+        damageType: DamageTypeSchema,
+        ability: z.union([AbilitySchema, z.literal("spellcasting")])
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type GrantOption = z.infer<typeof GrantOptionSchema>;
@@ -1839,7 +1857,16 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   optionsPerTarget: z.literal(true).optional(),
   /** Its attack, save, check and Initiative penalties shrink by one with each of the recipient's Long Rests (Raise
    *  Dead's -4). */
-  shrinksEachLongRest: z.literal(true).optional()
+  shrinksEachLongRest: z.literal(true).optional(),
+  /** It ends early when the recipient takes damage (Sequester: "This spell also ends if the target takes any
+   *  damage"). */
+  endsOnDamage: z.literal(true).optional(),
+  /** The recipient also takes the Dash action as it is granted (Expeditious Retreat: "You take the Dash action, and
+   *  until the spell ends, you can take that action again as a Bonus Action"). */
+  dashesNow: z.literal(true).optional(),
+  /** Damage a creature within 5 feet takes when it hits the recipient with a melee attack roll, of the type the option
+   *  picked sets, else `type` (Fire Shield: 2d8 Fire from the warm shield, Cold from the chill one). */
+  meleeHitDamage: z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema.optional() }).strict().optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */

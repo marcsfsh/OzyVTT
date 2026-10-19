@@ -296,7 +296,8 @@ export function spellCastMechanics(
               ...(effect.selfSave
                 ? { dc: effect.selfSave.dc, bySelf: true as const }
                 : { dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) }),
-              ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {})
+              ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {}),
+              ...(effect.successEffect ? { successEffect: structuredClone(effect.successEffect) } : {})
             }
           }
         : {}),
@@ -458,12 +459,25 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
     action.save && !action.save.failureEffect && effect.failureEffect
       ? structuredClone(effect.failureEffect)
       : undefined;
+  const successEffect =
+    action.save && !action.save.successEffect && effect.successEffect
+      ? structuredClone(effect.successEffect)
+      : undefined;
   const saveFields = action.save ? newerSaveFields(action.save, spell.save) : {};
-  if (!grants && !failureEffect && Object.keys(saveFields).length === 0) return action;
+  if (!grants && !failureEffect && !successEffect && Object.keys(saveFields).length === 0) return action;
   return {
     ...action,
     ...(grants ? { grants } : {}),
-    ...(action.save ? { save: { ...action.save, ...saveFields, ...(failureEffect ? { failureEffect } : {}) } } : {})
+    ...(action.save
+      ? {
+          save: {
+            ...action.save,
+            ...saveFields,
+            ...(failureEffect ? { failureEffect } : {}),
+            ...(successEffect ? { successEffect } : {})
+          }
+        }
+      : {})
   };
 }
 

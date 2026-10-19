@@ -128,6 +128,24 @@ export const barbarian: ClassMechanicsModule = {
     "persistent-rage": {
       uses: { limit: 1, per: "long-rest" }
     },
+    // "If your total for a Strength check or Strength saving throw is less than your Strength score, you can use that
+    // score in place of the total."
+    "indomitable-might": {
+      modifiers: [
+        {
+          type: "total-minimum",
+          roll: "check",
+          abilityScore: "str",
+          when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }]
+        },
+        {
+          type: "total-minimum",
+          roll: "save",
+          abilityScore: "str",
+          when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+        }
+      ]
+    },
     "epic-boon": {
       choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },

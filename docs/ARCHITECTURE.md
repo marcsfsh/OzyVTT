@@ -323,6 +323,15 @@ everything the sheet stores (AC, initiative, slots, senses). Riders name damage 
 conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
 refuses a rider gated on a moment its reader never collects.
 
+A grant or a failed save can offer options (Fire Shield's warm or chill, Bestow Curse's curse), one for
+each target where the text says so. The resolve carries the pick (`optionId`, `targetOptions`), which is
+checked before anything rolls and kept on the effect with what it adds (`resolution/grant-extras.ts`). A
+grant can also bind to one carried weapon (`itemId`): its `this-item` riders reach that row's rolls and
+its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A live effect
+can offer its bearer actions: a Bonus Action Dash or Disengage, an action that ends it with a save or a
+check, and another creature's spell action at the numbers it was cast with (`builtinActionsFor` in
+`builtin-actions.ts`, `granted-actions.ts`).
+
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
 it over (`character.give-item`). A Long Rest gives back the item's printed dice (`charges.regain`), not
