@@ -21,6 +21,7 @@ import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js"
 import { withArticle } from "@vtt/domain";
 import { altitudeOf, heightSpan } from "./altitude.js";
 import { bandTest, ringTest } from "./zone-shapes.js";
+import { pullTokenToward } from "./forced-movement.js";
 import { AURA_IMMUNE_TAG } from "./statblock-traits.js";
 import { breakTimeStop } from "./time-stop.js";
 import { applyCastSight } from "./vision/cast-sight.js";
@@ -1050,10 +1051,54 @@ export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDe
       });
     } else events.push(...drift(state, zone, drifts, deps));
   }
+  events.push(...pulledIn(state, actorId, deps));
   events.push(...zonesWhereItStands(state, actorId, "start-turn", deps));
   events.push(...zonesAtCasterTurnStart(state, actorId, deps));
   return events;
 }
+
+/**
+ * A vortex's pull as a creature's turn starts (SRD 5.2.1 Control Water's Whirlpool: "A creature or object in the water
+ * and within 25 feet of the vortex is pulled 10 feet toward it"): each area that pulls draws the creature, within its
+ * reach of the area's middle, that many feet toward the middle, and the creature meets whatever it is pulled into.
+ * Whether the creature is in the water is the GM's.
+ */
+function pulledIn(state: GameState, actorId: string, deps: ZoneDeps): EffectNarration[] {
+  const geometry = deps.geometry;
+  const creature = state.actors.find((actor) => actor.id === actorId);
+  if (!geometry?.calibration || !creature || !state.combat.active) return [];
+  const events: EffectNarration[] = [];
+  for (const zone of liveZones(state)) {
+    const content = zoneContentOf(zone, deps.catalog);
+    const pulls = content?.trigger.pulls;
+    const area = zone.annotationId
+      ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+      : undefined;
+    const from = tokenOf(state, actorId)?.position;
+    if (!content || !pulls || !area || !from) continue;
+    if (!exposed(state, zone, content.trigger, deps).some((candidate) => candidate.id === actorId)) continue;
+    const middle = area.shape === "circle" ? area.geometry.origin : midpointOf(area.geometry);
+    const apart = mapDistance(geometry, from, middle)?.value ?? null;
+    if (apart === null || apart < 5 - DISTANCE_TOLERANCE_FEET || apart > pulls.withinFeet + DISTANCE_TOLERANCE_FEET)
+      continue;
+    const moved = pullTokenToward(state, actorId, middle, Math.min(pulls.feet, apart), geometry);
+    const to = tokenOf(state, actorId)?.position;
+    if (!moved || moved.value <= 0 || !to) continue;
+    events.push({
+      kind: "effect",
+      text: `${content.name} pulls ${creature.name} ${moved.value} feet toward it.`,
+      actorId,
+      source: { actorId: zone.casterId, name: state.actors.find((actor) => actor.id === zone.casterId)?.name ?? null }
+    });
+    events.push(...zonesAfterMove(state, { moverId: actorId, path: [from, to] }, deps));
+  }
+  return events;
+}
+
+const midpointOf = (geometry: Readonly<{ origin: Point; target: Point }>): Point => ({
+  x: (geometry.origin.x + geometry.target.x) / 2,
+  y: (geometry.origin.y + geometry.target.y) / 2
+});
 
 /**
  * SRD Cloudkill: "The Sphere moves 10 feet away from you at the start of each of your turns" (Incendiary Cloud's too):

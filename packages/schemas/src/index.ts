@@ -4080,6 +4080,12 @@ export const AreaTriggerSchema = z
     sparesUser: z.literal(true).optional(),
     /** A creature's action area that lasts this many rounds (a Rod of Alertness planted for 10 minutes). */
     lastsRounds: z.number().int().min(1).max(100).optional(),
+    /** As a creature's turn starts within `withinFeet` of its middle, it is pulled `feet` toward the middle (Control
+     *  Water's whirlpool: "within 25 feet of the vortex is pulled 10 feet toward it"). */
+    pulls: z
+      .object({ withinFeet: z.number().int().min(5).max(120), feet: z.number().int().min(5).max(60) })
+      .strict()
+      .optional(),
     /** A creature within `withinFeet` can take control of it with a Magic action and an Intelligence (Arcana) check
      *  against `dc`, until the start of its next turn; a failure draws it `pullFeet` toward that creature. In control,
      *  a Bonus Action moves it 5 feet for each point of the controller's Intelligence modifier (Sphere of
