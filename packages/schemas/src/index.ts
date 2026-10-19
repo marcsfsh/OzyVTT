@@ -2706,6 +2706,12 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   temporaryHitPointsEachTurn: z
     .union([z.number().int().min(1).max(100), z.literal("spellcasting-modifier")])
     .optional(),
+  /** The dice each of its `extra-damage` riders gains for each slot level above the spell's (Conjure Minor Elementals:
+   *  1d8). */
+  extraDamagePerSlot: z
+    .string()
+    .regex(/^\d{1,2}d(?:4|6|8|10|12)$/)
+    .optional(),
   /** What the recipient's Hit Point maximum and current hit points rise by while it lasts (Aid's 5), `perSlot` more for
    *  each slot level above the spell's; with `formula`, a roll made for each recipient (Heroes' Feast's 2d10). */
   hitPointMaximumGain: z

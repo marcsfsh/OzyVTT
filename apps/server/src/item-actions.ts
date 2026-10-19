@@ -876,10 +876,54 @@ function burstAt(burst: NonNullable<ActorAction["burst"]>, above: number): NonNu
   };
 }
 
+/** A formula with `perSlot` dice added `times` over: "4d6 + 3" with 2d6 twice is "8d6 + 3". A part whose die differs
+ *  gets the dice as a term of their own. */
+export function withDiceAdded(formula: string, perSlot: string, times: number): string {
+  const extra = /^(\d+)d(\d+)$/.exec(perSlot.trim());
+  if (!extra || times <= 0) return formula;
+  const count = Number(extra[1]) * times;
+  const dice = /^(\d+)d(\d+)(.*)$/.exec(formula.trim());
+  if (dice && dice[2] === extra[2]) return `${Number(dice[1]) + count}d${dice[2]}${dice[3]}`;
+  return `${count}d${extra[2]} + ${formula.trim()}`;
+}
+
+/** A grant at a higher slot: its Hit Point gain (Aid) and its `extra-damage` riders with its per-slot dice added
+ *  (Conjure Minor Elementals: 2d8, 1d8 more a slot level above 4), in its own modifiers and in each option's. */
+function grantAt(grants: NonNullable<ActorAction["grants"]>, above: number): NonNullable<ActorAction["grants"]> {
+  const gain = grants.hitPointMaximumGain;
+  // Aid's "Each target's Hit Points increase by 5 for each spell slot level above 2."
+  if (gain?.perSlot)
+    grants = { ...grants, hitPointMaximumGain: { ...gain, amount: Math.min(100, gain.amount + gain.perSlot * above) } };
+  const perSlot = grants.extraDamagePerSlot;
+  if (!perSlot || above <= 0) return grants;
+  const scaled = <M extends Readonly<{ type: string; formula?: string }>>(modifiers: readonly M[] | undefined) =>
+    modifiers?.map((modifier) =>
+      modifier.type === "extra-damage" && modifier.formula
+        ? { ...modifier, formula: withDiceAdded(modifier.formula, perSlot, above) }
+        : modifier
+    );
+  return {
+    ...grants,
+    ...(grants.modifiers ? { modifiers: scaled(grants.modifiers)! } : {}),
+    ...(grants.options
+      ? {
+          options: grants.options.map((option) =>
+            option.modifiers ? { ...option, modifiers: scaled(option.modifiers)! } : option
+          )
+        }
+      : {})
+  };
+}
+
 export function upcastAction(action: ActorAction, spell: SpellReference, level: number): ActorAction {
+  const above = Math.max(0, level - spell.level);
+  // A later action's or zone's part that scales by its own clause (Arcane Hand's 2d8 a slot level) and a grant's
+  // extra damage scale whether or not the spell's own roll does.
+  const later = laterRowOf(spell, action.id);
+  const ownScaling = (later?.damage ?? []).some((part) => part.perSlot) || action.grants?.extraDamagePerSlot;
   const row = spell.castingOptions.find((option) => option.type === `slot_level_${level}`);
-  if (!row) return action;
-  const roll = row.damageRoll;
+  if (!row && !ownScaling) return action;
+  const roll = row?.damageRoll ?? null;
   const swapFrom =
     (base: string | null | undefined) =>
     (formula: string): string => {
@@ -892,15 +936,17 @@ export function upcastAction(action: ActorAction, spell: SpellReference, level: 
     };
   const damage = swapFrom(spell.damage.roll);
   const healing = swapFrom(spell.effect?.healing?.formula ?? spell.damage.roll);
-  const above = Math.max(0, level - spell.level);
   // A flat amount for each level above ("5 additional Temporary Hit Points for each spell slot level above 1").
   const healingPerSlot = (spell.effect?.healing?.perSlot ?? 0) * above;
-  const count = row.targetCount;
+  const count = row?.targetCount ?? null;
   const rays = count !== null && action.attack !== undefined && (spell.effect?.attacks ?? 0) > 1;
   const darts = count !== null && action.darts !== undefined;
   return {
     ...action,
-    damage: action.damage.map((part) => ({ ...part, formula: damage(part.formula) })),
+    damage: action.damage.map((part, index) => {
+      const perSlot = later?.damage[index]?.perSlot;
+      return { ...part, formula: perSlot ? withDiceAdded(part.formula, perSlot, above) : damage(part.formula) };
+    }),
     ...(action.onHit ? { onHit: action.onHit.map((rider) => withScaledOngoing(rider, spell.damage.roll, roll)) } : {}),
     // A cast that deals no damage of its own scales its failure's damage on later turns (Ensnaring Strike's 1d6).
     ...(action.save?.ongoingDamage && action.damage.length === 0
@@ -909,21 +955,7 @@ export function upcastAction(action: ActorAction, spell: SpellReference, level: 
     ...(action.healing
       ? { healing: { ...action.healing, formula: formulaPlus(healing(action.healing.formula), healingPerSlot) } }
       : {}),
-    // Aid's "Each target's Hit Points increase by 5 for each spell slot level above 2."
-    ...(action.grants?.hitPointMaximumGain?.perSlot
-      ? {
-          grants: {
-            ...action.grants,
-            hitPointMaximumGain: {
-              ...action.grants.hitPointMaximumGain,
-              amount: Math.min(
-                100,
-                action.grants.hitPointMaximumGain.amount + action.grants.hitPointMaximumGain.perSlot * above
-              )
-            }
-          }
-        }
-      : {}),
+    ...(action.grants ? { grants: grantAt(action.grants, above) } : {}),
     ...(action.burst ? { burst: burstAt(action.burst, above) } : {}),
     ...(rays ? { attack: { ...action.attack!, count: Math.min(10, count) } } : {}),
     ...(darts ? { darts: Math.min(20, count) } : {})

@@ -1371,7 +1371,8 @@
      "damage": [
       {
        "formula": "5d8",
-       "type": "force"
+       "type": "force",
+       "perSlot": "2d8"
       }
      ]
     },
@@ -1396,7 +1397,8 @@
       {
        "formula": "4d6",
        "type": "bludgeoning",
-       "addsModifier": true
+       "addsModifier": true,
+       "perSlot": "2d6"
       }
      ]
     }
@@ -5969,6 +5971,7 @@
      "type": "rounds",
      "rounds": 100
     },
+    "extraDamagePerSlot": "1d8",
     "options": [
      {
       "id": "acid",
@@ -13698,7 +13701,8 @@
      "damage": [
       {
        "formula": "5d8",
-       "type": "thunder"
+       "type": "thunder",
+       "perSlot": "1d8"
       }
      ],
      "zone": {

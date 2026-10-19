@@ -473,7 +473,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "bonus-action",
       when: "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
       attackRange: melee(125),
-      damage: [{ formula: "5d8", type: "force" }]
+      // "The damage of the Clenched Fist increases by 2d8 ... for each spell slot level above 5."
+      damage: [{ formula: "5d8", type: "force", perSlot: "2d8" }]
     },
     {
       name: "grasping hand",
@@ -486,7 +487,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "crush",
       activation: "bonus-action",
       when: "While the hand grapples a creature, a Bonus Action crushes it.",
-      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true }]
+      // "... and the damage of the Grasping Hand increases by 2d6 for each spell slot level above 5."
+      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true, perSlot: "2d6" }]
     }
   ],
   "arcane-sword": [
@@ -756,7 +758,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "A creature that steps onto the glyph sets it off: each creature in the 20-foot-radius Sphere makes the save, and the spell ends.",
       save: save("dex"),
-      damage: [{ formula: "5d8", type: "thunder" }],
+      // "The damage of an explosive rune increases by 1d8 for each spell slot level above 3."
+      damage: [{ formula: "5d8", type: "thunder", perSlot: "1d8" }],
       zone: { on: ["enter", "spell-end"], around: "point", feet: 5, once: true, hidden: true }
     }
   ],
@@ -1905,6 +1908,8 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     tags: ["conjure-minor-elementals"],
     target: "self",
     duration: rounds(100),
+    // "The damage increases by 1d8 for each spell slot level above 4."
+    extraDamagePerSlot: "1d8",
     options: (["acid", "cold", "fire", "lightning"] as const).map((type) =>
       option(type, titled(type), {
         modifiers: [

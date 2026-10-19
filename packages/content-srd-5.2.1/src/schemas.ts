@@ -81,7 +81,20 @@ const SpellAttackRangeSchema = z
  *  ability modifier (Spiritual Weapon's 1d8 + it). */
 const SpellDamageSchema = z
   .array(
-    z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema, addsModifier: z.boolean().optional() }).strict()
+    z
+      .object({
+        formula: DamageFormulaSchema,
+        type: DamageTypeSchema,
+        addsModifier: z.boolean().optional(),
+        /** The dice it gains for each slot level above the spell's, where its own scaling clause names this part
+         *  (Arcane Hand's Clenched Fist: 2d8; Glyph of Warding's explosive rune: 1d8). Without it, a part scales only
+         *  when it is the spell's own roll. */
+        perSlot: z
+          .string()
+          .regex(/^\d{1,2}d(?:4|6|8|10|12)$/)
+          .optional()
+      })
+      .strict()
   )
   .max(4);
 
