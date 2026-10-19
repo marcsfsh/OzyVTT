@@ -3207,7 +3207,14 @@ export const SightEffectSchema = z
         kind: z.enum(["lightly-obscured", "heavily-obscured", "magical-darkness"]),
         aroundSelfFeet: z.number().int().min(5).max(120).optional(),
         /** Its user sees through it ("Heavily Obscured for creatures other than you": Insect Cloud). */
-        sparesUser: z.literal(true).optional()
+        sparesUser: z.literal(true).optional(),
+        /** What clears it, ending its spell: a strong wind (`wind`: Fog Cloud "until a strong wind (such as one created
+         *  by Gust of Wind) disperses it") or water that destroys fog (`water`: Destroy Water). */
+        dispersedBy: z
+          .array(z.enum(["wind", "water"]))
+          .min(1)
+          .max(2)
+          .optional()
       })
       .strict()
       .optional(),
@@ -4005,7 +4012,28 @@ export const AreaTriggerSchema = z
     casterHolds: z
       .object({ feet: z.number().int().min(5).max(120), modifiers: EffectModifiersSchema })
       .strict()
-      .optional()
+      .optional(),
+    /** Its caster picks the way it drifts at the start of each of its turns, any way that takes it farther from the
+     *  caster (Incendiary Cloud: "in a direction you choose"); a turn that ends with no pick drifts it straight away. */
+    steered: z.literal(true).optional(),
+    /** It ends, with its spell, when a strong wind's area overlaps it (`wind`: "until a strong wind (such as the one
+     *  created by Gust of Wind) disperses it"), or water that destroys fog does (`water`: Cloudkill's fog). */
+    endsBy: z
+      .array(z.enum(["wind", "water"]))
+      .min(1)
+      .max(2)
+      .optional(),
+    /** A strong wind (Gust of Wind): it disperses the clouds and fog it overlaps and puts out the exposed flames in it,
+     *  and a lantern's protected flame there has a 50 percent chance to go out. */
+    wind: z.literal(true).optional(),
+    /** It puts out the exposed flames in it: a burning creature stops burning, and a lit Candle, Lamp or Torch goes out
+     *  (Sleet Storm: "exposed flames in the area are doused"). */
+    douses: z.literal(true).optional(),
+    /** It destroys the fog it overlaps (Destroy Water): a fog that water ends goes, and so does fog's Heavily Obscured
+     *  area. */
+    destroysFog: z.literal(true).optional(),
+    /** It acts once over the area it is placed on, then ends (Create or Destroy Water's instant rain). */
+    instant: z.literal(true).optional()
   })
   .strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;

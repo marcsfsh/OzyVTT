@@ -568,7 +568,9 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The Sphere moves 10 feet away from you at the start of each of your turns.`,
       save: save("con"),
       damage: [{ formula: "5d8", type: "poison" }],
-      zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
+      // "The fog lasts for the duration or until strong wind (such as the one created by Gust of Wind) disperses it":
+      // destroying fog ends it too.
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10, endsBy: ["wind", "water"] }
     }
   ],
   // "You have Advantage on Strength saving throws while you're within 5 feet of the pack, and when you move on your
@@ -646,6 +648,27 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       feet: 15,
       terrain: { cost: 2, for: "enemies" }
     })
+  ],
+  // "Create Water ... Alternatively, the water falls as rain in a 30-foot Cube within range, extinguishing exposed flames
+  // there", or "Destroy Water ... Alternatively, you destroy fog in a 30-foot Cube within range." Water in an open
+  // container is description.
+  "create-or-destroy-water": [
+    {
+      name: "rain",
+      activation: "other",
+      when: "Rain falls over the Cube and puts out the exposed flames there.",
+      damage: [],
+      zone: { on: [], douses: true, instant: true },
+      option: { id: "create", name: "Create Water: rain" }
+    },
+    {
+      name: "destroy fog",
+      activation: "other",
+      when: "The fog in the Cube is destroyed.",
+      damage: [],
+      zone: { on: [], destroysFog: true, instant: true },
+      option: { id: "destroy", name: "Destroy Water: fog" }
+    }
   ],
   "conjure-woodland-beings": [
     {
@@ -782,7 +805,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "A creature that ends its turn in the Line makes the save, and a failure pushes it 15 feet away from you. Moving closer to you in the Line costs 2 feet for every foot.",
       save: { ability: "str", successDamage: "none", failureConditions: [], failurePush: { feet: 15 } },
       damage: [],
-      zone: { on: ["end-turn"], towardCaster: true }
+      // "The gust disperses gas or vapor, and it extinguishes candles and similar unprotected flames in the area."
+      zone: { on: ["end-turn"], towardCaster: true, wind: true }
     },
     {
       name: "turn",
@@ -918,10 +942,19 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns.`,
+      when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns, the way you pick, until a strong wind disperses it.`,
       save: save("dex"),
       damage: [{ formula: "10d8", type: "fire" }],
-      zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10, steered: true, endsBy: ["wind"] }
+    },
+    // "The cloud moves 10 feet away from you in a direction you choose at the start of each of your turns."
+    {
+      name: "steer",
+      activation: "other",
+      when: "At the start of each of your turns, move the cloud 10 feet the way you pick, farther from you; if you don't, it moves straight away from you as your turn ends.",
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
+      movesArea: { feet: 10, steersDrift: true }
     }
   ],
   "insect-plague": [
@@ -1048,7 +1081,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration. The ground is Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
       damage: [],
-      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "ice" } }
+      // "Exposed flames in the area are doused."
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "ice" }, douses: true }
     }
   ],
   "spike-growth": [
@@ -1093,7 +1127,9 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         failureDuration: { type: "until-bearer-turn-end" }
       },
       damage: [],
-      zone: { on: ["start-turn"] }
+      // "The cloud lingers in the air for the duration or until a strong wind (such as the one created by Gust of Wind)
+      // disperses it."
+      zone: { on: ["start-turn"], endsBy: ["wind"] }
     }
   ],
   // "Until the spell ends, you can take a Magic action to create a new Line of radiance."

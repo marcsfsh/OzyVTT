@@ -1257,7 +1257,12 @@ export const VisionAreaSchema = z
     ]),
     /** The one creature that sees through it (Insect Cloud: "Heavily Obscured for creatures other than you"). */
     sparedActorId: z.uuid().optional(),
-    source: VisionSourceSchema.optional()
+    source: VisionSourceSchema.optional(),
+    /** What clears it, ending the spell that made it: a strong wind (Gust of Wind) or water that destroys fog. */
+    dispersedBy: z
+      .array(z.enum(["wind", "water"]))
+      .max(2)
+      .optional()
   })
   .strict();
 export type VisionArea = z.infer<typeof VisionAreaSchema>;
@@ -1359,6 +1364,17 @@ export const SpellZoneSchema = z
     heightened: z.uuid().optional(),
     /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
     grown: z.number().int().nonnegative().max(100).optional(),
+    /** Where it stood as its caster's turn began, waiting for the caster to steer its drift (Incendiary Cloud). */
+    driftFrom: z
+      .object({
+        origin: z.object({ x: z.number(), y: z.number() }).strict(),
+        target: z.object({ x: z.number(), y: z.number() }).strict()
+      })
+      .strict()
+      .optional(),
+    /** The carried lights (`actorId:itemId`) whose protected flame has had its chance to go out in it (Gust of
+     *  Wind's 50 percent for a lantern). */
+    windTried: z.array(z.string().max(240)).max(200).optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
      *  has raised the saves. */
     burstsOnEnd: z.literal(true).optional(),

@@ -15,6 +15,7 @@ import { planNextTurn } from "../combat-history.js";
 import { nextInitiativeTurn } from "../encounter.js";
 import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeaves } from "../summons.js";
 import { holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
+import { holdsZoneOutcomes, settleZoneOutcomes, zoneOutcomesPending } from "../zone-outcomes.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -266,6 +267,24 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
   }
 
   /**
+   * What the standing spell areas do to fire, fog and clouds once a command has moved a creature or an area (Sleet
+   * Storm douses a torch carried in, Gust of Wind disperses a cloud), with the server's dice, as its own write when
+   * anything changed.
+   */
+  async function settleZoneOutcomesAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsZoneOutcomes(before, kit.equipmentCatalog())) return;
+    const geometry = await kit.liveGeometry();
+    if (!zoneOutcomesPending(before, kit.zoneDeps(before, geometry))) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.outcomes" }, (draft) => {
+      events = settleZoneOutcomes(draft, kit.zoneDeps(draft, geometry));
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /**
    * A spell area that acts as its spell ends (Delayed Blast Fireball's bead) is left bursting by whatever ended the
    * spell; the table then raises its saves with the server's dice and the live map, as its own write.
    */
@@ -342,6 +361,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     const accepted = committed ? { revision: committed.state.revision, duplicate: committed.duplicate } : {};
     const reply = projectReply(principal, { ...accepted, ...extras });
     if (settle && committed && !committed.duplicate) {
+      await settleZoneOutcomesAfter();
       await settleBurstingZones();
       await settleZoneAurasAfter();
       await settleDownedReactions();

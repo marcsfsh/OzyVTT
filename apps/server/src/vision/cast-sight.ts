@@ -161,6 +161,7 @@ export function applyCastSight(state: GameState, input: CastSightInput): EffectN
         kind: area.kind,
         shape,
         ...(area.sparesUser ? { sparedActorId: casterId } : {}),
+        ...(area.dispersedBy ? { dispersedBy: [...area.dispersedBy] } : {}),
         source
       };
       areas = [...areas, made].slice(-100);
@@ -168,6 +169,37 @@ export function applyCastSight(state: GameState, input: CastSightInput): EffectN
   }
   state.combat = { ...state.combat, vision: { ...vision, lights, areas } };
   return sight.dispels ? dispelOverlapping(state, input, sight.dispels) : [];
+}
+
+/** A spell area that clears the fog and clouds it overlaps while it stands (Gust of Wind's Line, Destroy Water's Cube),
+ *  measured on the map's own scale so it works whether or not the scene's vision is on. Ends each spell whose fog it
+ *  clears. */
+export function dispelFogUnder(
+  state: GameState,
+  input: Readonly<{
+    annotationId: string;
+    casterId: string;
+    spellId: string;
+    widthFeet: number | null;
+    pixelsPerFoot: number;
+    by: "wind" | "water";
+  }>
+): EffectNarration[] {
+  return dispelOverlapping(
+    state,
+    {
+      commandId: input.annotationId,
+      casterId: input.casterId,
+      sight: {},
+      spellId: input.spellId,
+      targetIds: [],
+      areaPlaced: true,
+      widthFeet: input.widthFeet
+    },
+    { kind: "fog" },
+    input.pixelsPerFoot,
+    input.by
+  );
 }
 
 /** A shape on the map: a circle of light, or an area's outline. */
@@ -251,9 +283,12 @@ function endSpellOf(state: GameState, source: VisionSource): EffectNarration[] {
 function dispelOverlapping(
   state: GameState,
   input: CastSightInput,
-  dispels: NonNullable<SightEffect["dispels"]>
+  dispels: NonNullable<SightEffect["dispels"]>,
+  scale?: number,
+  /** What clears fog: a strong wind (Gust of Wind), or water that destroys fog (Destroy Water). */
+  by: "wind" | "water" = "wind"
 ): EffectNarration[] {
-  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  const pixelsPerFoot = scale ?? state.combat.vision.measure?.pixelsPerFoot;
   if (!pixelsPerFoot) return [];
   const reach = reachOf(state, input, pixelsPerFoot);
   if (reach.length === 0) return [];
@@ -279,9 +314,10 @@ function dispelOverlapping(
       : vision.lights;
   const resolved = new Map(resolveAreas(vision.areas, state.combat, pixelsPerFoot).map((area) => [area.id, area]));
   const areas = vision.areas.filter((area) => {
+    // Only fog and clouds clear; an opaque wall or sleet stands in the wind.
     const gone =
       (dispels.kind === "darkness" && area.kind === "magical-darkness") ||
-      (dispels.kind === "fog" && area.kind === "heavily-obscured");
+      (dispels.kind === "fog" && area.dispersedBy?.includes(by) === true);
     const shape = resolved.get(area.id);
     return !gone || keep(area.source, shape ? { outline: shape.outline } : null);
   });

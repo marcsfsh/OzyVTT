@@ -101,7 +101,23 @@ export function planAreaMove(
   // A move that goes with its caster's own (Conjure Animals' pack) waits for the caster to move, once a turn.
   const waits = terms?.withCasterMove ? movesWithCaster(state, input.casterId, input.spell) : null;
   if (waits) refuse("economy.not-your-turn", waits);
-  if (terms?.anywhereInRange && caster) {
+  if (terms?.steersDrift) {
+    // A steered drift (Incendiary Cloud): from where the cloud stood as its caster's turn began, the full distance,
+    // ending farther from the caster.
+    const from = zone.driftFrom;
+    if (!from) throw new CommandRejectedError(`${input.spell.name} drifts at the start of its caster's turn.`);
+    const moved = apart(from.origin, snapped.origin);
+    if (Math.abs(moved - input.feet) > calibration.distancePerCell / 2)
+      refuse(
+        "range.out-of-range",
+        `${input.spell.name} drifts ${input.feet} feet; that move is ${Math.round(moved)} feet.`
+      );
+    // Away: any heading that takes it farther from the caster, measured straight (a grid's diagonal rule would call a
+    // step sideways no farther).
+    const straight = (point: AnnotationPoint) => (caster ? Math.hypot(point.x - caster.x, point.y - caster.y) : 0);
+    if (caster && straight(snapped.origin) <= straight(from.origin) + 1)
+      refuse("range.out-of-range", `${input.spell.name} drifts away from its caster.`);
+  } else if (terms?.anywhereInRange && caster) {
     // An illusion goes to any spot within the spell's range of its caster (Silent Image, Major Image).
     const out = apart(caster, snapped.origin);
     if (out > input.feet + DISTANCE_TOLERANCE_FEET)
@@ -159,6 +175,8 @@ export function moveArea(
 ): EffectNarration[] {
   const annotationId = move.zone.annotationId!;
   moveAnnotation(state, annotationId, placed.origin, placed.target, table, deps.geometry);
+  // The drift is steered for this turn.
+  if (terms?.steersDrift) delete move.zone.driftFrom;
   if (terms?.withCasterMove && state.combat.active) {
     const key = withMoveKey(move.zone.casterId, move.zone.spellId);
     state.combat = {

@@ -173,7 +173,10 @@ export const SpellLaterActionSchema = z
          *  move on your turn, you can also move the pack up to 30 feet"). */
         withCasterMove: z.literal(true).optional(),
         /** To a spot no creature's space covers (Conjure Animals' pack: "to an unoccupied space"). */
-        unoccupied: z.literal(true).optional()
+        unoccupied: z.literal(true).optional(),
+        /** It is the drift its caster steers at the start of its turn (Incendiary Cloud): exactly `feet` from where the
+         *  area stood as the turn began, farther from the caster, once that turn. */
+        steersDrift: z.literal(true).optional()
       })
       .strict()
       .optional(),

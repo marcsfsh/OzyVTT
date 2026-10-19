@@ -669,10 +669,22 @@ export function zonesAfterAreaMove(
  *  caster's turns end gains its die (SRD Delayed Blast Fireball: "the damage increases by 1d6 whenever your turn ends
  *  and the spell hasn't ended"). */
 export function zonesAtTurnEnd(state: GameState, actorId: string, deps: ZoneDeps): EffectNarration[] {
-  for (const zone of liveZones(state))
-    if (zone.casterId === actorId && zoneContentOf(zone, deps.catalog)?.trigger.grows)
-      zone.grown = Math.min(100, (zone.grown ?? 0) + 1);
-  return [...zonesWhereItStands(state, actorId, "end-turn", deps), ...zonesAtCasterTurnEnd(state, actorId, deps)];
+  const unsteered: EffectNarration[] = [];
+  for (const zone of liveZones(state)) {
+    if (zone.casterId !== actorId) continue;
+    const trigger = zoneContentOf(zone, deps.catalog)?.trigger;
+    if (trigger?.grows) zone.grown = Math.min(100, (zone.grown ?? 0) + 1);
+    // A cloud its caster didn't steer this turn drifts straight away from it.
+    if (zone.driftFrom && trigger?.drifts !== undefined) {
+      delete zone.driftFrom;
+      unsteered.push(...drift(state, zone, trigger.drifts, deps));
+    }
+  }
+  return [
+    ...unsteered,
+    ...zonesWhereItStands(state, actorId, "end-turn", deps),
+    ...zonesAtCasterTurnEnd(state, actorId, deps)
+  ];
 }
 
 /** SRD Earthquake: "at the end of each of your turns for the duration, each creature on the ground in the area makes a
@@ -711,8 +723,21 @@ export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDe
       events.push({ kind: "effect", text: `${zone.name} ends.`, actorId: zone.casterId });
       continue;
     }
-    const drifts = zoneContentOf(zone, deps.catalog)?.trigger.drifts;
-    if (drifts !== undefined && zoneHeld(state, zone)) events.push(...drift(state, zone, drifts, deps));
+    const trigger = zoneContentOf(zone, deps.catalog)?.trigger;
+    const drifts = trigger?.drifts;
+    if (drifts === undefined || !zoneHeld(state, zone)) continue;
+    // A cloud its caster steers waits for the caster's pick of way (Incendiary Cloud).
+    const area = zone.annotationId
+      ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+      : undefined;
+    if (trigger?.steered && area) {
+      zone.driftFrom = { origin: { ...area.geometry.origin }, target: { ...area.geometry.target } };
+      events.push({
+        kind: "effect",
+        text: `${zone.name} drifts ${drifts} feet the way its caster picks, or straight away as its caster's turn ends.`,
+        actorId: zone.casterId
+      });
+    } else events.push(...drift(state, zone, drifts, deps));
   }
   events.push(...zonesWhereItStands(state, actorId, "start-turn", deps));
   events.push(...zonesAtCasterTurnStart(state, actorId, deps));
