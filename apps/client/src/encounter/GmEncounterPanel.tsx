@@ -260,13 +260,13 @@ export function GmEncounterPanel({
   };
   // SRD Experience Points: the characters in the fight share the XP of the monsters they brought to 0 Hit Points.
   const fightExperience = fightExperienceOf(state);
-  const awardFightExperience = async () => {
+  const awardFightExperience = async (inLair: boolean) => {
     if (!fightExperience) return;
     const names = fightExperience.recipients.map((actor) => actor.name);
     if (
       !(await askConfirm({
         title: "Award the fight's XP?",
-        body: `${listOf(names)} share the XP of ${listOf(fightExperience.defeated.map((actor) => actor.name))}.`,
+        body: `${listOf(names)} share the XP of ${listOf(fightExperience.defeated.map((actor) => actor.name))}${inLair ? ", at the lair XP for a legendary creature" : ""}.`,
         confirmLabel: "Award XP"
       }))
     )
@@ -274,7 +274,9 @@ export function GmEncounterPanel({
     setBusy(true);
     const result = await command("actor:award-experience", {
       actorIds: fightExperience.recipients.map((actor) => actor.id),
-      defeatedIds: fightExperience.defeated.map((actor) => actor.id)
+      defeatedIds: fightExperience.defeated.map((actor) => actor.id),
+      // A creature with no lair XP gives its usual XP.
+      ...(inLair ? { inLairIds: fightExperience.defeated.map((actor) => actor.id) } : {})
     });
     setBusy(false);
     setMessage(
@@ -546,7 +548,7 @@ export function GmEncounterPanel({
         onFeedback={setMessage}
         onAddMonsters={() => setBrowsing(true)}
         onEnd={() => void end()}
-        {...(fightExperience ? { onAwardExperience: () => void awardFightExperience() } : {})}
+        {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
       />
     </div>
   );

@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { GmView } from "@vtt/domain";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { GameStateSchema, type GmView } from "@vtt/domain";
 
 const command = vi.fn(async (..._args: unknown[]) => ({ ok: true, each: 300, ready: [] }));
 vi.mock("../lib/command", () => ({ command: (...args: unknown[]) => command(...args) }));
 
 import { AwardExperience, ExperienceLine, experienceOf } from "./Experience";
+import { FightMenu } from "../encounter/FightMenu";
 import { fightExperienceOf } from "../encounter/GmEncounterPanel";
 import type { SheetActor } from "./sheet-model";
 
@@ -75,5 +77,29 @@ describe("the GM's XP award", () => {
       actors: state.actors.map((entry) => ({ ...entry, hp: { ...entry.hp, current: 5 } }))
     } as unknown as GmView;
     expect(fightExperienceOf(standing)).toBeNull();
+  });
+});
+
+describe("the fight menu's XP award", () => {
+  it("awards the fight's XP, at the lair XP when the GM says the fight was in their lair", async () => {
+    const award = vi.fn();
+    const state = GameStateSchema.parse({ schemaVersion: 1 }) as unknown as GmView;
+    render(
+      <FightMenu
+        state={{ ...state, combat: { ...state.combat, active: true } }}
+        busy={false}
+        run={vi.fn()}
+        onFeedback={() => {}}
+        onAddMonsters={() => {}}
+        onEnd={() => {}}
+        onAwardExperience={award}
+      />
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /Fight options/ }));
+    const xp = within(screen.getByRole("group", { name: "Experience Points" }));
+    await user.click(xp.getByRole("switch", { name: "Fought in their lair" }));
+    await user.click(xp.getByRole("button", { name: "Award the fight's XP" }));
+    expect(award).toHaveBeenCalledWith(true);
   });
 });
