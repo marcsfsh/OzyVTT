@@ -1246,6 +1246,65 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "antipathy",
+     "activation": "other",
+     "when": "A creature of the chosen kind that comes within 120 feet of the target makes a Wisdom save or is Frightened of the target, and must use its movement to get as far from it as it can.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "none",
+      "failureConditions": [
+       "frightened"
+      ],
+      "repeatBeyondFeet": 120,
+      "immuneOnSuccess": true
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter"
+      ],
+      "around": "target",
+      "feet": 120,
+      "picksType": true
+     },
+     "option": {
+      "id": "antipathy",
+      "name": "Antipathy"
+     }
+    },
+    {
+     "name": "sympathy",
+     "activation": "other",
+     "when": "A creature of the chosen kind that comes within 120 feet of the target makes a Wisdom save or is Charmed by the target, and must use its movement to get as close to it as it can.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "none",
+      "failureConditions": [
+       "charmed"
+      ],
+      "repeatBeyondFeet": 120,
+      "repeatOnDamage": {
+       "fromSourceOnly": true
+      },
+      "immuneOnSuccess": true
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter"
+      ],
+      "around": "target",
+      "feet": 120,
+      "picksType": true
+     },
+     "option": {
+      "id": "sympathy",
+      "name": "Sympathy"
+     }
+    }
+   ],
    "targets": {
     "count": 1
    },
@@ -3148,6 +3207,48 @@
        "cost": 2
       },
       "cover": "three-quarters"
+     },
+     "option": {
+      "id": "straight",
+      "name": "Straight wall"
+     }
+    },
+    {
+     "name": "ring save",
+     "activation": "other",
+     "when": "A creature that enters the ringed wall's space or ends its turn there makes the save. A creature makes this save only once per turn. Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "6d10",
+       "type": "force"
+      }
+     ],
+     "area": {
+      "shape": "cylinder",
+      "sizeFeet": 30,
+      "widthFeet": null,
+      "heightFeet": 20
+     },
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 2
+      },
+      "cover": "three-quarters",
+      "ring": true
+     },
+     "option": {
+      "id": "ring",
+      "name": "Ringed wall"
      }
     }
    ],
@@ -3843,6 +3944,40 @@
       "shape": "sphere",
       "sizeFeet": 5,
       "widthFeet": null
+     },
+     "inArea": true
+    },
+    {
+     "name": "cloud",
+     "activation": "other",
+     "when": "The storm cloud stays where it formed, reaching 60 feet out from its middle.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 60,
+      "stays": true
+     },
+     "option": {
+      "id": "clear",
+      "name": "No storm"
+     }
+    },
+    {
+     "name": "storm cloud",
+     "activation": "other",
+     "when": "In a storm, the cloud is the storm's, and the spell's damage is 1d10 more.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 60,
+      "stays": true,
+      "extraDice": 1
+     },
+     "option": {
+      "id": "storm",
+      "name": "Outdoors in a storm"
      }
     }
    ],
@@ -4776,7 +4911,11 @@
        "end-turn"
       ],
       "oncePerTurn": true,
-      "drifts": 10
+      "drifts": 10,
+      "endsBy": [
+       "wind",
+       "water"
+      ]
      }
     }
    ],
@@ -4784,7 +4923,11 @@
   },
   "sight": {
    "area": {
-    "kind": "heavily-obscured"
+    "kind": "heavily-obscured",
+    "dispersedBy": [
+     "wind",
+     "water"
+    ]
    }
   },
   "classes": [
@@ -5488,7 +5631,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. A creature makes this save only once per turn.",
+     "when": "When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. A creature makes this save only once per turn. You have Advantage on Strength saving throws within 5 feet of the pack.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
@@ -5508,7 +5651,44 @@
       "oncePerTurn": true,
       "around": "point",
       "feet": 10,
-      "affects": "enemies"
+      "affects": "enemies",
+      "casterHolds": {
+       "feet": 5,
+       "modifiers": [
+        {
+         "type": "roll-mode",
+         "roll": "save",
+         "mode": "advantage",
+         "when": [
+          {
+           "type": "on-saving-throw"
+          },
+          {
+           "type": "ability-is",
+           "abilities": [
+            "str"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    },
+    {
+     "name": "move",
+     "activation": "other",
+     "when": "When you move on your turn, you can also move the pack up to 30 feet to an unoccupied space.",
+     "damage": [],
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 10,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 30,
+      "withCasterMove": true,
+      "unoccupied": true
      }
     }
    ],
@@ -5601,10 +5781,122 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": {
-    "formula": "4d12",
-    "addsModifier": true
-   }
+   "laterActions": [
+    {
+     "name": "light",
+     "activation": "other",
+     "when": "Heal you and your allies, sear the rest: Healing Light restores 4d12 plus your spellcasting ability modifier, and Searing Light asks for the save. Each creature in the Cylinder, entering it or ending its turn there is bathed once a turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "6d12",
+       "type": "radiant"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "atCast": true,
+      "dicePerSlot": 1,
+      "heals": {
+       "formula": "4d12",
+       "addsModifier": true,
+       "who": "allies"
+      }
+     },
+     "option": {
+      "id": "by-side",
+      "name": "Heal you and your allies, sear the rest"
+     }
+    },
+    {
+     "name": "healing light",
+     "activation": "other",
+     "when": "Healing Light on everyone: Healing Light restores 4d12 plus your spellcasting ability modifier, and Searing Light asks for the save. Each creature in the Cylinder, entering it or ending its turn there is bathed once a turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "6d12",
+       "type": "radiant"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "atCast": true,
+      "dicePerSlot": 1,
+      "heals": {
+       "formula": "4d12",
+       "addsModifier": true,
+       "who": "all"
+      }
+     },
+     "option": {
+      "id": "heal-all",
+      "name": "Healing Light on everyone"
+     }
+    },
+    {
+     "name": "searing light",
+     "activation": "other",
+     "when": "Searing Light on everyone: Healing Light restores 4d12 plus your spellcasting ability modifier, and Searing Light asks for the save. Each creature in the Cylinder, entering it or ending its turn there is bathed once a turn.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "6d12",
+       "type": "radiant"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "atCast": true,
+      "dicePerSlot": 1
+     },
+     "option": {
+      "id": "sear-all",
+      "name": "Searing Light on everyone"
+     }
+    },
+    {
+     "name": "move",
+     "activation": "other",
+     "when": "When you move on your turn, you can also move the Cylinder up to 30 feet.",
+     "damage": [],
+     "area": {
+      "shape": "cylinder",
+      "sizeFeet": 10,
+      "widthFeet": null,
+      "heightFeet": 40
+     },
+     "movesArea": {
+      "feet": 30,
+      "withCasterMove": true
+     }
+    }
+   ],
+   "healing": null
   },
   "sight": {
    "light": {
@@ -6893,6 +7185,38 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "rain",
+     "activation": "other",
+     "when": "Rain falls over the Cube and puts out the exposed flames there.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "douses": true,
+      "instant": true
+     },
+     "option": {
+      "id": "create",
+      "name": "Create Water: rain"
+     }
+    },
+    {
+     "name": "destroy fog",
+     "activation": "other",
+     "when": "The fog in the Cube is destroyed.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "destroysFog": true,
+      "instant": true
+     },
+     "option": {
+      "id": "destroy",
+      "name": "Destroy Water: fog"
+     }
+    }
+   ],
    "healing": null,
    "areaPerSlot": 5
   },
@@ -7670,7 +7994,10 @@
       "on": [
        "spell-end"
       ],
-      "grows": true
+      "grows": true,
+      "touched": {
+       "throwFeet": 40
+      }
      }
     }
    ],
@@ -10720,7 +11047,7 @@
     {
      "name": "bite",
      "activation": "other",
-     "when": "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
+     "when": "At the start of each of your turns, the hound bites one enemy within 5 feet of it. It barks when a Small or larger creature comes within 30 feet of it.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
@@ -10738,7 +11065,34 @@
       ],
       "around": "point",
       "feet": 5,
-      "affects": "enemies"
+      "affects": "enemies",
+      "hidden": true,
+      "warns": {
+       "feet": 30,
+       "sizes": [
+        "small",
+        "medium",
+        "large",
+        "huge",
+        "gargantuan"
+       ]
+      },
+      "leash": 300
+     }
+    },
+    {
+     "name": "move",
+     "activation": "action",
+     "when": "On your later turns, a Magic action moves the hound up to 30 feet.",
+     "laterTurnsOnly": true,
+     "damage": [],
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 5,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 30
      }
     }
    ],
@@ -12426,7 +12780,11 @@
   },
   "sight": {
    "area": {
-    "kind": "heavily-obscured"
+    "kind": "heavily-obscured",
+    "dispersedBy": [
+     "wind",
+     "water"
+    ]
    }
   },
   "classes": [
@@ -14846,7 +15204,8 @@
       "on": [
        "end-turn"
       ],
-      "towardCaster": true
+      "towardCaster": true,
+      "wind": true
      }
     },
     {
@@ -17071,7 +17430,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn. The cloud moves 10 feet away from you at the start of each of your turns.",
+     "when": "A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. A creature makes this save only once per turn. The cloud moves 10 feet away from you at the start of each of your turns, the way you pick, until a strong wind disperses it.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -17089,7 +17448,26 @@
        "end-turn"
       ],
       "oncePerTurn": true,
-      "drifts": 10
+      "drifts": 10,
+      "steered": true,
+      "endsBy": [
+       "wind"
+      ]
+     }
+    },
+    {
+     "name": "steer",
+     "activation": "other",
+     "when": "At the start of each of your turns, move the cloud 10 feet the way you pick, farther from you; if you don't, it moves straight away from you as your turn ends.",
+     "damage": [],
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 20,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 10,
+      "steersDrift": true
      }
     }
    ],
@@ -17097,7 +17475,10 @@
   },
   "sight": {
    "area": {
-    "kind": "heavily-obscured"
+    "kind": "heavily-obscured",
+    "dispersedBy": [
+     "wind"
+    ]
    }
   },
   "classes": [
@@ -19195,6 +19576,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "image",
+     "activation": "other",
+     "when": "The image stands where it was placed.",
+     "damage": [],
+     "zone": {
+      "on": []
+     }
+    },
+    {
+     "name": "move",
+     "activation": "action",
+     "when": "While you are within 120 feet of the image, a Magic action moves it to any other spot within 120 feet of you.",
+     "damage": [],
+     "area": {
+      "shape": "cube",
+      "sizeFeet": 20,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 120,
+      "anywhereInRange": true,
+      "casterInRange": true
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21423,6 +21831,18 @@
        "kind": "plants"
       }
      }
+    },
+    {
+     "name": "leave out",
+     "activation": "other",
+     "when": "As you cast it, leave a 10-foot square of the Sphere out of the overgrowth, as many times as you like.",
+     "damage": [],
+     "area": {
+      "shape": "cube",
+      "sizeFeet": 10,
+      "widthFeet": null
+     },
+     "cutsArea": true
     }
    ],
    "healing": null
@@ -25448,6 +25868,32 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "image",
+     "activation": "other",
+     "when": "The image stands where it was placed.",
+     "damage": [],
+     "zone": {
+      "on": []
+     }
+    },
+    {
+     "name": "move",
+     "activation": "action",
+     "when": "A Magic action moves the image to any spot within 60 feet of you.",
+     "damage": [],
+     "area": {
+      "shape": "cube",
+      "sizeFeet": 15,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 60,
+      "anywhereInRange": true
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -25675,7 +26121,8 @@
       "terrain": {
        "cost": 2,
        "kind": "ice"
-      }
+      },
+      "douses": true
      }
     }
    ],
@@ -26078,6 +26525,61 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "plants",
+     "activation": "other",
+     "when": "The plants in the Emanation speak with you; the ground is as it was.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 30,
+      "stays": true
+     },
+     "option": {
+      "id": "talk",
+      "name": "Leave the ground as it is"
+     }
+    },
+    {
+     "name": "thicket",
+     "activation": "other",
+     "when": "The plants in the Emanation make its ground Difficult Terrain.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 30,
+      "stays": true,
+      "terrain": {
+       "cost": 2,
+       "kind": "plants"
+      }
+     },
+     "option": {
+      "id": "thicket",
+      "name": "Make the ground Difficult Terrain"
+     }
+    },
+    {
+     "name": "clearing",
+     "activation": "other",
+     "when": "The plants in the Emanation clear their Difficult Terrain into ordinary ground.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 30,
+      "stays": true,
+      "clearsTerrain": true
+     },
+     "option": {
+      "id": "clearing",
+      "name": "Clear the plants' Difficult Terrain"
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -26714,6 +27216,9 @@
      "zone": {
       "on": [
        "start-turn"
+      ],
+      "endsBy": [
+       "wind"
       ]
      }
     }
@@ -26722,7 +27227,10 @@
   },
   "sight": {
    "area": {
-    "kind": "heavily-obscured"
+    "kind": "heavily-obscured",
+    "dispersedBy": [
+     "wind"
+    ]
    }
   },
   "classes": [
@@ -26928,6 +27436,120 @@
     {
      "formula": "2d6",
      "type": "thunder"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "storm",
+     "activation": "other",
+     "when": "At the start of each of your later turns, the storm under the cloud changes.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "schedule": [
+       {
+        "turn": 2,
+        "row": "acid rain"
+       },
+       {
+        "turn": 3,
+        "row": "lightning"
+       },
+       {
+        "turn": 4,
+        "row": "hail"
+       },
+       {
+        "turn": 5,
+        "row": "freezing rain"
+       }
+      ]
+     }
+    },
+    {
+     "name": "acid rain",
+     "activation": "other",
+     "when": "Turn 2: each creature under the cloud takes the damage.",
+     "damage": [
+      {
+       "formula": "4d6",
+       "type": "acid"
+      }
+     ],
+     "zone": {
+      "on": [
+       "caster-turn-start"
+      ],
+      "everyone": true
+     }
+    },
+    {
+     "name": "lightning",
+     "activation": "other",
+     "when": "Turn 3: you call six bolts down on six creatures under the cloud.",
+     "damage": [],
+     "zone": {
+      "on": []
+     }
+    },
+    {
+     "name": "bolts",
+     "activation": "other",
+     "when": "On the storm's third turn, six bolts strike six different creatures you pick under the cloud; each makes the save.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "10d6",
+       "type": "lightning"
+      }
+     ],
+     "inArea": true,
+     "targetCount": 6,
+     "atRow": "lightning"
+    },
+    {
+     "name": "hail",
+     "activation": "other",
+     "when": "Turn 4: each creature under the cloud takes the damage.",
+     "damage": [
+      {
+       "formula": "2d6",
+       "type": "bludgeoning"
+      }
+     ],
+     "zone": {
+      "on": [
+       "caster-turn-start"
+      ],
+      "everyone": true
+     }
+    },
+    {
+     "name": "freezing rain",
+     "activation": "other",
+     "when": "Turns 5 to 10: each creature under the cloud takes the damage; the area is Difficult Terrain and Heavily Obscured, ranged weapon attacks there miss, and a strong wind blows.",
+     "damage": [
+      {
+       "formula": "1d6",
+       "type": "cold"
+      }
+     ],
+     "zone": {
+      "on": [
+       "caster-turn-start"
+      ],
+      "everyone": true,
+      "terrain": {
+       "cost": 2
+      },
+      "obscures": true,
+      "stopsRangedWeapons": true,
+      "wind": true
+     }
     }
    ],
    "healing": null,
@@ -27328,12 +27950,263 @@
   },
   "area": {
    "shape": "sphere",
-   "sizeFeet": 60,
+   "sizeFeet": 5,
    "widthFeet": null
   },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "death glyph",
+     "activation": "other",
+     "when": "A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes a Constitution save against 10d10 Necrotic damage, half on a success.",
+     "save": {
+      "ability": "con",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "10d10",
+       "type": "necrotic"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "point",
+      "feet": 60,
+      "hidden": true,
+      "glyph": {
+       "feet": 5,
+       "growsToFeet": 60,
+       "rounds": 100
+      }
+     },
+     "option": {
+      "id": "death",
+      "name": "Death"
+     }
+    },
+    {
+     "name": "discord glyph",
+     "activation": "other",
+     "when": "A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes a Wisdom save or argues for 1 minute, with Disadvantage on attack rolls and ability checks.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "none",
+      "failureConditions": [],
+      "failureDuration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "failureEffect": {
+       "name": "Discord",
+       "tags": [
+        "discord"
+       ],
+       "modifiers": [
+        {
+         "type": "roll-mode",
+         "roll": "attack",
+         "mode": "disadvantage",
+         "when": [
+          {
+           "type": "on-attack-roll"
+          }
+         ]
+        },
+        {
+         "type": "roll-mode",
+         "roll": "check",
+         "mode": "disadvantage",
+         "when": [
+          {
+           "type": "on-ability-check"
+          }
+         ]
+        }
+       ]
+      }
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "point",
+      "feet": 60,
+      "hidden": true,
+      "glyph": {
+       "feet": 5,
+       "growsToFeet": 60,
+       "rounds": 100
+      }
+     },
+     "option": {
+      "id": "discord",
+      "name": "Discord"
+     }
+    },
+    {
+     "name": "fear glyph",
+     "activation": "other",
+     "when": "A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes a Wisdom save or is Frightened for 1 minute.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "none",
+      "failureConditions": [
+       "frightened"
+      ],
+      "failureDuration": {
+       "type": "rounds",
+       "rounds": 10
+      }
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "point",
+      "feet": 60,
+      "hidden": true,
+      "glyph": {
+       "feet": 5,
+       "growsToFeet": 60,
+       "rounds": 100
+      }
+     },
+     "option": {
+      "id": "fear",
+      "name": "Fear"
+     }
+    },
+    {
+     "name": "pain glyph",
+     "activation": "other",
+     "when": "A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes a Constitution save or is Incapacitated for 1 minute.",
+     "save": {
+      "ability": "con",
+      "successDamage": "none",
+      "failureConditions": [
+       "incapacitated"
+      ],
+      "failureDuration": {
+       "type": "rounds",
+       "rounds": 10
+      }
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "point",
+      "feet": 60,
+      "hidden": true,
+      "glyph": {
+       "feet": 5,
+       "growsToFeet": 60,
+       "rounds": 100
+      }
+     },
+     "option": {
+      "id": "pain",
+      "name": "Pain"
+     }
+    },
+    {
+     "name": "sleep glyph",
+     "activation": "other",
+     "when": "A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes a Wisdom save or is Unconscious for 10 minutes, until it takes damage or is shaken awake.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "none",
+      "failureConditions": [
+       "unconscious"
+      ],
+      "failureDuration": {
+       "type": "rounds",
+       "rounds": 100
+      },
+      "endsOnDamage": true,
+      "failureEffect": {
+       "name": "Symbol of Sleep",
+       "tags": [
+        "wakeable"
+       ],
+       "modifiers": []
+      }
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "point",
+      "feet": 60,
+      "hidden": true,
+      "glyph": {
+       "feet": 5,
+       "growsToFeet": 60,
+       "rounds": 100
+      }
+     },
+     "option": {
+      "id": "sleep",
+      "name": "Sleep"
+     }
+    },
+    {
+     "name": "stunning glyph",
+     "activation": "other",
+     "when": "A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes a Wisdom save or is Stunned for 1 minute.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "none",
+      "failureConditions": [
+       "stunned"
+      ],
+      "failureDuration": {
+       "type": "rounds",
+       "rounds": 10
+      }
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "around": "point",
+      "feet": 60,
+      "hidden": true,
+      "glyph": {
+       "feet": 5,
+       "growsToFeet": 60,
+       "rounds": 100
+      }
+     },
+     "option": {
+      "id": "stunning",
+      "name": "Stunning"
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -28396,7 +29269,8 @@
   "area": {
    "shape": "line",
    "sizeFeet": 300,
-   "widthFeet": 50
+   "widthFeet": 50,
+   "heightFeet": 300
   },
   "effect": {
    "attacks": 0,
@@ -28404,6 +29278,38 @@
     {
      "formula": "6d10",
      "type": "bludgeoning"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "wave",
+     "activation": "other",
+     "when": "At the start of each of your turns the wall moves 50 feet away from you with the creatures in it, and each Huge or smaller creature it holds makes the save. It then loses 50 feet of height and 1d10 of damage. A creature in it moves only after a Strength (Athletics) check.",
+     "save": {
+      "ability": "str",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "5d10",
+       "type": "bludgeoning"
+      }
+     ],
+     "zone": {
+      "on": [],
+      "drifts": 50,
+      "carries": true,
+      "sizes": [
+       "tiny",
+       "small",
+       "medium",
+       "large",
+       "huge"
+      ],
+      "fadesFeet": 50,
+      "athleticsToMove": true
+     }
     }
    ],
    "healing": null
@@ -28867,7 +29773,7 @@
     {
      "name": "burn",
      "activation": "other",
-     "when": "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn within 10 feet of the burning side.",
+     "when": "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn within 10 feet of its left side.",
      "damage": [
       {
        "formula": "5d8",
@@ -28878,7 +29784,104 @@
       "on": [
        "enter",
        "end-turn"
-      ]
+      ],
+      "band": {
+       "feet": 10,
+       "side": "left"
+      }
+     },
+     "option": {
+      "id": "left",
+      "name": "Straight, burning on the left"
+     }
+    },
+    {
+     "name": "burn right",
+     "activation": "other",
+     "when": "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn within 10 feet of its right side.",
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "fire"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "band": {
+       "feet": 10,
+       "side": "right"
+      }
+     },
+     "option": {
+      "id": "right",
+      "name": "Straight, burning on the right"
+     }
+    },
+    {
+     "name": "burn inside",
+     "activation": "other",
+     "when": "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn inside the ring within 10 feet of it.",
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "fire"
+      }
+     ],
+     "area": {
+      "shape": "cylinder",
+      "sizeFeet": 10,
+      "widthFeet": null,
+      "heightFeet": 20
+     },
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "band": {
+       "feet": 10,
+       "side": "inside"
+      },
+      "ring": true
+     },
+     "option": {
+      "id": "ring-inside",
+      "name": "Ring, burning inside"
+     }
+    },
+    {
+     "name": "burn outside",
+     "activation": "other",
+     "when": "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn outside the ring within 10 feet of it.",
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "fire"
+      }
+     ],
+     "area": {
+      "shape": "cylinder",
+      "sizeFeet": 10,
+      "widthFeet": null,
+      "heightFeet": 20
+     },
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "band": {
+       "feet": 10,
+       "side": "outside"
+      },
+      "ring": true
+     },
+     "option": {
+      "id": "ring-outside",
+      "name": "Ring, burning outside"
      }
     }
    ],
@@ -29570,6 +30573,9 @@
       "terrain": {
        "cost": 2,
        "kind": "webs"
+      },
+      "burns": {
+       "formula": "2d4"
       }
      }
     }

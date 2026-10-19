@@ -10775,6 +10775,15 @@
    {
     "spellId": "light",
     "consumesSpellSlot": false
+   },
+   {
+    "spellId": "faerie-fire",
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "ring-of-shooting-stars-charges"
+    },
+    "consumesSpellSlot": false
    }
   ],
   "charges": {
@@ -10788,7 +10797,7 @@
     "id": "shooting-stars",
     "name": "Shooting Stars",
     "activation": "action",
-    "description": "Expend 1 charge to launch a glowing mote of light at a point within 60 feet. Each creature in a 15-foot Cube originating from that point makes a DC 15 Dexterity saving throw, taking 5d4 Radiant damage on a failed save or half as much damage on a successful one.",
+    "description": "Expend 1 to 3 charges. For every charge you expend, launch a glowing mote of light at a point within 60 feet. Each creature in a 15-foot Cube originating from that point makes a DC 15 Dexterity saving throw, taking 5d4 Radiant damage on a failed save or half as much damage on a successful one.",
     "damage": [
      {
       "formula": "5d4",
@@ -10803,7 +10812,56 @@
     "area": {
      "shape": "cube",
      "sizeFeet": 15,
-     "widthFeet": null
+     "widthFeet": null,
+     "count": 3,
+     "eachCostsAUse": true
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 15,
+     "successDamage": "half",
+     "failureConditions": []
+    }
+   },
+   {
+    "id": "lightning-spheres",
+    "name": "Lightning Spheres",
+    "activation": "action",
+    "description": "Expend 2 charges to create up to four spheres of lightning within 120 feet, lasting while you keep Concentration, up to 1 minute. The first time a sphere comes within 5 feet of a creature other than you, it discharges at that creature and disappears: a DC 15 Dexterity saving throw, taking Lightning damage by the number of spheres made (one 4d12, two 5d4, three 2d6, four 2d4) on a failure, or half on a success. As a Bonus Action, move each sphere up to 30 feet.",
+    "damage": [
+     {
+      "formula": "4d12",
+      "type": "lightning"
+     }
+    ],
+    "useCost": 2,
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "ring-of-shooting-stars-charges"
+    },
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 5,
+     "widthFeet": null,
+     "count": 4
+    },
+    "zone": {
+     "on": [
+      "enter"
+     ],
+     "around": "point",
+     "feet": 5,
+     "once": true,
+     "concentration": true,
+     "sparesUser": true,
+     "lastsRounds": 10,
+     "damageByCount": [
+      "4d12",
+      "5d4",
+      "2d6",
+      "2d4"
+     ]
     },
     "save": {
      "ability": "dex",
@@ -11467,6 +11525,28 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "zone": {
+     "on": [],
+     "around": "caster",
+     "feet": 60,
+     "affects": "allies",
+     "holds": {
+      "modifiers": [
+       {
+        "type": "save-bonus",
+        "amount": 1
+       },
+       {
+        "type": "sense",
+        "sense": "see-invisibility",
+        "feet": 60
+       }
+      ],
+      "armorClassBonus": 1
+     },
+     "stays": true,
+     "lastsRounds": 100
     },
     "sight": {
      "light": {
@@ -12615,7 +12695,47 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "set",
+    "name": "Set the Sphere",
+    "activation": "other",
+    "description": "Set the Sphere of Annihilation in a space on the map, where it hovers until someone takes control of it. Any creature whose space the sphere enters must succeed on a DC 19 Dexterity saving throw or be touched by it, taking 8d10 Force damage; a creature reduced to 0 Hit Points by this damage is obliterated, leaving its possessions behind but no other physical remains.",
+    "damage": [
+     {
+      "formula": "8d10",
+      "type": "force"
+     }
+    ],
+    "drain": {
+     "killsAtZero": {
+      "cause": "obliterated by a Sphere of Annihilation",
+      "bodyGone": true
+     }
+    },
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 5,
+     "widthFeet": null
+    },
+    "zone": {
+     "on": [
+      "enter"
+     ],
+     "controlled": {
+      "dc": 25,
+      "withinFeet": 60,
+      "pullFeet": 10
+     }
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 19,
+     "successDamage": "none",
+     "failureConditions": []
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
