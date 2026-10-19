@@ -1,8 +1,9 @@
 /**
  * Sorcerer and Draconic Sorcery mechanics, merged over the ETL-generated prose.
  *
- * A Metamagic option is a pick with no action of its own, so it can't carry a price: the 1-point options ride the
- * `sorcery-points` pool, and Heightened and Quickened Spell's 2 points are spent from the sheet's Limited uses.
+ * A Metamagic option is chosen with the cast it shapes, which the server checks against the Sorcerer's picks and pays
+ * from the `sorcery-points` pool (`apps/server/src/resolution/metamagic.ts`). The 1-point options keep a row that shows
+ * the pool on the sheet; Seeking Spell's row answers a missed spell attack on its roll.
  */
 import type { DamageType } from "@vtt/schemas";
 import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
@@ -61,9 +62,8 @@ export const sorcerer: ClassMechanicsModule = {
       uses: { scaling: { type: "class-resource", id: "sorcery-points" }, per: "long-rest", pool: "sorcery-points" }
     },
     /**
-     * The modifications themselves are not expressible; the price is. The eight 1-point options each
-     * debit the shared pool. The 2 -> 4 -> 6 option count is handled by the ETL's `choose` and
-     * `grantedAtLevels`.
+     * The options shape a cast on the server, which reads the picks; each 1-point option's row names the shared
+     * pool. The 2 -> 4 -> 6 option count is handled by the ETL's `choose` and `grantedAtLevels`.
      */
     metamagic: {
       options: {
@@ -71,7 +71,22 @@ export const sorcerer: ClassMechanicsModule = {
         "distant-spell": ONE_SORCERY_POINT,
         "empowered-spell": ONE_SORCERY_POINT,
         "extended-spell": ONE_SORCERY_POINT,
-        "seeking-spell": ONE_SORCERY_POINT,
+        // "If you make an attack roll for a spell and miss, you can spend 1 Sorcery Point to reroll the d20, and you
+        // must use the new roll."
+        "seeking-spell": {
+          ...ONE_SORCERY_POINT,
+          actions: [
+            {
+              id: "seeking-spell",
+              name: "Seeking Spell",
+              activation: "other",
+              description:
+                "When you miss with an attack roll for a spell, spend 1 Sorcery Point to reroll the d20. You must use the new roll.",
+              damage: [],
+              answer: { rolls: ["attack"], when: "failure", spellAttacks: true, effect: { kind: "reroll" } }
+            }
+          ]
+        },
         "subtle-spell": ONE_SORCERY_POINT,
         "transmuted-spell": ONE_SORCERY_POINT,
         "twinned-spell": ONE_SORCERY_POINT
@@ -80,8 +95,9 @@ export const sorcerer: ClassMechanicsModule = {
     // The once-per-Long-Rest permission only; the GM gives the points back from the sheet's Limited uses.
     "sorcerous-restoration": { uses: { limit: 1, per: "long-rest" } },
     "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
-    // Not modeled: Sorcery Incarnate (substitute cost, two Metamagic per spell), Arcane Apotheosis
-    // (cost waiver) and the cantrip replacement clauses.
+    // Sorcery Incarnate's two Metamagic options per spell and Arcane Apotheosis's free option are read by the server
+    // while Innate Sorcery is active. Not modeled: Sorcery Incarnate's 2-point Innate Sorcery and the cantrip
+    // replacement clauses.
   },
   subclassStages: {
     "draconic-sorcery": spellTableStages("draconic-spells", "Draconic Spells", "Sorcerer", [

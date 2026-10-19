@@ -1117,17 +1117,18 @@ describe("Sorcerer: Sorcerous Restoration and Epic Boon (audit row 6, the Sorcer
 
 describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Magic opens", () => {
   it("debits the shared counter, so a Metamagic option and Font of Magic spend one supply", () => {
-    // Careful Spell prints "Cost: 1 Sorcery Point", so the chosen option carries a use of the same
-    // `sorcery-points` pool, and Metamagic is a button that spends.
+    // Distant Spell prints "Cost: 1 Sorcery Point": the cast it shapes pays it from the same `sorcery-points` pool,
+    // which the chosen option's own row names. The row alone spends nothing (metamagic.test.ts).
     const built = table(sorcerer(5));
-    expect(actionOf(built, "careful-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
-
-    resolveDefinitionAction(
-      built.state,
-      actionOf(built, "careful-spell"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000100" },
-      deps(built, [])
-    );
+    expect(actionOf(built, "distant-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
+    const distantFlame = (commandId: string) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-sacred-flame"),
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId, shaping: [{ id: "distant-spell" }] },
+        deps(built, [4, 4])
+      );
+    distantFlame("50000000-0000-4000-8000-000000000100");
     expect(built.hero.actionUses["sorcery-points"]).toBe(1);
 
     // ...and the four points left are Font of Magic's four: one pool, two ways to spend it.
@@ -1140,19 +1141,15 @@ describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Ma
       );
     }
     expect(built.hero.actionUses["sorcery-points"]).toBe(5);
-    expect(() =>
-      resolveDefinitionAction(
-        built.state,
-        actionOf(built, "distant-spell"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000119" },
-        deps(built, [])
-      )
-    ).toThrow();
+    built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, actionUsed: false } };
+    expect(thrown(() => distantFlame("50000000-0000-4000-8000-000000000119"))).toMatch(
+      /Ilde has 0 Sorcery Points left, and this cast's Metamagic costs 1/
+    );
   });
 
-  it("gives the two-point options NO counter, because a use is not a cost", () => {
-    // `ActionUsesSchema` counts uses and cannot charge two, so Quickened Spell ("Cost: 2 Sorcery Points")
-    // stays prose. Subtle Spell, at one point, does land.
+  it("gives the two-point options no row of their own: the cast that uses one pays its two points", () => {
+    // Quickened Spell's "Cost: 2 Sorcery Points" is paid by the cast it shapes (metamagic.test.ts); a 1-point option
+    // such as Subtle Spell keeps a row that shows the pool.
     const built = table(sorcerer(10));
     const ids = effectiveActions(built.definition, built.hero, built.catalog).map((entry) => entry.id);
     expect(ids).toContain("subtle-spell");

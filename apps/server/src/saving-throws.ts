@@ -380,10 +380,27 @@ export function createPendingSaves(
     advantageAtSize?: PendingSave["advantageAtSize"];
     /** The spell the save is against, for what answers a save against a spell. */
     spell?: PendingSave["spell"];
+    /** One target's save, and the saves it repeats against the effect, have Disadvantage from this (Heightened
+     *  Spell). */
+    disadvantage?: Readonly<{ targetId: string; from: string }>;
     newSaveId: () => string;
     createdAt: number;
   }>
 ) {
+  const disadvantaged = (targetActorId: string) => input.disadvantage?.targetId === targetActorId;
+  const onFailFor = (targetActorId: string) => {
+    const onFail = input.onFailEffect;
+    if (!onFail) return {};
+    const repeat =
+      onFail.repeatSave && disadvantaged(targetActorId) ? { disadvantageFrom: input.disadvantage!.from } : {};
+    return {
+      onFailEffect: {
+        ...onFail,
+        modifiers: [...(onFail.modifiers ?? [])],
+        ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave, ...repeat } } : {})
+      }
+    };
+  };
   const additions: PendingSave[] = input.targetIds.map((targetActorId) => ({
     id: input.newSaveId(),
     targetActorId,
@@ -399,9 +416,8 @@ export function createPendingSaves(
     halfOnSuccess: input.halfOnSuccess,
     conditionIds: [...input.conditionIds],
     saveBonus: input.saveBonus ?? 0,
-    ...(input.onFailEffect
-      ? { onFailEffect: { ...input.onFailEffect, modifiers: [...(input.onFailEffect.modifiers ?? [])] } }
-      : {}),
+    ...onFailFor(targetActorId),
+    ...(disadvantaged(targetActorId) ? { disadvantageFrom: input.disadvantage!.from } : {}),
     ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
     ...(input.callId !== undefined ? { callId: input.callId } : {}),
     ...(input.extra?.onSuccessEffect ? { onSuccessEffect: structuredClone(input.extra.onSuccessEffect) } : {}),
@@ -717,6 +733,9 @@ export function answerSave(
     // "A Large or larger creature has Advantage on this save" (Ensnaring Strike).
     if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
       sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
+    // Heightened Spell's target, on the cast's save and each it repeats.
+    if (pending.disadvantageFrom)
+      sources.disadvantage.push({ source: "disadvantage-from", label: pending.disadvantageFrom });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
     const ward = holyWardClaim(state, target, pending.sourceActorId, {
       resolveDefinition: deps.resolveDefinition,

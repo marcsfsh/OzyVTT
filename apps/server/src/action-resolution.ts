@@ -72,6 +72,7 @@ import { checkKnockOut, knockOutOffered, knocksOut } from "./resolution/knock-ou
 import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
 import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-casting.js";
+import { shapedAction, shapedOutcome, shapingInForce, shapingOffers, withShapedSpell } from "./resolution/metamagic.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -84,19 +85,23 @@ export type { ResolveDependencies, ResolveInput };
  */
 export function resolveDefinitionAction(
   state: GameState,
-  action: DefinitionAction,
-  input: ResolveInput,
-  deps: ResolveDependencies
+  declared: DefinitionAction,
+  declaredInput: ResolveInput,
+  declaredDeps: ResolveDependencies
 ): ActionResolution {
+  const printed = declared.spellId ? declaredDeps.catalog?.spellRecord?.(declared.spellId) : undefined;
   // A spell of a minute or more cast in a fight takes the action on each of its caster's turns, and resolves on the
-  // last with the targets and slot picked on the first.
-  const longCast = longCastStepOf(
-    state,
-    action,
-    input,
-    action.spellId ? deps.catalog?.spellRecord?.(action.spellId) : undefined
-  );
-  const ctx = openResolve(state, action, longCast?.input ?? input, deps);
+  // last with the targets, slot and shaping picked on the first.
+  const longCast = longCastStepOf(state, declared, declaredInput, printed);
+  // How its caster shapes the cast (Metamagic): every step reads the spell and the action as shaped.
+  const stepped = longCast?.input ?? declaredInput;
+  const { shaping: _sent, ...stepInput } = stepped;
+  const shaping = shapingInForce(state, declared, stepped);
+  const input: ResolveInput = shaping.length > 0 ? { ...stepInput, shaping } : stepInput;
+  const deps = withShapedSpell(declaredDeps, declared.spellId, shaping);
+  const ctx = openResolve(state, shapedAction(declared, shaping), input, deps);
+  // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
+  ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
   if (longCast && longCast.phase !== "finish") {
@@ -350,6 +355,7 @@ export function actionAvailability(
     }
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
     const passive = passiveOf(action, builtin);
+    const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
     return {
       id: action.id,
       name: action.name,
@@ -359,6 +365,7 @@ export function actionAvailability(
       // The sheet's one sentence for why not; the violations keep the full account.
       ...(reason !== undefined ? { reason } : {}),
       ...(passive !== undefined ? { passive } : {}),
+      ...(shaping !== undefined ? { shaping } : {}),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),

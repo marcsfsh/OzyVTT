@@ -107,6 +107,16 @@ const RULE_FAMILIES = {
   "slots.one-per-turn": "slots",
   // Casting a spell the character hasn't prepared is spellcasting bookkeeping too.
   "slots.not-prepared": "slots",
+  // Metamagic and Sculpt Spells shape a cast: an option the caster doesn't have, one the spell can't take, more options
+  // than one spell carries, and Quickened Spell's "can't cast a level 1+ spell on this turn" are spellcasting rules.
+  "metamagic.unknown": "slots",
+  "metamagic.unfit": "slots",
+  "metamagic.too-many": "slots",
+  "metamagic.quickened": "slots",
+  // The creatures or the type a pick names (Careful Spell's, Heightened Spell's target) are a cast's targeting.
+  "metamagic.choice": "targeting",
+  // A Metamagic option's own row is chosen with a cast and never taken alone, as a hit rider is.
+  "metamagic.with-a-cast": "economy",
   // Spell components (SRD Components) are their own family, so a table can stop checking hands and pouches alone.
   "spell.no-verbal": "components",
   "spell.no-free-hand": "components",

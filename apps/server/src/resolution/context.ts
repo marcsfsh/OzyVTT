@@ -14,7 +14,7 @@ import {
   type RandomSource,
   type RiderContext
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import type { EquipmentCatalog, EquipmentDerivation } from "../equipment-derivation.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "../roll-history.js";
 import type { RuleId, RulesOverride } from "../rules-families.js";
@@ -104,6 +104,8 @@ export type ResolveInput = Readonly<{
   forgoneAdvantageBy?: string;
   /** A melee hit that drops its target to 0 leaves it at 1 Hit Point and Unconscious (SRD Knocking Out a Creature). */
   knockOut?: boolean;
+  /** How the caster shapes this spell's cast (Metamagic, Sculpt Spells), checked and applied by `metamagic.ts`. */
+  shaping?: readonly CastShaping[];
 }>;
 
 export type ResolveDependencies = Readonly<{

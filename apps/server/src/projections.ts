@@ -223,6 +223,7 @@ const PENDING_SAVE_FIELDS = {
   failurePush: "never",
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
+  disadvantageFrom: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -239,7 +240,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   escapeDc: "player",
   modifiers: "player",
   duration: "player",
-  repeatSave: "player",
+  // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
+  repeatSave: "derived",
   endsOnDamage: "player",
   endsOnSourceSideDamage: "player",
   speedZero: "player",
@@ -424,6 +426,9 @@ export function projectPlayerCombat(
             ? {
                 onFailEffect: {
                   ...copyPlayerFields(onFail, ON_FAIL_EFFECT_FIELDS),
+                  ...(onFail.repeatSave
+                    ? { repeatSave: { ability: onFail.repeatSave.ability, dc: onFail.repeatSave.dc } }
+                    : {}),
                   name: onFailHidden ? withoutSourceName(onFail.name, onFail.sourceName) : onFail.name,
                   sourceName: onFailHidden ? HIDDEN_SOURCE : onFail.sourceName,
                   sourceActorId: null
@@ -482,8 +487,11 @@ function playerEffect(
     longCast: _longCast,
     // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
     struck: _struck,
-    ...visible
+    // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
+    repeatSave,
+    ...rest
   } = effect;
+  const visible = repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
   const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };

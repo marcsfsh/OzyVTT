@@ -72,7 +72,8 @@ export function longCastStepOf(
     ...input,
     targetIds: [...casting.targetIds],
     ...(casting.slotLevel !== null ? { slotLevel: casting.slotLevel } : {}),
-    ...(casting.areaPlaced ? { areaPlaced: true } : {})
+    ...(casting.areaPlaced ? { areaPlaced: true } : {}),
+    ...(casting.shaping ? { shaping: casting.shaping } : {})
   };
   return { phase: casting.turnsLeft <= 1 ? "finish" : "continue", input: carried, spell, rounds };
 }
@@ -80,8 +81,12 @@ export function longCastStepOf(
 /** The first turn or one between: the action is spent, nothing else is. Returns the line the table reads. */
 export function stepLongCast(ctx: ResolveContext, step: LongCastStep): void {
   const { state, attacker, input, deps } = ctx;
-  // The slot, a limited use and consumed materials wait for the last turn; the action is this turn's.
-  commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+  // The slot, a limited use, consumed materials and Metamagic's points wait for the last turn; the action is this
+  // turn's.
+  commitEconomy({
+    ...ctx,
+    plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [], shaping: null }
+  });
   const name = step.spell.name;
   if (step.phase === "start") {
     const casting: Casting = {
@@ -89,6 +94,7 @@ export function stepLongCast(ctx: ResolveContext, step: LongCastStep): void {
       targetIds: ctx.targets.map((target) => target.id),
       slotLevel: ctx.plan.spendSpellSlot?.level ?? null,
       areaPlaced: input.areaPlaced === true,
+      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping.map((entry) => ({ ...entry })) } : {}),
       turnsLeft: step.rounds - 1,
       lastRound: state.combat.round
     };

@@ -5,6 +5,7 @@ import {
   DamageDrainSchema,
   ForcedPushSchema,
   ActorSchema,
+  CastShapingSchema,
   EffectInstanceSchema,
   EffectModifiersSchema,
   HealthDisplaySchema,
@@ -305,6 +306,8 @@ export const PendingSaveSchema = z
     failurePush: ForcedPushSchema.optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** What gives the save Disadvantage, as the roll names it (Heightened Spell). GM bookkeeping, never projected. */
+    disadvantageFrom: z.string().min(1).max(60).optional(),
     /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
      *  card says so, so it never reads as if the engine did. */
     gmApplies: z.literal(true).optional(),
@@ -540,7 +543,9 @@ export const ParkedAttackSchema = z
       .max(120)
       .optional(),
     /** The attacker chose to knock the target out (SRD Knocking Out a Creature), so the replay's damage does. */
-    knockOut: z.literal(true).optional()
+    knockOut: z.literal(true).optional(),
+    /** How the caster shaped the spell (Metamagic), so the replay's damage and range are the shaped ones. */
+    shaping: z.array(CastShapingSchema).max(4).optional()
   })
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
@@ -596,7 +601,9 @@ export const ParkedCastSchema = z
     /** The key the cast's attack d20 is held under, if a preview rolled one. */
     holdKey: z.string().max(120).nullable(),
     initiatorRole: z.enum(["gm", "player"]),
-    initiatorSessionId: z.string().min(1).max(200)
+    initiatorSessionId: z.string().min(1).max(200),
+    /** How the caster shaped the spell (Metamagic, Sculpt Spells); its Sorcery Points were spent with the cast. */
+    shaping: z.array(CastShapingSchema).max(4).optional()
   })
   .strict();
 export type ParkedCast = z.infer<typeof ParkedCastSchema>;
@@ -983,13 +990,21 @@ const sceneCombatShape = {
           components: z.record(z.string(), z.number().int().nonnegative()),
           slotLevel: z.number().int().min(1).max(9).optional(),
           parentId: z.string().max(120).optional(),
-          replacements: z.record(z.string(), z.number().int().nonnegative()).optional()
+          replacements: z.record(z.string(), z.number().int().nonnegative()).optional(),
+          /** How the spell whose rays it holds was shaped (Metamagic), which every later ray keeps. Never projected. */
+          shaping: z.array(CastShapingSchema).max(4).optional()
         })
         .strict()
         .nullable()
         .default(null),
+      /** The same for a Bonus Action: a compound one's strikes, or the rays of a spell cast as one (Quickened Spell). */
       bonusActionInstance: z
-        .object({ actorId: z.uuid(), components: z.record(z.string(), z.number().int().nonnegative()) })
+        .object({
+          actorId: z.uuid(),
+          components: z.record(z.string(), z.number().int().nonnegative()),
+          slotLevel: z.number().int().min(1).max(9).optional(),
+          shaping: z.array(CastShapingSchema).max(4).optional()
+        })
         .strict()
         .nullable()
         .default(null),
@@ -1001,6 +1016,17 @@ const sceneCombatShape = {
       /** Who has expended a spell slot to cast a spell this turn (SRD: one per turn). Engine bookkeeping, never
        *  projected. */
       spellSlotCasters: z.array(z.uuid()).max(200).optional(),
+      /** What the turn's actor has cast this turn, for Quickened Spell ("You can't modify a spell in this way if you've
+       *  already cast a level 1+ spell on the current turn, nor can you cast a level 1+ spell on this turn after"), and
+       *  whether Arcane Apotheosis's free Metamagic option is used. Engine bookkeeping, never projected. */
+      metamagic: z
+        .object({
+          leveledCast: z.literal(true).optional(),
+          quickened: z.literal(true).optional(),
+          freeUsed: z.literal(true).optional()
+        })
+        .strict()
+        .optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine

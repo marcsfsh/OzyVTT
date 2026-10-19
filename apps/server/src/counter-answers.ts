@@ -209,7 +209,8 @@ function goAhead(
       damageType: parked.damageType,
       ability: parked.ability,
       ...(parked.areaPlaced ? { areaPlaced: true } : {}),
-      ...(parked.holdKey !== null ? { holdKey: parked.holdKey } : {})
+      ...(parked.holdKey !== null ? { holdKey: parked.holdKey } : {}),
+      ...(parked.shaping ? { shaping: parked.shaping } : {})
     },
     {
       random: deps.random,

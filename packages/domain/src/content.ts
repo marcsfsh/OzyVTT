@@ -8,6 +8,7 @@ import {
   type DamageType
 } from "@vtt/schemas";
 import type { Wire } from "./wire.js";
+import type { CastShapingOffers } from "./results.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
 const slug = (max = 80) =>
@@ -880,6 +881,7 @@ export type ContentActionSummary = Readonly<{
   }>;
   /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
   /** The spell it casts. */ spellId?: string;
+  /** The ways its caster may shape the cast (Metamagic, Sculpt Spells), from the server's availability read. */ shaping?: CastShapingOffers;
 }>;
 export type ContentActionsResult = {
   ok: boolean;
