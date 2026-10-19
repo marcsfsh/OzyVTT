@@ -145,9 +145,11 @@ describe("a spell that takes a minute or more to cast", () => {
   it("takes the Magic action, and in a fight the action on each turn of its minute", () => {
     const { resolve, action, hero } = fight(caster);
     expect(action("spell-alarm").activation).toBe("action");
-    expect(resolve("spell-alarm", { targetIds: [] }).tableNarration?.map((line) => line.text).join(" ")).toMatch(
-      /begins casting Alarm\. It takes the action on each of .+'s next 9 turns, with Concentration held\./
-    );
+    expect(
+      resolve("spell-alarm", { targetIds: [] })
+        .tableNarration?.map((line) => line.text)
+        .join(" ")
+    ).toMatch(/begins casting Alarm\. It takes the action on each of .+'s next 9 turns, with Concentration held\./);
     expect(hero.effects.some((effect) => effect.longCast?.actionId === "spell-alarm")).toBe(true);
   });
 

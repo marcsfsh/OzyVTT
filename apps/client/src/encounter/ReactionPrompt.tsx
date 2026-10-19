@@ -351,7 +351,11 @@ export function ReactionPrompt({
                 }
                 onClick={() => answer(false)}
               >
-                {reaction.kind === "attack-would-hit" ? "Take the hit" : reaction.kind === "casts-spell" ? "Let it go" : "Decline"}
+                {reaction.kind === "attack-would-hit"
+                  ? "Take the hit"
+                  : reaction.kind === "casts-spell"
+                    ? "Let it go"
+                    : "Decline"}
               </Button>
               <button
                 type="button"
