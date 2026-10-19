@@ -427,6 +427,41 @@ describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Sha
       )
     ).toThrowError(/no uses remaining \(2\/Long Rest\)/);
   });
+
+  it("heals one creature picked in the area with a roll of its own, 3d6 from Druid 10", () => {
+    expect(actionOf(definition, "lands-aid")).toMatchObject({
+      area: { shape: "sphere", sizeFeet: 10, rangeFeet: 60 },
+      areaHeal: { formula: "2d6" }
+    });
+    expect(
+      actionOf(build(druid(10, [primalOrder("warden"), elementalFury("primal-strike")])), "lands-aid")?.areaHeal
+    ).toEqual({ formula: "3d6" });
+    const state = encounterWith(definition);
+    state.actors[0]!.hp.current = 5;
+    const used = resolveDefinitionAction(
+      state,
+      actionOf(definition, "lands-aid")!,
+      { actorId: HERO, targetIds: [FOE], commandId: command(), aidTo: HERO },
+      { ...deps(definition), distanceFeet: () => 10 }
+    );
+    // Every die shows 3: 2d6 is 6, apart from the save's damage.
+    expect(state.actors[0]!.hp.current).toBe(11);
+    expect(used.healing?.targets).toEqual([{ targetId: HERO, targetName: state.actors[0]!.name, regained: 6 }]);
+    expect(state.combat.pendingSaves).toMatchObject([{ targetActorId: FOE, ability: "con", dc: 13 }]);
+  });
+
+  it("refuses a creature the area can't hold, and a Sphere centred beyond 60 feet", () => {
+    const use = (input: Record<string, unknown>, apart: (a: string, b: string) => number) =>
+      resolveDefinitionAction(
+        encounterWith(definition),
+        actionOf(definition, "lands-aid")!,
+        { actorId: HERO, targetIds: [FOE], commandId: command(), ...input },
+        { ...deps(definition), distanceFeet: apart }
+      );
+    expect(() => use({}, () => 75)).toThrowError(/beyond the 10-foot sphere Land's Aid centres within 60 ft/);
+    // The Druid 60 feet from the ghoul, which the Sphere holds; the Druid itself is 60 feet off, too far from it.
+    expect(() => use({ aidTo: HERO }, () => 60)).toThrowError(/too far apart for one area of Land's Aid/);
+  });
 });
 
 describe("Elemental Fury: the twin of Blessed Strikes (audit row 5)", () => {

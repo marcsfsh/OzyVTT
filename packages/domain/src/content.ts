@@ -990,6 +990,8 @@ export type ContentActionSummary = Readonly<{
     rangeFeet: number;
     amount: number;
   }>;
+  /** One creature its user picks in its area regains this many Hit Points (Land's Aid); `action.resolve`'s `aidTo`. */
+  areaHeal?: Readonly<{ formula: string }>;
   /** An option, one for each target, or a carried weapon it asks for (`actionChoicesOf`). */ choices?: ActionChoices;
   /** A stat block's spell list (Spellcasting, Divine Aid): the numbers its casts are made with. */ spellList?: Readonly<{
     ability: z.infer<typeof AbilitySchema>;

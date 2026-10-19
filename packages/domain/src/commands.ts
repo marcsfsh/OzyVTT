@@ -572,6 +572,9 @@ export const ActionResolveSchema = z
     /** Who the Temporary Hit Points of an action with `vitality` go to once its damage lands (Improved Potent
      *  Spellcasting): the user, or a creature within the range it names. Absent, the user. */
     vitalityTo: z.uuid().optional(),
+    /** The creature in an action's area that regains its `areaHeal` (Land's Aid), checked to stand in one area with
+     *  the creatures picked. Absent, nobody regains them. */
+    aidTo: z.uuid().optional(),
     /** Tactical Master (Fighter 9): the Push, Sap or Slow property this attack takes in place of its weapon's own
      *  mastery, sent with every look at the attack and its confirm. Refused for a swing that can't take it. */
     mastery: z.enum(["push", "sap", "slow"]).optional(),

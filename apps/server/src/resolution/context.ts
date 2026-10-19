@@ -92,6 +92,8 @@ export type ResolveInput = Readonly<{
   pushFeet?: number;
   /** Who an action's `vitality` goes to (Improved Potent Spellcasting); absent, the user. */
   vitalityTo?: string;
+  /** Who an action's `areaHeal` goes to (Land's Aid); absent, nobody. */
+  aidTo?: string;
   /** Tactical Master's Push, Sap or Slow in place of the weapon's own mastery for this attack. */
   mastery?: "push" | "sap" | "slow";
   /** An Evoker's Overchannel: the spell's damage dice deal their maximum (`resolution/overchannel.ts`). */

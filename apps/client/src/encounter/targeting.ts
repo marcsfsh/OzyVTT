@@ -53,6 +53,8 @@ export type TargetingSession = Readonly<
     /** Who a cantrip's Temporary Hit Points go to once its damage lands (Improved Potent Spellcasting); absent, the
      *  caster. */
     vitalityTo?: string;
+    /** Who regains an area's healing (Land's Aid); absent, nobody. */
+    aidTo?: string;
     /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
     conditionId?: string;
     /** The option picked for an action that offers several (Fire Shield's warm or chill); it starts on the first. */
@@ -353,6 +355,13 @@ export function setVitalityTo(actorId: string) {
   session = actorId === session.attackerId ? rest : { ...rest, vitalityTo: actorId };
   emit();
 }
+/** Who regains an area's healing (Land's Aid); "" picks nobody. */
+export function setAidTo(actorId: string) {
+  if (!session?.action.areaHeal) return;
+  const { aidTo: _old, ...rest } = session;
+  session = actorId === "" ? rest : { ...rest, aidTo: actorId };
+  emit();
+}
 /** The picks of a cast's shaping that name creatures among its targets: Careful Spell's and Sculpt Spells' protected
  *  creatures, and Heightened Spell's one target when the spell has several. */
 export const SHAPING_CREATURE_PICKS: ReadonlySet<string> = new Set([
@@ -519,6 +528,7 @@ export function resolveTargeting(
     skill,
     ability,
     vitalityTo,
+    aidTo,
     conditionId,
     shaping,
     summonPick,
@@ -578,6 +588,7 @@ export function resolveTargeting(
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
     ...(vitalityTo !== undefined ? { vitalityTo } : {}),
+    ...(aidTo !== undefined ? { aidTo } : {}),
     ...(conditionId !== undefined ? { conditionId } : {}),
     ...(optionId !== undefined ? { optionId } : {}),
     // Only the picks for creatures still selected.

@@ -3221,7 +3221,10 @@ export const ActionAreaSchema = z
     /** Each area must touch another ("Each Cube must be contiguous with at least one other Cube"). */
     contiguous: z.literal(true).optional(),
     /** How high a Cylinder rises from the ground it stands on ("5-foot-radius, 40-foot-high Cylinder"). */
-    heightFeet: z.number().int().min(1).max(1000).optional()
+    heightFeet: z.number().int().min(1).max(1000).optional(),
+    /** The point it centres on lies within this many feet of its user, for an action that is no spell (Land's Aid:
+     *  "choose a point within 60 feet of yourself"); a spell's range is its own. */
+    rangeFeet: z.number().int().min(5).max(1000).optional()
   })
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;
@@ -4560,7 +4563,7 @@ export const ActionSchema = z
       .enum(["turn-start", "attack-action", "own-turn"])
       .optional()
       .describe(
-        "When in its user's own turn it is taken: at the start, before moving or acting (turn-start), or as part of the Attack action (attack-action)"
+        "When in its user's own turn it is taken: at the start, before moving or acting (turn-start), as part of the Attack action (attack-action), or at any point of it (own-turn)"
       ),
     /** Once it deals damage to a creature, its user gives itself or a creature it picks within `rangeFeet` this many
      *  Temporary Hit Points, once a use (Improved Potent Spellcasting on a Cleric cantrip). */
@@ -4571,6 +4574,13 @@ export const ActionSchema = z
       .describe(
         "Once it deals damage, its user gives itself or a creature it picks within rangeFeet this many Temporary Hit Points (Improved Potent Spellcasting)"
       ),
+    /** One creature its user picks in its area regains this many Hit Points, a roll of its own beside the area's save
+     *  (Land's Aid). */
+    areaHeal: z
+      .object({ formula: HealingFormulaSchema })
+      .strict()
+      .optional()
+      .describe("One creature its user picks in its area regains this many Hit Points, a roll of its own (Land's Aid)"),
     /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
     requiresEffectTag: EffectTagSchema.optional().describe(
       'The action requires an active self effect carrying this tag (Frenzy requires "raging")'

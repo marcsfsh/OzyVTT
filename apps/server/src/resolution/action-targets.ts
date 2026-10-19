@@ -36,6 +36,41 @@ type TargetCheck = Readonly<{
   catalog?: EquipmentCatalog | undefined;
 }>;
 
+/** An action's Sphere centred on a point within its range (Land's Aid: "a point within 60 feet of yourself"): the
+ *  creatures picked in it stand within that range plus its radius, and no two farther apart than it is wide. A spell's
+ *  area is checked against the spell's range (`spell-targets.ts`). */
+function areaRangeViolations(
+  check: TargetCheck,
+  targets: readonly LiveActor[],
+  nameOf: (target: LiveActor) => string
+): Violation[] {
+  const { action, attacker, distanceFeet } = check;
+  const area = action.area;
+  if (!area?.rangeFeet || action.spellId !== undefined || !distanceFeet) return [];
+  if (area.shape !== "sphere" && area.shape !== "cylinder") return [];
+  const violations: Violation[] = [];
+  const reach = area.rangeFeet + area.sizeFeet;
+  for (const target of targets) {
+    const apart = target.id === attacker.id ? 0 : distanceFeet(attacker.id, target.id);
+    if (apart !== null && apart > reach + DISTANCE_TOLERANCE_FEET)
+      violations.push({
+        rule: "range.out-of-range",
+        message: `${nameOf(target)} is ${Math.round(apart)} ft away, beyond the ${area.sizeFeet}-foot ${area.shape} ${action.name} centres within ${area.rangeFeet} ft.`
+      });
+  }
+  for (const [index, first] of targets.entries())
+    for (const second of targets.slice(index + 1)) {
+      const apart = distanceFeet(first.id, second.id);
+      if (apart === null || apart <= area.sizeFeet * 2 + DISTANCE_TOLERANCE_FEET) continue;
+      violations.push({
+        rule: "target.outside-area",
+        message: `${nameOf(first)} and ${nameOf(second)} are ${Math.round(apart)} ft apart, too far for one ${area.sizeFeet}-foot ${area.shape} of ${action.name}.`
+      });
+      return violations;
+    }
+  return violations;
+}
+
 const words = (types: readonly string[]) =>
   types.map((type) => `${type[0]!.toUpperCase()}${type.slice(1)}`).join(" or ");
 
@@ -96,6 +131,7 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
       rule: "target.too-many",
       message: `${action.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}; ${unique.length} were chosen.`
     });
+  violations.push(...areaRangeViolations(check, targets, nameOf));
   const rules = action.targets;
   if (!rules) return violations;
   // "A creature you can see": the map with its vision on, else the conditions and the senses by distance.

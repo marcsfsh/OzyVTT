@@ -312,6 +312,7 @@ function interpretAction(
     damageDiceByAbility,
     multiattackByLevel,
     healingByLevel,
+    areaHealByLevel,
     adds,
     grantScaling,
     ridesHit,
@@ -389,6 +390,10 @@ function interpretAction(
       formula
     };
   }
+  const areaHealRows = (areaHealByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  if (areaHealRows.length > 0) assembled.areaHeal = { formula: areaHealRows[areaHealRows.length - 1].formula };
   // "1d10 plus your Fighter level", "add your Wisdom modifier": read off the character as it is built.
   if (adds) {
     const bonus =

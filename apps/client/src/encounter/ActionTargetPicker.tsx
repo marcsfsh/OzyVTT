@@ -20,6 +20,7 @@ import {
   setCheckSkill,
   setChosenAbility,
   setVitalityTo,
+  setAidTo,
   setConditionChoice,
   setDamageType,
   setEffectOption,
@@ -261,6 +262,20 @@ export function ActionTargetPicker({
               { id: picking.attackerId, label: targets.find((row) => row.id === picking.attackerId)?.label ?? "You" },
               ...targets.filter((row) => row.id !== picking.attackerId)
             ].map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {/* Land's Aid: one creature in the area regains its own roll of Hit Points. */}
+      {picking.action.areaHeal && (
+        <label className="action-damage-type">
+          <span>Regains {picking.action.areaHeal.formula} Hit Points</span>
+          <Select value={picking.aidTo ?? ""} onChange={(event) => setAidTo(event.target.value)}>
+            <option value="">No one</option>
+            {targets.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.label}
               </option>

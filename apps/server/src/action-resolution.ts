@@ -73,6 +73,7 @@ import {
 } from "./resolution/extra-attacks.js";
 import { recordAttackDealings } from "./resolution/dealings.js";
 import { vitalityOnHit, vitalityRecipient } from "./resolution/vitality.js";
+import { applyAreaHeal, areaHealRecipient } from "./resolution/area-heal.js";
 import {
   applyMasteryForces,
   checkTacticalMaster,
@@ -179,8 +180,9 @@ export function resolveDefinitionAction(
     throw new CommandRejectedError("Answer the damage on a look at it, before it is dealt.");
   checkOverchannel(ctx);
   checkTacticalMaster(ctx);
-  // Who a cantrip's vitality goes to is checked before anything rolls.
+  // Who a cantrip's vitality goes to, and who an area's healing goes to, are checked before anything rolls.
   vitalityRecipient(ctx);
+  areaHealRecipient(ctx);
   checkWallTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent.
@@ -355,6 +357,7 @@ export function resolveDefinitionAction(
     applyHealing(ctx);
     tape.stop();
   } else applyHealing(ctx);
+  applyAreaHeal(ctx);
   prayerShortRest(ctx);
   applyConditionCures(ctx);
   applySpellEndings(ctx);
