@@ -69,6 +69,7 @@ import {
   endIdleConcentration,
   makeEffect,
   sourceOf,
+  spellWords,
   type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
@@ -184,7 +185,20 @@ export type SaveSource = Readonly<{
   breathWeapon?: boolean;
 }>;
 
-/** A breath weapon as the SRD's stat blocks name it: a Dragon's "Fire Breath", a dragonborn's "Breath Weapon". */
+/** The active item whose success against this spell leaves it no effect on its bearer (a Ring of Spell Turning: "If
+ *  you succeed on the save for a spell of level 7 or lower, the spell has no effect on you"), by name. */
+function spellTurnedBy(target: Actor, pending: PendingSave, catalog: EquipmentCatalog | undefined): string | null {
+  const level = pending.spell?.level;
+  if (level === undefined || !catalog) return null;
+  for (const row of target.inventory) {
+    const record = rowRecord(catalog, row);
+    const turning = record?.savesNegateSpells;
+    if (turning && level <= turning.maxLevel && itemIsActive(row, record)) return record!.name;
+  }
+  return null;
+}
+
+/** What a breath weapon as the SRD's stat blocks name it: a Dragon's "Fire Breath", a dragonborn's "Breath Weapon". */
 export const isBreathWeapon = (actionName: string): boolean => /\bbreath(?: weapon)?\b/i.test(actionName);
 
 /** What a pending save is against: a spell is magic too. */
@@ -1057,12 +1071,14 @@ export function answerSave(
     !isIncapacitated(target) &&
     hasEvasion(target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined);
   const halved = success !== evasion;
+  // A Ring of Spell Turning: a success against a spell of its level or lower leaves the spell no effect at all.
+  const turnedBy = success ? spellTurnedBy(target, pending, deps.catalog) : null;
   // A failure that acts by the target's Hit Points (Divine Word, Slaying Bow) does its band's outcome instead.
   const band = success ? null : hitPointBandOf(pending, target);
   const outcomeParts = band
     ? []
     : parts && parts.length > 0
-      ? success && (!pending.halfOnSuccess || evasion)
+      ? success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
         ? []
         : halved
           ? halveDamageParts(parts)
@@ -1071,7 +1087,7 @@ export function answerSave(
   const outcomeDamage =
     outcomeParts !== null
       ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
-      : success && (!pending.halfOnSuccess || evasion)
+      : success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
         ? 0
         : halved
           ? Math.floor(proposedTotal / 2)
@@ -1262,8 +1278,15 @@ export function answerSave(
   // A gibbering mouther's d8 decides what the creature does this turn.
   if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))
     events.push(...gibberingTurn(target, deps.random));
-  // What a success leaves instead (Heat Metal's Disadvantage on a creature that keeps hold of the object).
-  if (success && pending.onSuccessEffect)
+  // A Ring of Spell Turning's success leaves the spell nothing; otherwise what a success leaves instead (Heat Metal's
+  // Disadvantage on a creature that keeps hold of the object).
+  if (turnedBy !== null)
+    events.push({
+      kind: "effect",
+      text: `${turnedBy} leaves ${spellWords(pending.spell!.id)} no effect on ${target.name}.`,
+      actorId: target.id
+    });
+  if (success && turnedBy === null && pending.onSuccessEffect)
     events.push(
       ...applyFailureEffect(state, target.id, pending.onSuccessEffect, `${commandId}:${saveId}:success`, immunities)
     );

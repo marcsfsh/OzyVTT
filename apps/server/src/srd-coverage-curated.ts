@@ -1474,10 +1474,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A rolled 20 against a creature adds 14 Slashing damage and a level of Exhaustion (resolution/damage.ts, resolution/on-hit.ts), and its damage dice against an object are maximized (object-strikes.ts)."
   ),
   "item:talisman-of-pure-good": guided(
-    "The +2 to spell attack rolls is applied. The 8d6 Radiant it deals a Fiend or an Undead that touches it, and Pure Rebuke's fissure on its charges, are the GM's."
+    "It is a Holy Symbol for its bearer's spells (resolution/components.ts) with +2 to spell attack rolls, and Pure Rebuke spends one of its 7 charges, which never come back; the last destroys it (item-spent.ts). The rebuke's DC 20 Dexterity save, with Disadvantage for a Fiend or an Undead, a failure destroying the target and a success dealing 4d6 Psychic, and the 8d6 Radiant it deals a Fiend or an Undead that touches it, are the GM's."
   ),
   "item:talisman-of-ultimate-evil": guided(
-    "The +2 to spell attack rolls is applied. The 8d6 Necrotic it deals a creature other than a Fiend or an Undead that touches it, and Ultimate End's fissure on its charges, are the GM's."
+    "It is a Holy Symbol for its bearer's spells (resolution/components.ts) with +2 to spell attack rolls, and Ultimate End spends one of its 6 charges, which never come back; the last destroys it (item-spent.ts). The DC 20 Dexterity save, with Disadvantage for a Celestial, a failure destroying the target and a success dealing 4d6 Psychic, and the 8d6 Necrotic it deals any other creature that touches it, are the GM's."
   ),
   "item:sword-of-wounding": enforced(
     "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points for 1 hour or until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts); the hour runs on the game clock after a fight (game-time.ts)."
@@ -2093,6 +2093,42 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:potion-of-water-breathing": enforced(
     "Drinking it lets the drinker breathe underwater for 24 hours of game time (breath.ts)."
+  ),
+  "item:ring-of-spell-turning": guided(
+    "Its wearer has Advantage on saves against spells, and a successful save against a spell of level 7 or lower leaves the spell no effect on it: no half damage, nothing a success would leave (saving-throws.ts). Deflecting a spell that targeted only the wearer back at its caster is the GM's."
+  ),
+  "item:candle-of-invocation": guided(
+    "Lit, it sheds Dim Light 30 feet for its 4 hours (item-light.ts), and while it burns its attuned bearer has Advantage on attack rolls, saves, checks and Initiative. It casts Gate once, which destroys it. Whether an alignment matches the candle's, the others in its light, slot-free level 1 spells for a Cleric or Druid, Gate only at the first lighting, and the minutes a snuffed candle keeps are the GM's."
+  ),
+  "item:crystal-ball-of-mind-reading": guided(
+    "It casts Scrying at DC 17, and Detect Thoughts at DC 17 only through that Scrying: it takes no Concentration of its own and ends with the Scrying (resolution/concentration.ts). Which creatures stand within 30 feet of the sensor is the GM's."
+  ),
+  "item:crystal-ball-of-telepathy": guided(
+    "It casts Scrying at DC 17, and Suggestion at DC 17 once a dawn only through that Scrying: it takes no Concentration of its own and ends with the Scrying (resolution/concentration.ts). Speaking telepathically with creatures near the sensor, and which of them it can reach, are the GM's."
+  ),
+  "item:potion-of-mind-reading": guided(
+    "Drunk, it is used up and its drinker bears Detect Thoughts for 10 minutes with no Concentration. The thoughts it reads, and the DC 13 save a creature makes against a deeper probe, are the GM's."
+  ),
+  "item:amulet-of-the-planes": guided(
+    "Its Plane Shift is cast only after a DC 15 Intelligence (Arcana) check, which the server rolls in a fight and outside one; a failure spends the action and casts nothing (cast-check.ts). Where a failure sends its wearer and those within 15 feet, on the d100 table, is the GM's."
+  ),
+  "item:ring-of-the-ram": guided(
+    "Each of its three actions spends 1 to 3 of its 3 charges (1d3 back at dawn) on a ranged spell attack at its printed +7 against a creature within 60 feet, dealing 2d10 Force and pushing it 5 feet for each charge. Its Strength check at +5 a charge to break an object is the GM's."
+  ),
+  "item:dragon-orb": guided(
+    "Its spells cost their printed charges from 7 (1d4 + 3 back at dawn): Cure Wounds at level 9 for 4, Daylight for 1, Death Ward for 2, Detect Magic for none, Scrying at DC 18 for 3; Call Dragons waits an hour of game time (clock-pools.ts). Peering into it, its Charm and Suggestion on a user who fails the DC 15 Charisma save, the spells answering only to one who controls it, and its AC 20 are the GM's."
+  ),
+  "item:carpet-of-flying": enforced(
+    "The GM says which of the four sizes a carpet is, and a Magic action makes it hover and fly with its user at that size's Fly Speed until it lands (falling.ts). Its weight limits and half speed, and steering it from 30 feet away, need what the sheet doesn't record."
+  ),
+  "item:horn-of-blasting": enforced(
+    "Its blast fills a 30-foot Cone with a DC 15 Constitution save: 5d8 Thunder and Deafened for 1 minute on a failure, half on a success. Each use rolls the d100 for its 20 percent chance to explode, dealing 10d6 Force to its user and destroying it (resolution/charges.ts, item-breaks.ts). The glass and crystal objects it shatters are story."
+  ),
+  "item:bag-of-beans": guided(
+    "inventory.ts rolls its 3d4 beans when it is added, which never come back, and the bag is a plain one once they are gone. Dumped beans explode in a 10-foot Sphere, DC 15 Dexterity for 5d4 Force, half on a success. What a planted bean grows, on its d100 table, is the GM's."
+  ),
+  "item:oil-of-slipperiness": guided(
+    "Applied, it is used up and its creature has Freedom of Movement's effect for 8 hours: a Swim Speed equal to its Speed, and no Paralyzed or Restrained. Poured as Grease on a 10-foot square for 8 hours is the GM's."
   ),
   "item:well-of-many-worlds": guided(
     "Opening a portal starts its wait of 1d8 hours of game time before the next (clock-pools.ts). Where a portal leads, and what passes through, are the GM's."

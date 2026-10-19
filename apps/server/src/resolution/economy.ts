@@ -12,7 +12,9 @@ import {
   CANT_ATTACK_TAG,
   DASH_ONLY_TAG,
   HASTED_TAG,
+  concentrationOn,
   hasEffectTag,
+  spellWords,
   NO_ACTIONS_TAG,
   NO_BONUS_ACTIONS_TAG,
   NO_REACTIONS_TAG,
@@ -627,6 +629,12 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
       message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.`
     });
   }
+  // A cast through another spell (a Crystal Ball's Detect Thoughts through Scrying) needs that spell held.
+  if (action.castThrough && !concentrationOn(attacker, action.castThrough))
+    violations.push({
+      rule: "feature.requires-effect",
+      message: `${action.name} is cast through ${spellWords(action.castThrough)}, which ${attacker.name} isn't concentrating on.`
+    });
   // End an Effect needs an effect an action ends, on the creature named or anywhere before one is.
   if (action.id === END_EFFECT_ACTION_ID && !hasEndingOption(state, attacker, targetIds))
     violations.push({ rule: "feature.requires-effect", message: NO_ENDING_OPTION });

@@ -645,11 +645,15 @@ describe("what a spent last charge does", () => {
         .map((row) => [row.id, row.charges!.lastCharge])
     );
     expect(outcomes).toEqual({
+      "bag-of-beans": "nonmagical",
+      "candle-of-invocation": "destroyed",
       "chime-of-opening": "destroyed",
       "gem-of-brightness": "nonmagical",
       "necklace-of-fireballs": "destroyed",
       "ring-of-three-wishes": "nonmagical",
-      "scarab-of-protection": "destroyed"
+      "scarab-of-protection": "destroyed",
+      "talisman-of-pure-good": "destroyed",
+      "talisman-of-ultimate-evil": "destroyed"
     });
   });
 });

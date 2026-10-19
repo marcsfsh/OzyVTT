@@ -5,7 +5,10 @@ import { holdsFeature } from "../class-features.js";
 import { startTimedPool } from "../clock-pools.js";
 import { itemRowOfAction, lastChargeLine, lastChargeRollFor, regainOnTwenty } from "../item-charges.js";
 import { endItemMagic } from "../item-spent.js";
-import { recordRoll, type DefinitionAction, type ResolveContext } from "./context.js";
+import type { EffectNarration } from "../effects.js";
+import { applyDamageDetailed } from "../hit-points.js";
+import { breakableItemOf, breakChance, brokenLine } from "../item-breaks.js";
+import { recordRoll, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { useLimitFor, type EconomyPlan } from "./economy.js";
 
 type Spend = EconomyPlan["spendUse"];
@@ -41,6 +44,79 @@ function spendTheItem(ctx: ResolveContext, item: InventoryItem, record: Equipmen
  *  that never regains its charges is spent with no roll (a Chime of Opening cracks). */
 export function rollLastCharge(ctx: ResolveContext): void {
   afterItemSpend(ctx, ctx.action, ctx.plan.spendUse);
+  breaksAfterUse(ctx);
+}
+
+/** An item whose break stops the use (a Wind Fan: "if the fan fails to work, it tears into useless, nonmagical
+ *  tatters") rolls before it, on a commit. True when it breaks and the use does nothing. */
+export function breaksBeforeUse(ctx: ResolveContext): boolean {
+  const { action, attacker, deps, input } = ctx;
+  if (input.commit === false || input.economyPaid === true) return false;
+  const found = breakableItemOf(action, attacker.inventory, deps.catalog);
+  if (!found?.breaks.failsUse) return false;
+  const key = action.uses ? (action.uses.pool ?? action.id) : null;
+  return rollBreak(ctx, found.row, found.breaks, key ? (attacker.actionUses[key] ?? 0) : 0);
+}
+
+/** One that breaks as it is used (a Horn of Blasting exploding) rolls once the use is done. */
+function breaksAfterUse(ctx: ResolveContext): void {
+  const { action, attacker, deps, input, plan } = ctx;
+  if (input.commit === false) return;
+  const found = breakableItemOf(action, attacker.inventory, deps.catalog);
+  if (!found || found.breaks.failsUse) return;
+  const spend = plan.spendUse;
+  const before = spend ? Math.max(0, (attacker.actionUses[spend.key] ?? 0) - spend.amount) : 0;
+  rollBreak(ctx, found.row, found.breaks, before);
+}
+
+/** Rolls the d100 against the chance; a break deals its damage to the user and destroys the item. */
+function rollBreak(
+  ctx: ResolveContext,
+  row: InventoryItem,
+  breaks: NonNullable<EquipmentReference["breaks"]>,
+  usesBefore: number
+): boolean {
+  const { attacker, deps, state } = ctx;
+  const chance = breakChance(breaks, usesBefore);
+  if (chance <= 0) return false;
+  const rolled = resolveDice(parseDiceFormula("1d100"), deps.random);
+  recordRoll(ctx, rolled, "manual", `${row.name} breaking (${chance} percent)`);
+  if (rolled.total > chance) return false;
+  let hurt: string | null = null;
+  const events: EffectNarration[] = [];
+  if (breaks.damage) {
+    const damage = resolveDice(parseDiceFormula(breaks.damage.formula), deps.random);
+    recordRoll(ctx, damage, "damage", row.name);
+    const applied = applyDamageDetailed(
+      state,
+      attacker.id,
+      {
+        amount: damage.total,
+        parts: [{ amount: damage.total, type: breaks.damage.type }],
+        sourceName: row.name,
+        sourceActorId: attacker.id
+      },
+      { role: "gm" },
+      {
+        resolveDefinition: deps.resolveDefinition ?? (() => undefined),
+        newId: deps.newRollId,
+        now: deps.now,
+        ...(deps.catalog ? { catalog: deps.catalog } : {}),
+        rollDie: deps.random
+      }
+    );
+    const type = breaks.damage.type;
+    hurt = `${attacker.name} takes ${applied.application.totalApplied} ${type[0]!.toUpperCase()}${type.slice(1)} damage`;
+    events.push(...applied.events);
+  }
+  const end = endItemMagic(attacker, row, "destroyed", deps.definition, deps.catalog);
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${brokenLine(row.name, rolled.total, hurt)} ${end}`,
+    actorIds: [attacker.id]
+  });
+  for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+  return true;
 }
 
 /** What spending an item's charges sets off, for the resolved action or a property that rode its hit (a Staff of

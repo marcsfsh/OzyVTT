@@ -1195,8 +1195,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `ring-of-spell-storing` - needs per-copy storage and the original caster's numbers.
-  // "You have Advantage on saving throws against spells." Turning a spell back on its caster is the GM's.
+  // "You have Advantage on saving throws against spells", and a success against a spell of level 7 or lower leaves it
+  // no effect on the wearer. Turning a spell back on its caster is the GM's.
   "ring-of-spell-turning": {
+    savesNegateSpells: { maxLevel: 7 },
     modifiers: [
       {
         type: "roll-mode",
@@ -1212,7 +1214,24 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "While wearing this ring, you can cast Telekinesis from it." At will, no charges, no DC override. */
   "ring-of-telekinesis": { casts: [{ spellId: "telekinesis" }] },
 
-  // `ring-of-the-ram` - a flat +7 attack bonus and per-charge damage are not expressible.
+  // One action for each number of charges spent: a ranged spell attack at +7 against a creature it sees within 60 feet,
+  // 2d10 Force and a 5-foot push for each charge. 3 charges, 1d3 back at dawn. Breaking an object with its Strength
+  // check is the GM's.
+  "ring-of-the-ram": {
+    charges: { regain: "1d3" },
+    actions: ([1, 2, 3] as const).map((spent) => ({
+      id: `ram-${spent}`,
+      name: `Ram (${spent} charge${spent === 1 ? "" : "s"})`,
+      activation: "action" as const,
+      description: `Expend ${spent} charge${spent === 1 ? "" : "s"}: a spectral ram's head makes a ranged spell attack with a +7 bonus against one creature you can see within 60 feet. On a hit, it takes ${2 * spent}d10 Force damage and is pushed ${5 * spent} feet away from you.`,
+      attack: { ability: "spellcasting" as const, bonus: 7, rangeFeet: 60 },
+      damage: [{ formula: `${2 * spent}d10`, type: "force" as const }],
+      onHitPush: { feet: 5 * spent },
+      targets: { count: 1, rangeFeet: 60, seen: true as const },
+      uses: { limit: 3, per: "long-rest" as const, pool: "ring-of-the-ram-charges" },
+      ...(spent > 1 ? { useCost: spent } : {})
+    }))
+  },
   /** "you can expend 1 of its 3 charges to cast Wish from it": three Wishes in all, which never come back, and "the
    *  ring becomes nonmagical when you use the last charge". */
   "ring-of-three-wishes": {
@@ -2421,7 +2440,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "Your Constitution is 19 while you wear this amulet": the Hit Point maximum follows it. */
   "amulet-of-health": { modifiers: [{ type: "ability-score-minimum", ability: "con", score: 19 }] },
   // `amulet-of-proof-against-detection-and-location` - no immunity keyed to a school of magic.
-  // `amulet-of-the-planes` - a cast gated on an Arcana check with a d100 failure table.
+  // Plane Shift after a DC 15 Intelligence (Arcana) check. On a failure the wearer and everything within 15 feet go
+  // to a random destination: the d100 table and the journey are the GM's.
+  "amulet-of-the-planes": {
+    casts: [{ spellId: "plane-shift", check: { ability: "int", skill: "arcana", dc: 15 } }]
+  },
 
   // Immunity to Magic Missile damage only (not all Force) is not expressible.
   "brooch-of-shielding": { grants: { damageResistances: ["force"] } },
@@ -2522,10 +2545,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The +2 to spell attack rolls. The touch damage by creature type and the charges that destroy a creature are not
-  // authored.
-  "talisman-of-pure-good": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
-  "talisman-of-ultimate-evil": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
+  // A Holy Symbol for its bearer's spells, with +2 to spell attack rolls. Its rebuke spends one of its charges, which
+  // never come back, and the last destroys it; the rebuke's save (Disadvantage for some creature types, a failure
+  // destroying the target, a success dealing 4d6 Psychic) and the damage the talisman deals to the creatures it
+  // repels are the GM's.
+  "talisman-of-pure-good": talisman("Pure Rebuke", 7, "If the target is a Fiend or an Undead, it has Disadvantage on the save."),
+  "talisman-of-ultimate-evil": talisman("Ultimate End", 6, "If the target is a Celestial, it has Disadvantage on the save."),
   // `talisman-of-the-sphere` - Arcana advantage only against a Sphere of Annihilation, which the engine does not hold.
 
   // ---- Shoulders -------------------------------------------------------------------------------
@@ -2746,7 +2771,36 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ---- Carried wondrous items (alphabetical, absences inline) ----------------------------------
 
   // `apparatus-of-the-crab`: a vehicle, outside the rider model.
-  // `bag-of-beans` - a GM-rolled table (temp HP and an ability score among its rows).
+  // 3d4 beans when found, which never come back; with none left the bag is a plain one. Dumped beans explode in a
+  // 10-foot-radius Sphere (DC 15 Dexterity, 5d4 Force, half on a success), the dumper included. A planted bean's
+  // d100 table is the GM's.
+  "bag-of-beans": {
+    charges: { starting: "3d4", lastCharge: "nonmagical" },
+    actions: [
+      {
+        id: "dump",
+        name: "Dump Beans",
+        activation: "action",
+        description:
+          "Dump one or more beans out of the bag: they explode in a 10-foot-radius Sphere centered on them and are destroyed. Each creature in the Sphere, including you, makes a DC 15 Dexterity saving throw, taking 5d4 Force damage on a failure or half as much on a success.",
+        damage: [{ formula: "5d4", type: "force" }],
+        area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
+        targets: { rangeFeet: 5 },
+        save: { ability: "dex", dc: 15, successDamage: "half" },
+        uses: { limit: 12, per: "never", pool: "bag-of-beans-beans" },
+        useCost: "chosen"
+      },
+      {
+        id: "plant",
+        name: "Plant a Bean",
+        activation: "action",
+        description:
+          "Remove a bean, plant it in dirt or sand and water it: 1 minute later it produces an effect from where it was planted, which the GM picks or rolls on the bag's d100 table.",
+        damage: [],
+        uses: { limit: 12, per: "never", pool: "bag-of-beans-beans" }
+      }
+    ]
+  },
   // `bag-of-devouring` - a trap with a percentage pull and instant death.
   // `bag-of-holding` - no capacity/container model (also `handy-haversack`, `efficient-quiver`, `portable-hole`).
 
@@ -2944,9 +2998,54 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Its light: "the candle sheds Dim Light in a 30-foot radius" for its 4 hours of burning. Not modeled: Advantage on
-  // D20 Tests and slot-free level 1 spells within that light, and the Gate it can open.
-  "candle-of-invocation": { light: { brightFeet: 0, dimFeet: 30, burnHours: 4 } },
+  // The GM says which of the four sizes a carpet is. A Magic action makes it hover and fly at its size's Fly Speed with
+  // its riders aboard, and its flight ends when it lands. Its weight limits, and steering it from 30 feet away, are the
+  // GM's.
+  "carpet-of-flying": {
+    variants: (
+      [
+        ["3x5", "3 ft. by 5 ft.", 80, 200],
+        ["4x6", "4 ft. by 6 ft.", 60, 400],
+        ["5x7", "5 ft. by 7 ft.", 40, 600],
+        ["6x9", "6 ft. by 9 ft.", 30, 800]
+      ] as const
+    ).map(([id, size, feet, pounds]) => ({
+      id,
+      name: `${size} (Fly Speed ${feet} feet)`,
+      actions: [
+        {
+          id: `fly-${id}`,
+          name: "Fly the Carpet",
+          activation: "action" as const,
+          description: `Speak the carpet's command word: it hovers and flies with you aboard, at a Fly Speed of ${feet} feet, moving as you direct while you are within 30 feet of it. It carries up to ${pounds} pounds at that speed, and up to twice that at half the speed. It stops flying when it lands.`,
+          damage: [],
+          grants: {
+            name: "Carpet of Flying",
+            tags: ["carpet-of-flying", "ends-on-landing"],
+            duration: { type: "manual" as const },
+            modifiers: [{ type: "special-speed" as const, movement: "fly" as const, feet, hover: true as const }]
+          }
+        }
+      ]
+    })),
+    variantChoice: { by: "gm" }
+  },
+
+  // Its light: "the candle sheds Dim Light in a 30-foot radius" for its 4 hours of burning, and while it burns its
+  // attuned bearer has Advantage on D20 Tests. It can cast Gate once, which destroys it. Whether an alignment matches
+  // the candle's, others in its light, the slot-free level 1 spells, Gate only at the first lighting, and the minutes
+  // a snuffed candle has left are the GM's.
+  "candle-of-invocation": {
+    light: { brightFeet: 0, dimFeet: 30, burnHours: 4, ridersWhileLit: true },
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "advantage", when: [{ type: "on-attack-roll" }] },
+      { type: "roll-mode", roll: "save", mode: "advantage", when: [{ type: "on-saving-throw" }] },
+      { type: "roll-mode", roll: "check", mode: "advantage", when: [{ type: "on-ability-check" }] },
+      { type: "roll-mode", roll: "initiative", mode: "advantage" }
+    ],
+    charges: { lastCharge: "destroyed" },
+    casts: [{ spellId: "gate", uses: { limit: 1, per: "never", pool: "candle-of-invocation-gate" } }]
+  },
 
   // One of the four elemental-commanding items; see the bowl.
   "censer-of-controlling-air-elementals": {
@@ -2979,21 +3078,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
    * loadout raises this, since that rider applies to every save-bearing action. The sensor and the
    * save-modifier table stay prose.
    *
-   * The Mind Reading and Telepathy orbs' second spells are cast through an active Scrying's sensor;
-   * nothing can gate a cast on another cast or a target on a sensor, so they are not authored.
+   * The Mind Reading and Telepathy orbs cast their second spell through the Scrying their holder concentrates on: no
+   * Concentration of its own, ending with the Scrying. Which creatures stand within 30 feet of the sensor is the GM's.
    */
   "crystal-ball": {
     casts: [{ spellId: "scrying", saveDc: 17 }]
   },
 
-  // Not modeled: Detect Thoughts through the sensor, and waiving its Concentration.
   "crystal-ball-of-mind-reading": {
-    casts: [{ spellId: "scrying", saveDc: 17 }]
+    casts: [
+      { spellId: "scrying", saveDc: 17 },
+      { spellId: "detect-thoughts", saveDc: 17, through: "scrying" }
+    ]
   },
 
-  // Not modeled: Suggestion through the sensor, and telepathy near the sensor.
+  // Suggestion through the sensor once a dawn. Speaking telepathically with creatures near the sensor is the GM's.
   "crystal-ball-of-telepathy": {
-    casts: [{ spellId: "scrying", saveDc: 17 }]
+    casts: [
+      { spellId: "scrying", saveDc: 17 },
+      { spellId: "suggestion", saveDc: 17, through: "scrying", uses: { limit: 1, per: "long-rest" } }
+    ]
   },
 
   // Truesight around the sensor is not modeled.
@@ -3062,7 +3166,40 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `deck-of-illusions` - illusions and card state are not modeled.
   // `dimensional-shackles` - prevents extradimensional movement, which is not modeled.
-  // `dragon-orb` - multi-charge spells, a healing cast, a self-charm on attunement and a curse.
+  // Its spells at their printed charge costs on 7 charges (1d4 + 3 back at dawn), Detect Magic at no cost, Scrying at
+  // DC 18, and Call Dragons once an hour. Peering into it (the DC 15 Charisma save, the orb's Charm and its Suggestion
+  // while attuned), the spells being usable only by one who controls it, and its AC 20 are the GM's.
+  "dragon-orb": {
+    charges: { regain: "1d4 + 3" },
+    casts: [
+      {
+        spellId: "cure-wounds",
+        atLevel: 9,
+        useCost: 4,
+        uses: { limit: 7, per: "long-rest", pool: "dragon-orb-charges" }
+      },
+      { spellId: "daylight", uses: { limit: 7, per: "long-rest", pool: "dragon-orb-charges" } },
+      { spellId: "death-ward", useCost: 2, uses: { limit: 7, per: "long-rest", pool: "dragon-orb-charges" } },
+      { spellId: "detect-magic" },
+      {
+        spellId: "scrying",
+        saveDc: 18,
+        useCost: 3,
+        uses: { limit: 7, per: "long-rest", pool: "dragon-orb-charges" }
+      }
+    ],
+    actions: [
+      {
+        id: "call-dragons",
+        name: "Call Dragons",
+        activation: "action",
+        description:
+          "While you control the orb, it issues a telepathic call for 40 miles in every direction. Chromatic dragons in range feel compelled to come to the orb as soon as possible by the most direct route, and might be Hostile toward you for compelling them. It can't be used again for 1 hour.",
+        damage: [],
+        uses: { limit: 1, per: "time", afterHours: "1" }
+      }
+    ]
+  },
 
   // `dust-of-disappearance` - single use, rolled duration, area effect.
   // 1d6 + 4 pinches. A pinch on an Elemental of water within 5 feet: DC 13 Constitution, 10d6 Necrotic, half on a
@@ -3578,8 +3715,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `handy-haversack` - a container.
   // `hat-of-many-spells` - a cast gated on an Arcana check outcome with a wild-magic table.
-  // `horn-of-blasting` - authorable except its 20% chance to explode and damage the user; authoring
-  //     only the blast would make it strictly better than printed.
+  // A blast in a 30-foot Cone: DC 15 Constitution, 5d8 Thunder and Deafened for 1 minute on a failure, half on a
+  // success. Each use has a 20 percent chance of exploding the horn for 10d6 Force to its user. The glass and crystal
+  // it shatters are the GM's.
+  "horn-of-blasting": {
+    breaks: { percent: 20, damage: { formula: "10d6", type: "force" } },
+    actions: [
+      {
+        id: "blast",
+        name: "Blow the Horn",
+        activation: "action",
+        description:
+          "Blow the horn: a thunderous blast in a 30-foot Cone, audible out to 600 feet. Each creature in the Cone makes a DC 15 Constitution saving throw, taking 5d8 Thunder damage and having the Deafened condition for 1 minute on a failure, or half as much damage only on a success. Glass or crystal objects in the Cone that aren't worn or carried take 10d8 Thunder damage. Each use has a 20 percent chance of causing the horn to explode, dealing 10d6 Force damage to you and destroying it.",
+        damage: [{ formula: "5d8", type: "thunder" }],
+        area: { shape: "cone", sizeFeet: 30, widthFeet: null },
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "half",
+          failureConditions: ["deafened"],
+          failureDuration: { type: "rounds", rounds: 10 }
+        }
+      }
+    ]
+  },
   // One action for each metal: its number of Berserkers within 60 feet for 1 hour, obeying the user who meets the
   // horn's requirement (checked on the sheet) and attacking one who doesn't, immune to Charmed and Frightened; then 7
   // days before it sounds again.
@@ -3955,7 +4114,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // `wind-fan` - each reuse risks tearing it; authoring the cast alone would remove the risk.
+  // Gust of Wind at DC 13. Each use after the first before the next dawn has a 20 percent chance more of failing, and a
+  // fan that fails tears to tatters: by its sixth use since a Long Rest it is sure to.
+  "wind-fan": {
+    casts: [{ spellId: "gust-of-wind", saveDc: 13, uses: { limit: 6, per: "long-rest", pool: "wind-fan-uses" } }],
+    breaks: { percent: 20, cumulative: true, failsUse: true }
+  },
 
   // ---- Potions -----------------------------------------------------------------------------------
 
@@ -4238,6 +4402,48 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
+  // "You gain the effect of the Detect Thoughts spell (save DC 13) for 10 minutes (no Concentration required)": the
+  // drinker bears it for its 10 minutes, and the thoughts it reads are the GM's.
+  "potion-of-mind-reading": {
+    consumedOnUse: true,
+    actions: [
+      drink(
+        "Potion of Mind Reading",
+        "Drink it: you gain the effect of the Detect Thoughts spell (save DC 13) for 10 minutes, with no Concentration required.",
+        {
+          name: "Detect Thoughts (Potion of Mind Reading)",
+          tags: ["mind-reading"],
+          duration: { type: "rounds", rounds: 100 }
+        }
+      )
+    ]
+  },
+
+  // Applied over 10 minutes, Freedom of Movement's effect for 8 hours: a Swim Speed equal to its Speed, and no
+  // Paralyzed or Restrained. Pouring it as a Grease for 8 hours is the GM's, since a cast lasts the spell's minute.
+  "oil-of-slipperiness": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "apply",
+        name: "Apply Oil of Slipperiness",
+        activation: "other",
+        description:
+          "Spend 10 minutes covering one Medium or smaller creature, with what it wears and carries: it gains the effect of the Freedom of Movement spell for 8 hours. Poured on the ground as a Magic action instead, it duplicates the Grease spell there for 8 hours.",
+        damage: [],
+        targets: { count: 1, rangeFeet: 5 },
+        grants: {
+          name: "Freedom of Movement (Oil of Slipperiness)",
+          tags: ["freedom-of-movement"],
+          target: "target",
+          duration: { type: "minutes", minutes: 480 },
+          modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
+          conditionImmunities: ["paralyzed", "restrained"]
+        }
+      }
+    ]
+  },
+
   // "You can breathe underwater for 24 hours after drinking this potion": the Water Breathing spell's tag, which the
   // breath rules read.
   "potion-of-water-breathing": {
@@ -4349,6 +4555,27 @@ type ItemAction = NonNullable<ItemMechanics["actions"]>[number];
 type Grant = NonNullable<ItemAction["grants"]>;
 
 /** A potion drunk as a Bonus Action that puts its effect on its drinker. */
+/** A talisman of good or evil: a Holy Symbol with +2 to spell attack rolls, and its rebuke on charges that never come
+ *  back, the last destroying it. */
+function talisman(rebuke: string, charges: number, disadvantage: string): ItemMechanics {
+  return {
+    servesAsFocus: "holy-symbol",
+    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
+    charges: { lastCharge: "destroyed" },
+    actions: [
+      {
+        id: "rebuke",
+        name: rebuke,
+        activation: "action",
+        description: `Expend 1 charge and target one creature you can see on the ground within 120 feet. A fissure opens under it, and it makes a DC 20 Dexterity saving throw. ${disadvantage} On a failure it falls into the fissure and is destroyed, leaving no remains; on a success it takes 4d6 Psychic damage. When you expend the last charge, the talisman is destroyed.`,
+        damage: [],
+        targets: { count: 1, rangeFeet: 120, seen: true },
+        uses: { limit: charges, per: "never", pool: "talisman-charges" }
+      }
+    ]
+  };
+}
+
 function drink(name: string, description: string, grants: Grant): ItemAction {
   return { id: "drink", name: `Drink ${name}`, activation: "bonus-action", description, damage: [], grants };
 }

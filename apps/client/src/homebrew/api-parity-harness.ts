@@ -492,6 +492,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].castThrough",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast made through a spell its user concentrates on (a Crystal Ball's Detect Thoughts through Scrying) - synthesised from an item cast's `through`; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castCheck.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a check made before a use (an Amulet of the Planes' DC 15 Intelligence (Arcana)) - synthesised from an item cast's `check`; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].timePool",
     types: ACTION_CARRIERS,
     reason:
@@ -621,6 +635,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "attack keys the action rows do not enumerate: surfaced when the bare-group false credit was removed (this batch's adversarial review)",
+    status: "gap"
+  },
+  {
+    at: "actions[].attack.bonus",
+    types: FEATURE_CARRIERS,
+    reason:
+      "a printed to-hit that stands in for the derived one (a Ring of the Ram's +7) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {
@@ -1240,6 +1261,41 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["equipment"],
     reason:
       "the most charges a cast may spend, each a level higher (Wand of Fireballs) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].through",
+    types: ["equipment"],
+    reason:
+      "the spell an item's cast goes through (a Crystal Ball's Scrying) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].check.**",
+    types: ["equipment"],
+    reason:
+      "the check an item's cast asks first (an Amulet of the Planes) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "servesAsFocus",
+    types: ["equipment"],
+    reason:
+      "the Spellcasting Focus a magic item serves as (a talisman's Holy Symbol) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "savesNegateSpells.**",
+    types: ["equipment"],
+    reason:
+      "a successful save that leaves a spell no effect (a Ring of Spell Turning) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "breaks.**",
+    types: ["equipment"],
+    reason:
+      "the chance a use breaks the item (a Horn of Blasting, a Wind Fan) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

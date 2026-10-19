@@ -154,11 +154,19 @@ export const FeatureAttackSchema = z
     rangeFeet: z.number().int().positive().optional(),
     rangeNormalFeet: z.number().int().positive().optional(),
     count: z.number().int().min(1).max(10).optional(),
-    criticalBonusDice: z.number().int().min(1).max(4).optional()
+    criticalBonusDice: z.number().int().min(1).max(4).optional(),
+    /** A printed to-hit that stands in for the derived one (a Ring of the Ram's "+7 bonus"). */
+    bonus: z
+      .number()
+      .int()
+      .min(-5)
+      .max(20)
+      .optional()
+      .describe('A printed to-hit that stands in for the derived one (a Ring of the Ram\'s "+7 bonus")')
   })
   .strict()
   .describe(
-    'An attack a feature grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is derived: the feature names the ability (or "spellcasting") and the builder resolves the number.'
+    'An attack a feature grants. Same vocabulary as a stat block\'s attack except the to-hit bonus is derived: the feature names the ability (or "spellcasting") and the builder resolves the number, unless a printed `bonus` stands in.'
   );
 
 /**

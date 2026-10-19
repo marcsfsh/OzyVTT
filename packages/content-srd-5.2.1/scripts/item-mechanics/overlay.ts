@@ -58,9 +58,12 @@ export type ItemRiderKey =
   | "variantChoice"
   | "weaponChanges"
   | "bonusActionAttack"
-  | "magicSaveAura";
+  | "magicSaveAura"
+  | "servesAsFocus"
+  | "savesNegateSpells"
+  | "breaks";
 
-/** The same twenty-three, as a value, so the empty-rider check below iterates the list it is typed against. */
+/** The same keys, as a value, so the empty-rider check below iterates the list it is typed against. */
 const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "tags",
   "actions",
@@ -84,7 +87,10 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "variantChoice",
   "weaponChanges",
   "bonusActionAttack",
-  "magicSaveAura"
+  "magicSaveAura",
+  "servesAsFocus",
+  "savesNegateSpells",
+  "breaks"
 ] as const);
 
 /** The riders one magic item may carry. Every key optional: an entry authors only what it names. */

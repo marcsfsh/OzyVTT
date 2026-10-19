@@ -36,6 +36,8 @@ import { checkPlan } from "../ability-checks.js";
 import { rollSettledCheck } from "../check-rolls.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
+import { castCheckFailedLine, castCheckLabel, castCheckSubject } from "../cast-check.js";
+import { breakableItemOf, looseBreak } from "../item-breaks.js";
 import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
 import { areaAtLevel } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
@@ -798,12 +800,13 @@ export const actionCommands = [
       });
       const initiator = initiatorOf(principal);
       const rollIds = plan.map(() => kit.context.newId());
-      const scrollCheckId = kit.context.newId();
-      let scrollChecked = false;
-      let scrollLost: string | null = null;
+      const checkId = kit.context.newId();
+      let checked = false;
+      let checkFailed: string | null = null;
       let spend: ReturnType<typeof spendLooseUses> = { usesLeft: null, spent: false };
       let lastCharge: string | null = null;
       let timedLine: string | null = null;
+      let breakLine: string | null = null;
       let usedUp = false;
       let narrations: EffectNarration[] = [];
       let rulesNote: string | null = null;
@@ -822,8 +825,9 @@ export const actionCommands = [
         // A scroll outside a fight: one the reader can't read is refused, and a spell above their levels needs its
         // check first. A failure loses the scroll, and nothing else is rolled.
         const scroll = scrollOfAction(action, live.inventory, kit.equipmentCatalog());
-        scrollChecked = false;
-        scrollLost = null;
+        checked = false;
+        checkFailed = null;
+        breakLine = null;
         if (scroll) {
           const catalog = kit.equipmentCatalog();
           const reading = scrollReading(definition, scroll.spell, catalog);
@@ -841,7 +845,7 @@ export const actionCommands = [
               live,
               plan,
               {
-                id: scrollCheckId,
+                id: checkId,
                 commandId,
                 sessionId: sessionIdOf(principal),
                 role: initiator.role,
@@ -851,12 +855,44 @@ export const actionCommands = [
               },
               (sides) => kit.context.random(sides)
             );
-            scrollChecked = true;
+            checked = true;
             if (rolled.total < reading.check.dc) {
-              scrollLost = scrollLostLine(live.name, scroll.spell.name);
+              checkFailed = scrollLostLine(live.name, scroll.spell.name);
               live.inventory = withOneUsedUp(live.inventory, scroll.row.id);
               return;
             }
+          }
+        }
+        // An item's cast that asks a check first (an Amulet of the Planes): a failure spends the use, and nothing else
+        // is rolled.
+        if (action.castCheck) {
+          const catalog = kit.equipmentCatalog();
+          const plan = checkPlan(
+            live,
+            definition,
+            deriveEquipment(live, definition, catalog),
+            castCheckSubject(action.castCheck)
+          );
+          const rolled = rollSettledCheck(
+            draft,
+            live,
+            plan,
+            {
+              id: checkId,
+              commandId,
+              sessionId: sessionIdOf(principal),
+              role: initiator.role,
+              label: castCheckLabel(action.castCheck, action.name),
+              visibility: live.visibility === "gm-only" ? "gm-only" : "public",
+              createdAt: new Date().toISOString()
+            },
+            (sides) => kit.context.random(sides)
+          );
+          checked = true;
+          if (rolled.total < action.castCheck.dc) {
+            spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
+            checkFailed = castCheckFailedLine(live.name, action.name);
+            return;
           }
         }
         // A shot outside a fight needs a piece to fire and spends it as in one; half come back when it is picked up.
@@ -893,7 +929,53 @@ export const actionCommands = [
             throw new RulesBlockedError(UNTRAINED_ARMOR, armorBlock);
           if (mode !== "freeform") rulesNote = armorBlock;
         }
+        // An item that may break with use rolls its d100 (a Wind Fan before it works, a Horn of Blasting after).
+        const breakable = breakableItemOf(action, live.inventory, kit.equipmentCatalog());
+        const usesKey = action.uses ? (action.uses.pool ?? action.id) : null;
+        const breakRolls = {
+          d100: (label: string) => {
+            const face = kit.context.random(100);
+            recordRoll(draft, {
+              id: kit.context.newId(),
+              commandId,
+              initiatorSessionId: sessionIdOf(principal),
+              initiatorRole: initiator.role,
+              initiatorLabel: live.name,
+              label,
+              actorId,
+              purpose: "manual",
+              visibility: live.visibility === "gm-only" ? "gm-only" : "public",
+              formula: "1d100",
+              normalizedFormula: "1d100",
+              dice: [{ group: 0, sides: 100, face, kept: true, sign: 1 as const }],
+              modifiers: [],
+              total: face,
+              createdAt: new Date().toISOString()
+            });
+            return face;
+          },
+          damage: (formula: string) => rollDice(formula, (sides) => kit.context.random(sides)).total
+        };
+        if (breakable?.breaks.failsUse) {
+          const usesBefore = usesKey ? (live.actionUses[usesKey] ?? 0) : 0;
+          const broke = looseBreak(live, breakable, usesBefore, breakRolls, definition, kit.equipmentCatalog());
+          if (broke) {
+            checkFailed = broke;
+            return;
+          }
+        }
         spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
+        breakLine =
+          breakable && !breakable.breaks.failsUse
+            ? looseBreak(
+                live,
+                breakable,
+                usesKey ? Math.max(0, (live.actionUses[usesKey] ?? 0) - useCostOf(action)) : 0,
+                breakRolls,
+                definition,
+                kit.equipmentCatalog()
+              )
+            : null;
         // A pool spent for a time starts its wait on its first use, outside a fight as in one (Well of Many Worlds).
         timedLine =
           action.uses?.per === "time" && action.uses.afterHours
@@ -972,7 +1054,7 @@ export const actionCommands = [
         });
         healed = applyLooseHealing(draft, action, healTargets, healRoll, (sides) => kit.context.random(sides));
       });
-      const usedRollIds = scrollLost !== null ? [scrollCheckId] : scrollChecked ? [scrollCheckId, ...rollIds] : rollIds;
+      const usedRollIds = checkFailed !== null ? [checkId] : checked ? [checkId, ...rollIds] : rollIds;
       // Who regained what goes back to the one who used it, as the fight's resolution says it.
       const healedReply = healed.healing ? { healing: healed.healing } : {};
       if (duplicate) return { route: "loose", rollIds: usedRollIds };
@@ -980,10 +1062,10 @@ export const actionCommands = [
       kit.publishNarrations(narrations);
       for (const line of healed.lines)
         kit.context.appendLog({ kind: "heal", text: line.text, actorIds: [line.actorId] });
-      if (scrollLost !== null) {
+      if (checkFailed !== null) {
         kit.context.appendLog({
           kind: "action",
-          text: scrollLost,
+          text: checkFailed,
           actorId,
           actorIds: [actorId],
           gmOnly: kit.actorHidden(actorId)
@@ -999,7 +1081,7 @@ export const actionCommands = [
             actorIds: [actorId],
             gmOnly: true
           });
-      for (const line of [lastCharge, timedLine])
+      for (const line of [lastCharge, timedLine, breakLine])
         if (line !== null)
           kit.context.appendLog({
             kind: "action",

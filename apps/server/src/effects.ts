@@ -306,6 +306,18 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
   return actor.effects.some((effect) => effect.tags.includes(tag));
 }
 
+/** The creature's Concentration on this spell, while it holds one. */
+export function concentrationOn(actor: Actor, spellId: string): EffectInstance | undefined {
+  return actor.effects.find((effect) => effect.concentration && effect.spell?.id === spellId);
+}
+
+/** A spell id as its name reads, for a line that has no record to hand ("scrying" reads "Scrying"). */
+export const spellWords = (spellId: string): string =>
+  spellId
+    .split("-")
+    .map((word) => word[0]!.toUpperCase() + word.slice(1))
+    .join(" ");
+
 /** What is carried in a hand rather than worn: a row with weapon stats, a wand, a staff or a rod. */
 const HELD_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "wand", "staff", "rod"]);
 

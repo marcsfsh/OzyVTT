@@ -2,7 +2,14 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { spellDurationAt, spellSpanOf } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { EffectInstance, SpellZone } from "@vtt/domain";
 import { catalogIdOf, MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/schemas";
-import { addEffect, CONCENTRATING_TAG, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
+import {
+  addEffect,
+  CONCENTRATING_TAG,
+  concentrationOn,
+  makeEffect,
+  turnEndDuration,
+  type EffectNarration
+} from "../effects.js";
 import { isItemActionId, itemActionRest, laterRowOf, laterSpellActionId } from "../item-actions.js";
 import { CommandRejectedError } from "../game-store.js";
 import { itemRowOfAction } from "../item-charges.js";
@@ -80,6 +87,13 @@ export function startConcentration(ctx: ResolveContext): void {
   if (!spell || !castsWithConcentration(spell, castLevelOf(ctx, spell))) return;
   // Cast without Concentration where its caster may (Dragon Companion): it lasts its minute on its own.
   if (castWithoutConcentration(ctx)) return;
+  // Cast through a spell its caster holds (a Crystal Ball's Detect Thoughts through Scrying): it takes no
+  // Concentration of its own, and what it leaves joins that cast, ending when it does.
+  if (ctx.action.castThrough) {
+    const holding = concentrationOn(ctx.attacker, ctx.action.castThrough);
+    if (holding?.castId) ctx.castId = holding.castId;
+    return;
+  }
   // What the spell lets its caster do once it is up (Spirit Guardians' save, moving Hex) is no new cast.
   if (isLaterAction(ctx, spell)) return;
   ctx.castId = ctx.input.commandId;

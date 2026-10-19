@@ -4546,6 +4546,20 @@ export const ActionSchema = z
     requiresEffectTag: EffectTagSchema.optional().describe(
       'The action requires an active self effect carrying this tag (Frenzy requires "raging")'
     ),
+    /** It is cast through this spell, which its user must be concentrating on: it needs no Concentration of its own,
+     *  and what it leaves ends when that spell does (a Crystal Ball's Detect Thoughts through its Scrying). */
+    castThrough: RiderSlugSchema.optional().describe(
+      "It is cast through this spell, which its user must be concentrating on: it needs no Concentration of its own, and what it leaves ends when that spell does (a Crystal Ball's Detect Thoughts through Scrying)"
+    ),
+    /** A check its user makes as it is used: a failure spends it and nothing else happens (an Amulet of the Planes'
+     *  DC 15 Intelligence (Arcana) before its Plane Shift). */
+    castCheck: z
+      .object({ ability: AbilitySchema, skill: SkillIdSchema.optional(), dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional()
+      .describe(
+        "A check its user makes as it is used: a failure spends it and nothing else happens (an Amulet of the Planes' DC 15 Intelligence (Arcana))"
+      ),
     uses: ActionUsesSchema.optional().describe("Limited uses; unlike a feature's, an action's may recharge on a d6"),
     /** Resolving this action also spends one of the bearer's spell slots of this level ("expend a spell slot to cast
      * it from the staff"). Checked and spent by the limited-uses economy pass, so a preview never spends. */
