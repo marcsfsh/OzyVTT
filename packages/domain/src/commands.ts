@@ -16,6 +16,7 @@ import {
 } from "./state.js";
 import {
   AbilitySchema,
+  CastShapingSchema,
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
@@ -358,6 +359,15 @@ export const RollAnswerChoiceSchema = z
     face: z.number().int().min(1).max(20).optional()
   })
   .strict();
+/** How a spell's caster shapes this casting: Metamagic options paid in Sorcery Points (Careful Spell's and Heightened
+ *  Spell's creatures, Transmuted Spell's new damage type) and Sculpt Spells' protected creatures. The server checks each
+ *  against the caster's picks, the spell and the points left, and spends them. Each option at most once. */
+const CastShapingListSchema = z
+  .array(CastShapingSchema)
+  .max(4)
+  .refine((list) => new Set(list.map((entry) => entry.id)).size === list.length, {
+    error: "Choose each way to shape the spell at most once."
+  });
 export const ActionResolveSchema = z
   .object({
     commandId: z.uuid(),
@@ -438,6 +448,7 @@ export const ActionResolveSchema = z
     /** Knocking out a creature (SRD): a melee hit that drops the target to 0 leaves it at 1 Hit Point and Unconscious
      *  instead. Refused on any other attack. */
     knockOut: z.boolean().optional(),
+    shaping: CastShapingListSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -681,6 +692,8 @@ export const ActionUseSchema = z
     spend: z.number().int().min(1).max(100).optional(),
     /** The damage type picked; see `action.resolve`. */
     damageType: DamageTypeSchema.optional(),
+    /** How the spell's caster shapes the cast (Metamagic); see `action.resolve`. Refused on the loose route. */
+    shaping: CastShapingListSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

@@ -576,6 +576,7 @@ function replayParkedAttack(
       ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
       ...(parked.forgoneAdvantageBy !== undefined ? { forgoneAdvantageBy: parked.forgoneAdvantageBy } : {}),
       ...(parked.knockOut === true ? { knockOut: true } : {}),
+      ...(parked.shaping ? { shaping: parked.shaping } : {}),
       economyPaid: true,
       ...finish.extra
     },

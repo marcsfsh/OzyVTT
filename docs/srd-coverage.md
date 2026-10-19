@@ -32,9 +32,9 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Paladin features (26) | 23 | 2 | 1 |
 | Ranger features (22) | 16 | 2 | 4 |
 | Rogue features (23) | 17 | 3 | 3 |
-| Sorcerer features (18) | 13 | 3 | 2 |
+| Sorcerer features (18) | 15 | 3 | 0 |
 | Warlock features (20) | 15 | 3 | 2 |
-| Wizard features (15) | 8 | 2 | 5 |
+| Wizard features (15) | 9 | 2 | 4 |
 | Species traits (77) | 72 | 2 | 3 |
 | Backgrounds (4) | 4 | 0 | 0 |
 | Feats (19) | 14 | 4 | 1 |
@@ -44,7 +44,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 13 | 2 | 0 |
 | Rules glossary (155) | 109 | 13 | 33 |
-| All records (2423) | 1601 | 483 | 339 |
+| All records (2423) | 1604 | 483 | 336 |
 
 ## How records are classified
 
@@ -442,16 +442,17 @@ Notes on the curated rows:
 
 ## Sorcerer features
 
-**Enforced (13):** Ability Score Improvement · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Companion (Draconic Sorcery) · Dragon Wings (Draconic Sorcery) · Elemental Affinity (Draconic Sorcery) · Epic Boon · Innate Sorcery · Sorcerer Subclass · Spellcasting
+**Enforced (15):** Ability Score Improvement · Arcane Apotheosis · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Companion (Draconic Sorcery) · Dragon Wings (Draconic Sorcery) · Elemental Affinity (Draconic Sorcery) · Epic Boon · Innate Sorcery · Metamagic · Sorcerer Subclass · Spellcasting
 
-**Guided (3):** Font of Magic · Metamagic · Sorcerous Restoration
-
-**Reference (2):** Arcane Apotheosis · Sorcery Incarnate
+**Guided (3):** Font of Magic · Sorcerous Restoration · Sorcery Incarnate
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Arcane Apotheosis | enforced | While Innate Sorcery is active, the first Metamagic option on each of the Sorcerer's turns in a fight costs no Sorcery Points (resolution/metamagic.ts). |
+| Metamagic | enforced | A cast carries one Metamagic option the Sorcerer knows, paid in Sorcery Points and applied by the server (resolution/metamagic.ts, resolution/economy.ts). Empowered Spell can join another option, and Seeking Spell is offered when a spell attack misses (roll-answers.ts). The server refuses an option the spell can't take, and picks the dice Empowered Spell rerolls. Careful Spell covers the save the cast itself calls for (resolution/pending.ts). |
+| Sorcery Incarnate | guided | While Innate Sorcery is active, a cast may carry two Metamagic options (resolution/metamagic.ts). Activating Innate Sorcery for 2 Sorcery Points once its uses are spent is the GM's. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
 
 ## Warlock features
@@ -473,16 +474,17 @@ Notes on the curated rows:
 
 ## Wizard features
 
-**Enforced (8):** Ability Score Improvement · Epic Boon · Evocation Savant (Evoker) · Scholar · Signature Spells · Spell Mastery · Spellcasting · Wizard Subclass
+**Enforced (9):** Ability Score Improvement · Epic Boon · Evocation Savant (Evoker) · Scholar · Sculpt Spells (Evoker) · Signature Spells · Spell Mastery · Spellcasting · Wizard Subclass
 
 **Guided (2):** Arcane Recovery · Overchannel (Evoker)
 
-**Reference (5):** Empowered Evocation (Evoker) · Memorize Spell · Potent Cantrip (Evoker) · Ritual Adept · Sculpt Spells (Evoker)
+**Reference (4):** Empowered Evocation (Evoker) · Memorize Spell · Potent Cantrip (Evoker) · Ritual Adept
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Sculpt Spells (Evoker) | enforced | An Evoker's Evocation spell protects up to 1 plus the spell's level creatures the Wizard can see: they succeed on its save with no roll and take no damage (resolution/pending.ts). Saves its area calls for later are rolled as usual. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
 
 ## Species traits

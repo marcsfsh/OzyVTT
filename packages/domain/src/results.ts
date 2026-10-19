@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   ActionReactionSchema,
+  CastShapingIdSchema,
   CharacterChoiceSchema,
   DamageTypeSchema,
   SaveConditionSchema,
@@ -350,6 +351,36 @@ export type ReactionAnswerResult = MutationResult & {
 };
 /** One action's strict-mode availability for an actor, with every violated rule named (server-computed; ADR-0020
  *  explainability), plus the action's display values. */
+/** One way a spell's cast can be shaped, as the cast offers it: its cost in Sorcery Points, whether this spell can take
+ *  it now and why not, whether it counts toward the options one spell may carry, the creatures it names (Careful
+ *  Spell's up to the Charisma modifier, Heightened Spell's one, Sculpt Spells' 1 plus the spell's level, with
+ *  `plusLevel` when that is 1 plus the slot's level), and the types Transmuted Spell can change to. */
+const CastShapingOfferSchema = z.strictObject({
+  id: CastShapingIdSchema,
+  name: z.string(),
+  cost: z.number().int().min(0).max(2),
+  available: z.boolean(),
+  reason: z.string().optional(),
+  counted: z.boolean(),
+  creatures: z
+    .strictObject({ count: z.number().int().min(1).max(10), plusLevel: z.literal(true).optional() })
+    .optional(),
+  damageTypes: z.array(DamageTypeSchema).optional()
+});
+const CastShapingOffersSchema = z
+  .strictObject({
+    /** How many counted options one spell may carry: 1, or 2 while Sorcery Incarnate's Innate Sorcery is active. */
+    limit: z.number().int().min(1).max(2),
+    /** Sorcery Points left to pay with. */
+    points: z.number().int().min(0),
+    /** One option's cost is waived on this turn (Arcane Apotheosis). */
+    free: z.literal(true).optional(),
+    options: z.array(CastShapingOfferSchema)
+  })
+  .describe(
+    "The ways the caster may shape this spell's cast (Metamagic options it knows, Sculpt Spells), each with its Sorcery Point cost and whether this spell can take it now. Send the picks as `action.resolve`'s `shaping`; the server checks them again."
+  );
+export type CastShapingOffers = Wire<z.infer<typeof CastShapingOffersSchema>>;
 export const ActionAvailabilitySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
@@ -480,6 +511,8 @@ export const ActionAvailabilitySchema = z.strictObject({
     .describe(
       'Why it can\'t be used now, in one short sentence for the sheet ("Not prepared.", "No level 2 spell slots left.", "You used your Bonus Action this turn."). Present exactly when `available` is false. The character comes first (Stunned, 0 Hit Points), then the option itself, then the turn, then targeting; `violations` keeps the full account. A hint only: resolution checks again.'
     ),
+  /** The ways its caster may shape this spell's cast (Metamagic, Sculpt Spells), for the cast to offer. */
+  shaping: CastShapingOffersSchema.optional(),
   /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
    *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
    *  (a spell area's later save). */

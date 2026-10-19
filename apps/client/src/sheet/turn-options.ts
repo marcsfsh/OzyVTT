@@ -220,8 +220,13 @@ export function turnOptions({
     const own = ownSummaries.get(action.id);
     if (!own) continue;
     const row = facts.rows.get(action.id);
-    // The damage the server rolls, where it differs (a lasting spell's later row at its cast level).
-    const rolled = row && row.damage.length === own.damage.length ? { ...own, damage: row.damage } : own;
+    // The damage the server rolls, where it differs (a lasting spell's later row at its cast level), and the ways the
+    // caster may shape a spell's cast.
+    const rolled = {
+      ...own,
+      ...(row && row.damage.length === own.damage.length ? { damage: row.damage } : {}),
+      ...(row?.shaping ? { shaping: row.shaping } : {})
+    };
     // Who a feature's grant reaches, as the server takes it: a self grant is a tap with no target.
     const summary =
       action.grants !== undefined && action.spellId === undefined && row?.targeting

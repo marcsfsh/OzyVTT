@@ -27,6 +27,7 @@ import { endEffect, NO_REACTIONS_TAG, type EffectNarration } from "./effects.js"
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { useLimitFor } from "./resolution/economy.js";
+import { freeOptionReady, isMetamagicOption, useFreeOption } from "./resolution/metamagic.js";
 import type { DefinitionAction, LiveActor } from "./resolution/context.js";
 import { recordRoll, rolledTerms } from "./roll-history.js";
 import { effectiveModeFor } from "./rules-families.js";
@@ -67,6 +68,8 @@ export type AnswerTarget = Readonly<{
   automatic?: "fail" | "succeed";
   /** The mode the d20s are read under, which a reroll throws them with. */
   mode: RollMode;
+  /** An attack roll made for a spell (Seeking Spell answers only those). */
+  spellAttack?: boolean;
   ability?: AbilityId;
   stakes?: SaveStakes;
   /** How the roll was recorded, so an answer's own dice are recorded the same way. */
@@ -268,6 +271,8 @@ function refusal(
     return `${bearer.name} can't use ${source.name} while Incapacitated.`;
   if (answer.abilities && (target.ability === undefined || !answer.abilities.includes(target.ability)))
     return `${source.name} doesn't answer this roll.`;
+  if (answer.spellAttacks && (target.kind !== "attack" || target.spellAttack !== true))
+    return `${source.name} answers the attack roll of a spell.`;
   if (answer.versus && !versusMatches(answer.versus, target, state, deps))
     return `${source.name} doesn't answer a save against this.`;
   const effect = answer.effect;
@@ -289,7 +294,11 @@ function refusal(
     )
       return `${bearer.name} has already used a Reaction this round.`;
   }
-  if (action.uses && effectiveModeFor(state.combat, "feature.no-uses-remaining") === "strict") {
+  if (
+    action.uses &&
+    effectiveModeFor(state.combat, "feature.no-uses-remaining") === "strict" &&
+    !freeMetamagicFor(state, bearer, action, deps)
+  ) {
     const key = action.uses.pool ?? action.id;
     const spent =
       action.uses.per === "turn"
@@ -371,8 +380,25 @@ function rewriteHeld(state: GameState, key: string, change: (held: HeldRoll) => 
   state.heldRolls = state.heldRolls.map((entry) => (entry.key === key ? change(entry) : entry));
 }
 
+/** Whether a Metamagic option answering a roll costs nothing: the turn's free option is there (Arcane Apotheosis). */
+function freeMetamagicFor(
+  state: GameState,
+  bearer: LiveActor,
+  action: DefinitionAction,
+  deps: Pick<AnswerDeps, "resolveDefinition">
+): boolean {
+  if (!isMetamagicOption(action.id)) return false;
+  return freeOptionReady(state, bearer, bearer.definitionId ? deps.resolveDefinition(bearer.definitionId) : undefined);
+}
+
 /** Spends what an answer costs: the action's uses and its Reaction, or the effect it ends. */
-function payFor(state: GameState, bearer: LiveActor, source: AnswerSource, events: EffectNarration[]): void {
+function payFor(
+  state: GameState,
+  bearer: LiveActor,
+  source: AnswerSource,
+  events: EffectNarration[],
+  deps: Pick<AnswerDeps, "resolveDefinition">
+): void {
   if (source.kind === "effect") {
     events.push(...endEffect(state, bearer.id, source.effect.id));
     return;
@@ -384,6 +410,11 @@ function payFor(state: GameState, bearer: LiveActor, source: AnswerSource, event
       reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== bearer.id), bearer.id]
     };
   if (!action.uses) return;
+  // Seeking Spell may be the turn's free Metamagic option (Arcane Apotheosis).
+  if (freeMetamagicFor(state, bearer, action, deps)) {
+    useFreeOption(state);
+    return;
+  }
   const key = action.uses.pool ?? action.id;
   const amount = useCostOf(action);
   if (action.uses.per === "turn") {
@@ -516,7 +547,7 @@ export function applyRollAnswer(
       break;
   }
   const events: EffectNarration[] = [];
-  if (entry.spent) payFor(state, bearer, source, events);
+  if (entry.spent) payFor(state, bearer, source, events, deps);
   // The latest roll of the roller stays the one held, so its own reroll still meets it.
   const latest = [...state.rolls].reverse().find((roll) => roll.actorId === target.roller.id);
   rewriteHeld(state, target.key, (current) => ({
@@ -563,7 +594,7 @@ export function answerAmount(
   const sign = effect.kind === "subtract" || (effect.kind === "add-or-subtract" && choice.subtract === true) ? -1 : 1;
   recordAnswerRoll(state, target, bearer, `${source.name} on ${target.roller.name}'s ${target.label}`, rolled, deps);
   const events: EffectNarration[] = [];
-  payFor(state, bearer, source, events);
+  payFor(state, bearer, source, events, deps);
   return { name: source.name, amount: effect.amount, bonus: sign * rolled.total, events };
 }
 

@@ -859,6 +859,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:tome-of-leadership-and-influence": studied("Charisma"),
   "item:tome-of-understanding": studied("Wisdom"),
 
+  // Features that shape a spell as it is cast (resolution/metamagic.ts), checked and paid for by the economy.
+  "feature:metamagic": enforced(
+    "A cast carries one Metamagic option the Sorcerer knows, paid in Sorcery Points and applied by the server (resolution/metamagic.ts, resolution/economy.ts). Empowered Spell can join another option, and Seeking Spell is offered when a spell attack misses (roll-answers.ts). The server refuses an option the spell can't take, and picks the dice Empowered Spell rerolls. Careful Spell covers the save the cast itself calls for (resolution/pending.ts)."
+  ),
+  "feature:sculpt-spells": enforced(
+    "An Evoker's Evocation spell protects up to 1 plus the spell's level creatures the Wizard can see: they succeed on its save with no roll and take no damage (resolution/pending.ts). Saves its area calls for later are rolled as usual."
+  ),
+  "feature:sorcery-incarnate": guided(
+    "While Innate Sorcery is active, a cast may carry two Metamagic options (resolution/metamagic.ts). Activating Innate Sorcery for 2 Sorcery Points once its uses are spent is the GM's."
+  ),
+  "feature:arcane-apotheosis": enforced(
+    "While Innate Sorcery is active, the first Metamagic option on each of the Sorcerer's turns in a fight costs no Sorcery Points (resolution/metamagic.ts)."
+  ),
+
   // Magic items whose riders apply part of what they do, and leave a property the table would expect applied.
   "item:armor-of-invulnerability": guided(
     "Resistance to Bludgeoning, Piercing and Slashing damage is applied. The once-a-day Immunity to them is the GM's."

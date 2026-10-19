@@ -101,6 +101,8 @@ export const RollAnswerSchema = z
     when: z.enum(["failure", "success", "any", "natural-one"]).default("failure"),
     /** Not while the bearer is Incapacitated (a Luck Blade's luck). */
     notWhileIncapacitated: z.literal(true).optional(),
+    /** Only the attack rolls of the bearer's spells (Seeking Spell: "If you make an attack roll for a spell"). */
+    spellAttacks: z.literal(true).optional(),
     abilities: z.array(AbilitySchema).min(1).max(6).optional(),
     versus: z
       .object({
@@ -115,7 +117,7 @@ export const RollAnswerSchema = z
   })
   .strict()
   .describe(
-    "A way to change a roll after it is seen and before it counts: the rolls it answers, whose roll (own, other or any, within rangeFeet), when (failure, success, any or natural-one), what it does (add, subtract, add-or-subtract, reroll, set-d20, succeed, hit), and what a save must be against. It costs the action's own uses, and its Reaction when the action is one."
+    "A way to change a roll after it is seen and before it counts: the rolls it answers, whose roll (own, other or any, within rangeFeet), when (failure, success, any or natural-one), whether only a spell's attack rolls (spellAttacks), what it does (add, subtract, add-or-subtract, reroll, set-d20, succeed, hit), and what a save must be against. It costs the action's own uses, and its Reaction when the action is one."
   );
 export type RollAnswer = z.infer<typeof RollAnswerSchema>;
 /** The SRD's 13 damage types. Riders name one of these, so a misspelled type is refused, and no
@@ -136,6 +138,32 @@ export const DamageTypeSchema = z.enum([
   "thunder"
 ]);
 export type DamageType = z.infer<typeof DamageTypeSchema>;
+
+/** The ways a caster shapes one casting as it casts: the Sorcerer's Metamagic options chosen with the cast (SRD 5.2.1
+ *  Metamagic Options; Seeking Spell answers a missed roll instead) and the Evoker's Sculpt Spells. */
+export const CastShapingIdSchema = z.enum([
+  "careful-spell",
+  "distant-spell",
+  "empowered-spell",
+  "extended-spell",
+  "heightened-spell",
+  "quickened-spell",
+  "subtle-spell",
+  "transmuted-spell",
+  "twinned-spell",
+  "sculpt-spells"
+]);
+export type CastShapingId = z.infer<typeof CastShapingIdSchema>;
+/** One way a casting is shaped, with what it names: the creatures Careful Spell and Sculpt Spells protect or the one
+ *  target Heightened Spell picks, and the damage type Transmuted Spell changes to. */
+export const CastShapingSchema = z
+  .object({
+    id: CastShapingIdSchema,
+    creatureIds: z.array(z.uuid()).max(10).optional(),
+    damageType: DamageTypeSchema.optional()
+  })
+  .strict();
+export type CastShaping = z.infer<typeof CastShapingSchema>;
 
 /**
  * What a melee hit on an effect's bearer costs the attacker (SRD Fire Shield: "Whenever a creature within 5 feet of
@@ -1060,9 +1088,14 @@ export const EffectInstanceSchema = z
     escapeDc: z.number().int().min(1).max(40).nullable().default(null),
     onEnd: z.array(EffectOnEndSchema).max(2).default([]),
     /** "Repeats the save at the end of each of its turns": the bearer owes this save as each of its turns ends, and
-     * a success ends the effect (Hold Person, a ghast's claws). */
+     * a success ends the effect (Hold Person, a ghast's claws). `disadvantageFrom` names what gives each repeat
+     * Disadvantage (Heightened Spell). */
     repeatSave: z
-      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .object({
+        ability: AbilitySchema,
+        dc: z.number().int().min(1).max(40),
+        disadvantageFrom: z.string().min(1).max(60).optional()
+      })
       .strict()
       .optional(),
     /** Ends early when the bearer takes any damage (Sleep, Turn Undead, Hypnotic Pattern, a knocked-out creature). */
@@ -1095,7 +1128,9 @@ export const EffectInstanceSchema = z
       .object({
         actionId: z.string().min(1).max(120),
         level: z.number().int().min(0).max(9),
-        raysLeft: z.number().int().min(1).max(20).optional()
+        raysLeft: z.number().int().min(1).max(20).optional(),
+        /** How the caster shaped it when it was readied (Metamagic), which its release keeps. */
+        shaping: z.array(CastShapingSchema).max(4).optional()
       })
       .strict()
       .optional(),
@@ -1127,14 +1162,15 @@ export const EffectInstanceSchema = z
     /** The bearer's AC is at least this while it lasts (Barkskin's 17). */
     armorClassFloor: z.number().int().min(10).max(25).optional(),
     /** A spell its bearer is casting over a minute or more in a fight (SRD Longer Casting Times): the cast it finishes,
-     *  with the targets and slot level picked when it began, the turns' actions it still needs, and the round of the
-     *  last one, so a turn without one lets it lapse. */
+     *  with the targets, slot level and shaping (Metamagic) picked when it began, the turns' actions it still needs, and
+     *  the round of the last one, so a turn without one lets it lapse. */
     longCast: z
       .object({
         actionId: z.string().min(1).max(120),
         targetIds: z.array(z.uuid()).max(40),
         slotLevel: z.number().int().min(1).max(9).nullable(),
         areaPlaced: z.boolean().default(false),
+        shaping: z.array(CastShapingSchema).max(4).optional(),
         turnsLeft: z.number().int().min(0).max(15000),
         lastRound: z.number().int().positive()
       })
