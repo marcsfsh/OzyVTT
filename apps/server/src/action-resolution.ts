@@ -44,6 +44,7 @@ import type {
 import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
+import { planThisTurn } from "./resolution/multiattack-after.js";
 import { applyGrant } from "./resolution/grant.js";
 import { spendStudy, studyAMiss } from "./resolution/studied.js";
 import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
@@ -460,8 +461,9 @@ export function actionAvailability(
       usesPool: action.uses?.pool ?? null,
       useCost: action.useCost ?? null,
       requiresEffectTag: action.requiresEffectTag ?? null,
+      // The plan it makes this turn (a clay golem's three Slams after Hasten).
       multiattack: action.multiattack
-        ? action.multiattack.map((component) => ({
+        ? planThisTurn(state, attacker.id, action).multiattack!.map((component) => ({
             actionId: component.actionId,
             count: component.count,
             ...(component.or ? { or: [...component.or] } : {})

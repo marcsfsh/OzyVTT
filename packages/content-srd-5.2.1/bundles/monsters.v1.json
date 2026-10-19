@@ -13203,7 +13203,8 @@
        "count": 3
       }
      ]
-    ]
+    ],
+    "multiattackAlternativesAfter": "hasten-recharge-5-6"
    },
    {
     "id": "slam",

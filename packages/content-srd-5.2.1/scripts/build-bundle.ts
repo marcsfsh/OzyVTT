@@ -1326,7 +1326,10 @@ const monsters: ActorDefinition[] = creatures
         ...(reminder ? { reminder: reminder.slice(0, 600) } : {}),
         ...(multiattack ? { multiattack: multiattack.plan } : {}),
         ...(multiattack && multiattack.alternatives.length > 0
-          ? { multiattackAlternatives: multiattack.alternatives }
+          ? {
+              multiattackAlternatives: multiattack.alternatives,
+              ...(multiattack.alternativesAfter ? { multiattackAlternativesAfter: multiattack.alternativesAfter } : {})
+            }
           : {}),
         ...(multiattack && multiattack.replacements.length > 0
           ? { multiattackReplacements: multiattack.replacements }

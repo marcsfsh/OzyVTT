@@ -4113,6 +4113,16 @@ export const ActionSchema = z
     /** Other plans a Multiattack can be, beside `multiattack` ("or it makes two Hurl Flame attacks"), chosen by the first
      *  attack taken. */
     multiattackAlternatives: z.array(z.array(MultiattackComponentSchema).min(1).max(6)).min(1).max(2).optional(),
+    /** The action its creature must have used this turn for `multiattackAlternatives` to open, which are then its plan
+     *  ("or it makes three Slam attacks if it used Hasten this turn"); any other turn it has `multiattack` alone. */
+    multiattackAlternativesAfter: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional()
+      .describe(
+        "The action its creature must have used this turn for the other plans to open, which are then its plan (a clay golem's three Slams after Hasten)"
+      ),
     /** What can take the place of a Multiattack's attacks ("It can replace one attack with a use of Roar"): one of
      *  `actionIds` replaces `attacks` of them, once, or for any attack (`any`), or only the one `of` names ("the Claw
      *  attack"). */

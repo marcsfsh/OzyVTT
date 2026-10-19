@@ -146,6 +146,7 @@ const LABELS: Readonly<Record<string, string>> = {
   atZeroHitPoints: "creatures at 0 Hit Points only",
   endsUntilItActs: "ends what lasts until its user acts",
   multiattack: "Multiattack",
+  multiattackAlternativesAfter: "action the other Multiattack waits on",
   count: "number of attacks",
   bonus: "bonus",
   amount: "amount",

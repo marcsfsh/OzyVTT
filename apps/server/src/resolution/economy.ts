@@ -43,6 +43,7 @@ import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { planThisTurn, usedMarkOf } from "./multiattack-after.js";
 import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { actionTargetViolations } from "./action-targets.js";
@@ -106,6 +107,8 @@ export type EconomyPlan = Readonly<{
   surge: boolean;
   /** The turn's uses key of a feature used once per turn beside a pool of its own (Stunning Strike), or null. */
   oncePerTurn?: string | null;
+  /** The turn's mark that this action was used, which a sibling Multiattack waits on (`multiattack-after.ts`). */
+  usedMark?: string | null;
   /** The consumed materials and coins the cast uses up (SRD Components). */
   componentSpends?: readonly ComponentSpend[];
   /** The Sorcery Points the cast's Metamagic spends and what it marks on the turn (`metamagic.ts`). */
@@ -180,6 +183,10 @@ export function evaluateActionEconomy(
     shaping?: readonly CastShaping[];
   }> = {}
 ): EconomyEvaluation {
+  // A Multiattack whose other plan waits on an action used this turn (a clay golem's Hasten) plans as it stands now.
+  const usedMark = usedMarkOf(state, attacker.id, action, siblings);
+  action = planThisTurn(state, attacker.id, action);
+  siblings = siblings.map((sibling) => planThisTurn(state, attacker.id, sibling));
   const evaluation: Evaluation = {
     state,
     attacker,
@@ -321,6 +328,7 @@ export function evaluateActionEconomy(
       magicAction: evaluation.onOwnTurn && isMagicAction(action),
       surge,
       oncePerTurn,
+      usedMark,
       ...(components.spends.length > 0 ? { componentSpends: components.spends } : {}),
       ...(shaped?.plan ? { shaping: shaped.plan } : {}),
       ...(newCast && spell.level >= 1 ? { leveledCast: true } : {})
@@ -1767,13 +1775,12 @@ export function commitEconomy({
   // A consumed material is used up as the cast happens ("which the spell consumes").
   if (plan.componentSpends) spendComponents(attacker, plan.componentSpends);
   commitShaping(state, attacker, plan.shaping, plan.leveledCast === true);
-  if (plan.oncePerTurn) {
-    const key = plan.oncePerTurn;
-    state.combat = {
-      ...state.combat,
-      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
-    };
-  }
+  for (const key of [plan.oncePerTurn, plan.usedMark])
+    if (key)
+      state.combat = {
+        ...state.combat,
+        turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+      };
   if (plan.spendUse) commitUse(state, attacker, plan.spendUse);
 }
 

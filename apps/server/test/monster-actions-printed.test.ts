@@ -217,3 +217,29 @@ describe("an invisible stalker's Vortex", () => {
     expect(hero.effects.flatMap((effect) => effect.tags)).toContain("cant-speak");
   });
 });
+
+describe("a clay golem's Multiattack", () => {
+  const slams = (built: Table, count: number) => {
+    for (let swing = 0; swing < count; swing++) use(built, "slam", IDS.hero, [15, 3, 3]);
+  };
+
+  it("makes two Slams, and three on a turn it used Hasten", () => {
+    const calm = table("clay-golem");
+    use(calm, "multiattack", IDS.hero);
+    slams(calm, 2);
+    expect(() => use(calm, "slam", IDS.hero, [15, 3, 3])).toThrow(RulesBlockedError);
+
+    const hasty = table("clay-golem");
+    use(hasty, "hasten-recharge-5-6", IDS.monster);
+    use(hasty, "multiattack", IDS.hero);
+    slams(hasty, 3);
+    expect(() => use(hasty, "slam", IDS.hero, [15, 3, 3])).toThrow(RulesBlockedError);
+  });
+
+  it("opens the three Slams when the first Slam starts the Multiattack after Hasten", () => {
+    const built = table("clay-golem");
+    use(built, "hasten-recharge-5-6", IDS.monster);
+    slams(built, 3);
+    expect(built.state.combat.turn.actionInstance?.components).toEqual({ slam: 0 });
+  });
+});

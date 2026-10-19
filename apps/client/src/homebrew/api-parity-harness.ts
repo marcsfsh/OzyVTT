@@ -718,6 +718,12 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].multiattackAlternativesAfter",
+    types: "*",
+    reason: "one SRD author (a clay golem's three Slams after Hasten), read from its Multiattack's prose",
+    status: "permanent: lone SRD record"
+  },
+  {
     at: "actions[].multiattackReplacements[].**",
     types: ACTION_CARRIERS,
     reason:
