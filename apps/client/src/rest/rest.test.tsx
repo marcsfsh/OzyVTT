@@ -30,7 +30,13 @@ vi.mock("../codex/api", () => ({
 }));
 
 import { GameStateSchema, type GmView, type PlayerView } from "@vtt/domain";
-import { RestAnswerSchema, RestAskSchema, RestMarkDoneSchema, RestPartySchema } from "@vtt/domain/commands";
+import {
+  RestAnswerSchema,
+  RestAskSchema,
+  RestMarkDoneSchema,
+  RestPartySchema,
+  TimePassSchema
+} from "@vtt/domain/commands";
 import { ToastProvider } from "@vtt/ui";
 import { socket } from "../socket";
 import { RestButtons } from "../sheet/PlayTab";
@@ -83,6 +89,22 @@ describe("the GM's rest panel", () => {
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("rest:party");
     expect(RestPartySchema.parse({ ...payload, ...COMMAND })).toMatchObject({ kind: "long", actorIds: [TORVA] });
+  });
+
+  it("passes time on the road at the pace the GM picks", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <PartyRest state={gmView({ clockHours: 38 })} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Rest" }));
+    const dialog = screen.getByRole("dialog", { name: "Rest" });
+    await user.click(within(dialog).getByRole("button", { name: "Normal" }));
+    await user.click(within(dialog).getByRole("button", { name: "Travel 8 hours" }));
+    const [event, payload] = emitted().at(-1)!;
+    expect(event).toBe("time:pass");
+    expect(TimePassSchema.parse({ ...payload, ...COMMAND })).toMatchObject({ hours: 8, pace: "normal" });
   });
 
   it("answers a player's request from the button's badge", async () => {

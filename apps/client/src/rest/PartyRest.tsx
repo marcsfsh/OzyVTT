@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
-import { Badge, Button, Modal, Stepper, useToast } from "@vtt/ui";
+import { Badge, Button, Modal, SegmentedControl, Stepper, useToast } from "@vtt/ui";
 import { pathForSection } from "../codex/routes";
 import { command } from "../lib/command";
 import { navigate } from "../router";
@@ -35,6 +35,8 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState(8);
+  // Passing time on the road (SRD Travel Pace): the server logs how far the party went.
+  const [pace, setPace] = useState<"stay" | "slow" | "normal" | "fast">("stay");
   const [unpicked, setUnpicked] = useState<ReadonlySet<string>>(new Set());
   const { toast } = useToast();
   // Read defensively: the first state a signing-in GM receives can still be player-shaped.
@@ -156,14 +158,35 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               </p>
             )}
             <div className="party-rest-row">
+              <SegmentedControl
+                size="sm"
+                ariaLabel="Travel pace"
+                options={[
+                  { value: "stay", label: "Stay", title: "The party stays where it is" },
+                  { value: "slow", label: "Slow", title: "2 miles an hour, Advantage on Perception and Survival" },
+                  { value: "normal", label: "Normal", title: "3 miles an hour, Disadvantage on Stealth" },
+                  {
+                    value: "fast",
+                    label: "Fast",
+                    title: "4 miles an hour, Disadvantage on Perception, Survival and Stealth"
+                  }
+                ]}
+                value={pace}
+                onChange={(value) => setPace(value as typeof pace)}
+              />
+            </div>
+            <div className="party-rest-row">
               <Stepper value={hours} onChange={setHours} min={1} max={72} disabled={busy} aria-label="Hours to pass" />
               <Button
                 disabled={busy}
                 onClick={() =>
-                  void send(() => command("time:pass", { hours }), `${hours} ${hours === 1 ? "hour" : "hours"} passed.`)
+                  void send(
+                    () => command("time:pass", { hours, ...(pace !== "stay" ? { pace } : {}) }),
+                    `${hours} ${hours === 1 ? "hour" : "hours"} passed.`
+                  )
                 }
               >
-                Pass {hours} {hours === 1 ? "hour" : "hours"}
+                {pace === "stay" ? "Pass" : "Travel"} {hours} {hours === 1 ? "hour" : "hours"}
               </Button>
             </div>
             <p className="party-rest-hint">

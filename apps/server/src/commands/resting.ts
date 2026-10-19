@@ -203,13 +203,13 @@ export const restingCommands = [
     type: "time.pass",
     operationId: "passTime",
     description:
-      "GM-only: moves the game clock forward by whole hours. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day. Nothing else happens with the time: effects and Concentration are the GM's to end.",
+      "GM-only: moves the game clock forward by whole hours. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day. With `pace` the party travels for those hours (SRD Travel Pace: 4, 3 or 2 miles an hour), and the log says how far it went and what the pace does to its checks. Nothing else happens with the time: effects and Concentration are the GM's to end.",
     summary: "Move game time forward by some hours.",
     schema: TimePassSchema,
     malformed: "Choose between 1 and 720 hours.",
     gmOnly: "Only the GM moves game time.",
     async run({ request, execute }, kit) {
-      const { hours } = request;
+      const { hours, pace } = request;
       const span: ClockSpan = { fromHours: 0, toHours: 0 };
       const { duplicate } = await execute((state) => timed(state, () => passTime(state, hours), span));
       if (duplicate) return;
@@ -219,6 +219,21 @@ export const restingCommands = [
         text: `${hours} ${hours === 1 ? "hour passes" : "hours pass"}.`,
         gmOnly: false
       });
+      if (pace) kit.context.appendLog({ kind: "encounter", text: travelLine(hours, pace), gmOnly: false });
     }
   })
 ];
+
+/** SRD 5.2.1 Travel Pace: how far the party goes in those hours, and what the pace does to its checks. */
+const TRAVEL_PACES = {
+  fast: { milesPerHour: 4, effect: "Disadvantage on Wisdom (Perception or Survival) and Dexterity (Stealth) checks" },
+  normal: { milesPerHour: 3, effect: "Disadvantage on Dexterity (Stealth) checks" },
+  slow: { milesPerHour: 2, effect: "Advantage on Wisdom (Perception or Survival) checks" }
+} as const;
+
+export function travelLine(hours: number, pace: keyof typeof TRAVEL_PACES): string {
+  const { milesPerHour, effect } = TRAVEL_PACES[pace];
+  const miles = hours * milesPerHour;
+  const name = pace[0]!.toUpperCase() + pace.slice(1);
+  return `The party travels ${miles} ${miles === 1 ? "mile" : "miles"} at a ${name} pace, with ${effect} on the way.`;
+}

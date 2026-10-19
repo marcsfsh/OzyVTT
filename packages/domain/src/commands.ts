@@ -1128,6 +1128,8 @@ export const TimePassSchema = z
   .object({
     commandId: z.uuid(),
     hours: z.number().int().min(1).max(720),
+    /** The party travels for those hours at this pace (SRD 5.2.1 Travel Pace): the log says how far it went. */
+    pace: z.enum(["fast", "normal", "slow"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
