@@ -825,23 +825,23 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:cape-of-the-mountebank": guided(
     "The cast of Dimension Door, once a dawn, teleports the wearer on the map (granted-moves.ts). The smoke cloud is the GM's."
   ),
-  "action:Giant Hyena/rampage-1-day": guided(
-    "It can be taken move first: the use is spent and a move of half its Speed granted (granted-moves.ts). The Bite it then makes, and the Bloodied creature it needs to have damaged, are the GM's."
+  "action:Giant Hyena/rampage-1-day": enforced(
+    "It is offered only right after the hyena damages a creature that was already Bloodied (bloodied-hits.ts). Taken move first, the use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes its Bite."
   ),
-  "action:Gnoll Warrior/rampage-1-day": guided(
-    "It can be taken move first: the use is spent and a move of half its Speed granted (granted-moves.ts). The Rend it then makes, and the Bloodied creature it needs to have damaged, are the GM's."
+  "action:Gnoll Warrior/rampage-1-day": enforced(
+    "It is offered only right after the gnoll damages a creature that was already Bloodied (bloodied-hits.ts). Taken move first, the use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes its Rend."
   ),
   "action:Roc/swoop-recharge-5-6": guided(
     "The recharge is spent and a flight of half its Fly Speed granted that provokes no Opportunity Attacks (granted-moves.ts). Dropping the grappled creature is the GM's, who makes it fall (actor.fall)."
   ),
-  "action:Tarrasque/onslaught": guided(
-    "It can be taken move first: the legendary use is spent and a move of half its Speed granted (granted-moves.ts). The Claw or Tail attack it then makes is the GM's to take."
+  "action:Tarrasque/onslaught": enforced(
+    "Its Claw and its Tail are each a choice printed inside it: taken move first, the legendary use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes that attack."
   ),
-  "action:Tarrasque/world-shaking-movement": guided(
-    "The legendary use is spent, a move of its Speed granted (granted-moves.ts) and its Emanation offered. Ending Concentration and knocking Medium or smaller creatures Prone in it are the GM's."
+  "action:Tarrasque/world-shaking-movement": enforced(
+    "Taken move first, the legendary use is spent and a move of its Speed granted (granted-moves.ts); then each creature in the 60-foot Emanation loses Concentration, and the Medium or smaller ones fall Prone (resolution/inflicts.ts)."
   ),
-  "action:Lich/deathly-teleport": guided(
-    "The legendary use is spent and a 60-foot teleport granted (granted-moves.ts). Who stood within 10 feet of the space it left, for the Necrotic damage, is the GM's to pick."
+  "action:Lich/deathly-teleport": enforced(
+    "The legendary use is spent and a 60-foot teleport granted (granted-moves.ts), and each creature in the 10-foot Emanation placed on the space it leaves takes 2d10 Necrotic damage."
   ),
   "action:Hydra/multiattack": enforced(
     "effective-actions.ts makes the Multiattack one Bite per living head, which death-traits.ts counts as heads die and grow back (Multiple Heads)."

@@ -146,6 +146,8 @@ const LABELS: Readonly<Record<string, string>> = {
   atZeroHitPoints: "creatures at 0 Hit Points only",
   heldByAction: "action that must hold the target",
   holdsAtOnce: "creatures it holds at once",
+  inflicts: "what it does to its targets with no roll",
+  afterHurtingBloodied: "right after damaging a Bloodied creature",
   disgorges: "lets the creature out after its damage",
   regurgitate: "damage from inside that makes it save",
   endsUntilItActs: "ends what lasts until its user acts",

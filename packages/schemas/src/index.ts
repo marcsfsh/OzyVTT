@@ -4322,6 +4322,21 @@ export const ActionSchema = z
     /** How many creatures its effect can hold at once (a shambling mound's Engulf: "only one creature Grappled by this
      *  action at a time"). */
     holdsAtOnce: z.number().int().min(1).max(10).optional(),
+    /** What it does to each target with no roll: conditions, on creatures of `maxTargetSize` or smaller, standing
+     *  until ended or for `duration`; and a lost Concentration (a tarrasque's shock wave: "Creatures in that area lose
+     *  Concentration and, if Medium or smaller, have the Prone condition"). */
+    inflicts: z
+      .object({
+        conditions: z.array(ConditionIdSchema).min(1).max(3).optional(),
+        maxTargetSize: SizeSchema.optional(),
+        duration: SaveFailureDurationSchema.optional(),
+        breaksConcentration: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** It can be used only right after its user damaged a creature that was already Bloodied, this turn (a gnoll's
+     *  Rampage). */
+    afterHurtingBloodied: z.literal(true).optional(),
     /** The creatures it brings onto the map (Summon Dragon, a Bowl of Commanding Water Elementals), see `SummonSchema`. */
     summons: SummonSchema.optional(),
     /** Its spell is cast with this action alone, whatever the spell's casting time (Pact of the Chain: "cast it as a

@@ -21793,15 +21793,25 @@
     "name": "Rampage (1/Day)",
     "activation": "bonus-action",
     "description": "Immediately after dealing damage to a creature that was already Bloodied, the hyena can move up to half its Speed, and it makes one Bite attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 3",
+      "type": "piercing"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "long-rest"
     },
+    "afterHurtingBloodied": true,
     "move": {
      "speed": "half",
      "provokes": true,
      "first": true
+    },
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
     }
    }
   ],
@@ -24069,15 +24079,25 @@
     "name": "Rampage (1/Day)",
     "activation": "bonus-action",
     "description": "Immediately after dealing damage to a creature that is already Bloodied, the gnoll moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d6 + 2",
+      "type": "piercing"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "long-rest"
     },
+    "afterHurtingBloodied": true,
     "move": {
      "speed": "half",
      "provokes": true,
      "first": true
+    },
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
     }
    },
    {
@@ -30570,9 +30590,19 @@
     "name": "Deathly Teleport",
     "activation": "other",
     "description": "Legendary Action. The lich teleports up to 60 feet to an unoccupied space it can see, and each creature within 10 feet of the space it left takes 11 (2d10) Necrotic damage.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10",
+      "type": "necrotic"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 10,
+     "widthFeet": null
     },
     "teleport": {
      "feet": 60
@@ -33557,6 +33587,65 @@
     "legendary": {
      "cost": 1
     }
+   },
+   {
+    "id": "necrotic-strike-rotting-fist",
+    "name": "Necrotic Strike: Rotting Fist",
+    "activation": "other",
+    "description": "Legendary Action. The mummy makes one Rotting Fist or Channel Negative Energy attack.",
+    "damage": [
+     {
+      "formula": "2d10 + 4",
+      "type": "bludgeoning"
+     },
+     {
+      "formula": "3d6",
+      "type": "necrotic"
+     }
+    ],
+    "legendary": {
+     "cost": 1
+    },
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 5
+    },
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Cursed",
+      "tags": [
+       "no-healing",
+       "curse"
+      ],
+      "atRest": {
+       "at": "day",
+       "maximumLoss": "3d6",
+       "noBenefit": "long"
+      }
+     }
+    ],
+    "partOf": "necrotic-strike"
+   },
+   {
+    "id": "necrotic-strike-channel-negative-energy",
+    "name": "Necrotic Strike: Channel Negative Energy",
+    "activation": "other",
+    "description": "Legendary Action. The mummy makes one Rotting Fist or Channel Negative Energy attack.",
+    "damage": [
+     {
+      "formula": "6d6 + 4",
+      "type": "necrotic"
+     }
+    ],
+    "legendary": {
+     "cost": 1
+    },
+    "attack": {
+     "bonus": 9,
+     "rangeFeet": 60
+    },
+    "partOf": "necrotic-strike"
    },
    {
     "id": "rotting-fist",
@@ -45384,6 +45473,66 @@
     }
    },
    {
+    "id": "onslaught-claw",
+    "name": "Onslaught: Claw",
+    "activation": "other",
+    "description": "Legendary Action. The tarrasque moves up to half its Speed, and it makes one Claw or Tail attack.",
+    "damage": [
+     {
+      "formula": "4d8 + 10",
+      "type": "slashing"
+     }
+    ],
+    "legendary": {
+     "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
+    "attack": {
+     "bonus": 19,
+     "reachFeet": 15
+    },
+    "partOf": "onslaught"
+   },
+   {
+    "id": "onslaught-tail",
+    "name": "Onslaught: Tail",
+    "activation": "other",
+    "description": "Legendary Action. The tarrasque moves up to half its Speed, and it makes one Claw or Tail attack.",
+    "damage": [
+     {
+      "formula": "3d8 + 10",
+      "type": "bludgeoning"
+     }
+    ],
+    "legendary": {
+     "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
+    "attack": {
+     "bonus": 19,
+     "reachFeet": 30
+    },
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "huge"
+     }
+    ],
+    "partOf": "onslaught"
+   },
+   {
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
@@ -45471,14 +45620,22 @@
      "cost": 1,
      "oncePerRound": true
     },
+    "move": {
+     "speed": "full",
+     "provokes": true,
+     "first": true
+    },
+    "inflicts": {
+     "conditions": [
+      "prone"
+     ],
+     "maxTargetSize": "medium",
+     "breaksConcentration": true
+    },
     "area": {
      "shape": "emanation",
      "sizeFeet": 60,
      "widthFeet": null
-    },
-    "move": {
-     "speed": "full",
-     "provokes": true
     }
    },
    {

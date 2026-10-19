@@ -46,6 +46,7 @@ import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { planThisTurn } from "./resolution/multiattack-after.js";
 import { pullOnAction, swallowOnAction } from "./resolution/swallowing.js";
+import { inflictOnTargets } from "./resolution/inflicts.js";
 import { applyGrant } from "./resolution/grant.js";
 import { spendStudy, studyAMiss } from "./resolution/studied.js";
 import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
@@ -245,6 +246,7 @@ export function resolveDefinitionAction(
   applyGrant(ctx);
   swallowOnAction(ctx);
   pullOnAction(ctx);
+  inflictOnTargets(ctx);
   applySummons(ctx);
   applyShapeShift(ctx);
   layOutProvisions(ctx);

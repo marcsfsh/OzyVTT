@@ -635,6 +635,11 @@ const ACTION_ENRICHMENTS: Record<
       | "endsUntilItActs"
       | "pull"
       | "holdsAtOnce"
+      | "move"
+      | "damage"
+      | "area"
+      | "inflicts"
+      | "afterHurtingBloodied"
     >
   >
 > = {
@@ -681,6 +686,22 @@ const ACTION_ENRICHMENTS: Record<
   },
   // "The shambling mound can have only one creature Grappled by this action at a time."
   "shambling-mound/engulf": { holdsAtOnce: 1 },
+  // "The tarrasque moves up to its Speed. At the end of this movement, the tarrasque creates an instantaneous shock
+  // wave in a 60-foot Emanation originating from itself. Creatures in that area lose Concentration and, if Medium or
+  // smaller, have the Prone condition."
+  "tarrasque/world-shaking-movement": {
+    move: { speed: "full", provokes: true, first: true },
+    inflicts: { conditions: ["prone"], maxTargetSize: "medium", breaksConcentration: true }
+  },
+  // "The lich teleports up to 60 feet to an unoccupied space it can see, and each creature within 10 feet of the space
+  // it left takes 11 (2d10) Necrotic damage."
+  "lich/deathly-teleport": {
+    damage: [{ formula: "2d10", type: "necrotic" }],
+    area: { shape: "emanation", sizeFeet: 10, widthFeet: null }
+  },
+  // "Immediately after dealing damage to a creature that is already Bloodied".
+  "gnoll-warrior/rampage-1-day": { afterHurtingBloodied: true },
+  "giant-hyena/rampage-1-day": { afterHurtingBloodied: true },
   // "One living creature the wisp can see within 5 feet that has 0 Hit Points", and Vanish "ends early immediately
   // after the wisp makes an attack roll or uses Consume Life".
   "will-o-wisp/consume-life": {
@@ -771,11 +792,32 @@ const ACTION_ENRICHMENTS: Record<
 
 const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";
 
+/** What a linked action takes from the action it makes or uses: its attack or save and what they deal and leave. */
+function withActionOf(next: ActorAction, source: ActorAction): ActorAction {
+  const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules, targets } = source;
+  return {
+    ...next,
+    ...(attack ? { attack } : {}),
+    ...(save ? { save } : {}),
+    damage,
+    ...(onHit ? { onHit } : {}),
+    ...(conditionalDamage ? { conditionalDamage } : {}),
+    ...(reminder ? { reminder } : {}),
+    ...(area && !next.area ? { area } : {}),
+    ...(targetRules ? { targetRules } : {}),
+    ...(targets && !next.targets ? { targets } : {})
+  };
+}
+
+/** Whether an action deals or rolls anything of its own. */
+const actsOnItsOwn = (action: ActorAction) => action.attack || action.save || action.damage.length > 0;
+
 /**
  * What one action says about another, read across the stat block: a grapple that keeps an attack off its target
- * ("While Grappled, ... can't be targeted by the tyrannosaurus's Tail"), and a legendary action that makes one attack
- * or uses another action ("it makes one Rend attack", "The kraken uses Lightning Strike"), which resolves as that
- * action, so the swing spends the pool. "One Claw or Tail attack" stays the GM's pick.
+ * ("While Grappled, ... can't be targeted by the tyrannosaurus's Tail"), and a legendary action or a Bonus Action that
+ * makes one attack or uses another action ("it makes one Rend attack", "The kraken uses Lightning Strike"), which
+ * resolves as that action, so the swing spends the pool. One that makes one of two attacks ("one Claw or Tail
+ * attack") prints inside it a choice for each, which the turn list offers (`partOf`).
  */
 function linkedActions(actions: ActorAction[], idOf: (name: string) => string | undefined): ActorAction[] {
   const byId = new Map(actions.map((action) => [action.id, action]));
@@ -787,33 +829,36 @@ function linkedActions(actions: ActorAction[], idOf: (name: string) => string | 
     const id = match ? idOf(match[1]) : undefined;
     if (id) keptOffGrappled.add(id);
   }
-  return actions.map((action) => {
+  return actions.flatMap((action) => {
     let next = action;
     if (keptOffGrappled.has(next.id) && !next.targetRules?.includes("not-grappled-by-source"))
       next = { ...next, targetRules: [...(next.targetRules ?? []), "not-grappled-by-source"] };
-    if (next.legendary && !next.attack && !next.save && next.damage.length === 0) {
-      const body = next.description.replace(/^Legendary Action[^.]*\.\s*/, "");
-      const named =
-        new RegExp(`\\bmakes one (${PRINTED_NAME}) attack\\b`).exec(body) ??
-        new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body);
-      const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
-      if (source && (source.attack || source.save || source.damage.length > 0)) {
-        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules, targets } = source;
-        next = {
-          ...next,
-          ...(attack ? { attack } : {}),
-          ...(save ? { save } : {}),
-          damage,
-          ...(onHit ? { onHit } : {}),
-          ...(conditionalDamage ? { conditionalDamage } : {}),
-          ...(reminder ? { reminder } : {}),
-          ...(area && !next.area ? { area } : {}),
-          ...(targetRules ? { targetRules } : {}),
-          ...(targets && !next.targets ? { targets } : {})
-        };
-      }
-    }
-    return next;
+    const links = (next.legendary || next.activation === "bonus-action") && !actsOnItsOwn(next);
+    if (!links) return [next];
+    const body = next.description.replace(/^Legendary Action[^.]*\.\s*/, "");
+    // "The mummy makes one Rotting Fist or Channel Negative Energy attack": a choice for each attack.
+    const choice = new RegExp(`\\bmakes one (${PRINTED_NAME}) or (${PRINTED_NAME}) attack\\b`).exec(body);
+    const choices = choice
+      ? [choice[1]!, choice[2]!].flatMap((name) => {
+          const source = byId.get(idOf(name) ?? "");
+          return source && actsOnItsOwn(source) ? [source] : [];
+        })
+      : [];
+    if (choices.length === 2)
+      return [
+        next,
+        ...choices.map((source) => ({
+          ...withActionOf(next, source),
+          id: `${next.id}-${source.id}`.slice(0, 120),
+          name: `${next.name}: ${source.name}`.slice(0, 120),
+          partOf: next.id
+        }))
+      ];
+    const named =
+      new RegExp(`\\bmakes one (${PRINTED_NAME}) attack\\b`).exec(body) ??
+      (next.legendary ? new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body) : null);
+    const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
+    return [source && actsOnItsOwn(source) ? withActionOf(next, source) : next];
   });
 }
 

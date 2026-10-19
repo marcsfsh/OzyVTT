@@ -58,6 +58,7 @@ import { holdsFeature } from "./class-features.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
 import { releaseSwallowedBy, tallyDamageFromInside } from "./swallow.js";
+import { markBloodiedHit } from "./bloodied-hits.js";
 import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
@@ -903,6 +904,8 @@ export function applyDamageDetailed(
     events.push(...blessOnTheKill(state, actor, input.sourceActorId, deps));
   // A swallower counts the damage the creatures inside it deal this turn.
   tallyDamageFromInside(state, actor.id, input.sourceActorId, totalAdjusted);
+  // Damage on a creature already Bloodied opens its dealer's Rampage.
+  markBloodiedHit(state, input.sourceActorId, hpBefore, actor.hp.maximum, totalAdjusted);
   // A hydra's heads and a troll's limbs count the damage of each turn.
   events.push(
     ...tallyTurnDamage(state, actor, definition, parts, totalAdjusted, (cause) => {

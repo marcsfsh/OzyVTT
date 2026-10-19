@@ -166,7 +166,7 @@ type ResolvingFields = Pick<
   | "effectOptions"
   | "raisesCorpse"
 > &
-  Partial<Pick<ActorAction, "move" | "teleport" | "leap" | "pull" | "swallow">> &
+  Partial<Pick<ActorAction, "move" | "teleport" | "leap" | "pull" | "swallow" | "inflicts">> &
   Readonly<{ attack?: unknown; save?: Readonly<Record<string, unknown>>; damageByLevel?: unknown }>;
 
 /** A save applies when its failure leaves something (conditions or a choice of them, an effect, Speed 0, a push, a
@@ -223,6 +223,7 @@ const actionResolves = (action: ResolvingFields) =>
   action.leap !== undefined ||
   action.pull !== undefined ||
   action.swallow?.conditions !== undefined ||
+  action.inflicts !== undefined ||
   action.raisesCorpse !== undefined;
 
 /**
@@ -272,6 +273,11 @@ export function monsterActionRow(
           } only as ${unfinished.length === 1 ? "its own row says" : "their own rows say"}.`
         };
   }
+  // An entry that prints its choices inside it (a mummy lord's Necrotic Strike: "one Rotting Fist or Channel Negative
+  // Energy attack") is as applied as the least of them.
+  const parts = definition.actions.filter((other) => other.partOf === action.id);
+  if (parts.length > 0)
+    return { state: least(parts.map((part) => monsterActionRow(part, definition, spellStates, spellNames).state)) };
   const offered = builtinActionsFor(definition).some((builtin) => builtin.name.startsWith(`${action.name}: `));
   // A reminder is what the engine leaves to the GM when the action resolves, so the action applies only in part.
   if (actionResolves(withTakenActions(action)) || offered) return { state: action.reminder ? "guided" : "enforced" };
@@ -400,8 +406,9 @@ export function srdCoverageRows(): CoverageRow[] {
   }
 
   const spellNames = new Map(loadSpells().map((spell) => [spell.id, spell.name]));
+  // A choice printed inside its entry (Necrotic Strike's two attacks) is that entry's row.
   for (const definition of loadMonsterDefinitions())
-    for (const action of definition.actions)
+    for (const action of definition.actions.filter((candidate) => candidate.partOf === undefined))
       rows.push({
         group: "Monster actions",
         id: `${definition.name}/${action.id}`,

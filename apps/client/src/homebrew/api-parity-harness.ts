@@ -732,6 +732,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].inflicts.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action does to its targets with no roll (a tarrasque's shock wave: Prone and lost Concentration), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].afterHurtingBloodied",
+    types: "*",
+    reason:
+      "an action offered only right after its user damages a Bloodied creature (a gnoll's Rampage), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].holdsAtOnce",
     types: "*",
     reason: "one SRD author (a shambling mound's Engulf, one creature at a time)",

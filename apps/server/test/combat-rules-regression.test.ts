@@ -3971,11 +3971,12 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
       cost: 1,
       oncePerRound: true
     });
-    // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (the lair bump stays
-    // prose); 32 creatures carry Legendary Resistance; every legendary action row costs 1.
+    // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (4 in a lair); 32 creatures carry
+    // Legendary Resistance; every printed legendary action costs 1, and the choices printed inside one cost the same.
     expect(monsters.filter((monster) => monster.legendary?.actionsPerRound === 3).length).toBe(30);
     expect(monsters.filter((monster) => monster.legendary?.resistancesPerDay !== undefined).length).toBe(32);
-    expect(monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary).length).toBe(82);
+    const legendary = monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary);
+    expect(legendary.filter((action) => action.partOf === undefined).length).toBe(82);
   });
 });
 

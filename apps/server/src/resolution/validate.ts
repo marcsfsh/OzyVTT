@@ -177,6 +177,7 @@ function combatantsOf(
     action.raisesCorpse === undefined &&
     action.swallow?.conditions === undefined &&
     action.pull === undefined &&
+    action.inflicts === undefined &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");

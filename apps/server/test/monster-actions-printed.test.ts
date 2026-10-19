@@ -4,6 +4,8 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { startEncounter } from "../src/encounter.js";
+import { addEffect, CONCENTRATING_TAG, makeEffect } from "../src/effects.js";
+import { activeMoveGrant, activeTeleportGrant } from "../src/granted-moves.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerSave } from "../src/saving-throws.js";
 import { RulesBlockedError } from "../src/game-store.js";
@@ -91,14 +93,21 @@ const resolveDefinition = (built: Table) => (id: string) =>
   id === "hero-def" ? heroDefinition : built.state.definitions.find((entry) => entry.id === id)?.definition;
 const actor = (built: Table, id: string) => built.state.actors.find((candidate) => candidate.id === id)!;
 
-/** The monster uses `actionId` on `targetId`. */
-function use(built: Table, actionId: string, targetId: string, faces: number[] = []) {
+/** The monster uses `actionId` on `targetId` (or on `targetIds`, its move first, or the rest owed after it). */
+function use(
+  built: Table,
+  actionId: string,
+  targetId: string,
+  faces: number[] = [],
+  input: Readonly<{ targetIds?: string[]; moveFirst?: true; owedPaid?: true }> = {}
+) {
   const action = built.definition.actions.find((entry) => entry.id === actionId);
   if (!action) throw new Error(`${built.definition.name} has no ${actionId}`);
+  const { targetIds = [targetId], ...rest } = input;
   return resolveDefinitionAction(
     built.state,
     action,
-    { actorId: IDS.monster, targetIds: [targetId], commandId: nextId() },
+    { actorId: IDS.monster, targetIds, commandId: nextId(), ...rest },
     {
       random: () => faces.shift() ?? 3,
       newRollId: nextId,
@@ -241,5 +250,79 @@ describe("a clay golem's Multiattack", () => {
     use(built, "hasten-recharge-5-6", IDS.monster);
     slams(built, 3);
     expect(built.state.combat.turn.actionInstance?.components).toEqual({ slam: 0 });
+  });
+});
+
+describe("actions that make one attack, or one of two", () => {
+  it("offers a mummy lord's Necrotic Strike as either attack, each spending the legendary use", () => {
+    const built = table("mummy-lord");
+    legendaryWindow(built);
+    const strike = use(built, "necrotic-strike-rotting-fist", IDS.hero, [15, 3, 3, 3, 3, 3, 3, 3, 3]);
+    expect(strike.attack?.outcome).toBe("hit");
+    expect(built.state.combat.legendaryUsed[IDS.monster]).toBe(1);
+    expect(
+      built.definition.actions.find((action) => action.id === "necrotic-strike-channel-negative-energy")
+    ).toMatchObject({
+      partOf: "necrotic-strike",
+      attack: { bonus: 9, rangeFeet: 60 }
+    });
+  });
+
+  it("offers a gnoll's Rampage only right after it damages a creature that was already Bloodied", () => {
+    const built = table("gnoll-warrior", 100);
+    expect(() => use(built, "rampage-1-day", IDS.hero, [], { moveFirst: true })).toThrow(RulesBlockedError);
+    // Damage on a creature above half its Hit Points doesn't open it; on one at half or fewer, it does.
+    const damage = (amount: number) =>
+      applyDamageDetailed(
+        built.state,
+        IDS.hero,
+        { amount, parts: [{ amount, type: "slashing" }], sourceActorId: IDS.monster },
+        GM,
+        { resolveDefinition: resolveDefinition(built), newId: nextId, now: NOW, rollDie: () => 3 }
+      );
+    damage(45);
+    expect(() => use(built, "rampage-1-day", IDS.hero, [], { moveFirst: true })).toThrow(RulesBlockedError);
+    damage(5);
+    use(built, "rampage-1-day", IDS.hero, [], { moveFirst: true });
+    expect(activeMoveGrant(built.state, actor(built, IDS.monster))).toMatchObject({ owedActionId: "rampage-1-day" });
+    const rend = use(built, "rampage-1-day", IDS.hero, [15, 3, 3], { owedPaid: true });
+    expect(rend.attack?.outcome).toBe("hit");
+  });
+});
+
+describe("legendary actions that strike an area", () => {
+  it("shakes the ground after a tarrasque's move: Concentration ends, and Medium or smaller creatures fall Prone", () => {
+    const built = table("tarrasque");
+    actor(built, IDS.ally).size = "huge";
+    addEffect(
+      built.state,
+      IDS.hero,
+      makeEffect({
+        id: "focus",
+        name: "Concentrating",
+        tags: [CONCENTRATING_TAG],
+        sourceActorId: IDS.hero,
+        duration: { type: "manual" },
+        concentration: true
+      })
+    );
+    legendaryWindow(built);
+    use(built, "world-shaking-movement", IDS.hero, [], { targetIds: [], moveFirst: true });
+    expect(activeMoveGrant(built.state, actor(built, IDS.monster))).toMatchObject({ feet: expect.any(Number) });
+    use(built, "world-shaking-movement", IDS.hero, [], { targetIds: [IDS.hero, IDS.ally], owedPaid: true });
+    expect(actor(built, IDS.hero).conditions.map((condition) => condition.id)).toEqual(["prone"]);
+    expect(actor(built, IDS.hero).effects).toEqual([]);
+    expect(actor(built, IDS.ally).conditions).toEqual([]);
+  });
+
+  it("burns those beside the space a lich leaves with Necrotic damage, and gives it the teleport", () => {
+    const built = table("lich");
+    legendaryWindow(built);
+    const left = use(built, "deathly-teleport", IDS.hero, [5, 5], { targetIds: [IDS.hero, IDS.ally] });
+    expect(left.damageTargets?.map((target) => [target.targetId, target.total])).toEqual([
+      [IDS.hero, 10],
+      [IDS.ally, 10]
+    ]);
+    expect(activeTeleportGrant(built.state, actor(built, IDS.monster))).toMatchObject({ feet: 60 });
   });
 });

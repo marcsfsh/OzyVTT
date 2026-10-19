@@ -43,7 +43,10 @@ describe("SRD monster attack damage matches the stat block", () => {
       monster.actions
         .filter((action) => action.legendary && action.attack && !/Attack Roll:/.test(action.description))
         .flatMap((action) => {
-          const named = /makes one ([A-Z][A-Za-z' ]*?) attack/.exec(action.description)?.[1];
+          // A choice printed inside its entry ("Necrotic Strike: Rotting Fist") is named for its attack.
+          const named = action.partOf
+            ? action.name.slice(action.name.indexOf(": ") + 2)
+            : /makes one ([A-Z][A-Za-z' ]*?) attack/.exec(action.description)?.[1];
           const source = monster.actions.find((candidate) => candidate.name.replace(/\s*\(.*\)$/, "") === named);
           return source &&
             JSON.stringify(source.attack) === JSON.stringify(action.attack) &&
