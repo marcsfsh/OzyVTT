@@ -1358,9 +1358,19 @@ export const SpellZoneSchema = z
     /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
      *  may be gone; a spell's area reads its spell instead. */
     rule: z
-      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .object({
+        trigger: AreaTriggerSchema,
+        save: ActionSchema.shape.save,
+        damage: ActionSchema.shape.damage,
+        /** What its damage does at 0 Hit Points (a Sphere of Annihilation obliterates). */
+        drain: ActionSchema.shape.drain
+      })
       .strict()
       .optional(),
+    /** The creature in control of it until the start of its next turn (a Sphere of Annihilation). */
+    controllerId: z.uuid().optional(),
+    /** The creature that started its current turn in control of it, which a Talisman of the Sphere lets move it far. */
+    heldAtTurnStart: z.uuid().optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element, Transmuted Spell's); absent, the

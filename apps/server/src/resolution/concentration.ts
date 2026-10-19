@@ -387,7 +387,8 @@ export function openActionZone(ctx: ResolveContext): boolean {
     rule: {
       trigger: structuredClone(trigger),
       ...(action.save ? { save: structuredClone(action.save) } : {}),
-      damage: structuredClone(action.damage)
+      damage: structuredClone(action.damage),
+      ...(action.drain ? { drain: structuredClone(action.drain) } : {})
     },
     damageDealt: 0,
     // It stays where its user stood (the rod planted in the ground).

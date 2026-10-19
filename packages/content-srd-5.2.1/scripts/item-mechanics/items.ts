@@ -2476,7 +2476,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // authored.
   "talisman-of-pure-good": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
   "talisman-of-ultimate-evil": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
-  // `talisman-of-the-sphere` - Arcana advantage only against a Sphere of Annihilation, which the engine does not hold.
+  // `talisman-of-the-sphere` - read by Control the Sphere (Advantage) and Move the Sphere (Talisman) while attuned
+  // (`zone-sphere.ts`); it carries nothing of its own.
 
   // ---- Shoulders -------------------------------------------------------------------------------
 
@@ -3780,7 +3781,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `sovereign-glue` - consumed ounces, GM fiat.
-  // `sphere-of-annihilation` - a map hazard controlled by an Arcana check.
+
+  // The sphere set on the map by whoever has it: a creature whose space it enters, or that enters its space, makes the
+  // DC 19 Dexterity save or takes 8d10 Force damage, obliterated at 0 Hit Points. Control the Sphere and Move the
+  // Sphere are generic actions (`zone-sphere.ts`). Its meetings with portals are the GM's.
+  "sphere-of-annihilation": {
+    actions: [
+      {
+        id: "set",
+        name: "Set the Sphere",
+        activation: "other",
+        area: { shape: "cube", sizeFeet: 5, widthFeet: null },
+        description:
+          "Set the Sphere of Annihilation in a space on the map, where it hovers until someone takes control of it. Any creature whose space the sphere enters must succeed on a DC 19 Dexterity saving throw or be touched by it, taking 8d10 Force damage; a creature reduced to 0 Hit Points by this damage is obliterated, leaving its possessions behind but no other physical remains.",
+        save: { ability: "dex", dc: 19, successDamage: "none", failureConditions: [] },
+        damage: [{ formula: "8d10", type: "force" }],
+        drain: { killsAtZero: { cause: "obliterated by a Sphere of Annihilation", bodyGone: true } },
+        zone: { on: ["enter"], controlled: { dc: 25, withinFeet: 60, pullFeet: 10 } }
+      }
+    ]
+  },
 
   // One of the four elemental-commanding items; this one's wording differs (no languages, placed within 30 feet).
   "stone-of-controlling-earth-elementals": {

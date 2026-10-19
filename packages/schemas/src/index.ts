@@ -4080,6 +4080,18 @@ export const AreaTriggerSchema = z
     sparesUser: z.literal(true).optional(),
     /** A creature's action area that lasts this many rounds (a Rod of Alertness planted for 10 minutes). */
     lastsRounds: z.number().int().min(1).max(100).optional(),
+    /** A creature within `withinFeet` can take control of it with a Magic action and an Intelligence (Arcana) check
+     *  against `dc`, until the start of its next turn; a failure draws it `pullFeet` toward that creature. In control,
+     *  a Bonus Action moves it 5 feet for each point of the controller's Intelligence modifier (Sphere of
+     *  Annihilation). */
+    controlled: z
+      .object({
+        dc: z.number().int().min(1).max(40),
+        withinFeet: z.number().int().min(5).max(300),
+        pullFeet: z.number().int().min(5).max(60)
+      })
+      .strict()
+      .optional(),
     /** Its first damage part's dice by how many areas the use placed, the first for one (a Ring of Shooting Stars'
      *  lightning spheres: 4d12 for one, down to 2d4 each for four). */
     damageByCount: z.array(DiceFormulaSchema).min(2).max(10).optional(),

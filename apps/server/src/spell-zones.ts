@@ -589,6 +589,8 @@ function act(
     ...(save.failurePush ? { failurePush: save.failurePush } : {}),
     // "A creature that successfully saves against this effect is immune to it" (Antipathy/Sympathy).
     ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+    // A Sphere of Annihilation obliterates a creature its damage drops to 0.
+    ...(action.drain ? { drain: structuredClone(action.drain) } : {}),
     // Heightened Spell's target has Disadvantage on every save against the spell.
     ...(zone.heightened === creature.id ? { disadvantage: { targetId: creature.id, from: "Heightened Spell" } } : {}),
     newSaveId: deps.newId,
@@ -612,14 +614,15 @@ export function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction |
     const built = laterSpellAction(spell, row, { attackBonus: 0, saveDc: zone.dc, bearersDc: false, modifier: 0 });
     action = zone.level > spell.level ? upcastAction(built, spell, zone.level) : built;
   } else if (zone.rule) {
-    const { save, damage } = zone.rule;
+    const { save, damage, drain } = zone.rule;
     action = {
       id: zone.laterActionId,
       name: zone.name,
       activation: "other",
       description: zone.name,
       damage: structuredClone(damage),
-      ...(save ? { save: { ...structuredClone(save), dc: zone.dc } } : {})
+      ...(save ? { save: { ...structuredClone(save), dc: zone.dc } } : {}),
+      ...(drain ? { drain: structuredClone(drain) } : {})
     };
   } else return undefined;
   const chosen = zone.damageType;
@@ -1018,6 +1021,12 @@ export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDe
   for (const zone of [...state.combat.spellZones]) {
     zone.entered = [];
     zone.affected = [];
+    // A Sphere of Annihilation's control lasts until the start of its controller's next turn, which it starts in
+    // control (what a Talisman of the Sphere asks).
+    if (zone.controllerId === actorId) {
+      zone.heldAtTurnStart = actorId;
+      delete zone.controllerId;
+    } else delete zone.heldAtTurnStart;
     if (zone.casterId !== actorId || zone.bursting) continue;
     if (zone.rounds !== null && state.combat.round - zone.startedRound >= zone.rounds) {
       endZone(state, zone.id);

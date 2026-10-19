@@ -17,8 +17,20 @@ import type { TokenMapGeometry } from "./token-placement.js";
  */
 
 type Actor = GameState["actors"][number];
+type Point = Readonly<{ x: number; y: number }>;
 
-/** Feet from a creature to the point an area was placed at (a bead), on the map; null when the map can't say. */
+/** The middle of a placed area: a circle's centre, a square's or a line's midpoint. */
+export function areaMiddle(
+  area: Readonly<{ shape: string | null; geometry: Readonly<{ origin: Point; target: Point }> }>
+): Point {
+  const { origin, target } = area.geometry;
+  return area.shape === "circle" || area.shape === "cone"
+    ? { x: origin.x, y: origin.y }
+    : { x: (origin.x + target.x) / 2, y: (origin.y + target.y) / 2 };
+}
+
+/** Feet from a creature to the point an area was placed at (a bead, a Sphere of Annihilation), on the map; null when
+ *  the map can't say. */
 export function zonePointFeet(
   state: GameState,
   actorId: string,
@@ -41,7 +53,7 @@ export function zonePointFeet(
         sizePx: token.sizePx,
         altitudeFeet: token.altitudeFeet ?? 0
       },
-      { position: area.geometry.origin, sizeCells: 1, sizePx: calibration.cellSizePx }
+      { position: areaMiddle(area), sizeCells: 1, sizePx: calibration.cellSizePx }
     )?.value ?? null
   );
 }

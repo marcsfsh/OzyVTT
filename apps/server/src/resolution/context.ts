@@ -181,6 +181,8 @@ export type ResolveDependencies = Readonly<{
   deflectedBy?: (fromActorId: string, targetId: string) => string | null;
   /** Feet from a combatant to the point a spell area was placed at (Delayed Blast Fireball's bead), or null. */
   zoneFeet?: (actorId: string, zoneId: string) => number | null;
+  /** Moves an area straight toward a combatant, up to these feet, and reports what it met (a Sphere of Annihilation). */
+  moveZone?: (zoneId: string, towardActorId: string, feet: number) => EffectNarration[];
 }>;
 
 type RollBase = Pick<
