@@ -1,3 +1,4 @@
+import { formEffectOf } from "../transform/forms.js";
 import type { HitOffer, HitOptionChoice } from "@vtt/domain";
 import { isMeleeWeapon, parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import { catalogIdOf, DamageTypeSchema, DiceFormulaSchema, type HitRiderEffect } from "@vtt/schemas";
@@ -72,6 +73,14 @@ function pactWeapon(ctx: ResolveContext): true | string {
   return `Only with ${ctx.attacker.name}'s pact weapon.`;
 }
 
+/** An attack of the stat block the attacker took a form from (a Wolf's Bite in Wild Shape). */
+function formAttack(ctx: ResolveContext): boolean {
+  const statBlockId = formEffectOf(ctx.attacker)?.form?.statBlockId;
+  if (statBlockId === undefined) return false;
+  const statBlock = ctx.deps.resolveDefinition?.(statBlockId);
+  return (statBlock?.actions ?? []).some((action) => action.id === ctx.action.id && action.attack !== undefined);
+}
+
 /** Whether this hit can carry the rider: true, false, or what the engine couldn't check for the attacker to vouch for. */
 function qualifies(ctx: ResolveContext, rider: HitRider, action: DefinitionAction): true | false | string {
   const kinds = ctx.riderFilters.attackKinds ?? [];
@@ -84,6 +93,9 @@ function qualifies(ctx: ResolveContext, rider: HitRider, action: DefinitionActio
       break;
     case "weapon":
       if (!weapon) return false;
+      break;
+    case "weapon-or-beast-form":
+      if (!weapon && !formAttack(ctx)) return false;
       break;
     case "melee-weapon-or-unarmed":
       if (!unarmed && !(weapon && attack.reachFeet !== undefined)) return false;

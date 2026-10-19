@@ -228,6 +228,8 @@ const PENDING_SAVE_FIELDS = {
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
   disadvantageFrom: "never",
+  // A failure's return to a creature's true form is narrated when it lands.
+  endsForm: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -264,7 +266,11 @@ const ON_FAIL_EFFECT_FIELDS = {
   sourceActionId: "never",
   ongoingDamage: "never",
   currentTurn: "player",
-  magical: "never"
+  magical: "never",
+  // The form a failure gives is the caster's pick, named in the effect's `name`; its stat block and terms stay the GM's.
+  form: "never",
+  // The size a failure changes is the spell's own text (Enlarge/Reduce).
+  sizeChange: "player"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -512,11 +518,19 @@ function playerEffect(
     light: _light,
     findDc: _findDc,
     detects: _detects,
+    // A form's stat block, the definition it replaced and its terms are the GM's; its name reaches the table, as the
+    // effect's own name says it. What size the bearer has is on the actor.
+    form,
+    sizeChange: _sizeChange,
+    ownSize: _ownSize,
     // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
     repeatSave,
     ...rest
   } = effect;
-  const visible = repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest;
+  const visible = {
+    ...(repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest),
+    ...(form ? { form: { name: form.name } } : {})
+  };
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
   // A readied spell's Metamagic picks are the engine's to apply at its release.
   const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
@@ -619,6 +633,7 @@ const PLAYER_ACTOR_FIELDS = {
   pactSlots: "derived",
   preparedSpellIds: "derived",
   spellbook: "derived",
+  knownForms: "derived",
   preparation: "derived",
   inventory: "derived",
   currency: "derived",
@@ -754,6 +769,7 @@ export function projectPlayerView(
           pactSlots,
           preparedSpellIds,
           spellbook,
+          knownForms,
           preparation,
           inventory,
           currency,
@@ -823,6 +839,7 @@ export function projectPlayerView(
                 pactSlots: pactSlots === null ? null : { ...pactSlots },
                 preparedSpellIds: [...preparedSpellIds],
                 spellbook: spellbook.map((entry) => ({ ...entry })),
+                ...(knownForms ? { knownForms: { ids: [...knownForms.ids], swapOpen: knownForms.swapOpen } } : {}),
                 preparation: preparation === null ? null : { ...preparation },
                 inventory: inventory.map(playerInventoryRow),
                 currency: { ...currency }

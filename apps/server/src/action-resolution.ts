@@ -38,6 +38,8 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
+import { formsOffer } from "./transform/offer.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
@@ -104,6 +106,8 @@ export function resolveDefinitionAction(
   // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
   ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
   ctx.builtin?.check?.(ctx);
+  // A form the action can't give is refused before anything is spent.
+  checkShapeShift(ctx);
   ctx.builtin?.apply?.(ctx);
   if (longCast && longCast.phase !== "finish") {
     stepLongCast(ctx, longCast);
@@ -189,6 +193,7 @@ export function resolveDefinitionAction(
   markCastTurn(ctx);
   openSpellZone(ctx);
   applyGrant(ctx);
+  applyShapeShift(ctx);
   placeCastSight(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
@@ -358,6 +363,7 @@ export function actionAvailability(
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
     const passive = passiveOf(action, builtin);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
+    const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;
     return {
       id: action.id,
       name: action.name,
@@ -368,6 +374,10 @@ export function actionAvailability(
       ...(reason !== undefined ? { reason } : {}),
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
+      ...(forms !== undefined ? { forms } : {}),
+      ...(action.effectOptions
+        ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
+        : {}),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),

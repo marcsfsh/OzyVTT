@@ -1021,6 +1021,116 @@ export const OngoingDamageSchema = z
   .strict();
 export type OngoingDamage = z.infer<typeof OngoingDamageSchema>;
 
+/** The speeds a form moves with, in place of the creature's own (a quasit's toad: Speed 40, Swim 40). */
+export const FormSpeedsSchema = z
+  .object({
+    walk: z.number().int().min(0).max(500),
+    fly: z.number().int().min(1).max(500).optional(),
+    swim: z.number().int().min(1).max(500).optional(),
+    climb: z.number().int().min(1).max(500).optional(),
+    burrow: z.number().int().min(1).max(500).optional(),
+    hover: z.literal(true).optional()
+  })
+  .strict()
+  .describe("The speeds a form moves with, in place of the creature's own: Speed (`walk`) and any special speeds.");
+export type FormSpeeds = z.infer<typeof FormSpeedsSchema>;
+
+/** What a creature keeps of its own when its statistics are replaced by a stat block (SRD Shape-Shifting: the effect's
+ *  description says): its Intelligence, Wisdom and Charisma (`mental`), its class features, feats and languages
+ *  (`features`), its skill and save proficiencies at its own Proficiency Bonus (`proficiencies`), its Spellcasting
+ *  feature (`spellcasting`) and its creature type (`type`). Its Hit Points and Hit Point Dice always stay its own. */
+export const FormKeepSchema = z.enum(["mental", "features", "proficiencies", "spellcasting", "type"]);
+export type FormKeep = z.infer<typeof FormKeepSchema>;
+
+/** A stat block's own printed form (a werewolf's wolf, a vampire's mist): the size and speeds that change, and what the
+ *  form can't do. Every other statistic stays the creature's ("Its game statistics, other than its size, are the same
+ *  in each form"). */
+export const PrintedFormSchema = z
+  .object({
+    id: RiderSlugSchema,
+    name: z.string().min(1).max(60),
+    size: SizeSchema.optional(),
+    speeds: FormSpeedsSchema.optional(),
+    /** It can't take actions or Bonus Actions (a vampire's mist); it can still move. */
+    noActions: z.literal(true).optional(),
+    /** It can't speak, so it casts no spell with a Verbal component (a vampire's bat). */
+    noSpeech: z.literal(true).optional(),
+    /** It can enter another creature's space and stop there (a vampire's mist). */
+    sharesSpaces: z.literal(true).optional(),
+    /** What the form has while it lasts (the mist's Resistance to all damage). */
+    modifiers: EffectModifiersSchema.default([])
+  })
+  .strict()
+  .describe(
+    "One of a stat block's printed forms: its size and speeds, and what it can't do (take actions, speak). The creature's other statistics stay its own."
+  );
+export type PrintedForm = z.infer<typeof PrintedFormSchema>;
+
+/** A creature's size changing while an effect lasts: to one size (Large Form), or one size larger or smaller
+ *  (Enlarge/Reduce). */
+export const SizeChangeSchema = z
+  .object({ to: SizeSchema.optional(), step: z.union([z.literal(1), z.literal(-1)]).optional() })
+  .strict()
+  .refine((change) => (change.to === undefined) !== (change.step === undefined), {
+    message: "Give a size to change to or a step of 1 or -1, and only one of the two."
+  })
+  .describe(
+    "The bearer's size while it lasts: `to` one size (Large Form), or `step` one size larger (1) or smaller (-1)."
+  );
+export type SizeChange = z.infer<typeof SizeChangeSchema>;
+
+/**
+ * A form its bearer has taken while the effect lasts (SRD Rules Glossary, Shape-Shifting): the stat block it took
+ * (`statBlockId`, Polymorph's Beast) or one of its own printed forms (`printedId`, a werewolf's wolf), what it keeps of
+ * its own statistics, and what the form can't do. Conditions and other effects on it carry over, and it reverts when the
+ * effect ends or it dies. `trueDefinitionId` is the definition it had before, given back as it reverts.
+ */
+export const FormSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    statBlockId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(200)
+      .optional(),
+    printedId: RiderSlugSchema.optional(),
+    keeps: z.array(FormKeepSchema).max(5).default([]),
+    size: SizeSchema.optional(),
+    speeds: FormSpeedsSchema.optional(),
+    /** Its gear melds into the form and gives nothing (`merged`), or keeps working (`worn`). */
+    gear: z.enum(["merged", "worn"]).default("worn"),
+    /** It can't cast spells. */
+    noSpells: z.literal(true).optional(),
+    /** Beast Spells: it casts in the form anyway, except a spell whose Material component has a cost or is consumed. */
+    beastSpells: z.literal(true).optional(),
+    noSpeech: z.literal(true).optional(),
+    noActions: z.literal(true).optional(),
+    sharesSpaces: z.literal(true).optional(),
+    /** It ends once the bearer has no Temporary Hit Points left (Polymorph). */
+    endsWithoutTemporaryHitPoints: z.literal(true).optional(),
+    /** It ends when the bearer has the Incapacitated condition (Wild Shape). */
+    endsOnIncapacitated: z.literal(true).optional(),
+    /** The Temporary Hit Points the form gave, any left of which vanish when it ends. */
+    temporaryHitPoints: z.number().int().min(1).max(1000).optional(),
+    /** The action that ends the form early, offered while it lasts. */
+    leaveAs: z.enum(["bonus-action", "action"]).optional(),
+    trueDefinitionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(200)
+      .optional(),
+    /** The bearer's own Speed and stored Armor Class before the form replaced them, given back as it reverts. */
+    trueStats: z
+      .object({
+        speedFeet: z.number().int().min(0).max(500).optional(),
+        armorClass: z.number().int().min(1).max(60).optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type Form = z.infer<typeof FormSchema>;
+
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
 export const EffectInstanceSchema = z
@@ -1186,7 +1296,17 @@ export const EffectInstanceSchema = z
     /** A Hide's Dexterity (Stealth) total: "the DC for a creature to find you with a Wisdom (Perception) check". */
     findDc: z.number().int().min(1).max(60).optional(),
     /** The creatures it lets its bearer sense (Divine Sense), shown to the bearer's player alone. */
-    detects: DetectsSchema.optional()
+    detects: DetectsSchema.optional(),
+    /** The form its bearer has taken while it lasts (Wild Shape, Polymorph, a werewolf's wolf). */
+    form: FormSchema.optional(),
+    /** The bearer's size while it lasts (Enlarge/Reduce, Large Form). */
+    sizeChange: SizeChangeSchema.optional(),
+    /** The size the bearer had before any effect changed it, kept on each effect that changes it so the last to end
+     *  gives it back. */
+    ownSize: z
+      .object({ size: SizeSchema.optional(), sizeCells: z.number().int().min(1).max(4).optional() })
+      .strict()
+      .optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1586,6 +1706,22 @@ export const ActorSchema = z.object({
     )
     .max(300)
     .default([]),
+  /** The Beast forms a Druid knows for Wild Shape (bestiary ids), and whether one may be replaced now: "Whenever you
+   *  finish a Long Rest, you can replace one of your known forms with another eligible form." Owner-only. */
+  knownForms: z
+    .object({
+      ids: z
+        .array(
+          z
+            .string()
+            .regex(/^[a-z0-9-]+$/)
+            .max(200)
+        )
+        .max(8),
+      swapOpen: z.boolean().default(false)
+    })
+    .strict()
+    .optional(),
   /** Open after a Long Rest for a caster that changes its prepared spells then (SRD Spell Preparation by Class): the
    *  spells it may still swap in (null: any number). Null when closed. Owner-only. */
   preparation: z
@@ -1745,7 +1881,9 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
    *  Inspiration die at a time"): a grant to a creature that holds one is refused. */
   onlyOne: z.literal(true).optional(),
   /** Only another creature may receive it ("inspire another creature"). */
-  notSelf: z.literal(true).optional()
+  notSelf: z.literal(true).optional(),
+  /** The recipient's size while it lasts (Large Form: Large), where there is room for it. */
+  sizeChange: SizeChangeSchema.optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
@@ -1918,7 +2056,15 @@ export const SaveOutcomeFields = {
   failurePush: ForcedPushSchema.optional(),
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
-  advantageAtSize: SizeSchema.optional()
+  advantageAtSize: SizeSchema.optional(),
+  /** A failure returns a shape-shifted creature to its true form, and it can't shape-shift while the spell lasts
+   *  (Moonbeam). */
+  failureEndsForm: z
+    .literal(true)
+    .optional()
+    .describe(
+      "A failure returns a shape-shifted creature to its true form, and it can't shape-shift again meanwhile (Moonbeam)"
+    )
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -2078,7 +2224,9 @@ export const SaveFailureEffectSchema = z
     /** It ends when a spell restores the bearer's hit points ("The wound closes after ... a spell restores Hit Points"). */
     endsOnSpellHealing: z.literal(true).optional(),
     /** The light the creature sheds while it lasts (Faerie Fire: "Each creature ... sheds Dim Light"). */
-    light: CarriedLightSchema.optional()
+    light: CarriedLightSchema.optional(),
+    /** The creature's size while it lasts (Enlarge/Reduce: one size larger or smaller). */
+    sizeChange: SizeChangeSchema.optional()
   })
   .strict();
 
@@ -2270,6 +2418,7 @@ export const HitRiderSchema = z
     rides: z.enum([
       "attack-roll",
       "weapon",
+      "weapon-or-beast-form",
       "melee-weapon-or-unarmed",
       "finesse-or-ranged-weapon",
       "monk-weapon-or-unarmed",
@@ -2416,6 +2565,49 @@ export const CastsSpellsSchema = z
   })
   .strict();
 
+/**
+ * An action that shape-shifts a creature (SRD Rules Glossary, Shape-Shifting): where its forms come from, what the
+ * creature keeps of its own statistics, and how the form ends. `known`: the user's known forms (Wild Shape). `bestiary`:
+ * a stat block under the limits given (Polymorph's Beast of the target's Challenge Rating or lower). `printed`: the
+ * forms the stat block prints (a werewolf's hybrid and wolf, or its true form). The user's own creature takes it, or
+ * with a save each target that fails (or each willing target, `save.unwillingOnly`), or each target named.
+ */
+export const ShapeShiftSchema = z
+  .object({
+    from: z.enum(["known", "bestiary", "printed"]),
+    /** Each target the action names takes a form of its own (Animal Shapes); absent, its user does, or with a save
+     *  each target that fails it. */
+    onTargets: z.literal(true).optional(),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(14).optional(),
+    notCreatureTypes: z.array(RiderSlugSchema).min(1).max(14).optional(),
+    maxChallenge: z.number().min(0).max(30).optional(),
+    /** The form's Challenge Rating is at most the target's, or the user's own; a creature with none counts its level. */
+    challengeOf: z.enum(["target", "user"]).optional(),
+    maxSize: SizeSchema.optional(),
+    /** No form with a Fly Speed (Wild Shape before Druid level 8). */
+    noFly: z.literal(true).optional(),
+    printed: z.array(PrintedFormSchema).min(1).max(4).optional(),
+    keeps: z.array(FormKeepSchema).max(5).default([]),
+    noSpells: z.literal(true).optional(),
+    noSpeech: z.literal(true).optional(),
+    /** Its gear melds and gives nothing (`merged`), keeps working (`worn`), or the user picks (`choice`). */
+    gear: z.enum(["merged", "worn", "choice"]).default("worn"),
+    /** Temporary Hit Points equal to the form's Hit Points: on each new form, or only the first one taken. They vanish
+     *  when the form ends. */
+    temporaryHitPoints: z.enum(["each-form", "first-form"]).optional(),
+    endsWithoutTemporaryHitPoints: z.literal(true).optional(),
+    endsOnIncapacitated: z.literal(true).optional(),
+    leaveAs: z.enum(["bonus-action", "action"]).optional(),
+    /** It lasts hours equal to half the user's level in this class (Wild Shape). Absent: the spell's duration, or until
+     *  ended. */
+    hoursPerTwoLevelsOf: RiderSlugSchema.optional()
+  })
+  .strict()
+  .describe(
+    "Shape-shifts a creature: forms from the user's known forms, the bestiary under limits, or the stat block's printed forms; what the creature keeps; and how the form ends."
+  );
+export type ShapeShift = z.infer<typeof ShapeShiftSchema>;
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z
   .object({
@@ -2471,7 +2663,13 @@ export const ActionSchema = z
         bySelf: z
           .literal(true)
           .optional()
-          .describe("The user makes this save itself, whatever it targets (Contact Other Plane)")
+          .describe("The user makes this save itself, whatever it targets (Contact Other Plane)"),
+        /** Only an unwilling creature saves ("If the target is an unwilling creature, it can make a Constitution saving
+         *  throw"): a creature on the user's side takes the failure's effect with no save. */
+        unwillingOnly: z
+          .literal(true)
+          .optional()
+          .describe("Only an unwilling creature saves: one on the user's side takes the failure's effect with no save")
       })
       .optional()
       .describe("A printed save DC, and what the save does"),
@@ -2694,7 +2892,34 @@ export const ActionSchema = z
       ),
     /** A Multiattack whose attacks the build could not read: the engine cannot track them against the action, so
      *  the creature's action-slot checks soften to notes. */
-    untrackedMultiattack: z.literal(true).optional()
+    untrackedMultiattack: z.literal(true).optional(),
+    /** It shape-shifts a creature (Wild Shape, Polymorph, a werewolf's Shape-Shift); see `ShapeShiftSchema`. */
+    shapeShift: ShapeShiftSchema.optional(),
+    /** It ends its user's form, which returns to its true form (leaving Wild Shape as a Bonus Action). */
+    endsForm: z
+      .literal(true)
+      .optional()
+      .describe("It ends its user's form, which returns to its true form (leaving Wild Shape early)"),
+    /** It works only in these of its user's printed forms; `true` is its true form ("Bite (Wolf or Hybrid Form
+     *  Only)"). */
+    formOnly: z
+      .array(RiderSlugSchema)
+      .min(1)
+      .max(4)
+      .optional()
+      .describe(
+        'It works only in these of its user\'s printed forms, `true` naming its true form ("Bite (Wolf or Hybrid Form Only)")'
+      ),
+    /** Effects a use picks one of (Enlarge/Reduce's Enlarge or Reduce), each going to every target that fails its save
+     *  (or takes it unsaved); the first is the default. */
+    effectOptions: z
+      .array(
+        z.object({ id: RiderSlugSchema, name: z.string().min(1).max(60), effect: SaveFailureEffectSchema }).strict()
+      )
+      .min(2)
+      .max(4)
+      .optional()
+      .describe("Effects a use picks one of (Enlarge or Reduce), the picked one landing as a failed save's effect")
   })
   .describe(
     'A stat block\'s action, in the exact `ActionSchema` vocabulary the live rules engine already resolves. Every mechanics field is optional: absent means "prose only", and the engine falls back to reference behavior.'

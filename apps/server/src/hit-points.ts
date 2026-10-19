@@ -1,3 +1,4 @@
+import { formsAfterDamage } from "./transform/rules.js";
 import {
   isDead,
   type Actor,
@@ -700,6 +701,9 @@ export function applyDamageDetailed(
     instantDeath ||= drained.died && isPlayerCharacter;
     defeated ||= drained.died && !isPlayerCharacter;
   }
+  // A form the damage ends: Polymorph with no Temporary Hit Points left, Wild Shape on falling Unconscious, any form
+  // on death.
+  if (totalAdjusted > 0) events.push(...formsAfterDamage(state, actor));
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
   // at 30, in a fight or out of one (a trap between fights). The prompt carries the effects a committed failure

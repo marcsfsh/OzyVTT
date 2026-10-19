@@ -51,8 +51,13 @@ export type PlayerEffect = Omit<
   | "light"
   | "findDc"
   | "detects"
+  | "form"
+  | "sizeChange"
+  | "ownSize"
 > & {
   yours?: true;
+  /** The form its bearer has taken, by name alone (the effect's name says it too). */
+  form?: Readonly<{ name: string }>;
 };
 /** A creature as one player sees it. Their own claimed character gets everything; another player's is limited by
  * `GameState.partyVisibility` (see apps/server/src/projections.ts). */
@@ -97,6 +102,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     pactSlots?: Actor["pactSlots"];
     preparedSpellIds?: Actor["preparedSpellIds"];
     /** A Wizard's spellbook beyond its sheet. Same gate as `preparedSpellIds`. */ spellbook?: Actor["spellbook"];
+    /** A Druid's known Wild Shape forms. Same gate as `preparedSpellIds`. */ knownForms?: Actor["knownForms"];
     preparation?: Actor["preparation"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];

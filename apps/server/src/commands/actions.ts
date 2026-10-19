@@ -257,6 +257,11 @@ export const actionCommands = [
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(request.knockOut === true ? { knockOut: true } : {}),
             ...(request.shaping && request.shaping.length > 0 ? { shaping: request.shaping } : {}),
+            // The form a shape-shift takes and what else it picks (its gear, Enlarge or Reduce).
+            ...(request.form !== undefined ? { form: request.form } : {}),
+            ...(request.targetForms ? { targetForms: request.targetForms } : {}),
+            ...(request.gear !== undefined ? { gear: request.gear } : {}),
+            ...(request.option !== undefined ? { option: request.option } : {}),
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             // Spell areas are the GM's to see, so only the GM aims a cast at one.
@@ -419,8 +424,19 @@ export const actionCommands = [
         spend: chosenSpend,
         damageType,
         shaping,
+        form,
+        targetForms,
+        gear,
+        option,
         expectedRevision
       } = request;
+      // What a shape-shift picks travels with the resolve wherever it goes.
+      const shape = {
+        ...(form === undefined ? {} : { form }),
+        ...(targetForms === undefined ? {} : { targetForms }),
+        ...(gear === undefined ? {} : { gear }),
+        ...(option === undefined ? {} : { option })
+      };
       if (override && !isGmGrade(principal)) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
       const snapshot = kit.read();
       requireActorAccess(initiatorOf(principal), snapshot, actorId, "attack");
@@ -439,6 +455,7 @@ export const actionCommands = [
           ...(chosenSpend === undefined ? {} : { spend: chosenSpend }),
           ...(damageType === undefined ? {} : { damageType }),
           ...(shaping === undefined ? {} : { shaping }),
+          ...shape,
           ...(expectedRevision === undefined ? {} : { expectedRevision })
         });
 
@@ -466,11 +483,13 @@ export const actionCommands = [
         (listed.healing !== undefined && listed.healing.self !== true) ||
         listed.endsConditions !== undefined;
       const named = targetIds && targetIds.length > 0 ? targetIds : !rollsOnTargets && aimed ? [actorId] : [];
+      // A shape-shift outside a fight (Wild Shape to scout, a werewolf's change) takes its form the same way.
+      const shapeShifts = listed.shapeShift !== undefined || listed.endsForm === true;
       if (
         !snapshot.combat.active &&
         !isItemActionId(listed.id) &&
-        castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null &&
-        (named.length > 0 || !rollsOnTargets)
+        (castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null || shapeShifts) &&
+        (named.length > 0 || !rollsOnTargets || shapeShifts)
       ) {
         const result = await dispatch("action.resolve", {
           commandId,
@@ -483,6 +502,7 @@ export const actionCommands = [
           ...(chosenSpend === undefined ? {} : { spend: chosenSpend }),
           ...(damageType === undefined ? {} : { damageType }),
           ...(shaping === undefined ? {} : { shaping }),
+          ...shape,
           ...(expectedRevision === undefined ? {} : { expectedRevision })
         });
         const healing = (result.resolution as ActionResolution | undefined)?.healing;

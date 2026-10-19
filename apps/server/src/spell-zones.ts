@@ -256,7 +256,9 @@ function act(
     ...(onFail ? { onFailEffect: currentTurn ? { ...onFail, currentTurn: true as const } : onFail } : {}),
     extra: {
       zoneId: zone.id,
-      ...(BREAKS_CONCENTRATION.has(spell.id) ? { breaksConcentration: true as const } : {})
+      ...(BREAKS_CONCENTRATION.has(spell.id) ? { breaksConcentration: true as const } : {}),
+      // Moonbeam: a shape-shifted creature that fails reverts to its true form.
+      ...(save.failureEndsForm ? { endsForm: true as const } : {})
     },
     // A creature can owe this zone a second save before answering the first (entering, then ending its turn there).
     replaceExisting: false,

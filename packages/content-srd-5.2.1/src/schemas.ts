@@ -136,7 +136,9 @@ export const SpellLaterActionSchema = z
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
-    zone: SpellZoneSchema.optional()
+    zone: SpellZoneSchema.optional(),
+    /** It shape-shifts a creature again while the spell lasts (Shapechange's new form, Animal Shapes' transforming). */
+    shapeShift: ActionSchema.shape.shapeShift
   })
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
@@ -239,7 +241,13 @@ export const SpellEffectSchema = z
     rangeDoubles: z.literal(true).optional(),
     /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
      *  with a Verbal component while the spell lasts. */
-    silencesArea: z.literal(true).optional()
+    silencesArea: z.literal(true).optional(),
+    /** The cast shape-shifts a creature (Polymorph's Beast, Shapechange's form), as `ActionSchema.shapeShift`. */
+    shapeShift: ActionSchema.shape.shapeShift,
+    /** Effects the cast picks one of (Enlarge/Reduce), as `ActionSchema.effectOptions`. */
+    effectOptions: ActionSchema.shape.effectOptions,
+    /** Only an unwilling creature makes the cast's save; one on the caster's side takes its effect with no save. */
+    unwillingOnly: z.literal(true).optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;

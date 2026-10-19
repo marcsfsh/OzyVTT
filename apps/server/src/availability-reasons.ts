@@ -118,6 +118,12 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "condition.raging": () => "You can't cast spells while raging.",
   "condition.no-reactions": () => "You can't take Reactions now.",
   "condition.no-spells": () => "You can't cast spells now.",
+  "form.no-spells": ({ spell }) =>
+    spell && (spell.components.materialConsumed || (spell.components.costly ?? []).length > 0)
+      ? "Beast Spells leaves out a spell with a costly or consumed Material component."
+      : "You can't cast spells in this form.",
+  "form.no-actions": () => "You can't take actions in this form.",
+  "form.wrong-form": ({ action }) => `Only in ${action.formOnly?.length === 1 ? "one" : "some"} of your forms.`,
   "legendary.own-turn": () => "Take it at the end of another creature's turn.",
   "attack.light-needs-attack": () => "Attack with another Light weapon first.",
   "attack.cleave-needs-hit": () => "Hit with this weapon in melee first.",

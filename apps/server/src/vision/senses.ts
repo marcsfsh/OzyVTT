@@ -1,3 +1,4 @@
+import { gearMerged } from "../transform/forms.js";
 import type { GameState } from "@vtt/domain";
 import { catalogIdOf, type ActorDefinition, type Modifier } from "@vtt/schemas";
 import { itemIsActive, type EquipmentCatalog } from "../equipment-derivation.js";
@@ -111,7 +112,8 @@ export function sensesOf(state: GameState, actor: Actor, content: SightContent):
       const record = catalog.featRecord?.(held.id);
       if (record) riderSenses(record.feature.modifiers, senses, extensions);
     }
-    for (const item of actor.inventory) {
+    // Gear melded into a form gives nothing while the form lasts.
+    for (const item of gearMerged(actor) ? [] : actor.inventory) {
       if (item.quantity <= 0) continue;
       const record = catalog.equipmentRecord(catalogIdOf(item));
       if (record && itemIsActive(item, record)) riderSenses(record.modifiers, senses, extensions);

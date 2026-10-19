@@ -42,6 +42,10 @@ const RULE_FAMILIES = {
   // An effect that takes away Reactions (Slow).
   "condition.no-reactions": "economy",
   "condition.no-spells": "economy",
+  // A form forbids it: spells (Wild Shape, Polymorph), actions (a vampire's mist), or another form's attack.
+  "form.no-spells": "economy",
+  "form.no-actions": "economy",
+  "form.wrong-form": "economy",
   // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.

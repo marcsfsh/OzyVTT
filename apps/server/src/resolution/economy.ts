@@ -1,3 +1,4 @@
+import { formViolations } from "../transform/rules.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition, CastShaping } from "@vtt/schemas";
@@ -187,6 +188,15 @@ export function evaluateActionEconomy(
     notes: []
   };
   checkAbleToAct(evaluation);
+  // What the creature's form keeps it from doing (no spells in Wild Shape, a werewolf's Bite only in wolf form).
+  evaluation.violations.push(
+    ...formViolations(
+      attacker,
+      action,
+      definition,
+      spell ?? (action.spellId !== undefined ? catalog?.spellRecord?.(action.spellId) : undefined)
+    )
+  );
   checkTurnsBegun(evaluation);
   checkOwnTurn(evaluation);
   checkExtraAttackOpened(evaluation);
