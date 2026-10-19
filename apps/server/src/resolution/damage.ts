@@ -88,7 +88,7 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
   // A strike declared before its roll (Brutal Strike) rolls its dice with the hit it rides, never with its tap.
   if (declaredBeforeRoll(action)) return;
   const parts = damageInForce(ctx);
-  if (parts.length > 0 && action.missDamage === "half" && missed(ctx.attack)) {
+  if (parts.length > 0 && (action.missDamage === "half" || potentCantrip(ctx)) && missed(ctx.attack)) {
     halfOnAMiss(ctx, parts);
     return;
   }
@@ -97,7 +97,10 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     for (let dart = 0; dart < action.darts; dart += 1) {
       const targetId = input.targetIds[dart % input.targetIds.length]!;
       for (const part of parts) {
-        const thrown = resolveDice(parseDiceFormula(part.formula), deps.random);
+        const thrown = resolveDice(
+          parseDiceFormula(part.formula),
+          input.overchannel === true ? (sides: number) => sides : deps.random
+        );
         recordRoll(ctx, thrown, "damage");
         const rolled = empowered(ctx, thrown);
         damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
@@ -110,11 +113,13 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
   const floor = damageDieFloor(ctx);
   const random = floor > 1 ? (sides: number) => Math.max(Math.min(floor, sides), deps.random(sides)) : deps.random;
   const savage = savageAttack(ctx);
+  // Overchannel: each of the spell's damage dice deals its maximum.
+  const dice = input.overchannel === true ? (sides: number) => sides : random;
   parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
     const rolledExpression = ctx.crit ? criticalExpression(expression, extraCritDice) : expression;
-    let rolled = resolveDice(rolledExpression, random);
+    let rolled = resolveDice(rolledExpression, dice);
     recordRoll(ctx, rolled, "damage");
     // The weapon's own dice are rolled again and the higher roll is used: no attacker would choose the lower.
     if (savage && index === 0) {
@@ -181,6 +186,18 @@ const missed = (attack: ActionResolutionAttack | null) =>
 
 /** SRD Acid Arrow: "On a miss, the arrow splashes the target with acid for half as much of the initial damage only." The
  *  dice roll as for a hit, and half of each part (rounded down) is owed like Graze's damage. */
+/** SRD Potent Cantrip (Evoker 3): "When you cast a cantrip at a creature and you miss with the attack roll or the target
+ *  succeeds on a saving throw against the cantrip, the target takes half the cantrip's damage (if any) but suffers no
+ *  additional effect from the cantrip." */
+export function potentCantrip(ctx: Pick<ResolveContext, "action" | "deps">): boolean {
+  const { action, deps } = ctx;
+  if (action.spellId === undefined) return false;
+  return (
+    deps.catalog?.spellRecord?.(action.spellId)?.level === 0 &&
+    holdsFeature(deps.definition, "potent-cantrip", "Potent Cantrip")
+  );
+}
+
 function halfOnAMiss(ctx: ResolveContext, parts: ResolveContext["action"]["damage"]): void {
   for (const part of parts) {
     const thrown = resolveDice(parseDiceFormula(part.formula), ctx.deps.random);

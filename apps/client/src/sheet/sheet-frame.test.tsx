@@ -324,6 +324,13 @@ describe("the Hit Point Dice", () => {
     expect(screen.getByRole("img", { name: "3 of 3 d10" })).toBeTruthy();
     expect(screen.getByRole("img", { name: "1 of 2 d8" })).toBeTruthy();
   });
+
+  it("offers no Spend outside a Short Rest, where the dice are spent", () => {
+    render(<HitPointDice actorId={HERO} hitDice={corwin} constitution={2} canSpend={false} onFeedback={() => {}} />);
+    const dice = within(screen.getByRole("group", { name: "Hit Point Dice" }));
+    expect(dice.getByText("Spend on a Short Rest · d10 + 2 or d8 + 2 each")).toBeTruthy();
+    expect(dice.queryByRole("button", { name: "Spend" })).toBeNull();
+  });
 });
 
 describe("the GM's sheet on a laptop", () => {

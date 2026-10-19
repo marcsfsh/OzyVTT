@@ -27,7 +27,7 @@ import { isIncapacitated } from "./condition-rules.js";
 import { scrollCastAction } from "./scrolls.js";
 import { speedZeroed } from "./speed.js";
 import {
-  castAction,
+  itemCastActions,
   extraAttackAction,
   isItemActionId,
   itemAction,
@@ -409,7 +409,8 @@ export function deriveEquipment(
     const entry = { item, record };
     if (item.equipped) equipped.push(entry);
     if (item.equipped && itemIsActive(item, record)) active.push(entry);
-    else if (record?.consumedOnUse) packed.push(entry);
+    // Caltrops are spread straight from their bag, as a potion is drunk from the pack.
+    else if (record?.consumedOnUse || record?.actions.some((action) => action.zone !== undefined)) packed.push(entry);
     if (item.attuned && record) cursedVulnerabilities.push(...curseVulnerabilitiesOf(record, item));
   }
   const carriers: RiderCarrier[] = [
@@ -482,7 +483,7 @@ export function deriveEquipment(
     takeEffects(record, item.id, label);
     for (const declared of record.actions) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
-      actions.push(castAction(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
+      actions.push(...itemCastActions(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
     const read = record.spellScroll ? scrollCastAction(item, definition, catalog) : null;
     if (read) actions.push(read);
     // Depth 1: the feat's riders join this block, so unequipping removes them in one recomputation.

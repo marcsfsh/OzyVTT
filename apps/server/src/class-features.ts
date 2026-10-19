@@ -25,3 +25,12 @@ export function spellClassOf(definition: ActorDefinition | undefined, spellId: s
   if (!definition || spellId === undefined) return null;
   return definition.spellcasting?.spells.find((entry) => entry.id === spellId)?.classId ?? null;
 }
+
+/** The feet Improved Potent Spellcasting adds to a Druid cantrip's range, or 0. */
+export function potentRangeFeet(
+  definition: ActorDefinition | undefined,
+  spell: Readonly<{ level: number; classes: readonly string[] }> | undefined
+): number {
+  if (!spell || spell.level !== 0 || !spell.classes.includes("druid")) return 0;
+  return holdsFeature(definition, "improved-potent-spellcasting", "Improved Potent Spellcasting") ? 300 : 0;
+}

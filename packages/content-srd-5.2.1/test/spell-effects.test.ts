@@ -53,7 +53,7 @@ describe("what one cast of an SRD spell does", () => {
     const waiting = loadSpells()
       .filter((spell) => spell.effect?.laterActions?.some((row) => row.laterTurnsOnly))
       .map((spell) => spell.id);
-    expect(waiting).toEqual(["arcane-sword", "conjure-fey", "heat-metal", "hex", "spiritual-weapon"]);
+    expect(waiting).toEqual(["arcane-sword", "conjure-fey", "heat-metal", "hex", "moonbeam", "spiritual-weapon"]);
     // "Until the spell ends, you can take a Magic action": the turn of the cast too.
     expect(effectOf("produce-flame")!.laterActions?.[0]?.laterTurnsOnly).toBeUndefined();
   });
@@ -135,9 +135,9 @@ describe("what one cast of an SRD spell does", () => {
       // "Any other creature's Speed is halved in the Emanation."
       halvesSpeed: true
     });
-    expect(zoneOf("web")).toEqual({ on: ["enter", "start-turn"] });
+    expect(zoneOf("web")).toEqual({ on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" } });
     expect(zoneOf("stinking-cloud")).toEqual({ on: ["start-turn"] });
-    expect(zoneOf("spike-growth")).toEqual({ on: ["travel"] });
+    expect(zoneOf("spike-growth")).toEqual({ on: ["travel"], terrain: { cost: 2, kind: "plants" } });
     expect(zoneOf("flaming-sphere")).toEqual({ on: ["end-turn"], around: "point", feet: 5 });
     expect(zoneOf("guardian-of-faith")).toMatchObject({ affects: "enemies", damageCap: 60 });
     // Damage with no save (a wall of fire), and a fixed amount (the guardian's 20).
@@ -154,6 +154,81 @@ describe("what one cast of an SRD spell does", () => {
       ["save", "other"],
       ["ram", "bonus-action"]
     ]);
+  });
+
+  it("marks the wards: an alarm, a glyph that bursts once, a ward by creature type, and barriers", () => {
+    const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
+    expect(zoneOf("alarm")).toEqual({ on: ["enter"], alerts: true, affects: "enemies" });
+    expect(zoneOf("glyph-of-warding")).toEqual({
+      on: ["enter", "spell-end"],
+      around: "point",
+      feet: 5,
+      once: true,
+      hidden: true
+    });
+    expect(effectOf("glyph-of-warding")!.damageTypes).toEqual(["thunder", "acid", "cold", "fire", "lightning"]);
+    expect(zoneOf("forbiddance")).toMatchObject({
+      types: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
+      noTeleport: true
+    });
+    expect(effectOf("forbiddance")!.laterActions?.[0]!.save).toBeUndefined();
+    expect(zoneOf("antilife-shell")?.bars).toEqual({ way: "both", except: ["construct", "undead"], reach: true });
+    expect(zoneOf("magic-circle")?.bars).toEqual({
+      way: "in",
+      types: ["celestial", "elemental", "fey", "fiend", "undead"]
+    });
+  });
+
+  it("marks the areas that move: by a later action, up to how far, and drifting from their caster", () => {
+    const rowOf = (id: string, name: string) => effectOf(id)!.laterActions?.find((row) => row.name === name);
+    expect(rowOf("moonbeam", "move")).toMatchObject({
+      activation: "action",
+      laterTurnsOnly: true,
+      movesArea: { feet: 60 }
+    });
+    expect(rowOf("flaming-sphere", "ram")?.movesArea).toEqual({ feet: 30 });
+    expect(rowOf("cloudkill", "save")?.zone?.drifts).toBe(10);
+    expect(rowOf("incendiary-cloud", "save")?.zone?.drifts).toBe(10);
+  });
+
+  it("marks what an aura gives the creatures in it, and to whom", () => {
+    const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
+    expect(zoneOf("holy-aura")).toMatchObject({ around: "caster", feet: 30, affects: "allies" });
+    expect(zoneOf("holy-aura")?.holds?.struck).toEqual({
+      creatureTypes: ["fiend", "undead"],
+      save: { ability: "con", conditions: ["blinded"] }
+    });
+    expect(zoneOf("aura-of-life")).toMatchObject({ on: ["start-turn"], affects: "allies", revives: 1 });
+    expect(zoneOf("pass-without-trace")?.holds?.modifiers).toEqual([
+      {
+        type: "check-bonus",
+        amount: 10,
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+      }
+    ]);
+    expect(zoneOf("silence")).toEqual({ on: [], holds: { conditions: ["deafened"] } });
+  });
+
+  it("marks the ground an area makes difficult, and how long the ground stays", () => {
+    const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
+    expect(zoneOf("entangle")).toEqual({ on: [], terrain: { cost: 2, kind: "plants" } });
+    // "Until the end of your next turn."
+    expect(zoneOf("ice-storm")).toEqual({ on: [], terrain: { cost: 2, kind: "ice" }, untilCasterNextTurnEnd: true });
+    // "4 feet of movement for every 1 foot."
+    expect(zoneOf("plant-growth")?.terrain).toEqual({ cost: 4, kind: "plants" });
+    expect(zoneOf("wall-of-thorns")?.terrain).toEqual({ cost: 4, kind: "plants" });
+    expect(zoneOf("conjure-minor-elementals")).toEqual({
+      on: [],
+      around: "caster",
+      feet: 15,
+      terrain: { cost: 2, for: "enemies" }
+    });
+    expect(zoneOf("earthquake")).toEqual({ on: ["caster-turn-end"], terrain: { cost: 2 } });
+    for (const id of ["black-tentacles", "blade-barrier", "grease", "insect-plague", "sleet-storm"])
+      expect(zoneOf(id)?.terrain?.cost, id).toBe(2);
+    // A failed save also ends the creature's Concentration.
+    expect(effectOf("sleet-storm")!.laterActions?.[0]!.save?.breaksConcentration).toBe(true);
+    expect(loadSpells().find((spell) => spell.id === "earthquake")!.save?.breaksConcentration).toBe(true);
   });
 
   it("gives a wall and a thing placed at a point an area the GM can place", () => {

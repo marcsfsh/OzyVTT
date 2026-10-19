@@ -1843,6 +1843,14 @@ export const ActorSchema = z.object({
   deathSaves: DeathSavesSchema.nullable().default(null),
   /** Spent limited-use counts by action id. */
   actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
+  /** When each spent pool that comes back after a time is ready again (Wings of Flying's 1d12 hours): the game-clock
+   *  minute, and the pool's name for the line the table reads. Keyed as `actionUses`. Owner-only. */
+  readyAt: z
+    .record(
+      z.string(),
+      z.object({ minute: z.number().int().min(0).max(1_000_000_000), name: z.string().min(1).max(120) }).strict()
+    )
+    .default({}),
   /** SRD Heroic Inspiration: held or not (never more than one). Spent to reroll one die; the GM gives it, and a Human
    * gains it on finishing a Long Rest. */
   heroicInspiration: z.boolean().default(false),
@@ -1852,8 +1860,8 @@ export const ActorSchema = z.object({
   /** A player character's Experience Points, which the GM awards (`actor.award-experience`). Absent until the first
    *  award, when it starts at the least XP the character's level needs. */
   experiencePoints: z.number().int().min(0).max(10_000_000).optional(),
-  /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest that clears the override,
-   * after which the build's recorded answer applies again. */
+  /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest after which it may be re-made;
+   * it stands until the character chooses again. */
   choiceOverrides: z
     .record(
       z.string(),
@@ -1924,6 +1932,18 @@ export const ActorSchema = z.object({
    *  spells it may still swap in (null: any number). Null when closed. Owner-only. */
   preparation: z
     .object({ changesLeft: z.number().int().min(0).max(60).nullable() })
+    .strict()
+    .nullable()
+    .default(null),
+  /** Open after a rest the character finished, for what a feature lets it do "when you finish" that rest: recover
+   *  slots or points (Arcane Recovery, Sorcerous Restoration), or re-make a pick. Closed by its player's Done or by
+   *  rolling Initiative. Null when closed. Owner-only. */
+  restStep: z
+    .object({
+      after: z.enum(["short-rest", "long-rest"]),
+      /** Answers swapped in this step, by offer key, for a pick that lets only so many change each rest. */
+      swaps: z.record(z.string(), z.number().int().min(0).max(20)).optional()
+    })
     .strict()
     .nullable()
     .default(null),
@@ -2191,13 +2211,19 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
 export const MAX_ACTION_USES = 100;
 
+/** Hours of game time, as the SRD prints a wait: dice ("1d12") or a number ("168" for 7 days). */
+export const HoursSchema = z
+  .string()
+  .regex(/^(?:\d+d(?:4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?|\d{1,4})$/i, "Use hours as dice such as 1d12, or a number.");
+
 /** Limited uses. "turn"/"encounter"/rests reset as named; "own-turn" at the start of the bearer's next turn ("you
- * can't use it again until the start of your next turn"); "recharge" on a start-of-turn d6 >= `recharge`.
+ * can't use it again until the start of your next turn"); "recharge" on a start-of-turn d6 >= `recharge`; "never"
+ * never comes back; "time" once `afterHours` of game time pass from its first use (Wings of Flying's 1d12 hours).
  * `pool` shares one counter across actions (Sneak Attack once per turn regardless of weapon). */
 export const ActionUsesSchema = z
   .object({
     limit: z.number().int().min(1).max(MAX_ACTION_USES),
-    per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
+    per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]),
     pool: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -2206,10 +2232,19 @@ export const ActionUsesSchema = z
       .describe(
         "Shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon)"
       ),
-    recharge: z.number().int().min(2).max(6).optional().describe('The d6 threshold, e.g. 5 for "Recharge 5-6"')
+    recharge: z.number().int().min(2).max(6).optional().describe('The d6 threshold, e.g. 5 for "Recharge 5-6"'),
+    afterHours: HoursSchema.optional().describe(
+      'With per "time": the hours of game time after its first use that it comes back, rolled then (Wings of Flying: 1d12)'
+    )
   })
   .strict()
   .superRefine((uses, context) => {
+    if ((uses.per === "time") !== (uses.afterHours !== undefined))
+      context.addIssue({
+        code: "custom",
+        path: ["afterHours"],
+        message: "Uses that come back after a time need the hours (afterHours), and only they take them."
+      });
     if (uses.per === "recharge" && uses.recharge === undefined)
       context.addIssue({
         code: "custom",
@@ -2358,7 +2393,12 @@ export const SaveOutcomeFields = {
   failurePush: ForcedPushSchema.optional(),
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
-  advantageAtSize: SizeSchema.optional()
+  advantageAtSize: SizeSchema.optional(),
+  /** A failure also breaks the creature's Concentration (Earthquake: "its Concentration is broken"; Sleet Storm). */
+  breaksConcentration: z
+    .literal(true)
+    .optional()
+    .describe("A failure also ends the Concentration the creature holds (Earthquake, Sleet Storm)")
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -2887,6 +2927,113 @@ export const CastsSpellsSchema = z
   })
   .strict();
 
+/** A creature type as the stat blocks name it ("undead", "fey"). */
+const CreatureTypeIdSchema = z
+  .string()
+  .regex(/^[a-z][a-z-]*$/)
+  .max(40);
+
+/**
+ * Where and when an area that lasts acts on a creature (a spell's, an item's spread caltrops, a creature's whirlwind), so
+ * the server raises the save or deals the damage: a creature entering it (or the area moving onto the creature),
+ * starting or ending its turn there, or travelling in it (Spike Growth's damage for every 5 feet); the start of each of
+ * its caster's turns, on the one creature in it nearest its point (Faithful Hound's bite); the end of each of its
+ * caster's turns, on every creature in it (Earthquake's tremor); or the spell's end, on every creature in it (Delayed
+ * Blast Fireball's bead). The area is the one the cast places on the map, or within `feet` of the caster (an
+ * Emanation) or of the point it is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A creature makes this save
+ * only once per turn" (entering counts once a turn anyway); `affects` "enemies" spares the caster's allies (Guardian of
+ * Faith; spirits that harm the creatures the caster chooses); `damageCap` ends it once it has dealt that much
+ * (Guardian of Faith's 60).
+ */
+export const AreaTriggerSchema = z
+  .object({
+    /** When it acts; none for an area that only changes the ground (Entangle's plants, Ice Storm's hail). */
+    on: z
+      .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "caster-turn-end", "spell-end"]))
+      .max(3),
+    oncePerTurn: z.literal(true).optional(),
+    around: z.enum(["caster", "point"]).optional(),
+    feet: z.number().int().min(5).max(120).optional(),
+    /** Only the caster's enemies, or only the caster and its allies ("you and your allies": Aura of Life). */
+    affects: z.enum(["enemies", "allies"]).optional(),
+    damageCap: z.number().int().min(1).max(1000).optional(),
+    /** The creatures it affects move at half Speed inside it (Spirit Guardians). */
+    halvesSpeed: z.literal(true).optional(),
+    /** It acts on no one while a creature it restrained is still held (Conjure Elemental: "if the spirit has no creature
+     *  Restrained"). */
+    holdsOne: z.literal(true).optional(),
+    /** Its damage grows by one die each time its caster's turn ends while it lasts (Delayed Blast Fireball). */
+    grows: z.literal(true).optional(),
+    /** What it does to the ground while it lasts: Difficult Terrain (`cost` 2: Web, Entangle) or 4 feet of movement
+     *  for every foot (Plant Growth, Wall of Thorns), for every creature or only the caster's enemies (Conjure Minor
+     *  Elementals). `kind` is what the ground is made of, for a creature that moves through it freely (Web Walker's
+     *  webs, Ice Walk's ice). */
+    terrain: z
+      .object({
+        cost: z.union([z.literal(2), z.literal(4)]),
+        for: z.literal("enemies").optional(),
+        kind: z.enum(["webs", "ice", "plants"]).optional()
+      })
+      .strict()
+      .optional(),
+    /** It lasts until the end of its caster's next turn, whatever the spell's own duration (Ice Storm's hailstones). */
+    untilCasterNextTurnEnd: z.literal(true).optional(),
+    /** It acts only on creatures of these types (Forbiddance: Aberrations, Celestials, Elementals, Fey, Fiends and
+     *  Undead). */
+    types: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
+    /** It alerts its caster, with no save or damage (Alarm): the GM is told who set it off. */
+    alerts: z.literal(true).optional(),
+    /** It ends the first time it acts (Glyph of Warding: "Once a glyph is triggered, this spell ends"; a Hunting Trap
+     *  springs); with `spell-end` it then bursts over its area. */
+    once: z.literal(true).optional(),
+    /** It is nearly imperceptible: its area is drawn for the GM and its caster alone (Glyph of Warding, a hidden trap). */
+    hidden: z.literal(true).optional(),
+    /** A barrier at its edge: the creatures it holds back can't move across it, into it (`way` "in": Magic Circle) or
+     *  either way ("both": Antilife Shell), and with `reach` can't reach through it with a melee attack that isn't
+     *  made with a Reach weapon. `types` it holds back, or every type `except` these; every creature when neither. */
+    bars: z
+      .object({
+        way: z.enum(["in", "both"]),
+        types: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
+        except: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
+        reach: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** No creature can teleport into it (Forbiddance). */
+    noTeleport: z.literal(true).optional(),
+    /** What a creature it affects holds while it stands inside (Holy Aura's Advantage on saving throws, Pass without
+     *  Trace's +10 to Stealth checks, Silence's Deafened): one effect, added as the creature comes in and taken away as
+     *  it leaves. A struck save rolls against the cast's save DC. */
+    holds: z
+      .object({
+        modifiers: EffectModifiersSchema.optional(),
+        conditions: z.array(ConditionSchema).min(1).max(2).optional(),
+        struck: StruckSchema.omit({ save: true })
+          .extend({
+            save: z
+              .object({ ability: AbilitySchema, conditions: z.array(ConditionSchema).min(1).max(3) })
+              .strict()
+              .optional()
+          })
+          .strict()
+          .optional()
+      })
+      .strict()
+      .optional(),
+    /** A creature it affects that starts its turn there at 0 Hit Points regains this many (Aura of Life's 1). */
+    revives: z.number().int().min(1).max(10).optional(),
+    /** Its area moves this many feet straight away from its caster at the start of each of the caster's turns
+     *  (Cloudkill, Incendiary Cloud), acting on the creatures it moves onto. */
+    drifts: z.number().int().min(5).max(60).optional(),
+    /** An Emanation that stays where its caster stood at the cast ("an immobile barrier": Globe of Invulnerability). */
+    stays: z.literal(true).optional(),
+    /** A spell of this level or lower cast from outside it can't affect anything within, one level higher for each slot
+     *  level the spell is cast above its own (Globe of Invulnerability's 5). */
+    wardsSpells: z.number().int().min(0).max(9).optional()
+  })
+  .strict();
+export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;
 /** A move an action grants beside the turn's own (SRD 5.2.1 stat blocks: "The dragon moves up to half its Speed, and
  *  it makes one Rend attack"). `speed`: half or all of the way's Speed, measured when it is taken; `mode`: the way it
  *  travels (any of the creature's ways when absent); `provokes: false` for "without provoking Opportunity Attacks";
@@ -3149,6 +3296,11 @@ export const ActionSchema = z
     /** The area it covers, for the map template. Filled from the description where the action enters the system
      *  (the content build, a homebrew save, an import), so play never reads the prose. */
     area: ActionAreaSchema.optional(),
+    /** The area it leaves on the map (spread Caltrops, a set Hunting Trap). The area acts later with the action's own
+     *  save and damage on the creatures that meet it, and using the action rolls nothing. */
+    zone: AreaTriggerSchema.optional().describe(
+      "The area it leaves on the map (spread Caltrops). The area acts later with the action's own save and damage on the creatures that meet it, and using the action rolls nothing"
+    ),
     /** A move the action grants ("moves up to half its Speed"), see `ActionMoveSchema`. */
     move: ActionMoveSchema.optional(),
     /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see

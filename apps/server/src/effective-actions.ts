@@ -1,3 +1,4 @@
+import { potentRangeFeet } from "./class-features.js";
 import type { Actor } from "@vtt/domain";
 import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
@@ -25,7 +26,7 @@ export function effectiveActions(
   const declared = definition?.actions ?? [];
   // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a level 3 spell slot).
   const taken = declared.map((action) =>
-    withPotentCantrip(
+    withPotentRange(
       withEmpoweredStrikes(
         withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
         definition
@@ -62,22 +63,19 @@ function withEldritchSpear(action: ActorAction, definition: ActorDefinition | un
   return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 30 * level } };
 }
 
-/** SRD Potent Cantrip: "When you cast a cantrip at a creature and you miss with the attack roll or the target succeeds
- *  on a saving throw against the cantrip, the target takes half the cantrip's damage (if any) but suffers no additional
- *  effect from the cantrip." An Evoker's Wizard cantrips that deal damage. */
-function withPotentCantrip(
+/** SRD Improved Elemental Fury, Improved Potent Spellcasting (Druid 15): "When you cast a Druid cantrip with a range of
+ *  10 feet or greater, the spell's range increases by 300 feet." Applied to the spell attack's range; a cantrip with
+ *  no attack has it added where its targets are checked (`resolution/spell-targets.ts`). */
+function withPotentRange(
   action: ActorAction,
   definition: ActorDefinition | undefined,
   catalog: EquipmentCatalog | undefined
 ): ActorAction {
-  if (action.spellId === undefined || action.damage.length === 0) return action;
-  if (!(definition?.character?.features ?? []).some((feature) => feature.id === "potent-cantrip")) return action;
-  if (spellClassOf(definition, action.spellId) !== "wizard" || catalog?.spellRecord?.(action.spellId)?.level !== 0)
-    return action;
-  if (action.attack) return action.missDamage ? action : { ...action, missDamage: "half" };
-  if (action.save && action.save.successDamage !== "half")
-    return { ...action, save: { ...action.save, successDamage: "half" } };
-  return action;
+  const rangeFeet = action.attack?.rangeFeet;
+  if (rangeFeet === undefined || rangeFeet < 10 || action.spellId === undefined) return action;
+  const spell = catalog?.spellRecord?.(action.spellId);
+  if (potentRangeFeet(definition, spell) === 0) return action;
+  return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 300 } };
 }
 
 /** A later action of a spell its caster has up at a higher level, rolled at that level; anything else unchanged. */

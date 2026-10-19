@@ -97,6 +97,13 @@ export type MovementCostOptions = Readonly<{
   ignoresDifficult?: boolean;
   /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
   halvedAt?: (position: Point, sizeCells: number) => boolean;
+  /** Whether a spell's area makes the cell with this centre Difficult Terrain for the mover (Web, Entangle). */
+  difficultAt?: (position: Point) => boolean;
+  /** Whether a spell's ground costs double again on top of its Difficult Terrain with the mover's centre at this point
+   *  (Plant Growth's 4 feet for every foot). A mover off the ground passes over it. */
+  costlyGroundAt?: (position: Point, sizeCells: number) => boolean;
+  /** Whether a spell's barrier bars the mover's step between these two centres (Antilife Shell, Magic Circle). */
+  barredStep?: (from: Point, to: Point, sizeCells: number) => boolean;
   /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
   altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
 }>;
@@ -185,6 +192,7 @@ export function movementCost(
   const walls = movementWalls(state, calibration);
   const crosses = wallCrossing(walls);
   const halvedAt = options.halvedAt;
+  const costlyGroundAt = aloft ? undefined : options.costlyGroundAt;
   const path = movementPath({
     from: footprintOrigin(imageToGrid(calibration, from), sizeCells),
     to: footprintOrigin(imageToGrid(calibration, to), sizeCells),
@@ -192,7 +200,10 @@ export function movementCost(
     isDifficult: (column, row) =>
       options.ignoresDifficult !== true &&
       (difficultCells.has(`${column},${row}`) ||
-        (!aloft && pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain))),
+        // The ground a spell's area makes difficult lies on the ground, as painted terrain does.
+        (!aloft &&
+          (pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain) ||
+            options.difficultAt?.(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 })) === true))),
     // A path can't leave the map to walk round something, nor pass a creature that bars the way.
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
@@ -200,7 +211,14 @@ export function movementCost(
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
     isStepOpen: (stepFrom, stepTo) =>
-      options.throughWalls === true || footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked",
+      (options.throughWalls === true ||
+        footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked") &&
+      // A spell's barrier holds back even a mover that passes walls.
+      options.barredStep?.(
+        gridToImage(calibration, footprintCenter(stepFrom, sizeCells)),
+        gridToImage(calibration, footprintCenter(stepTo, sizeCells)),
+        sizeCells
+      ) !== true,
     // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
     // so does a wall an incorporeal mover passes.
     isStepSqueezed: (stepFrom, stepTo) => {
@@ -209,10 +227,12 @@ export function movementCost(
       return passage === "squeeze" || (options.throughWalls === true && passage === "blocked");
     },
     extraPerStep: extra,
-    ...(halvedAt
+    ...(halvedAt || costlyGroundAt
       ? {
-          isHalved: (column: number, row: number) =>
-            halvedAt(gridToImage(calibration, footprintCenter({ column, row }, sizeCells)), sizeCells)
+          isHalved: (column: number, row: number) => {
+            const center = gridToImage(calibration, footprintCenter({ column, row }, sizeCells));
+            return halvedAt?.(center, sizeCells) === true || costlyGroundAt?.(center, sizeCells) === true;
+          }
         }
       : {})
   });

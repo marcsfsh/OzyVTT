@@ -6,19 +6,15 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 export const wizard: ClassMechanicsModule = {
   features: {
-    // "Whenever you finish a Long Rest, you can replace one of your cantrips": made in the Level flow until a rest
-    // offers it.
-    spellcasting: { replaces: [{ offer: "class-cantrips", when: "level-up", amount: 1 }] },
-    /**
-     * Two free level-3 castings back on a Short Rest (a Long Rest clears every pool too). One counter,
-     * so the per-spell split is not enforced; the description carries it. The spell `choice` is already
-     * on the record.
-     */
-    "signature-spells": { uses: { limit: 2, per: "short-rest" } },
+    // "Whenever you finish a Long Rest, you can replace one of your cantrips from this feature with another Wizard
+    // cantrip of your choice": one swap in the step a Long Rest opens.
+    spellcasting: { replaces: [{ offer: "class-cantrips", when: "long-rest", amount: 1 }] },
+    // Signature Spells' two level 3 spellbook spells (the pick is on the record) are each cast once free a Short
+    // Rest, each on its own counter (the build's `PICKED_SPELL_CASTS`).
 
     /**
-     * "Choose a level 1 and a level 2 spell": two blocks with exact level windows. "In your spellbook"
-     * and "casting time of an action" are not expressible (no spellbook model, no casting-time filter).
+     * "Choose a level 1 and a level 2 spell": two blocks with exact level windows, cast at will with no slot (the
+     * build's `PICKED_SPELL_CASTS`). "In your spellbook" isn't checked: a sheet's ledger needn't list its spellbook.
      */
     "spell-mastery": {
       choices: [
@@ -27,14 +23,14 @@ export const wizard: ClassMechanicsModule = {
         { kind: "spell", choose: 1, fromCatalog: "wizard-spells", minSpellLevel: 2, maxSpellLevel: 2 }
       ]
     }
-    // Not modeled: Spellcasting and Ritual Adept (no spellbook or ritual model), Arcane Recovery's slot
-    // refund (no slot-restoring rider; its counter is on the record), Memorize Spell (rest-timed
-    // replacement). Scholar, subclass, ASI and Epic Boon choices are already on the record.
+    // Arcane Recovery's slots are recovered by the server's conversions, and Memorize Spell opens a one-change prepare
+    // step after a Short Rest (`rests.ts`). Scholar, subclass, ASI and Epic Boon choices are already on the record.
   },
   subclasses: {
     evoker: {
       // "Whenever you cast a Wizard spell from the Evocation school, you can add your Intelligence modifier to one
-      // damage roll of that spell", of the spell's own type.
+      // damage roll of that spell": the modifier in the spell's own damage type, on each resolve of a Wizard Evocation
+      // spell. Once for a spell of several rolls isn't checked.
       "empowered-evocation": {
         modifiers: [
           {
@@ -48,9 +44,8 @@ export const wizard: ClassMechanicsModule = {
           }
         ]
       }
-      // Potent Cantrip is effective-actions.ts's: a Wizard cantrip that misses or is saved against deals half.
     }
-    // Not modeled: Evocation Savant's school filter, Sculpt Spells, and Overchannel's max-damage and backlash (its
-    // counter is on the record).
+    // Potent Cantrip is the server's (`resolution/damage.ts`). Not modeled: Evocation Savant's later free spells,
+    // Sculpt Spells, and Overchannel's max-damage and backlash (its counter is on the record).
   }
 };

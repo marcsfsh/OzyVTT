@@ -104,6 +104,31 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       "The equipment catalog has no weapons."
     );
   }
+  // A narrower kind of weapon, each word a filter it must pass: "melee-weapons" (a Barbarian's Weapon Mastery),
+  // "martial-finesse-weapons". A union joins several ("simple-weapons-or-martial-light-weapons").
+  const weaponFilter = /^((?:simple|martial|melee|ranged|light|finesse)-)+weapons$/.exec(slug);
+  if (weaponFilter) {
+    const words = slug.split("-").slice(0, -1);
+    return nonEmpty(
+      slug,
+      catalogs.equipment
+        .filter((item) => {
+          const weapon = item.category === "weapon" ? item.weapon : null;
+          if (!weapon) return false;
+          return words.every((word) =>
+            word === "simple" || word === "martial"
+              ? weapon.category === word
+              : word === "melee"
+                ? weapon.melee === true
+                : word === "ranged"
+                  ? weapon.melee === false
+                  : (weapon.properties ?? []).includes(word)
+          );
+        })
+        .map((item) => ({ id: item.id, name: item.name })),
+      `No weapon in the equipment catalog is ${words.join(" and ")}.`
+    );
+  }
   // Tools are equipment rows with `category: "tool"`.
   if (slug === "tools") {
     return nonEmpty(

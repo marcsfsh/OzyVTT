@@ -80,6 +80,8 @@ export type ResolveInput = Readonly<{
   attackKinds?: readonly AttackKind[];
   /** Push mastery's chosen distance (0 declines); absent pushes the most the mastery allows. */
   pushFeet?: number;
+  /** An Evoker's Overchannel: the spell's damage dice deal their maximum (`resolution/overchannel.ts`). */
+  overchannel?: boolean;
   /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */
   slotLevel?: number;
   /** The damage type picked for an action whose caster chooses one (`ActorAction.damageTypes`); absent, its first. */

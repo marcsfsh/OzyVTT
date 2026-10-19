@@ -64,6 +64,20 @@ describe("setSpellSlotRemaining", () => {
     const state = stateWith([{ level: 1, remaining: 4 }], []);
     expect(() => setSpellSlotRemaining(state, actorId, 5, 1, resolve(state))).toThrowError(/no level 5/);
   });
+  it("lets a player spend a slot and never raise one, which a rest or a feature gives back", () => {
+    const state = stateWith([{ level: 1, remaining: 2 }], []);
+    setSpellSlotRemaining(state, actorId, 1, 1, resolve(state), undefined, false, "player");
+    expect(state.actors[0].spellSlots![0].remaining).toBe(1);
+    expect(() => setSpellSlotRemaining(state, actorId, 1, 2, resolve(state), undefined, false, "player")).toThrowError(
+      /only spends spell slots/
+    );
+    expect(state.actors[0].spellSlots![0].remaining).toBe(1);
+  });
+  it("keeps a slot made above the maximum while a player spends another of that level", () => {
+    const state = stateWith([{ level: 1, remaining: 6 }], []);
+    setSpellSlotRemaining(state, actorId, 1, 5, resolve(state), undefined, false, "player");
+    expect(state.actors[0].spellSlots![0].remaining).toBe(5);
+  });
 });
 
 describe("setPreparedSpell", () => {

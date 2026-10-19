@@ -622,7 +622,7 @@ describe("ruling A - `replaces` names a pick this build really has, or the build
   });
 });
 
-describe("ruling A, the rest-time half: re-choose, then let the rest take it back", () => {
+describe("ruling A, the rest-time half: re-choose, and keep it until chosen again", () => {
   const HERO = "7a4b1a58-0f6c-4a52-9a51-2f60cf6f9d10";
   const onTheTable = (definition: ReturnType<typeof build>) => {
     const state = GameStateSchema.parse({ schemaVersion: 1 });
@@ -652,8 +652,8 @@ describe("ruling A, the rest-time half: re-choose, then let the rest take it bac
     expect(resilience!.options).not.toContain("force"); // "other than Force", as the SRD prints it
   });
 
-  it("a LONG rest clears both kinds; a SHORT rest clears only the short-rest one", () => {
-    // The override lasts until the next rest of its kind, so the choice is made afresh.
+  it("keeps a re-chosen pick through either rest, until the character chooses again", () => {
+    // SRD Fiendish Resilience: "You have Resistance to that damage type until you choose a different one".
     const state = onTheTable(build(warlock11("true-seeing")));
     const actor = state.actors[0];
     actor.choiceOverrides = {
@@ -661,8 +661,7 @@ describe("ruling A, the rest-time half: re-choose, then let the rest take it bac
       "feature:some-long-rest-pick": { id: "arid", per: "long-rest" }
     };
     applyRest(state, HERO, "short", () => state.definitions[0].definition);
-    expect(Object.keys(actor.choiceOverrides)).toEqual(["feature:some-long-rest-pick"]);
     applyRest(state, HERO, "long", () => state.definitions[0].definition);
-    expect(actor.choiceOverrides).toEqual({});
+    expect(Object.keys(actor.choiceOverrides)).toEqual(["feature:fiendish-resilience", "feature:some-long-rest-pick"]);
   });
 });

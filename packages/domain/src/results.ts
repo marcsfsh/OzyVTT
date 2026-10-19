@@ -43,6 +43,8 @@ export type MutationResult = {
 export type DiceRollResult = MutationResult & { rollId?: string; hiddenFromRoller?: boolean };
 /** A spellbook addition's reply: whether the spell is in the book now (a copy from a scroll can fail its check). */
 export type SpellbookResult = MutationResult & { inBook?: boolean };
+/** A conversion's reply: the line the table reads of what it did. */
+export type ConversionResult = MutationResult & { line?: string };
 export type EncounterStartEntry = Readonly<{
   actorId: string;
   score?: number;
@@ -450,7 +452,7 @@ export const ActionAvailabilitySchema = z.strictObject({
     .int()
     .nullable()
     .describe("Total limited uses including any item that raised the pool; null when unlimited"),
-  usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]).nullable(),
+  usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]).nullable(),
   usesPool: z.string().nullable().describe("Shared pool key; actions naming one pool spend one counter"),
   /** How many uses one activation spends when it is more than one, or `chosen` when the user picks it each time. */
   useCost: z.union([z.number().int(), z.literal("chosen")]).nullable(),
@@ -720,7 +722,11 @@ const RechoiceSchema = z.strictObject({
   label: z.string(),
   per: z.enum(["short-rest", "long-rest"]),
   options: z.array(z.strictObject({ id: z.string(), name: z.string() })),
-  chosen: z.string().nullable()
+  chosen: z.string().nullable(),
+  /** A pick of several (Weapon Mastery's weapon kinds): the answers in force, each swapped by `replacing` it. */
+  held: z.array(z.string()).optional(),
+  /** How many of `held` one rest lets the character swap: Weapon Mastery's "change one of those" is 1. */
+  swaps: z.number().int().min(1).optional()
 });
 export type Rechoice = Wire<z.infer<typeof RechoiceSchema>>;
 /** What a prepared caster may change about its spells (SRD Spell Preparation by Class): for each class that changes its
@@ -747,6 +753,43 @@ const SpellChoicesSchema = z.strictObject({
     .nullable()
 });
 export type SpellChoices = Wire<z.infer<typeof SpellChoicesSchema>>;
+/** One way a character's feature turns one resource into another or recovers one (Font of Magic, Arcane Recovery), as
+ *  `actor.convert` would apply it now: what it costs and gives, when it may be used, why it can't be now, and what
+ *  the user picks. */
+export const ConversionOfferSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  /** What it costs and what it gives, in a sentence. */
+  line: z.string(),
+  /** When it may be used: at any moment, as a Bonus Action or a Magic action on the character's turn in a fight, in
+   *  the step a finished Short Rest opens, over a minute outside a fight, or from rolling Initiative to the end of the
+   *  character's first turn. */
+  timing: z.enum(["no-action", "bonus-action", "magic-action", "after-short-rest", "one-minute", "on-initiative"]),
+  /** Why it can't be used now; null when it can. */
+  reason: z.string().nullable(),
+  pick: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("none") }),
+    /** One slot to spend, from those left. */
+    z.strictObject({
+      kind: z.literal("slot"),
+      options: z.array(z.strictObject({ level: z.number().int(), pact: z.boolean(), left: z.number().int() }))
+    }),
+    /** One slot to make, with what each costs. */
+    z.strictObject({
+      kind: z.literal("create-slot"),
+      options: z.array(z.strictObject({ level: z.number().int(), cost: z.number().int() }))
+    }),
+    /** Spent slots to recover, their levels adding up to at most `budget`. */
+    z.strictObject({
+      kind: z.literal("recover-slots"),
+      budget: z.number().int(),
+      options: z.array(z.strictObject({ level: z.number().int(), spent: z.number().int() }))
+    }),
+    /** How many uses or points, from `min` to `max`. */
+    z.strictObject({ kind: z.literal("count"), min: z.number().int(), max: z.number().int(), unit: z.string() })
+  ])
+});
+export type ConversionOffer = Wire<z.infer<typeof ConversionOfferSchema>>;
 /** What `actor:available-actions` answers: the table's rules mode, each action's availability, the sheet, and the
  *  picks the character may re-make on a rest. */
 export const AvailableActionsReplySchema = z.strictObject({
@@ -756,7 +799,12 @@ export const AvailableActionsReplySchema = z.strictObject({
     "Display only, and the sheet's single source for every number beside a roll button. Derived from the actor's live loadout with the same functions the resolver uses, so a chip cannot disagree with the roll it starts: a circlet's granted expertise and an amulet's save bonus are already inside these numbers. Present on every response; a client should still tolerate its absence so it can talk to an older server. It rides this request, outside the broadcast game-state projection, on purpose: this endpoint already authorizes its caller for one named actor, so the block is never even computed for an actor the caller may not see."
   ),
   rechoices: z.array(RechoiceSchema),
-  spellChoices: SpellChoicesSchema.nullable()
+  spellChoices: SpellChoicesSchema.nullable(),
+  conversions: z
+    .array(ConversionOfferSchema)
+    .describe(
+      "The ways the character's features turn one resource into another or recover one (Font of Magic, Arcane Recovery, restoring a use with a Rage), each with why it can't be used now; `actor.convert` applies one"
+    )
 });
 export type AvailableActionsReply = Wire<z.infer<typeof AvailableActionsReplySchema>>;
 export type ActorActionsAvailabilityResult = { ok: boolean; message?: string } & Partial<AvailableActionsReply>;

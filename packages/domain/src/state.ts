@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   ActionAreaSchema,
+  ActionSchema,
+  AreaTriggerSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   ForcedPushSchema,
@@ -602,7 +604,7 @@ export const ParkedCastSchema = z
     use: z
       .object({
         key: z.string().min(1).max(120),
-        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
+        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]),
         amount: z.number().int().min(1).max(100)
       })
       .strict()
@@ -1085,6 +1087,9 @@ export const SpellZoneSchema = z
     casterId: z.uuid(),
     /** The Concentration cast it ends with; null for a spell that lasts `rounds` from `startedRound`, or until ended. */
     castId: z.string().min(1).max(120).nullable(),
+    /** The effect on its caster that keeps a spell with no Concentration (Glyph of Warding, Guardian of Faith): the
+     *  area lasts while that effect does, in a fight and on the game clock outside one. */
+    effectId: z.string().min(1).max(120).optional(),
     rounds: z.number().int().min(1).max(100).nullable().default(null),
     startedRound: z.number().int().positive(),
     /** The slot level it was cast at, which its damage rolls at. */
@@ -1094,6 +1099,14 @@ export const SpellZoneSchema = z
     annotationId: z.string().min(1).max(120).nullable(),
     /** The template the GM places it with: the spell's own area. Null for an Emanation, which is its caster's. */
     area: ActionAreaSchema.nullable().default(null),
+    /** Where its caster stood at the cast, for an Emanation that stays there (Globe of Invulnerability). */
+    anchor: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
+     *  may be gone; a spell's area reads its spell instead. */
+    rule: z
+      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .strict()
+      .optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element, Transmuted Spell's); absent, the
@@ -1308,7 +1321,11 @@ const sceneCombatShape = {
   /** A player sees only their own (see PendingRuleAskSchema). */
   pendingRuleAsks: z.array(PendingRuleAskSchema).max(10).default([]),
   /** Claimed-PC actorIds whose owner still owes an initiative roll. */
-  pendingInitiative: z.array(z.uuid()).max(200).default([])
+  pendingInitiative: z.array(z.uuid()).max(200).default([]),
+  /** Combatants that rolled Initiative this fight and haven't ended their first turn: a feature that acts "when you
+   *  roll Initiative" and is the creature's to choose (Persistent Rage) may be used until then. Engine bookkeeping,
+   *  never projected. */
+  initiativeWindow: z.array(z.uuid()).max(200).default([])
 };
 
 /** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */
@@ -1535,6 +1552,9 @@ export const RestStateSchema = z
     clockMinutes: z.number().int().min(0).max(59).default(0),
     /** Characters whose players asked for a Long Rest, oldest first. */
     requests: z.array(z.uuid()).max(50).default([]),
+    /** The hour of the day dawn comes, when the GM keeps the clock: what "regains at dawn" (a wand's charges) comes
+     *  back as the clock passes it. Null: at each Long Rest. GM-set. */
+    dawnHour: z.number().int().min(0).max(23).nullable().default(null),
     shortRest: PartyShortRestSchema.nullable().default(null)
   })
   .strict();

@@ -1663,7 +1663,21 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "knock",
+    "uses": {
+     "limit": 10,
+     "per": "never",
+     "pool": "chime-of-opening-uses"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -1715,9 +1729,26 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "web",
+    "saveDc": 13,
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false,
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 40,
+     "widthFeet": null
+    }
+   }
+  ],
   "grantsFeatIds": [],
-  "tags": [],
+  "tags": [
+   "web-walker"
+  ],
   "actions": [],
   "effects": [],
   "grants": {
@@ -1735,7 +1766,13 @@
    "conditionImmunities": [],
    "spells": []
   },
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "climb",
+    "equalToSpeed": true
+   }
+  ]
  },
  {
   "id": "cloak-of-displacement",
@@ -2113,7 +2150,66 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "mage-armor",
+    "saveDc": 17,
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "cube-of-force-charges"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "tiny-hut",
+    "saveDc": 17,
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "cube-of-force-charges"
+    },
+    "useCost": 3,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "private-sanctum",
+    "saveDc": 17,
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "cube-of-force-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "resilient-sphere",
+    "saveDc": 17,
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "cube-of-force-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "wall-of-force",
+    "saveDc": 17,
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "cube-of-force-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1d6",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -3108,6 +3204,7 @@
      "per": "long-rest",
      "pool": "eyes-of-charming-charges"
     },
+    "chargesRaiseLevel": 3,
     "consumesSpellSlot": false
    }
   ],
@@ -3427,7 +3524,69 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "beam",
+    "name": "Beam of Light",
+    "activation": "action",
+    "description": "Expend 1 charge to fire a beam of light at one creature you can see within 60 feet. It must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "uses": {
+     "limit": 50,
+     "per": "never",
+     "pool": "gem-of-brightness-charges"
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "blinded"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
+    }
+   },
+   {
+    "id": "flare",
+    "name": "Flare",
+    "activation": "action",
+    "description": "Expend 5 charges to flare with intense light in a 30-foot Cone. Each creature in it must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+    "damage": [],
+    "useCost": 5,
+    "uses": {
+     "limit": 50,
+     "per": "never",
+     "pool": "gem-of-brightness-charges"
+    },
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "blinded"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -4213,7 +4372,20 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "blow",
+    "name": "Blow the Horn",
+    "activation": "action",
+    "description": "Magic action: warrior spirits (Berserkers) appear within 60 feet of you for 1 hour: 2 from a silver horn, 3 from brass, 4 from bronze, 5 from iron. If you don't meet the horn's requirement, they attack you. The horn can't be used again until 7 days have passed.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "time",
+     "afterHours": "168"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -4559,7 +4731,21 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "wish",
+    "uses": {
+     "limit": 3,
+     "per": "never",
+     "pool": "luck-blade-wish"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "lastChargeRoll": false,
+   "starting": "1d3"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -5149,7 +5335,23 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "fireball",
+    "saveDc": 15,
+    "uses": {
+     "limit": 9,
+     "per": "never",
+     "pool": "necklace-of-fireballs-beads"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "destroyed",
+   "starting": "1d6 + 3"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7021,7 +7223,17 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "wish",
+    "uses": {
+     "limit": 3,
+     "per": "never",
+     "pool": "ring-of-three-wishes-charges"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7284,7 +7496,22 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "magic-missile",
+    "atLevel": 5,
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "robe-of-stars-stars"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1d6",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7609,7 +7836,32 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "heal",
+    "uses": {
+     "limit": 5,
+     "per": "long-rest",
+     "pool": "rod-of-resurrection-charges"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "resurrection",
+    "uses": {
+     "limit": 5,
+     "per": "long-rest",
+     "pool": "rod-of-resurrection-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1",
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8333,7 +8585,8 @@
   ],
   "charges": {
    "regain": "1d8 + 2",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -8402,11 +8655,32 @@
      "pool": "staff-of-fire-charges"
     },
     "consumesSpellSlot": false
+   },
+   {
+    "spellId": "fireball",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-fire-charges"
+    },
+    "useCost": 3,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "wall-of-fire",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-fire-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
    }
   ],
   "charges": {
    "regain": "1d6 + 4",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -8462,11 +8736,42 @@
      "pool": "staff-of-frost-charges"
     },
     "consumesSpellSlot": false
+   },
+   {
+    "spellId": "cone-of-cold",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-frost-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "ice-storm",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-frost-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "wall-of-ice",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-frost-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
    }
   ],
   "charges": {
    "regain": "1d6 + 4",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -8512,7 +8817,43 @@
    ]
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "cure-wounds",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-healing-charges"
+    },
+    "chargesRaiseLevel": 4,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "lesser-restoration",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-healing-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "mass-cure-wounds",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-healing-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1d6 + 4",
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8554,7 +8895,103 @@
    ]
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "cone-of-cold",
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "fireball",
+    "atLevel": 5,
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "globe-of-invulnerability",
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "useCost": 6,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "hold-monster",
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "levitate",
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "lightning-bolt",
+    "atLevel": 5,
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "magic-missile",
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "ray-of-enfeeblement",
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "wall-of-force",
+    "uses": {
+     "limit": 20,
+     "per": "long-rest",
+     "pool": "staff-of-power-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "2d8 + 4",
+   "lastChargeRoll": true,
+   "lastChargeTwenty": "1d8 + 2"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8723,10 +9160,32 @@
    ]
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "giant-insect",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-swarming-insects-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "insect-plague",
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-swarming-insects-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   }
+  ],
   "charges": {
    "regain": "1d6 + 4",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -8811,8 +9270,149 @@
    {
     "spellId": "light",
     "consumesSpellSlot": false
+   },
+   {
+    "spellId": "protection-from-evil-and-good",
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "conjure-elemental",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 7,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "dispel-magic",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 3,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "fireball",
+    "atLevel": 7,
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 7,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "flaming-sphere",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "ice-storm",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "invisibility",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "knock",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "lightning-bolt",
+    "atLevel": 7,
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 7,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "passwall",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "plane-shift",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 7,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "telekinesis",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "wall-of-fire",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 4,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "web",
+    "uses": {
+     "limit": 50,
+     "per": "long-rest",
+     "pool": "staff-of-the-magi-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
    }
   ],
+  "charges": {
+   "regain": "4d6 + 2",
+   "lastChargeRoll": true,
+   "lastChargeTwenty": "1d12 + 1"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8909,11 +9509,74 @@
      "pool": "staff-of-the-woodlands-charges"
     },
     "consumesSpellSlot": false
+   },
+   {
+    "spellId": "awaken",
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "staff-of-the-woodlands-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "barkskin",
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "staff-of-the-woodlands-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "locate-animals-or-plants",
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "staff-of-the-woodlands-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "pass-without-trace",
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "staff-of-the-woodlands-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "speak-with-plants",
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "staff-of-the-woodlands-charges"
+    },
+    "useCost": 3,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "wall-of-thorns",
+    "uses": {
+     "limit": 6,
+     "per": "long-rest",
+     "pool": "staff-of-the-woodlands-charges"
+    },
+    "useCost": 6,
+    "consumesSpellSlot": false
    }
   ],
   "charges": {
    "regain": "1d6",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": {
+    "becomes": "quarterstaff"
+   }
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -9986,7 +10649,35 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "hold-monster",
+    "saveDc": 17,
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "wand-of-binding-charges"
+    },
+    "useCost": 5,
+    "consumesSpellSlot": false
+   },
+   {
+    "spellId": "hold-person",
+    "saveDc": 17,
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "wand-of-binding-charges"
+    },
+    "useCost": 2,
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -10069,7 +10760,8 @@
   ],
   "charges": {
    "regain": "1d6 + 1",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -10107,12 +10799,14 @@
      "per": "long-rest",
      "pool": "wand-of-fireballs-charges"
     },
+    "chargesRaiseLevel": 3,
     "consumesSpellSlot": false
    }
   ],
   "charges": {
    "regain": "1d6 + 1",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -10150,12 +10844,14 @@
      "per": "long-rest",
      "pool": "wand-of-lightning-bolts-charges"
     },
+    "chargesRaiseLevel": 3,
     "consumesSpellSlot": false
    }
   ],
   "charges": {
    "regain": "1d6 + 1",
-   "lastChargeRoll": true
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -10222,7 +10918,23 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "magic-missile",
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "wand-of-magic-missiles-charges"
+    },
+    "chargesRaiseLevel": 3,
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -10498,7 +11210,23 @@
    ]
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "web",
+    "saveDc": 13,
+    "uses": {
+     "limit": 7,
+     "per": "long-rest",
+     "pool": "wand-of-web-charges"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1d6 + 1",
+   "lastChargeRoll": true,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -11019,6 +11747,11 @@
      "target": "self",
      "voidWhileIncapacitated": false,
      "concentration": false
+    },
+    "uses": {
+     "limit": 1,
+     "per": "time",
+     "afterHours": "1d12+1"
     }
    }
   ],

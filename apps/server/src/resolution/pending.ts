@@ -2,6 +2,7 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
 import { catalogIdOf, type ActionReaction, type GrantOption } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
+import { holdsFeature } from "../class-features.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
 import { HAZARDS } from "../hazards.js";
@@ -14,7 +15,7 @@ import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./
 import { optionFor, optionParts, withOptionName } from "./grant-extras.js";
 import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
-import { damagePartsOf } from "./damage.js";
+import { damagePartsOf, potentCantrip } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
@@ -445,6 +446,17 @@ export function parkActionSave(ctx: ResolveContext): void {
   const rider = attack !== null;
   if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
   // The GM's explicit choice wins over the condition the action declares.
+  // SRD Contact Patron: "you can cast the spell without expending a spell slot to contact your patron, and you
+  // automatically succeed on the spell's saving throw."
+  if (
+    action.save.bySelf &&
+    action.spellId === "contact-other-plane" &&
+    action.id.endsWith("-free") &&
+    holdsFeature(deps.definition, "contact-patron", "Contact Patron")
+  ) {
+    ctx.warnings.push(`Contact Patron: ${attacker.name} succeeds on the Intelligence saving throw.`);
+    return;
+  }
   const conditionIds = input.conditionId ? [input.conditionId] : action.save.failureConditions;
   const cast = spellCastOf(ctx);
   // The caster's pick of what the failure does (Bestow Curse's curse), one for each target where the text says so.
@@ -571,6 +583,10 @@ export function parkActionSave(ctx: ResolveContext): void {
         singleTarget: ctx.targets.length === 1 && action.area === undefined && spell.area === null
       }
     : undefined;
+  const extra = {
+    ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
+    ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {})
+  };
   for (const { saveBonus, option, targetIds } of groups.values()) {
     const onFailEffect = onFailFor(option);
     createPendingSaves(state, {
@@ -583,11 +599,11 @@ export function parkActionSave(ctx: ResolveContext): void {
       proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
       proposedDamageParts: parts,
       saveBonus,
-      halfOnSuccess: action.save.successDamage === "half",
+      halfOnSuccess: action.save.successDamage === "half" || potentCantrip(ctx),
       // A pick's own Prone stays bare, as the action's does (Command's Grovel).
       conditionIds: [...conditionIds, ...barePicks(option)],
       ...(onFailEffect ? { onFailEffect } : {}),
-      ...(onSuccessEffect ? { extra: { onSuccessEffect } } : gmApplies ? { extra: { gmApplies: true as const } } : {}),
+      ...(Object.keys(extra).length > 0 ? { extra } : {}),
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),

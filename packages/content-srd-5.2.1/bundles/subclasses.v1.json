@@ -1303,11 +1303,7 @@
     "id": "overchannel",
     "name": "Overchannel",
     "level": 14,
-    "description": "You can increase the power of your spells. When you cast a Wizard spell with a spell slot of levels 1–5 that deals damage, you can deal maximum damage with that spell on the turn you cast it. The first time you do so, you suffer no adverse effect. If you use this feature again before you finish a Long Rest, you take 2d12 Necrotic damage for each level of the spell slot immediately after you cast it. This damage ignores Resistance and Immunity. Each time you use this feature again before finishing a Long Rest, the Necrotic damage per spell level increases by 1d12.",
-    "uses": {
-     "limit": 1,
-     "per": "long-rest"
-    }
+    "description": "You can increase the power of your spells. When you cast a Wizard spell with a spell slot of levels 1–5 that deals damage, you can deal maximum damage with that spell on the turn you cast it. The first time you do so, you suffer no adverse effect. If you use this feature again before you finish a Long Rest, you take 2d12 Necrotic damage for each level of the spell slot immediately after you cast it. This damage ignores Resistance and Immunity. Each time you use this feature again before finishing a Long Rest, the Necrotic damage per spell level increases by 1d12."
    }
   ]
  },
@@ -1666,6 +1662,13 @@
     "name": "Hunter's Prey",
     "level": 3,
     "description": "You gain one of the following feature options of your choice. Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one. Colossus Slayer. Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn. Horde Breaker. Once on each of your turns when you make an attack with a weapon, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target, that is within the weapon's range, and that you haven't attacked this turn.",
+    "replaces": [
+     {
+      "offer": "feature:hunters-prey",
+      "when": "short-rest",
+      "amount": 1
+     }
+    ],
     "choice": {
      "kind": "hunters-prey",
      "choose": 1,
@@ -1709,6 +1712,13 @@
     "name": "Defensive Tactics",
     "level": 7,
     "description": "You gain one of the following feature options of your choice. Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one. Escape the Horde. Opportunity Attacks have Disadvantage against you. Multiattack Defense. When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn.",
+    "replaces": [
+     {
+      "offer": "feature:defensive-tactics",
+      "when": "short-rest",
+      "amount": 1
+     }
+    ],
     "choice": {
      "kind": "defensive-tactics",
      "choose": 1,

@@ -212,7 +212,16 @@ const LABELS: Readonly<Record<string, string>> = {
   endAction: "action that ends it",
   bindsWeapon: "weapon it binds to",
   optionsPerTarget: "an option for each target",
-  shrinksEachLongRest: "penalty that shrinks each Long Rest"
+  shrinksEachLongRest: "penalty that shrinks each Long Rest",
+  areaPerSlot: "area growth for each higher slot",
+  movesArea: "how far it moves the spell's area",
+  terrain: "ground it changes",
+  bars: "creatures its edge holds back",
+  noTeleport: "no teleporting in",
+  holds: "what a creature in it holds",
+  revives: "Hit Points regained at 0",
+  drifts: "feet it drifts each turn",
+  untilCasterNextTurnEnd: "lasts until the end of the caster's next turn"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };

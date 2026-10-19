@@ -191,7 +191,7 @@ export const druid: ClassMechanicsModule = {
 
     /**
      * Each option `requires` the matching level-7 pick, so the true one is adopted without a prompt.
-     * Potent Spellcasting's +300 feet of cantrip range stays prose.
+     * Improved Potent Spellcasting's +300 feet of cantrip range is the server's (`potentRangeFeet`).
      */
     "improved-elemental-fury": {
       choice: {

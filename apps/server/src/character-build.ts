@@ -391,7 +391,8 @@ function interpretAction(
       assembled.uses = {
         limit: Math.min(MAX_ACTION_USES, limit),
         per: feature.uses.per,
-        ...(feature.uses.pool ? { pool: feature.uses.pool } : {})
+        ...(feature.uses.pool ? { pool: feature.uses.pool } : {}),
+        ...(feature.uses.afterHours ? { afterHours: feature.uses.afterHours } : {})
       };
     }
   }
@@ -495,6 +496,16 @@ function ritualActionOf(cast: ActorAction, spell: SpellReference): ActorAction {
  *  (Evocation Savant). */
 const SPELLBOOK_TAG = "spellbook";
 
+/**
+ * Picked spells a feature casts without a slot in a way its uses can't say. SRD Spell Mastery: "You can cast them at
+ * their lowest level without expending a spell slot" (at will, null). SRD Signature Spells: "you can cast each of them
+ * once at level 3 without expending a spell slot ... until you finish a Short or Long Rest" (a counter each).
+ */
+const PICKED_SPELL_CASTS: Readonly<Record<string, (spellId: string) => ActorAction["uses"] | null>> = {
+  "spell-mastery": () => null,
+  "signature-spells": (spellId) => ({ limit: 1, per: "short-rest", pool: `signature-spells-${spellId}` })
+};
+
 /** `ActorDefinitionSchema`'s cap on a sheet's actions; spells past it keep their sheet entry without an action. */
 const MAX_DEFINITION_ACTIONS = 100;
 
@@ -555,6 +566,8 @@ function linkSpellActions(
       // One the spell gives the creature it touches (Dragon's Breath's exhale) is on that creature's sheet, from its
       // effect, not the caster's.
       if (record.effect?.grant?.grantsLaterAction === later.name) continue;
+      // An area that only changes the ground (Entangle's plants) is the server's alone, with nothing to take or roll.
+      if (later.activation === "other" && !later.save && later.damage.length === 0 && !later.attackRange) continue;
       const action = laterSpellAction(
         record,
         later,
@@ -637,7 +650,12 @@ function interpretFeature(
   const carriesUses = feature.uses !== undefined && synthesizedUses >= 1;
   // The counter of a free-cast grant (Divine Smite once per Long Rest) rides its spell's free-cast action instead.
   const freeUses: ActorAction["uses"] | undefined = carriesUses
-    ? { limit: synthesizedUses, per: feature.uses!.per, pool: owned(feature.uses!.pool ?? feature.id) }
+    ? {
+        limit: synthesizedUses,
+        per: feature.uses!.per,
+        pool: owned(feature.uses!.pool ?? feature.id),
+        ...(feature.uses!.afterHours ? { afterHours: feature.uses!.afterHours } : {})
+      }
     : undefined;
   const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
   // A spell picked for a feature with limited uses is cast with them (Magic Initiate once per Long Rest, Mystic
@@ -662,7 +680,8 @@ function interpretFeature(
             uses: {
               limit: synthesizedUses,
               per: feature.uses!.per,
-              ...(feature.uses!.pool ? { pool: owned(feature.uses!.pool) } : {})
+              ...(feature.uses!.pool ? { pool: owned(feature.uses!.pool) } : {}),
+              ...(feature.uses!.afterHours ? { afterHours: feature.uses!.afterHours } : {})
             }
           }
         : {})
@@ -1179,7 +1198,9 @@ export function buildCharacterDefinition(
     const record = library.spellRecord(pick.id);
     const source = sourceOfFeature(pick.featureId, pick.classId);
     const spellbook = spellbookFeatures.has(pick.featureId);
-    const uses = kind === "spell" ? interpreted.pickedSpellUses.get(pick.featureId) : undefined;
+    // How the pick is cast without a slot: by the feature's own rule where its uses can't say it, else on its uses.
+    const rule = kind === "spell" ? PICKED_SPELL_CASTS[pick.featureId] : undefined;
+    const uses = rule ? rule(pick.id) : kind === "spell" ? interpreted.pickedSpellUses.get(pick.featureId) : undefined;
     const castsAs = castingClassOf(source);
     return {
       id: pick.id,
@@ -1189,7 +1210,7 @@ export function buildCharacterDefinition(
       alwaysPrepared: !spellbook,
       ...(castsAs ? { classId: castsAs } : {}),
       source,
-      ...(uses ? { free: uses } : {})
+      ...(uses !== undefined ? { free: uses } : {})
     };
   };
   const featureCantripEntries = featurePicksOf("cantrip").map((pick) => pickedEntry(pick, "cantrip"));

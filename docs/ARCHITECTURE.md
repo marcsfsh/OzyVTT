@@ -285,7 +285,12 @@ of a hidden thing. When in doubt, leave it out.
   and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
   mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
   so it charges those spaces as the server does. Players and the table screen get only the terrain the
-  fog reveals, and with vision on only what the party has seen.
+  fog reveals, and with vision on only what the party has seen. A spell's area changes the ground while it
+  lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
+  and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies, and
+  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
+  server alone charges it, on the ground (a mover off the ground passes over it as over painted terrain); the
+  area itself is on the map.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
   levitation); a creature on a ledge or a wall it climbs is up without being airborne. A space is as
@@ -369,7 +374,26 @@ Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A sta
 wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
 runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
 such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
-(`lasting-spells.ts`).
+(`lasting-spells.ts`). A zone lasts while its caster's Concentration does, or the effect a spell with none
+leaves on its caster, so it opens outside a fight too (where it acts on the creatures the GM moves into
+it), counts down on the game clock, outlasts a fight and is carried into the next one on the same map.
+A zone may act only on the creature types it names (Forbiddance), tell the GM who came in (Alarm), end
+its spell the first time it acts and burst over its area (Glyph of Warding, drawn for the GM and its
+caster alone), or raise a barrier at its edge (`zone-barriers.ts`): a step across it closes the path
+for the creatures it holds back (Antilife Shell, Magic Circle), a melee attack without a Reach weapon
+can't reach through Antilife Shell, and no creature teleports into Forbiddance. What an area gives the
+creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened)
+is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeline settles who holds it
+after every command, as its own write when anything changed. A later action that moves a spell's area
+(Moonbeam's Magic action, Flaming Sphere's ram) takes a template like a cast: the area moves there if that
+is within the spell's reach of where it stood, its save falls on the creatures the area moves onto, and no
+new shape is drawn (`zone-moves.ts`). A cloud that drifts (Cloudkill) moves straight away from its caster as
+the caster's turn starts. A cast's template grows with its slot where the spell says so (Fog Cloud), an
+item's cast may place its own area (Cloak of Arachnida's doubled Web), and an Emanation that stays where
+its caster stood (Globe of Invulnerability) keeps lower spells cast from outside off the creatures in it.
+An item's action with a `zone` (spread Caltrops, a set Hunting Trap) rolls nothing as it is used: it opens
+a zone that carries the action's own save and damage (`SpellZone.rule`), which stays until the GM ends it
+or it goes off once.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
@@ -426,8 +450,15 @@ checked as a spell's targets are, in `resolution/action-targets.ts`.
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
-it over (`character.give-item`). A Long Rest gives back the item's printed dice (`charges.regain`), not
-every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
+it over (`character.give-item`). A cast spends its printed cost (`useCost`), and one whose extra charges raise its
+level (`chargesRaiseLevel`, a Wand of Fireballs) is one action for each cost. A pool that never comes back
+(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`).
+A Long Rest gives back the item's printed dice (`charges.regain`), not every charge; when the GM keeps a dawn hour
+(`time.set-dawn`) the clock's dawn gives them back instead (`clock-pools.ts`). Spending the last charge rolls the
+SRD's d20, and the record says what a 1 does (destroyed, or a plain item it becomes) and what a 20 gives back
+(`resolution/charges.ts`, which also rolls a Thief's Use Magic Device d6). A pool spent for a time (`per: "time"`,
+Wings of Flying) waits `afterHours` of game time from its first use (`readyAt` on the actor) and comes back as
+`passGameTime` passes it. Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
 kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only
@@ -455,6 +486,18 @@ the area). A cast with components waits while a creature that sees it may answer
 creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
 (`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
 spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
+
+A player only spends spell slots (`character.set-slot` refuses a raise from a player); everything that gives a
+resource back is its own checked command. `conversions.ts` is one table of the features that turn one resource
+into another or recover one (Font of Magic both ways, Arcane and Natural Recovery, Magical Cunning, restoring a
+use with a slot or points, Pearl of Power), each with its timing, its check and its pick, offered by
+`actor:available-actions` and taken with `actor.convert`. Hit Point Dice are spent only during a Short Rest, a
+player's own or the party's (`rests.ts`). A finished rest opens a step on the actor (`restStep`) where its
+recoveries and re-choices are made until its player taps Done; a re-choice the build reads (a Weapon Mastery pick,
+a Wizard's cantrip, a Hunter's option) is written to the ledger and the sheet rebuilt (`ledger-rechoice.ts`), a
+pick of several one held answer at a time. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
+features that act then (Persistent Rage, Uncanny Metabolism) and gives back what others restore (Perfect Focus,
+Superior Inspiration, Archdruid).
 
 A cast can carry Metamagic options and Sculpt Spells' picks (`ResolveInput.shaping`, `resolution/metamagic.ts`).
 The economy checks each pick against the options the caster knows, the spell and the Sorcery Points left, and spends

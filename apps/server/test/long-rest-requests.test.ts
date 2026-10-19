@@ -227,7 +227,10 @@ describe("over the API", () => {
     const long = await post(rest, player, { commandId: randomUUID(), kind: "long" });
     expect(long.status).toBe(403);
     expect((await long.json()).error.message).toBe("Ask the GM for a Long Rest. The GM approves it.");
+    // A player's Short Rest is under way until the GM ends it.
     expect((await post(rest, player, { commandId: randomUUID(), kind: "short" })).status).toBe(200);
+    expect(server.store.snapshot.rest.shortRest).toEqual({ actorIds: [TORVA], done: [] });
+    expect((await post(GAME_PATHS.restFinish, gmToken, { commandId: randomUUID(), apply: false })).status).toBe(200);
 
     const ask = (token: string, actorId: string) =>
       post(GAME_PATHS.restAsk.replace("{actorId}", actorId), token, { commandId: randomUUID() });
